@@ -1,0 +1,5 @@
+$ErrorActionPreference = "Stop"
+py -c "from gateway.app.config import get_settings; s=get_settings(); print('OK settings', type(s))"
+py -c "from gateway.app.main import app; print('OK app', type(app))"
+py -c "from gateway.main import app; print('OK wrapper', type(app))"
+Write-Host "OK: imports succeeded."
