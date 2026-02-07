@@ -6,12 +6,8 @@ echo "[build] pip=$(python -m pip --version)"
 
 python -m pip install -U pip
 
-REQ="requirements.txt"
-if [ -f "gateway/requirements.txt" ]; then
-  REQ="gateway/requirements.txt"
-fi
-echo "[build] installing deps from: ${REQ}"
-python -m pip install -r "${REQ}"
+echo "[build] installing deps from: gateway/requirements.txt"
+python -m pip install -r "gateway/requirements.txt"
 
 # ---- install static ffmpeg (no apt-get) ----
 mkdir -p .render/bin /tmp/ffmpeg
@@ -32,3 +28,5 @@ chmod +x .render/bin/ffmpeg .render/bin/ffprobe
 
 echo "[build] ffmpeg installed at .render/bin"
 python -c "import multipart; print('multipart:', multipart.__version__)"
+python -c "import boto3, botocore; print('boto3', boto3.__version__, 'botocore', botocore.__version__)"
+python -c "import faster_whisper; print('faster_whisper', getattr(faster_whisper,'__version__','ok'))"
