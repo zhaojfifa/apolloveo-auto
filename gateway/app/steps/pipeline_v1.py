@@ -27,6 +27,7 @@ from gateway.app.services.steps_v1 import (
     run_subtitles_step,
 )
 from gateway.app.providers.registry import get_provider, resolve_tool_providers
+from gateway.app.services.task_state_service import TaskStateService
 from gateway.app.utils.pipeline_config import parse_pipeline_config
 logger = logging.getLogger(__name__)
 
@@ -236,12 +237,15 @@ async def run_pipeline_for_task(task_id: str, db: Session):
         pack_req = schemas.PackRequest(task_id=task.id)
         ok, pack_res = await _run_step("pack", pack_handler(pack_req))
         if not ok:
-            task.status = "error"
-            task.last_step = "pack"
-            task.error_message = str(pack_res)
-            task.error_reason = str(pack_res)
-            task.updated_at = datetime.utcnow()
-            db.commit()
+            TaskStateService(session=db, step="steps.pipeline_v1").update_fields(
+                task_id,
+                {
+                    "status": "error",
+                    "last_step": "pack",
+                    "error_message": str(pack_res),
+                    "error_reason": str(pack_res),
+                },
+            )
             return
 
         pack_key = None
@@ -252,16 +256,19 @@ async def run_pipeline_for_task(task_id: str, db: Session):
                 or pack_res.get("pack_path")
             )
         if pack_key:
-            task.pack_key = str(pack_key)
-            task.pack_type = "capcut_v18"
-            task.pack_status = "ready"
+            TaskStateService(session=db, step="steps.pipeline_v1").set_pack_key(
+                task_id, str(pack_key)
+            )
 
-        task.status = "ready"
-        task.last_step = "pack"
-        task.error_message = None
-        task.error_reason = None
-        task.updated_at = datetime.utcnow()
-        db.commit()
+        TaskStateService(session=db, step="steps.pipeline_v1").update_fields(
+            task_id,
+            {
+                "status": "ready",
+                "last_step": "pack",
+                "error_message": None,
+                "error_reason": None,
+            },
+        )
         logger.info("Pipeline finished for task %s", task_id)
     except Exception as exc:  # pragma: no cover - defensive
         task.status = "error"

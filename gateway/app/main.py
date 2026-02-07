@@ -79,21 +79,6 @@ def log_routes_on_startup() -> None:
         name = getattr(route, "name", "")
         logger.info("route=%s methods=%s name=%s", path, methods, name)
 
-app.include_router(tasks_router.pages_router)
-app.include_router(tasks_router.api_router)
-app.include_router(auth_router)
-app.include_router(tools_api_router)
-app.include_router(v1_actions.router, prefix="/v1")
-app.include_router(publish_router.router)
-app.include_router(admin_publish.router, tags=["admin"])
-app.include_router(admin_tools_router.router)
-app.include_router(v17_pack_router)
-app.include_router(hot_follow_ui_router.router)
-if get_settings().enable_apollo_avatar:
-    from gateway.app.routers.apollo_avatar import router as apollo_avatar_router
-
-    app.include_router(apollo_avatar_router)
-
 ALLOW_PREFIXES = (
     "/health",
     "/healthz",
@@ -162,6 +147,22 @@ async def auth_middleware(request: Request, call_next):
     if request.url.query:
         next_url += "?" + request.url.query
     return RedirectResponse(url=f"/auth/login?next={next_url}", status_code=302)
+
+
+app.include_router(tasks_router.pages_router)
+app.include_router(tasks_router.api_router)
+app.include_router(auth_router)
+app.include_router(tools_api_router)
+app.include_router(v1_actions.router, prefix="/v1")
+app.include_router(publish_router.router)
+app.include_router(admin_publish.router, tags=["admin"])
+app.include_router(admin_tools_router.router)
+app.include_router(v17_pack_router)
+app.include_router(hot_follow_ui_router.router)
+if get_settings().enable_apollo_avatar:
+    from gateway.app.routers.apollo_avatar import router as apollo_avatar_router
+
+    app.include_router(apollo_avatar_router)
 
 
 @app.get("/auth/login", response_class=HTMLResponse, include_in_schema=False)

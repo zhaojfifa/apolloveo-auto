@@ -145,6 +145,7 @@ from gateway.app.services.artifact_storage import (
 from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.services.scene_split import enqueue_scenes_build
 from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
+from gateway.app.services.task_state_service import TaskStateService
 from gateway.app.db import SessionLocal
 
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
@@ -522,17 +523,30 @@ def download_pack(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Pack not found")
-    pack_type = _task_value(task, "pack_type")
-    if pack_type == "capcut_v18":
-        pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
-        if not pack_key or not object_exists(str(pack_key)):
-            return _not_ready_response(task, "pack", ["pack_key"])
+    pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
+    if pack_key and object_exists(str(pack_key)):
         return RedirectResponse(url=get_download_url(str(pack_key)), status_code=302)
 
-    key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
-    if not key or not object_exists(str(key)):
-        return _not_ready_response(task, "pack", ["pack_key"])
-    return RedirectResponse(url=get_download_url(str(key)), status_code=302)
+    status = derive_status(task)
+    if status in ("done", "packed", "published"):
+        fresh = repo.get(task_id) or task
+        repair_key = (
+            _task_value(fresh, "pack_key")
+            or _task_value(fresh, "pack_path")
+            or _task_value(fresh, "zip_key")
+        )
+        if repair_key and object_exists(str(repair_key)):
+            return RedirectResponse(url=get_download_url(str(repair_key)), status_code=302)
+        return _not_ready_response(
+            fresh,
+            "pack",
+            ["pack_key"],
+            reason="repair_attempted",
+            status_code=202,
+            extra={"repair_attempted": True},
+        )
+
+    return _not_ready_response(task, "pack", ["pack_key"])
 
 
 @pages_router.get("/v1/tasks/{task_id}/scenes")
@@ -875,6 +889,18 @@ def _task_key(task: dict, field: str) -> Optional[str]:
     return str(value) if value else None
 
 
+def derive_status(task: dict) -> str:
+    pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
+    if pack_key:
+        try:
+            if object_exists(str(pack_key)):
+                return "done"
+        except Exception:
+            pass
+        return "done"
+    return task.get("status") or "processing"
+
+
 def _require_storage_key(task: dict, field: str, not_found: str) -> str:
     key = _task_key(task, field)
     if not key or not object_exists(key):
@@ -882,9 +908,17 @@ def _require_storage_key(task: dict, field: str, not_found: str) -> str:
     return key
 
 
-def _not_ready_response(task: dict, artifact: str, missing: list[str], *, reason: str = "not_ready") -> JSONResponse:
+def _not_ready_response(
+    task: dict,
+    artifact: str,
+    missing: list[str],
+    *,
+    reason: str = "not_ready",
+    status_code: int = 409,
+    extra: dict | None = None,
+) -> JSONResponse:
     return JSONResponse(
-        status_code=409,
+        status_code=status_code,
         content={
             "ok": False,
             "reason": reason,
@@ -899,6 +933,7 @@ def _not_ready_response(task: dict, artifact: str, missing: list[str], *, reason
                 "publish": _task_value(task, "publish_status"),
             },
             "hint": "Call generate or wait for pipeline to finish.",
+            **(extra or {}),
         },
     )
 
@@ -1071,9 +1106,7 @@ def _normalize_selected_tool_ids(value: Any) -> Optional[list[str]]:
 
 def _task_to_detail(task: dict) -> TaskDetail:
     paths = _resolve_download_urls(task)
-    status = task.get("status") or "pending"
-    if status != "error" and paths.get("pack_path"):
-        status = "ready"
+    status = derive_status(task)
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
 
     payload = {
@@ -1234,6 +1267,7 @@ def auto_run_pipeline(task_id: str, repo) -> None:
         if not task:
             logger.info("AUTO_PIPELINE_DONE", extra={"task_id": task_id, "reason": "missing_task"})
             return
+        state_service = TaskStateService(repo=repo, step="router.tasks")
 
         pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
         default_lang = os.getenv("DEFAULT_MM_LANG", "my")
@@ -1275,13 +1309,13 @@ def auto_run_pipeline(task_id: str, repo) -> None:
         )
         if not has_pack:
             logger.info("AUTO_PIPELINE_STEP", extra={"task_id": task_id, "step": "pack"})
-            _policy_upsert(repo, task_id, {"status": "processing", "last_step": "pack"})
+            state_service.update_fields(task_id, {"status": "processing", "last_step": "pack"})
             pack_req = PackRequest(task_id=task_id)
             pack_res = asyncio.run(run_pack_step_v1(pack_req))
             pack_key = None
             if isinstance(pack_res, dict):
                 pack_key = pack_res.get("pack_key") or pack_res.get("zip_key")
-            _policy_upsert(repo, 
+            state_service.update_fields(
                 task_id,
                 {
                     "last_step": "pack",
@@ -1428,14 +1462,14 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         )
 
         current_step = "pack"
-        _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
+        state_service = TaskStateService(repo=repo, step="router.tasks")
+        state_service.update_fields(task_id, {**status_update, "last_step": current_step})
         pack_req = PackRequest(task_id=task_id)
         pack_res = asyncio.run(run_pack_step_v1(pack_req))
         pack_key = None
         if isinstance(pack_res, dict):
             pack_key = pack_res.get("pack_key") or pack_res.get("zip_key")
-        _repo_upsert(
-            repo,
+        state_service.update_fields(
             task_id,
             {
                 "status": "done",
@@ -1894,9 +1928,7 @@ def list_tasks(
         download_paths = _resolve_download_urls(t)
         pack_path = download_paths.get("pack_path")
         scenes_path = download_paths.get("scenes_path")
-        status = t.get("status") or "pending"
-        if status != "error" and pack_path:
-            status = "ready"
+        status = derive_status(t)
         summaries.append(
             TaskSummary(
                 task_id=str(t.get("task_id") or t.get("id")),
@@ -2513,12 +2545,13 @@ def build_pack(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    _policy_upsert(repo, task_id, {"status": "processing", "last_step": "pack"})
+    state_service = TaskStateService(repo=repo, step="router.tasks")
+    state_service.update_fields(task_id, {"status": "processing", "last_step": "pack"})
     pack_req = PackRequest(task_id=task_id)
     try:
         pack_res = asyncio.run(run_pack_step_v1(pack_req))
     except HTTPException as exc:
-        _policy_upsert(repo, 
+        state_service.update_fields(
             task_id,
             {
                 "status": "failed",
@@ -2532,7 +2565,7 @@ def build_pack(
     pack_key = None
     if isinstance(pack_res, dict):
         pack_key = pack_res.get("pack_key") or pack_res.get("zip_key")
-    _policy_upsert(repo, 
+    state_service.update_fields(
         task_id,
         {
             "status": "ready",
