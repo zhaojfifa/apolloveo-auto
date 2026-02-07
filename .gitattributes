@@ -4,3 +4,5 @@
 *.ps1 text eol=crlf
 *.bat text eol=crlf
 *.cmd text eol=crlf
+# Shell scripts must be LF on Linux deploy env
+*.sh text eol=lf
