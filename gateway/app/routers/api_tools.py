@@ -1,12 +1,20 @@
-import logging
-logger = logging.getLogger(__name__)
-
 from __future__ import annotations
+
+import logging
+
 from fastapi import APIRouter, HTTPException, Query
 
-from gateway.app.services.tools_registry import get_tool, list_tools, redact_tool, redact_tools
+from gateway.app.services.tools_registry import (
+    get_tool,
+    list_tools,
+    redact_tool,
+    redact_tools,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["tools"])
+
 
 
 def _http500(message: str) -> HTTPException:
