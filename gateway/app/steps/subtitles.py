@@ -30,7 +30,6 @@ from gateway.app.providers.gemini_subtitles import (
     translate_segments_with_gemini,
 )
 from gateway.app.providers.whisper_singleton import transcribe
-from gateway.app.services import subtitles_openai
 
 logger = logging.getLogger(__name__)
 
@@ -697,6 +696,8 @@ async def generate_subtitles(
             )
 
         try:
+            from gateway.app.services import subtitles_openai
+
             result = await subtitles_openai.generate_with_openai(
                 task_id=task_id,
                 target_lang=target_lang,

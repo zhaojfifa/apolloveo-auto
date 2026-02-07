@@ -3,8 +3,6 @@ import subprocess
 from pathlib import Path
 from typing import Optional
 
-from openai import OpenAI
-
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import (
     audio_wav_path,
@@ -64,11 +62,25 @@ def preview_lines(text: str, limit: int = 5) -> list[str]:
     return preview
 
 
-def _client() -> OpenAI:
+def _load_openai_client():
+    try:
+        from openai import OpenAI  # type: ignore
+    except Exception as exc:
+        raise RuntimeError(
+            "OpenAI subtitles backend requires 'openai' package. "
+            "Install it or switch SUBTITLES_BACKEND to 'gemini/whisper'."
+        ) from exc
+    return OpenAI
+
+
+def _client():
     settings = get_settings()
     if not settings.openai_api_key:
         raise SubtitleError("OPENAI_API_KEY is not configured")
-    return OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_api_base)
+    return _load_openai_client()(
+        api_key=settings.openai_api_key,
+        base_url=settings.openai_api_base,
+    )
 
 
 def transcribe(task_id: str, raw: Path, force: bool = False) -> Path:

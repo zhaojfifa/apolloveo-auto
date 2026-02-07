@@ -6,3 +6,8 @@ py -m venv .venv
 py -m pip install -r gateway/requirements.txt
 powershell -ExecutionPolicy Bypass -File ops/checks/check_import_app.ps1
 ```
+
+Optional providers:
+```powershell
+py -m pip install -r gateway/requirements-optional.txt
+```
