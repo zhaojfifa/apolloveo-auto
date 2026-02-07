@@ -2,12 +2,8 @@ from functools import lru_cache
 import os
 from typing import Dict
 
-try:
-    from pydantic_settings import BaseSettings
-except Exception:  # pragma: no cover
-    from pydantic import BaseSettings  # type: ignore
-
 from pydantic import Field
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
