@@ -1,17 +1,29 @@
 ﻿from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Iterable
 
-REGISTRY_PATH = Path("data/tools_registry.json")
+# Default baseline registry shipped with code:
+# gateway/data/tools_registry.json
+_DEFAULT_REGISTRY_PATH = Path(__file__).resolve().parents[2] / "data" / "tools_registry.json"
+
+
+def _resolve_registry_path() -> Path:
+    # Optional override for ops / future remote registry workflows
+    env = os.getenv("TOOLS_REGISTRY_PATH")
+    if env:
+        return Path(env).expanduser().resolve()
+    return _DEFAULT_REGISTRY_PATH
 
 
 def load_registry() -> dict[str, Any]:
-    if not REGISTRY_PATH.exists():
-        raise RuntimeError(f"tools registry missing: {REGISTRY_PATH}")
+    path = _resolve_registry_path()
+    if not path.exists():
+        raise RuntimeError(f"tools registry missing: {path}")
     try:
-        return json.loads(REGISTRY_PATH.read_text(encoding="utf-8-sig"))
+        return json.loads(path.read_text(encoding="utf-8-sig"))
     except Exception as exc:  # pragma: no cover
         raise RuntimeError(f"tools registry invalid: {exc}") from exc
 
