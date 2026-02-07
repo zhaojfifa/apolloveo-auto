@@ -144,7 +144,7 @@ class TaskSummary(BaseModel):
     pipeline_config: Optional[dict[str, str]] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class TaskDetail(TaskSummary):

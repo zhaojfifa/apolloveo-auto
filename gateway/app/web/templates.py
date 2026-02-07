@@ -7,7 +7,7 @@ from starlette.templating import Jinja2Templates
 
 from gateway.app.web.template_helpers import get_template_globals
 
-templates = Jinja2Templates(directory="gateway/app/templates")
+_templates: Jinja2Templates | None = None
 
 
 def _template_context(request: Request) -> dict[str, object]:
@@ -15,18 +15,19 @@ def _template_context(request: Request) -> dict[str, object]:
     return get_template_globals(request)
 
 
-# Use a context processor so globals refresh per request (env globals are shared
-# across requests and can become stale if settings or language preferences
-# change at runtime).
-templates.context_processors.append(_template_context)
-
-
 def get_templates() -> Jinja2Templates:
     """
-    Backward-compatible accessor for routes that import get_templates().
-    Prefer importing `templates` directly in new code.
+    Lazy accessor for templates to avoid import-time initialization.
     """
-    return templates
+    global _templates
+    if _templates is None:
+        templates = Jinja2Templates(directory="gateway/app/templates")
+        # Use a context processor so globals refresh per request (env globals are shared
+        # across requests and can become stale if settings or language preferences
+        # change at runtime).
+        templates.context_processors.append(_template_context)
+        _templates = templates
+    return _templates
 
 
 def render_template(*, request: Request, name: str, ctx: Optional[Dict[str, Any]] = None):
@@ -37,4 +38,4 @@ def render_template(*, request: Request, name: str, ctx: Optional[Dict[str, Any]
     if ctx:
         data.update(ctx)
     data.update(get_template_globals(request))
-    return templates.TemplateResponse(name, data)
+    return get_templates().TemplateResponse(name, data)
