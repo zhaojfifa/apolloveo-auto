@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ t("page.tools.hub.title") }}</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f3f4f6;
+      color: #0f172a;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 1200px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+      padding: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+    .subhead { margin: 4px 0 0; color: #6b7280; }
+    .btn {
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #d1d5db;
+      color: #111827;
+      background: #f9fafb;
+    }
+    .btn.primary {
+      background: #2563eb;
+      border-color: #2563eb;
+      color: #ffffff;
+    }
+    .btn.disabled { opacity: 0.5; pointer-events: none; }
+    .filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+    label { font-size: 0.85rem; color: #475569; font-weight: 700; display: block; margin-bottom: 6px; }
+    input, select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      background: #ffffff;
+    }
+    .tool-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .tool-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 14px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .tool-title { font-weight: 800; font-size: 1.05rem; }
+    .muted { color: #64748b; font-size: 0.85rem; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #334155;
+      margin-right: 6px;
+      margin-bottom: 4px;
+    }
+    .badge { display: inline-flex; padding: 4px 8px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; }
+    .badge.status { background: #e0f2fe; color: #0369a1; }
+    .badge.level { background: #dcfce7; color: #166534; }
+    .group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .group-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      padding-bottom: 6px;
+    }
+    .group-title { font-weight: 800; font-size: 1.05rem; }
+    .group-subtitle { color: #64748b; font-size: 0.85rem; }
+    .group-count { color: #475569; font-weight: 700; font-size: 0.85rem; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .empty { color: #6b7280; padding: 12px 0; }
+    .error { color: #b91c1c; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    {% set topbar_title = t("ui.tools.title") %}
+{% set topbar_subtitle = t("page.tools.hub.subtitle") %}
+{% set topbar_nav = [
+  {"label": t("common.tasks"), "href": "/tasks", "active": False},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": True},
+] %}
+{% set topbar_actions = [
+  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
+] %}
+{% include "_topbar.html" %}
+    <div class="card">
+      <div class="filters">
+        <div>
+          <label for="filter-q">{{ t("tools.filters.search") }}</label>
+          <input id="filter-q" placeholder="{{ t("tools.filters.search_placeholder") }}" />
+        </div>
+        <div>
+          <label for="filter-category">{{ t("tools.filters.category") }}</label>
+          <select id="filter-category">
+            <option value="">{{ t("tools.filters.all") }}</option>
+          </select>
+        </div>
+        <div>
+          <label for="filter-capabilities">{{ t("tools.filters.capabilities") }}</label>
+          <input id="filter-capabilities" placeholder="{{ t("tools.filters.capabilities_placeholder") }}" />
+        </div>
+        <div>
+          <label for="filter-tags">{{ t("tools.filters.tags") }}</label>
+          <input id="filter-tags" placeholder="{{ t("tools.filters.tags_placeholder") }}" />
+        </div>
+        <div>
+          <label for="filter-level">{{ t("tools.filters.integration") }}</label>
+          <select id="filter-level">
+            <option value="">{{ t("tools.filters.all") }}</option>
+            <option value="integrated_run">integrated_run</option>
+            <option value="integrated_open">integrated_open</option>
+            <option value="external_link">external_link</option>
+          </select>
+        </div>
+        <div>
+          <label for="filter-status">{{ t("tools.filters.status") }}</label>
+          <select id="filter-status">
+            <option value="">{{ t("tools.filters.all") }}</option>
+            <option value="active">active</option>
+            <option value="degraded">degraded</option>
+            <option value="outage">outage</option>
+            <option value="disabled">disabled</option>
+            <option value="deprecated">deprecated</option>
+            <option value="experimental">experimental</option>
+          </select>
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button id="filter-clear" class="btn">{{ t("tools.filters.clear") }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div id="tools-state" class="muted">{{ t("tools.loading") }}</div>
+      <div id="tools-list" class="tool-list" style="display:none;"></div>
+    </div>
+  </div>
+
+  <script>
+    const state = { tools: [] };
+    const BUCKETS = [
+      {
+        key: "keyframe_det",
+        title: "{{ t('tools.bucket.keyframe.title') }}",
+        subtitle: "{{ t('tools.bucket.keyframe.subtitle') }}",
+        ids: ["local:ffprobe_inspect", "local:ffmpeg_scene_split", "local:ffmpeg_keyframe_extract"],
+      },
+      {
+        key: "post_det",
+        title: "{{ t('tools.bucket.post.title') }}",
+        subtitle: "{{ t('tools.bucket.post.subtitle') }}",
+        ids: ["local:ffmpeg_transcode", "local:ffmpeg_burn_subtitles"],
+      },
+      {
+        key: "voice_audio",
+        title: "{{ t('tools.bucket.voice.title') }}",
+        subtitle: "{{ t('tools.bucket.voice.subtitle') }}",
+        ids: ["local:ffmpeg_audio_mix", "tts:edge_tts", "tts:lovo"],
+      },
+      {
+        key: "editors",
+        title: "{{ t('tools.bucket.editors.title') }}",
+        subtitle: "{{ t('tools.bucket.editors.subtitle') }}",
+        ids: ["editor:capcut", "editor:youcut", "editor:vn"],
+      },
+      {
+        key: "face_swap",
+        title: "{{ t('tools.bucket.face_swap.title') }}",
+        subtitle: "{{ t('tools.bucket.face_swap.subtitle') }}",
+        ids: ["vendor:akool_face_swap"],
+      },
+      {
+        key: "avatar",
+        title: "{{ t('tools.bucket.avatar.title') }}",
+        subtitle: "{{ t('tools.bucket.avatar.subtitle') }}",
+        ids: ["vendor:kling_motion", "vendor:heygen_avatar"],
+      },
+      {
+        key: "gemini",
+        title: "{{ t('tools.bucket.gemini.title') }}",
+        subtitle: "{{ t('tools.bucket.gemini.subtitle') }}",
+        ids: [
+          "google:gemini_video_understanding",
+          "google:veo",
+          "google:gemini_copywriter",
+          "asr:whisper",
+        ],
+      },
+    ];
+
+    function splitCsv(value) {
+      return value
+        .split(",")
+        .map((v) => v.trim().toLowerCase())
+        .filter((v) => v);
+    }
+
+    function matchesAny(values, needles) {
+      if (!needles.length) return true;
+      const set = new Set(values.map((v) => String(v).toLowerCase()));
+      return needles.some((n) => set.has(n));
+    }
+
+    function nameFor(tool) {
+      const name = tool.name || {};
+      return name.zh || name.en || name.mm || tool.tool_id || "Unknown";
+    }
+
+    function renderTool(tool) {
+      const div = document.createElement("div");
+      div.className = "tool-card";
+      const name = nameFor(tool);
+      const toolId = tool.tool_id || "";
+      const category = tool.category || "-";
+      const status = (tool.status || {}).state || "-";
+      const level = (tool.integration || {}).level || "-";
+      const shortDesc = (tool.ui || {}).short_desc || "";
+      const access = tool.access || {};
+
+      div.innerHTML = `
+        <div>
+          <div class="tool-title">${name}</div>
+          <div class="muted">${toolId}</div>
+        </div>
+        <div>
+          <span class="chip">${category}</span>
+          ${(tool.capabilities || []).map((c) => `<span class="chip">${c}</span>`).join("")}
+        </div>
+        <div>
+          <span class="badge status">${status}</span>
+          <span class="badge level">${level}</span>
+        </div>
+        <div class="muted">${shortDesc}</div>
+        <div class="actions">
+          <a class="btn ${access.entry_url ? "primary" : "disabled"}" href="${access.entry_url || "#"}" target="_blank" rel="noopener">Open</a>
+          <a class="btn ${access.docs_url ? "" : "disabled"}" href="${access.docs_url || "#"}" target="_blank" rel="noopener">Docs</a>
+          <a class="btn" href="/tools/${encodeURIComponent(toolId)}">Details</a>
+        </div>
+      `;
+      return div;
+    }
+
+    function sortTools(tools) {
+      return tools.slice().sort((a, b) => {
+        const aUi = a.ui || {};
+        const bUi = b.ui || {};
+        const aw = Number(aUi.sort_weight || 0);
+        const bw = Number(bUi.sort_weight || 0);
+        if (aw !== bw) return bw - aw;
+        const ar = aUi.recommended ? 1 : 0;
+        const br = bUi.recommended ? 1 : 0;
+        if (ar !== br) return br - ar;
+        return String(a.tool_id || "").localeCompare(String(b.tool_id || ""));
+      });
+    }
+
+    function groupByBuckets(tools) {
+      const toolMap = new Map(tools.map((t) => [t.tool_id, t]));
+      const filteredIds = new Set(tools.map((t) => t.tool_id));
+      const seen = new Set();
+      const groups = [];
+
+      BUCKETS.forEach((bucket) => {
+        const items = bucket.ids
+          .filter((id) => filteredIds.has(id))
+          .map((id) => toolMap.get(id))
+          .filter(Boolean);
+        items.forEach((item) => seen.add(item.tool_id));
+        if (items.length) {
+          groups.push({
+            title: bucket.title,
+            subtitle: bucket.subtitle,
+            items: sortTools(items),
+          });
+        }
+      });
+
+      const remaining = tools.filter((t) => !seen.has(t.tool_id));
+      if (remaining.length) {
+        groups.push({
+          title: "{{ t('tools.bucket.other.title') }}",
+          subtitle: "{{ t('tools.bucket.other.subtitle') }}",
+          items: sortTools(remaining),
+        });
+      }
+      return groups;
+    }
+
+    function renderList(tools) {
+      const list = document.getElementById("tools-list");
+      const stateEl = document.getElementById("tools-state");
+      if (!list || !stateEl) return;
+      list.innerHTML = "";
+      if (!tools.length) {
+        list.style.display = "none";
+        stateEl.textContent = "No tools match filters.";
+        return;
+      }
+      stateEl.textContent = "";
+      list.style.display = "grid";
+      const groups = groupByBuckets(tools);
+      list.style.display = "block";
+      groups.forEach((group) => {
+        const section = document.createElement("div");
+        section.className = "group";
+        const header = document.createElement("div");
+        header.className = "group-header";
+        header.innerHTML = `
+          <div>
+            <div class="group-title">${group.title}</div>
+            <div class="group-subtitle">${group.subtitle}</div>
+          </div>
+          <div class="group-count">${group.items.length} tools</div>
+        `;
+        const grid = document.createElement("div");
+        grid.className = "tool-list";
+        group.items.forEach((tool) => grid.appendChild(renderTool(tool)));
+        section.appendChild(header);
+        section.appendChild(grid);
+        list.appendChild(section);
+      });
+    }
+
+    function applyFilters() {
+      const q = (document.getElementById("filter-q").value || "").toLowerCase();
+      const category = document.getElementById("filter-category").value;
+      const capabilities = splitCsv(document.getElementById("filter-capabilities").value || "");
+      const tags = splitCsv(document.getElementById("filter-tags").value || "");
+      const level = document.getElementById("filter-level").value;
+      const status = document.getElementById("filter-status").value;
+
+      const filtered = state.tools.filter((tool) => {
+        if (category && tool.category !== category) return false;
+        if (level && (tool.integration || {}).level !== level) return false;
+        if (status && (tool.status || {}).state !== status) return false;
+        if (!matchesAny(tool.capabilities || [], capabilities)) return false;
+        if (!matchesAny(tool.tags || [], tags)) return false;
+        if (q) {
+          const name = tool.name || {};
+          const hay = [
+            tool.tool_id || "",
+            name.zh || "",
+            name.en || "",
+            name.mm || "",
+            (tool.ui || {}).short_desc || "",
+          ]
+            .join(" ")
+            .toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        return true;
+      });
+
+      renderList(filtered);
+    }
+
+    function bindFilters() {
+      ["filter-q", "filter-category", "filter-capabilities", "filter-tags", "filter-level", "filter-status"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener("input", applyFilters);
+          el.addEventListener("change", applyFilters);
+        }
+      });
+      const clearBtn = document.getElementById("filter-clear");
+      if (clearBtn) {
+        clearBtn.addEventListener("click", () => {
+          document.getElementById("filter-q").value = "";
+          document.getElementById("filter-category").value = "";
+          document.getElementById("filter-capabilities").value = "";
+          document.getElementById("filter-tags").value = "";
+          document.getElementById("filter-level").value = "";
+          document.getElementById("filter-status").value = "";
+          applyFilters();
+        });
+      }
+    }
+
+    function populateFilters(tools) {
+      const categorySelect = document.getElementById("filter-category");
+      if (!categorySelect) return;
+      const categories = Array.from(new Set(tools.map((t) => t.category).filter(Boolean))).sort();
+      categories.forEach((c) => {
+        const option = document.createElement("option");
+        option.value = c;
+        option.textContent = c;
+        categorySelect.appendChild(option);
+      });
+    }
+
+    async function init() {
+      const stateEl = document.getElementById("tools-state");
+      try {
+        const resp = await fetch("/api/tools");
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        state.tools = data.items || [];
+        populateFilters(state.tools);
+        bindFilters();
+        renderList(state.tools);
+      } catch (err) {
+        if (stateEl) {
+          stateEl.innerHTML = `<span class="error">Failed to load tools: ${err}</span>`;
+        }
+      }
+    }
+
+    init();
+  </script>
+  <script src="/static/js/i18n_v185.js"></script>
+</body>
+</html>

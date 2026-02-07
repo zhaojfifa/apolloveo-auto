@@ -1,0 +1,172 @@
+﻿/* v1.85 UI polish: topbar + language tabs + form grids */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:10px 0 14px 0;}
+.topbar-left{display:flex;align-items:baseline;gap:12px;min-width:220px;}
+.topbar-mid{display:flex;align-items:center;gap:10px;flex:1;justify-content:center;}
+.topbar-right{display:flex;align-items:center;gap:12px;justify-content:flex-end;flex-wrap:nowrap;}
+
+.lang-tabs{display:flex;gap:8px;align-items:center;}
+.lang-tab{padding:6px 10px;border:1px solid #ddd;border-radius:8px;text-decoration:none;color:inherit;font-size:12px;line-height:1;}
+.lang-tab.active{border-color:#111;font-weight:600;}
+
+.actions{display:flex;align-items:center;gap:10px;flex-wrap:nowrap;}
+.actions .btn{white-space:nowrap;}
+
+.form-row{display:flex;gap:12px;align-items:flex-start;}
+.form-row > label{min-width:110px;white-space:nowrap;}
+.form-row .field{flex:1;min-width:0;}
+
+.option-grid{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(180px,1fr));}
+@media (max-width: 860px){ .option-grid{grid-template-columns:1fr;} }
+
+.option-item{display:flex;gap:8px;align-items:flex-start;}
+.option-item .opt-text{white-space:normal;line-height:1.25;}
+.nav-segment{display:flex;gap:6px;padding:4px;border-radius:999px;background:#eef2ff;}
+.nav-segment .nav-item{padding:6px 12px;border-radius:999px;text-decoration:none;color:#1f2937;font-size:12px;font-weight:600;}
+.nav-segment .nav-item.active{background:#111827;color:#fff;}
+
+.btn-primary{background:#2563eb;color:#fff;padding:8px 12px;border-radius:8px;text-decoration:none;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;}
+.btn-primary:hover{background:#1d4ed8;}
+.btn-ghost{background:#e5e7eb;color:#111827;padding:8px 12px;border-radius:8px;text-decoration:none;font-weight:700;white-space:nowrap;display:inline-flex;align-items:center;justify-content:center;border:0;cursor:pointer;}
+.btn-ghost:hover{background:#d1d5db;}
+/* ===== clickable nav/action emphasis (ops-friendly) ===== */
+
+/* A) segmented nav (任务/工具) */
+.nav-segment a{
+  padding: 9px 16px;
+  min-height: 36px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 999px;
+}
+.nav-segment a.active{
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
+
+/* B) navigation buttons (返回/进入/任务看板/工具中心) */
+.btn-nav{
+  padding: 9px 14px;
+  min-height: 36px;
+  min-width: 104px;
+  font-size: 14px;
+  font-weight: 700;
+  border-radius: 12px;
+  border: 1px solid #e5e5e5;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-nav:hover{ background:#f7f7f7; border-color:#d8d8d8; }
+
+/* C) primary action button (新建任务等) */
+.btn-primary-lg{
+  padding: 10px 16px;
+  min-height: 38px;
+  min-width: 116px;
+  font-size: 15px;
+  font-weight: 800;
+  border-radius: 12px;
+}
+
+/* D) language tabs should be smaller than nav/action */
+.lang-tab{
+  padding: 6px 10px;
+  min-height: 28px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+/* ===== v1.85 Segmented Nav: rounded-rect + larger type ===== */
+
+.topbar .nav-segment{
+  display:flex;
+  align-items:center;
+  gap:0;
+  border:1px solid #e5e5e5;
+  border-radius:14px;
+  background:#f4f4f5;
+  padding:4px;
+  height:40px;
+}
+
+.topbar .nav-segment a{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  height:32px;
+  padding:0 18px;
+  font-size:15px;
+  font-weight:800;
+  border-radius:10px;
+  text-decoration:none;
+  color:#111;
+  border:1px solid transparent;
+}
+
+.topbar .nav-segment a.active{
+  background:#111;
+  color:#fff;
+  border-color:#111;
+}
+
+/* language tabs: same shape but weaker */
+.topbar .lang-tab{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  min-height:34px;
+  padding:0 12px;
+  font-size:13px;
+  font-weight:700;
+  border-radius:12px;
+}
+
+/* primary button: match height + bigger */
+.topbar .btn-primary-lg,
+.topbar .btn-primary{
+  min-height:40px;
+  padding:0 18px;
+  font-size:15px;
+  font-weight:900;
+  border-radius:12px;
+}
+
+/* v1.85 SSOT: pill buttons => rounded-rectangle + bigger text */
+:root{
+  --ui-pill-radius: 12px;
+  --ui-pill-font: 15px;
+  --ui-pill-pad-y: 10px;
+  --ui-pill-pad-x: 14px;
+}
+
+.ui-pill,
+.lang-pill,
+.nav-pill,
+.topbar .btn,
+.topbar button,
+.topbar a.buttonlike {
+  border-radius: var(--ui-pill-radius) !important;
+  font-size: var(--ui-pill-font) !important;
+  padding: var(--ui-pill-pad-y) var(--ui-pill-pad-x) !important;
+  line-height: 1.1;
+  font-weight: 600;
+}
+
+/* segmented container spacing */
+.topbar .segmented,
+.topbar .tabs,
+.topbar .lang-switch {
+  gap: 10px;
+}
+
+/* ensure active state still clear */
+.topbar .segmented .active,
+.topbar .tabs .active,
+.topbar .lang-switch .active {
+  box-shadow: 0 1px 0 rgba(0,0,0,.06);
+}

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Apollo Avatar Workbench</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css" />
+  <style>
+    body { margin: 0; padding: 16px; background: #f3f4f6; color: #111827; }
+    .page { max-width: 980px; margin: 0 auto; }
+    .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+    .muted { color: #6b7280; font-size: 13px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+    .btn { border: none; border-radius: 10px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .output { background: #0f172a; color: #e2e8f0; padding: 10px; border-radius: 8px; font-size: 12px; white-space: pre-wrap; }
+    .links a { display: inline-block; margin-right: 12px; }
+    .ops-advanced textarea { width: 100%; min-height: 140px; }
+    .ops-advanced input[type="text"], .ops-advanced input[type="number"] { width: 240px; }
+    .ops-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .ops-card { padding: 12px; border: 1px solid #eee; border-radius: 10px; }
+    .outputs-row { display: flex; align-items: center; }
+    .outputs-links { display: flex; gap: 12px; flex-wrap: wrap; width: 100%; }
+    .outputs-links a:last-child { margin-left: auto; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    {% set topbar_title = "Apollo Avatar Workbench" %}
+    {% set topbar_subtitle = "Generate → Subtitles → Dub → Pack" %}
+    {% set topbar_nav = [
+      {"label": "数字人", "href": "/tasks?kind=apollo_avatar", "active": True},
+      {"label": "热点跟随", "href": "/tasks/hot-follow", "active": False},
+      {"label": "工具", "href": "/tools/hub", "active": False},
+    ] %}
+    {% set topbar_actions = [
+      {"label": "返回列表", "href": "/tasks?kind=apollo_avatar", "primary": False},
+    ] %}
+    {% include "_topbar.html" %}
+
+    <div class="card ops-advanced" id="ops-advanced">
+      <h3 style="margin:0 0 6px;">Advanced</h3>
+      <div class="ops-row">
+        <div class="field" style="flex:1 1 360px;">
+          <label>Prompt</label>
+          <textarea id="adv-prompt" rows="5"></textarea>
+        </div>
+      </div>
+      <div class="ops-row">
+        <div class="field">
+          <label>Seed</label>
+          <input id="adv-seed" type="number" placeholder="(optional)" />
+        </div>
+        <div class="field">
+          <label>Strategy</label>
+          <input id="adv-strategy" type="text" placeholder="default" />
+        </div>
+        <div class="field">
+          <label>Force</label>
+          <input id="adv-force" type="checkbox" />
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" id="btn-apollo-generate">Generate (Model)</button>
+        <button class="btn" id="btn-run-post" style="display:none;">Run Post (Subs/Dub/Pack)</button>
+      </div>
+      <div class="muted" style="margin-top:8px;">Generate calls the avatar model and then runs subtitles/dub/pack automatically.</div>
+    </div>
+
+    <div class="card" id="ops-preview">
+      <h3 style="margin:0 0 6px;">Preview</h3>
+      <div class="ops-row">
+        <div class="field ops-card">
+          <label>Avatar</label>
+          <img id="avatar-preview" class="preview" alt="avatar preview" />
+        </div>
+        <div class="field ops-card">
+          <label>Reference</label>
+          <video id="ref-preview" class="preview" controls preload="metadata"></video>
+        </div>
+        <div class="field ops-card">
+          <label>Open Video</label>
+          <div id="preview-link"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="ops-stepper">
+      <h3 style="margin:0 0 6px;">Process Stepper</h3>
+      <div class="ops-row" id="stepper-list" style="gap:8px;"></div>
+    </div>
+
+    <details class="card" id="ops-debug">
+      <summary>Params / Debug JSON</summary>
+      <pre id="param-summary" class="output">-</pre>
+      <pre id="apollo-result" class="output">-</pre>
+    </details>
+
+    <div class="card" id="ops-outputs">
+      <h3 style="margin:0 0 6px;">Outputs</h3>
+      <div class="outputs-row">
+        <div class="links outputs-links" id="outputs-links"></div>
+      </div>
+    </div>
+
+    <details class="card" id="ops-log">
+      <summary>Process Log</summary>
+      <div class="actions">
+        <button class="btn" id="btn-refresh-events">Refresh</button>
+      </div>
+      <pre id="apollo-events" class="output">-</pre>
+    </details>
+  </div>
+
+  <script>
+    window.__WORKBENCH_KIND__ = "{{ workbench_kind }}";
+    window.__TASK_ID__ = "{{ task.task_id }}";
+    window.__EVENTS_URL__ = "/api/tasks/{{ task.task_id }}/events";
+    window.__APOLLO_GENERATE_URL__ = "/api/apollo/avatar/{{ task.task_id }}/generate";
+    window.__TASK_JSON__ = {{ task_json | tojson | safe }};
+  </script>
+  {% if workbench_js %}
+  <script src="{{ workbench_js }}"></script>
+  {% endif %}
+</body>
+</html>

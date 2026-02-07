@@ -1,0 +1,403 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ t("page.tasks.new.title") }} - ShortVideo</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f3f4f6;
+      color: #111827;
+    }
+    .page { max-width: 720px; margin: 0 auto; }
+    header { margin-bottom: 16px; }
+    h1 { margin: 0; font-size: 1.5rem; font-weight: 700; }
+    a { color: #2563eb; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .card {
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      border: 1px solid #e5e7eb;
+    }
+    .field { margin-bottom: 12px; }
+    label { display: block; font-weight: 600; margin-bottom: 4px; }
+    input, select, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 1rem;
+      background: #fff;
+    }
+    textarea { min-height: 80px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .row .field { flex: 1 1 220px; }
+    .radio-group { display: flex; gap: 12px; flex-wrap: wrap; }
+    .radio { display: flex; gap: 6px; align-items: center; }
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn-secondary:hover { background: #d1d5db; }
+    .tools-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+    .tools-buckets { display: grid; gap: 12px; }
+    .tools-bucket { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; background: #f9fafb; }
+    .tools-bucket h4 { margin: 0 0 4px; font-size: 1rem; }
+    .tools-bucket .subtitle { color: #6b7280; font-size: 0.85rem; margin-bottom: 6px; }
+    .tool-item { display: flex; gap: 8px; align-items: flex-start; margin-bottom: 6px; }
+    .tool-item input { width: auto; margin-top: 3px; }
+    .tool-item .tool-meta { font-size: 0.85rem; color: #6b7280; }
+    .muted { color: #6b7280; font-size: 0.9rem; }
+    .summary {
+      border: 1px dashed #d1d5db;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #f9fafb;
+      margin: 12px 0;
+    }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+    .summary-item strong { display: block; font-size: 0.85rem; color: #111827; }
+    pre { background: #f9fafb; padding: 10px; border-radius: 8px; border: 1px solid #e5e7eb; }
+    .error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    {% set topbar_title = t("page.tasks.new.title") %}
+{% set topbar_subtitle = t("page.tasks.new.subtitle") %}
+{% set topbar_nav = [
+  {"label": t("common.tasks"), "href": "/tasks", "active": True},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
+] %}
+{% set topbar_actions = [
+  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
+] %}
+{% include "_topbar.html" %}
+
+
+    <main class="card">
+      <form id="task-form">
+        <div class="field">
+          <label>{{ t("tasks.new.source_mode") }}</label>
+          <div class="radio-group">
+            <label class="radio">
+              <input type="radio" name="source_mode" value="url" checked />
+              <span>{{ t("tasks.new.source_mode.url") }}</span>
+            </label>
+            <label class="radio">
+              <input type="radio" name="source_mode" value="local" />
+              <span>{{ t("tasks.new.source_mode.local") }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field" id="source-url-field">
+          <label for="source_url">{{ t("label.source_url") }} *</label>
+          <input id="source_url" name="source_url" type="text" autocomplete="off" required placeholder="{{ t('label.source_url.placeholder') }}" />
+        </div>
+
+        <div class="field" id="local-upload-block" style="display:none;">
+          <label for="local_file">{{ t("tasks.new.local_upload.choose_file") }}</label>
+          <input id="local_file" name="local_file" type="file" accept="video/*" />
+          <div class="muted t-secondary" style="margin-top:6px;">{{ t("tasks.new.local_upload.hint") }}</div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="platform">{{ t("label.platform") }}</label>
+            <select id="platform" name="platform">
+              <option value="douyin" selected>{{ t("label.platform_douyin") }}</option>
+              <option value="xhs">{{ t("label.platform_xhs") }}</option>
+              <option value="tiktok">{{ t("label.platform_tiktok") }}</option>
+              <option value="fb">{{ t("label.platform_fb") }}</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="account_id">{{ t("label.account") }}</label>
+            <select id="account_id" name="account_id">
+              <option value="suitcase_mm_1">Suitcase MM #1</option>
+            </select>
+            <input type="hidden" id="account_name" name="account_name" value="Suitcase MM #1" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>{{ t("label.video_type") }}</label>
+          <div class="muted t-secondary">{{ t("label.video_type.hint") }}</div>
+          <div class="option-grid" style="margin-top:6px;">
+            <label class="option-item">
+              <input type="radio" name="video_type" value="review" checked />
+              <span class="opt-text">{{ t("label.video_type.review") }}</span>
+            </label>
+            <label class="option-item">
+              <input type="radio" name="video_type" value="scenario" />
+              <span class="opt-text">{{ t("label.video_type.scenario") }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>{{ t("label.style_preset") }}</label>
+          <div class="muted t-secondary">{{ t("label.style_preset.hint") }}</div>
+          <div class="option-grid" style="margin-top:6px;">
+            <label class="option-item">
+              <input type="radio" name="style_preset" value="review_brief" checked />
+              <span class="opt-text">{{ t("label.style.fast") }}</span>
+            </label>
+            <label class="option-item">
+              <input type="radio" name="style_preset" value="scenario_story" />
+              <span class="opt-text">{{ t("label.style.story") }}</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="title">{{ t("label.title.optional") }}</label>
+          <input id="title" name="title" type="text" placeholder="{{ t('label.title.placeholder') }}" />
+        </div>
+
+        <div class="field">
+          <label for="note">{{ t("label.note") }}</label>
+          <textarea id="note" name="note" placeholder="{{ t('label.note.placeholder') }}"></textarea>
+        </div>
+
+        <div class="field" id="pipeline-tools">
+          <label>{{ t("label.pipeline_tools") }}</label>
+          <div class="muted">{{ t("label.pipeline_hint") }}</div>
+          <div class="option-grid" style="margin-top:6px;">
+            <label class="option-item">
+              <input type="radio" name="subtitles_mode" value="whisper-only" />
+              <span class="opt-text">{{ t("label.subtitles_mode.whisper_only") }}</span>
+            </label>
+            <label class="option-item">
+              <input type="radio" name="subtitles_mode" value="whisper+gemini" checked />
+              <span class="opt-text">{{ t("label.subtitles_mode.whisper_gemini") }}</span>
+            </label>
+          </div>
+          <div class="option-grid" style="margin-top:6px;">
+            <label class="option-item">
+              <input type="radio" name="dub_mode" value="edge" />
+              <span class="opt-text">{{ t("label.dub_mode.edge") }}</span>
+            </label>
+            <label class="option-item">
+              <input type="radio" name="dub_mode" value="lovo" />
+              <span class="opt-text">{{ t("label.dub_mode.lovo") }}</span>
+            </label>
+            <label class="option-item">
+              <input type="radio" name="dub_mode" value="auto-fallback" checked />
+              <span class="opt-text">{{ t("label.dub_mode.auto") }}</span>
+            </label>
+          </div>
+          <div class="muted" style="margin-top:6px;">{{ t("label.more_tools") }} <a href="/tools/hub">{{ t("common.tools") }}</a>.</div>
+        </div>
+
+        <div class="summary" id="summary-block">
+          <div class="summary-grid">
+            <div class="summary-item"><strong>{{ t("label.platform") }}</strong><span id="summary-platform">-</span></div>
+            <div class="summary-item"><strong>{{ t("label.account") }}</strong><span id="summary-account">-</span></div>
+            <div class="summary-item"><strong>{{ t("label.video_type") }}</strong><span id="summary-video">-</span></div>
+            <div class="summary-item"><strong>{{ t("label.style") }}</strong><span id="summary-style">-</span></div>
+            <div class="summary-item"><strong>{{ t("label.language") }}</strong><span id="summary-lang">{{ t("label.lang.mm") }}</span></div>
+          </div>
+        </div>
+
+        <button class="btn-primary" type="submit" id="submit-btn">{{ t("action.create") }}</button>
+        <div class="muted t-secondary" style="margin-top: 6px;">{{ t("label.auto_category_hint") }}</div>
+      </form>
+
+      <div style="margin-top: 12px;">
+        <pre id="create-result"></pre>
+      </div>
+    </main>
+  </div>
+
+  <script src="/static/js/i18n_v185.js"></script>
+  <script>
+    window.__FEATURES__ = {{ features | tojson | safe }};
+    const form = document.getElementById("task-form");
+    const resultEl = document.getElementById("create-result");
+    const sourceModeInputs = Array.from(form.querySelectorAll("input[name='source_mode']"));
+    const sourceUrlField = document.getElementById("source-url-field");
+    const sourceUrlInput = document.getElementById("source_url");
+    const localUploadBlock = document.getElementById("local-upload-block");
+    const localFileInput = document.getElementById("local_file");
+    const submitBtn = document.getElementById("submit-btn");
+
+    function getSourceMode() {
+      return form.querySelector("input[name='source_mode']:checked")?.value || "url";
+    }
+
+    function setSourceMode(mode) {
+      const isLocal = mode === "local";
+      sourceUrlField.style.display = isLocal ? "none" : "block";
+      localUploadBlock.style.display = isLocal ? "block" : "none";
+      sourceUrlInput.disabled = isLocal;
+      sourceUrlInput.required = !isLocal;
+      if (isLocal) {
+        submitBtn.textContent = window.__V185_I18N__.t("tasks.new.local_upload.submit");
+      } else {
+        submitBtn.textContent = window.__V185_I18N__.t("action.create");
+      }
+    }
+
+    function updateSummary() {
+      const platform = document.getElementById("platform").value;
+      const account = document.getElementById("account_id").value;
+      const videoType = form.querySelector("input[name='video_type']:checked")?.value || "review";
+      const stylePreset = form.querySelector("input[name='style_preset']:checked")?.value || "review_brief";
+      document.getElementById("summary-platform").textContent = platform || "-";
+      document.getElementById("summary-account").textContent = account || "-";
+      document.getElementById("summary-video").textContent = videoType || "-";
+      document.getElementById("summary-style").textContent = stylePreset || "-";
+    }
+
+    form.addEventListener("change", updateSummary);
+    document.addEventListener("DOMContentLoaded", () => {
+      updateSummary();
+      setSourceMode(getSourceMode());
+    });
+    sourceModeInputs.forEach((input) => {
+      input.addEventListener("change", () => setSourceMode(getSourceMode()));
+    });
+
+    form.addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const mode = getSourceMode();
+      resultEl.textContent =
+        mode === "local"
+          ? window.__V185_I18N__.t("tasks.new.local_upload.uploading")
+          : window.__V185_I18N__.t("label.submit.status.submitting");
+
+      const platform = document.getElementById("platform").value;
+      const account_id = document.getElementById("account_id").value;
+      const account_name = document.getElementById("account_name").value;
+      const video_type = form.querySelector("input[name='video_type']:checked")?.value || "review";
+      const stylePreset = form.querySelector("input[name='style_preset']:checked")?.value || "review_brief";
+      const title = document.getElementById("title").value.trim();
+      const note = document.getElementById("note").value.trim();
+      const subtitlesMode = form.querySelector("input[name='subtitles_mode']:checked")?.value || "whisper+gemini";
+      const dubMode = form.querySelector("input[name='dub_mode']:checked")?.value || "auto-fallback";
+
+      try {
+        let res;
+        if (mode === "local") {
+          const file = localFileInput?.files?.[0];
+          if (!file) {
+            alert(window.__V185_I18N__.t("tasks.new.local_upload.error"));
+            resultEl.textContent = "";
+            return;
+          }
+          const formData = new FormData();
+          formData.append("file", file);
+          formData.append("platform", platform);
+          formData.append("account", account_id);
+          formData.append("account_id", account_id);
+          formData.append("account_name", account_name);
+          formData.append("video_type", video_type);
+          formData.append("template", stylePreset);
+          formData.append("style_preset", stylePreset);
+          formData.append("category", "suitcase");
+          formData.append("language", "mm");
+          if (title) formData.append("title", title);
+          if (note) formData.append("note", note);
+          formData.append("subtitles_mode", subtitlesMode);
+          formData.append("dub_mode", dubMode);
+
+          res = await fetch("/api/tasks/local_upload", {
+            method: "POST",
+            body: formData,
+          });
+        } else {
+          const rawSource = sourceUrlInput.value.trim();
+          if (!rawSource) {
+            alert(window.__V185_I18N__.t("label.submit.error.missing_link"));
+            resultEl.textContent = "";
+            return;
+          }
+          const payload = {
+            source_url: rawSource,
+            platform,
+            account_id,
+            account_name,
+            video_type,
+            template: stylePreset,
+            title: title || undefined,
+            note: note || undefined,
+            pipeline_config: {
+              subtitles_mode: subtitlesMode,
+              dub_mode: dubMode,
+            },
+            category_key: "suitcase",
+            content_lang: "mm",
+            ui_lang: "zh",
+            style_preset: stylePreset,
+            face_swap_enabled: false,
+          };
+
+          res = await fetch("/api/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+        }
+
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch (_) { /* noop */ }
+
+        if (!res.ok) {
+          if (mode === "local") {
+            resultEl.textContent = `${window.__V185_I18N__.t("tasks.new.local_upload.error")} (${res.status})`;
+          } else {
+            resultEl.textContent = `Error ${res.status}: ${text}`;
+          }
+          resultEl.classList.add("error");
+          return;
+        }
+
+        const taskId = data?.task_id || "(unknown)";
+        resultEl.classList.remove("error");
+        resultEl.textContent = window.__V185_I18N__.t("label.submit.status.created", {
+          task_id: taskId,
+          status: data?.status || "pending",
+        });
+        const redirectUrl = data?.redirect || "/tasks";
+        setTimeout(() => { window.location.href = redirectUrl; }, 800);
+      } catch (err) {
+        if (mode === "local") {
+          resultEl.textContent = window.__V185_I18N__.t("tasks.new.local_upload.error");
+        } else {
+          resultEl.textContent = window.__V185_I18N__.t("label.submit.status.failed", {
+            error: err.message,
+          });
+        }
+        resultEl.classList.add("error");
+      }
+    });
+  </script>
+</body>
+</html>

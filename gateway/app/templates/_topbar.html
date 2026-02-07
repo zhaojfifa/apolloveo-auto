@@ -1,0 +1,36 @@
+{# gateway/app/templates/_topbar.html #}
+<div class="topbar">
+  <div class="topbar-left">
+    {% if topbar_title %}
+      <div class="topbar-title">{{ topbar_title }}</div>
+    {% endif %}
+    {% if topbar_subtitle %}
+      <div class="topbar-subtitle">{{ topbar_subtitle }}</div>
+    {% endif %}
+  </div>
+
+  <div class="topbar-center">
+    {% if topbar_nav %}
+      <div class="segmented">
+        {% for item in topbar_nav %}
+          <a class="segmented-item nav-pill ui-pill {% if item.active %}active{% endif %}" href="{{ item.href }}">
+            {{ item.label }}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="topbar-right">
+    {% include "_lang_tabs.html" %}
+    {% if topbar_actions %}
+      <div class="topbar-actions">
+        {% for a in topbar_actions %}
+          <a class="btn ui-pill {% if a.primary %}btn-primary{% else %}btn-ghost{% endif %}" href="{{ a.href }}">
+            {{ a.label }}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+</div>

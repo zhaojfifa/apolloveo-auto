@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pipeline Lab (Static)</title>
+  <link rel="stylesheet" href="/static/pipeline_lab.css" />
+</head>
+<body>
+  <div class="page">
+    <main class="card">
+      <header class="hero">
+        <div class="hero-title">
+          <h1>Pipeline Lab (Static)</h1>
+        </div>
+        <p class="hero-subtitle">Debug the legacy v1 pipeline actions.</p>
+      </header>
+
+      <section id="task" class="panel">
+        <div class="section-title">
+          <h2>Task</h2>
+          <div class="action-row">
+            <button class="ghost" type="button" id="btn-generate-task">Generate Task ID</button>
+            <button class="ghost" type="button" id="btn-generate-from-link">Generate From Link</button>
+            <button class="ghost" type="button" id="btn-reset-task">Reset</button>
+          </div>
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="taskId">Task ID</label>
+            <input id="taskId" value="demo_v1" />
+          </div>
+          <div class="field">
+            <label for="platform">Platform</label>
+            <select id="platform">
+              <option value="douyin">douyin</option>
+              <option value="tiktok">tiktok</option>
+              <option value="local_file">local_file</option>
+            </select>
+          </div>
+          <div class="field span-2">
+            <label for="link">Link</label>
+            <input id="link" placeholder="https://www.douyin.com/video/..." />
+          </div>
+        </div>
+        <div class="button-row">
+          <button id="btn-step1">Step 1: Parse</button>
+          <button id="btn-step2">Step 2: Subtitles</button>
+          <button id="btn-step3">Step 3: Dub</button>
+          <button id="btn-step4">Step 4: Pack</button>
+          <button class="primary" id="btn-run-all">Run Full Pipeline</button>
+        </div>
+        <div class="downloads">
+          <span class="downloads-title">Downloads</span>
+          <div class="downloads-links">
+            <a id="rawLink" href="#" target="_blank">raw.mp4</a>
+            <a id="originLink" href="#" target="_blank">origin.srt</a>
+            <a id="mmLink" href="#" target="_blank">mm.srt</a>
+            <a id="mmTxtLink" href="#" target="_blank">mm.txt</a>
+            <a id="audioLink" href="#" target="_blank">audio_mm</a>
+            <a id="packLink" href="#" target="_blank">pack.zip</a>
+            <a id="scenesLink" href="#" target="_blank">scenes.zip</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Parse</h2>
+          <button class="ghost" id="btn-parse">Execute</button>
+        </div>
+        <pre id="parseOutput" class="output">Response</pre>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Subtitles</h2>
+          <button class="ghost" id="btn-subtitles">Execute</button>
+        </div>
+        <pre id="subsOutput" class="output">(output)</pre>
+        <div class="section-grid">
+          <div>
+            <strong>Origin subtitles</strong>
+            <pre id="originPreview" class="output">(empty)</pre>
+          </div>
+          <div>
+            <strong>Translated subtitles</strong>
+            <pre id="mmPreview" class="output">(empty)</pre>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Dub</h2>
+          <button class="ghost" id="btn-dub">Execute</button>
+        </div>
+        <div class="field">
+          <label for="voiceId">Voice ID</label>
+          <input id="voiceId" value="mm_female_1" />
+        </div>
+        <pre id="dubOutput" class="output">(empty)</pre>
+        <audio id="audioPlayer" controls style="margin-top:8px; width:100%; display:none;"></audio>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Pack</h2>
+          <button class="ghost" id="btn-pack">Execute</button>
+        </div>
+        <pre id="packOutput" class="output">(empty)</pre>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Status</h2>
+          <button class="ghost" id="btn-status">Refresh</button>
+        </div>
+        <pre id="statusOutput" class="output">(empty)</pre>
+      </section>
+
+      <section class="panel">
+        <div class="section-title">
+          <h2>Log</h2>
+          <button class="ghost" id="btn-clear-log">Clear</button>
+        </div>
+        <pre id="log" class="output">Ready.</pre>
+      </section>
+    </main>
+  </div>
+
+  <!-- Logic lives in /static/pipeline_lab.js. Do not embed JS inline. -->
+  <script src="/static/pipeline_lab.js" defer></script>
+</body>
+</html>

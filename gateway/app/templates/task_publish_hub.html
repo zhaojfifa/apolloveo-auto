@@ -1,0 +1,704 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ t("page.publish.title") }} - {{ task.task_id }}</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
+  <link rel="stylesheet" href="/static/pipeline_lab.css" />
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      background: #f3f4f6;
+    }
+    .page.publish {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 16px;
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+    .btn-primary {
+      background: #2563eb;
+      color: #ffffff;
+      border: 1px solid #2563eb;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+      border: 1px solid #d1d5db;
+    }
+    .btn-primary,
+    .btn-secondary {
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .btn-primary:hover { filter: brightness(.95); }
+    .btn-secondary:hover { filter: brightness(.98); }
+    .muted { color: #64748b; font-size: 0.85rem; }
+    .section-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .link-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .download-link {
+      color: #1d4ed8;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .download-link.disabled { color: #9ca3af; pointer-events: none; }
+    a.disabled { color: #9ca3af; pointer-events: none; }
+    .info-row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .info-pill {
+      background: #f1f5f9;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .copy-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .copy-btn {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #cbd5f5; }
+    .publish-textarea { width: 100%; min-height: 120px; }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tab-btn {
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #111827;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #111827;
+      color: #ffffff;
+      border-color: #111827;
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .bilingual { display: flex; flex-direction: column; gap: 4px; }
+    .qr-placeholder {
+      width: 180px;
+      height: 180px;
+      border: 1px dashed #cbd5e1;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-weight: 600;
+      text-align: center;
+      padding: 12px;
+    }
+    .lang-toggle {
+      display: inline-flex;
+      gap: 6px;
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
+      padding: 2px;
+      background: #ffffff;
+    }
+    .lang-btn {
+      border: none;
+      background: transparent;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .lang-btn.active {
+      background: #111827;
+      color: #ffffff;
+    }
+    .i18n.zh { display: inline; }
+    .i18n.mm { display: inline; }
+    .i18n.mm:not(.block)::before { content: ""; }
+    .i18n.block { display: block; }
+  </style>
+</head>
+<body data-lang="zh">
+  <div class="page publish">
+    <div class="card">
+{% set topbar_title = t("page.publish.title") %}
+{% set topbar_subtitle = t("page.publish.subtitle", task_id=task.task_id) %}
+{% set topbar_nav = [
+  {"label": t("common.tasks"), "href": "/tasks", "active": True},
+  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
+] %}
+{% set topbar_actions = [
+  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
+] %}
+{% include "_topbar.html" %}
+<div class="info-row" style="margin-top:10px;">
+        <div class="info-pill">
+          <span>{{ t("publish.download_code") }}</span>
+          : <span id="download-code">{{ task.task_id[:6]|upper }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="op-gate" style="display:none;">
+      <div class="section-title">
+        <h2>{{ t("publish.gate.title") }}</h2>
+        <div class="secondary">{{ t("publish.gate.desc") }}</div>
+      </div>
+      <div class="copy-row" style="margin-top:10px;">
+        <input id="op-key-input" class="publish-textarea" placeholder="{{ t('publish.gate.need_key') }}" />
+        <button type="button" class="btn-primary" id="op-key-save">
+          {{ t("action.unlock") }}
+        </button>
+        <span id="op-key-status" class="muted"></span>
+      </div>
+    </div>
+
+    <div id="hub-content" style="display:none;">
+      <div class="card">
+        <div class="tabs" role="tablist">
+          <button class="tab-btn active" data-tab="tab-sop" type="button">
+            {{ t("publish.tab.sop") }}
+          </button>
+          <button class="tab-btn" data-tab="tab-copy" type="button">
+            {{ t("publish.tab.copy") }}
+          </button>
+          <button class="tab-btn" data-tab="tab-deliverables" type="button">
+            {{ t("publish.tab.deliverables") }}
+          </button>
+          <button class="tab-btn" data-tab="tab-archive" type="button">
+            {{ t("publish.tab.archive") }}
+          </button>
+        </div>
+      </div>
+
+    <div class="tab-panel active" id="tab-sop">
+      <div class="card">
+        <div class="section-title">
+          <h2>{{ t("publish.sop.title") }}</h2>
+          <div class="secondary">{{ t("publish.sop.desc") }}</div>
+        </div>
+        <div class="block">{{ t("publish.sop.step1") }}</div>
+        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step2") }}</div>
+        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step3") }}</div>
+        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step4") }}</div>
+      </div>
+    </div>
+    <div class="tab-panel" id="tab-copy">
+      <div class="card">
+        <div class="section-title">
+          <h2>{{ t("publish.copy.title") }}</h2>
+          <div class="secondary">{{ t("publish.copy.desc") }}</div>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>{{ t("publish.copy.caption") }}</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-caption">{{ t("action.copy") }}</button>
+          </div>
+          <textarea id="copy-caption" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>{{ t("publish.copy.hashtags") }}</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-hashtags">{{ t("action.copy") }}</button>
+          </div>
+          <textarea id="copy-hashtags" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>{{ t("publish.copy.comment") }}</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">{{ t("action.copy") }}</button>
+          </div>
+          <textarea id="copy-comment-cta" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>{{ t("publish.copy.link_text") }}</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-link-text">{{ t("action.copy") }}</button>
+          </div>
+          <textarea id="copy-link-text" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>{{ t("publish.copy.publish_time") }}</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-publish-time">{{ t("action.copy") }}</button>
+          </div>
+          <textarea id="copy-publish-time" class="publish-textarea"></textarea>
+        </div>
+      </div>
+    </div>
+<div class="tab-panel" id="tab-deliverables">
+      <div class="card">
+        <div class="section-title">
+          <h2>{{ t("publish.deliverables.title") }}</h2>
+          <div class="secondary">{{ t("publish.deliverables.desc") }}</div>
+        </div>
+        <div id="deliverables-list" class="copy-row" style="margin-top:12px;"></div>
+        <div class="muted" id="deliverables-empty" style="margin-top:8px; display:none;">
+          {{ t("publish.deliverables.empty") }}
+        </div>
+        <div class="copy-row" style="margin-top:12px;">
+          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.bundle") }}</a>
+        </div>
+        <div class="copy-row" style="margin-top:12px;">
+          <img id="qr-image" alt="QR" style="width:180px;height:180px;border:1px solid #e5e7eb;background:#fff;" />
+          <div class="muted">{{ t("publish.deliverables.qr") }}</div>
+        </div>
+        <div class="copy-row" style="margin-top:6px;">
+          <a id="qr-link" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.open_link") }}</a>
+          <button type="button" class="copy-btn" data-copy-target="qr-link">{{ t("publish.deliverables.copy_link") }}</button>
+        </div>
+        <div class="copy-row" style="margin-top:6px;">
+          <a id="short-link" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.short_link") }}</a>
+          <button type="button" class="copy-btn" data-copy-target="short-link">{{ t("publish.deliverables.copy_short") }}</button>
+        </div>
+      </div>
+    </div>
+<div class="tab-panel" id="tab-archive">
+      <div class="card">
+        <div class="section-title">
+          <h2>{{ t("publish.archive.title") }}</h2>
+          <div class="secondary">{{ t("publish.archive.desc") }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-pill">
+            {{ t("publish.archive.published_at") }}: <span id="published-at">-</span>
+          </div>
+        </div>
+        <div class="section-grid" style="margin-top:12px;">
+          <div class="field">
+            <label>{{ t("publish.archive.location") }}</label>
+            <input id="archive-location" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+          <div class="field">
+            <label>{{ t("publish.archive.status") }}</label>
+            <input id="archive-status" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+          <div class="field">
+            <label>{{ t("publish.archive.published") }}</label>
+            <div class="copy-row">
+              <input type="checkbox" id="archive-published" />
+              <span class="muted">{{ t("publish.archive.published_hint") }}</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>{{ t("publish.archive.download_url") }}</label>
+            <div class="copy-row">
+              <input id="archive-download-url" class="publish-textarea" style="min-height:0;height:36px;" />
+              <a id="archive-download-link" class="btn-secondary" href="#" target="_blank" rel="noopener">{{ t("publish.archive.open") }}</a>
+            </div>
+          </div>
+          <div class="field">
+            <label>{{ t("publish.archive.key") }}</label>
+            <input id="archive-key" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+        </div>
+        <div class="action-row" style="margin-top:12px;">
+          <button id="archive-save-btn" class="btn-primary">{{ t("publish.archive.save") }}</button>
+          <button id="publish-btn" class="btn-success">{{ t("publish.archive.submit") }}</button>
+          <span id="archive-save-status" class="muted"></span>
+        </div>
+      </div>
+    </div>
+
+  <script src="/static/js/i18n_v185.js"></script>
+  <script>
+    const TASK_ID = "{{ task.task_id }}";
+    const TASK_KIND = "{{ task.category_key or task.kind or task.platform or '' }}";
+    const OP_KEY_STORAGE = "op_access_key";
+    const LANG_STORAGE = "ui_lang_publish_hub";
+
+        // UI language policy: show ZH + MM together in UI (English stays in code/logs only).
+function resolveLang(serverLang) {
+      const saved = localStorage.getItem(LANG_STORAGE);
+      return saved || serverLang || "zh";
+    }
+
+    function applyLang(lang) {
+      document.body.dataset.lang = lang;
+      localStorage.setItem(LANG_STORAGE, lang);
+      const toggle = document.getElementById("lang-toggle");
+      if (!toggle) return;
+      toggle.querySelectorAll(".lang-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.lang === lang);
+      });
+    }
+
+    function getOpKey() {
+      return sessionStorage.getItem(OP_KEY_STORAGE) || "";
+    }
+
+    function setOpKey(value) {
+      sessionStorage.setItem(OP_KEY_STORAGE, value);
+    }
+
+    function showGate(message) {
+      const gate = document.getElementById("op-gate");
+      const hub = document.getElementById("hub-content");
+      if (gate) gate.style.display = "";
+      if (hub) hub.style.display = "none";
+      const statusEl = document.getElementById("op-key-status");
+      if (statusEl) statusEl.textContent = message || "";
+    }
+
+    function hideGate() {
+      const gate = document.getElementById("op-gate");
+      const hub = document.getElementById("hub-content");
+      if (gate) gate.style.display = "none";
+      if (hub) hub.style.display = "";
+    }
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value || "-";
+    }
+
+    function setLink(id, href) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (href) {
+        el.href = href;
+        el.classList.remove("disabled");
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+      }
+    }
+
+    function setInputValue(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.value = value || "";
+    }
+
+    function setArchiveLink(url) {
+      const el = document.getElementById("archive-download-link");
+      if (!el) return;
+      if (url) {
+        el.href = url;
+        el.classList.remove("disabled");
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+      }
+    }
+
+    function renderDeliverables(deliverables) {
+      const list = document.getElementById("deliverables-list");
+      const empty = document.getElementById("deliverables-empty");
+      if (!list) return;
+      list.innerHTML = "";
+      const order = ["pack_zip", "scenes_zip", "origin_srt", "mm_srt", "mm_txt", "mm_audio", "edit_bundle_zip"];
+      let count = 0;
+      order.forEach((key) => {
+        const item = deliverables && deliverables[key];
+        if (!item || !item.url) return;
+        const row = document.createElement("div");
+        row.className = "link-row";
+        const link = document.createElement("a");
+        link.className = "download-link";
+        link.href = item.url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = item.label || key;
+        row.appendChild(link);
+        list.appendChild(row);
+        count += 1;
+      });
+      if (empty) empty.style.display = count ? "none" : "";
+    }
+
+    function renderCopyBundle(copy) {
+      const captionEl = document.getElementById("copy-caption");
+      if (captionEl && !captionEl.value) captionEl.value = copy.caption || "";
+      const hashtagsEl = document.getElementById("copy-hashtags");
+      if (hashtagsEl && !hashtagsEl.value) hashtagsEl.value = copy.hashtags || "";
+      const ctaEl = document.getElementById("copy-comment-cta");
+      if (ctaEl && !ctaEl.value) ctaEl.value = copy.comment_cta || "";
+      const linkEl = document.getElementById("copy-link-text");
+      if (linkEl && !linkEl.value) linkEl.value = copy.link_text || "";
+      const timeEl = document.getElementById("copy-publish-time");
+      if (timeEl && !timeEl.value) timeEl.value = copy.publish_time_suggestion || "";
+    }
+
+    async function fetchText(kind) {
+      const headers = {};
+      const opKey = getOpKey();
+      if (opKey) headers["X-OP-KEY"] = opKey;
+      const url = `/api/tasks/${encodeURIComponent(TASK_ID)}/text?kind=${encodeURIComponent(kind)}`;
+      const resp = await fetch(url, { headers });
+      if (!resp.ok) return "";
+      const text = await resp.text();
+      return (text || "").trim();
+    }
+
+    async function fillCaptionFallback(copy) {
+      const captionEl = document.getElementById("copy-caption");
+      if (!captionEl || captionEl.value) return;
+      const fromPayload = (copy && copy.caption) || "";
+      if (fromPayload) {
+        captionEl.value = fromPayload;
+        return;
+      }
+      const candidates = ["mm_edited", "mm_txt", "origin_srt"];
+      for (const kind of candidates) {
+        try {
+          const text = await fetchText(kind);
+          if (text) {
+            captionEl.value = text;
+            break;
+          }
+        } catch (err) {
+          continue;
+        }
+      }
+    }
+
+    function renderArchive(archive) {
+      setText("published-at", archive.published_at || "-");
+      setInputValue("archive-location", archive.archive_location || archive.publish_provider || "");
+      setInputValue("archive-status", archive.status || archive.publish_status || "");
+      setInputValue("archive-key", archive.archive_key || archive.publish_key || "");
+      const downloadUrl = archive.download_url || archive.publish_url || "";
+      setInputValue("archive-download-url", downloadUrl);
+      setArchiveLink(downloadUrl);
+      const published = Boolean(archive.published || archive.published_at) && archive.published_at !== "-";
+      const publishedEl = document.getElementById("archive-published");
+      if (publishedEl) publishedEl.checked = published;
+    }
+
+    function copyTextFromElement(el) {
+      if (!el) return;
+      let text = "";
+      if (el.tagName === "A") {
+        text = el.getAttribute("href") || "";
+      } else if (el.tagName === "TEXTAREA") {
+        text = el.value || "";
+      } else {
+        text = el.textContent || "";
+      }
+      if (!text || text === "#") return;
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    document.querySelectorAll("[data-copy-target]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.getAttribute("data-copy-target");
+        const target = document.getElementById(targetId);
+        copyTextFromElement(target);
+      });
+    });
+
+    async function fetchPublishHub() {
+      const opKey = getOpKey();
+      if (!opKey) {
+        showGate(window.__V185_I18N__.t("publish.gate.need_key"));
+        return;
+      }
+      const kind = (TASK_KIND || "").toLowerCase();
+      const publishHubUrl = kind === "apollo_avatar"
+        ? `/api/apollo/avatar/${encodeURIComponent(TASK_ID)}/publish_hub`
+        : `/api/tasks/${encodeURIComponent(TASK_ID)}/publish_hub`;
+      const resp = await fetch(publishHubUrl, {
+        headers: { "X-OP-KEY": opKey },
+      });
+      if (resp.status === 401 || resp.status === 403) {
+        showGate(window.__V185_I18N__.t("publish.gate.invalid_key"));
+        return;
+      }
+      if (!resp.ok) {
+        showGate(window.__V185_I18N__.t("publish.gate.load_failed", { status: resp.status }));
+        return;
+      }
+      hideGate();
+      const data = await resp.json();
+      setText("download-code", data.download_code || "-");
+      renderDeliverables(data.deliverables || {});
+      renderCopyBundle(data.copy_bundle || {});
+      await fillCaptionFallback(data.copy_bundle || {});
+      renderArchive(data.archive || {});
+      const editLink = document.getElementById("edit-bundle-link");
+      if (editLink && data.deliverables && data.deliverables.edit_bundle_zip) {
+        editLink.href = data.deliverables.edit_bundle_zip.url;
+        editLink.classList.remove("disabled");
+      } else if (editLink) {
+        editLink.href = "#";
+        editLink.classList.add("disabled");
+      }
+      const sopEl = document.getElementById("sop-markdown");
+      if (sopEl) sopEl.textContent = data.sop_markdown || "";
+      const mobile = data.mobile || {};
+      const shortLink = mobile.short_url || mobile.short_link || mobile.qr_target || mobile.qr_url;
+      const qrTarget = shortLink || mobile.qr_target || mobile.qr_url;
+      if (qrTarget) {
+        const abs = new URL(qrTarget, window.location.origin).toString();
+        const qrImg = document.getElementById("qr-image");
+        if (qrImg) {
+          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(abs)}`;
+        }
+        setLink("qr-link", abs);
+      }
+      if (shortLink) {
+        setLink("short-link", new URL(shortLink, window.location.origin).toString());
+      }
+      const serverLang = data.ui_lang;
+      const savedLang = localStorage.getItem("ui_lang_publish_hub");
+      if (!savedLang && serverLang) {
+        applyLang(serverLang);
+      }
+    }
+
+    const publishBtn = document.getElementById("publish-btn");
+    if (publishBtn) {
+      publishBtn.addEventListener("click", async () => {
+      const statusEl = document.getElementById("publish-status");
+      if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submitting");
+      try {
+        const opKey = getOpKey();
+        const headers = { "Content-Type": "application/json" };
+        if (opKey) headers["X-OP-KEY"] = opKey;
+        const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ task_id: TASK_ID, force: false }),
+        });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submit_failed", { detail: `${resp.status} ${detail}` });
+            return;
+          }
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submitted");
+          await fetchPublishHub();
+        } catch (err) {
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submit_error", { error: err });
+        }
+      });
+    }
+
+    const archiveSaveBtn = document.getElementById("archive-save-btn");
+    if (archiveSaveBtn) {
+      archiveSaveBtn.addEventListener("click", async () => {
+        const statusEl = document.getElementById("archive-save-status");
+        if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.saving");
+        const payload = {
+          archive: {
+            archive_location: document.getElementById("archive-location")?.value?.trim() || "",
+            status: document.getElementById("archive-status")?.value?.trim() || "",
+            published: Boolean(document.getElementById("archive-published")?.checked),
+            download_url: document.getElementById("archive-download-url")?.value?.trim() || "",
+            archive_key: document.getElementById("archive-key")?.value?.trim() || "",
+          },
+        };
+        Object.assign(payload, payload.archive);
+        try {
+          const opKey = getOpKey();
+          const headers = { "Content-Type": "application/json" };
+          if (opKey) headers["X-OP-KEY"] = opKey;
+          const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.save_failed", { detail: `${resp.status} ${detail}` });
+            return;
+          }
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.saved");
+          await fetchPublishHub();
+        } catch (err) {
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.save_error", { error: err });
+        }
+      });
+    }
+
+    const archiveUrlInput = document.getElementById("archive-download-url");
+    if (archiveUrlInput) {
+      archiveUrlInput.addEventListener("input", () => {
+        setArchiveLink(archiveUrlInput.value.trim());
+      });
+    }
+
+    const saveBtn = document.getElementById("op-key-save");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => {
+        const input = document.getElementById("op-key-input");
+        const value = input ? input.value.trim() : "";
+        if (!value) {
+          showGate(window.__V185_I18N__.t("publish.gate.need_key"));
+          return;
+        }
+        setOpKey(value);
+        fetchPublishHub().catch(() => {});
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const tabs = document.querySelectorAll(".tab-btn");
+      const panels = document.querySelectorAll(".tab-panel");
+      function activate(id) {
+        tabs.forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === id));
+        panels.forEach((panel) => panel.classList.toggle("active", panel.id === id));
+      }
+      tabs.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.tab;
+          if (id) activate(id);
+        });
+      });
+      const hash = window.location.hash.replace("#", "");
+      if (hash) activate(`tab-${hash}`);
+      const initialLang = resolveLang(null);
+      applyLang(initialLang);
+      const langToggle = document.getElementById("lang-toggle");
+      if (langToggle) {
+        langToggle.addEventListener("click", (event) => {
+          const btn = event.target.closest(".lang-btn");
+          if (!btn) return;
+          const lang = btn.dataset.lang;
+          if (!lang) return;
+          applyLang(lang);
+        });
+      }
+
+      if (!getOpKey()) {
+        showGate(window.__V185_I18N__.t("publish.gate.need_key"));
+        return;
+      }
+      fetchPublishHub().catch(() => {});
+    });
+  </script>
+</body>
+</html>

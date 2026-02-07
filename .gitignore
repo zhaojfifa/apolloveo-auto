@@ -1,0 +1,23 @@
+﻿# Python / Node
+.venv/
+__pycache__/
+node_modules/
+
+# Build / outputs
+outputs/
+debug/
+tmp/
+downloads/
+*.zip
+*.mp4
+*.wav
+*.log
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Review artifacts
+.review_artifacts/
