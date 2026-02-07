@@ -1,7 +1,5 @@
 # gateway/app/main.py
 
-from pathlib import Path
-
 import importlib.util
 import logging
 import os
