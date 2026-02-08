@@ -227,13 +227,13 @@
 
   const FALLBACK = {
     zh: {
-      "page.tasks.tab.all": "È«²¿",
-      "page.tasks.tab.processing": "´¦ÀíÖÐ",
-      "page.tasks.tab.done": "ÒÑÍê³É",
-      "page.tasks.tab.attention": "Òì³£(ÐèÈË¹¤½éÈë)",
-      "page.tasks.new": "ÐÂ½¨ÈÎÎñ",
-      "page.tasks.action.download_pack": "ÏÂÔØ²úÎï",
-      "page.tasks.action.more": "¸ü¶à",
+      "page.tasks.tab.all": "å…¨éƒ¨",
+      "page.tasks.tab.processing": "å¤„ç†ä¸­",
+      "page.tasks.tab.done": "å·²å®Œæˆ",
+      "page.tasks.tab.attention": "å¼‚å¸¸(éœ€äººå·¥ä»‹å…¥)",
+      "page.tasks.new": "æ–°å»ºä»»åŠ¡",
+      "page.tasks.action.download_pack": "ä¸‹è½½äº§ç‰©",
+      "page.tasks.action.more": "æ›´å¤š",
     },
     // mm can be added later
     mm: {}
@@ -265,7 +265,7 @@
         el.classList.add("i18n-patched");
       });
 
-      // 2) Patch any remaining visible ¡°[page.xxx]¡± strings (defensive)
+      // 2) Patch any remaining visible â€œ[page.xxx]â€ strings (defensive)
       //    Note: these may appear as real text in some nodes
       const all = document.querySelectorAll("button,a,span,div");
       all.forEach((el) => {
