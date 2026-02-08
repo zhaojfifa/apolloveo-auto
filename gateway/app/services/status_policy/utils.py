@@ -51,6 +51,10 @@ def coerce_final_status(kind: str | None, task: dict | None, updates: dict | Non
             updates[key] = "ready"
             merged[key] = "ready"
 
+    if is_deliverable_ready(task or {}, updates):
+        updates["status"] = "ready"
+        return updates
+
     failed = bool(merged.get("error_reason"))
     if not failed:
         for key in FAILED_SUBSTATUSES:
@@ -60,10 +64,6 @@ def coerce_final_status(kind: str | None, task: dict | None, updates: dict | Non
 
     if failed:
         updates["status"] = "failed"
-        return updates
-
-    if is_deliverable_ready(task or {}, updates):
-        updates["status"] = "ready"
         return updates
 
     updates["status"] = "running"
