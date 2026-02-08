@@ -1,6 +1,6 @@
 from datetime import datetime
 import re
-from typing import Literal, Optional
+from typing import Literal, Optional, Any
 
 from pydantic import BaseModel, constr, root_validator, validator
 
@@ -123,6 +123,8 @@ class TaskSummary(BaseModel):
     dub_error: Optional[str] = None
     pack_status: Optional[str] = None
     pack_error: Optional[str] = None
+    warnings: Optional[list[str]] = None
+    warning_reasons: Optional[dict[str, Any]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
     error_reason: Optional[str] = None

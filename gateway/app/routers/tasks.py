@@ -2109,6 +2109,8 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
         "pack_path",
         "scenes_path",
         "updated_at",
+        "warnings",
+        "warning_reasons",
     ):
         payload.setdefault(key, None)
 

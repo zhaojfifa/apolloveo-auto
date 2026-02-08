@@ -51,8 +51,32 @@ def coerce_final_status(kind: str | None, task: dict | None, updates: dict | Non
             updates[key] = "ready"
             merged[key] = "ready"
 
-    if is_deliverable_ready(task or {}, updates):
+    warnings = list(merged.get("warnings") or [])
+    warning_reasons = dict(merged.get("warning_reasons") or {})
+
+    deliverable_ready = is_deliverable_ready(task or {}, updates)
+    if deliverable_ready and str(merged.get("dub_status") or "").lower() == "failed":
+        if "dub_failed" not in warnings:
+            warnings.append("dub_failed")
+        warning_reasons.setdefault(
+            "dub_failed",
+            {"code": "dub_failed", "message": "Dub step failed but deliverable is ready"},
+        )
+
+    if str((task or {}).get("status") or "").lower() == "ready" and deliverable_ready:
         updates["status"] = "ready"
+        if warnings:
+            updates["warnings"] = warnings
+        if warning_reasons:
+            updates["warning_reasons"] = warning_reasons
+        return updates
+
+    if deliverable_ready:
+        updates["status"] = "ready"
+        if warnings:
+            updates["warnings"] = warnings
+        if warning_reasons:
+            updates["warning_reasons"] = warning_reasons
         return updates
 
     failed = bool(merged.get("error_reason"))
@@ -64,7 +88,15 @@ def coerce_final_status(kind: str | None, task: dict | None, updates: dict | Non
 
     if failed:
         updates["status"] = "failed"
+        if warnings:
+            updates["warnings"] = warnings
+        if warning_reasons:
+            updates["warning_reasons"] = warning_reasons
         return updates
 
     updates["status"] = "running"
+    if warnings:
+        updates["warnings"] = warnings
+    if warning_reasons:
+        updates["warning_reasons"] = warning_reasons
     return updates
