@@ -1,4 +1,4 @@
-﻿# Normalize text files, keep consistent diffs across Windows/Linux
+# Normalize text files, keep consistent diffs across Windows/Linux
 * text=auto eol=lf
 
 *.ps1 text eol=crlf
