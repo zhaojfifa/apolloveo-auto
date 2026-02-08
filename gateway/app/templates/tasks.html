@@ -213,42 +213,91 @@
   </script>
 
   <script>
-    (function uiFallbackPatch(){
-      const FALLBACK = {
-        "page.tasks.tab.all": "å…¨éƒ¨",
-        "page.tasks.tab.processing": "å¤„ç†ä¸­",
-        "page.tasks.tab.done": "å·²å®Œæˆ",
-        "page.tasks.tab.attention": "å¼‚å¸¸(éœ€äººå·¥ä»‹å…¥)",
-        "page.tasks.new": "æ–°å»ºä»»åŠ¡",
-        "page.tasks.action.download_pack": "ä¸‹è½½äº§ç‰©",
-      };
+/**
+ * UI fallback patch for Tasks page.
+ * Problem: some labels are not in textContent; they are rendered via CSS using attr(data-i18n*).
+ * Fix: detect i18n key from attributes and force textContent to override placeholder rendering.
+ */
+(function uiFallbackPatch(){
+  // default zh; later can wire to real language switch
+  const lang =
+    (document.documentElement && (document.documentElement.dataset.locale || document.documentElement.getAttribute("data-locale"))) ||
+    (localStorage.getItem("ui_lang")) ||
+    "zh";
 
-      function looksLikeKey(s){
-        return typeof s === "string" && s.startsWith("[") && s.endsWith("]");
-      }
+  const FALLBACK = {
+    zh: {
+      "page.tasks.tab.all": "È«²¿",
+      "page.tasks.tab.processing": "´¦ÀíÖÐ",
+      "page.tasks.tab.done": "ÒÑÍê³É",
+      "page.tasks.tab.attention": "Òì³£(ÐèÈË¹¤½éÈë)",
+      "page.tasks.new": "ÐÂ½¨ÈÎÎñ",
+      "page.tasks.action.download_pack": "ÏÂÔØ²úÎï",
+      "page.tasks.action.more": "¸ü¶à",
+    },
+    // mm can be added later
+    mm: {}
+  };
 
-      function patchText(el){
-        if (!el) return;
-        const key = el.getAttribute("data-i18n") || el.getAttribute("data-i18n-key") || "";
-        if (!key || !FALLBACK[key]) return;
+  function getKey(el){
+    return (
+      el.getAttribute("data-i18n") ||
+      el.getAttribute("data-i18n-key") ||
+      el.getAttribute("data-i18n-id") ||
+      ""
+    ).trim();
+  }
 
-        const cur = (el.textContent || "").trim();
-        if (looksLikeKey(cur) || cur === key) {
-          el.textContent = FALLBACK[key];
-        }
-      }
+  function apply(){
+    try{
+      const dict = FALLBACK[lang] || FALLBACK.zh;
 
-      document.querySelectorAll("[data-i18n], [data-i18n-key]").forEach(patchText);
+      // 1) Patch elements that carry i18n keys (common pattern in other pages)
+      const nodes = document.querySelectorAll("[data-i18n],[data-i18n-key],[data-i18n-id]");
+      nodes.forEach((el) => {
+        const key = getKey(el);
+        if (!key) return;
+        const v = dict[key];
+        if (!v) return;
 
-      document.querySelectorAll("button, a").forEach(el=>{
-        const cur = (el.textContent || "").trim();
-        if (looksLikeKey(cur)) {
-          const innerKey = cur.slice(1, -1);
-          if (FALLBACK[innerKey]) el.textContent = FALLBACK[innerKey];
+        // Force override (important when CSS uses attr(...) to display keys)
+        el.textContent = v;
+        el.classList.add("i18n-patched");
+      });
+
+      // 2) Patch any remaining visible ¡°[page.xxx]¡± strings (defensive)
+      //    Note: these may appear as real text in some nodes
+      const all = document.querySelectorAll("button,a,span,div");
+      all.forEach((el) => {
+        const txt = (el.textContent || "").trim();
+        if (!txt) return;
+        // only patch the exact bracket-key style to avoid accidental replacements
+        if (txt.startsWith("[page.") && txt.endsWith("]")) {
+          const k = txt.slice(1, -1); // remove [ ]
+          const v = dict[k];
+          if (v) el.textContent = v;
         }
       });
-    })();
-  </script>
+    } catch (e) {
+      // silent
+    }
+  }
+
+  // Run multiple times because i18n hydrate may run after DOMContentLoaded
+  apply();
+  document.addEventListener("DOMContentLoaded", apply);
+  setTimeout(apply, 0);
+  setTimeout(apply, 250);
+  setTimeout(apply, 1000);
+
+  // MutationObserver: patch late-inserted nodes for a short window
+  try{
+    const mo = new MutationObserver(() => apply());
+    mo.observe(document.documentElement, {subtree:true, childList:true, attributes:true});
+    setTimeout(() => mo.disconnect(), 2500);
+  } catch(e) {}
+})();
+</script>
 
 </body>
 </html>
