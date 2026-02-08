@@ -120,7 +120,7 @@
 
             <div class="flex items-center gap-x-4">
               <div class="hidden sm:flex sm:flex-col sm:items-end">
-                <p class="text-sm leading-6 text-gray-900">{{ task.category_key or '-' }}</p>
+                <span class="text-sm text-gray-700" data-kind="{{ task.kind or '' }}">{{ task.kind or '-' }}</span>
               </div>
 
               <div class="flex items-center gap-2">
@@ -189,16 +189,64 @@
         const res = await fetch('/static/ui/scene_labels.v1.json', { cache: 'no-store' });
         if (!res.ok) return;
         const map = await res.json();
-        const lang = (document.documentElement.lang || 'zh').startsWith('en') ? 'en' : 'zh';
-        document.querySelectorAll('.kind-label[data-kind]').forEach(el=>{
-          const code = (el.getAttribute('data-kind') || '').trim();
-          if (!code) return;
-          const entry = map[code];
-          if (entry && entry[lang]) el.textContent = entry[lang];
-        });
+
+        // TODO: later wire to real UI language; default zh
+        const lang = "zh";
+
+        function apply(){
+          document.querySelectorAll("[data-kind]").forEach(el=>{
+            const code = (el.getAttribute("data-kind") || "").trim();
+            if (!code) return;
+            const entry = map[code];
+            if (entry && entry[lang]) el.textContent = entry[lang];
+          });
+        }
+
+        apply();
+        document.addEventListener("DOMContentLoaded", apply);
+        setTimeout(apply, 0);
+        setTimeout(apply, 250);
       }catch(e){
-        // silent fail: fallback remains code
+        // silent
       }
+    })();
+  </script>
+
+  <script>
+    (function uiFallbackPatch(){
+      const FALLBACK = {
+        "page.tasks.tab.all": "全部",
+        "page.tasks.tab.processing": "处理中",
+        "page.tasks.tab.done": "已完成",
+        "page.tasks.tab.attention": "异常(需人工介入)",
+        "page.tasks.new": "新建任务",
+        "page.tasks.action.download_pack": "下载产物",
+      };
+
+      function looksLikeKey(s){
+        return typeof s === "string" && s.startsWith("[") && s.endsWith("]");
+      }
+
+      function patchText(el){
+        if (!el) return;
+        const key = el.getAttribute("data-i18n") || el.getAttribute("data-i18n-key") || "";
+        if (!key || !FALLBACK[key]) return;
+
+        const cur = (el.textContent || "").trim();
+        if (looksLikeKey(cur) || cur === key) {
+          el.textContent = FALLBACK[key];
+        }
+      }
+
+      document.querySelectorAll("[data-i18n], [data-i18n-key]").forEach(patchText);
+
+      document.querySelectorAll("button, a").forEach(el=>{
+        const cur = (el.textContent || "").trim();
+        if (looksLikeKey(cur)) {
+          const innerKey = cur.slice(1, -1);
+          if (FALLBACK[innerKey]) el.textContent = FALLBACK[innerKey];
+        }
+      });
     })();
   </script>
 
