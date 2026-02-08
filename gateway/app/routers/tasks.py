@@ -528,7 +528,7 @@ def download_pack(task_id: str, repo=Depends(get_task_repository)):
         return RedirectResponse(url=get_download_url(str(pack_key)), status_code=302)
 
     status = derive_status(task)
-    if status in ("done", "packed", "published"):
+    if status in ("ready", "packed", "published"):
         fresh = repo.get(task_id) or task
         repair_key = (
             _task_value(fresh, "pack_key")
@@ -894,10 +894,10 @@ def derive_status(task: dict) -> str:
     if pack_key:
         try:
             if object_exists(str(pack_key)):
-                return "done"
+                return "ready"
         except Exception:
             pass
-        return "done"
+        return "ready"
     return task.get("status") or "processing"
 
 
@@ -1323,7 +1323,7 @@ def auto_run_pipeline(task_id: str, repo) -> None:
                     "pack_type": "capcut_v18" if pack_key else None,
                     "pack_status": "ready" if pack_key else None,
                     "pack_error": None,
-                    "status": "done" if pack_key else "processing",
+                    "status": "ready" if pack_key else "processing",
                 },
             )
         else:
@@ -1472,7 +1472,7 @@ def _run_pipeline_background(task_id: str, repo) -> None:
         state_service.update_fields(
             task_id,
             {
-                "status": "done",
+                "status": "ready",
                 "last_step": current_step,
                 "pack_key": pack_key,
                 "pack_type": "capcut_v18" if pack_key else None,
@@ -2115,16 +2115,6 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     payload["stale"] = stale
     payload["stale_reason"] = "running_but_not_updated" if stale else None
     payload["stale_for_seconds"] = stale_for
-
-    if payload.get("subtitles_status") in (None, "error"):
-        if payload.get("origin_srt_path") or payload.get("mm_srt_path") or payload.get("mm_txt_path"):
-            payload["subtitles_status"] = "ready"
-            payload["subtitles_error"] = None
-
-    if payload.get("dub_status") in (None, "error"):
-        if payload.get("mm_audio_path") or payload.get("no_dub") is True:
-            payload["dub_status"] = "ready"
-            payload["dub_error"] = None
 
     logger.info(
         "task_status_shape",

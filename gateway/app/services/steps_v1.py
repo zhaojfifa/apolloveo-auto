@@ -32,6 +32,7 @@ from gateway.app.services.artifact_storage import upload_task_artifact, get_down
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.services.status_policy.registry import get_status_policy
 from gateway.app.services.status_policy.utils import policy_upsert
+from gateway.app.services.status_policy.registry import get_status_policy
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_video
 from gateway.app.services.publish_service import publish_task_pack
@@ -1195,13 +1196,13 @@ async def run_post_generate_pipeline(
     is_apollo = str(task.get("kind") or task.get("category_key") or task.get("platform") or "").lower() == "apollo_avatar"
     pack_key = task.get("pack_key") or task.get("pack_path")
     pack_status = str(task.get("pack_status") or "").lower()
-    if pack_key and pack_status in {"ready", "done"} and not force:
+    if pack_key and pack_status in {"ready"} and not force:
         task = policy_upsert(
             repo,
             task_id,
             task,
             {
-                "status": "done",
+                "status": "ready",
                 "last_step": task.get("last_step") or "pack",
             },
             step="steps_v1.post_pipeline",
@@ -1293,7 +1294,7 @@ async def run_post_generate_pipeline(
         _update(
             {
                 "subtitles_key": subtitles_key,
-                "subtitles_status": "done",
+                "subtitles_status": "ready",
                 "subtitles_provider": task.get("subtitles_provider") or "gemini",
             }
         )
@@ -1339,7 +1340,7 @@ async def run_post_generate_pipeline(
     if audio_key:
         _update(
             {
-                "dub_status": "done",
+                "dub_status": "ready",
                 "dub_provider": task.get("dub_provider") or "edge-tts",
             }
         )
@@ -1396,7 +1397,7 @@ async def run_post_generate_pipeline(
 
     task = repo.get(task_id) or task
     if str(task.get("scenes_status") or "").lower() == "ready":
-        _update({"scenes_status": "done"})
+        _update({"scenes_status": "ready"})
 
     # --------- Step 3: Pack ---------
     pack_key = task.get("pack_key") or task.get("pack_path")
@@ -1422,7 +1423,7 @@ async def run_post_generate_pipeline(
                 _update(
                     {
                         "pack_key": pack_key,
-                        "pack_status": "done",
+                        "pack_status": "ready",
                         "pack_provider": task.get("pack_provider") or "capcut",
                     }
                 )
@@ -1463,7 +1464,7 @@ async def run_post_generate_pipeline(
 
     task = repo.get(task_id) or task
     if str(task.get("pack_status") or "").lower() == "ready":
-        _update({"pack_status": "done", "pack_provider": task.get("pack_provider") or "capcut"})
+        _update({"pack_status": "ready", "pack_provider": task.get("pack_provider") or "capcut"})
 
     # --------- Step 4: Publish bundle ---------
     publish_key = task.get("publish_key")
@@ -1511,7 +1512,7 @@ async def run_post_generate_pipeline(
                         "publish_provider": publish_provider,
                         "publish_key": publish_key,
                         "publish_url": publish_url,
-                        "publish_status": "done" if publish_key else "failed",
+                        "publish_status": "ready" if publish_key else "failed",
                     }
                 )
             _append_event(
@@ -1581,7 +1582,7 @@ async def run_post_generate_pipeline(
         else:
             _update(
                 {
-                    "status": "done",
+                    "status": "ready",
                     "last_step": "publish" if task.get("publish_key") else "pack",
                     "error_message": None,
                     "error_reason": None,
@@ -1589,7 +1590,7 @@ async def run_post_generate_pipeline(
             )
     if str(task.get("publish_status") or "").lower() == "ready":
         if not is_apollo:
-            _update({"publish_status": "done"})
+            _update({"publish_status": "ready"})
 
     _append_event(
         repo,
@@ -1618,7 +1619,15 @@ def _update_task(task_id: str, **fields) -> None:
         task = db.query(models.Task).filter(models.Task.id == task_id).first()
         if not task:
             return
-        for key, value in fields.items():
+        current = {col.name: getattr(task, col.name) for col in task.__table__.columns}
+        policy = get_status_policy(current)
+        updates = policy.reconcile_after_step(
+            current,
+            step="steps_v1._update_task",
+            updates=dict(fields),
+            force=True,
+        )
+        for key, value in updates.items():
             if hasattr(task, key):
                 setattr(task, key, value)
         db.commit()
