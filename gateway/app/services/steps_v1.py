@@ -31,7 +31,7 @@ from gateway.app import config, models
 from gateway.app.services.artifact_storage import upload_task_artifact, get_download_url, object_exists
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.services.status_policy.registry import get_status_policy
-from gateway.app.services.status_policy.utils import policy_upsert
+from gateway.app.services.status_policy.registry import policy_upsert
 from gateway.app.services.status_policy.registry import get_status_policy
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.parse import detect_platform, parse_video
@@ -1676,5 +1676,4 @@ def _get_task_mm_audio_key(task_id: str) -> str | None:
         return getattr(task, "mm_audio_key", None) or getattr(task, "mm_audio_path", None)
     finally:
         db.close()
-
 

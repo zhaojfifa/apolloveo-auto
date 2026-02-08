@@ -15,7 +15,7 @@ from gateway.app.services.steps_v1 import (
     run_apollo_avatar_generate_step,
     run_post_generate_pipeline,
 )
-from gateway.app.services.status_policy.utils import policy_upsert
+from gateway.app.services.status_policy.registry import policy_upsert
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.task_repo_utils import normalize_task_payload
 from gateway.app.utils.pipeline_config import pipeline_config_to_storage
