@@ -8,3 +8,5 @@
 ## v1.9 Repo Layout
 
 - v1.9 repo layout guide: `v1.9/REPO_LAYOUT_GUIDE.md`
+- [STATUS_AND_DELIVERABLES_SPEC](./v1.9/STATUS_AND_DELIVERABLES_SPEC.md)
+
