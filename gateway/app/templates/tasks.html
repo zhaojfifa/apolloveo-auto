@@ -12,6 +12,15 @@
     tailwind.config = { theme: { extend: { colors: { primary: '#4f46e5' } } } };
   </script>
 </head>
+{% macro tr(key, fallback) -%}
+  {%- set v = t(key) -%}
+  {%- if (v is string) and v.startswith('[') and v.endswith(']') -%}
+    {{ fallback }}
+  {%- else -%}
+    {{ v }}
+  {%- endif -%}
+{%- endmacro %}
+
 <body class="bg-gray-50 text-slate-900 {{ 'mobile' if is_mobile else 'desktop' }}">
   <header class="sticky top-0 z-30 border-b border-gray-200 bg-white/90 backdrop-blur">
     <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
@@ -28,13 +37,13 @@
           <!-- Status Tabs (client-side filter) -->
           <nav class="inline-flex rounded-lg border border-gray-200 bg-white p-1 text-sm">
             <button class="tab-btn rounded-md px-3 py-1.5 data-[active=true]:bg-gray-900 data-[active=true]:text-white"
-                    data-filter="all" data-active="true">{{ t("page.tasks.tab.all") if t("page.tasks.tab.all") else "??" }}</button>
+                    data-filter="all" data-active="true">{{ tr("page.tasks.tab.all", "??") }}</button>
             <button class="tab-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                    data-filter="processing">{{ t("page.tasks.tab.processing") if t("page.tasks.tab.processing") else "???" }}</button>
+                    data-filter="processing">{{ tr("page.tasks.tab.processing", "???") }}</button>
             <button class="tab-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                    data-filter="done">{{ t("page.tasks.tab.done") if t("page.tasks.tab.done") else "???" }}</button>
+                    data-filter="done">{{ tr("page.tasks.tab.done", "???") }}</button>
             <button class="tab-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                    data-filter="attention">{{ t("page.tasks.tab.attention") if t("page.tasks.tab.attention") else "??(?????)" }}</button>
+                    data-filter="attention">{{ tr("page.tasks.tab.attention", "??(?????)") }}</button>
           </nav>
 
           <!-- KEEP EXISTING LANGUAGE SWITCHER BLOCK HERE (paste your current HTML+JS, unchanged) -->
@@ -44,7 +53,7 @@
 
           <a href="/tasks/new"
              class="inline-flex items-center rounded-md bg-primary px-3 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-90">
-            + {{ t("page.tasks.new") if t("page.tasks.new") else "????" }}
+            + {{ tr("page.tasks.new", "????") }}
           </a>
         </div>
       </div>
@@ -103,7 +112,7 @@
                   </span>
 
                   {% if yellow %}
-                    <span class="text-xs text-amber-700 ml-1">{{ t("page.tasks.hint.degraded_but_usable") if t("page.tasks.hint.degraded_but_usable") else "?????????" }}</span>
+                    <span class="text-xs text-amber-700 ml-1">{{ tr("page.tasks.hint.degraded_but_usable", "?????????") }}</span>
                   {% endif %}
                 </div>
               </div>
@@ -119,17 +128,17 @@
                   {% if db == 'failed' %}
                     <a href="/v1/tasks/{{task.task_id}}/pack"
                        class="rounded bg-indigo-50 px-2 py-1 text-sm font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-300 hover:bg-indigo-100">
-                      {{ t("page.tasks.action.force_download") if t("page.tasks.action.force_download") else "????" }}
+                      {{ tr("page.tasks.action.force_download", "????") }}
                     </a>
                   {% else %}
                     <a href="/v1/tasks/{{task.task_id}}/pack"
                        class="rounded bg-white px-2 py-1 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
-                      {{ t("page.tasks.action.download_pack") if t("page.tasks.action.download_pack") else "????" }}
+                      {{ tr("page.tasks.action.download_pack", "????") }}
                     </a>
                   {% endif %}
                 {% else %}
                   <button class="rounded bg-gray-100 px-2 py-1 text-sm font-semibold text-gray-400 cursor-not-allowed">
-                    {{ t("page.tasks.action.download_pack") if t("page.tasks.action.download_pack") else "????" }}
+                    {{ tr("page.tasks.action.download_pack", "????") }}
                   </button>
                 {% endif %}
 
@@ -173,5 +182,25 @@
       });
     });
   </script>
+
+  <script>
+    (async function hydrateKindLabels(){
+      try{
+        const res = await fetch('/static/ui/scene_labels.v1.json', { cache: 'no-store' });
+        if (!res.ok) return;
+        const map = await res.json();
+        const lang = (document.documentElement.lang || 'zh').startsWith('en') ? 'en' : 'zh';
+        document.querySelectorAll('.kind-label[data-kind]').forEach(el=>{
+          const code = (el.getAttribute('data-kind') || '').trim();
+          if (!code) return;
+          const entry = map[code];
+          if (entry && entry[lang]) el.textContent = entry[lang];
+        });
+      }catch(e){
+        // silent fail: fallback remains code
+      }
+    })();
+  </script>
+
 </body>
 </html>
