@@ -11,8 +11,11 @@ _APOLLO_AVATAR = ApolloAvatarStatusPolicy()
 def get_policy(kind: str | None) -> StatusPolicy:
     k = (kind or "").strip().lower()
     if k in ("apollo_avatar", "apollo-avatar"):
-        return _APOLLO_AVATAR
-    return _DEFAULT
+        policy = _APOLLO_AVATAR
+    else:
+        policy = _DEFAULT
+    setattr(policy, "kind", k)
+    return policy
 
 
 def get_status_policy(task: dict | None) -> StatusPolicy:

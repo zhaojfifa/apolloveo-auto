@@ -99,7 +99,7 @@ def publish_task_pack(
 
     chosen = (provider or getattr(task, "publish_provider", None) or PUBLISH_PROVIDER_DEFAULT).lower()
     if (
-        getattr(task, "publish_status", None) == "published"
+        getattr(task, "publish_status", None) == "ready"
         and getattr(task, "publish_key", None)
         and not force
         and chosen == (getattr(task, "publish_provider", None) or chosen)
@@ -125,7 +125,7 @@ def publish_task_pack(
             task.publish_provider = "r2"
             task.publish_key = key
             task.publish_url = download_url
-            task.publish_status = "published"
+            task.publish_status = "ready"
             task.published_at = published_at
             db.commit()
         return {
@@ -140,7 +140,7 @@ def publish_task_pack(
         task.publish_provider = "local"
         task.publish_key = publish_key
         task.publish_url = ""
-        task.publish_status = "published"
+        task.publish_status = "ready"
         task.published_at = published_at
         db.commit()
     return {

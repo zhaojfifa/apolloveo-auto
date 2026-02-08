@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Dict, Any
 
+from .utils import coerce_final_status
+
 
 class StatusPolicy:
     """
@@ -16,5 +18,8 @@ class StatusPolicy:
         updates: Dict[str, Any],
         force: bool = False,
     ) -> Dict[str, Any]:
-        return updates or {}
+        del step
+        del force
+        kind = getattr(self, "kind", None)
+        return coerce_final_status(kind, task, updates or {})
 
