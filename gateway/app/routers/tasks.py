@@ -65,7 +65,7 @@ from ..services.steps_v1 import (
     run_subtitles_step_entry,
     run_dub_step as run_dub_step_v1,
 )
-from gateway.app.services.status_policy.registry import policy_upsert
+from gateway.app.services.status_policy.service import policy_upsert
 
 
 def _policy_upsert(repo, task_id: str, updates: dict, *, task: dict | None = None, step: str = "router.tasks", force: bool = False):

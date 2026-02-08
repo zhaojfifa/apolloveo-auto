@@ -5,7 +5,7 @@ from typing import Any
 
 from gateway.app.db import SessionLocal
 from gateway.app.models import Task
-from gateway.app.services.status_policy.registry import policy_upsert
+from gateway.app.services.status_policy.service import policy_upsert
 
 
 class TaskStateService:

@@ -99,7 +99,8 @@ Policy is chosen by **task.kind/category_key** (e.g., "apollo_avatar").
 
 ### 5.4 Import discipline (anti-circular)
 - utils.py must be pure functions (no registry import)
-- egistry.py imports policy classes and returns an instance
+- 
+egistry.py imports policy classes and returns an instance
 - ase.py can import utils, but utils must not import registry
 
 ---
@@ -147,7 +148,8 @@ We must support:
 Status model and deliverables spec are defined in STATUS_AND_DELIVERABLES_SPEC.md (next milestone).  
 For v1.9 baseline, we enforce:
 - deliverables are truth source
-- final status must coerce to eady when deliverables are ready
+- final status must coerce to 
+eady when deliverables are ready
 - "done" must be normalized to "ready" in response fields
 
 ---
@@ -163,3 +165,7 @@ P1:
 - STATUS_AND_DELIVERABLES_SPEC.md
 - UI refactor for multi-scenario operator UX
 - live avatar provider integration (adapter hardening)
+
+## Related Specs
+- STATUS_AND_DELIVERABLES_SPEC: ./STATUS_AND_DELIVERABLES_SPEC.md
+
