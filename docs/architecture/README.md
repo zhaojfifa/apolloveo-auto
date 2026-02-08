@@ -1,0 +1,6 @@
+﻿# Architecture
+
+## v1.9 Baseline (Refactor Baseline)
+- [ARCHITECTURE_BASELINE_v1.9](./v1.9/ARCHITECTURE_BASELINE_v1.9.md)
+- [SKILLS_CATALOG](./v1.9/SKILLS_CATALOG.md)
+- [SCENE_SOP_AVATAR](./v1.9/SCENE_SOP_AVATAR.md)
