@@ -256,3 +256,70 @@
   cursor:pointer;
 }
 .btn-link-weak:hover{ color:#1f2937; text-decoration:underline; }
+
+/* ===== Tasks Board (Figma v0.95) ===== */
+
+.tasks-header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; }
+.tasks-header__title { font-size:24px; font-weight:700; color:#111827; line-height:1.2; }
+.tasks-header__subtitle { margin-top:6px; font-size:14px; color:#6b7280; }
+
+.tasks-actions { display:flex; align-items:center; gap:12px; }
+.btn-ghost { background: rgba(0,0,0,0.04); border:1px solid rgba(0,0,0,0.06); color:#111827; border-radius:10px; padding:8px 10px; }
+.btn-cta { background:#4f46e5; border:1px solid transparent; color:#fff; border-radius:12px; padding:10px 14px; font-weight:600; }
+.btn-cta:hover { filter:brightness(0.97); }
+
+.filter-console { display:flex; justify-content:space-between; align-items:center; gap:16px; border-bottom:1px solid #e5e7eb; padding-bottom:12px; }
+.scene-tabs { display:flex; gap:18px; align-items:center; }
+.scene-tab { padding:10px 2px; color:#6b7280; font-weight:600; border-bottom:2px solid transparent; cursor:pointer; background:none; border-top:0; border-left:0; border-right:0; }
+.scene-tab[data-active="true"] { color:#111827; border-bottom-color:#111827; }
+
+.status-legend { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.status-legend__label { font-size:12px; color:#9ca3af; margin-right:4px; }
+.status-item { display:flex; align-items:center; gap:8px; font-size:13px; color:#111827; cursor:pointer; background:none; border:0; padding:0; }
+.status-dot { width:8px; height:8px; border-radius:999px; background:#9ca3af; display:inline-block; }
+
+.status-dot--green { background:#22c55e; }
+.status-dot--orange { background:#f59e0b; }
+.status-dot--blue { background:#3b82f6; }
+.status-dot--red { background:#ef4444; }
+
+.tasks-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:18px; }
+@media (max-width: 1024px){ .tasks-grid{ grid-template-columns:1fr; } }
+
+.task-card { background:#fff; border-radius:12px; border:1px solid #eef2f7; box-shadow:0 1px 2px rgba(0,0,0,0.05); padding:14px; display:flex; justify-content:space-between; gap:14px; }
+.task-card:hover { box-shadow:0 6px 18px rgba(0,0,0,0.08); }
+
+.task-card__left { display:flex; gap:14px; min-width:0; }
+.task-card__cover { width:72px; height:72px; border-radius:10px; object-fit:cover; background:#f3f4f6; flex:0 0 auto; }
+.task-card__info { min-width:0; display:flex; flex-direction:column; gap:6px; }
+
+.task-card__title{
+  display:-webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow:hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+  max-height: calc(1.25em * 2);
+  font-weight: 700;
+  color:#111827;
+}
+
+.task-card__meta{ color:#6b7280; font-size:12px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.task-pill{ font-size:12px; padding:2px 8px; border-radius:999px; background:#f3f4f6; color:#374151; border:1px solid #e5e7eb; }
+
+.task-card__right{ width:140px; flex:0 0 140px; display:flex; flex-direction:column; align-items:flex-end; }
+.task-badge{ padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600; }
+
+.badge-green{ background:#ecfdf5; color:#047857; border:1px solid rgba(16,185,129,0.25); }
+.badge-yellow{ background:#fffbeb; color:#92400e; border:1px solid rgba(245,158,11,0.25); }
+.badge-blue{ background:#eff6ff; color:#1d4ed8; border:1px solid rgba(59,130,246,0.18); }
+.badge-red{ background:#fef2f2; color:#b91c1c; border:1px solid rgba(239,68,68,0.18); }
+.badge-gray{ background:#f3f4f6; color:#374151; border:1px solid rgba(107,114,128,0.18); }
+
+.task-actions{ margin-top:auto; display:flex; flex-direction:column; gap:8px; width:100%; }
+.btn-primary{ background:#4f46e5; color:#fff; border:1px solid transparent; border-radius:10px; padding:8px 10px; font-weight:600; text-align:center; }
+.btn-primary[disabled]{ background:#e5e7eb; color:#9ca3af; cursor:not-allowed; }
+.btn-secondary{ background:#fff; color:#111827; border:1px solid #d1d5db; border-radius:10px; padding:8px 10px; font-weight:600; text-align:center; }
+.btn-danger-link{ color:#9ca3af; background:transparent; border:none; padding:6px 8px; cursor:pointer; text-align:center; }
+.btn-danger-link:hover{ color:#dc2626; }

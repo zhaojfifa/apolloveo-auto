@@ -21,126 +21,122 @@
 
 <body class="{{ 'mobile' if is_mobile else 'desktop' }}">
   <div class="page">
-    <header class="mb-4 flex flex-wrap items-center gap-3">
-      <div class="flex-1">
-        <div class="flex items-center gap-2">
-          <h1 class="text-2xl font-bold text-gray-900">{{ t("ui.tasks.board") }}</h1>
-          <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">veoUI-0.95</span>
-        </div>
-        <p class="mt-1 text-sm text-gray-500">{{ t("tasks.board.subhead") }}</p>
+    <header class="tasks-header mb-4">
+      <div>
+        <div class="tasks-header__title">{{ t("ui.tasks.board") }}</div>
+        <div class="tasks-header__subtitle">{{ t("tasks.board.subhead") }}</div>
       </div>
-      <div class="flex items-center gap-2">
+      <div class="tasks-actions">
         {% include "_lang_tabs.html" %}
-        <a href="/tasks/new" class="inline-flex items-center rounded-md bg-gray-900 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800">
-          {{ t("common.new_task") }}
-        </a>
+        <a href="/tasks/new" class="btn-cta">{{ t("common.new_task") }}</a>
       </div>
     </header>
 
-    <div class="mb-2 flex flex-wrap items-center gap-2">
-      <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1 text-sm">
-        <button class="status-btn rounded-md px-3 py-1.5 data-[active=true]:bg-gray-900 data-[active=true]:text-white"
-                data-status="all" data-active="true">{{ t("tasks.filter.status.all") }}</button>
-        <button class="status-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                data-status="processing">{{ t("tasks.filter.status.processing") }}</button>
-        <button class="status-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                data-status="done">{{ t("tasks.filter.status.done") }}</button>
-        <button class="status-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                data-status="attention">{{ t("tasks.filter.status.attention") }}</button>
+    <div class="filter-console">
+      <div class="scene-tabs">
+        <button class="scene-tab" data-scene="all" data-active="true">{{ t("tasks.filter.scene.all") }}</button>
+        <button class="scene-tab" data-scene="avatar">{{ t("tasks.filter.scene.avatar") }}</button>
+        <button class="scene-tab" data-scene="hot_follow">{{ t("tasks.filter.scene.hot_follow") }}</button>
+        <button class="scene-tab" data-scene="baseline">{{ t("tasks.filter.scene.baseline") }}</button>
+      </div>
+      <div class="status-legend">
+        <span class="status-legend__label">状态</span>
+        <button class="status-item" data-status="all" data-active="true"><span class="status-dot"></span>{{ t("tasks.filter.status.all") }}</button>
+        <button class="status-item" data-status="processing"><span class="status-dot status-dot--orange"></span>{{ t("tasks.filter.status.processing") }}</button>
+        <button class="status-item" data-status="done"><span class="status-dot status-dot--green"></span>{{ t("tasks.filter.status.done") }}</button>
+        <button class="status-item" data-status="attention"><span class="status-dot status-dot--red"></span>{{ t("tasks.filter.status.attention") }}</button>
       </div>
     </div>
+    <div class="text-sm text-gray-500 mt-2" id="boardMessage">{{ t("tasks.filtered_n", n=(items|length)) }}</div>
 
-    <div class="mb-4 flex flex-wrap items-center gap-2">
-      <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1 text-sm">
-        <button class="scene-btn rounded-md px-3 py-1.5 data-[active=true]:bg-gray-900 data-[active=true]:text-white"
-                data-scene="all" data-active="true">{{ t("tasks.filter.scene.all") }}</button>
-        <button class="scene-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                data-scene="avatar">{{ t("tasks.filter.scene.avatar") }}</button>
-        <button class="scene-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                data-scene="hot_follow">{{ t("tasks.filter.scene.hot_follow") }}</button>
-        <button class="scene-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                data-scene="baseline">{{ t("tasks.filter.scene.baseline") }}</button>
-      </div>
-      <div class="ml-auto text-sm text-gray-500" id="boardMessage">{{ t("tasks.filtered_n", n=(items|length)) }}</div>
-    </div>
-
-    <div class="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl">
-      <div id="taskList" class="divide-y divide-gray-100">
-        {% for it in items %}
-          {% if it.filter_status == "processing" %}
-            {% set status_label = t("tasks.filter.status.processing") %}
-          {% elif it.filter_status == "done" %}
-            {% set status_label = t("tasks.filter.status.done") %}
-          {% elif it.filter_status == "attention" %}
-            {% set status_label = t("tasks.filter.status.attention") %}
-          {% else %}
-            {% set status_label = t("status.unknown") %}
-          {% endif %}
-          <div class="task-row relative flex justify-between gap-x-6 px-4 py-4 sm:px-6 hover:bg-gray-50 {{ it.row_class }}"
-               data-scene="{{ it.scene_key }}" data-status="{{ it.filter_status }}">
-            <div class="flex min-w-0 gap-x-4">
-              <a href="{{ it.primary_action_href }}" class="h-16 w-16 flex-none rounded-lg bg-gray-200 overflow-hidden flex items-center justify-center">
-                {% if it.cover_url %}
-                  <img class="h-full w-full object-cover" src="{{ it.cover_url }}" alt="cover" />
-                {% else %}
-                  <span class="text-gray-400 text-xl"></span>
-                {% endif %}
-              </a>
-
-              <div class="min-w-0 flex-auto">
-                <p class="text-sm font-semibold leading-6 text-gray-900 task-title-2l">{{ it.title_display }}</p>
-                {% if it.subtitle %}
-                  <p class="mt-1 flex text-xs leading-5 text-gray-500 gap-2">{{ it.subtitle }}</p>
-                {% endif %}
-
-                <div class="mt-1 flex gap-2 flex-wrap">
-                  <span class="status-badge" data-status="{{ it.filter_status }}">{{ status_label }}</span>
-                  {% if it.show_pack_badge %}
-                    <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset {{ it.pack_badge_class }}">
-                      {{ t(it.pack_badge_label_key) }}
-                    </span>
-                  {% endif %}
-                  {% if it.show_video_badge %}
-                    <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset {{ it.video_badge_class }}">
-                      {{ t("tasks.badge.video") }}
-                    </span>
-                  {% endif %}
-                </div>
+    <div id="taskList" class="tasks-grid">
+      {% for it in items %}
+        {% set task_id = it.task_id or it.id %}
+        {% set title = it.title or it.task_title or (it.meta.title if it.meta and it.meta.title) or it.title_display or t("tasks.untitled") %}
+        {% set cover = it.cover_url or it.cover or it.cover_head or it.thumb_url or "" %}
+        {% set platform = it.platform or it.source_platform or it.site or "-" %}
+        {% set created = it.created_label or it.created_at or it.created_time or it.created or "" %}
+        {% set scene_raw = (it.kind or it.category or it.scene or "baseline") | lower %}
+        {% if it.scene_label_key %}
+          {% set scene_label = t(it.scene_label_key) %}
+        {% elif "avatar" in scene_raw %}
+          {% set scene_label = t("tasks.filter.scene.avatar") %}
+        {% elif "hot" in scene_raw %}
+          {% set scene_label = t("tasks.filter.scene.hot_follow") %}
+        {% else %}
+          {% set scene_label = t("tasks.filter.scene.baseline") %}
+        {% endif %}
+        {% set status_value = it.filter_status or it.status or "unknown" %}
+        {% if status_value == "done" %}
+          {% set status_label = t("tasks.filter.status.done") %}
+          {% set badge_class = "badge-green" %}
+        {% elif status_value == "processing" %}
+          {% set status_label = t("tasks.filter.status.processing") %}
+          {% set badge_class = "badge-yellow" %}
+        {% elif status_value == "attention" or status_value == "failed" %}
+          {% set status_label = t("tasks.filter.status.attention") %}
+          {% set badge_class = "badge-red" %}
+        {% elif status_value == "queued" %}
+          {% set status_label = t("status.queued") %}
+          {% set badge_class = "badge-blue" %}
+        {% else %}
+          {% set status_label = t("status.unknown") %}
+          {% set badge_class = "badge-gray" %}
+        {% endif %}
+        <div class="task-card task-row" data-scene="{{ it.scene_key or scene_raw }}" data-status="{{ status_value }}">
+          <div class="task-card__left">
+            {% if cover %}
+              <img class="task-card__cover" src="{{ cover }}" alt="cover" />
+            {% else %}
+              <div class="task-card__cover"></div>
+            {% endif %}
+            <div class="task-card__info">
+              <div class="task-card__title">{{ title }}</div>
+              <div class="task-card__meta">
+                <span>{{ platform }}</span>
+                <span>&middot;</span>
+                <span>ID: {{ task_id }}</span>
               </div>
-            </div>
-
-            <div class="flex items-center gap-x-4">
-              <div class="hidden sm:flex sm:flex-col sm:items-end">
-                <p class="text-sm leading-6 text-gray-900">{{ t(it.scene_label_key) }}</p>
-                <p class="mt-1 text-xs leading-5 text-gray-500">{{ it.created_label }}</p>
-              </div>
-
-              <div class="flex items-center gap-2 task-actions">
-                {% if it.download_class %}
-                  <a href="{{ it.pack_download_href }}" target="_blank" rel="noopener" class="btn-sm btn-primary-soft">
-                    {{ t(it.download_label_key) }}
-                  </a>
-                {% else %}
-                  <button class="btn-sm btn-disabled" disabled>
-                    {{ t(it.download_label_key) }}
-                  </button>
+              <div class="task-card__meta">
+                <span class="task-pill">{{ scene_label }}</span>
+                {% if created %}
+                  <span title="{{ it.created_at or created }}">{{ created }}</span>
                 {% endif %}
-
-                <a href="{{ it.primary_action_href }}" class="btn-sm btn-outline">
-                  {{ t("action.open_detail") }}
-                </a>
-                <button class="btn-xs btn-link-weak"
-                        onclick="deleteTask('{{ it.task_id }}'); return false;">
-                  {{ t("action.delete") }}
-                </button>
+              </div>
+              <div class="task-card__meta">
+                {% if it.show_pack_badge %}
+                  <span class="task-pill">{{ t(it.pack_badge_label_key) }}</span>
+                {% endif %}
+                {% if it.show_video_badge %}
+                  <span class="task-pill">{{ t("tasks.badge.video") }}</span>
+                {% endif %}
               </div>
             </div>
           </div>
-        {% endfor %}
-      </div>
-      <div id="emptyState" class="hidden p-6 text-center text-sm text-gray-500">
-        {{ t("tasks.empty") }}
-      </div>
+          <div class="task-card__right">
+            <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
+            <div class="task-actions">
+              {% if it.download_class %}
+                <a href="{{ it.pack_download_href }}" target="_blank" rel="noopener" class="btn-primary">
+                  {{ t(it.download_label_key) }}
+                </a>
+              {% else %}
+                <button class="btn-primary" disabled>
+                  {{ t(it.download_label_key) }}
+                </button>
+              {% endif %}
+              <a href="{{ it.primary_action_href }}" class="btn-secondary">{{ t("action.open_detail") }}</a>
+              <button class="btn-danger-link" data-action="delete" data-id="{{ task_id }}"
+                      onclick="deleteTask('{{ task_id }}'); return false;">
+                {{ t("action.delete") }}
+              </button>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    <div id="emptyState" class="hidden p-6 text-center text-sm text-gray-500">
+      {{ t("tasks.empty") }}
     </div>
   </div>
 
@@ -169,8 +165,8 @@
     function applyFilters() {
       const rows = Array.from(document.querySelectorAll(".task-row"));
       let shown = 0;
-      const curStatus = document.querySelector(".status-btn[data-active='true']")?.dataset.status || "all";
-      const curScene = document.querySelector(".scene-btn[data-active='true']")?.dataset.scene || "all";
+      const curStatus = document.querySelector(".status-item[data-active='true']")?.dataset.status || "all";
+      const curScene = document.querySelector(".scene-tab[data-active='true']")?.dataset.scene || "all";
       rows.forEach((r) => {
         const rs = r.getAttribute("data-status") || "other";
         const rc = r.getAttribute("data-scene") || "baseline";
@@ -202,8 +198,8 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      bindTabs(".status-btn");
-      bindTabs(".scene-btn");
+      bindTabs(".status-item");
+      bindTabs(".scene-tab");
       applyFilters();
     });
   </script>
