@@ -401,29 +401,54 @@ async def run_parse_step(req: ParseRequest):
     try:
         result = await parse_video(req.task_id, req.link, platform_hint=platform)
 
+        title = (result.get("title") if isinstance(result, dict) else None)
+        cover = (result.get("cover") if isinstance(result, dict) else None)
+        logger.info(
+            "PARSE_RESULT task=%s keys=%s title=%s has_cover=%s cover_head=%s",
+            req.task_id,
+            sorted(list(result.keys())) if isinstance(result, dict) else str(type(result)),
+            (title[:80] if isinstance(title, str) else title),
+            bool(cover),
+            (str(cover)[:80] if cover else None),
+        )
+
         raw_file = raw_path(req.task_id)
         raw_key = None
         if raw_file.exists():
             raw_key = _upload_artifact(req.task_id, raw_file, RAW_ARTIFACT)
 
-        existing_title = None
-        db = SessionLocal()
-        try:
-            task = db.query(models.Task).filter(models.Task.id == req.task_id).first()
-            if task:
-                existing_title = getattr(task, "title", None)
-        finally:
-            db.close()
+        title_from_parse = (title or "").strip() if isinstance(title, str) else ""
+        cover_from_parse = (cover or "").strip() if isinstance(cover, str) else ""
 
-        _update_task(
-            req.task_id,
-            raw_path=raw_key,
-            platform=(result.get("platform") or platform),
-            title=(result.get("title") or existing_title),
-            cover_url=result.get("cover"),
-            parse_status="done",
-            last_step="parse",
-        )
+        updates = {
+            "raw_path": raw_key,
+            "platform": (result.get("platform") or platform),
+            "parse_status": "done",
+            "last_step": "parse",
+        }
+        if title_from_parse:
+            updates["title"] = title_from_parse
+        if cover_from_parse:
+            updates["cover_url"] = cover_from_parse
+
+        _update_task(req.task_id, **updates)
+
+        try:
+            db = SessionLocal()
+            try:
+                task = db.query(models.Task).filter(models.Task.id == req.task_id).first()
+                logger.info(
+                    "TASK_AFTER_PARSE_UPDATE task=%s title=%s cover_url=%s platform=%s last_step=%s",
+                    req.task_id,
+                    getattr(task, "title", None) if task else None,
+                    getattr(task, "cover_url", None) if task else None,
+                    getattr(task, "platform", None) if task else None,
+                    getattr(task, "last_step", None) if task else None,
+                )
+            finally:
+                db.close()
+        except Exception:
+            logger.exception("TASK_AFTER_PARSE_UPDATE_FAILED")
         return result
 
     except HTTPException as exc:
