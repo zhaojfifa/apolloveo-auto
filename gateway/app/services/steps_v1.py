@@ -401,15 +401,15 @@ async def run_parse_step(req: ParseRequest):
     try:
         result = await parse_video(req.task_id, req.link, platform_hint=platform)
 
+        title = (result.get("title") if isinstance(result, dict) else None)
+        cover = (result.get("cover") if isinstance(result, dict) else None)
         logger.info(
-            "PARSE_RESULT",
-            extra={
-                "task_id": req.task_id,
-                "keys": sorted(list(result.keys())) if isinstance(result, dict) else str(type(result)),
-                "title": (result.get("title")[:80] if isinstance(result, dict) and result.get("title") else None),
-                "has_cover": bool(result.get("cover")) if isinstance(result, dict) else False,
-                "cover_head": (str(result.get("cover"))[:64] if isinstance(result, dict) and result.get("cover") else None),
-            },
+            "PARSE_RESULT task=%s keys=%s title=%s has_cover=%s cover_head=%s",
+            req.task_id,
+            sorted(list(result.keys())) if isinstance(result, dict) else str(type(result)),
+            (title[:80] if isinstance(title, str) else title),
+            bool(cover),
+            (str(cover)[:80] if cover else None),
         )
 
         raw_file = raw_path(req.task_id)
@@ -417,11 +417,8 @@ async def run_parse_step(req: ParseRequest):
         if raw_file.exists():
             raw_key = _upload_artifact(req.task_id, raw_file, RAW_ARTIFACT)
 
-        title_from_parse = None
-        cover_from_parse = None
-        if isinstance(result, dict):
-            title_from_parse = (result.get("title") or "").strip() or None
-            cover_from_parse = (result.get("cover") or "").strip() or None
+        title_from_parse = (title or "").strip() if isinstance(title, str) else ""
+        cover_from_parse = (cover or "").strip() if isinstance(cover, str) else ""
 
         updates = {
             "raw_path": raw_key,
@@ -429,9 +426,9 @@ async def run_parse_step(req: ParseRequest):
             "parse_status": "done",
             "last_step": "parse",
         }
-        if title_from_parse is not None:
+        if title_from_parse:
             updates["title"] = title_from_parse
-        if cover_from_parse is not None:
+        if cover_from_parse:
             updates["cover_url"] = cover_from_parse
 
         _update_task(req.task_id, **updates)
@@ -441,15 +438,12 @@ async def run_parse_step(req: ParseRequest):
             try:
                 task = db.query(models.Task).filter(models.Task.id == req.task_id).first()
                 logger.info(
-                    "TASK_AFTER_PARSE_UPDATE",
-                    extra={
-                        "task_id": req.task_id,
-                        "title": getattr(task, "title", None) if task else None,
-                        "cover_url": getattr(task, "cover_url", None) if task else None,
-                        "platform": getattr(task, "platform", None) if task else None,
-                        "raw_path": getattr(task, "raw_path", None) if task else None,
-                        "last_step": getattr(task, "last_step", None) if task else None,
-                    },
+                    "TASK_AFTER_PARSE_UPDATE task=%s title=%s cover_url=%s platform=%s last_step=%s",
+                    req.task_id,
+                    getattr(task, "title", None) if task else None,
+                    getattr(task, "cover_url", None) if task else None,
+                    getattr(task, "platform", None) if task else None,
+                    getattr(task, "last_step", None) if task else None,
                 )
             finally:
                 db.close()
