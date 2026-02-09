@@ -401,29 +401,60 @@ async def run_parse_step(req: ParseRequest):
     try:
         result = await parse_video(req.task_id, req.link, platform_hint=platform)
 
+        logger.info(
+            "PARSE_RESULT",
+            extra={
+                "task_id": req.task_id,
+                "keys": sorted(list(result.keys())) if isinstance(result, dict) else str(type(result)),
+                "title": (result.get("title")[:80] if isinstance(result, dict) and result.get("title") else None),
+                "has_cover": bool(result.get("cover")) if isinstance(result, dict) else False,
+                "cover_head": (str(result.get("cover"))[:64] if isinstance(result, dict) and result.get("cover") else None),
+            },
+        )
+
         raw_file = raw_path(req.task_id)
         raw_key = None
         if raw_file.exists():
             raw_key = _upload_artifact(req.task_id, raw_file, RAW_ARTIFACT)
 
-        existing_title = None
-        db = SessionLocal()
-        try:
-            task = db.query(models.Task).filter(models.Task.id == req.task_id).first()
-            if task:
-                existing_title = getattr(task, "title", None)
-        finally:
-            db.close()
+        title_from_parse = None
+        cover_from_parse = None
+        if isinstance(result, dict):
+            title_from_parse = (result.get("title") or "").strip() or None
+            cover_from_parse = (result.get("cover") or "").strip() or None
 
-        _update_task(
-            req.task_id,
-            raw_path=raw_key,
-            platform=(result.get("platform") or platform),
-            title=(result.get("title") or existing_title),
-            cover_url=result.get("cover"),
-            parse_status="done",
-            last_step="parse",
-        )
+        updates = {
+            "raw_path": raw_key,
+            "platform": (result.get("platform") or platform),
+            "parse_status": "done",
+            "last_step": "parse",
+        }
+        if title_from_parse is not None:
+            updates["title"] = title_from_parse
+        if cover_from_parse is not None:
+            updates["cover_url"] = cover_from_parse
+
+        _update_task(req.task_id, **updates)
+
+        try:
+            db = SessionLocal()
+            try:
+                task = db.query(models.Task).filter(models.Task.id == req.task_id).first()
+                logger.info(
+                    "TASK_AFTER_PARSE_UPDATE",
+                    extra={
+                        "task_id": req.task_id,
+                        "title": getattr(task, "title", None) if task else None,
+                        "cover_url": getattr(task, "cover_url", None) if task else None,
+                        "platform": getattr(task, "platform", None) if task else None,
+                        "raw_path": getattr(task, "raw_path", None) if task else None,
+                        "last_step": getattr(task, "last_step", None) if task else None,
+                    },
+                )
+            finally:
+                db.close()
+        except Exception:
+            logger.exception("TASK_AFTER_PARSE_UPDATE_FAILED")
         return result
 
     except HTTPException as exc:

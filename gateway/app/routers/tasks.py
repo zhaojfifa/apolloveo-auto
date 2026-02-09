@@ -384,6 +384,20 @@ async def tasks_page(
 
     items = [derive_task_semantics(row) for row in rows]
 
+    if rows:
+        x = rows[0]
+        logger.info(
+            "TASKS_PAGE_SAMPLE",
+            extra={
+                "sample_task_id": x.get("task_id") or x.get("id"),
+                "sample_title": x.get("title"),
+                "sample_cover_url": x.get("cover_url"),
+                "sample_kind": x.get("kind"),
+                "sample_status": x.get("status"),
+                "sample_pack_path": x.get("pack_path"),
+            },
+        )
+
     return render_template(
         request=request,
         name="tasks.html",

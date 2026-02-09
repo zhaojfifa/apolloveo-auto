@@ -119,6 +119,10 @@
                 <a href="{{ it.primary_action_href }}" class="rounded bg-gray-900 px-2 py-1 text-sm font-semibold text-white hover:bg-gray-800">
                   {{ t("action.open_detail") }}
                 </a>
+                <button class="text-sm text-blue-600 hover:underline"
+                        onclick="deleteTask('{{ it.task_id }}'); return false;">
+                  {{ t("action.delete") }}
+                </button>
               </div>
             </div>
           </div>
@@ -132,6 +136,26 @@
 
   <script src="/static/js/i18n_v185.js"></script>
   <script>
+    async function deleteTask(taskId){
+      if (!taskId) return;
+      if (!confirm("Delete task " + taskId + " ?")) return;
+
+      try{
+        const resp = await fetch(`/api/tasks/${encodeURIComponent(taskId)}?delete_assets=false`, {
+          method: "DELETE",
+          headers: {"Content-Type":"application/json"},
+        });
+        if(!resp.ok){
+          const txt = await resp.text();
+          alert("Delete failed: " + resp.status + " " + txt);
+          return;
+        }
+        location.reload();
+      }catch(e){
+        alert("Delete error: " + e.message);
+      }
+    }
+
     function applyFilters() {
       const rows = Array.from(document.querySelectorAll(".task-row"));
       let shown = 0;
