@@ -38,6 +38,7 @@ from gateway.app.services.parse import detect_platform, parse_video
 from gateway.app.services.publish_service import publish_task_pack
 from gateway.app.services.scene_split import run_scenes_build
 from gateway.app.services.subtitles import generate_subtitles
+from gateway.app.deps import get_task_repository
 from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
 from gateway.app.utils.timing import log_step_timing
@@ -431,22 +432,27 @@ async def run_parse_step(req: ParseRequest):
         if cover_from_parse:
             updates["cover_url"] = cover_from_parse
 
+        logger.info(
+            "PARSE_WRITEBACK_FIELDS task=%s keys=%s title=%s cover_url=%s",
+            req.task_id,
+            sorted(list(updates.keys())),
+            updates.get("title"),
+            updates.get("cover_url"),
+        )
+
         _update_task(req.task_id, **updates)
 
         try:
-            db = SessionLocal()
-            try:
-                task = db.query(models.Task).filter(models.Task.id == req.task_id).first()
-                logger.info(
-                    "TASK_AFTER_PARSE_UPDATE task=%s title=%s cover_url=%s platform=%s last_step=%s",
-                    req.task_id,
-                    getattr(task, "title", None) if task else None,
-                    getattr(task, "cover_url", None) if task else None,
-                    getattr(task, "platform", None) if task else None,
-                    getattr(task, "last_step", None) if task else None,
-                )
-            finally:
-                db.close()
+            repo = get_task_repository()
+            task = repo.get(req.task_id)
+            logger.info(
+                "AFTER_WRITEBACK_TASK_SHAPE task=%s title=%s cover_url=%s platform=%s last_step=%s",
+                req.task_id,
+                (task or {}).get("title"),
+                (task or {}).get("cover_url"),
+                (task or {}).get("platform"),
+                (task or {}).get("last_step"),
+            )
         except Exception:
             logger.exception("TASK_AFTER_PARSE_UPDATE_FAILED")
         return result
@@ -1651,25 +1657,22 @@ def _update_task(task_id: str, **fields) -> None:
     注意：这里允许把字段显式更新为 None（例如清理 error_message / error_reason）。
     只要调用方传了 key，就会写入数据库。
     """
-    db = SessionLocal()
-    try:
-        task = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if not task:
-            return
-        current = {col.name: getattr(task, col.name) for col in task.__table__.columns}
-        policy = get_status_policy(current)
-        updates = policy.reconcile_after_step(
-            current,
-            step="steps_v1._update_task",
-            updates=dict(fields),
-            force=True,
-        )
-        for key, value in updates.items():
-            if hasattr(task, key):
-                setattr(task, key, value)
-        db.commit()
-    finally:
-        db.close()
+    repo = get_task_repository()
+    logger.info(
+        "UPDATE_TASK_REPO_BACKEND task=%s repo=%s keys=%s",
+        task_id,
+        repo.__class__.__name__,
+        sorted(list(fields.keys())),
+    )
+    current = repo.get(task_id) or {}
+    policy = get_status_policy(current)
+    updates = policy.reconcile_after_step(
+        current,
+        step="steps_v1._update_task",
+        updates=dict(fields),
+        force=True,
+    )
+    repo.update(task_id, updates)
 
 
 def _update_pipeline_config(task_id: str, updates: dict[str, str]) -> None:
