@@ -38,6 +38,7 @@ class Task(Base):
     status = Column(String(32), nullable=False, default="pending")
     duration_sec = Column(Integer, nullable=True)
     thumb_url = Column(Text, nullable=True)
+    cover_url = Column(Text, nullable=True)
     
     # 核心产物 (兼容旧字段 + 补全缺失字段)
     raw_path = Column(Text, nullable=True)
