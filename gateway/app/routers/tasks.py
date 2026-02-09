@@ -152,6 +152,7 @@ from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_cr
 from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
 from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 from gateway.app.utils.subtitle_probe import probe_subtitles
+from gateway.app.services.task_semantics import derive_task_semantics
 
 from ..core.workspace import (
     Workspace,
@@ -366,16 +367,28 @@ async def tasks_page(
                 "status": t.get("status") or "pending",
                 "created_at": t.get("created_at") or "",
                 "pack_path": _pack_path_for_list(t),
+                "pack_key": t.get("pack_key"),
+                "pack_url": t.get("pack_url"),
+                "deliver_pack_key": t.get("deliver_pack_key"),
+                "cover_url": t.get("cover_url"),
+                "thumb_url": t.get("thumb_url"),
+                "raw_path": t.get("raw_path"),
+                "raw_key": t.get("raw_key"),
+                "raw_url": t.get("raw_url"),
+                "video_url": t.get("video_url"),
+                "preview_url": t.get("preview_url"),
                 "ui_lang": t.get("ui_lang") or "",
                 "selected_tool_ids": _normalize_selected_tool_ids(t.get("selected_tool_ids")),
             }
         )
 
+    items = [derive_task_semantics(row) for row in rows]
+
     return render_template(
         request=request,
         name="tasks.html",
         ctx={
-            "tasks": rows,
+            "items": items,
             "features": get_features(),
             "tasks_kind": kind_norm or "tasks",
         },
@@ -1949,6 +1962,7 @@ def list_tasks(
                 last_step=t.get("last_step"),
                 duration_sec=t.get("duration_sec"),
                 thumb_url=t.get("thumb_url"),
+                cover_url=t.get("cover_url"),
                 pack_path=pack_path,
                 scenes_path=scenes_path,
                 scenes_status=t.get("scenes_status"),

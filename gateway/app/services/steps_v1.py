@@ -406,10 +406,22 @@ async def run_parse_step(req: ParseRequest):
         if raw_file.exists():
             raw_key = _upload_artifact(req.task_id, raw_file, RAW_ARTIFACT)
 
+        existing_title = None
+        db = SessionLocal()
+        try:
+            task = db.query(models.Task).filter(models.Task.id == req.task_id).first()
+            if task:
+                existing_title = getattr(task, "title", None)
+        finally:
+            db.close()
+
         _update_task(
             req.task_id,
             raw_path=raw_key,
             platform=(result.get("platform") or platform),
+            title=(result.get("title") or existing_title),
+            cover_url=result.get("cover"),
+            parse_status="done",
             last_step="parse",
         )
         return result

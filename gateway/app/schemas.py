@@ -111,6 +111,7 @@ class TaskSummary(BaseModel):
     last_step: Optional[str] = None
     duration_sec: Optional[int] = None
     thumb_url: Optional[str] = None
+    cover_url: Optional[str] = None
     pack_path: Optional[str] = None
     scenes_path: Optional[str] = None
     scenes_status: Optional[str] = None
