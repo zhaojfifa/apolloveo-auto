@@ -420,6 +420,17 @@ async def tasks_new(request: Request) -> HTMLResponse:
     )
 
 
+@pages_router.get("/tasks/newtasks", response_class=HTMLResponse)
+async def tasks_newtasks(request: Request) -> HTMLResponse:
+    """Render tasks wizard selection page."""
+
+    return render_template(
+        request=request,
+        name="tasks_newtasks.html",
+        ctx={"features": get_features()},
+    )
+
+
 @pages_router.get("/tasks/apollo-avatar/new", response_class=HTMLResponse)
 async def tasks_apollo_avatar_new(request: Request) -> HTMLResponse:
     settings = get_settings()
@@ -435,6 +446,11 @@ async def tasks_apollo_avatar_new(request: Request) -> HTMLResponse:
             "demo_asset_base_url": getattr(settings, "demo_asset_base_url", "") or "",
         },
     )
+
+
+@pages_router.get("/tasks/avatar/new", response_class=HTMLResponse)
+async def tasks_avatar_new(request: Request) -> HTMLResponse:
+    return await tasks_apollo_avatar_new(request)
 
 
 @pages_router.get("/ui", response_class=HTMLResponse)

@@ -16,3 +16,8 @@ async def hot_follow_tasks_page(request: Request) -> HTMLResponse:
 @router.get("/tasks/hot-follow/new", response_class=HTMLResponse)
 async def hot_follow_new_page(request: Request) -> HTMLResponse:
     return render_template(request=request, name="hot_follow_new.html")
+
+
+@router.get("/tasks/hot/new", response_class=HTMLResponse)
+async def hot_follow_new_alias(request: Request) -> HTMLResponse:
+    return await hot_follow_new_page(request)
