@@ -21,3 +21,6 @@ Thumbs.db
 
 # Review artifacts
 .review_artifacts/
+
+# local accidental nested repo copy
+/apolloveo-auto/
