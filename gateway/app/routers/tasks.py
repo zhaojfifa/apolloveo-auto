@@ -149,6 +149,7 @@ from gateway.app.services.task_state_service import TaskStateService
 from gateway.app.db import SessionLocal
 
 from gateway.app.task_repo_utils import normalize_task_payload, sort_tasks_by_created
+from gateway.app.services.task_semantics import derive_task_semantics
 from gateway.app.services.task_cleanup import delete_task_record, purge_task_artifacts
 from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 from gateway.app.utils.subtitle_probe import probe_subtitles
@@ -366,10 +367,22 @@ async def tasks_page(
                 "status": t.get("status") or "pending",
                 "created_at": t.get("created_at") or "",
                 "pack_path": _pack_path_for_list(t),
+                "pack_key": t.get("pack_key"),
+                "pack_url": t.get("pack_url"),
+                "pack_download_url": t.get("pack_download_url"),
+                "deliverables": t.get("deliverables"),
+                "raw_url": t.get("raw_url"),
+                "raw_path": t.get("raw_path"),
+                "raw_key": t.get("raw_key"),
+                "video_url": t.get("video_url"),
+                "preview_url": t.get("preview_url"),
+                "thumb_url": t.get("thumb_url"),
                 "ui_lang": t.get("ui_lang") or "",
                 "selected_tool_ids": _normalize_selected_tool_ids(t.get("selected_tool_ids")),
             }
         )
+
+    rows = derive_task_semantics(rows)
 
     return render_template(
         request=request,

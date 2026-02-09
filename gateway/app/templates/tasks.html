@@ -16,42 +16,28 @@
     :root { color-scheme: light; }
     body { margin:0; padding: 16px; background:#f3f4f6; color:#0f172a; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
     .page { max-width: 1200px; margin: 0 auto; }
-    /* ensure topbar doesn't get squeezed */
-    .topbar-wrap { margin-bottom: 12px; }
   </style>
 </head>
 
 <body class="{{ 'mobile' if is_mobile else 'desktop' }}">
   <div class="page">
-
-    {# ---- Topbar (keep existing behavior / language rules) ---- #}
-    {% set ui_show_secondary = false %}
-    {% set topbar_title = t("ui.tasks.board") %}
-    {% set topbar_subtitle = t("tasks.loaded_n", n=(tasks | length)) %}
-    {% set avatar_active = (tasks_kind == "apollo_avatar") %}
-    {% set topbar_nav = [
-      {"label": t("tasks.scene.avatar"), "href": "/tasks?kind=apollo_avatar", "active": avatar_active},
-      {"label": t("tasks.scene.hot"), "href": "/tasks/hot-follow", "active": False},
-      {"label": t("common.tools"), "href": "/tools/hub", "active": False},
-    ] %}
-    {% set topbar_actions = [
-      {"label": (t("tasks.new.avatar") if avatar_active else t("common.new_task")), "href": ("/tasks/apollo-avatar/new" if avatar_active else "/tasks/new"), "primary": True},
-    ] %}
-    <div class="topbar-wrap">
-      {% include "_topbar.html" %}
-    </div>
-
-    {# ---- Board Header ---- #}
-    <div class="mb-4">
-      <div class="flex items-center gap-2">
-        <h1 class="text-2xl font-bold text-gray-900">{{ t("ui.tasks.board") }}</h1>
-        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">v1.9</span>
+    <header class="mb-4 flex flex-wrap items-center gap-3">
+      <div class="flex-1">
+        <div class="flex items-center gap-2">
+          <h1 class="text-2xl font-bold text-gray-900">{{ t("ui.tasks.board") }}</h1>
+          <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">v1.9</span>
+        </div>
+        <p class="mt-1 text-sm text-gray-500">{{ t("tasks.board.subhead") }}</p>
       </div>
-      <p class="mt-1 text-sm text-gray-500">{{ t("tasks.board.subhead") }}</p>
-    </div>
+      <div class="flex items-center gap-2">
+        {% include "_lang_tabs.html" %}
+        <a href="/tasks/new" class="inline-flex items-center rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-800">
+          {{ t("common.new_task") }}
+        </a>
+      </div>
+    </header>
 
-    {# ---- Filters (frontend-only) ---- #}
-    <div class="mb-4 flex flex-wrap items-center gap-2">
+    <div class="mb-3 flex flex-wrap items-center gap-2">
       <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1 text-sm">
         <button class="status-btn rounded-md px-3 py-1.5 data-[active=true]:bg-gray-900 data-[active=true]:text-white"
                 data-status="all" data-active="true">{{ t("tasks.status.all") }}</button>
@@ -62,7 +48,9 @@
         <button class="status-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
                 data-status="attention">{{ t("tasks.status.attention") }}</button>
       </div>
+    </div>
 
+    <div class="mb-4 flex flex-wrap items-center gap-2">
       <div class="inline-flex rounded-lg border border-gray-200 bg-white p-1 text-sm">
         <button class="scene-btn rounded-md px-3 py-1.5 data-[active=true]:bg-gray-900 data-[active=true]:text-white"
                 data-scene="all" data-active="true">{{ t("tasks.scene.all") }}</button>
@@ -73,142 +61,106 @@
         <button class="scene-btn rounded-md px-3 py-1.5 text-gray-700 hover:bg-gray-50"
                 data-scene="baseline">{{ t("tasks.scene.baseline") }}</button>
       </div>
-
       <div class="ml-auto text-sm text-gray-500" id="boardMessage">{{ t("tasks.loaded_n", n=(tasks|length)) }}</div>
     </div>
 
-    {# ---- Row List Container (render by JS) ---- #}
     <div class="bg-white shadow-sm ring-1 ring-gray-900/5 sm:rounded-xl">
-      <div id="taskList" class="divide-y divide-gray-100"></div>
+      <div id="taskList" class="divide-y divide-gray-100">
+        {% for task in tasks %}
+          {% set title = task.title_text or t("tasks.unnamed") %}
+          {% set subtitle = task.subtitle_text or "" %}
+          {% set scene_label = t(task.scene_label_key) %}
+          {% if task.processing %}
+            {% set status_key = "processing" %}
+          {% elif task.done %}
+            {% set status_key = "done" %}
+          {% elif task.needs_attention %}
+            {% set status_key = "attention" %}
+          {% else %}
+            {% set status_key = "other" %}
+          {% endif %}
+
+          <div class="task-row relative flex justify-between gap-x-6 px-4 py-4 sm:px-6 hover:bg-gray-50 {% if task.yellow %} bg-yellow-50/30 {% endif %}"
+               data-scene="{{ task.scene_key }}" data-status="{{ status_key }}">
+            <div class="flex min-w-0 gap-x-4">
+              <div class="h-16 w-16 flex-none rounded-lg bg-gray-200 overflow-hidden flex items-center justify-center">
+                {% if task.thumb_url %}
+                  <img class="h-full w-full object-cover" src="{{ task.thumb_url }}" alt="thumb" />
+                {% else %}
+                  <span class="text-gray-400 text-xl"></span>
+                {% endif %}
+              </div>
+
+              <div class="min-w-0 flex-auto">
+                <p class="text-sm font-semibold leading-6 text-gray-900 line-clamp-1">{{ title }}</p>
+                {% if subtitle %}
+                  <p class="mt-1 flex text-xs leading-5 text-gray-500 gap-2">{{ subtitle }}</p>
+                {% endif %}
+
+                <div class="mt-1 flex gap-2 flex-wrap">
+                  {% if task.pack_exists %}
+                    <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset bg-green-50 text-green-700 ring-green-600/20">
+                      {{ t("tasks.badge.pack_ready") if task.done else t("tasks.badge.pack_exists") }}
+                    </span>
+                  {% endif %}
+                  {% if task.video_exists %}
+                    <span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset bg-blue-50 text-blue-700 ring-blue-700/10">
+                      {{ t("tasks.badge.video") }}
+                    </span>
+                  {% endif %}
+                  {% if task.yellow %}
+                    <span class="text-xs text-amber-700">{{ t("tasks.badge.warn_but_usable") }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-x-4">
+              <div class="hidden sm:flex sm:flex-col sm:items-end">
+                <p class="text-sm leading-6 text-gray-900">{{ scene_label }}</p>
+                <p class="mt-1 text-xs leading-5 text-gray-500">{{ task.created_label }}</p>
+              </div>
+
+              <div class="flex items-center gap-2">
+                {% if task.yellow %}
+                  <a href="{{ task.pack_download_url }}" target="_blank" rel="noopener"
+                     class="rounded bg-indigo-50 px-2 py-1 text-sm font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-300 hover:bg-indigo-100">
+                    {{ t("tasks.action.force_download") }}
+                  </a>
+                {% elif task.pack_exists %}
+                  <a href="{{ task.pack_download_url }}" target="_blank" rel="noopener"
+                     class="rounded bg-white px-2 py-1 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">
+                    {{ t("tasks.action.download") }}
+                  </a>
+                {% else %}
+                  <button class="rounded bg-gray-100 px-2 py-1 text-sm font-semibold text-gray-400 cursor-not-allowed">
+                    {{ t("tasks.action.download") }}
+                  </button>
+                {% endif %}
+
+                <a href="{{ task.primary_action_url }}" class="rounded bg-gray-900 px-2 py-1 text-sm font-semibold text-white hover:bg-gray-800">
+                  {{ t("tasks.action.open") }}
+                </a>
+                <a href="{{ task.primary_action_url }}" class="text-gray-400 hover:text-gray-600" aria-label="detail">?</a>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
       <div id="emptyState" class="hidden p-6 text-center text-sm text-gray-500">
         {{ t("tasks.empty") }}
       </div>
     </div>
-
   </div>
 
   <script src="/static/js/i18n_v185.js"></script>
-  <script src="/static/js/task_semantics_v19.js"></script>
-
   <script>
-    // PR-UI-1: render /tasks board from server-rendered tasks JSON (no backend contract change).
-    // We embed tasks from Jinja to avoid extra polling / fetch duplication.
-    const TASKS = {{ tasks | tojson | safe }};
-    const I18N = window.__V185_I18N__ || window.i18n || {};
-    const i18nFn = I18N.t || I18N.tr || ((key, params) => key);
-    const t18n = (key, params) => i18nFn(key, params);
-
-    const SCENE_LABEL = {
-      avatar: t18n("tasks.scene.avatar"),
-      hot: t18n("tasks.scene.hot"),
-      baseline: t18n("tasks.scene.baseline"),
-    };
-
-    function escapeHtml(s){
-      return String(s||"")
-        .replaceAll("&","&amp;").replaceAll("<","&lt;")
-        .replaceAll(">","&gt;")
-        .replaceAll('"',"&quot;")
-        .replaceAll("'","&#039;");
-    }
-
-    function badge(label, cls){
-      return `<span class="inline-flex items-center rounded-md px-2 py-1 text-xs font-medium ring-1 ring-inset ${cls}">${label}</span>`;
-    }
-
-    function renderRow(sem){
-      const title = escapeHtml(sem.title || t18n("tasks.untitled"));
-      const subtitle = escapeHtml(sem.subtitle || "");
-      const scene = SCENE_LABEL[sem.sceneKey] || sem.sceneKey;
-
-      // deliverables badges (asset-first)
-      const badges = [];
-      if (sem.packExists) {
-        badges.push(badge(" " + (sem.done ? t18n("tasks.badge.pack_ready") : t18n("tasks.badge.pack_exists")),
-          "bg-green-50 text-green-700 ring-green-600/20"));
-      }
-      if (sem.videoExists) {
-        badges.push(badge(" " + t18n("tasks.badge.video"),
-          "bg-blue-50 text-blue-700 ring-blue-700/10"));
-      }
-      if (sem.yellow) {
-        badges.push(`<span class="text-xs text-amber-700">${t18n("tasks.badge.warn_but_usable")}</span>`);
-      }
-
-      // actions: primary = go detail (workbench)
-      const detailUrl = sem.detailUrl || "#";
-      const packBtn = (function(){
-        if (!sem.packExists || !sem.packDownloadUrl) {
-          return `<button class="rounded bg-gray-100 px-2 py-1 text-sm font-semibold text-gray-400 cursor-not-allowed">${t18n("tasks.action.download")}</button>`;
-        }
-        if (sem.dbStatus === "failed") {
-          return `<a href="${sem.packDownloadUrl}" target="_blank" rel="noopener"
-                    class="rounded bg-indigo-50 px-2 py-1 text-sm font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-300 hover:bg-indigo-100">${t18n("tasks.action.force_download")}</a>`;
-        }
-        return `<a href="${sem.packDownloadUrl}" target="_blank" rel="noopener"
-                  class="rounded bg-white px-2 py-1 text-sm font-semibold text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">${t18n("tasks.action.download")}</a>`;
-      })();
-
-      const rowBg = sem.yellow ? "bg-yellow-50/30" : "";
-
-      return `
-        <div class="task-row relative flex justify-between gap-x-6 px-4 py-4 sm:px-6 hover:bg-gray-50 ${rowBg}"
-             data-scene="${sem.sceneKey}" data-status="${sem.processing ? "processing" : (sem.done ? "done" : (sem.needsAttention ? "attention" : "other"))}">
-          <div class="flex min-w-0 gap-x-4">
-            <!-- Thumb (placeholder for now; do not require backend) -->
-            <div class="h-16 w-16 flex-none rounded-lg bg-gray-200 overflow-hidden flex items-center justify-center">
-              <span class="text-gray-400 text-xl"></span>
-            </div>
-
-            <div class="min-w-0 flex-auto">
-              <p class="text-sm font-semibold leading-6 text-gray-900 line-clamp-1">${title}</p>
-              <p class="mt-1 flex text-xs leading-5 text-gray-500 gap-2">${subtitle}</p>
-
-              <div class="mt-1 flex gap-2 flex-wrap">
-                ${badges.join("")}
-              </div>
-            </div>
-          </div>
-
-          <div class="flex items-center gap-x-4">
-            <div class="hidden sm:flex sm:flex-col sm:items-end">
-              <p class="text-sm leading-6 text-gray-900">${escapeHtml(scene)}</p>
-              <p class="mt-1 text-xs leading-5 text-gray-500">${escapeHtml(sem.createdLabel || "")}</p>
-            </div>
-
-            <div class="flex items-center gap-2">
-              ${packBtn}
-              <a href="${detailUrl}" class="rounded bg-gray-900 px-2 py-1 text-sm font-semibold text-white hover:bg-gray-800">${t18n("tasks.action.open")}</a>
-              <a href="${detailUrl}" class="text-gray-400 hover:text-gray-600" aria-label="detail">?</a>
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    function renderList(tasks){
-      const listEl = document.getElementById("taskList");
-      const emptyEl = document.getElementById("emptyState");
-      listEl.innerHTML = "";
-      if (!tasks || !tasks.length) {
-        emptyEl.classList.remove("hidden");
-        return;
-      }
-      emptyEl.classList.add("hidden");
-      for (const t of tasks) {
-        const sem = window.TaskSemanticsV19.derive(t);
-        listEl.insertAdjacentHTML("beforeend", renderRow(sem));
-      }
-    }
-
-    // Filter state (frontend-only)
-    let curStatus = "all";
-    let curScene = "all";
-
     function applyFilters() {
       const rows = Array.from(document.querySelectorAll(".task-row"));
       let shown = 0;
-      for (const r of rows) {
+      const curStatus = document.querySelector(".status-btn[data-active='true']")?.dataset.status || "all";
+      const curScene = document.querySelector(".scene-btn[data-active='true']")?.dataset.scene || "all";
+      rows.forEach((r) => {
         const rs = r.getAttribute("data-status") || "other";
         const rc = r.getAttribute("data-scene") || "baseline";
         const okStatus = (curStatus === "all") ? true : (rs === curStatus);
@@ -216,28 +168,31 @@
         const show = okStatus && okScene;
         r.style.display = show ? "" : "none";
         if (show) shown++;
+      });
+      const msg = document.getElementById("boardMessage");
+      if (msg) msg.textContent = {{ t("tasks.filtered_n", n="{n}") | tojson }}.replace("{n}", String(shown));
+
+      const empty = document.getElementById("emptyState");
+      if (empty) {
+        if (shown === 0) empty.classList.remove("hidden");
+        else empty.classList.add("hidden");
       }
-      document.getElementById("boardMessage").textContent = t18n("tasks.filtered_n", { n: shown });
     }
 
-    function bindTabs(selector, key, setFn) {
+    function bindTabs(selector, key) {
       const btns = Array.from(document.querySelectorAll(selector));
-      btns.forEach(b => {
+      btns.forEach((b) => {
         b.addEventListener("click", () => {
           btns.forEach(x => x.dataset.active = "false");
           b.dataset.active = "true";
-          setFn(b.dataset[key] || "all");
           applyFilters();
         });
       });
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      renderList(TASKS);
-
-      bindTabs(".status-btn", "status", (v) => curStatus = v);
-      bindTabs(".scene-btn", "scene", (v) => curScene = v);
-
+      bindTabs(".status-btn", "status");
+      bindTabs(".scene-btn", "scene");
       applyFilters();
     });
   </script>
