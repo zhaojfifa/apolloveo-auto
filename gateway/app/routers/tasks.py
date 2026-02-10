@@ -420,6 +420,11 @@ async def tasks_new(request: Request) -> HTMLResponse:
     )
 
 
+@pages_router.get("/tasks/baseline/new", response_class=HTMLResponse)
+async def tasks_baseline_new(request: Request) -> HTMLResponse:
+    return await tasks_new(request)
+
+
 @pages_router.get("/tasks/newtasks", response_class=HTMLResponse)
 async def tasks_newtasks(request: Request) -> HTMLResponse:
     """Render tasks wizard selection page."""
