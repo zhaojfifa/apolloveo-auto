@@ -1,53 +1,76 @@
 <!doctype html>
 <html lang="zh-CN">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{{ t("page.tasks.new.title") }} - ShortVideo</title>
-  <link rel="stylesheet" href="/static/i18n.css" />
-  <link rel="stylesheet" href="/static/css/ui_v185.css">
-  <style>
-    :root { color-scheme: light; }
-    body { margin: 0; padding: 16px; background: #f3f4f6; color: #111827; }
-    .page { max-width: 980px; margin: 0 auto; }
-    .wizard { margin-top: 12px; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
-    .wizard-card { background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.05); display:flex; flex-direction:column; gap:8px; }
-    .wizard-card h3 { margin: 0; font-size: 1rem; font-weight: 700; }
-    .wizard-card p { margin: 0; color:#6b7280; font-size: 0.9rem; }
-    .wizard-card a { margin-top: auto; display:inline-flex; align-items:center; justify-content:center; border-radius:10px; padding:8px 10px; font-weight:600; text-decoration:none; }
-    .wizard-primary { background:#4f46e5; color:#fff; border:1px solid transparent; }
-    .wizard-secondary { background:#fff; color:#111827; border:1px solid #d1d5db; }
-  </style>
-</head>
-<body>
-  <div class="page">
-    {% set topbar_title = t("page.tasks.new.title") %}
-    {% set topbar_subtitle = t("page.tasks.new.subtitle") %}
-    {% set topbar_nav = [
-      {"label": t("common.tasks"), "href": "/tasks", "active": True},
-      {"label": t("common.tools"), "href": "/tools/hub", "active": False},
-    ] %}
-    {% set topbar_actions = [
-      {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
-    ] %}
-    {% include "_topbar.html" %}
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ t("page.tasks.new.title") }} - ShortVideo</title>
 
-    <section class="wizard" aria-label="tasks wizard">
-      <div class="wizard-card">
-        <h3>{{ t("tasks.filter.scene.baseline") }}</h3>
-        <a class="wizard-primary" href="/tasks/new">{{ t("common.new_task") }}</a>
-      </div>
-      <div class="wizard-card">
-        <h3>{{ t("tasks.filter.scene.avatar") }}</h3>
-        <a class="wizard-secondary" href="/tasks/avatar/new">{{ t("common.new_task") }}</a>
-      </div>
-      <div class="wizard-card">
-        <h3>{{ t("tasks.filter.scene.hot_follow") }}</h3>
-        <a class="wizard-secondary" href="/tasks/hot/new">{{ t("common.new_task") }}</a>
-      </div>
-    </section>
-  </div>
+    <!-- Keep existing i18n + ui skin -->
+    <link rel="stylesheet" href="/static/i18n.css" />
+    <link rel="stylesheet" href="/static/css/ui_v185.css" />
+  </head>
 
-  <script src="/static/js/i18n_v185.js"></script>
-</body>
+  <body>
+    <div class="page">
+      {# Topbar (keep existing layout) #}
+      {% set topbar_title = t("page.tasks.new.title") %}
+      {% set topbar_subtitle = t("page.tasks.new.subtitle") %}
+      {% set topbar_nav = [
+        {"label": t("common.tasks"), "href": "/tasks/newtasks", "active": True},
+        {"label": t("common.tools"), "href": "/tools/hub", "active": False},
+      ] %}
+      {% set topbar_actions = [
+        {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
+      ] %}
+      {% include "_topbar.html" %}
+
+      <main class="wz-wrap">
+        <h1 class="wz-title">{{ t("tasks.wizard.title") }}</h1>
+        <div class="wz-sub">{{ t("tasks.wizard.subtitle") }}</div>
+
+        <section class="wz-grid" aria-label="task wizard">
+          <!-- Avatar -->
+          <a class="wz-card wz-card--avatar" href="/tasks/avatar/new">
+            <div class="wz-icon"></div>
+            <h3>{{ t("tasks.scene.avatar.title") }}</h3>
+            <div class="wz-en">AVATAR</div>
+            <p>{{ t("tasks.scene.avatar.desc") }}</p>
+            <div class="wz-divider"></div>
+            <div class="wz-link wz-link--avatar">{{ t("tasks.wizard.start") }} <span>?</span></div>
+          </a>
+
+          <!-- Hot -->
+          <a class="wz-card wz-card--hot" href="/tasks/hot/new">
+            <div class="wz-icon"></div>
+            <h3>{{ t("tasks.scene.hot.title") }}</h3>
+            <div class="wz-en">HOT</div>
+            <p>{{ t("tasks.scene.hot.desc") }}</p>
+            <div class="wz-divider"></div>
+            <div class="wz-link wz-link--hot">{{ t("tasks.wizard.start") }} <span>?</span></div>
+          </a>
+
+          <!-- Baseline -->
+          <a class="wz-card wz-card--baseline" href="/tasks/new">
+            <div class="wz-icon">??</div>
+            <h3>{{ t("tasks.scene.baseline.title") }}</h3>
+            <div class="wz-en">BASELINE</div>
+            <p>{{ t("tasks.scene.baseline.desc") }}</p>
+            <div class="wz-divider"></div>
+            <div class="wz-link wz-link--baseline">{{ t("tasks.wizard.start") }} <span>?</span></div>
+          </a>
+        </section>
+
+        <section class="wz-hint">
+          <div class="wz-hint__title"> {{ t("tasks.wizard.hint_title") }}</div>
+          <ul class="wz-hint__list">
+            <li><b>{{ t("tasks.scene.avatar.title") }}</b>£º{{ t("tasks.wizard.hint_avatar") }}</li>
+            <li><b>{{ t("tasks.scene.hot.title") }}</b>£º{{ t("tasks.wizard.hint_hot") }}</li>
+            <li><b>{{ t("tasks.scene.baseline.title") }}</b>£º{{ t("tasks.wizard.hint_baseline") }}</li>
+          </ul>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/js/i18n_v185.js"></script>
+  </body>
 </html>
