@@ -25,6 +25,12 @@ WORKBENCH_REGISTRY: Dict[str, WorkbenchSpec] = {
         js="/static/js/workbench_apollo_avatar.js",
         display_name="Apollo Avatar Workbench",
     ),
+    "hot_follow": WorkbenchSpec(
+        kind="hot_follow",
+        template="hot_follow_workbench.html",
+        js="/static/js/hot_follow_workbench.js",
+        display_name="Hot Follow Workbench",
+    ),
 }
 
 

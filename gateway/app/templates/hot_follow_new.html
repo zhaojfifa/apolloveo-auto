@@ -1,40 +1,103 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>热点跟随 - 新建</title>
+  <title>{{ t("hot.follow.new.title") }}</title>
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; padding: 16px; background: #f3f4f6; color: #111827; }
+    .page { max-width: 1100px; margin: 0 auto; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+    .grid { display:grid; gap:16px; grid-template-columns: 1.2fr 1fr; }
+    @media (max-width: 960px){ .grid{ grid-template-columns:1fr; } }
+    .field { margin-top: 12px; }
+    .field label { display:block; font-weight:600; margin-bottom:6px; }
+    .input, select { width:100%; border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; }
+    .probe-card { display:flex; gap:12px; align-items:center; border:1px dashed #d1d5db; border-radius:12px; padding:12px; }
+    .probe-cover { width:72px; height:72px; border-radius:10px; background:#f3f4f6; object-fit:cover; }
+    .muted { color:#6b7280; font-size:0.9rem; }
+    .btn-primary { background:#4f46e5; color:#fff; border:1px solid transparent; border-radius:10px; padding:10px 14px; font-weight:700; cursor:pointer; }
+    .btn-primary[disabled]{ background:#e5e7eb; color:#9ca3af; cursor:not-allowed; }
+    .btn-secondary { background:#fff; color:#111827; border:1px solid #d1d5db; border-radius:10px; padding:8px 12px; font-weight:600; cursor:pointer; }
+    .radio-row { display:flex; gap:12px; flex-wrap:wrap; }
+  </style>
 </head>
 <body>
   <div class="page">
-    {% set topbar_title = "热点跟随 - 新建" %}
-{% set topbar_subtitle = "Coming soon" %}
-{% set topbar_nav = [
-  {"label": "数字人", "href": "/tasks?kind=apollo_avatar", "active": False},
-  {"label": "热点跟随", "href": "/tasks/hot-follow", "active": True},
-  {"label": "工具", "href": "/tools/hub", "active": False},
-] %}
-{% set topbar_actions = [
-  {"label": "返回", "href": "/tasks/hot-follow", "primary": False},
-] %}
-{% include "_topbar.html" %}
+    {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
+    {% set topbar_title = t("hot.follow.new.title") %}
+    {% set topbar_subtitle = t("hot.follow.new.subtitle") %}
+    {% set topbar_nav = [
+      {"label": t("common.tasks"), "href": "/tasks" ~ ui_q, "active": False},
+      {"label": t("hot.follow.nav"), "href": "/tasks/hot-follow" ~ ui_q, "active": True},
+      {"label": t("common.tools"), "href": "/tools/hub" ~ ui_q, "active": False},
+    ] %}
+    {% set topbar_actions = [
+      {"label": t("common.back_task_board"), "href": "/tasks" ~ ui_q, "primary": False},
+    ] %}
+    {% include "_topbar.html" %}
 
-    <div class="card">
-      <div class="card-body">
-        <h2>热点跟随 - 新建</h2>
-        <p class="muted">Coming soon. 此页面为占位，不触发后端任务/外部API。</p>
-
-        <label>关键词 / 话题</label>
-        <input class="input" type="text" placeholder="例如：拉杆箱、防晒、开学季" disabled />
-
-        <div style="margin-top: 12px;">
-          <button class="btn btn-secondary" disabled>创建（暂不可用）</button>
-          <a class="btn" href="/tasks/hot-follow">返回列表</a>
+    <div class="grid">
+      <div class="card">
+        <h2>{{ t("hot.follow.new.form_title") }}</h2>
+        <div class="field">
+          <label for="hf-url">{{ t("label.source_url") }}</label>
+          <input id="hf-url" class="input" type="text" placeholder="{{ t('label.source_url.placeholder') }}" />
+          <div class="muted" id="hf-url-hint"></div>
         </div>
+
+        <div class="field">
+          <label for="hf-platform">{{ t("label.platform") }}</label>
+          <select id="hf-platform">
+            <option value="auto">Auto</option>
+            <option value="douyin">{{ t("label.platform_douyin") }}</option>
+            <option value="xhs">{{ t("label.platform_xhs") }}</option>
+            <option value="tiktok">{{ t("label.platform_tiktok") }}</option>
+            <option value="fb">{{ t("label.platform_fb") }}</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>{{ t("hot.follow.new.bgm_title") }}</label>
+          <div class="radio-row">
+            <label><input type="radio" name="bgm_strategy" value="replace" checked /> {{ t("hot.follow.new.bgm_replace") }}</label>
+            <label><input type="radio" name="bgm_strategy" value="keep" /> {{ t("hot.follow.new.bgm_keep") }}</label>
+            <label><input type="radio" name="bgm_strategy" value="mute" /> {{ t("hot.follow.new.bgm_mute") }}</label>
+          </div>
+          <div class="field">
+            <input id="hf-bgm" type="file" accept="audio/*" />
+          </div>
+          <div class="field">
+            <label>{{ t("hot.follow.new.bgm_mix") }}</label>
+            <input id="hf-mix" class="input" type="number" min="0" max="1" step="0.05" value="0.8" />
+          </div>
+        </div>
+
+        <div class="field">
+          <button id="hf-create" class="btn-primary" disabled>{{ t("hot.follow.new.cta") }}</button>
+          <span class="muted" id="hf-create-msg"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>{{ t("hot.follow.new.probe_title") }}</h2>
+        <div id="hf-probe" class="probe-card">
+          <img id="hf-cover" class="probe-cover" alt="cover" />
+          <div>
+            <div id="hf-title" class="text-lg font-semibold"></div>
+            <div id="hf-duration" class="muted"></div>
+            <div id="hf-platform-text" class="muted"></div>
+          </div>
+        </div>
+        <div class="muted" id="hf-probe-msg"></div>
       </div>
     </div>
   </div>
+
+  <script src="/static/js/i18n_v185.js"></script>
+  <script src="/static/js/hot_follow_new.js"></script>
 </body>
 </html>

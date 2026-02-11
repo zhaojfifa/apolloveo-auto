@@ -71,6 +71,7 @@ class PublishResponse(BaseModel):
 class TaskCreate(BaseModel):
     source_url: constr(strip_whitespace=True, min_length=1)
     platform: Optional[str] = None
+    kind: Optional[str] = None
     account_id: Optional[str] = None
     account_name: Optional[str] = None
     video_type: Optional[str] = None
@@ -95,6 +96,7 @@ class TaskUpdate(BaseModel):
 class TaskSummary(BaseModel):
     task_id: str
     title: Optional[str] = None
+    kind: Optional[str] = None
     source_url: Optional[str] = None
     source_link_url: Optional[str] = None
     platform: Optional[str] = None
