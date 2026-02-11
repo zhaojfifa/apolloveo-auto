@@ -66,6 +66,8 @@ from ..services.steps_v1 import (
     run_dub_step as run_dub_step_v1,
 )
 from gateway.app.services.status_policy.service import policy_upsert
+from gateway.app.services.parse import detect_platform
+from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 
 
 def _policy_upsert(repo, task_id: str, updates: dict, *, task: dict | None = None, step: str = "router.tasks", force: bool = False):
@@ -193,9 +195,17 @@ class ParseTaskRequest(BaseModel):
     platform: str | None = None
 
 
+class ProbeTaskRequest(BaseModel):
+    platform: str | None = None
+    url: str
+
+
 class PublishTaskRequest(BaseModel):
     provider: str | None = None
     force: bool = False
+    published: bool | None = None
+    published_url: str | None = None
+    notes: str | None = None
 
 
 pages_router = APIRouter()
@@ -1160,6 +1170,7 @@ def _task_to_detail(task: dict) -> TaskDetail:
     payload = {
         "task_id": str(task.get("task_id") or task.get("id")),
         "title": task.get("title"),
+        "kind": task.get("kind"),
         "source_url": str(task.get("source_url")) if task.get("source_url") else None,
         "source_link_url": _extract_first_http_url(task.get("source_url")),
         "platform": task.get("platform"),
@@ -1642,11 +1653,15 @@ async def task_publish_hub_page(
         resp.status_code = 404
         return resp
 
+    template_name = "task_publish_hub.html"
+    if str(task.get("kind") or "").lower() == "hot_follow":
+        template_name = "hot_follow_publish.html"
+
     detail = _task_to_detail(task)
     task_json = {"task_id": detail.task_id}
     return render_template(
         request=request,
-        name="task_publish_hub.html",
+        name=template_name,
         ctx={
             "task": detail,
             "task_json": task_json,
@@ -1711,6 +1726,44 @@ def resolve_download_code(code: str, repo=Depends(get_task_repository)):
     raise HTTPException(status_code=404, detail="Code not found")
 
 
+@api_router.post("/tasks/probe")
+async def probe_task(payload: ProbeTaskRequest):
+    url = _extract_first_http_url(payload.url) or payload.url
+    if not url:
+        raise HTTPException(status_code=400, detail="url is required")
+
+    platform = (payload.platform or "").strip().lower() if payload.platform else "auto"
+    if platform in ("", "auto"):
+        platform = detect_platform(url) or "auto"
+
+    try:
+        meta = await parse_with_xiongmao(url)
+    except XiongmaoError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    raw = meta.get("raw") if isinstance(meta, dict) else None
+    duration_sec = None
+    if isinstance(raw, dict):
+        for key in ("duration_sec", "duration", "durationSec"):
+            if raw.get(key):
+                try:
+                    duration_sec = int(float(raw.get(key)))
+                    break
+                except Exception:
+                    pass
+
+    return {
+        "platform": platform or meta.get("platform"),
+        "url": url,
+        "title": meta.get("title") if isinstance(meta, dict) else None,
+        "cover": meta.get("cover") if isinstance(meta, dict) else None,
+        "duration_sec": duration_sec,
+        "source_id": raw.get("source_id") if isinstance(raw, dict) else None,
+        "raw": raw,
+        "raw_downloaded": False,
+    }
+
+
 @api_router.post("/tasks", response_model=TaskDetail)
 def create_task(
     payload: TaskCreate,
@@ -1726,6 +1779,7 @@ def create_task(
     task_payload = {
         "task_id": task_id,
         "title": payload.title,
+        "kind": payload.kind,
         "source_url": source_text,
         "platform": platform,
         "account_id": payload.account_id,
@@ -1913,6 +1967,65 @@ def create_task_local_upload(
     return {"ok": True, "task_id": task_id, "redirect": f"/tasks/{task_id}"}
 
 
+@api_router.post("/tasks/{task_id}/bgm")
+def upload_task_bgm(
+    task_id: str,
+    bgm_file: UploadFile = File(...),
+    original_pct: int | None = Form(default=None),
+    bgm_pct: int | None = Form(default=None),
+    mix_ratio: float | None = Form(default=None),
+    strategy: str | None = Form(default=None),
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    if not bgm_file or not bgm_file.filename:
+        raise HTTPException(status_code=400, detail="bgm_file is required")
+
+    ext = Path(bgm_file.filename).suffix.lower()
+    if ext not in {".mp3", ".wav"}:
+        raise HTTPException(status_code=400, detail="unsupported file type")
+
+    max_mb = int(os.getenv("MAX_BGM_UPLOAD_MB", "50"))
+    max_bytes = max_mb * 1024 * 1024
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir) / f"user_bgm{ext}"
+        _save_upload_to_paths(
+            upload=bgm_file,
+            inputs_path=tmp_path,
+            raw_path_target=tmp_path,
+            max_bytes=max_bytes,
+        )
+        artifact_name = f"bgm/user_bgm{ext}"
+        bgm_key = upload_task_artifact(task, tmp_path, artifact_name, task_id=task_id)
+
+    ratio = mix_ratio
+    if ratio is None:
+        if bgm_pct is not None and original_pct is not None:
+            total = max(bgm_pct + original_pct, 0)
+            ratio = (bgm_pct / total) if total > 0 else 0.5
+        else:
+            ratio = 0.8
+    ratio = max(0.0, min(float(ratio), 1.0))
+
+    config = dict(task.get("config") or {})
+    config["bgm"] = {
+        "strategy": strategy or "replace",
+        "bgm_key": bgm_key,
+        "mix_ratio": ratio,
+    }
+    _policy_upsert(repo, task_id, {"config": config})
+
+    return {
+        "task_id": task_id,
+        "bgm_key": bgm_key,
+        "mix_ratio": ratio,
+        "strategy": config["bgm"]["strategy"],
+    }
+
+
 @api_router.patch("/tasks/{task_id}", response_model=TaskDetail)
 def update_task_selected_tools(
     task_id: str,
@@ -1981,6 +2094,7 @@ def list_tasks(
             TaskSummary(
                 task_id=str(t.get("task_id") or t.get("id")),
                 title=t.get("title"),
+                kind=t.get("kind"),
                 source_url=str(t.get("source_url")) if t.get("source_url") else None,
                 source_link_url=_extract_first_http_url(t.get("source_url")),
                 platform=t.get("platform"),
@@ -2663,6 +2777,28 @@ def publish_task(
     payload: PublishTaskRequest | None = None,
     repo=Depends(get_task_repository),
 ):
+    if payload and (payload.published or payload.published_url or payload.notes):
+        published = bool(payload.published or payload.published_url)
+        updates = {
+            "publish_status": "ready" if published else None,
+            "publish_url": payload.published_url or None,
+            "published_at": datetime.now(timezone.utc).isoformat(),
+            "publish_meta": {
+                "published": published,
+                "published_url": payload.published_url,
+                "notes": payload.notes,
+            },
+        }
+        _policy_upsert(repo, task_id, updates)
+        task = repo.get(task_id) or {}
+        return {
+            "task_id": task_id,
+            "provider": "manual",
+            "publish_key": task.get("publish_key"),
+            "download_url": payload.published_url or task.get("publish_url") or "",
+            "published_at": updates["published_at"],
+        }
+
     db = SessionLocal()
     try:
         res = publish_task_pack(

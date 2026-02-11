@@ -23,15 +23,16 @@
 
   <body class="bg-gray-50 text-gray-900">
     <div class="page">
+      {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
       {# Topbar (reuse existing component) #}
       {% set topbar_title = t("tasks.wizard.header_title") %}
       {% set topbar_subtitle = t("tasks.wizard.header_subtitle") %}
       {% set topbar_nav = [
-        {"label": t("common.tasks"), "href": "/tasks", "active": true},
-        {"label": t("common.tools"), "href": "/tools/hub", "active": false}
+        {"label": t("common.tasks"), "href": "/tasks" ~ ui_q, "active": true},
+        {"label": t("common.tools"), "href": "/tools/hub" ~ ui_q, "active": false}
       ] %}
       {% set topbar_actions = [
-        {"label": t("common.back_task_board"), "href": "/tasks", "primary": false}
+        {"label": t("common.back_task_board"), "href": "/tasks" ~ ui_q, "primary": false}
       ] %}
       {% include "_topbar.html" %}
 
@@ -43,7 +44,7 @@
 
         <section class="grid grid-cols-1 gap-6 md:grid-cols-3" aria-label="task scene wizard">
           <!-- Avatar -->
-          <a href="/tasks/avatar/new"
+          <a href="/tasks/avatar/new{{ ui_q }}"
              class="wizard-card group block bg-white shadow-sm ring-1 ring-gray-200 transition-all duration-150 hover:shadow-md hover:ring-gray-300 p-6">
             <div class="icon-box bg-purple-50 ring-1 ring-purple-200 text-purple-700">
               <!-- User-Astronaut (simple inline svg) -->
@@ -72,7 +73,7 @@
           </a>
 
           <!-- Hot -->
-          <a href="/tasks/hot/new"
+          <a href="/tasks/hot/new{{ ui_q }}"
              class="wizard-card group block bg-white shadow-sm ring-1 ring-gray-200 transition-all duration-150 hover:shadow-md hover:ring-gray-300 p-6">
             <div class="icon-box bg-orange-50 ring-1 ring-orange-200 text-orange-700">
               <!-- Fire -->
@@ -101,7 +102,7 @@
           </a>
 
           <!-- Baseline -->
-          <a href="/tasks/baseline/new"
+          <a href="/tasks/baseline/new{{ ui_q }}"
              class="wizard-card group block bg-white shadow-sm ring-1 ring-gray-200 transition-all duration-150 hover:shadow-md hover:ring-gray-300 p-6">
             <div class="icon-box bg-blue-50 ring-1 ring-blue-200 text-blue-700">
               <!-- Scissors -->
