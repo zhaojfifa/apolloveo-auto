@@ -84,13 +84,13 @@
         <section class="lg:col-span-7 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div class="flex items-center justify-between mb-4">
-              <h2 class="text-lg font-semibold">Pipeline Configuration</h2>
-              <span class="text-xs text-gray-400">P1</span>
+              <h2 class="text-lg font-semibold">加工流水线配置</h2>
+              <span class="text-xs text-gray-400">Config</span>
             </div>
 
             <div class="space-y-5">
               <div>
-                <label class="block text-sm font-semibold text-gray-700">{{ t("label.language") }}</label>
+                <label class="block text-sm font-semibold text-gray-700">目标语言</label>
                 <select name="target_lang" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
                   <option value="zh">中文</option>
                   <option value="mm">မြန်မာ</option>
@@ -99,27 +99,27 @@
               </div>
 
               <div>
-                <div class="text-sm font-semibold text-gray-700 mb-2">{{ t("label.subtitles_mode") }}</div>
+                <div class="text-sm font-semibold text-gray-700 mb-2">处理模式</div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label class="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
-                    <input type="radio" name="process_mode" value="fast_clone" checked />
+                  <label class="flex items-start gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
+                    <input type="radio" name="process_mode" value="fast_clone" checked class="mt-1" />
                     <div>
-                      <div class="text-sm font-semibold text-gray-900">{{ t("label.subtitles_mode.whisper_only") }}</div>
-                      <div class="text-xs text-gray-500">{{ t("hot.follow.step.parse") }} → {{ t("hot.follow.step.subtitles") }}</div>
+                      <div class="text-sm font-semibold text-gray-900">极速复刻</div>
+                      <div class="text-xs text-gray-500">优先速度，快速产出</div>
                     </div>
                   </label>
-                  <label class="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
-                    <input type="radio" name="process_mode" value="smart_rewrite" />
+                  <label class="flex items-start gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
+                    <input type="radio" name="process_mode" value="smart_rewrite" class="mt-1" />
                     <div>
-                      <div class="text-sm font-semibold text-gray-900">{{ t("label.subtitles_mode.whisper_gemini") }}</div>
-                      <div class="text-xs text-gray-500">{{ t("hot.follow.step.dub") }} → {{ t("hot.follow.step.pack") }}</div>
+                      <div class="text-sm font-semibold text-gray-900">智能仿写</div>
+                      <div class="text-xs text-gray-500">更注重表达优化与适配</div>
                     </div>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label class="block text-sm font-semibold text-gray-700">{{ t("label.account") }}</label>
+                <label class="block text-sm font-semibold text-gray-700">发布账号</label>
                 <select name="publish_account" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
                   <option value="default">Default</option>
                   <option value="account_a">Account A</option>
@@ -128,7 +128,7 @@
               </div>
 
               <div>
-                <label class="block text-sm font-semibold text-gray-700">{{ t("label.title.optional") }}</label>
+                <label class="block text-sm font-semibold text-gray-700">任务标题（可选）</label>
                 <input id="hf-task-title" name="task_title" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('label.title.placeholder') }}" />
               </div>
             </div>
