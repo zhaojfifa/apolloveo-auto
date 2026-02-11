@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -6,9 +6,23 @@
   <title>{{ t("hot.follow.delivery.title") }}</title>
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; padding: 16px; background: #f3f4f6; color: #111827; }
+    .page { max-width: 1100px; margin: 0 auto; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+    .grid { display:grid; gap:16px; grid-template-columns: 1.2fr 0.8fr; }
+    @media (max-width: 960px){ .grid{ grid-template-columns:1fr; } }
+    .deliverables { display:flex; flex-direction:column; gap:8px; }
+    .deliverable { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; }
+    .btn-primary { background:#4f46e5; color:#fff; border:1px solid transparent; border-radius:10px; padding:8px 12px; font-weight:700; }
+    .btn-secondary { background:#fff; color:#111827; border:1px solid #d1d5db; border-radius:10px; padding:8px 12px; font-weight:600; }
+    .input { width:100%; border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; }
+    .muted { color:#6b7280; font-size:0.9rem; }
+  </style>
 </head>
 <body>
-  <div class="page hf-page" data-task-id="{{ task.task_id }}">
+  <div class="page" data-task-id="{{ task.task_id }}">
     {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
     {% set topbar_title = t("hot.follow.delivery.title") %}
     {% set topbar_subtitle = t("hot.follow.delivery.subtitle") %}
@@ -22,81 +36,27 @@
     ] %}
     {% include "_topbar.html" %}
 
-    <div class="hf-sop">
-      <div class="hf-sop__title">{{ t("hot.follow.delivery.subtitle") }}</div>
-      <div class="hf-sop__steps">
-        <span>{{ t("hot.follow.step.parse") }}</span>
-        <span>{{ t("hot.follow.step.subtitles") }}</span>
-        <span>{{ t("hot.follow.step.dub") }}</span>
-        <span>{{ t("hot.follow.step.pack") }}</span>
+    <div class="grid">
+      <div class="card">
+        <h2>{{ t("hot.follow.delivery.deliverables") }}</h2>
+        <div id="hf-deliverables" class="deliverables"></div>
+        <div id="hf-deliverables-empty" class="muted" style="margin-top:8px; display:none;">{{ t("hot.follow.delivery.empty") }}</div>
       </div>
-    </div>
-
-    {% set cover_url = task.cover_url or task.cover or task.thumb_url or "" %}
-
-    <div class="hf-grid hf-publish-grid">
-      <section class="hf-card">
-        <h2 class="hf-section-title">{{ t("hot.follow.delivery.deliverables") }}</h2>
-        <div class="hf-deliverable-preview">
-          {% if cover_url %}
-            <img class="hf-preview__img" src="{{ cover_url }}" alt="cover" />
-          {% else %}
-            <div class="hf-preview__placeholder"></div>
-          {% endif %}
-          <div class="hf-muted">{{ t("hot.follow.delivery.subtitle") }}</div>
-        </div>
-        <div id="hf-publish-hub-msg" class="hf-muted"></div>
-        <div id="hf-deliverables" class="hf-deliverables"></div>
-        <div id="hf-deliverables-empty" class="hf-muted" style="margin-top:8px; display:none;">{{ t("hot.follow.delivery.empty") }}</div>
-      </section>
-
-      <section class="hf-card">
-        <h2 class="hf-section-title">{{ t("tasks.publish_hub") }}</h2>
-        <div class="hf-copy-list">
-          <div class="hf-copy-item">{{ t("hot.follow.delivery.publish") }}</div>
-          <div class="hf-copy-item">{{ t("hot.follow.delivery.publish_cta") }}</div>
-          <div class="hf-copy-item">{{ t("hot.follow.delivery.notes") }}</div>
-        </div>
-        <div class="hf-field">
-          <label>{{ t("hot.follow.delivery.notes") }}</label>
-          <textarea class="hf-textarea" rows="5" placeholder="{{ t('hot.follow.delivery.notes.placeholder') }}"></textarea>
-        </div>
-        <div class="hf-tags">
-          <span class="hf-tag">#hot</span>
-          <span class="hf-tag">#trend</span>
-          <span class="hf-tag">#remix</span>
-        </div>
-      </section>
-
-      <section class="hf-card">
-        <h2 class="hf-section-title">{{ t("hot.follow.delivery.publish") }}</h2>
-        <div class="hf-field">
-          <label>{{ t("hot.follow.delivery.publish_cta") }}</label>
-          <label class="hf-toggle">
-            <input type="checkbox" />
-            <span>{{ t("hot.follow.delivery.publish_cta") }}</span>
-          </label>
-        </div>
-        <div class="hf-field">
+      <div class="card">
+        <h2>{{ t("hot.follow.delivery.publish") }}</h2>
+        <div class="field" style="margin-top:10px;">
           <label>{{ t("hot.follow.delivery.published_url") }}</label>
-          <input id="hf-publish-url" class="hf-input" type="text" placeholder="https://..." />
+          <input id="hf-publish-url" class="input" type="text" placeholder="https://..." />
         </div>
-        <div class="hf-field">
+        <div class="field" style="margin-top:10px;">
           <label>{{ t("hot.follow.delivery.notes") }}</label>
-          <input id="hf-publish-notes" class="hf-input" type="text" placeholder="{{ t('hot.follow.delivery.notes.placeholder') }}" />
+          <input id="hf-publish-notes" class="input" type="text" placeholder="{{ t('hot.follow.delivery.notes.placeholder') }}" />
         </div>
-        <div class="hf-actions">
+        <div style="margin-top:12px;">
           <button id="hf-publish" class="btn-primary">{{ t("hot.follow.delivery.publish_cta") }}</button>
-          <span class="hf-muted" id="hf-publish-msg"></span>
+          <span class="muted" id="hf-publish-msg"></span>
         </div>
-
-        <div class="hf-info-card">
-          <div class="hf-info-title">{{ t("hot.follow.delivery.title") }}</div>
-          <div class="hf-info-row"><span>ID</span><span>{{ task.task_id }}</span></div>
-          <div class="hf-info-row"><span>{{ t("label.platform") }}</span><span>{{ task.platform or "-" }}</span></div>
-          <div class="hf-info-row"><span>{{ t("hot.follow.step.pack") }}</span><span>{{ task.pack_status or "-" }}</span></div>
-        </div>
-      </section>
+      </div>
     </div>
   </div>
 
