@@ -84,34 +84,53 @@
         <section class="lg:col-span-7 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div class="flex items-center justify-between mb-4">
-              <h2 class="text-lg font-semibold">{{ t("hot.follow.workbench.pipeline_title") }}</h2>
-              <span class="text-xs text-gray-400">Config</span>
+              <h2 class="text-lg font-semibold">Pipeline Configuration</h2>
+              <span class="text-xs text-gray-400">P1</span>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div class="rounded-xl border border-gray-200 p-4">
-                <div class="text-xs text-gray-500">{{ t("label.platform") }}</div>
-                <div class="text-sm font-semibold text-gray-900 mt-1">{{ t("label.platform_douyin") }}</div>
-              </div>
-              <div class="rounded-xl border border-gray-200 p-4">
-                <div class="text-xs text-gray-500">{{ t("hot.follow.step.subtitles") }}</div>
-                <div class="text-sm font-semibold text-gray-900 mt-1">{{ t("hot.follow.action.subtitles") }}</div>
-              </div>
-              <div class="rounded-xl border border-gray-200 p-4">
-                <div class="text-xs text-gray-500">{{ t("hot.follow.step.dub") }}</div>
-                <div class="text-sm font-semibold text-gray-900 mt-1">{{ t("hot.follow.action.dub") }}</div>
-              </div>
-              <div class="rounded-xl border border-gray-200 p-4">
-                <div class="text-xs text-gray-500">{{ t("hot.follow.step.pack") }}</div>
-                <div class="text-sm font-semibold text-gray-900 mt-1">{{ t("hot.follow.action.pack") }}</div>
-              </div>
-            </div>
-          </div>
 
-          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h3 class="text-base font-semibold mb-4">{{ t("hot.follow.delivery.deliverables") }}</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div class="rounded-xl border border-gray-200 p-4 text-sm text-gray-600">{{ t("hot.follow.step.scenes") }}</div>
-              <div class="rounded-xl border border-gray-200 p-4 text-sm text-gray-600">{{ t("hot.follow.step.pack") }}</div>
+            <div class="space-y-5">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700">{{ t("label.language") }}</label>
+                <select name="target_lang" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
+                  <option value="zh">中文</option>
+                  <option value="mm">မြန်မာ</option>
+                  <option value="en">English</option>
+                </select>
+              </div>
+
+              <div>
+                <div class="text-sm font-semibold text-gray-700 mb-2">{{ t("label.subtitles_mode") }}</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label class="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
+                    <input type="radio" name="process_mode" value="fast_clone" checked />
+                    <div>
+                      <div class="text-sm font-semibold text-gray-900">{{ t("label.subtitles_mode.whisper_only") }}</div>
+                      <div class="text-xs text-gray-500">{{ t("hot.follow.step.parse") }} → {{ t("hot.follow.step.subtitles") }}</div>
+                    </div>
+                  </label>
+                  <label class="flex items-center gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
+                    <input type="radio" name="process_mode" value="smart_rewrite" />
+                    <div>
+                      <div class="text-sm font-semibold text-gray-900">{{ t("label.subtitles_mode.whisper_gemini") }}</div>
+                      <div class="text-xs text-gray-500">{{ t("hot.follow.step.dub") }} → {{ t("hot.follow.step.pack") }}</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-gray-700">{{ t("label.account") }}</label>
+                <select name="publish_account" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
+                  <option value="default">Default</option>
+                  <option value="account_a">Account A</option>
+                  <option value="account_b">Account B</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-gray-700">{{ t("label.title.optional") }}</label>
+                <input id="hf-task-title" name="task_title" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('label.title.placeholder') }}" />
+              </div>
             </div>
           </div>
         </section>
