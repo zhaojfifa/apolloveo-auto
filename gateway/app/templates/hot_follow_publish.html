@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -6,22 +6,9 @@
   <title>{{ t("hot.follow.delivery.title") }}</title>
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
-  <style>
-    :root { color-scheme: light; }
-    body { margin: 0; padding: 16px; background: #f3f4f6; color: #111827; }
-    .page { max-width: 1100px; margin: 0 auto; }
-    .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
-    .grid { display:grid; gap:16px; grid-template-columns: 1.2fr 0.8fr; }
-    @media (max-width: 960px){ .grid{ grid-template-columns:1fr; } }
-    .deliverables { display:flex; flex-direction:column; gap:8px; }
-    .deliverable { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border:1px solid #e5e7eb; border-radius:10px; }
-    .btn-primary { background:#4f46e5; color:#fff; border:1px solid transparent; border-radius:10px; padding:8px 12px; font-weight:700; }
-    .btn-secondary { background:#fff; color:#111827; border:1px solid #d1d5db; border-radius:10px; padding:8px 12px; font-weight:600; }
-    .input { width:100%; border:1px solid #d1d5db; border-radius:10px; padding:10px 12px; }
-    .muted { color:#6b7280; font-size:0.9rem; }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gray-50 text-gray-900">
   <div class="page" data-task-id="{{ task.task_id }}">
     {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
     {% set topbar_title = t("hot.follow.delivery.title") %}
@@ -36,28 +23,81 @@
     ] %}
     {% include "_topbar.html" %}
 
-    <div class="grid">
-      <div class="card">
-        <h2>{{ t("hot.follow.delivery.deliverables") }}</h2>
-        <div id="hf-deliverables" class="deliverables"></div>
-        <div id="hf-deliverables-empty" class="muted" style="margin-top:8px; display:none;">{{ t("hot.follow.delivery.empty") }}</div>
-      </div>
-      <div class="card">
-        <h2>{{ t("hot.follow.delivery.publish") }}</h2>
-        <div class="field" style="margin-top:10px;">
-          <label>{{ t("hot.follow.delivery.published_url") }}</label>
-          <input id="hf-publish-url" class="input" type="text" placeholder="https://..." />
-        </div>
-        <div class="field" style="margin-top:10px;">
-          <label>{{ t("hot.follow.delivery.notes") }}</label>
-          <input id="hf-publish-notes" class="input" type="text" placeholder="{{ t('hot.follow.delivery.notes.placeholder') }}" />
-        </div>
-        <div style="margin-top:12px;">
-          <button id="hf-publish" class="btn-primary">{{ t("hot.follow.delivery.publish_cta") }}</button>
-          <span class="muted" id="hf-publish-msg"></span>
+    <main class="max-w-7xl mx-auto px-6 py-6">
+      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-4 mb-6">
+        <div class="text-sm font-semibold mb-2">{{ t("hot.follow.delivery.subtitle") }}</div>
+        <div class="flex flex-wrap gap-3 text-xs text-gray-500">
+          <span>1. {{ t("hot.follow.step.parse") }}</span>
+          <span>2. {{ t("hot.follow.step.subtitles") }}</span>
+          <span>3. {{ t("hot.follow.step.dub") }}</span>
+          <span>4. {{ t("hot.follow.step.pack") }}</span>
         </div>
       </div>
-    </div>
+
+      {% set cover_url = task.cover_url or task.cover or task.thumb_url or "" %}
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <section class="lg:col-span-4 space-y-6">
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h2 class="text-lg font-semibold mb-4">{{ t("hot.follow.delivery.deliverables") }}</h2>
+            <div class="space-y-3">
+              {% if cover_url %}
+                <img class="w-full h-48 rounded-xl object-cover bg-gray-100" src="{{ cover_url }}" alt="cover" />
+              {% else %}
+                <div class="w-full h-48 rounded-xl bg-gray-100 border border-dashed border-gray-300"></div>
+              {% endif %}
+              <div id="hf-deliverables" class="space-y-2"></div>
+              <div id="hf-deliverables-empty" class="text-sm text-gray-500" style="display:none;">{{ t("hot.follow.delivery.empty") }}</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-5 space-y-6">
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h2 class="text-lg font-semibold mb-4">{{ t("tasks.publish_hub") }}</h2>
+            <div class="space-y-3">
+              <div class="flex flex-wrap gap-2">
+                <span class="px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-600">{{ t("hot.follow.delivery.publish") }}</span>
+                <span class="px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-600">{{ t("hot.follow.delivery.publish_cta") }}</span>
+                <span class="px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-600">{{ t("hot.follow.delivery.notes") }}</span>
+              </div>
+              <label class="block text-sm font-semibold text-gray-700">{{ t("hot.follow.delivery.notes") }}</label>
+              <textarea class="w-full rounded-xl border border-gray-300 px-3 py-2" rows="6" placeholder="{{ t('hot.follow.delivery.notes.placeholder') }}"></textarea>
+              <div class="flex flex-wrap gap-2">
+                <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs">#hot</span>
+                <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs">#trend</span>
+                <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs">#remix</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-3 space-y-6">
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h2 class="text-lg font-semibold mb-4">{{ t("hot.follow.delivery.publish") }}</h2>
+            <div class="space-y-3">
+              <label class="block text-sm font-semibold text-gray-700">{{ t("hot.follow.delivery.published_url") }}</label>
+              <input id="hf-publish-url" class="w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="https://..." />
+              <label class="block text-sm font-semibold text-gray-700">{{ t("hot.follow.delivery.notes") }}</label>
+              <input id="hf-publish-notes" class="w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('hot.follow.delivery.notes.placeholder') }}" />
+              <div class="flex items-center gap-3">
+                <button id="hf-publish" class="btn-primary">{{ t("hot.follow.delivery.publish_cta") }}</button>
+                <span class="text-xs text-gray-500" id="hf-publish-msg"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h3 class="text-base font-semibold mb-3">{{ t("hot.follow.delivery.title") }}</h3>
+            <div class="text-sm text-gray-600 space-y-2">
+              <div class="flex justify-between"><span>ID</span><span>{{ task.task_id }}</span></div>
+              <div class="flex justify-between"><span>{{ t("label.platform") }}</span><span>{{ task.platform or "-" }}</span></div>
+              <div class="flex justify-between"><span>{{ t("hot.follow.step.pack") }}</span><span>{{ task.pack_status or "-" }}</span></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
   </div>
 
   <script src="/static/js/i18n_v185.js"></script>

@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -6,25 +6,9 @@
   <title>{{ t("hot.follow.workbench.title") }}</title>
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
-  <style>
-    :root { color-scheme: light; }
-    body { margin: 0; padding: 16px; background: #f3f4f6; color: #111827; }
-    .page { max-width: 1100px; margin: 0 auto; }
-    .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
-    .grid { display:grid; gap:16px; grid-template-columns: 1fr 1fr; }
-    @media (max-width: 960px){ .grid{ grid-template-columns:1fr; } }
-    .step { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f3f4f6; }
-    .step:last-child{ border-bottom:none; }
-    .step .label{ font-weight:600; }
-    .badge { padding:2px 8px; border-radius:999px; font-size:12px; background:#e5e7eb; color:#374151; }
-    .actions { display:flex; gap:8px; flex-wrap:wrap; }
-    .btn-primary { background:#4f46e5; color:#fff; border:1px solid transparent; border-radius:10px; padding:8px 12px; font-weight:700; }
-    .btn-secondary { background:#fff; color:#111827; border:1px solid #d1d5db; border-radius:10px; padding:8px 12px; font-weight:600; }
-    .muted { color:#6b7280; font-size:0.9rem; }
-    .events { max-height: 260px; overflow:auto; font-size:12px; background:#f9fafb; border-radius:10px; padding:8px; border:1px solid #e5e7eb; }
-  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
+<body class="bg-gray-50 text-gray-900">
   <div class="page" data-task-id="{{ task.task_id }}">
     {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
     {% set topbar_title = t("hot.follow.workbench.title") %}
@@ -39,31 +23,85 @@
     ] %}
     {% include "_topbar.html" %}
 
-    <div class="grid">
-      <div class="card">
-        <h2>{{ t("hot.follow.workbench.pipeline_title") }}</h2>
-        <div id="hf-steps">
-          <div class="step"><span class="label">{{ t("hot.follow.step.parse") }}</span><span class="badge" data-step="parse">-</span></div>
-          <div class="step"><span class="label">{{ t("hot.follow.step.subtitles") }}</span><span class="badge" data-step="subtitles">-</span></div>
-          <div class="step"><span class="label">{{ t("hot.follow.step.dub") }}</span><span class="badge" data-step="dub">-</span></div>
-          <div class="step"><span class="label">{{ t("hot.follow.step.pack") }}</span><span class="badge" data-step="pack">-</span></div>
-          <div class="step"><span class="label">{{ t("hot.follow.step.scenes") }}</span><span class="badge" data-step="scenes">-</span></div>
-        </div>
-        <div class="actions" style="margin-top:12px;">
-          <button class="btn-secondary" data-action="parse">{{ t("hot.follow.action.parse") }}</button>
-          <button class="btn-secondary" data-action="subtitles">{{ t("hot.follow.action.subtitles") }}</button>
-          <button class="btn-secondary" data-action="dub">{{ t("hot.follow.action.dub") }}</button>
-          <button class="btn-secondary" data-action="pack">{{ t("hot.follow.action.pack") }}</button>
-          <button class="btn-secondary" data-action="scenes">{{ t("hot.follow.action.scenes") }}</button>
-        </div>
-      </div>
+    {% set cover_url = task.cover_url or task.cover or task.thumb_url or "" %}
+    {% set title_text = task.title or task.name or t("tasks.untitled") %}
+    {% set platform_text = task.platform or task.source_platform or "-" %}
+    {% set source_url = task.source_url or task.url or task.source or "-" %}
 
-      <div class="card">
-        <h2>{{ t("hot.follow.workbench.events_title") }}</h2>
-        <div id="hf-events" class="events"></div>
-        <div class="muted" id="hf-status" style="margin-top:8px;"></div>
+    <main class="max-w-7xl mx-auto px-6 py-6">
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <section class="lg:col-span-5 space-y-6">
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 lg:sticky lg:top-24">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="text-lg font-semibold">{{ title_text }}</h2>
+              <span class="text-xs text-gray-400">ID: {{ task.task_id }}</span>
+            </div>
+
+            <div class="flex gap-3 text-sm">
+              <button class="px-3 py-1 rounded-full bg-gray-900 text-white">{{ t("label.source_url") }}</button>
+              <button class="px-3 py-1 rounded-full bg-gray-100 text-gray-600">{{ t("hot.follow.delivery.deliverables") }}</button>
+            </div>
+
+            <div class="mt-4">
+              {% if cover_url %}
+                <img class="w-full h-56 rounded-xl object-cover bg-gray-100" src="{{ cover_url }}" alt="cover" />
+              {% else %}
+                <div class="w-full h-56 rounded-xl bg-gray-100 border border-dashed border-gray-300"></div>
+              {% endif %}
+            </div>
+
+            <div class="mt-4 text-sm text-gray-600">
+              <div>{{ platform_text }} · ID: {{ task.task_id }}</div>
+              <div class="truncate">{{ source_url }}</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="lg:col-span-7 space-y-6">
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h2 class="text-lg font-semibold mb-4">{{ t("hot.follow.workbench.pipeline_title") }}</h2>
+            <div id="hf-steps" class="space-y-3">
+              <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+                <span class="font-semibold">{{ t("hot.follow.step.parse") }}</span><span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-step="parse">-</span>
+              </div>
+              <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+                <span class="font-semibold">{{ t("hot.follow.step.subtitles") }}</span><span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-step="subtitles">-</span>
+              </div>
+              <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+                <span class="font-semibold">{{ t("hot.follow.step.dub") }}</span><span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-step="dub">-</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="font-semibold">{{ t("hot.follow.step.pack") }}</span><span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-step="pack">-</span>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-3 mt-4">
+              <button class="btn-secondary" data-action="parse">{{ t("hot.follow.action.parse") }}</button>
+              <button class="btn-secondary" data-action="subtitles">{{ t("hot.follow.action.subtitles") }}</button>
+              <button class="btn-secondary" data-action="dub">{{ t("hot.follow.action.dub") }}</button>
+              <button class="btn-secondary" data-action="pack">{{ t("hot.follow.action.pack") }}</button>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h3 class="text-base font-semibold mb-3">{{ t("hot.follow.step.scenes") }}</h3>
+            <div class="text-sm text-gray-600 mb-3">{{ t("hot.follow.action.scenes") }}</div>
+            <button class="btn-secondary" data-action="scenes">{{ t("hot.follow.action.scenes") }}</button>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h3 class="text-base font-semibold mb-3">{{ t("hot.follow.delivery.deliverables") }}</h3>
+            <div class="text-sm text-gray-600 mb-3">{{ t("hot.follow.delivery.subtitle") }}</div>
+            <button class="btn-secondary" data-action="pack">{{ t("hot.follow.action.pack") }}</button>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h3 class="text-base font-semibold mb-3">{{ t("hot.follow.workbench.events_title") }}</h3>
+            <div id="hf-events" class="max-h-64 overflow-auto rounded-xl border border-gray-100 bg-gray-50 p-3 text-xs"></div>
+            <div class="text-xs text-gray-500 mt-2" id="hf-status"></div>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   </div>
 
   <script src="/static/js/i18n_v185.js"></script>
