@@ -3,7 +3,6 @@
   const taskId = root ? root.getAttribute("data-task-id") : null;
   const listEl = document.getElementById("hf-deliverables");
   const emptyEl = document.getElementById("hf-deliverables-empty");
-  const hubMsg = document.getElementById("hf-publish-hub-msg");
   const publishBtn = document.getElementById("hf-publish");
   const publishUrl = document.getElementById("hf-publish-url");
   const publishNotes = document.getElementById("hf-publish-notes");
@@ -11,21 +10,14 @@
 
   if (!taskId) return;
 
-  async function apiGet(path) {
-    const res = await fetch(path, { method: "GET" });
-    if (res.status === 401) return { __unauthorized: true };
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  }
-
   async function loadDeliverables() {
     try {
-      const data = await apiGet(`/api/tasks/${encodeURIComponent(taskId)}/publish_hub`);
-      if (data && data.__unauthorized) {
-        if (hubMsg) hubMsg.textContent = "Unauthorized: please login and refresh.";
+      const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/publish_hub`);
+      if (!res.ok) {
         if (emptyEl) emptyEl.style.display = "block";
         return;
       }
+      const data = await res.json();
       const deliverables = data.deliverables || {};
       const keys = Object.keys(deliverables);
       if (!keys.length) {
@@ -33,7 +25,6 @@
         return;
       }
       if (emptyEl) emptyEl.style.display = "none";
-      if (hubMsg) hubMsg.textContent = "";
       if (listEl) {
         listEl.innerHTML = keys.map((k) => {
           const item = deliverables[k];
@@ -41,7 +32,6 @@
         }).join("");
       }
     } catch (e) {
-      if (hubMsg) hubMsg.textContent = e.message || "";
       if (emptyEl) emptyEl.style.display = "block";
     }
   }

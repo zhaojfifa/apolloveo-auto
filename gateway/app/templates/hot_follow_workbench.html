@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -6,9 +6,26 @@
   <title>{{ t("hot.follow.workbench.title") }}</title>
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <style>
+    :root { color-scheme: light; }
+    body { margin: 0; padding: 16px; background: #f3f4f6; color: #111827; }
+    .page { max-width: 1100px; margin: 0 auto; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+    .grid { display:grid; gap:16px; grid-template-columns: 1fr 1fr; }
+    @media (max-width: 960px){ .grid{ grid-template-columns:1fr; } }
+    .step { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #f3f4f6; }
+    .step:last-child{ border-bottom:none; }
+    .step .label{ font-weight:600; }
+    .badge { padding:2px 8px; border-radius:999px; font-size:12px; background:#e5e7eb; color:#374151; }
+    .actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .btn-primary { background:#4f46e5; color:#fff; border:1px solid transparent; border-radius:10px; padding:8px 12px; font-weight:700; }
+    .btn-secondary { background:#fff; color:#111827; border:1px solid #d1d5db; border-radius:10px; padding:8px 12px; font-weight:600; }
+    .muted { color:#6b7280; font-size:0.9rem; }
+    .events { max-height: 260px; overflow:auto; font-size:12px; background:#f9fafb; border-radius:10px; padding:8px; border:1px solid #e5e7eb; }
+  </style>
 </head>
 <body>
-  <div class="page hf-page" data-task-id="{{ task.task_id }}">
+  <div class="page" data-task-id="{{ task.task_id }}">
     {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
     {% set topbar_title = t("hot.follow.workbench.title") %}
     {% set topbar_subtitle = t("hot.follow.workbench.subtitle") %}
@@ -22,82 +39,29 @@
     ] %}
     {% include "_topbar.html" %}
 
-    {% set cover_url = task.cover_url or task.cover or task.thumb_url or "" %}
-    {% set title_text = task.title or task.name or t("tasks.untitled") %}
-    {% set platform_text = task.platform or task.source_platform or "-" %}
-    {% set source_url = task.source_url or task.url or task.source or "-" %}
-
-    <div class="hf-grid hf-workbench-grid">
-      <div class="hf-card">
-        <div class="hf-preview">
-          <div class="hf-preview__media">
-            {% if cover_url %}
-              <img class="hf-preview__img" src="{{ cover_url }}" alt="cover" />
-            {% else %}
-              <div class="hf-preview__placeholder"></div>
-            {% endif %}
-          </div>
-          <div class="hf-preview__info">
-            <div class="hf-preview__title">{{ title_text }}</div>
-            <div class="hf-preview__meta">{{ platform_text }} · ID: {{ task.task_id }}</div>
-            <div class="hf-preview__meta">{{ t("label.source_url") }}: {{ source_url }}</div>
-          </div>
+    <div class="grid">
+      <div class="card">
+        <h2>{{ t("hot.follow.workbench.pipeline_title") }}</h2>
+        <div id="hf-steps">
+          <div class="step"><span class="label">{{ t("hot.follow.step.parse") }}</span><span class="badge" data-step="parse">-</span></div>
+          <div class="step"><span class="label">{{ t("hot.follow.step.subtitles") }}</span><span class="badge" data-step="subtitles">-</span></div>
+          <div class="step"><span class="label">{{ t("hot.follow.step.dub") }}</span><span class="badge" data-step="dub">-</span></div>
+          <div class="step"><span class="label">{{ t("hot.follow.step.pack") }}</span><span class="badge" data-step="pack">-</span></div>
+          <div class="step"><span class="label">{{ t("hot.follow.step.scenes") }}</span><span class="badge" data-step="scenes">-</span></div>
         </div>
-
-        <div class="hf-summary">
-          <div class="hf-summary__row">
-            <span class="hf-summary__label">{{ t("label.platform") }}</span>
-            <span class="hf-summary__value">{{ platform_text }}</span>
-          </div>
-          <div class="hf-summary__row">
-            <span class="hf-summary__label">{{ t("label.source_url") }}</span>
-            <span class="hf-summary__value">{{ source_url }}</span>
-          </div>
-          <div class="hf-summary__row">
-            <span class="hf-summary__label">{{ t("hot.follow.new.bgm_title") }}</span>
-            <span class="hf-summary__value">-</span>
-          </div>
+        <div class="actions" style="margin-top:12px;">
+          <button class="btn-secondary" data-action="parse">{{ t("hot.follow.action.parse") }}</button>
+          <button class="btn-secondary" data-action="subtitles">{{ t("hot.follow.action.subtitles") }}</button>
+          <button class="btn-secondary" data-action="dub">{{ t("hot.follow.action.dub") }}</button>
+          <button class="btn-secondary" data-action="pack">{{ t("hot.follow.action.pack") }}</button>
+          <button class="btn-secondary" data-action="scenes">{{ t("hot.follow.action.scenes") }}</button>
         </div>
       </div>
 
-      <div class="hf-right">
-        <div class="hf-card">
-          <h2 class="hf-section-title">{{ t("hot.follow.workbench.pipeline_title") }}</h2>
-          <div id="hf-steps" class="hf-steps">
-            <div class="hf-step"><span class="hf-step__label">{{ t("hot.follow.step.parse") }}</span><span class="hf-badge" data-step="parse">-</span></div>
-            <div class="hf-step"><span class="hf-step__label">{{ t("hot.follow.step.subtitles") }}</span><span class="hf-badge" data-step="subtitles">-</span></div>
-            <div class="hf-step"><span class="hf-step__label">{{ t("hot.follow.step.dub") }}</span><span class="hf-badge" data-step="dub">-</span></div>
-            <div class="hf-step"><span class="hf-step__label">{{ t("hot.follow.step.pack") }}</span><span class="hf-badge" data-step="pack">-</span></div>
-          </div>
-          <div class="hf-actions-row">
-            <button class="btn-secondary" data-action="parse">{{ t("hot.follow.action.parse") }}</button>
-            <button class="btn-secondary" data-action="subtitles">{{ t("hot.follow.action.subtitles") }}</button>
-            <button class="btn-secondary" data-action="dub">{{ t("hot.follow.action.dub") }}</button>
-            <button class="btn-secondary" data-action="pack">{{ t("hot.follow.action.pack") }}</button>
-          </div>
-        </div>
-
-        <div class="hf-card">
-          <h2 class="hf-section-title">{{ t("hot.follow.step.scenes") }}</h2>
-          <div class="hf-muted">{{ t("hot.follow.action.scenes") }}</div>
-          <div class="hf-actions-row">
-            <button class="btn-secondary" data-action="scenes">{{ t("hot.follow.action.scenes") }}</button>
-          </div>
-        </div>
-
-        <div class="hf-card">
-          <h2 class="hf-section-title">{{ t("hot.follow.delivery.deliverables") }}</h2>
-          <div class="hf-muted">{{ t("hot.follow.delivery.subtitle") }}</div>
-          <div class="hf-actions-row">
-            <button class="btn-secondary" data-action="pack">{{ t("hot.follow.action.pack") }}</button>
-          </div>
-        </div>
-
-        <div class="hf-card">
-          <h2 class="hf-section-title">{{ t("hot.follow.workbench.events_title") }}</h2>
-          <div id="hf-events" class="hf-events"></div>
-          <div class="hf-muted" id="hf-status" style="margin-top:8px;"></div>
-        </div>
+      <div class="card">
+        <h2>{{ t("hot.follow.workbench.events_title") }}</h2>
+        <div id="hf-events" class="events"></div>
+        <div class="muted" id="hf-status" style="margin-top:8px;"></div>
       </div>
     </div>
   </div>
