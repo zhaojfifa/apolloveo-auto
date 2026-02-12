@@ -214,6 +214,12 @@ class PublishBackfillRequest(BaseModel):
     status: str | None = None
 
 
+class HotFollowAudioConfigRequest(BaseModel):
+    tts_engine: str | None = None
+    tts_voice: str | None = None
+    bgm_mix: float | None = None
+
+
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
 api_key_header = APIKeyHeader(name=OP_HEADER_KEY, auto_error=False)
@@ -940,6 +946,122 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
             "published_at": task.get("published_at") or "-",
         },
     }
+
+
+def _hf_status(value: Any) -> str:
+    v = str(value or "").strip().lower()
+    if v in {"ready", "done", "success", "completed"}:
+        return "ready"
+    if v in {"running", "processing", "queued", "pending"}:
+        return "running"
+    if v in {"failed", "error"}:
+        return "failed"
+    return "none"
+
+
+def _hf_engine_public(provider: str | None) -> str:
+    p = str(provider or "").strip().lower()
+    if p in {"edge", "edge-tts", "edge_tts"}:
+        return "edge_tts"
+    if p == "lovo":
+        return "lovo"
+    return "none"
+
+
+def _hf_engine_internal(engine: str | None) -> str | None:
+    e = str(engine or "").strip().lower()
+    if e in {"edge", "edge-tts", "edge_tts"}:
+        return "edge-tts"
+    if e == "lovo":
+        return "lovo"
+    if e in {"none", ""}:
+        return None
+    return None
+
+
+def _hf_audio_config(task: dict) -> dict[str, Any]:
+    config = dict(task.get("config") or {})
+    bgm = dict(config.get("bgm") or {})
+    mix = bgm.get("mix_ratio")
+    try:
+        mix_val = float(mix if mix is not None else 0.3)
+    except Exception:
+        mix_val = 0.3
+    return {
+        "tts_engine": _hf_engine_public(task.get("dub_provider")),
+        "tts_voice": task.get("voice_id") or "zh-CN-XiaoxiaoNeural",
+        "bgm_key": bgm.get("bgm_key"),
+        "bgm_mix": max(0.0, min(1.0, mix_val)),
+    }
+
+
+def _hf_deliverable_status(task: dict, key: str | None, fallback_status_field: str | None = None) -> str:
+    if key and object_exists(str(key)):
+        return "ready"
+    if fallback_status_field and _hf_status(task.get(fallback_status_field)) == "failed":
+        return "failed"
+    return "none"
+
+
+def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
+    raw_key = _task_key(task, "raw_path")
+    origin_key = _task_key(task, "origin_srt_path")
+    mm_key = _task_key(task, "mm_srt_path")
+    pack_key = _task_key(task, "pack_key") or _task_key(task, "pack_path")
+    scenes_key = _task_key(task, "scenes_key")
+    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
+
+    raw_url = _task_endpoint(task_id, "raw") if raw_key and object_exists(raw_key) else None
+    origin_url = _task_endpoint(task_id, "origin") if origin_key and object_exists(origin_key) else None
+    mm_url = _task_endpoint(task_id, "mm") if mm_key and object_exists(mm_key) else None
+    pack_url = _task_endpoint(task_id, "pack") if pack_key and object_exists(pack_key) else None
+    scenes_url = _task_endpoint(task_id, "scenes") if scenes_key and object_exists(scenes_key) else None
+    final_url = get_download_url(str(final_key)) if final_key and object_exists(str(final_key)) else None
+
+    return [
+        {
+            "kind": "raw_video",
+            "title": "无字幕纯净视频",
+            "key": raw_key,
+            "url": raw_url,
+            "status": _hf_deliverable_status(task, raw_key, "parse_status"),
+        },
+        {
+            "kind": "origin_subtitle",
+            "title": "origin.srt",
+            "key": origin_key,
+            "url": origin_url,
+            "status": _hf_deliverable_status(task, origin_key, "subtitles_status"),
+        },
+        {
+            "kind": "subtitle",
+            "title": "mm.srt",
+            "key": mm_key,
+            "url": mm_url,
+            "status": _hf_deliverable_status(task, mm_key, "subtitles_status"),
+        },
+        {
+            "kind": "pack",
+            "title": "剪辑包 (ZIP)",
+            "key": pack_key,
+            "url": pack_url,
+            "status": _hf_deliverable_status(task, pack_key, "pack_status"),
+        },
+        {
+            "kind": "scenes",
+            "title": "场景包 (ZIP)",
+            "key": scenes_key,
+            "url": scenes_url,
+            "status": _hf_deliverable_status(task, scenes_key, "scenes_status"),
+        },
+        {
+            "kind": "final",
+            "title": "最终视频",
+            "key": final_key,
+            "url": final_url,
+            "status": _hf_deliverable_status(task, final_key, None),
+        },
+    ]
 
 
 def _task_value(task: dict, field: str) -> Optional[str]:
@@ -2401,6 +2523,123 @@ def get_hot_follow_publish_hub(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return _publish_hub_payload(task)
+
+
+@api_router.get("/hot_follow/tasks/{task_id}/workbench_hub")
+def get_hot_follow_workbench_hub(
+    task_id: str,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    parse_status = _hf_status(task.get("parse_status"))
+    if parse_status == "none":
+        parse_status = "ready" if task.get("raw_path") else _hf_status(task.get("status"))
+    subtitles_status = _hf_status(task.get("subtitles_status"))
+    if subtitles_status == "none" and (task.get("origin_srt_path") or task.get("mm_srt_path")):
+        subtitles_status = "ready"
+    audio_status = _hf_status(task.get("dub_status"))
+    if audio_status == "none" and (task.get("mm_audio_key") or task.get("mm_audio_path")):
+        audio_status = "ready"
+    synthesis_status = _hf_status(task.get("pack_status"))
+    if synthesis_status == "none" and (task.get("pack_key") or task.get("pack_path")):
+        synthesis_status = "ready"
+
+    scene_key = task.get("scenes_key")
+    scene_status = _hf_status(task.get("scenes_status"))
+    if scene_status == "none" and scene_key:
+        scene_status = "ready"
+    scenes_url = _task_endpoint(task_id, "scenes") if scene_key and object_exists(str(scene_key)) else None
+
+    return {
+        "task_id": task_id,
+        "title": task.get("title"),
+        "platform": task.get("platform"),
+        "cover_url": task.get("cover_url") or task.get("cover") or task.get("thumb_url"),
+        "input": {
+            "source_url": task.get("source_url"),
+            "target_lang": task.get("content_lang") or "zh",
+            "subtitles_mode": pipeline_config.get("subtitles_mode") or "whisper+gemini",
+        },
+        "pipeline": {
+            "parse": {
+                "status": parse_status,
+                "updated_at": task.get("updated_at"),
+                "summary": f"raw={'ready' if task.get('raw_path') else 'none'}",
+            },
+            "subtitles": {
+                "status": subtitles_status,
+                "updated_at": task.get("updated_at"),
+                "summary": "origin/mm subtitles",
+            },
+            "audio": {
+                "status": audio_status,
+                "updated_at": task.get("updated_at"),
+                "summary": f"dub_provider={task.get('dub_provider') or '-'} voice={task.get('voice_id') or '-'}",
+            },
+            "synthesis": {
+                "status": synthesis_status,
+                "updated_at": task.get("updated_at"),
+                "summary": f"pack={task.get('pack_type') or '-'}",
+            },
+        },
+        "audio_config": _hf_audio_config(task),
+        "scene_pack": {
+            "scenes_key": scene_key,
+            "scenes_url": scenes_url,
+            "status": scene_status,
+        },
+        "deliverables": _hf_deliverables(task_id, task),
+        "errors": {
+            "audio": {
+                "reason": task.get("error_reason") if audio_status == "failed" else None,
+                "message": task.get("dub_error"),
+            },
+            "pack": {
+                "reason": task.get("error_reason") if synthesis_status == "failed" else None,
+                "message": task.get("pack_error"),
+            },
+        },
+    }
+
+
+@api_router.patch("/hot_follow/tasks/{task_id}/audio_config")
+def patch_hot_follow_audio_config(
+    task_id: str,
+    payload: HotFollowAudioConfigRequest,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    updates: dict[str, Any] = {}
+    config = dict(task.get("config") or {})
+    bgm = dict(config.get("bgm") or {})
+    if payload.bgm_mix is not None:
+        mix = max(0.0, min(1.0, float(payload.bgm_mix)))
+        bgm["mix_ratio"] = mix
+    if bgm:
+        config["bgm"] = bgm
+        updates["config"] = config
+
+    provider = _hf_engine_internal(payload.tts_engine)
+    if payload.tts_engine is not None:
+        updates["dub_provider"] = provider
+    if payload.tts_voice is not None:
+        updates["voice_id"] = payload.tts_voice.strip() or None
+
+    if updates:
+        _policy_upsert(repo, task_id, updates)
+
+    current = repo.get(task_id) or task
+    return {
+        "task_id": task_id,
+        "audio_config": _hf_audio_config(current),
+    }
 
 
 @api_router.post("/hot_follow/tasks/{task_id}/probe")

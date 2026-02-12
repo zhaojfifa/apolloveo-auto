@@ -66,34 +66,87 @@
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <h2 class="text-lg font-semibold mb-4">Processing Pipeline</h2>
             <div id="hf-steps" class="space-y-3">
-              <div class="flex items-center justify-between border-b border-gray-100 pb-3">
-                <span class="font-semibold">{{ t("hot.follow.step.parse") }}</span><span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-step="parse">-</span>
+              <div class="border-b border-gray-100 pb-3" data-hf-step="parse">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold">{{ t("hot.follow.step.parse") }}</span>
+                  <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="parse">-</span>
+                </div>
+                <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="parse">-</div>
               </div>
-              <div class="flex items-center justify-between border-b border-gray-100 pb-3">
-                <span class="font-semibold">{{ t("hot.follow.step.subtitles") }}</span><span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-step="subtitles">-</span>
+              <div class="border-b border-gray-100 pb-3" data-hf-step="subtitles">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold">{{ t("hot.follow.step.subtitles") }}</span>
+                  <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="subtitles">-</span>
+                </div>
+                <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="subtitles">-</div>
               </div>
-              <div class="flex items-center justify-between border-b border-gray-100 pb-3">
-                <span class="font-semibold">{{ t("hot.follow.step.dub") }}</span><span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-step="dub">-</span>
+              <div class="border-b border-gray-100 pb-3" data-hf-step="audio">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold">{{ t("hot.follow.step.dub") }}</span>
+                  <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="audio">-</span>
+                </div>
+                <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="audio">-</div>
+                <div class="grid grid-cols-1 gap-3 mt-3">
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">TTS Engine</label>
+                    <select id="hf_tts_engine" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                      <option value="edge_tts">edge_tts</option>
+                      <option value="lovo">lovo</option>
+                      <option value="none">none</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">TTS Voice</label>
+                    <select id="hf_tts_voice" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                      <option value="zh-CN-XiaoxiaoNeural">zh-CN-XiaoxiaoNeural</option>
+                      <option value="zh-CN-YunxiNeural">zh-CN-YunxiNeural</option>
+                      <option value="my-MM-NilarNeural">my-MM-NilarNeural</option>
+                      <option value="mm_female_1">mm_female_1</option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <button id="hf_tts_preview_btn" class="btn-secondary text-xs">试听</button>
+                    <button id="hf_rerun_audio_btn" class="btn-secondary text-xs">Re-Run Audio</button>
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">BGM Upload</label>
+                    <input id="hf_bgm_file" type="file" accept="audio/*" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">BGM Mix</label>
+                    <input id="hf_bgm_mix" type="range" min="0" max="1" step="0.05" value="0.3" class="w-full" />
+                  </div>
+                </div>
               </div>
-              <div class="flex items-center justify-between">
-                <span class="font-semibold">{{ t("hot.follow.step.pack") }}</span><span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-step="pack">-</span>
+              <div data-hf-step="synthesis">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold">{{ t("hot.follow.step.pack") }}</span>
+                  <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="synthesis">-</span>
+                </div>
+                <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="synthesis">-</div>
               </div>
             </div>
             <div class="flex flex-wrap gap-3 mt-4">
               <button class="btn-secondary" data-action="parse">{{ t("hot.follow.action.parse") }}</button>
               <button class="btn-secondary" data-action="subtitles">{{ t("hot.follow.action.subtitles") }}</button>
-              <button class="btn-secondary" data-action="dub">{{ t("hot.follow.action.dub") }}</button>
-              <button class="btn-secondary" data-action="pack">{{ t("hot.follow.action.pack") }}</button>
+              <button class="btn-secondary" data-action="synthesis">{{ t("hot.follow.action.pack") }}</button>
             </div>
+            <div class="text-xs text-gray-500 mt-2" id="hf-audio-msg"></div>
           </div>
 
-          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+          <div id="hf_scene_pack_card" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <h3 class="text-base font-semibold mb-3">Scene Pack</h3>
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600">{{ t("hot.follow.step.scenes") }}</span>
-              <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-step="scenes">-</span>
+              <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="scenes">-</span>
             </div>
-            <button class="btn-secondary mt-4" data-action="scenes">{{ t("hot.follow.action.scenes") }}</button>
+            <div class="text-xs text-gray-500 mt-2" id="hf-scene-pack-hint">可选，未生成时不影响主流程</div>
+            <a id="hf_scene_pack_download" class="btn-secondary mt-4 inline-block opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener">下载 Scene Pack</a>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <h3 class="text-base font-semibold mb-3">Deliverables</h3>
+            <div id="hf_deliverables_grid" class="grid grid-cols-1 gap-3"></div>
           </div>
         </section>
       </div>
