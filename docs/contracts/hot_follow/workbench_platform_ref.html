@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hot Follow Workbench Platform Reference</title>
+</head>
+<body>
+  <main>
+    <section>
+      <h2>Source / Final Preview</h2>
+      <div>源视频</div>
+      <div>最终成片</div>
+      <div>VIDEO PREVIEW AREA</div>
+    </section>
+
+    <section>
+      <h2>Processing Pipeline</h2>
+      <div data-hf-step="parse">
+        <span data-hf-step-status="parse"></span>
+        <span data-hf-step-summary="parse"></span>
+      </div>
+      <div data-hf-step="subtitles">
+        <span data-hf-step-status="subtitles"></span>
+        <span data-hf-step-summary="subtitles"></span>
+      </div>
+      <div data-hf-step="audio">
+        <span data-hf-step-status="audio"></span>
+        <span data-hf-step-summary="audio"></span>
+        <select id="hf_tts_engine"></select>
+        <select id="hf_tts_voice"></select>
+        <button id="hf_tts_preview_btn">试听</button>
+        <input id="hf_bgm_file" type="file" />
+        <input id="hf_bgm_mix" type="range" />
+        <button id="hf_rerun_audio_btn">Re-Run Audio</button>
+      </div>
+      <div data-hf-step="synthesis">
+        <span data-hf-step-status="synthesis"></span>
+        <span data-hf-step-summary="synthesis"></span>
+      </div>
+    </section>
+
+    <section id="hf_scene_pack_card">
+      <h2>Scene Pack</h2>
+      <a id="hf_scene_pack_download" href="#">Download</a>
+    </section>
+
+    <section>
+      <h2>Deliverables</h2>
+      <div id="hf_deliverables_grid"></div>
+    </section>
+  </main>
+</body>
+</html>
