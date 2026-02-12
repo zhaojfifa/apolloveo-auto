@@ -1,0 +1,7 @@
+#!/usr/bin/env sh
+branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo '')"
+if [ "$branch" = "pr/ui-1-tasks-board" ]; then
+  echo "[BLOCKED] pr/ui-1-tasks-board is read-only. Please work on VeoScenes01." >&2
+  exit 1
+fi
+exit 0
