@@ -280,6 +280,69 @@ def _ensure_mp3_audio(src_path: Path, dst_path: Path) -> Path:
     return dst_path
 
 
+def _mix_with_bgm_if_configured(task_id: str, audio_file: Path, workspace: Workspace) -> Path:
+    repo = get_task_repository()
+    task = repo.get(task_id) or {}
+    config = task.get("config") if isinstance(task, dict) else None
+    if not isinstance(config, dict):
+        return audio_file
+    bgm = config.get("bgm")
+    if not isinstance(bgm, dict):
+        return audio_file
+
+    bgm_key = str(bgm.get("bgm_key") or "").strip()
+    if not bgm_key:
+        return audio_file
+    strategy = str(bgm.get("strategy") or "replace").strip().lower()
+    if strategy == "mute":
+        return audio_file
+
+    mix_ratio = bgm.get("mix_ratio")
+    try:
+        ratio = float(mix_ratio if mix_ratio is not None else 0.8)
+    except Exception:
+        ratio = 0.8
+    ratio = max(0.0, min(1.0, ratio))
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise PackError("ffmpeg not found in PATH (required for BGM mix).")
+
+    bgm_ext = Path(bgm_key).suffix or ".mp3"
+    bgm_local = workspace.audio_dir / f"user_bgm{bgm_ext}"
+    bgm_local.parent.mkdir(parents=True, exist_ok=True)
+    storage = get_storage_service()
+    storage.download_file(bgm_key, str(bgm_local))
+
+    output_audio = workspace.audio_dir / "voice_mix_pack.mp3"
+    base_weight = max(0.0, 1.0 - ratio)
+    bgm_weight = ratio
+    filter_complex = (
+        f"[0:a]volume={base_weight}[base];"
+        f"[1:a]volume={bgm_weight}[bgm];"
+        "[base][bgm]amix=inputs=2:duration=first:dropout_transition=2[mix]"
+    )
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(audio_file),
+        "-i",
+        str(bgm_local),
+        "-filter_complex",
+        filter_complex,
+        "-map",
+        "[mix]",
+        "-c:a",
+        "libmp3lame",
+        str(output_audio),
+    ]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if proc.returncode != 0 or not output_audio.exists() or output_audio.stat().st_size == 0:
+        raise PackError(f"ffmpeg bgm mix failed: {proc.stderr[-800:]}")
+    return output_audio
+
+
 def _clean_text_for_dub(text: str) -> str:
     return re.sub(r"[\W_]+", "", text or "", flags=re.UNICODE)
 
@@ -831,6 +894,8 @@ async def run_pack_step(req: PackRequest):
         wav_candidate = (workspace.audio_dir / f"{task_id}_mm_vo.wav") if hasattr(workspace, "audio_dir") else None
         if wav_candidate and wav_candidate.exists():
             audio_file = wav_candidate
+    if audio_file.exists():
+        audio_file = _mix_with_bgm_if_configured(task_id, audio_file, workspace)
 
     # subs：优先 translated_srt_path(task_id, "my")，fallback "mm"
     subs_mm_srt = translated_srt_path(task_id, "my")

@@ -24,16 +24,6 @@
     {% include "_topbar.html" %}
 
     <main class="max-w-7xl mx-auto px-6 py-6">
-      <div class="bg-white rounded-2xl border border-gray-200 shadow-sm px-6 py-4 mb-6">
-        <div class="text-sm font-semibold mb-2">{{ t("hot.follow.delivery.subtitle") }}</div>
-        <div class="flex flex-wrap gap-3 text-xs text-gray-500">
-          <span>1. {{ t("hot.follow.step.parse") }}</span>
-          <span>2. {{ t("hot.follow.step.subtitles") }}</span>
-          <span>3. {{ t("hot.follow.step.dub") }}</span>
-          <span>4. {{ t("hot.follow.step.pack") }}</span>
-        </div>
-      </div>
-
       {% set cover_url = task.cover_url or task.cover or task.thumb_url or "" %}
 
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -54,15 +44,14 @@
 
         <section class="lg:col-span-5 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h2 class="text-lg font-semibold mb-4">{{ t("tasks.publish_hub") }}</h2>
+            <h2 class="text-lg font-semibold mb-4">发布中心</h2>
             <div class="space-y-3">
-              <div class="flex flex-wrap gap-2">
-                <span class="px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-600">{{ t("hot.follow.delivery.publish") }}</span>
-                <span class="px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-600">{{ t("hot.follow.delivery.publish_cta") }}</span>
-                <span class="px-3 py-1 rounded-full bg-gray-100 text-xs text-gray-600">{{ t("hot.follow.delivery.notes") }}</span>
-              </div>
+              <label class="block text-sm font-semibold text-gray-700">发布文案</label>
+              <textarea class="w-full rounded-xl border border-gray-300 px-3 py-2" rows="6" placeholder="输入文案..."></textarea>
+              <label class="block text-sm font-semibold text-gray-700">Hashtags</label>
+              <input class="w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="#hot #trend #remix" />
               <label class="block text-sm font-semibold text-gray-700">{{ t("hot.follow.delivery.notes") }}</label>
-              <textarea class="w-full rounded-xl border border-gray-300 px-3 py-2" rows="6" placeholder="{{ t('hot.follow.delivery.notes.placeholder') }}"></textarea>
+              <textarea class="w-full rounded-xl border border-gray-300 px-3 py-2" rows="3" placeholder="{{ t('hot.follow.delivery.notes.placeholder') }}"></textarea>
               <div class="flex flex-wrap gap-2">
                 <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs">#hot</span>
                 <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs">#trend</span>
@@ -74,7 +63,7 @@
 
         <section class="lg:col-span-3 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h2 class="text-lg font-semibold mb-4">{{ t("hot.follow.delivery.publish") }}</h2>
+            <h2 class="text-lg font-semibold mb-4">发布回填</h2>
             <div class="space-y-3">
               <label class="block text-sm font-semibold text-gray-700">{{ t("hot.follow.delivery.published_url") }}</label>
               <input id="hf-publish-url" class="w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="https://..." />

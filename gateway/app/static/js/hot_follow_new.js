@@ -11,6 +11,9 @@
   const createMsg = document.getElementById("hf-create-msg");
   const bgmFile = document.getElementById("hf-bgm");
   const mixEl = document.getElementById("hf-mix");
+  const targetLangEl = document.querySelector('select[name="target_lang"]');
+  const publishAccountEl = document.querySelector('select[name="publish_account"]');
+  const taskTitleEl = document.getElementById("hf-task-title");
 
   let lastProbe = null;
   let debounceTimer = null;
@@ -77,17 +80,28 @@
     const locale = getLocale() || "zh";
 
     try {
-      const res = await fetch("/api/tasks", {
+      const processModeEl = document.querySelector('input[name="process_mode"]:checked');
+      const processMode = processModeEl ? processModeEl.value : "fast_clone";
+      const pipelineConfig = {
+        process_mode: processMode,
+      };
+      if (publishAccountEl && publishAccountEl.value) pipelineConfig.publish_account = publishAccountEl.value;
+
+      const res = await fetch("/api/hot_follow/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           source_url: url,
           platform: platform === "auto" ? null : platform,
-          title: lastProbe.title || null,
+          title: (taskTitleEl && taskTitleEl.value ? taskTitleEl.value : "") || lastProbe.title || null,
           category_key: "hot_follow",
           kind: "hot_follow",
-          content_lang: "mm",
+          account_id: publishAccountEl ? publishAccountEl.value : null,
+          account_name: publishAccountEl ? publishAccountEl.value : null,
+          content_lang: targetLangEl ? targetLangEl.value : "mm",
           ui_lang: locale,
+          pipeline_config: pipelineConfig,
+          auto_start: true,
         }),
       });
       if (!res.ok) {
@@ -108,20 +122,14 @@
       const strategy = strategyEl ? strategyEl.value : "replace";
       if (bgmFile && bgmFile.files && bgmFile.files[0]) {
         const fd = new FormData();
-        fd.append("bgm_file", bgmFile.files[0]);
+        fd.append("file", bgmFile.files[0]);
         fd.append("mix_ratio", mixEl ? mixEl.value : "0.8");
         fd.append("strategy", strategy);
-        await fetch(`/api/tasks/${encodeURIComponent(taskId)}/bgm`, {
+        await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/bgm`, {
           method: "POST",
           body: fd,
         });
       }
-
-      await fetch(`/api/tasks/${encodeURIComponent(taskId)}/parse`, { method: "POST" });
-      await fetch(`/api/tasks/${encodeURIComponent(taskId)}/subtitles`, { method: "POST" });
-      await fetch(`/api/tasks/${encodeURIComponent(taskId)}/dub`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      await fetch(`/api/tasks/${encodeURIComponent(taskId)}/pack`, { method: "POST" });
-      await fetch(`/api/tasks/${encodeURIComponent(taskId)}/scenes`, { method: "POST" });
 
       window.location.href = withLocale(`/tasks/${encodeURIComponent(taskId)}`);
     } catch (e) {

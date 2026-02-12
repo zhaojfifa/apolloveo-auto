@@ -86,6 +86,7 @@ class TaskCreate(BaseModel):
     ui_lang: Optional[str] = "en"
     style_preset: Optional[str] = None
     face_swap_enabled: Optional[bool] = False
+    auto_start: Optional[bool] = None
 
 
 class TaskUpdate(BaseModel):

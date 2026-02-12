@@ -208,6 +208,12 @@ class PublishTaskRequest(BaseModel):
     notes: str | None = None
 
 
+class PublishBackfillRequest(BaseModel):
+    publish_url: str | None = None
+    note: str | None = None
+    status: str | None = None
+
+
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
 api_key_header = APIKeyHeader(name=OP_HEADER_KEY, auto_error=False)
@@ -1726,13 +1732,12 @@ def resolve_download_code(code: str, repo=Depends(get_task_repository)):
     raise HTTPException(status_code=404, detail="Code not found")
 
 
-@api_router.post("/tasks/probe")
-async def probe_task(payload: ProbeTaskRequest):
-    url = _extract_first_http_url(payload.url) or payload.url
+async def _probe_url_metadata(url: str, platform_hint: str | None = None) -> dict[str, Any]:
+    url = _extract_first_http_url(url) or url
     if not url:
         raise HTTPException(status_code=400, detail="url is required")
 
-    platform = (payload.platform or "").strip().lower() if payload.platform else "auto"
+    platform = (platform_hint or "").strip().lower() if platform_hint else "auto"
     if platform in ("", "auto"):
         platform = detect_platform(url) or "auto"
 
@@ -1762,6 +1767,11 @@ async def probe_task(payload: ProbeTaskRequest):
         "raw": raw,
         "raw_downloaded": False,
     }
+
+
+@api_router.post("/tasks/probe")
+async def probe_task(payload: ProbeTaskRequest):
+    return await _probe_url_metadata(payload.url, payload.platform)
 
 
 @api_router.post("/tasks", response_model=TaskDetail)
@@ -1813,7 +1823,8 @@ def create_task(
             detail=f"Task persistence failed for task_id={task_id}",
         )
 
-    if source_text:
+    should_auto_start = bool(source_text) if payload.auto_start is None else bool(payload.auto_start)
+    if source_text and should_auto_start:
         _kickoff_autostart(
             task_id=task_id,
             start_step="parse",
@@ -1823,6 +1834,21 @@ def create_task(
         )
 
     return _task_to_detail(stored_task)
+
+
+@api_router.post("/hot_follow/tasks", response_model=TaskDetail)
+def create_hot_follow_task(
+    payload: TaskCreate,
+    background_tasks: BackgroundTasks,
+    repo=Depends(get_task_repository),
+):
+    data = payload.dict()
+    data["kind"] = "hot_follow"
+    data["category_key"] = data.get("category_key") or "hot_follow"
+    if data.get("auto_start") is None:
+        data["auto_start"] = True
+    normalized = TaskCreate(**data)
+    return create_task(normalized, background_tasks=background_tasks, repo=repo)
 
 
 def _save_upload_to_paths(
@@ -1967,16 +1993,16 @@ def create_task_local_upload(
     return {"ok": True, "task_id": task_id, "redirect": f"/tasks/{task_id}"}
 
 
-@api_router.post("/tasks/{task_id}/bgm")
-def upload_task_bgm(
+def _upload_task_bgm_impl(
     task_id: str,
-    bgm_file: UploadFile = File(...),
-    original_pct: int | None = Form(default=None),
-    bgm_pct: int | None = Form(default=None),
-    mix_ratio: float | None = Form(default=None),
-    strategy: str | None = Form(default=None),
-    repo=Depends(get_task_repository),
-):
+    *,
+    bgm_file: UploadFile,
+    original_pct: int | None,
+    bgm_pct: int | None,
+    mix_ratio: float | None,
+    strategy: str | None,
+    repo,
+) -> dict[str, Any]:
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -2018,12 +2044,53 @@ def upload_task_bgm(
     }
     _policy_upsert(repo, task_id, {"config": config})
 
+    bgm_url = get_download_url(str(bgm_key)) if bgm_key else None
     return {
         "task_id": task_id,
         "bgm_key": bgm_key,
+        "bgm_url": bgm_url,
         "mix_ratio": ratio,
         "strategy": config["bgm"]["strategy"],
     }
+
+@api_router.post("/tasks/{task_id}/bgm")
+def upload_task_bgm(
+    task_id: str,
+    bgm_file: UploadFile = File(...),
+    original_pct: int | None = Form(default=None),
+    bgm_pct: int | None = Form(default=None),
+    mix_ratio: float | None = Form(default=None),
+    strategy: str | None = Form(default=None),
+    repo=Depends(get_task_repository),
+):
+    return _upload_task_bgm_impl(
+        task_id,
+        bgm_file=bgm_file,
+        original_pct=original_pct,
+        bgm_pct=bgm_pct,
+        mix_ratio=mix_ratio,
+        strategy=strategy,
+        repo=repo,
+    )
+
+
+@api_router.post("/hot_follow/tasks/{task_id}/bgm")
+def upload_hot_follow_bgm(
+    task_id: str,
+    file: UploadFile = File(...),
+    mix_ratio: float | None = Form(default=None),
+    strategy: str | None = Form(default=None),
+    repo=Depends(get_task_repository),
+):
+    return _upload_task_bgm_impl(
+        task_id,
+        bgm_file=file,
+        original_pct=None,
+        bgm_pct=None,
+        mix_ratio=mix_ratio,
+        strategy=strategy,
+        repo=repo,
+    )
 
 
 @api_router.patch("/tasks/{task_id}", response_model=TaskDetail)
@@ -2323,6 +2390,111 @@ def get_publish_hub(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return _publish_hub_payload(task)
+
+
+@api_router.get("/hot_follow/tasks/{task_id}/publish_hub")
+def get_hot_follow_publish_hub(
+    task_id: str,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return _publish_hub_payload(task)
+
+
+@api_router.post("/hot_follow/tasks/{task_id}/probe")
+async def probe_hot_follow_task(
+    task_id: str,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    source_url = (task.get("source_url") or "").strip()
+    if not source_url:
+        raise HTTPException(status_code=400, detail="source_url is empty")
+
+    probe = await _probe_url_metadata(source_url, task.get("platform"))
+    cover = probe.get("cover")
+    duration = probe.get("duration_sec")
+    source_title = probe.get("title")
+    updates = {
+        "platform": probe.get("platform") or task.get("platform"),
+        "cover_url": cover or task.get("cover_url") or task.get("cover"),
+        "duration_sec": duration if duration is not None else task.get("duration_sec"),
+        "source_title": source_title,
+        "error_message": None,
+        "error_reason": None,
+    }
+    _policy_upsert(repo, task_id, updates)
+    _update_pipeline_probe(repo, task_id, probe.get("raw"))
+    current = repo.get(task_id) or {}
+    return {
+        "task_id": task_id,
+        "status": current.get("status") or "pending",
+        "cover": current.get("cover_url") or current.get("cover") or cover,
+        "source_title": current.get("source_title") or source_title,
+        "duration": current.get("duration_sec"),
+        "platform": current.get("platform"),
+    }
+
+
+@api_router.post("/tasks/{task_id}/run")
+def run_task_pipeline(
+    task_id: str,
+    background_tasks: BackgroundTasks,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    _policy_upsert(
+        repo,
+        task_id,
+        {"status": "processing", "last_step": task.get("last_step") or "parse", "error_message": None, "error_reason": None},
+    )
+    background_tasks.add_task(_run_pipeline_background, task_id, repo)
+    return {"queued": True, "task_id": task_id}
+
+
+@api_router.post("/hot_follow/tasks/{task_id}/run")
+def run_hot_follow_pipeline(
+    task_id: str,
+    background_tasks: BackgroundTasks,
+    repo=Depends(get_task_repository),
+):
+    return run_task_pipeline(task_id, background_tasks=background_tasks, repo=repo)
+
+
+@api_router.put("/hot_follow/tasks/{task_id}/publish_backfill")
+def publish_backfill_hot_follow(
+    task_id: str,
+    payload: PublishBackfillRequest,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    backfill = dict(task.get("publish_backfill") or {})
+    if payload.publish_url is not None:
+        backfill["publish_url"] = payload.publish_url
+    if payload.note is not None:
+        backfill["note"] = payload.note
+    if payload.status is not None:
+        backfill["status"] = payload.status
+    backfill["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    updates = {
+        "publish_backfill": backfill,
+        "publish_url": backfill.get("publish_url") or task.get("publish_url"),
+        "published_at": backfill["updated_at"],
+    }
+    if backfill.get("status"):
+        updates["publish_status"] = backfill.get("status")
+    _policy_upsert(repo, task_id, updates)
+    return {"task_id": task_id, "backfill": backfill}
 
 
 @api_router.post("/tasks/{task_id}/parse")
