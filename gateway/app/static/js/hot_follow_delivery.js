@@ -12,7 +12,7 @@
 
   async function loadDeliverables() {
     try {
-      const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/publish_hub`);
+      const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/publish_hub`);
       if (!res.ok) {
         if (emptyEl) emptyEl.style.display = "block";
         return;
@@ -41,13 +41,13 @@
     publishBtn.disabled = true;
     if (publishMsg) publishMsg.textContent = "...";
     try {
-      const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/publish`, {
-        method: "POST",
+      const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/publish_backfill`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          published: true,
-          published_url: publishUrl ? publishUrl.value : "",
-          notes: publishNotes ? publishNotes.value : "",
+          publish_url: publishUrl ? publishUrl.value : "",
+          note: publishNotes ? publishNotes.value : "",
+          status: "ready",
         }),
       });
       if (!res.ok) {
