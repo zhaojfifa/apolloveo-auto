@@ -130,6 +130,7 @@
           body: fd,
         });
       }
+      await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/run`, { method: "POST" });
 
       window.location.href = withLocale(`/tasks/${encodeURIComponent(taskId)}`);
     } catch (e) {
