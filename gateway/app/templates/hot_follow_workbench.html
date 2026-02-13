@@ -193,10 +193,10 @@
     </main>
   </div>
 
-  <script src="/static/js/i18n_v185.js"></script>
+  <script src="/static/js/i18n_v185.js" defer></script>
   <script>
     window.__TASK_JSON__ = {{ task_json | tojson | safe }};
   </script>
-  <script src="/static/js/hot_follow_workbench.js?v={{ task.updated_at or task.created_at or 'dev' }}"></script>
+  <script defer src="/static/js/hot_follow_workbench.js?v={{ task.updated_at or task.created_at or 'dev' }}"></script>
 </body>
 </html>
