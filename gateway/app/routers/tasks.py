@@ -1002,14 +1002,19 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
     except Exception:
         mix_val = 0.3
     task_id = str(task.get("task_id") or task.get("id") or "")
+    voice_url = _task_endpoint(task_id, "audio") if (task.get("mm_audio_key") or task.get("mm_audio_path")) else None
+    bust = task.get("audio_sha256") or task.get("dub_generated_at") or task.get("updated_at")
+    if voice_url and bust:
+        sep = "&" if "?" in voice_url else "?"
+        voice_url = f"{voice_url}{sep}v={bust}"
     return {
         "tts_engine": _hf_engine_public(task.get("dub_provider")),
         "tts_voice": task.get("voice_id") or "zh-CN-XiaoxiaoNeural",
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
-        "voiceover_url": _task_endpoint(task_id, "audio") if (task.get("mm_audio_key") or task.get("mm_audio_path")) else None,
-        "audio_url": _task_endpoint(task_id, "audio") if (task.get("mm_audio_key") or task.get("mm_audio_path")) else None,
+        "voiceover_url": voice_url,
+        "audio_url": voice_url,
     }
 
 
@@ -1120,6 +1125,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
     pack_key = _task_key(task, "pack_key") or _task_key(task, "pack_path")
     scenes_key = _task_key(task, "scenes_key")
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
+    bgm_key = str(((task.get("config") or {}).get("bgm") or {}).get("bgm_key") or "").strip() or None
 
     def _entry(kind: str, title: str, key: str | None, url: str | None, state: str) -> dict[str, Any]:
         sha = None
@@ -1167,6 +1173,13 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             audio_key,
             _task_endpoint(task_id, "audio") if audio_key and object_exists(str(audio_key)) else None,
             _hf_deliverable_state(task, audio_key, "dub_status"),
+        ),
+        _entry(
+            "bgm",
+            "BGM",
+            bgm_key,
+            get_download_url(str(bgm_key)) if bgm_key and object_exists(str(bgm_key)) else None,
+            "done" if bgm_key and object_exists(str(bgm_key)) else "pending",
         ),
         _entry(
             "pack",
@@ -2777,6 +2790,8 @@ def get_hot_follow_workbench_hub(
         "media": {
             "source_video_url": raw_url,
             "mute_video_url": mute_url,
+            "voiceover_url": audio_cfg.get("voiceover_url") or audio_cfg.get("audio_url"),
+            "bgm_url": audio_cfg.get("bgm_url"),
             "final_video_url": final_url,
         },
         "pipeline": pipeline,
@@ -3101,6 +3116,35 @@ def compose_hot_follow_final_video(
             },
         )
         raise HTTPException(status_code=500, detail=f"compose failed: {exc}") from exc
+
+
+@api_router.post("/hot_follow/tasks/{task_id}/dub", response_model=DubResponse)
+async def rerun_hot_follow_dub(
+    task_id: str,
+    payload: DubProviderRequest,
+    background_tasks: BackgroundTasks,
+    repo: ITaskRepository = Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    kind = str(task.get("kind") or "").strip().lower()
+    if kind and kind != "hot_follow":
+        raise HTTPException(status_code=400, detail="task is not hot_follow")
+    if not (payload.mm_text or "").strip():
+        edited = _hf_load_subtitles_text(task_id, task).strip()
+        if edited:
+            payload = DubProviderRequest(
+                provider=payload.provider,
+                voice_id=payload.voice_id,
+                mm_text=edited,
+            )
+    return await rerun_dub(
+        task_id=task_id,
+        payload=payload,
+        background_tasks=background_tasks,
+        repo=repo,
+    )
 
 
 @api_router.post("/hot_follow/tasks/{task_id}/probe")
@@ -3472,6 +3516,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "dub_status": "ready",
                     "dub_error": None,
                     "audio_sha256": audio_sha256,
+                    "dub_generated_at": datetime.now(timezone.utc).isoformat(),
                 },
             )
             stored = repo.get(task_id)
@@ -3517,6 +3562,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "dub_status": "ready",
             "dub_error": None,
             "audio_sha256": audio_sha256,
+            "dub_generated_at": datetime.now(timezone.utc).isoformat(),
         },
     )
 

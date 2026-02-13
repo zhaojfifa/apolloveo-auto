@@ -30,6 +30,7 @@
   const finalLinkEl = document.getElementById("hf_final_video_link");
   const tabSourceEl = document.getElementById("hf-tab-source");
   const tabFinalEl = document.getElementById("hf-tab-final");
+  const previewAudioEl = new Audio();
 
   let currentHub = null;
   let subtitleDirty = false;
@@ -265,7 +266,7 @@
       provider: provider === "edge_tts" ? "edge-tts" : provider,
       voice_id: voiceId || null,
     };
-    const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/dub`, {
+    const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/dub`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -354,9 +355,22 @@
     });
   }
   if (ttsPreviewBtn) {
-    ttsPreviewBtn.addEventListener("click", (e) => {
+    ttsPreviewBtn.addEventListener("click", async (e) => {
       e.preventDefault();
-      if (audioMsgEl) audioMsgEl.textContent = "Preview is reserved in this version. Use Re-Run Audio.";
+      try {
+        const media = (currentHub && currentHub.media) || {};
+        const audio = (currentHub && currentHub.audio) || {};
+        const voiceUrl = media.voiceover_url || audio.voiceover_url || audio.audio_url || null;
+        if (!voiceUrl) {
+          if (audioMsgEl) audioMsgEl.textContent = "No voiceover yet; run Re-Run Audio first.";
+          return;
+        }
+        previewAudioEl.src = voiceUrl;
+        await previewAudioEl.play();
+        if (audioMsgEl) audioMsgEl.textContent = "Playing current voiceover preview...";
+      } catch (err) {
+        if (audioMsgEl) audioMsgEl.textContent = (err && err.message) ? err.message : "preview failed";
+      }
     });
   }
   if (subtitlesRefreshBtn) {
