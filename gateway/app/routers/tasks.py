@@ -2542,6 +2542,36 @@ def list_tasks(
     return TaskListResponse(items=summaries, page=page, page_size=page_size, total=total)
 
 
+@api_router.get("/contracts/hot_follow_workbench_v1")
+def get_hot_follow_workbench_contract_v1():
+    return {
+        "name": "hot_follow_workbench",
+        "version": "v1",
+        "endpoints": {
+            "hub": "/api/hot_follow/tasks/{task_id}/workbench_hub",
+            "rerun_audio": "/api/hot_follow/tasks/{task_id}/dub",
+            "compose_final": "/api/hot_follow/tasks/{task_id}/compose",
+            "raw_video": "/v1/tasks/{task_id}/raw",
+            "final_video": "/v1/tasks/{task_id}/final",
+            "audio_mm": "/v1/tasks/{task_id}/audio_mm",
+        },
+        "tts": {
+            "engines": ["edge_tts", "lovo", "none"],
+            "voices": [
+                "zh-CN-XiaoxiaoNeural",
+                "zh-CN-YunxiNeural",
+                "my-MM-NilarNeural",
+                "mm_female_1",
+            ],
+        },
+        "bgm": {
+            "mix_range": [0.0, 1.0],
+            "mix_step": 0.05,
+            "accept": "audio/*",
+        },
+    }
+
+
 @api_router.get("/tasks/{task_id}/text", response_class=PlainTextResponse)
 def get_task_text(
     task_id: str,
