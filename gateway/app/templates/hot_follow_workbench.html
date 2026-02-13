@@ -40,9 +40,11 @@
               <button id="hf-tab-source" class="px-3 py-1 rounded-full bg-gray-900 text-white">源视频</button>
               <button id="hf-tab-final" class="px-3 py-1 rounded-full bg-gray-100 text-gray-600">最终成片</button>
               <a id="hf_source_video_link" class="px-3 py-1 rounded-full bg-gray-100 text-gray-600 opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener">打开源视频</a>
+              <a id="hf_final_video_link" class="px-3 py-1 rounded-full bg-gray-100 text-gray-600 opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener">打开最终成片</a>
             </div>
             <div id="hf_source_video_container" class="w-full h-72 rounded-xl bg-gray-100 border border-dashed border-gray-300 overflow-hidden">
               <video id="hf_source_video" class="w-full h-full object-cover hidden" controls preload="metadata"></video>
+              <video id="hf_final_video" class="w-full h-full object-cover hidden" controls preload="metadata"></video>
               {% if cover_url %}
                 <img id="hf_source_poster" class="w-full h-full object-cover bg-gray-100" src="{{ cover_url }}" alt="cover" />
               {% else %}
@@ -67,8 +69,19 @@
 
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <h3 class="text-base font-semibold mb-3">字幕编辑</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              <div class="rounded-xl border border-gray-200 p-3">
+                <div class="text-xs text-gray-500 mb-2">Original</div>
+                <pre id="hf_subtitles_origin" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
+              </div>
+              <div class="rounded-xl border border-gray-200 p-3">
+                <div class="text-xs text-gray-500 mb-2">Target / Edited</div>
+                <pre id="hf_subtitles_edited_preview" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
+              </div>
+            </div>
             <textarea id="hf_subtitles_text" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" rows="10" placeholder="在此编辑 SRT 文本"></textarea>
             <div class="flex items-center gap-3 mt-3">
+              <button id="hf_subtitles_refresh_btn" class="btn-secondary">刷新字幕</button>
               <button id="hf_subtitles_save_btn" class="btn-secondary">保存字幕</button>
               <span id="hf_subtitles_msg" class="text-xs text-gray-500"></span>
             </div>
@@ -131,18 +144,26 @@
                   </div>
                 </div>
               </div>
-              <div data-hf-step="synthesis">
+              <div class="border-b border-gray-100 pb-3" data-hf-step="pack">
                 <div class="flex items-center justify-between">
                   <span class="font-semibold">{{ t("hot.follow.step.pack") }}</span>
-                  <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="synthesis">-</span>
+                  <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="pack">-</span>
                 </div>
-                <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="synthesis">-</div>
+                <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="pack">-</div>
+              </div>
+              <div data-hf-step="compose">
+                <div class="flex items-center justify-between">
+                  <span class="font-semibold">Compose</span>
+                  <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="compose">-</span>
+                </div>
+                <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="compose">-</div>
               </div>
             </div>
             <div class="flex flex-wrap gap-3 mt-4">
               <button class="btn-secondary" data-action="parse">{{ t("hot.follow.action.parse") }}</button>
               <button class="btn-secondary" data-action="subtitles">{{ t("hot.follow.action.subtitles") }}</button>
-              <button class="btn-secondary" data-action="synthesis">{{ t("hot.follow.action.pack") }}</button>
+              <button class="btn-secondary" data-action="pack">{{ t("hot.follow.action.pack") }}</button>
+              <button id="hf_compose_btn" class="btn-secondary" data-action="compose">Compose Final</button>
             </div>
             <div class="text-xs text-gray-500 mt-2" id="hf-audio-msg"></div>
           </div>
