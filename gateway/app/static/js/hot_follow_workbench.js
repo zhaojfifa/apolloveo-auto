@@ -7,7 +7,7 @@
   const composeUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/compose`;
   const statusEl = document.getElementById("hf-status");
   const eventsEl = document.getElementById("hf-events");
-  const audioMsgEl = document.getElementById("hf-audio-msg");
+  const audioMsgEl = document.getElementById("hf_audio_msg") || document.getElementById("hf-audio-msg");
   const ttsEngineEl = document.getElementById("hf_tts_engine");
   const ttsVoiceEl = document.getElementById("hf_tts_voice");
   const ttsPreviewBtn = document.getElementById("hf_tts_preview_btn");
@@ -30,10 +30,17 @@
   const finalLinkEl = document.getElementById("hf_final_video_link");
   const tabSourceEl = document.getElementById("hf-tab-source");
   const tabFinalEl = document.getElementById("hf-tab-final");
-  const previewAudioEl = new Audio();
+  const voicePreviewEl = document.getElementById("hf_voice_preview_audio");
+  const voicePreviewEmptyEl = document.getElementById("hf_voice_preview_empty");
+  const audioConfirmChkEl = document.getElementById("hf_audio_confirm_chk");
+  const audioHintEl = document.getElementById("hf_audio_hint");
+  const composeBtnEl = document.getElementById("hf_compose_btn");
+  const composeHintEl = document.getElementById("hf_compose_hint");
 
   let currentHub = null;
-  let subtitleDirty = false;
+  let subtitlesDirty = false;
+  let audioConfirmed = false;
+  let lastVoiceoverUrl = null;
   let activeTab = "source";
 
   function escapeHtml(s) {
@@ -42,6 +49,46 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/\"/g, "&quot;");
+  }
+
+  function confirmStorageKey(voiceUrl) {
+    return `hf_audio_confirmed::${taskId}::${voiceUrl || "-"}`;
+  }
+
+  function hideAudioHint() {
+    if (!audioHintEl) return;
+    audioHintEl.textContent = "";
+    audioHintEl.classList.add("hidden");
+  }
+
+  function showAudioHint(message) {
+    if (!audioHintEl) return;
+    audioHintEl.textContent = message || "";
+    if (message) audioHintEl.classList.remove("hidden");
+    else audioHintEl.classList.add("hidden");
+  }
+
+  function setConfirmUI(confirmed) {
+    audioConfirmed = !!confirmed;
+    if (audioConfirmChkEl) audioConfirmChkEl.checked = audioConfirmed;
+    updateComposeGate();
+  }
+
+  function updateComposeGate() {
+    if (!composeBtnEl) return;
+    const media = (currentHub && currentHub.media) || {};
+    const audio = (currentHub && currentHub.audio) || {};
+    const voiceUrl = media.voiceover_url || audio.voiceover_url || audio.audio_url || null;
+    let reason = "";
+    if (subtitlesDirty) reason = "Subtitles edited — please Re-Run Audio.";
+    else if (voiceUrl && !audioConfirmed) reason = "Confirm voiceover before Compose Final.";
+    composeBtnEl.disabled = !!reason;
+    composeBtnEl.classList.toggle("opacity-50", !!reason);
+    composeBtnEl.classList.toggle("pointer-events-none", !!reason);
+    if (composeHintEl) {
+      composeHintEl.textContent = reason;
+      composeHintEl.classList.toggle("hidden", !reason);
+    }
   }
 
   function setTab(tab) {
@@ -82,6 +129,12 @@
     const summaryEl = document.querySelector(`[data-hf-step-summary="${step}"]`);
     if (stateEl) stateEl.textContent = status || "pending";
     if (summaryEl) summaryEl.textContent = summary || "";
+    if (step === "audio") {
+      const audioStateEl = document.querySelector('[data-hf-audio-status="audio"]');
+      const audioSummaryEl = document.querySelector('[data-hf-audio-summary="audio"]');
+      if (audioStateEl) audioStateEl.textContent = status || "pending";
+      if (audioSummaryEl) audioSummaryEl.textContent = summary || "";
+    }
   }
 
   function renderPipeline() {
@@ -139,15 +192,43 @@
     const edited = subtitles.edited_text || subtitles.srt_text || "";
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || "-";
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || "-";
-    if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = edited || "";
+    if (subtitlesTextEl && !subtitlesDirty) subtitlesTextEl.value = edited || "";
   }
 
   function renderAudio() {
     const audio = (currentHub && currentHub.audio) || {};
+    const media = (currentHub && currentHub.media) || {};
+    const voiceUrl = media.voiceover_url || audio.voiceover_url || audio.audio_url || null;
+    const dubStage = ((currentHub && currentHub.pipeline) || []).find((x) => x && x.key === "dub") || {};
+    const updatedAt = dubStage.updated_at || (currentHub && currentHub.updated_at) || Date.now();
+    const cachedUrl = voiceUrl ? `${voiceUrl}${voiceUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(updatedAt)}` : null;
+
     if (ttsEngineEl && audio.tts_engine) ttsEngineEl.value = audio.tts_engine;
     if (ttsVoiceEl && audio.tts_voice) ttsVoiceEl.value = audio.tts_voice;
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
     if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
+
+    if (voicePreviewEl && voicePreviewEmptyEl) {
+      if (cachedUrl) {
+        voicePreviewEl.classList.remove("hidden");
+        voicePreviewEmptyEl.classList.add("hidden");
+        if (voicePreviewEl.src !== cachedUrl) voicePreviewEl.src = cachedUrl;
+      } else {
+        voicePreviewEl.pause();
+        voicePreviewEl.removeAttribute("src");
+        voicePreviewEl.classList.add("hidden");
+        voicePreviewEmptyEl.classList.remove("hidden");
+      }
+    }
+
+    if (voiceUrl !== lastVoiceoverUrl) {
+      if (lastVoiceoverUrl) localStorage.removeItem(confirmStorageKey(lastVoiceoverUrl));
+      lastVoiceoverUrl = voiceUrl;
+      const stored = voiceUrl ? localStorage.getItem(confirmStorageKey(voiceUrl)) : null;
+      setConfirmUI(stored === "1");
+    } else {
+      updateComposeGate();
+    }
   }
 
   function renderScenePack() {
@@ -300,9 +381,21 @@
   if (tabSourceEl) tabSourceEl.addEventListener("click", (e) => { e.preventDefault(); setTab("source"); });
   if (tabFinalEl) tabFinalEl.addEventListener("click", (e) => { e.preventDefault(); setTab("final"); });
   if (subtitlesTextEl) subtitlesTextEl.addEventListener("input", () => {
-    subtitleDirty = true;
+    subtitlesDirty = true;
+    showAudioHint("Subtitles edited — please Re-Run Audio");
+    if (lastVoiceoverUrl) localStorage.removeItem(confirmStorageKey(lastVoiceoverUrl));
+    setConfirmUI(false);
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = subtitlesTextEl.value || "-";
   });
+
+  if (audioConfirmChkEl) {
+    audioConfirmChkEl.addEventListener("change", () => {
+      const checked = !!audioConfirmChkEl.checked;
+      if (checked && lastVoiceoverUrl) localStorage.setItem(confirmStorageKey(lastVoiceoverUrl), "1");
+      else if (lastVoiceoverUrl) localStorage.removeItem(confirmStorageKey(lastVoiceoverUrl));
+      setConfirmUI(checked);
+    });
+  }
 
   if (ttsEngineEl) {
     ttsEngineEl.addEventListener("change", async () => {
@@ -341,6 +434,9 @@
       e.preventDefault();
       try {
         if (audioMsgEl) audioMsgEl.textContent = "Rerunning audio...";
+        if (subtitlesDirty) {
+          await patchSubtitles(subtitlesTextEl ? subtitlesTextEl.value : "");
+        }
         await patchAudioConfig({
           tts_engine: ttsEngineEl ? ttsEngineEl.value : null,
           tts_voice: ttsVoiceEl ? ttsVoiceEl.value : null,
@@ -348,6 +444,10 @@
         });
         await rerunAudio();
         await loadHub();
+        subtitlesDirty = false;
+        hideAudioHint();
+        if (lastVoiceoverUrl) localStorage.removeItem(confirmStorageKey(lastVoiceoverUrl));
+        setConfirmUI(false);
         if (audioMsgEl) audioMsgEl.textContent = "Audio rerun requested";
       } catch (err) {
         if (audioMsgEl) audioMsgEl.textContent = err.message || "rerun failed";
@@ -365,8 +465,12 @@
           if (audioMsgEl) audioMsgEl.textContent = "No voiceover yet; run Re-Run Audio first.";
           return;
         }
-        previewAudioEl.src = voiceUrl;
-        await previewAudioEl.play();
+        if (voicePreviewEl) {
+          if (!voicePreviewEl.src) {
+            voicePreviewEl.src = `${voiceUrl}${voiceUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
+          }
+          await voicePreviewEl.play();
+        }
         if (audioMsgEl) audioMsgEl.textContent = "Playing current voiceover preview...";
       } catch (err) {
         if (audioMsgEl) audioMsgEl.textContent = (err && err.message) ? err.message : "preview failed";
@@ -379,7 +483,8 @@
       try {
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Refreshing...";
         await refreshSubtitles();
-        subtitleDirty = false;
+        subtitlesDirty = false;
+        hideAudioHint();
         await loadHub();
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Refreshed";
       } catch (err) {
@@ -393,7 +498,8 @@
       try {
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Saving...";
         await patchSubtitles(subtitlesTextEl ? subtitlesTextEl.value : "");
-        subtitleDirty = false;
+        subtitlesDirty = false;
+        hideAudioHint();
         await loadHub();
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Saved";
       } catch (err) {
