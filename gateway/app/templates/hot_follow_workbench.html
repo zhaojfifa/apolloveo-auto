@@ -157,13 +157,27 @@
                   <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="compose">-</span>
                 </div>
                 <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="compose">-</div>
+                <div class="mt-3 space-y-3">
+                  <label class="flex items-center gap-2 text-xs text-gray-600">
+                    <input id="hf_compose_confirm" type="checkbox" class="rounded border-gray-300" />
+                    I confirm voiceover and mix settings are ready.
+                  </label>
+                  <button id="hf_compose_btn" class="btn-secondary" data-action="compose">Compose Final</button>
+                  <div id="hf_compose_msg" class="text-xs text-gray-500"></div>
+                  <div id="hf_compose_final_block" class="hidden rounded-xl border border-gray-200 p-3">
+                    <div class="flex items-center justify-between mb-2">
+                      <div class="text-xs font-semibold text-gray-700">Final Composed Video</div>
+                      <a id="hf_compose_final_link" class="text-xs text-gray-600 underline opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener">Open</a>
+                    </div>
+                    <video id="hf_compose_final_video" class="w-full rounded-lg bg-gray-100" controls preload="metadata"></video>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="flex flex-wrap gap-3 mt-4">
               <button class="btn-secondary" data-action="parse">{{ t("hot.follow.action.parse") }}</button>
               <button class="btn-secondary" data-action="subtitles">{{ t("hot.follow.action.subtitles") }}</button>
               <button class="btn-secondary" data-action="pack">{{ t("hot.follow.action.pack") }}</button>
-              <button id="hf_compose_btn" class="btn-secondary" data-action="compose">Compose Final</button>
             </div>
             <div class="text-xs text-gray-500 mt-2" id="hf-audio-msg"></div>
           </div>
