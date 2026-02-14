@@ -4,7 +4,7 @@
   if (!taskId) return;
 
   const hubUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/workbench_hub`;
-  const composeUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/compose`;
+  const composeUrl = `/api/tasks/${encodeURIComponent(taskId)}/compose`;
   const statusEl = document.getElementById("hf-status");
   const eventsEl = document.getElementById("hf-events");
   const audioMsgEl = document.getElementById("hf_audio_msg") || document.getElementById("hf-audio-msg");
@@ -36,6 +36,13 @@
   const audioHintEl = document.getElementById("hf_audio_hint");
   const composeBtnEl = document.getElementById("hf_compose_btn");
   const composeHintEl = document.getElementById("hf_compose_hint");
+  const composeBtn = document.getElementById("hf_compose_btn");
+  const composeConfirmEl = document.getElementById("hf_compose_confirm");
+  const composeMsgEl = document.getElementById("hf_compose_msg");
+  const composeFinalBlockEl = document.getElementById("hf_compose_final_block");
+  const composeFinalVideoEl = document.getElementById("hf_compose_final_video");
+  const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
+  const previewAudioEl = new Audio();
 
   let currentHub = null;
   let subtitlesDirty = false;
@@ -164,7 +171,7 @@
 
   function renderMedia() {
     const media = (currentHub && currentHub.media) || {};
-    const sourceUrl = media.source_video_url || null;
+    const sourceUrl = media.source_video_url || media.raw_url || null;
     const finalUrl = media.final_video_url || null;
 
     if (sourceVideoEl) {
@@ -181,6 +188,15 @@
         finalVideoEl.removeAttribute("src");
       }
     }
+    if (composeFinalVideoEl) {
+      if (finalUrl) {
+        if (composeFinalVideoEl.src !== finalUrl) composeFinalVideoEl.src = finalUrl;
+      } else {
+        composeFinalVideoEl.removeAttribute("src");
+      }
+    }
+    if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
+    setLink(composeFinalLinkEl, finalUrl);
     setLink(sourceLinkEl, sourceUrl);
     setLink(finalLinkEl, finalUrl);
     setTab(activeTab);
@@ -290,6 +306,7 @@
     renderScenePack();
     renderDeliverables();
     renderEvents();
+    updateComposeButtonState();
   }
 
   async function loadHub() {
@@ -343,11 +360,17 @@
   async function rerunAudio() {
     const provider = ttsEngineEl ? ttsEngineEl.value : null;
     const voiceId = ttsVoiceEl ? ttsVoiceEl.value : null;
+    const subtitles = (currentHub && currentHub.subtitles) || {};
+    const originalSrt = subtitles.origin_text || "";
+    const targetSrt = subtitlesTextEl ? subtitlesTextEl.value : (subtitles.edited_text || subtitles.srt_text || "");
     const payload = {
+      tts_engine: provider || null,
+      tts_voice: voiceId || null,
       provider: provider === "edge_tts" ? "edge-tts" : provider,
       voice_id: voiceId || null,
+      subtitles_srt: (targetSrt || "").trim().length > 0 ? targetSrt : originalSrt,
     };
-    const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/dub`, {
+    const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/dub`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -357,9 +380,32 @@
   }
 
   async function composeFinal() {
-    const res = await fetch(composeUrl, { method: "POST" });
+    const payload = {
+      bgm_mix: bgmMixEl ? Number(bgmMixEl.value || "0.3") : 0.3,
+      force: false,
+    };
+    const res = await fetch(composeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
     if (!res.ok) throw new Error((await res.text()) || "compose failed");
     return res.json();
+  }
+
+  function updateComposeButtonState() {
+    if (!composeBtn) return;
+    const media = (currentHub && currentHub.media) || {};
+    const hasVoiceover = Boolean(media.voiceover_url);
+    const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
+    composeBtn.disabled = !(hasVoiceover && confirmed);
+    composeBtn.classList.toggle("opacity-50", composeBtn.disabled);
+    composeBtn.classList.toggle("pointer-events-none", composeBtn.disabled);
+    if (composeMsgEl) {
+      if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
+      else if (!confirmed) composeMsgEl.textContent = "Compose disabled: check confirmation first.";
+      else composeMsgEl.textContent = "";
+    }
   }
 
   async function runAction(action) {
@@ -387,6 +433,7 @@
     setConfirmUI(false);
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = subtitlesTextEl.value || "-";
   });
+  if (composeConfirmEl) composeConfirmEl.addEventListener("change", updateComposeButtonState);
 
   if (audioConfirmChkEl) {
     audioConfirmChkEl.addEventListener("change", () => {

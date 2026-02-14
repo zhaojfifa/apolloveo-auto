@@ -172,6 +172,9 @@ class DubProviderRequest(BaseModel):
     provider: str | None = None
     voice_id: str | None = None
     mm_text: str | None = None
+    subtitles_srt: str | None = None
+    tts_engine: str | None = None
+    tts_voice: str | None = None
 
 
 class EditedTextRequest(BaseModel):
@@ -219,6 +222,13 @@ class HotFollowAudioConfigRequest(BaseModel):
 
 class HotFollowSubtitlesRequest(BaseModel):
     srt_text: str = ""
+
+
+class ComposeTaskRequest(BaseModel):
+    voiceover_url: str | None = None
+    bgm_url: str | None = None
+    bgm_mix: float | None = None
+    force: bool = False
 
 
 pages_router = APIRouter()
@@ -2818,6 +2828,7 @@ def get_hot_follow_workbench_hub(
             "subtitles_mode": pipeline_config.get("subtitles_mode") or "whisper+gemini",
         },
         "media": {
+            "raw_url": raw_url,
             "source_video_url": raw_url,
             "mute_video_url": mute_url,
             "voiceover_url": audio_cfg.get("voiceover_url") or audio_cfg.get("audio_url"),
@@ -2953,14 +2964,21 @@ def patch_hot_follow_subtitles(
     }
 
 
-def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
+def _hf_compose_final_video(
+    task_id: str,
+    task: dict,
+    *,
+    audio_key_override: str | None = None,
+    bgm_key_override: str | None = None,
+    bgm_mix_override: float | None = None,
+) -> dict[str, Any]:
     storage = get_storage_service()
     video_key = (
         _task_key(task, "mute_video_key")
         or _task_key(task, "mute_video_path")
         or _task_key(task, "raw_path")
     )
-    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
+    audio_key = audio_key_override or _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     if not video_key:
         raise HTTPException(status_code=409, detail="missing video source for compose")
     if not audio_key:
@@ -2976,13 +2994,16 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
 
     config = dict(task.get("config") or {})
     bgm = dict(config.get("bgm") or {})
-    bgm_key = str(bgm.get("bgm_key") or "").strip() or None
+    bgm_key = bgm_key_override or (str(bgm.get("bgm_key") or "").strip() or None)
     if bgm_key and not object_exists(bgm_key):
         bgm_key = None
-    try:
-        bgm_mix = float(bgm.get("mix_ratio") if bgm.get("mix_ratio") is not None else 0.3)
-    except Exception:
-        bgm_mix = 0.3
+    if bgm_mix_override is not None:
+        bgm_mix = bgm_mix_override
+    else:
+        try:
+            bgm_mix = float(bgm.get("mix_ratio") if bgm.get("mix_ratio") is not None else 0.3)
+        except Exception:
+            bgm_mix = 0.3
     bgm_mix = max(0.0, min(1.0, bgm_mix))
 
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -3148,6 +3169,105 @@ def compose_hot_follow_final_video(
         raise HTTPException(status_code=500, detail=f"compose failed: {exc}") from exc
 
 
+def _resolve_compose_storage_key(candidate: str | None) -> str | None:
+    value = str(candidate or "").strip()
+    if not value:
+        return None
+    if object_exists(value):
+        return value
+    return None
+
+
+@api_router.post("/tasks/{task_id}/compose")
+def compose_task(
+    task_id: str,
+    payload: ComposeTaskRequest | None = None,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    req = payload or ComposeTaskRequest()
+    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
+    if final_key and object_exists(str(final_key)) and not req.force:
+        return {
+            "task_id": task_id,
+            "final_video_url": _task_endpoint(task_id, "final"),
+            "final_key": str(final_key),
+        }
+
+    bgm_mix = None
+    if req.bgm_mix is not None:
+        bgm_mix = max(0.0, min(1.0, float(req.bgm_mix)))
+        config = dict(task.get("config") or {})
+        bgm_cfg = dict(config.get("bgm") or {})
+        bgm_cfg["mix_ratio"] = bgm_mix
+        config["bgm"] = bgm_cfg
+        _policy_upsert(repo, task_id, {"config": config})
+
+    audio_key_override = _resolve_compose_storage_key(req.voiceover_url)
+    bgm_key_override = _resolve_compose_storage_key(req.bgm_url)
+    if bgm_key_override:
+        latest_cfg = dict((repo.get(task_id) or task).get("config") or {})
+        bgm_cfg = dict(latest_cfg.get("bgm") or {})
+        bgm_cfg["bgm_key"] = bgm_key_override
+        latest_cfg["bgm"] = bgm_cfg
+        _policy_upsert(repo, task_id, {"config": latest_cfg})
+
+    _policy_upsert(
+        repo,
+        task_id,
+        {
+            "status": "processing",
+            "last_step": "compose",
+            "compose_status": "running",
+            "compose_error": None,
+        },
+    )
+    try:
+        updates = _hf_compose_final_video(
+            task_id,
+            repo.get(task_id) or task,
+            audio_key_override=audio_key_override,
+            bgm_key_override=bgm_key_override,
+            bgm_mix_override=bgm_mix,
+        )
+        _policy_upsert(repo, task_id, updates)
+    except HTTPException as exc:
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "compose_status": "error",
+                "compose_error": str(exc.detail),
+                "status": "failed",
+                "last_step": "compose",
+            },
+        )
+        raise
+    except Exception as exc:
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "compose_status": "error",
+                "compose_error": str(exc),
+                "status": "failed",
+                "last_step": "compose",
+            },
+        )
+        raise HTTPException(status_code=500, detail=f"compose failed: {exc}") from exc
+
+    latest = repo.get(task_id) or {}
+    latest_final_key = _task_key(latest, "final_video_key") or _task_key(latest, "final_video_path")
+    return {
+        "task_id": task_id,
+        "final_video_url": _task_endpoint(task_id, "final"),
+        "final_key": str(latest_final_key or ""),
+    }
+
+
 @api_router.post("/hot_follow/tasks/{task_id}/dub", response_model=DubResponse)
 async def rerun_hot_follow_dub(
     task_id: str,
@@ -3161,14 +3281,36 @@ async def rerun_hot_follow_dub(
     kind = str(task.get("kind") or "").strip().lower()
     if kind and kind != "hot_follow":
         raise HTTPException(status_code=400, detail="task is not hot_follow")
-    if not (payload.mm_text or "").strip():
-        edited = _hf_load_subtitles_text(task_id, task).strip()
-        if edited:
-            payload = DubProviderRequest(
-                provider=payload.provider,
-                voice_id=payload.voice_id,
-                mm_text=edited,
-            )
+    provider = payload.provider or _hf_engine_internal(payload.tts_engine)
+    voice = payload.voice_id or payload.tts_voice
+    target_text = (payload.subtitles_srt or payload.mm_text or "").strip()
+    if not target_text:
+        target_text = _hf_load_subtitles_text(task_id, task).strip()
+    if not target_text:
+        target_text = _hf_load_origin_subtitles_text(task).strip()
+    if target_text:
+        override_path = _hf_subtitles_override_path(task_id)
+        override_path.parent.mkdir(parents=True, exist_ok=True)
+        override_path.write_text(target_text + ("\n" if target_text else ""), encoding="utf-8")
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "subtitles_status": "ready",
+                "last_step": "subtitles",
+                "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
+                "error_message": None,
+                "error_reason": None,
+            },
+        )
+    payload = DubProviderRequest(
+        provider=provider,
+        voice_id=voice,
+        mm_text=target_text or None,
+        subtitles_srt=payload.subtitles_srt,
+        tts_engine=payload.tts_engine,
+        tts_voice=payload.tts_voice,
+    )
     return await rerun_dub(
         task_id=task_id,
         payload=payload,
@@ -3705,6 +3847,33 @@ async def rerun_dub(
         task = repo.get(task_id)
         if not task:
             raise HTTPException(status_code=404, detail="Task not found")
+
+        provider = payload.provider or _hf_engine_internal(payload.tts_engine)
+        voice = payload.voice_id or payload.tts_voice
+        mm_text = payload.mm_text
+        if not (mm_text or "").strip():
+            mm_text = payload.subtitles_srt
+        payload = DubProviderRequest(
+            provider=provider,
+            voice_id=voice,
+            mm_text=mm_text,
+            subtitles_srt=payload.subtitles_srt,
+            tts_engine=payload.tts_engine,
+            tts_voice=payload.tts_voice,
+        )
+        if (payload.mm_text or "").strip() and str(task.get("kind") or "").strip().lower() == "hot_follow":
+            active_text = (payload.mm_text or "").strip()
+            override_path = _hf_subtitles_override_path(task_id)
+            override_path.parent.mkdir(parents=True, exist_ok=True)
+            override_path.write_text(active_text + "\n", encoding="utf-8")
+            _policy_upsert(
+                repo,
+                task_id,
+                {
+                    "subtitles_status": "ready",
+                    "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
+                },
+            )
 
         run_async = os.getenv("RUN_STEPS_ASYNC", "1").strip().lower() not in ("0", "false", "no")
         _policy_upsert(repo, task_id, {"dub_status": "running", "dub_error": None, "last_step": "dub"})
