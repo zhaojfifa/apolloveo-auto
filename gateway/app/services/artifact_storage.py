@@ -152,6 +152,29 @@ def object_exists(task_or_key: str, artifact_name: str | None = None,
 
 
 
+def object_head(task_or_key: str, artifact_name: str | None = None,
+                tenant_id: str = "default", project_id: str = "default") -> dict | None:
+    storage = get_storage_service()
+    if artifact_name is None:
+        key = task_or_key
+        lp = _local_path_from_file_url(key)
+        if lp is not None:
+            if not lp.exists():
+                return None
+            return {
+                "content_length": int(lp.stat().st_size),
+                "content_type": "application/octet-stream",
+                "etag": None,
+            }
+    else:
+        key = KeyBuilder.build(tenant_id, project_id, task_or_key, artifact_name)
+    try:
+        return storage.head(key)
+    except Exception as e:
+        logger.error(f"Failed to read object head from {key}: {e}")
+        return None
+
+
 def get_object_bytes(task_or_key: str, artifact_name: str | None = None,
                      tenant_id: str = "default", project_id: str = "default") -> bytes | None:
     import os

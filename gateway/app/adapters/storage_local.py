@@ -1,5 +1,6 @@
 import os
 import shutil
+import mimetypes
 from gateway.app.ports.storage import IStorageService
 
 class LocalStorageService(IStorageService):
@@ -51,6 +52,17 @@ class LocalStorageService(IStorageService):
     def exists(self, remote_key: str) -> bool:
         path = os.path.join(self.root_dir, remote_key)
         return os.path.exists(path)
+
+    def head(self, remote_key: str) -> dict | None:
+        path = os.path.join(self.root_dir, remote_key)
+        if not os.path.exists(path):
+            return None
+        guess, _ = mimetypes.guess_type(path)
+        return {
+            "content_length": int(os.path.getsize(path)),
+            "content_type": guess or "application/octet-stream",
+            "etag": None,
+        }
 
     def generate_presigned_url(
         self,

@@ -19,6 +19,7 @@ from gateway.app.config import get_settings
 from gateway.app.core.workspace import Workspace
 from gateway.app.providers.edge_tts import EdgeTTSError, generate_audio_edge_tts
 from gateway.app.providers import lovo_tts
+from gateway.app.services.media_validation import assert_local_audio_ok, file_size_bytes, probe_duration_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,35 @@ async def _synthesize_from_text(
 ) -> dict:
     ws = workspace or Workspace(task_id)
     if ws.mm_audio_exists() and not force:
-        return {"audio_path": str(ws.mm_audio_path), "duration_sec": None}
+        existing = ws.mm_audio_mp3_path if ws.mm_audio_mp3_path.exists() else ws.mm_audio_path
+        try:
+            size, dur = assert_local_audio_ok(existing)
+            logger.info(
+                "DUB3_SKIP",
+                extra={
+                    "task_id": task_id,
+                    "step": "dub",
+                    "stage": "DUB3_SKIP",
+                    "reason": "VALID_EXISTING_AUDIO",
+                    "output_path": str(existing),
+                    "output_size": size,
+                    "duration_sec": dur,
+                },
+            )
+            return {"audio_path": str(existing), "duration_sec": dur}
+        except Exception:
+            logger.info(
+                "DUB3_REGEN",
+                extra={
+                    "task_id": task_id,
+                    "step": "dub",
+                    "stage": "DUB3_REGEN",
+                    "reason": "INVALID_EXISTING_AUDIO",
+                    "output_path": str(existing),
+                    "output_size": file_size_bytes(existing),
+                    "duration_sec": probe_duration_seconds(existing),
+                },
+            )
 
     start_time = time.perf_counter()
     text = _normalize_text(mm_srt_text)
@@ -185,6 +214,7 @@ async def _synthesize_from_text(
                 "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
                 "output_path": str(output_path),
                 "output_size": output_path.stat().st_size if output_path.exists() else None,
+                "duration_sec": probe_duration_seconds(output_path),
             },
         )
         return {"audio_path": str(output_path), "duration_sec": None}
@@ -240,6 +270,7 @@ async def _synthesize_from_text(
                 "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
                 "output_path": str(path),
                 "output_size": path.stat().st_size if path.exists() else None,
+                "duration_sec": probe_duration_seconds(path),
             },
         )
         return {"audio_path": str(path), "duration_sec": None}

@@ -75,6 +75,19 @@ class R2StorageService(IStorageService):
             else:
                 raise
 
+    def head(self, key: str) -> dict | None:
+        try:
+            resp = self.s3_client.head_object(Bucket=self.bucket_name, Key=key)
+            return {
+                "content_length": int(resp.get("ContentLength") or 0),
+                "content_type": resp.get("ContentType"),
+                "etag": resp.get("ETag"),
+            }
+        except self.s3_client.exceptions.ClientError as e:
+            if e.response.get("Error", {}).get("Code") in {"404", "NoSuchKey"}:
+                return None
+            raise
+
     def generate_presigned_url(
         self,
         key: str,

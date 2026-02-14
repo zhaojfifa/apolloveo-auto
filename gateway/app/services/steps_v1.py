@@ -1,4 +1,4 @@
-"""Reusable pipeline step functions shared by /v1 routes and background tasks."""
+﻿"""Reusable pipeline step functions shared by /v1 routes and background tasks."""
 
 import asyncio
 import json
@@ -28,7 +28,7 @@ from gateway.app.core.workspace import (
 )
 from gateway.app.db import SessionLocal
 from gateway.app import config, models
-from gateway.app.services.artifact_storage import upload_task_artifact, get_download_url, object_exists
+from gateway.app.services.artifact_storage import upload_task_artifact, get_download_url, object_exists, object_head
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.services.status_policy.registry import get_status_policy
 from gateway.app.services.status_policy.service import policy_upsert
@@ -42,6 +42,12 @@ from gateway.app.deps import get_task_repository
 from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
 from gateway.app.utils.timing import log_step_timing
+from gateway.app.services.media_validation import (
+    MIN_AUDIO_BYTES,
+    assert_local_audio_ok,
+    deliver_key,
+    media_meta_from_head,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -179,13 +185,11 @@ def _truthy_env(name: str, default: str = "1") -> bool:
 # -------------------------
 # Artifact name conventions
 # -------------------------
-# 强制所有 key 都落到 artifacts/ 下，确保 /files/<key> 路径一致、可预期
+# 寮哄埗鎵€鏈?key 閮借惤鍒?artifacts/ 涓嬶紝纭繚 /files/<key> 璺緞涓€鑷淬€佸彲棰勬湡
 RAW_ARTIFACT = "raw/raw.mp4"
 ORIGIN_SRT_ARTIFACT = "subs/origin.srt"
 MM_SRT_ARTIFACT = "subs/mm.srt"
 MM_TXT_ARTIFACT = "subs/mm.txt"
-
-AUDIO_MM_KEY_TEMPLATE = "deliver/tasks/{task_id}/audio_mm.mp3"
 
 README_TEMPLATE = """CapCut pack usage
 
@@ -383,62 +387,26 @@ def _ensure_silent_wav(path: Path) -> None:
     path.write_bytes(b"")
 
 
-def _skip_dub_ready(req: DubRequest, workspace: Workspace, reason: str, provider: str | None) -> dict:
-    _write_no_dub_note(req.task_id, reason)
-    audio_path = workspace.mm_audio_primary_path
-    _ensure_silent_wav(audio_path)
-
-    audio_key = None
-    try:
-        mp3_path = _ensure_mp3_audio(audio_path, workspace.mm_audio_mp3_path)
-        key_template = AUDIO_MM_KEY_TEMPLATE.format(task_id=req.task_id)
-        storage = get_storage_service()
-        uploaded_key = storage.upload_file(
-            str(mp3_path),
-            key_template,
-            content_type="audio/mpeg",
-        )
-        if uploaded_key:
-            audio_key = uploaded_key
-    except Exception as exc:  # pragma: no cover
-        logger.warning("DUB3_SKIP upload failed: %s", exc)
-
-    if audio_key:
-        _update_task(
-            req.task_id,
-            mm_audio_path=audio_key,
-            mm_audio_key=audio_key,
-            last_step="dub",
-            dub_status="ready",
-            dub_error=None,
-        )
-    else:
-        _update_task(
-            req.task_id,
-            last_step="dub",
-            dub_status="ready",
-            dub_error=None,
-        )
-
-    _update_pipeline_config(req.task_id, {"no_dub": "true", "dub_skip_reason": reason})
-
+def _fail_dub(req: DubRequest, reason: str, provider: str | None) -> None:
+    _update_task(
+        req.task_id,
+        last_step="dub",
+        dub_status="failed",
+        dub_error=reason,
+        error_reason="dub_failed",
+    )
     logger.info(
-        "DUB3_SKIP",
+        "DUB3_FAIL",
         extra={
             "task_id": req.task_id,
             "step": "dub",
-            "stage": "DUB3_SKIP",
+            "stage": "DUB3_FAIL",
             "dub_provider": provider,
+            "voice_id": req.voice_id,
             "reason": reason,
         },
     )
-    return {
-        "task_id": req.task_id,
-        "voice_id": req.voice_id,
-        "audio_mm_url": f"/v1/tasks/{req.task_id}/audio_mm",
-        "no_dub": True,
-        "dub_skip_reason": reason,
-    }
+    raise HTTPException(status_code=500, detail=reason)
 
 
 def _maybe_fill_missing_for_pack(*, raw_path: Path, audio_path: Path, subs_path: Path) -> None:
@@ -603,8 +571,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
         if workspace.origin_srt_path.exists():
             origin_key = _upload_artifact(req.task_id, workspace.origin_srt_path, ORIGIN_SRT_ARTIFACT)
 
-        # 你的 Workspace 里 mm_srt_path / mm_srt_exists() 可能有差异，这里按“路径存在”判断
-        if workspace.mm_srt_path.exists():
+        # 浣犵殑 Workspace 閲?mm_srt_path / mm_srt_exists() 鍙兘鏈夊樊寮傦紝杩欓噷鎸夆€滆矾寰勫瓨鍦ㄢ€濆垽鏂?        if workspace.mm_srt_path.exists():
             mm_key = _upload_artifact(req.task_id, workspace.mm_srt_path, MM_SRT_ARTIFACT)
 
             mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
@@ -688,6 +655,8 @@ async def run_subtitles_step(req: SubtitlesRequest):
 
 async def run_dub_step(req: DubRequest):
     """Run the dubbing step for the given request."""
+async def run_dub_step(req: DubRequest):
+    """Run the dubbing step for the given request."""
 
     start_time = time.perf_counter()
     provider = os.getenv("DUB_PROVIDER", None)
@@ -726,19 +695,66 @@ async def run_dub_step(req: DubRequest):
         db.close()
 
     if pipeline_config.get("no_subtitles") == "true":
-        return _skip_dub_ready(req, workspace, "no_subtitles", provider)
+        _fail_dub(req, "NO_SUBTITLES", provider)
+
+    existing_key = _get_task_mm_audio_key(req.task_id) or deliver_key(req.task_id, "audio_mm.mp3")
+    if not req.force and existing_key:
+        meta = object_head(existing_key)
+        size, _ = media_meta_from_head(meta)
+        if size >= MIN_AUDIO_BYTES:
+            logger.info(
+                "DUB3_SKIP",
+                extra={
+                    "task_id": req.task_id,
+                    "step": "dub",
+                    "stage": "DUB3_SKIP",
+                    "dub_provider": provider,
+                    "voice_id": req.voice_id,
+                    "reason": "VALID_EXISTING_AUDIO",
+                    "size": size,
+                    "key": existing_key,
+                },
+            )
+            _update_task(
+                req.task_id,
+                mm_audio_path=existing_key,
+                mm_audio_key=existing_key,
+                last_step="dub",
+                dub_status="ready",
+                dub_error=None,
+            )
+            return {
+                "task_id": req.task_id,
+                "voice_id": req.voice_id,
+                "audio_mm_url": f"/v1/tasks/{req.task_id}/audio_mm",
+                "duration_sec": None,
+                "audio_path": None,
+            }
+        logger.info(
+            "DUB3_REGEN",
+            extra={
+                "task_id": req.task_id,
+                "step": "dub",
+                "stage": "DUB3_REGEN",
+                "dub_provider": provider,
+                "voice_id": req.voice_id,
+                "reason": "INVALID_EXISTING_AUDIO",
+                "size": size,
+                "key": existing_key,
+            },
+        )
 
     mm_txt_path = workspace.mm_txt_path
     if not mm_txt_path.exists():
-        return _skip_dub_ready(req, workspace, "mm_txt_missing", provider)
+        _fail_dub(req, "MM_TXT_MISSING", provider)
     try:
         mm_txt_text = mm_txt_path.read_text(encoding="utf-8")
     except Exception:
-        return _skip_dub_ready(req, workspace, "mm_txt_missing", provider)
+        _fail_dub(req, "MM_TXT_MISSING", provider)
     if mm_txt_text.strip().lower() == "no subtitles":
-        return _skip_dub_ready(req, workspace, "no_subtitles_marker", provider)
+        _fail_dub(req, "NO_SUBTITLES_MARKER", provider)
     if not mm_txt_text.strip():
-        return _skip_dub_ready(req, workspace, "mm_txt_empty", provider)
+        _fail_dub(req, "MM_TXT_EMPTY", provider)
 
     override_text = (req.mm_text or "").strip()
     mm_text = override_text or mm_txt_text
@@ -756,7 +772,7 @@ async def run_dub_step(req: DubRequest):
         },
     )
     if not mm_text.strip() or not _clean_text_for_dub(mm_text):
-        return _skip_dub_ready(req, workspace, "mm_text_empty", provider)
+        _fail_dub(req, "MM_TEXT_EMPTY", provider)
 
     step_timeout_sec = _env_int("DUB_STEP_TIMEOUT_SEC", 900)
     try:
@@ -772,40 +788,41 @@ async def run_dub_step(req: DubRequest):
             timeout=step_timeout_sec,
         )
     except asyncio.TimeoutError:
-        return _skip_dub_ready(req, workspace, "tts_failed:timeout", provider)
+        _fail_dub(req, "TTS_FAILED_TIMEOUT", provider)
     except asyncio.CancelledError:
-        return _skip_dub_ready(req, workspace, "tts_failed:cancelled", provider)
+        _fail_dub(req, "TTS_FAILED_CANCELLED", provider)
     except DubbingError as exc:
-        return _skip_dub_ready(req, workspace, f"tts_failed:{str(exc)[:80]}", provider)
+        _fail_dub(req, f"TTS_FAILED:{str(exc)[:120]}", provider)
     except HTTPException as exc:
-        return _skip_dub_ready(req, workspace, f"tts_failed:{exc.status_code}", provider)
+        _fail_dub(req, f"TTS_FAILED_HTTP_{exc.status_code}", provider)
     except Exception as exc:  # pragma: no cover
-        return _skip_dub_ready(req, workspace, f"tts_failed:{str(exc)[:80]}", provider)
+        _fail_dub(req, f"TTS_FAILED:{str(exc)[:120]}", provider)
 
-    # synthesize_voice 可能返回 dict 或其他对象，这里做防御性解析
     audio_path_value = result.get("audio_path") if isinstance(result, dict) else None
     audio_key = None
+    output_size = 0
+    output_duration = 0.0
 
     if audio_path_value:
         p = Path(audio_path_value)
         if not p.is_absolute():
-            # 相对路径时，落到 workspace 的默认输出
             p = workspace.mm_audio_path
-
         if p.exists():
             mp3_path = _ensure_mp3_audio(p, workspace.mm_audio_mp3_path)
-            key_template = AUDIO_MM_KEY_TEMPLATE.format(task_id=req.task_id)
+            try:
+                output_size, output_duration = assert_local_audio_ok(mp3_path)
+            except ValueError:
+                _fail_dub(req, "EMPTY_OR_INVALID_AUDIO", provider)
+            out_key = deliver_key(req.task_id, "audio_mm.mp3")
             storage = get_storage_service()
             uploaded_key = storage.upload_file(
                 str(mp3_path),
-                key_template,
+                out_key,
                 content_type="audio/mpeg",
             )
             if not uploaded_key:
-                detail = "Audio upload failed; no storage key returned"
-                _update_task(req.task_id, dub_status="error", dub_error=detail)
-                raise HTTPException(status_code=500, detail=detail)
-            audio_key = uploaded_key
+                _fail_dub(req, "EMPTY_OR_INVALID_AUDIO", provider)
+            audio_key = out_key
             logger.info(
                 "DUB3_UPLOAD_DONE",
                 extra={
@@ -815,20 +832,24 @@ async def run_dub_step(req: DubRequest):
                     "dub_provider": provider,
                     "voice_id": req.voice_id,
                     "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                    "audio_key": audio_key,
                     "output_path": str(mp3_path),
-                    "output_size": mp3_path.stat().st_size if mp3_path.exists() else None,
+                    "output_size": output_size,
+                    "duration_sec": output_duration,
                 },
             )
 
-    if audio_key:
-        _update_task(
-            req.task_id,
-            mm_audio_path=audio_key,
-            mm_audio_key=audio_key,
-            last_step="dub",
-            dub_status="ready",
-            dub_error=None,
-        )
+    if not audio_key:
+        _fail_dub(req, "EMPTY_OR_INVALID_AUDIO", provider)
+
+    _update_task(
+        req.task_id,
+        mm_audio_path=audio_key,
+        mm_audio_key=audio_key,
+        last_step="dub",
+        dub_status="ready",
+        dub_error=None,
+    )
 
     edited_text = workspace.read_mm_edited_text()
     if edited_text and edited_text.strip():
@@ -843,7 +864,7 @@ async def run_dub_step(req: DubRequest):
             "task_id": req.task_id,
             "voice_id": req.voice_id,
             "audio_mm_url": audio_url,
-            "duration_sec": result.get("duration_sec") if isinstance(result, dict) else None,
+            "duration_sec": output_duration,
             "audio_path": (result.get("audio_path") or result.get("path")) if isinstance(result, dict) else None,
         }
         logger.info(
@@ -856,6 +877,8 @@ async def run_dub_step(req: DubRequest):
                 "voice_id": req.voice_id,
                 "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
                 "audio_key": audio_key,
+                "output_size": output_size,
+                "duration_sec": output_duration,
             },
         )
         return resp
@@ -868,12 +891,6 @@ async def run_dub_step(req: DubRequest):
             provider=provider,
             voice_id=req.voice_id,
         )
-
-
-async def run_pack_step(req: PackRequest):
-    """Run the packaging step for the given request."""
-
-    start_time = time.perf_counter()
     task_id = req.task_id
     workspace = Workspace(task_id)
 
@@ -881,7 +898,7 @@ async def run_pack_step(req: PackRequest):
     zip_path = deliver_pack_zip_path(task_id)
     zip_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # audio：优先 workspace.mm_audio_path（你的 dub 可能输出 mp3），不存在则 fallback 到 wav 命名
+    # audio锛氫紭鍏?workspace.mm_audio_path锛堜綘鐨?dub 鍙兘杈撳嚭 mp3锛夛紝涓嶅瓨鍦ㄥ垯 fallback 鍒?wav 鍛藉悕
     audio_file = workspace.mm_audio_path
     audio_key = _get_task_mm_audio_key(task_id)
     if audio_key and not audio_file.exists():
@@ -897,7 +914,7 @@ async def run_pack_step(req: PackRequest):
     if audio_file.exists():
         audio_file = _mix_with_bgm_if_configured(task_id, audio_file, workspace)
 
-    # subs：优先 translated_srt_path(task_id, "my")，fallback "mm"
+    # subs锛氫紭鍏?translated_srt_path(task_id, "my")锛宖allback "mm"
     subs_mm_srt = translated_srt_path(task_id, "my")
     if not subs_mm_srt.exists():
         subs_mm_srt = translated_srt_path(task_id, "mm")
@@ -988,7 +1005,6 @@ async def run_pack_step(req: PackRequest):
         f"deliver/packs/{task_id}/README.md",
     ]
 
-    # 更新任务：pack_path 必须存 key（供 /v1/tasks/{id}/pack 302 → /files/<key>）
     _update_task(
         task_id,
         pack_key=zip_key,
@@ -1001,7 +1017,7 @@ async def run_pack_step(req: PackRequest):
         error_reason=None,
     )
 
-    # 返回值对 UI/调试友好：保留 zip_path/files
+    # 杩斿洖鍊煎 UI/璋冭瘯鍙嬪ソ锛氫繚鐣?zip_path/files
     zip_path_value = relative_to_workspace(zip_path) if zip_path.exists() else None
     try:
         download_url = storage.generate_presigned_url(
@@ -1719,9 +1735,7 @@ async def run_post_generate_pipeline(
 
 def _update_task(task_id: str, **fields) -> None:
     """
-    注意：这里允许把字段显式更新为 None（例如清理 error_message / error_reason）。
-    只要调用方传了 key，就会写入数据库。
-    """
+    娉ㄦ剰锛氳繖閲屽厑璁告妸瀛楁鏄惧紡鏇存柊涓?None锛堜緥濡傛竻鐞?error_message / error_reason锛夈€?    鍙璋冪敤鏂逛紶浜?key锛屽氨浼氬啓鍏ユ暟鎹簱銆?    """
     repo = get_task_repository()
     logger.info(
         "UPDATE_TASK_REPO_BACKEND task=%s repo=%s keys=%s",
@@ -1758,15 +1772,14 @@ def _update_pipeline_config(task_id: str, updates: dict[str, str]) -> None:
 
 def _upload_artifact(task_id: str, local_path: Path, artifact_name: str) -> str | None:
     """
-    返回 storage key（例如 default/default/<task_id>/artifacts/xxx）。
-    """
+    杩斿洖 storage key锛堜緥濡?default/default/<task_id>/artifacts/xxx锛夈€?    """
     db = SessionLocal()
     try:
         task = db.query(models.Task).filter(models.Task.id == task_id).first()
         if not task:
             return None
 
-        # 关键：不要再额外传 task_id=...，避免 wrapper 内部签名变化导致重复参数
+        # 鍏抽敭锛氫笉瑕佸啀棰濆浼?task_id=...锛岄伩鍏?wrapper 鍐呴儴绛惧悕鍙樺寲瀵艰嚧閲嶅鍙傛暟
         return upload_task_artifact(task, local_path, artifact_name)
     finally:
         db.close()

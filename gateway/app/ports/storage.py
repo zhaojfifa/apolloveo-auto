@@ -20,6 +20,10 @@ class IStorageService(ABC):
         pass
 
     @abstractmethod
+    def head(self, key: str) -> Dict[str, Any] | None:
+        pass
+
+    @abstractmethod
     def generate_presigned_url(
         self,
         key: str,
