@@ -14,6 +14,8 @@
   const bgmFileEl = document.getElementById("hf_bgm_file");
   const bgmMixEl = document.getElementById("hf_bgm_mix");
   const rerunAudioBtn = document.getElementById("hf_rerun_audio_btn");
+  const voiceoverAudioEl = document.getElementById("hf_voiceover_audio");
+  const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
   const scenePackDownloadEl = document.getElementById("hf_scene_pack_download");
   const scenePackHintEl = document.getElementById("hf-scene-pack-hint");
   const deliverablesGridEl = document.getElementById("hf_deliverables_grid");
@@ -30,14 +32,8 @@
   const finalLinkEl = document.getElementById("hf_final_video_link");
   const tabSourceEl = document.getElementById("hf-tab-source");
   const tabFinalEl = document.getElementById("hf-tab-final");
-  const voicePreviewEl = document.getElementById("hf_voice_preview_audio");
-  const voicePreviewEmptyEl = document.getElementById("hf_voice_preview_empty");
-  const audioConfirmChkEl = document.getElementById("hf_audio_confirm_chk");
-  const audioHintEl = document.getElementById("hf_audio_hint");
-  const composeBtnEl = document.getElementById("hf_compose_btn");
-  const composeHintEl = document.getElementById("hf_compose_hint");
-  const composeBtn = document.getElementById("hf_compose_btn");
   const composeConfirmEl = document.getElementById("hf_compose_confirm");
+  const composeBtnEl = document.getElementById("hf_compose_btn");
   const composeMsgEl = document.getElementById("hf_compose_msg");
   const composeFinalBlockEl = document.getElementById("hf_compose_final_block");
   const composeFinalVideoEl = document.getElementById("hf_compose_final_video");
@@ -45,9 +41,7 @@
   const previewAudioEl = new Audio();
 
   let currentHub = null;
-  let subtitlesDirty = false;
-  let audioConfirmed = false;
-  let lastVoiceoverUrl = null;
+  let subtitleDirty = false;
   let activeTab = "source";
 
   function escapeHtml(s) {
@@ -56,46 +50,6 @@
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/\"/g, "&quot;");
-  }
-
-  function confirmStorageKey(voiceUrl) {
-    return `hf_audio_confirmed::${taskId}::${voiceUrl || "-"}`;
-  }
-
-  function hideAudioHint() {
-    if (!audioHintEl) return;
-    audioHintEl.textContent = "";
-    audioHintEl.classList.add("hidden");
-  }
-
-  function showAudioHint(message) {
-    if (!audioHintEl) return;
-    audioHintEl.textContent = message || "";
-    if (message) audioHintEl.classList.remove("hidden");
-    else audioHintEl.classList.add("hidden");
-  }
-
-  function setConfirmUI(confirmed) {
-    audioConfirmed = !!confirmed;
-    if (audioConfirmChkEl) audioConfirmChkEl.checked = audioConfirmed;
-    updateComposeGate();
-  }
-
-  function updateComposeGate() {
-    if (!composeBtnEl) return;
-    const media = (currentHub && currentHub.media) || {};
-    const audio = (currentHub && currentHub.audio) || {};
-    const voiceUrl = media.voiceover_url || audio.voiceover_url || audio.audio_url || null;
-    let reason = "";
-    if (subtitlesDirty) reason = "Subtitles edited — please Re-Run Audio.";
-    else if (voiceUrl && !audioConfirmed) reason = "Confirm voiceover before Compose Final.";
-    composeBtnEl.disabled = !!reason;
-    composeBtnEl.classList.toggle("opacity-50", !!reason);
-    composeBtnEl.classList.toggle("pointer-events-none", !!reason);
-    if (composeHintEl) {
-      composeHintEl.textContent = reason;
-      composeHintEl.classList.toggle("hidden", !reason);
-    }
   }
 
   function setTab(tab) {
@@ -136,26 +90,18 @@
     const summaryEl = document.querySelector(`[data-hf-step-summary="${step}"]`);
     if (stateEl) stateEl.textContent = status || "pending";
     if (summaryEl) summaryEl.textContent = summary || "";
-    if (step === "audio") {
-      const audioStateEl = document.querySelector('[data-hf-audio-status="audio"]');
-      const audioSummaryEl = document.querySelector('[data-hf-audio-summary="audio"]');
-      if (audioStateEl) audioStateEl.textContent = status || "pending";
-      if (audioSummaryEl) audioSummaryEl.textContent = summary || "";
-    }
   }
 
   function renderPipeline() {
     const parse = getPipelineItem("parse");
     const subtitles = getPipelineItem("subtitles");
     const dub = getPipelineItem("dub");
-    const pack = getPipelineItem("pack");
     const compose = getPipelineItem("compose");
     setStep("parse", parse.status, parse.error || parse.message);
     setStep("subtitles", subtitles.status, subtitles.error || subtitles.message);
     setStep("audio", dub.status, dub.error || dub.message);
-    setStep("pack", pack.status, pack.error || pack.message);
     setStep("compose", compose.status, compose.error || compose.message);
-    if (statusEl) statusEl.textContent = `${compose.status || pack.status || dub.status || "pending"}`;
+    if (statusEl) statusEl.textContent = `${compose.status || dub.status || subtitles.status || parse.status || "pending"}`;
   }
 
   function setLink(el, url) {
@@ -172,7 +118,7 @@
   function renderMedia() {
     const media = (currentHub && currentHub.media) || {};
     const sourceUrl = media.source_video_url || media.raw_url || null;
-    const finalUrl = media.final_video_url || null;
+    const finalUrl = media.final_url || media.final_video_url || null;
 
     if (sourceVideoEl) {
       if (sourceUrl) {
@@ -208,43 +154,24 @@
     const edited = subtitles.edited_text || subtitles.srt_text || "";
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || "-";
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || "-";
-    if (subtitlesTextEl && !subtitlesDirty) subtitlesTextEl.value = edited || "";
+    if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = edited || "";
   }
 
   function renderAudio() {
     const audio = (currentHub && currentHub.audio) || {};
     const media = (currentHub && currentHub.media) || {};
     const voiceUrl = media.voiceover_url || audio.voiceover_url || audio.audio_url || null;
-    const dubStage = ((currentHub && currentHub.pipeline) || []).find((x) => x && x.key === "dub") || {};
-    const updatedAt = dubStage.updated_at || (currentHub && currentHub.updated_at) || Date.now();
-    const cachedUrl = voiceUrl ? `${voiceUrl}${voiceUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(updatedAt)}` : null;
-
     if (ttsEngineEl && audio.tts_engine) ttsEngineEl.value = audio.tts_engine;
     if (ttsVoiceEl && audio.tts_voice) ttsVoiceEl.value = audio.tts_voice;
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
-    if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
-
-    if (voicePreviewEl && voicePreviewEmptyEl) {
-      if (cachedUrl) {
-        voicePreviewEl.classList.remove("hidden");
-        voicePreviewEmptyEl.classList.add("hidden");
-        if (voicePreviewEl.src !== cachedUrl) voicePreviewEl.src = cachedUrl;
+    if (voiceoverAudioEl) {
+      if (voiceUrl) {
+        if (voiceoverAudioEl.src !== voiceUrl) voiceoverAudioEl.src = voiceUrl;
       } else {
-        voicePreviewEl.pause();
-        voicePreviewEl.removeAttribute("src");
-        voicePreviewEl.classList.add("hidden");
-        voicePreviewEmptyEl.classList.remove("hidden");
+        voiceoverAudioEl.removeAttribute("src");
       }
     }
-
-    if (voiceUrl !== lastVoiceoverUrl) {
-      if (lastVoiceoverUrl) localStorage.removeItem(confirmStorageKey(lastVoiceoverUrl));
-      lastVoiceoverUrl = voiceUrl;
-      const stored = voiceUrl ? localStorage.getItem(confirmStorageKey(voiceUrl)) : null;
-      setConfirmUI(stored === "1");
-    } else {
-      updateComposeGate();
-    }
+    if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
   }
 
   function renderScenePack() {
@@ -361,16 +288,15 @@
     const provider = ttsEngineEl ? ttsEngineEl.value : null;
     const voiceId = ttsVoiceEl ? ttsVoiceEl.value : null;
     const subtitles = (currentHub && currentHub.subtitles) || {};
-    const originalSrt = subtitles.origin_text || "";
-    const targetSrt = subtitlesTextEl ? subtitlesTextEl.value : (subtitles.edited_text || subtitles.srt_text || "");
+    const textareaText = subtitlesTextEl ? subtitlesTextEl.value : "";
+    const fallbackText = subtitles.edited_text || subtitles.srt_text || subtitles.origin_text || "";
+    const dubText = (textareaText || "").trim() ? textareaText : fallbackText;
     const payload = {
-      tts_engine: provider || null,
-      tts_voice: voiceId || null,
       provider: provider === "edge_tts" ? "edge-tts" : provider,
       voice_id: voiceId || null,
-      subtitles_srt: (targetSrt || "").trim().length > 0 ? targetSrt : originalSrt,
+      mm_text: dubText || "",
     };
-    const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/dub`, {
+    const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/dub`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -380,27 +306,41 @@
   }
 
   async function composeFinal() {
-    const payload = {
-      bgm_mix: bgmMixEl ? Number(bgmMixEl.value || "0.3") : 0.3,
-      force: false,
-    };
+    const media = (currentHub && currentHub.media) || {};
+    const audio = (currentHub && currentHub.audio) || {};
+    const voiceUrl = media.voiceover_url || audio.voiceover_url || null;
+    if (composeConfirmEl && !composeConfirmEl.checked) throw new Error("Please confirm before composing.");
+    if (!voiceUrl) throw new Error("No voiceover yet; run Re-Run Audio first.");
     const res = await fetch(composeUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        bgm_mix: Number(bgmMixEl ? (bgmMixEl.value || "0.3") : "0.3"),
+        force: false,
+      }),
     });
     if (!res.ok) throw new Error((await res.text()) || "compose failed");
-    return res.json();
+    const data = await res.json();
+    await loadHub();
+    const hub = currentHub || {};
+    const media2 = hub.media || {};
+    const finalUrl = media2.final_url || media2.final_video_url || data.final_url || data.final_video_url || null;
+    if (finalUrl && composeFinalVideoEl) composeFinalVideoEl.src = finalUrl;
+    if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
+    setLink(composeFinalLinkEl, finalUrl);
+    return data;
   }
 
   function updateComposeButtonState() {
-    if (!composeBtn) return;
+    if (!composeBtnEl) return;
     const media = (currentHub && currentHub.media) || {};
-    const hasVoiceover = Boolean(media.voiceover_url);
+    const audio = (currentHub && currentHub.audio) || {};
+    const hasVoiceover = Boolean(media.voiceover_url || audio.voiceover_url);
     const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
-    composeBtn.disabled = !(hasVoiceover && confirmed);
-    composeBtn.classList.toggle("opacity-50", composeBtn.disabled);
-    composeBtn.classList.toggle("pointer-events-none", composeBtn.disabled);
+    const enabled = hasVoiceover && confirmed;
+    composeBtnEl.disabled = !enabled;
+    composeBtnEl.classList.toggle("opacity-50", !enabled);
+    composeBtnEl.classList.toggle("pointer-events-none", !enabled);
     if (composeMsgEl) {
       if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
       else if (!confirmed) composeMsgEl.textContent = "Compose disabled: check confirmation first.";
@@ -427,20 +367,14 @@
   if (tabSourceEl) tabSourceEl.addEventListener("click", (e) => { e.preventDefault(); setTab("source"); });
   if (tabFinalEl) tabFinalEl.addEventListener("click", (e) => { e.preventDefault(); setTab("final"); });
   if (subtitlesTextEl) subtitlesTextEl.addEventListener("input", () => {
-    subtitlesDirty = true;
-    showAudioHint("Subtitles edited — please Re-Run Audio");
-    if (lastVoiceoverUrl) localStorage.removeItem(confirmStorageKey(lastVoiceoverUrl));
-    setConfirmUI(false);
+    subtitleDirty = true;
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = subtitlesTextEl.value || "-";
   });
   if (composeConfirmEl) composeConfirmEl.addEventListener("change", updateComposeButtonState);
-
-  if (audioConfirmChkEl) {
-    audioConfirmChkEl.addEventListener("change", () => {
-      const checked = !!audioConfirmChkEl.checked;
-      if (checked && lastVoiceoverUrl) localStorage.setItem(confirmStorageKey(lastVoiceoverUrl), "1");
-      else if (lastVoiceoverUrl) localStorage.removeItem(confirmStorageKey(lastVoiceoverUrl));
-      setConfirmUI(checked);
+  if (confirmVoiceoverEl && composeConfirmEl) {
+    confirmVoiceoverEl.addEventListener("change", () => {
+      composeConfirmEl.checked = !!confirmVoiceoverEl.checked;
+      updateComposeButtonState();
     });
   }
 
@@ -481,9 +415,6 @@
       e.preventDefault();
       try {
         if (audioMsgEl) audioMsgEl.textContent = "Rerunning audio...";
-        if (subtitlesDirty) {
-          await patchSubtitles(subtitlesTextEl ? subtitlesTextEl.value : "");
-        }
         await patchAudioConfig({
           tts_engine: ttsEngineEl ? ttsEngineEl.value : null,
           tts_voice: ttsVoiceEl ? ttsVoiceEl.value : null,
@@ -491,10 +422,6 @@
         });
         await rerunAudio();
         await loadHub();
-        subtitlesDirty = false;
-        hideAudioHint();
-        if (lastVoiceoverUrl) localStorage.removeItem(confirmStorageKey(lastVoiceoverUrl));
-        setConfirmUI(false);
         if (audioMsgEl) audioMsgEl.textContent = "Audio rerun requested";
       } catch (err) {
         if (audioMsgEl) audioMsgEl.textContent = err.message || "rerun failed";
@@ -512,12 +439,8 @@
           if (audioMsgEl) audioMsgEl.textContent = "No voiceover yet; run Re-Run Audio first.";
           return;
         }
-        if (voicePreviewEl) {
-          if (!voicePreviewEl.src) {
-            voicePreviewEl.src = `${voiceUrl}${voiceUrl.includes("?") ? "&" : "?"}v=${Date.now()}`;
-          }
-          await voicePreviewEl.play();
-        }
+        previewAudioEl.src = voiceUrl;
+        await previewAudioEl.play();
         if (audioMsgEl) audioMsgEl.textContent = "Playing current voiceover preview...";
       } catch (err) {
         if (audioMsgEl) audioMsgEl.textContent = (err && err.message) ? err.message : "preview failed";
@@ -530,8 +453,7 @@
       try {
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Refreshing...";
         await refreshSubtitles();
-        subtitlesDirty = false;
-        hideAudioHint();
+        subtitleDirty = false;
         await loadHub();
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Refreshed";
       } catch (err) {
@@ -545,8 +467,7 @@
       try {
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Saving...";
         await patchSubtitles(subtitlesTextEl ? subtitlesTextEl.value : "");
-        subtitlesDirty = false;
-        hideAudioHint();
+        subtitleDirty = false;
         await loadHub();
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Saved";
       } catch (err) {
@@ -563,7 +484,9 @@
       try {
         if (action === "compose" && statusEl) statusEl.textContent = "Composing final video...";
         await runAction(action);
+        if (action === "compose" && composeMsgEl) composeMsgEl.textContent = "Compose requested.";
       } catch (err) {
+        if (action === "compose" && composeMsgEl) composeMsgEl.textContent = err.message || "compose failed";
         if (statusEl) statusEl.textContent = err.message || "action failed";
       }
     });
