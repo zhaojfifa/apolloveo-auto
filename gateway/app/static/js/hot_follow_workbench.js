@@ -4,16 +4,18 @@
   if (!taskId) return;
 
   const hubUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/workbench_hub`;
-  const composeUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/compose`;
+  const composeUrl = `/api/tasks/${encodeURIComponent(taskId)}/compose`;
   const statusEl = document.getElementById("hf-status");
   const eventsEl = document.getElementById("hf-events");
-  const audioMsgEl = document.getElementById("hf-audio-msg");
+  const audioMsgEl = document.getElementById("hf_audio_msg") || document.getElementById("hf-audio-msg");
   const ttsEngineEl = document.getElementById("hf_tts_engine");
   const ttsVoiceEl = document.getElementById("hf_tts_voice");
   const ttsPreviewBtn = document.getElementById("hf_tts_preview_btn");
   const bgmFileEl = document.getElementById("hf_bgm_file");
   const bgmMixEl = document.getElementById("hf_bgm_mix");
   const rerunAudioBtn = document.getElementById("hf_rerun_audio_btn");
+  const voiceoverAudioEl = document.getElementById("hf_voiceover_audio");
+  const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
   const scenePackDownloadEl = document.getElementById("hf_scene_pack_download");
   const scenePackHintEl = document.getElementById("hf-scene-pack-hint");
   const deliverablesGridEl = document.getElementById("hf_deliverables_grid");
@@ -30,6 +32,12 @@
   const finalLinkEl = document.getElementById("hf_final_video_link");
   const tabSourceEl = document.getElementById("hf-tab-source");
   const tabFinalEl = document.getElementById("hf-tab-final");
+  const composeConfirmEl = document.getElementById("hf_compose_confirm");
+  const composeBtnEl = document.getElementById("hf_compose_btn");
+  const composeMsgEl = document.getElementById("hf_compose_msg");
+  const composeFinalBlockEl = document.getElementById("hf_compose_final_block");
+  const composeFinalVideoEl = document.getElementById("hf_compose_final_video");
+  const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
@@ -88,14 +96,12 @@
     const parse = getPipelineItem("parse");
     const subtitles = getPipelineItem("subtitles");
     const dub = getPipelineItem("dub");
-    const pack = getPipelineItem("pack");
     const compose = getPipelineItem("compose");
     setStep("parse", parse.status, parse.error || parse.message);
     setStep("subtitles", subtitles.status, subtitles.error || subtitles.message);
     setStep("audio", dub.status, dub.error || dub.message);
-    setStep("pack", pack.status, pack.error || pack.message);
     setStep("compose", compose.status, compose.error || compose.message);
-    if (statusEl) statusEl.textContent = `${compose.status || pack.status || dub.status || "pending"}`;
+    if (statusEl) statusEl.textContent = `${compose.status || dub.status || subtitles.status || parse.status || "pending"}`;
   }
 
   function setLink(el, url) {
@@ -111,8 +117,8 @@
 
   function renderMedia() {
     const media = (currentHub && currentHub.media) || {};
-    const sourceUrl = media.source_video_url || null;
-    const finalUrl = media.final_video_url || null;
+    const sourceUrl = media.source_video_url || media.raw_url || null;
+    const finalUrl = media.final_url || media.final_video_url || null;
 
     if (sourceVideoEl) {
       if (sourceUrl) {
@@ -128,6 +134,15 @@
         finalVideoEl.removeAttribute("src");
       }
     }
+    if (composeFinalVideoEl) {
+      if (finalUrl) {
+        if (composeFinalVideoEl.src !== finalUrl) composeFinalVideoEl.src = finalUrl;
+      } else {
+        composeFinalVideoEl.removeAttribute("src");
+      }
+    }
+    if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
+    setLink(composeFinalLinkEl, finalUrl);
     setLink(sourceLinkEl, sourceUrl);
     setLink(finalLinkEl, finalUrl);
     setTab(activeTab);
@@ -144,9 +159,18 @@
 
   function renderAudio() {
     const audio = (currentHub && currentHub.audio) || {};
+    const media = (currentHub && currentHub.media) || {};
+    const voiceUrl = media.voiceover_url || audio.voiceover_url || audio.audio_url || null;
     if (ttsEngineEl && audio.tts_engine) ttsEngineEl.value = audio.tts_engine;
     if (ttsVoiceEl && audio.tts_voice) ttsVoiceEl.value = audio.tts_voice;
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
+    if (voiceoverAudioEl) {
+      if (voiceUrl) {
+        if (voiceoverAudioEl.src !== voiceUrl) voiceoverAudioEl.src = voiceUrl;
+      } else {
+        voiceoverAudioEl.removeAttribute("src");
+      }
+    }
     if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
   }
 
@@ -209,6 +233,7 @@
     renderScenePack();
     renderDeliverables();
     renderEvents();
+    updateComposeButtonState();
   }
 
   async function loadHub() {
@@ -262,9 +287,14 @@
   async function rerunAudio() {
     const provider = ttsEngineEl ? ttsEngineEl.value : null;
     const voiceId = ttsVoiceEl ? ttsVoiceEl.value : null;
+    const subtitles = (currentHub && currentHub.subtitles) || {};
+    const textareaText = subtitlesTextEl ? subtitlesTextEl.value : "";
+    const fallbackText = subtitles.edited_text || subtitles.srt_text || subtitles.origin_text || "";
+    const dubText = (textareaText || "").trim() ? textareaText : fallbackText;
     const payload = {
       provider: provider === "edge_tts" ? "edge-tts" : provider,
       voice_id: voiceId || null,
+      mm_text: dubText || "",
     };
     const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/dub`, {
       method: "POST",
@@ -276,9 +306,46 @@
   }
 
   async function composeFinal() {
-    const res = await fetch(composeUrl, { method: "POST" });
+    const media = (currentHub && currentHub.media) || {};
+    const audio = (currentHub && currentHub.audio) || {};
+    const voiceUrl = media.voiceover_url || audio.voiceover_url || null;
+    if (composeConfirmEl && !composeConfirmEl.checked) throw new Error("Please confirm before composing.");
+    if (!voiceUrl) throw new Error("No voiceover yet; run Re-Run Audio first.");
+    const res = await fetch(composeUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        bgm_mix: Number(bgmMixEl ? (bgmMixEl.value || "0.3") : "0.3"),
+        force: false,
+      }),
+    });
     if (!res.ok) throw new Error((await res.text()) || "compose failed");
-    return res.json();
+    const data = await res.json();
+    await loadHub();
+    const hub = currentHub || {};
+    const media2 = hub.media || {};
+    const finalUrl = media2.final_url || media2.final_video_url || data.final_url || data.final_video_url || null;
+    if (finalUrl && composeFinalVideoEl) composeFinalVideoEl.src = finalUrl;
+    if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
+    setLink(composeFinalLinkEl, finalUrl);
+    return data;
+  }
+
+  function updateComposeButtonState() {
+    if (!composeBtnEl) return;
+    const media = (currentHub && currentHub.media) || {};
+    const audio = (currentHub && currentHub.audio) || {};
+    const hasVoiceover = Boolean(media.voiceover_url || audio.voiceover_url);
+    const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
+    const enabled = hasVoiceover && confirmed;
+    composeBtnEl.disabled = !enabled;
+    composeBtnEl.classList.toggle("opacity-50", !enabled);
+    composeBtnEl.classList.toggle("pointer-events-none", !enabled);
+    if (composeMsgEl) {
+      if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
+      else if (!confirmed) composeMsgEl.textContent = "Compose disabled: check confirmation first.";
+      else composeMsgEl.textContent = "";
+    }
   }
 
   async function runAction(action) {
@@ -303,6 +370,13 @@
     subtitleDirty = true;
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = subtitlesTextEl.value || "-";
   });
+  if (composeConfirmEl) composeConfirmEl.addEventListener("change", updateComposeButtonState);
+  if (confirmVoiceoverEl && composeConfirmEl) {
+    confirmVoiceoverEl.addEventListener("change", () => {
+      composeConfirmEl.checked = !!confirmVoiceoverEl.checked;
+      updateComposeButtonState();
+    });
+  }
 
   if (ttsEngineEl) {
     ttsEngineEl.addEventListener("change", async () => {
@@ -410,7 +484,9 @@
       try {
         if (action === "compose" && statusEl) statusEl.textContent = "Composing final video...";
         await runAction(action);
+        if (action === "compose" && composeMsgEl) composeMsgEl.textContent = "Compose requested.";
       } catch (err) {
+        if (action === "compose" && composeMsgEl) composeMsgEl.textContent = err.message || "compose failed";
         if (statusEl) statusEl.textContent = err.message || "action failed";
       }
     });

@@ -221,6 +221,13 @@ class HotFollowSubtitlesRequest(BaseModel):
     srt_text: str = ""
 
 
+class ComposeTaskRequest(BaseModel):
+    voiceover_url: str | None = None
+    bgm_url: str | None = None
+    bgm_mix: float | None = None
+    force: bool = False
+
+
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
 api_key_header = APIKeyHeader(name=OP_HEADER_KEY, auto_error=False)
@@ -2788,10 +2795,12 @@ def get_hot_follow_workbench_hub(
             "subtitles_mode": pipeline_config.get("subtitles_mode") or "whisper+gemini",
         },
         "media": {
+            "raw_url": raw_url,
             "source_video_url": raw_url,
             "mute_video_url": mute_url,
             "voiceover_url": audio_cfg.get("voiceover_url") or audio_cfg.get("audio_url"),
             "bgm_url": audio_cfg.get("bgm_url"),
+            "final_url": final_url,
             "final_video_url": final_url,
         },
         "pipeline": pipeline,
@@ -3089,6 +3098,85 @@ def compose_hot_follow_final_video(
             "ok": True,
             "task_id": task_id,
             "final_video_url": _task_endpoint(task_id, "final"),
+            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
+            "compose_status": latest.get("compose_status"),
+        }
+    except HTTPException as exc:
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "compose_status": "error",
+                "compose_error": str(exc.detail),
+                "status": "failed",
+                "last_step": "compose",
+            },
+        )
+        raise
+    except Exception as exc:
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "compose_status": "error",
+                "compose_error": str(exc),
+                "status": "failed",
+                "last_step": "compose",
+            },
+        )
+        raise HTTPException(status_code=500, detail=f"compose failed: {exc}") from exc
+
+
+@api_router.post("/tasks/{task_id}/compose")
+def compose_task(
+    task_id: str,
+    payload: ComposeTaskRequest | None = None,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    req = payload or ComposeTaskRequest()
+    if req.bgm_mix is not None:
+        mix = max(0.0, min(1.0, float(req.bgm_mix)))
+        config = dict(task.get("config") or {})
+        bgm = dict(config.get("bgm") or {})
+        bgm["mix_ratio"] = mix
+        config["bgm"] = bgm
+        _policy_upsert(repo, task_id, {"config": config})
+        task = repo.get(task_id) or task
+
+    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
+    if final_key and object_exists(str(final_key)) and not req.force:
+        return {
+            "task_id": task_id,
+            "final_url": _task_endpoint(task_id, "final"),
+            "final_video_url": _task_endpoint(task_id, "final"),
+            "final_key": str(final_key),
+            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
+        }
+
+    _policy_upsert(
+        repo,
+        task_id,
+        {
+            "status": "processing",
+            "last_step": "compose",
+            "compose_status": "running",
+            "compose_error": None,
+        },
+    )
+    try:
+        updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
+        _policy_upsert(repo, task_id, updates)
+        latest = repo.get(task_id) or task
+        resolved_key = _task_key(latest, "final_video_key") or _task_key(latest, "final_video_path")
+        return {
+            "task_id": task_id,
+            "final_url": _task_endpoint(task_id, "final"),
+            "final_video_url": _task_endpoint(task_id, "final"),
+            "final_key": str(resolved_key or ""),
             "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
             "compose_status": latest.get("compose_status"),
         }
