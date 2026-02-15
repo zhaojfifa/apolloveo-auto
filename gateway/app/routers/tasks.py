@@ -156,6 +156,7 @@ from gateway.app.services.task_semantics import derive_task_semantics
 from gateway.app.services.media_validation import (
     MIN_AUDIO_BYTES,
     MIN_VIDEO_BYTES,
+    assert_artifact_ready,
     assert_local_audio_ok,
     assert_local_video_ok,
     deliver_key,
@@ -604,19 +605,33 @@ def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     chosen_key = None
     chosen_size = 0
     chosen_type = None
+    dub_status = str(_task_value(task, "dub_status") or "")
     for key in candidates:
         if key in seen:
             continue
         seen.add(key)
-        meta = object_head(key)
-        size, ctype = media_meta_from_head(meta)
-        if size >= MIN_AUDIO_BYTES and object_exists(key):
+        try:
+            size, ctype = assert_artifact_ready(
+                kind="audio",
+                key=key,
+                exists_fn=object_exists,
+                head_fn=object_head,
+            )
             chosen_key = key
             chosen_size = size
             chosen_type = ctype
             break
+        except Exception:
+            continue
     if not chosen_key:
-        return _not_ready_response(task, "audio_mm", ["mm_audio_key"])
+        return JSONResponse(
+            status_code=404,
+            content={
+                "error": "voiceover_not_ready",
+                "dub_status": dub_status,
+                "mm_audio_key": preferred,
+            },
+        )
     logger.info(
         "audio_mm download: task_id=%s key=%s size=%s content_type=%s",
         task_id,
@@ -633,7 +648,16 @@ def download_final_video(task_id: str, repo=Depends(get_task_repository)):
     if not task:
         raise HTTPException(status_code=404, detail="final video not found")
     key = _task_value(task, "final_video_key") or _task_value(task, "final_video_path") or deliver_key(task_id, "final.mp4")
-    if not key or not object_exists(str(key)):
+    if not key:
+        return _not_ready_response(task, "final", ["final_video_key"])
+    try:
+        assert_artifact_ready(
+            kind="video",
+            key=str(key),
+            exists_fn=object_exists,
+            head_fn=object_head,
+        )
+    except Exception:
         return _not_ready_response(task, "final", ["final_video_key"])
     return RedirectResponse(url=get_download_url(str(key)), status_code=302)
 
@@ -2989,13 +3013,23 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         raise HTTPException(status_code=409, detail="missing video source for compose")
     if not audio_key:
         raise HTTPException(status_code=409, detail="missing voiceover audio for compose")
-    if not object_exists(str(video_key)):
+    try:
+        assert_artifact_ready(
+            kind="video",
+            key=str(video_key),
+            exists_fn=object_exists,
+            head_fn=object_head,
+        )
+    except Exception:
         raise HTTPException(status_code=409, detail="video source not ready")
-    if not object_exists(str(audio_key)):
-        raise HTTPException(status_code=409, detail="voiceover audio not ready")
-    audio_meta = object_head(str(audio_key))
-    audio_size, _ = media_meta_from_head(audio_meta)
-    if audio_size < MIN_AUDIO_BYTES:
+    try:
+        assert_artifact_ready(
+            kind="audio",
+            key=str(audio_key),
+            exists_fn=object_exists,
+            head_fn=object_head,
+        )
+    except Exception:
         raise HTTPException(status_code=409, detail="voiceover audio invalid")
 
     ffmpeg = shutil.which("ffmpeg")
@@ -3007,6 +3041,16 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     bgm_key = str(bgm.get("bgm_key") or "").strip() or None
     if bgm_key and not object_exists(bgm_key):
         bgm_key = None
+    if bgm_key:
+        try:
+            assert_artifact_ready(
+                kind="audio",
+                key=bgm_key,
+                exists_fn=object_exists,
+                head_fn=object_head,
+            )
+        except Exception:
+            bgm_key = None
     try:
         bgm_mix = float(bgm.get("mix_ratio") if bgm.get("mix_ratio") is not None else 0.3)
     except Exception:
@@ -3056,6 +3100,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 "-c:a",
                 "aac",
                 "-shortest",
+                "-movflags",
+                "+faststart",
                 str(final_path),
             ]
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -3078,6 +3124,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 "-c:a",
                 "aac",
                 "-shortest",
+                "-movflags",
+                "+faststart",
                 str(final_path),
             ]
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -3102,6 +3150,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     "-c:a",
                     "aac",
                     "-shortest",
+                    "-movflags",
+                    "+faststart",
                     str(final_path),
                 ]
                 proc2 = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

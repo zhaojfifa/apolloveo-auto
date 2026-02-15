@@ -79,3 +79,20 @@ def assert_local_video_ok(path: str | Path) -> tuple[int, float]:
         raise ValueError("EMPTY_OR_INVALID_VIDEO")
     return size, dur
 
+
+def assert_artifact_ready(
+    *,
+    kind: str,
+    key: str | None,
+    exists_fn,
+    head_fn,
+) -> tuple[int, str | None]:
+    if not key:
+        raise ValueError(f"{kind}_MISSING")
+    if not exists_fn(key):
+        raise ValueError(f"{kind}_MISSING")
+    size, ctype = media_meta_from_head(head_fn(key))
+    min_bytes = MIN_AUDIO_BYTES if kind == "audio" else MIN_VIDEO_BYTES
+    if size < min_bytes:
+        raise ValueError(f"{kind}_INVALID")
+    return size, ctype

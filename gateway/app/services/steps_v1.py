@@ -43,8 +43,8 @@ from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_co
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
 from gateway.app.utils.timing import log_step_timing
 from gateway.app.services.media_validation import (
-    MIN_AUDIO_BYTES,
     assert_local_audio_ok,
+    assert_artifact_ready,
     deliver_key,
     media_meta_from_head,
 )
@@ -388,6 +388,18 @@ def _ensure_silent_wav(path: Path) -> None:
 
 
 def _fail_dub(req: DubRequest, reason: str, provider: str | None) -> None:
+    try:
+        repo = get_task_repository()
+        _append_event(
+            repo,
+            req.task_id,
+            channel="pipeline",
+            code="post.dub.fail",
+            message=reason,
+            extra={"reason": reason, "provider": provider, "voice_id": req.voice_id},
+        )
+    except Exception:
+        logger.exception("post.dub.fail event append failed", extra={"task_id": req.task_id})
     _update_task(
         req.task_id,
         last_step="dub",
@@ -655,8 +667,6 @@ async def run_subtitles_step(req: SubtitlesRequest):
 
 async def run_dub_step(req: DubRequest):
     """Run the dubbing step for the given request."""
-async def run_dub_step(req: DubRequest):
-    """Run the dubbing step for the given request."""
 
     start_time = time.perf_counter()
     provider = os.getenv("DUB_PROVIDER", None)
@@ -699,9 +709,13 @@ async def run_dub_step(req: DubRequest):
 
     existing_key = _get_task_mm_audio_key(req.task_id) or deliver_key(req.task_id, "audio_mm.mp3")
     if not req.force and existing_key:
-        meta = object_head(existing_key)
-        size, _ = media_meta_from_head(meta)
-        if size >= MIN_AUDIO_BYTES:
+        try:
+            size, _ = assert_artifact_ready(
+                kind="audio",
+                key=existing_key,
+                exists_fn=object_exists,
+                head_fn=object_head,
+            )
             logger.info(
                 "DUB3_SKIP",
                 extra={
@@ -730,6 +744,9 @@ async def run_dub_step(req: DubRequest):
                 "duration_sec": None,
                 "audio_path": None,
             }
+        except Exception:
+            meta = object_head(existing_key)
+            size, _ = media_meta_from_head(meta)
         logger.info(
             "DUB3_REGEN",
             extra={
@@ -891,6 +908,9 @@ async def run_dub_step(req: DubRequest):
             provider=provider,
             voice_id=req.voice_id,
         )
+
+
+async def run_pack_step(req: PackRequest):
     task_id = req.task_id
     workspace = Workspace(task_id)
 
