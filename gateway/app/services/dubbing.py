@@ -116,7 +116,7 @@ async def _synthesize_from_text(
     start_time = time.perf_counter()
     text = _normalize_text(mm_srt_text)
     if not text:
-        raise DubbingError("Empty text for dubbing")
+        raise DubbingError("TTS_EMPTY_TEXT: empty text")
 
     settings = get_settings()
     provider = (settings.dub_provider or "edge-tts").lower()
@@ -202,7 +202,11 @@ async def _synthesize_from_text(
                     "error": "output_missing",
                 },
             )
-            raise DubbingError("Edge-TTS did not produce audio output")
+            raise DubbingError("TTS_EMPTY_AUDIO: edge-tts did not produce audio output")
+        try:
+            assert_local_audio_ok(output_path)
+        except Exception as exc:
+            raise DubbingError(f"TTS_EMPTY_AUDIO: invalid edge-tts audio ({exc})") from exc
         logger.info(
             "DUB3_TTS_DONE",
             extra={
@@ -259,6 +263,10 @@ async def _synthesize_from_text(
             raise DubbingError("LOVO timeout" if error_text == "timeout" else str(exc)) from exc
         suffix = ext or "wav"
         path = ws.write_mm_audio(content, suffix=suffix)
+        try:
+            assert_local_audio_ok(path)
+        except Exception as exc:
+            raise DubbingError(f"TTS_EMPTY_AUDIO: invalid lovo audio ({exc})") from exc
         logger.info(
             "DUB3_TTS_DONE",
             extra={

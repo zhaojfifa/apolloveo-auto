@@ -387,7 +387,7 @@ def _ensure_silent_wav(path: Path) -> None:
     path.write_bytes(b"")
 
 
-def _fail_dub(req: DubRequest, reason: str, provider: str | None) -> None:
+def _fail_dub(req: DubRequest, reason: str, provider: str | None, *, status_code: int = 500) -> None:
     try:
         repo = get_task_repository()
         _append_event(
@@ -406,6 +406,11 @@ def _fail_dub(req: DubRequest, reason: str, provider: str | None) -> None:
         dub_status="failed",
         dub_error=reason,
         error_reason="dub_failed",
+        mm_audio_key=None,
+        mm_audio_path=None,
+        mm_audio_bytes=None,
+        mm_audio_duration_ms=None,
+        mm_audio_mime=None,
     )
     logger.info(
         "DUB3_FAIL",
@@ -418,7 +423,7 @@ def _fail_dub(req: DubRequest, reason: str, provider: str | None) -> None:
             "reason": reason,
         },
     )
-    raise HTTPException(status_code=500, detail=reason)
+    raise HTTPException(status_code=status_code, detail=reason)
 
 
 def _maybe_fill_missing_for_pack(*, raw_path: Path, audio_path: Path, subs_path: Path) -> None:
@@ -771,7 +776,7 @@ async def run_dub_step(req: DubRequest):
     if mm_txt_text.strip().lower() == "no subtitles":
         _fail_dub(req, "NO_SUBTITLES_MARKER", provider)
     if not mm_txt_text.strip():
-        _fail_dub(req, "MM_TXT_EMPTY", provider)
+        _fail_dub(req, "MM_TXT_EMPTY", provider, status_code=400)
 
     override_text = (req.mm_text or "").strip()
     mm_text = override_text or mm_txt_text
@@ -789,7 +794,7 @@ async def run_dub_step(req: DubRequest):
         },
     )
     if not mm_text.strip() or not _clean_text_for_dub(mm_text):
-        _fail_dub(req, "MM_TEXT_EMPTY", provider)
+        _fail_dub(req, "MM_TEXT_EMPTY", provider, status_code=400)
 
     step_timeout_sec = _env_int("DUB_STEP_TIMEOUT_SEC", 900)
     try:
@@ -809,7 +814,10 @@ async def run_dub_step(req: DubRequest):
     except asyncio.CancelledError:
         _fail_dub(req, "TTS_FAILED_CANCELLED", provider)
     except DubbingError as exc:
-        _fail_dub(req, f"TTS_FAILED:{str(exc)[:120]}", provider)
+        reason = str(exc)[:160]
+        if reason.startswith("TTS_EMPTY_TEXT"):
+            _fail_dub(req, reason, provider, status_code=400)
+        _fail_dub(req, reason if reason.startswith("TTS_") else f"TTS_FAILED:{reason}", provider)
     except HTTPException as exc:
         _fail_dub(req, f"TTS_FAILED_HTTP_{exc.status_code}", provider)
     except Exception as exc:  # pragma: no cover
@@ -863,6 +871,11 @@ async def run_dub_step(req: DubRequest):
         req.task_id,
         mm_audio_path=audio_key,
         mm_audio_key=audio_key,
+        mm_audio_provider=provider,
+        mm_audio_voice_id=req.voice_id,
+        mm_audio_bytes=output_size,
+        mm_audio_duration_ms=int(output_duration * 1000),
+        mm_audio_mime="audio/mpeg",
         last_step="dub",
         dub_status="ready",
         dub_error=None,

@@ -2833,13 +2833,19 @@ def get_hot_follow_workbench_hub(
     raw_url = _task_endpoint(task_id, "raw") if raw_key and object_exists(raw_key) else None
     mute_key = _task_key(task, "mute_video_key") or _task_key(task, "mute_video_path")
     mute_url = _task_endpoint(task_id, "raw") if mute_key and object_exists(str(mute_key)) else raw_url
-    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
-    final_url = _task_endpoint(task_id, "final") if final_key and object_exists(str(final_key)) else None
+    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
+    final_meta = object_head(str(final_key)) if final_key else None
+    final_size, _ = media_meta_from_head(final_meta)
+    final_url = _task_endpoint(task_id, "final") if final_key and final_size >= MIN_VIDEO_BYTES and object_exists(str(final_key)) else None
     scene_key = _task_key(task, "scenes_key")
     scenes_url = _task_endpoint(task_id, "scenes") if scene_key and object_exists(scene_key) else None
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
     audio_cfg = _hf_audio_config(task)
+    if not (audio_cfg.get("voiceover_url") or "").strip() and (task.get("mm_audio_key") or task.get("mm_audio_path")):
+        dub_state = "failed"
+        if not dub_summary:
+            dub_summary = "voiceover artifact invalid"
     deliverables = _hf_deliverables(task_id, task)
 
     pipeline = [
@@ -3229,6 +3235,8 @@ def compose_hot_follow_final_video(
                 "compose_error": str(exc.detail),
                 "status": "failed",
                 "last_step": "compose",
+                "final_video_key": None,
+                "final_video_path": None,
             },
         )
         raise
@@ -3241,6 +3249,8 @@ def compose_hot_follow_final_video(
                 "compose_error": str(exc),
                 "status": "failed",
                 "last_step": "compose",
+                "final_video_key": None,
+                "final_video_path": None,
             },
         )
         raise HTTPException(status_code=500, detail=f"compose failed: {exc}") from exc
@@ -3310,6 +3320,8 @@ def compose_task(
                 "compose_error": str(exc.detail),
                 "status": "failed",
                 "last_step": "compose",
+                "final_video_key": None,
+                "final_video_path": None,
             },
         )
         raise
@@ -3322,6 +3334,8 @@ def compose_task(
                 "compose_error": str(exc),
                 "status": "failed",
                 "last_step": "compose",
+                "final_video_key": None,
+                "final_video_path": None,
             },
         )
         raise HTTPException(status_code=500, detail=f"compose failed: {exc}") from exc
@@ -3748,6 +3762,11 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 {
                     "mm_audio_path": audio_key,
                     "mm_audio_key": audio_key,
+                    "mm_audio_provider": provider,
+                    "mm_audio_voice_id": final_voice_id,
+                    "mm_audio_bytes": local_size if 'local_size' in locals() else None,
+                    "mm_audio_duration_ms": int(local_duration * 1000) if 'local_duration' in locals() else None,
+                    "mm_audio_mime": "audio/mpeg" if audio_key else None,
                     "dub_provider": provider,
                     "last_step": "dubbing",
                     "voice_id": final_voice_id,
@@ -3805,10 +3824,28 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         )
 
     except HTTPException as exc:
-        _policy_upsert(repo, task_id, {"dub_status": "error", "dub_error": f"{exc.status_code}: {exc.detail}"})
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "dub_status": "failed",
+                "dub_error": f"{exc.status_code}: {exc.detail}",
+                "mm_audio_key": None,
+                "mm_audio_path": None,
+            },
+        )
         raise
     except Exception as exc:
-        _policy_upsert(repo, task_id, {"dub_status": "error", "dub_error": str(exc)})
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "dub_status": "failed",
+                "dub_error": str(exc),
+                "mm_audio_key": None,
+                "mm_audio_path": None,
+            },
+        )
         logger.exception("DUB3_FAIL", extra={"task_id": task_id, "step": "dub", "phase": "exception"})
         raise HTTPException(status_code=500, detail=f"Dubbing step failed: {exc}")
 
@@ -3818,6 +3855,11 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         {
             "mm_audio_path": audio_key,
             "mm_audio_key": audio_key,
+            "mm_audio_provider": provider,
+            "mm_audio_voice_id": final_voice_id,
+            "mm_audio_bytes": local_size,
+            "mm_audio_duration_ms": int(local_duration * 1000),
+            "mm_audio_mime": "audio/mpeg",
             "dub_provider": provider,
             "last_step": "dubbing",
             "voice_id": final_voice_id,

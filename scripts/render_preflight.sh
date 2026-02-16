@@ -6,6 +6,7 @@ export PATH="$PWD/.render/bin:$PATH"
 echo "[preflight] ffmpeg:"
 ffmpeg -version | head -n 2 || true
 python -c "import multipart; print('[preflight] python-multipart OK')" || true
+python -c "import edge_tts; print('[preflight] edge_tts OK')"
 
 DISK_ROOT="${DISK_ROOT:-/var/data}"
 mkdir -p "$DISK_ROOT/cache" "$DISK_ROOT/models"
@@ -46,3 +47,4 @@ else
 fi
 
 python -c "import multipart; print('python-multipart OK', multipart.__version__)"
+python -c "import edge_tts; print('edge_tts OK')"
