@@ -141,6 +141,7 @@ from gateway.app.services.artifact_storage import (
     get_object_bytes,
     object_head,
     object_exists,
+    stream_object_range,
 )
 from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.services.scene_split import enqueue_scenes_build
@@ -643,23 +644,56 @@ def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
 
 
 @pages_router.get("/v1/tasks/{task_id}/final")
-def download_final_video(task_id: str, repo=Depends(get_task_repository)):
+def download_final_video(task_id: str, request: Request, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="final video not found")
     key = _task_value(task, "final_video_key") or _task_value(task, "final_video_path") or deliver_key(task_id, "final.mp4")
     if not key:
-        return _not_ready_response(task, "final", ["final_video_key"])
+        raise HTTPException(status_code=404, detail="final video not found")
+    if not object_exists(str(key)):
+        raise HTTPException(status_code=404, detail="final video not found")
+    head = object_head(str(key))
+    size, _ = media_meta_from_head(head)
+    if size < MIN_VIDEO_BYTES:
+        raise HTTPException(status_code=404, detail="final video not found")
+    content_type = str(_task_value(task, "final_mime") or "video/mp4")
+    range_header = request.headers.get("range")
+    start = 0
+    end = size - 1
+    status_code = 200
+    if range_header:
+        m = re.match(r"bytes=(\d*)-(\d*)", range_header.strip())
+        if not m:
+            return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+        start_raw, end_raw = m.group(1), m.group(2)
+        if start_raw == "" and end_raw == "":
+            return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+        if start_raw == "":
+            suffix = int(end_raw)
+            if suffix <= 0:
+                return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+            start = max(size - suffix, 0)
+            end = size - 1
+        else:
+            start = int(start_raw)
+            end = int(end_raw) if end_raw else size - 1
+        if start >= size or start < 0 or end < start:
+            return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+        end = min(end, size - 1)
+        status_code = 206
     try:
-        assert_artifact_ready(
-            kind="video",
-            key=str(key),
-            exists_fn=object_exists,
-            head_fn=object_head,
-        )
-    except Exception:
-        return _not_ready_response(task, "final", ["final_video_key"])
-    return RedirectResponse(url=get_download_url(str(key)), status_code=302)
+        stream, length = stream_object_range(str(key), start=start, end=end)
+    except ValueError:
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Type": content_type,
+        "Content-Length": str(length),
+    }
+    if status_code == 206:
+        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+    return StreamingResponse(stream, status_code=status_code, headers=headers, media_type=content_type)
 
 
 @pages_router.get("/v1/tasks/{task_id}/pack")
@@ -3066,6 +3100,16 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     except Exception:
         bgm_mix = 0.3
     bgm_mix = max(0.0, min(1.0, bgm_mix))
+    logger.info(
+        "COMPOSE_START",
+        extra={
+            "task_id": task_id,
+            "raw_key": str(video_key),
+            "audio_key": str(audio_key),
+            "bgm_key": str(bgm_key) if bgm_key else None,
+            "mix": bgm_mix,
+        },
+    )
 
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
@@ -3114,6 +3158,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 "+faststart",
                 str(final_path),
             ]
+            logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd))
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                 raise HTTPException(status_code=500, detail=f"compose ffmpeg failed: {proc.stderr[-800:]}")
@@ -3138,6 +3183,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 "+faststart",
                 str(final_path),
             ]
+            logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd))
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                 cmd_fallback = [
@@ -3164,6 +3210,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     "+faststart",
                     str(final_path),
                 ]
+                logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd_fallback))
                 proc2 = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 if proc2.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                     raise HTTPException(status_code=500, detail=f"compose ffmpeg failed: {proc2.stderr[-800:]}")
@@ -3172,11 +3219,34 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             final_size, final_duration = assert_local_video_ok(final_path)
         except ValueError:
             raise HTTPException(status_code=500, detail="compose output invalid")
+        logger.info(
+            "COMPOSE_OUTPUT_READY",
+            extra={
+                "task_id": task_id,
+                "output_size": final_size,
+                "duration_sec": final_duration,
+                "output_path": str(final_path),
+            },
+        )
 
         final_key = deliver_key(task_id, "final.mp4")
+        logger.info(
+            "COMPOSE_UPLOAD_START",
+            extra={
+                "task_id": task_id,
+                "final_key": final_key,
+                "content_type": "video/mp4",
+            },
+        )
         uploaded_key = storage.upload_file(str(final_path), final_key, content_type="video/mp4")
         if not uploaded_key:
             raise HTTPException(status_code=500, detail="compose upload failed")
+        if not object_exists(final_key):
+            raise HTTPException(status_code=500, detail="compose upload verify failed: missing final object")
+        uploaded_meta = object_head(final_key)
+        uploaded_size, _ = media_meta_from_head(uploaded_meta)
+        if uploaded_size < MIN_VIDEO_BYTES:
+            raise HTTPException(status_code=500, detail="compose upload verify failed: invalid final object")
         logger.info(
             "COMPOSE_DONE",
             extra={
@@ -3184,12 +3254,16 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 "output_size": final_size,
                 "duration_sec": final_duration,
                 "uploaded_key": final_key,
+                "uploaded_size": uploaded_size,
             },
         )
         return {
             "final_video_key": final_key,
             "final_video_path": final_key,
             "final_video_sha256": _sha256_file(final_path),
+            "final_mime": "video/mp4",
+            "final_duration_ms": int(final_duration * 1000),
+            "final_video_bytes": int(uploaded_size),
             "compose_provider": "ffmpeg",
             "compose_status": "done",
             "compose_error": None,
@@ -3235,7 +3309,7 @@ def compose_hot_follow_final_video(
             repo,
             task_id,
             {
-                "compose_status": "error",
+                "compose_status": "failed",
                 "compose_error": str(exc.detail),
                 "status": "failed",
                 "last_step": "compose",
@@ -3249,7 +3323,7 @@ def compose_hot_follow_final_video(
             repo,
             task_id,
             {
-                "compose_status": "error",
+                "compose_status": "failed",
                 "compose_error": str(exc),
                 "status": "failed",
                 "last_step": "compose",
@@ -3320,7 +3394,7 @@ def compose_task(
             repo,
             task_id,
             {
-                "compose_status": "error",
+                "compose_status": "failed",
                 "compose_error": str(exc.detail),
                 "status": "failed",
                 "last_step": "compose",
@@ -3334,7 +3408,7 @@ def compose_task(
             repo,
             task_id,
             {
-                "compose_status": "error",
+                "compose_status": "failed",
                 "compose_error": str(exc),
                 "status": "failed",
                 "last_step": "compose",

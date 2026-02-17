@@ -1,6 +1,7 @@
 import os
 import logging
 import tempfile
+from typing import Iterator
 from gateway.app.config import get_settings
 from gateway.app.ports.storage_provider import get_storage_service
 from gateway.app.utils.keys import KeyBuilder
@@ -211,3 +212,101 @@ def get_object_bytes(task_or_key: str, artifact_name: str | None = None,
                 os.remove(temp_path)
         except Exception:
             pass
+
+
+def stream_object_range(
+    key: str,
+    *,
+    start: int = 0,
+    end: int | None = None,
+    chunk_size: int = 64 * 1024,
+) -> tuple[Iterator[bytes], int]:
+    """
+    Return an iterator for [start, end] bytes and the payload byte length.
+    Uses native S3 Range get_object when available, with a safe temp-file fallback.
+    """
+    if start < 0:
+        raise ValueError("invalid_start")
+
+    lp = _local_path_from_file_url(key)
+    if lp is not None:
+        total = int(lp.stat().st_size) if lp.exists() else 0
+        if total <= 0 or start >= total:
+            raise ValueError("range_not_satisfiable")
+        eff_end = total - 1 if end is None else min(int(end), total - 1)
+        if eff_end < start:
+            raise ValueError("range_not_satisfiable")
+        length = eff_end - start + 1
+
+        def _iter_local_file() -> Iterator[bytes]:
+            with open(lp, "rb") as fh:
+                fh.seek(start)
+                remaining = length
+                while remaining > 0:
+                    data = fh.read(min(chunk_size, remaining))
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    yield data
+
+        return _iter_local_file(), length
+
+    storage = get_storage_service()
+    s3_client = getattr(storage, "s3_client", None)
+    bucket_name = getattr(storage, "bucket_name", None)
+    if s3_client is not None and bucket_name:
+        range_header = f"bytes={start}-{'' if end is None else int(end)}"
+        resp = s3_client.get_object(Bucket=bucket_name, Key=key, Range=range_header)
+        body = resp["Body"]
+        length = int(resp.get("ContentLength") or 0)
+
+        def _iter_s3() -> Iterator[bytes]:
+            try:
+                for chunk in body.iter_chunks(chunk_size=chunk_size):
+                    if chunk:
+                        yield chunk
+            finally:
+                body.close()
+
+        return _iter_s3(), length
+
+    fd, temp_path = tempfile.mkstemp()
+    os.close(fd)
+    storage.download_file(key, temp_path)
+    total = int(os.path.getsize(temp_path)) if os.path.exists(temp_path) else 0
+    if total <= 0 or start >= total:
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception:
+            pass
+        raise ValueError("range_not_satisfiable")
+    eff_end = total - 1 if end is None else min(int(end), total - 1)
+    if eff_end < start:
+        try:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+        except Exception:
+            pass
+        raise ValueError("range_not_satisfiable")
+    length = eff_end - start + 1
+
+    def _iter_temp() -> Iterator[bytes]:
+        try:
+            with open(temp_path, "rb") as fh:
+                fh.seek(start)
+                remaining = length
+                while remaining > 0:
+                    data = fh.read(min(chunk_size, remaining))
+                    if not data:
+                        break
+                    remaining -= len(data)
+                    yield data
+        finally:
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except Exception:
+                pass
+
+    return _iter_temp(), length
