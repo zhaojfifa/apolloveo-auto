@@ -72,6 +72,20 @@ class Settings(BaseSettings):
     edge_tts_rate: str = Field("+0%", env="EDGE_TTS_RATE")
     edge_tts_volume: str = Field("+0%", env="EDGE_TTS_VOLUME")
 
+    # Azure Speech TTS
+    azure_speech_key: str = Field("", env="AZURE_SPEECH_KEY")
+    azure_speech_region: str = Field("", env="AZURE_SPEECH_REGION")
+    azure_tts_output_format: str = Field(
+        "audio-24khz-48kbitrate-mono-mp3",
+        env="AZURE_TTS_OUTPUT_FORMAT",
+    )
+    azure_tts_voice_map: Dict[str, str] = Field(
+        default_factory=lambda: {
+            "mm_female_1": "my-MM-NilarNeural",
+            "mm_male_1": "my-MM-ThihaNeural",
+        }
+    )
+
     # Dubbing provider selection
     dub_provider: str = Field("edge-tts", env="DUB_PROVIDER")
 

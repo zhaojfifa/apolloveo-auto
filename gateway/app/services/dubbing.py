@@ -17,6 +17,7 @@ from typing import Any
 
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import Workspace
+from gateway.app.providers.azure_speech import AzureSpeechError, generate_audio_azure_speech
 from gateway.app.providers.edge_tts import EdgeTTSError, generate_audio_edge_tts
 from gateway.app.providers import lovo_tts
 from gateway.app.services.media_validation import assert_local_audio_ok, file_size_bytes, probe_duration_seconds
@@ -72,11 +73,40 @@ def _map_edge_voice_id(voice_id: str | None, settings) -> str:
     return settings.edge_tts_voice_map.get(voice_key, voice_key)
 
 
+def _map_azure_voice_id(voice_id: str | None, settings) -> str:
+    voice_key = voice_id or "mm_female_1"
+    return settings.azure_tts_voice_map.get(voice_key, voice_key)
+
+
+def _normalize_provider_name(provider: str | None) -> str | None:
+    raw = str(provider or "").strip().lower().replace("_", "-")
+    if not raw or raw == "none":
+        return None
+    if raw == "edge":
+        return "edge-tts"
+    if raw in {"azure", "azure-tts", "azure-speech"}:
+        return "azure-speech"
+    if raw == "edge-tts":
+        return raw
+    if raw == "lovo":
+        return raw
+    return raw
+
+
+def _should_fallback_to_azure(error_text: str, settings) -> bool:
+    msg = (error_text or "").lower()
+    if "403" not in msg and "wsserverhandshakeerror" not in msg:
+        return False
+    return bool(getattr(settings, "azure_speech_key", "") and getattr(settings, "azure_speech_region", ""))
+
+
 async def _synthesize_from_text(
     *,
     task_id: str,
     target_lang: str | None,
     voice_id: str | None,
+    provider: str | None,
+    tts_engine: str | None,
     force: bool,
     mm_srt_text: str,
     workspace: Workspace | None,
@@ -119,11 +149,103 @@ async def _synthesize_from_text(
         raise DubbingError("TTS_EMPTY_TEXT: empty text")
 
     settings = get_settings()
-    provider = (settings.dub_provider or "edge-tts").lower()
-    if provider == "edge":
-        provider = "edge-tts"
+    requested_provider = _normalize_provider_name(tts_engine) or _normalize_provider_name(provider)
+    provider = requested_provider or _normalize_provider_name(settings.dub_provider) or "edge-tts"
 
     tts_timeout_sec = _env_int("DUB_TTS_TIMEOUT_SEC", 300)
+
+    async def _run_azure_speech() -> dict:
+        voice = _map_azure_voice_id(voice_id, settings)
+        output_path = ws.mm_audio_mp3_path
+        logger.info(
+            "DUB3_TTS_START",
+            extra={
+                "task_id": task_id,
+                "step": "dub",
+                "stage": "DUB3_TTS_START",
+                "dub_provider": "azure-speech",
+                "voice_id": voice_id,
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                "output_path": str(output_path),
+                "text_len": len(text),
+                "timeout_sec": tts_timeout_sec,
+            },
+        )
+        try:
+            await asyncio.wait_for(
+                generate_audio_azure_speech(
+                    text,
+                    voice,
+                    str(output_path),
+                    speech_key=settings.azure_speech_key,
+                    speech_region=settings.azure_speech_region,
+                    output_format=settings.azure_tts_output_format,
+                ),
+                timeout=tts_timeout_sec,
+            )
+        except AzureSpeechError as exc:
+            logger.info(
+                "DUB3_TTS_FAIL",
+                extra={
+                    "task_id": task_id,
+                    "step": "dub",
+                    "stage": "DUB3_TTS_FAIL",
+                    "dub_provider": "azure-speech",
+                    "voice_id": voice_id,
+                    "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                    "error": str(exc),
+                },
+            )
+            raise DubbingError(str(exc)) from exc
+        except asyncio.TimeoutError:
+            logger.info(
+                "DUB3_TTS_FAIL",
+                extra={
+                    "task_id": task_id,
+                    "step": "dub",
+                    "stage": "DUB3_TTS_FAIL",
+                    "dub_provider": "azure-speech",
+                    "voice_id": voice_id,
+                    "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                    "error": "timeout",
+                },
+            )
+            raise DubbingError("TTS_AZURE_TIMEOUT")
+        except Exception as exc:
+            logger.info(
+                "DUB3_TTS_FAIL",
+                extra={
+                    "task_id": task_id,
+                    "step": "dub",
+                    "stage": "DUB3_TTS_FAIL",
+                    "dub_provider": "azure-speech",
+                    "voice_id": voice_id,
+                    "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                    "error": str(exc),
+                },
+            )
+            raise DubbingError(f"TTS_AZURE_FAILED:{exc}") from exc
+        if not output_path.exists():
+            raise DubbingError("TTS_EMPTY_AUDIO: azure-speech did not produce audio output")
+        try:
+            assert_local_audio_ok(output_path)
+        except Exception as exc:
+            raise DubbingError(f"TTS_EMPTY_AUDIO: invalid azure-speech audio ({exc})") from exc
+        logger.info(
+            "DUB3_TTS_DONE",
+            extra={
+                "task_id": task_id,
+                "step": "dub",
+                "stage": "DUB3_TTS_DONE",
+                "dub_provider": "azure-speech",
+                "voice_id": voice_id,
+                "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
+                "output_path": str(output_path),
+                "output_size": output_path.stat().st_size if output_path.exists() else None,
+                "duration_sec": probe_duration_seconds(output_path),
+            },
+        )
+        return {"audio_path": str(output_path), "duration_sec": None, "provider": "azure-speech"}
 
     if provider == "edge-tts":
         voice = _map_edge_voice_id(voice_id, settings)
@@ -148,6 +270,18 @@ async def _synthesize_from_text(
                 timeout=tts_timeout_sec,
             )
         except EdgeTTSError as exc:
+            if _should_fallback_to_azure(str(exc), settings):
+                logger.warning(
+                    "DUB3_TTS_FALLBACK",
+                    extra={
+                        "task_id": task_id,
+                        "step": "dub",
+                        "from_provider": "edge-tts",
+                        "to_provider": "azure-speech",
+                        "reason": str(exc),
+                    },
+                )
+                return await _run_azure_speech()
             logger.info(
                 "DUB3_TTS_FAIL",
                 extra={
@@ -176,6 +310,18 @@ async def _synthesize_from_text(
             )
             raise DubbingError("Edge-TTS timeout")
         except Exception as exc:
+            if _should_fallback_to_azure(str(exc), settings):
+                logger.warning(
+                    "DUB3_TTS_FALLBACK",
+                    extra={
+                        "task_id": task_id,
+                        "step": "dub",
+                        "from_provider": "edge-tts",
+                        "to_provider": "azure-speech",
+                        "reason": str(exc),
+                    },
+                )
+                return await _run_azure_speech()
             logger.info(
                 "DUB3_TTS_FAIL",
                 extra={
@@ -221,7 +367,10 @@ async def _synthesize_from_text(
                 "duration_sec": probe_duration_seconds(output_path),
             },
         )
-        return {"audio_path": str(output_path), "duration_sec": None}
+        return {"audio_path": str(output_path), "duration_sec": None, "provider": "edge-tts"}
+
+    if provider == "azure-speech":
+        return await _run_azure_speech()
 
     if provider == "lovo":
         logger.info(
@@ -281,9 +430,9 @@ async def _synthesize_from_text(
                 "duration_sec": probe_duration_seconds(path),
             },
         )
-        return {"audio_path": str(path), "duration_sec": None}
+        return {"audio_path": str(path), "duration_sec": None, "provider": "lovo"}
 
-    raise DubbingError(f"Unsupported dub provider: {settings.dub_provider}")
+    raise DubbingError(f"Unsupported dub provider: {provider}")
 
 
 async def synthesize_voice(*args: Any, **kwargs: Any) -> Any:
@@ -305,6 +454,8 @@ async def synthesize_voice(*args: Any, **kwargs: Any) -> Any:
             task_id=task_id,
             target_lang=kwargs.get("target_lang"),
             voice_id=kwargs.get("voice_id"),
+            provider=kwargs.get("provider"),
+            tts_engine=kwargs.get("tts_engine"),
             force=bool(kwargs.get("force", False)),
             mm_srt_text=kwargs.get("mm_srt_text") or "",
             workspace=kwargs.get("workspace"),

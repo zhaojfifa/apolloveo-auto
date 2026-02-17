@@ -803,6 +803,7 @@ async def run_dub_step(req: DubRequest):
                 task_id=req.task_id,
                 target_lang=req.target_lang,
                 voice_id=req.voice_id,
+                provider=provider,
                 force=req.force,
                 mm_srt_text=mm_text,
                 workspace=workspace,
@@ -823,6 +824,9 @@ async def run_dub_step(req: DubRequest):
     except Exception as exc:  # pragma: no cover
         _fail_dub(req, f"TTS_FAILED:{str(exc)[:120]}", provider)
 
+    provider_used = result.get("provider") if isinstance(result, dict) else None
+    if isinstance(provider_used, str) and provider_used.strip():
+        provider = provider_used.strip()
     audio_path_value = result.get("audio_path") if isinstance(result, dict) else None
     audio_key = None
     output_size = 0
@@ -872,6 +876,7 @@ async def run_dub_step(req: DubRequest):
         mm_audio_path=audio_key,
         mm_audio_key=audio_key,
         mm_audio_provider=provider,
+        dub_provider=provider,
         mm_audio_voice_id=req.voice_id,
         mm_audio_bytes=output_size,
         mm_audio_duration_ms=int(output_duration * 1000),

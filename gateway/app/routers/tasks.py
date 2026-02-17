@@ -1039,6 +1039,8 @@ def _hf_engine_public(provider: str | None) -> str:
     p = str(provider or "").strip().lower()
     if p in {"edge", "edge-tts", "edge_tts"}:
         return "edge_tts"
+    if p in {"azure", "azure-speech", "azure_tts", "azure-tts"}:
+        return "azure_speech"
     if p == "lovo":
         return "lovo"
     return "none"
@@ -1048,6 +1050,8 @@ def _hf_engine_internal(engine: str | None) -> str | None:
     e = str(engine or "").strip().lower()
     if e in {"edge", "edge-tts", "edge_tts"}:
         return "edge-tts"
+    if e in {"azure", "azure-speech", "azure_speech", "azure_tts", "azure-tts"}:
+        return "azure-speech"
     if e == "lovo":
         return "lovo"
     if e in {"none", ""}:
@@ -3636,19 +3640,37 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             provider_raw = "edge-tts"
         elif dub_mode == "lovo":
             provider_raw = "lovo"
+        elif dub_mode in {"azure", "azure_tts", "azure-speech"}:
+            provider_raw = "azure-speech"
         else:
-            provider_raw = "lovo" if getattr(settings, "lovo_api_key", None) else "edge-tts"
+            provider_raw = getattr(settings, "dub_provider", None) or (
+                "lovo" if getattr(settings, "lovo_api_key", None) else "edge-tts"
+            )
     if not provider_raw:
         provider_raw = "edge-tts"
     provider_norm = provider_raw.lower().replace("-", "_")
     if provider_norm == "edge":
         provider_norm = "edge_tts"
-    if provider_norm not in {"edge_tts", "lovo"}:
+    if provider_norm in {"azure", "azure_tts", "azure_speech"}:
+        provider_norm = "azure_speech"
+    if provider_norm not in {"edge_tts", "lovo", "azure_speech"}:
         raise HTTPException(status_code=400, detail="Unsupported dub provider")
-    provider = "edge-tts" if provider_norm == "edge_tts" else "lovo"
+    provider = (
+        "edge-tts"
+        if provider_norm == "edge_tts"
+        else ("azure-speech" if provider_norm == "azure_speech" else "lovo")
+    )
 
     if provider == "lovo" and not getattr(settings, "lovo_api_key", None):
         raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
+    if provider == "azure-speech":
+        if (not getattr(settings, "azure_speech_key", None)) or (
+            not getattr(settings, "azure_speech_region", None)
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="AZURE_SPEECH_KEY and AZURE_SPEECH_REGION are required for azure-speech",
+            )
 
     req_voice_id = payload.voice_id or None
     prev_voice_id = task.get("voice_id") if isinstance(task, dict) else getattr(task, "voice_id", None)

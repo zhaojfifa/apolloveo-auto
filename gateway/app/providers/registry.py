@@ -14,7 +14,7 @@ from gateway.app.services.steps_v1 import (
 AVAILABLE_PROVIDERS: Dict[str, list[str]] = {
     "parse": ["xiongmao", "xiaomao"],
     "subtitles": ["gemini", "whisper"],
-    "dub": ["lovo", "edge-tts"],
+    "dub": ["lovo", "edge-tts", "azure-speech"],
     "pack": ["capcut", "youcut"],
     "face_swap": ["none", "xxx_faceswap_api"],
 }
@@ -25,7 +25,7 @@ def default_providers(settings=None) -> Dict[str, str]:
     return {
         "parse": "xiongmao",
         "subtitles": "gemini",
-        "dub": "lovo",
+        "dub": getattr(_settings, "dub_provider", "edge-tts") or "edge-tts",
         "pack": "capcut",
         "face_swap": "none",
     }
@@ -65,6 +65,7 @@ def get_provider(tool_type: str, name: str):
         "dub": {
             "lovo": run_dub_step,
             "edge-tts": run_dub_step,
+            "azure-speech": run_dub_step,
         },
         "pack": {
             "capcut": run_pack_step,
