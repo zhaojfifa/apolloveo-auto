@@ -213,14 +213,15 @@
   }
 
   function renderComposedReadiness() {
-    const ready = Boolean(currentHub && currentHub.composed_ready);
-    const reason = (currentHub && currentHub.composed_reason) || "compose.never_run";
+    const ready = Boolean(currentHub && currentHub.composed_ready) && Boolean(currentHub && currentHub.final && currentHub.final.exists);
+    const reason = (currentHub && currentHub.composed_reason) || "final_missing";
     const reasonTextMap = {
-      "compose.never_run": "Compose never run",
-      "compose.running": "Compose running",
-      "compose.failed": "Compose failed",
-      "final.missing": "Final artifact missing",
-      "ready": "Ready",
+      "ready": "可发布",
+      "final_missing": "尚未生成最终成片",
+      "compose_in_progress": "合成中…",
+      "compose_failed": "合成失败，可重试",
+      "missing_voiceover": "缺少配音",
+      "missing_raw": "缺少源视频",
     };
     if (composedBadgeEl) {
       composedBadgeEl.textContent = ready ? "✅ Composed: Ready" : "⚠️ Not Ready";
