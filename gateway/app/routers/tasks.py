@@ -643,56 +643,146 @@ def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     return RedirectResponse(url=get_download_url(chosen_key), status_code=302)
 
 
-@pages_router.get("/v1/tasks/{task_id}/final")
-def download_final_video(task_id: str, request: Request, repo=Depends(get_task_repository)):
+def _resolve_final_meta(task_id: str, repo) -> tuple[str, int, str]:
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="final video not found")
     key = _task_value(task, "final_video_key") or _task_value(task, "final_video_path") or deliver_key(task_id, "final.mp4")
-    if not key:
-        raise HTTPException(status_code=404, detail="final video not found")
-    if not object_exists(str(key)):
+    if not key or not object_exists(str(key)):
         raise HTTPException(status_code=404, detail="final video not found")
     head = object_head(str(key))
-    size, _ = media_meta_from_head(head)
-    if size < MIN_VIDEO_BYTES:
+    total, ctype = media_meta_from_head(head)
+    if total <= 0:
         raise HTTPException(status_code=404, detail="final video not found")
-    content_type = str(_task_value(task, "final_mime") or "video/mp4")
+    content_type = str(_task_value(task, "final_mime") or ctype or "video/mp4")
+    return str(key), int(total), content_type
+
+
+def _parse_http_range(range_header: str, total: int) -> tuple[int, int]:
+    m = re.match(r"bytes=(\d*)-(\d*)", (range_header or "").strip())
+    if not m:
+        raise ValueError("invalid_range")
+    start_raw, end_raw = m.group(1), m.group(2)
+    if start_raw == "" and end_raw == "":
+        raise ValueError("invalid_range")
+    if start_raw == "":
+        suffix = int(end_raw)
+        if suffix <= 0:
+            raise ValueError("invalid_range")
+        start = max(total - suffix, 0)
+        end = total - 1
+    else:
+        start = int(start_raw)
+        end = int(end_raw) if end_raw else total - 1
+    if start >= total or start < 0 or end < start:
+        raise ValueError("range_not_satisfiable")
+    end = min(end, total - 1)
+    return start, end
+
+
+@pages_router.head("/v1/tasks/{task_id}/final")
+def head_final_video(task_id: str, repo=Depends(get_task_repository)):
+    try:
+        _, total, content_type = _resolve_final_meta(task_id, repo)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc.detail)})
+    except Exception as exc:
+        logger.exception("final_head_failed", extra={"task_id": task_id, "error": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "final head failed"})
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Type": content_type or "video/mp4",
+        "Content-Length": str(total),
+    }
+    logger.info(
+        "FINAL_STREAM",
+        extra={
+            "task_id": task_id,
+            "has_range": False,
+            "range_in": None,
+            "start": 0,
+            "end": total - 1,
+            "total": total,
+            "status": 200,
+            "content_type": headers["Content-Type"],
+        },
+    )
+    return Response(status_code=200, headers=headers)
+
+
+@pages_router.get("/v1/tasks/{task_id}/final")
+def download_final_video(task_id: str, request: Request, repo=Depends(get_task_repository)):
+    try:
+        key, total, content_type = _resolve_final_meta(task_id, repo)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc.detail)})
+    except Exception as exc:
+        logger.exception("final_get_failed", extra={"task_id": task_id, "error": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "final get failed"})
+
     range_header = request.headers.get("range")
     start = 0
-    end = size - 1
+    end = total - 1
     status_code = 200
     if range_header:
-        m = re.match(r"bytes=(\d*)-(\d*)", range_header.strip())
-        if not m:
-            return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
-        start_raw, end_raw = m.group(1), m.group(2)
-        if start_raw == "" and end_raw == "":
-            return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
-        if start_raw == "":
-            suffix = int(end_raw)
-            if suffix <= 0:
-                return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
-            start = max(size - suffix, 0)
-            end = size - 1
-        else:
-            start = int(start_raw)
-            end = int(end_raw) if end_raw else size - 1
-        if start >= size or start < 0 or end < start:
-            return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
-        end = min(end, size - 1)
+        try:
+            start, end = _parse_http_range(range_header, total)
+        except Exception:
+            logger.info(
+                "FINAL_STREAM",
+                extra={
+                    "task_id": task_id,
+                    "has_range": True,
+                    "range_in": range_header,
+                    "start": None,
+                    "end": None,
+                    "total": total,
+                    "status": 416,
+                    "content_type": content_type,
+                },
+            )
+            return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
         status_code = 206
     try:
         stream, length = stream_object_range(str(key), start=start, end=end)
     except ValueError:
-        return Response(status_code=416, headers={"Content-Range": f"bytes */{size}"})
+        logger.info(
+            "FINAL_STREAM",
+            extra={
+                "task_id": task_id,
+                "has_range": bool(range_header),
+                "range_in": range_header,
+                "start": start,
+                "end": end,
+                "total": total,
+                "status": 416,
+                "content_type": content_type,
+            },
+        )
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
+    except Exception as exc:
+        logger.exception("final_stream_failed", extra={"task_id": task_id, "error": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "final stream failed"})
     headers = {
         "Accept-Ranges": "bytes",
         "Content-Type": content_type,
         "Content-Length": str(length),
     }
     if status_code == 206:
-        headers["Content-Range"] = f"bytes {start}-{end}/{size}"
+        headers["Content-Range"] = f"bytes {start}-{end}/{total}"
+    logger.info(
+        "FINAL_STREAM",
+        extra={
+            "task_id": task_id,
+            "has_range": bool(range_header),
+            "range_in": range_header,
+            "start": start,
+            "end": end,
+            "total": total,
+            "status": status_code,
+            "content_type": content_type,
+        },
+    )
     return StreamingResponse(stream, status_code=status_code, headers=headers, media_type=content_type)
 
 
