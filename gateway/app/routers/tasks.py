@@ -1202,6 +1202,7 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
     task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
     deliverables = {}
     for key, label in (
+        ("final_mp4", "final.mp4"),
         ("pack_zip", "pack.zip"),
         ("scenes_zip", "scenes.zip"),
         ("origin_srt", "origin.srt"),
@@ -1213,6 +1214,29 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         url = _deliverable_url(task_id, task, key)
         if url:
             deliverables[key] = {"label": label, "url": url}
+    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
+    final_exists = bool(final_key and object_exists(str(final_key)))
+    final_meta = object_head(str(final_key)) if final_exists else None
+    final_size, _ = media_meta_from_head(final_meta)
+    composed_ready = bool(
+        str(task.get("compose_status") or "").lower() in {"done", "ready", "success", "completed"}
+        and final_exists
+        and int(final_size or 0) > 0
+    )
+    composed_reason = "ready" if composed_ready else (
+        "compose.running" if str(task.get("compose_status") or "").lower() in {"running", "processing", "queued"}
+        else ("compose.failed" if str(task.get("compose_status") or "").lower() in {"failed", "error"} else "final.missing")
+    )
+    scenes_key = _task_key(task, "scenes_key")
+    scenes_status = str(task.get("scenes_status") or "").lower()
+    scene_pack_pending_reason = None
+    if not scenes_key or not object_exists(str(scenes_key)):
+        if scenes_status in {"running", "processing", "queued"}:
+            scene_pack_pending_reason = "scenes.running"
+        elif scenes_status in {"failed", "error"}:
+            scene_pack_pending_reason = "scenes.failed"
+        else:
+            scene_pack_pending_reason = "scenes.not_ready"
     short_code = _download_code(task_id)
     short_url = f"/d/{short_code}"
 
@@ -1220,6 +1244,10 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         "task_id": task_id,
         "gate_enabled": _op_gate_enabled(),
         "deliverables": deliverables,
+        "composed_ready": composed_ready,
+        "composed_reason": composed_reason,
+        "scene_pack_pending_reason": scene_pack_pending_reason,
+        "scene_pack_action_url": f"/tasks/{task_id}",
         "copy_bundle": _build_copy_bundle(task),
         "download_code": short_code,
         "mobile": {
@@ -3042,6 +3070,17 @@ def get_hot_follow_workbench_hub(
         raise HTTPException(status_code=404, detail="Task not found")
     logger.info("hot_follow_hub_hit task=%s kind=%s", task_id, task.get("kind"))
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    compose_plan = dict(task.get("compose_plan") or {})
+    if not compose_plan:
+        compose_plan = {
+            "mute": True,
+            "overlay_subtitles": False,
+            "cleanup_mode": "none",
+            "target_lang": task.get("content_lang") or "my",
+        }
+    scene_outputs = task.get("scene_outputs")
+    if not isinstance(scene_outputs, list):
+        scene_outputs = []
     parse_state, parse_summary = _hf_pipeline_state(task, "parse")
     subtitles_state, subtitles_summary = _hf_pipeline_state(task, "subtitles")
     dub_state, dub_summary = _hf_pipeline_state(task, "audio")
@@ -3180,6 +3219,8 @@ def get_hot_follow_workbench_hub(
         },
         "deliverables": deliverables if isinstance(deliverables, list) else [],
         "events": task.get("events") or [],
+        "compose_plan": compose_plan,
+        "scene_outputs": scene_outputs,
         "composed_ready": composed_ready,
         "composed_reason": composed_reason,
         "final": final_info,
@@ -3409,6 +3450,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                 raise HTTPException(status_code=500, detail=f"compose ffmpeg failed: {proc.stderr[-800:]}")
         else:
+            filter_complex = "[1:a]volume=1.0[mix]"
             cmd = [
                 ffmpeg,
                 "-y",
@@ -3416,10 +3458,12 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 str(video_path),
                 "-i",
                 str(voice_path),
+                "-filter_complex",
+                filter_complex,
                 "-map",
                 "0:v:0",
                 "-map",
-                "1:a:0",
+                "[mix]",
                 "-c:v",
                 "copy",
                 "-c:a",
@@ -3440,10 +3484,12 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     str(video_path),
                     "-i",
                     str(voice_path),
+                    "-filter_complex",
+                    filter_complex,
                     "-map",
                     "0:v:0",
                     "-map",
-                    "1:a:0",
+                    "[mix]",
                     "-c:v",
                     "libx264",
                     "-preset",
@@ -3516,6 +3562,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "final_duration_ms": int(final_duration * 1000),
             "final_video_bytes": int(uploaded_size),
             "compose_provider": "ffmpeg",
+            "compose_version": int(task.get("compose_version") or 0) + 1,
             "compose_status": "done",
             "compose_error": None,
             "compose_last_status": "done",
@@ -3550,6 +3597,13 @@ def compose_hot_follow_final_video(
             "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
             "compose_last_finished_at": None,
             "compose_last_error": None,
+            "compose_plan": {
+                "mute": True,
+                "overlay_subtitles": False,
+                "cleanup_mode": "none",
+                "target_lang": (repo.get(task_id) or task).get("content_lang") or "my",
+            },
+            "scene_outputs": (repo.get(task_id) or task).get("scene_outputs") or [],
         },
     )
     try:
@@ -3644,6 +3698,13 @@ def compose_task(
             "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
             "compose_last_finished_at": None,
             "compose_last_error": None,
+            "compose_plan": {
+                "mute": True,
+                "overlay_subtitles": False,
+                "cleanup_mode": "none",
+                "target_lang": (repo.get(task_id) or task).get("content_lang") or "my",
+            },
+            "scene_outputs": (repo.get(task_id) or task).get("scene_outputs") or [],
         },
     )
     try:
@@ -4095,9 +4156,23 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         await run_dub_step_ssot(task_adapter)
 
         task_after = repo.get(task_id) or {}
+        existing_audio_key = task_after.get("mm_audio_key") or task_after.get("mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
+        existing_audio_exists = bool(existing_audio_key and object_exists(str(existing_audio_key)))
+        existing_audio_size = 0
+        if existing_audio_key:
+            head = object_head(str(existing_audio_key))
+            existing_audio_size, _ = media_meta_from_head(head)
         pipeline_config = parse_pipeline_config(task_after.get("pipeline_config"))
         no_dub_flag = pipeline_config.get("no_dub") == "true"
         no_dub_note = (task_base_dir(task_id) / "dub" / "no_dub.txt").exists()
+        logger.info(
+            "DUB3_DECISION",
+            extra={
+                "task_id": task_id,
+                "decision": "skipped" if (no_dub_flag or no_dub_note) else "executed",
+                "reason": "no_dub_mode" if (no_dub_flag or no_dub_note) else "run_dub_step_ssot",
+            },
+        )
         if no_dub_flag or no_dub_note:
             audio_key = task_after.get("mm_audio_key") or task_after.get("mm_audio_path")
             audio_sha256 = None
@@ -4127,8 +4202,43 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                             "uploaded_key": audio_key,
                         },
                     )
+            logger.info(
+                "DUB3_OUTPUT_CHECK",
+                extra={
+                    "task_id": task_id,
+                    "decision": "skipped",
+                    "key": audio_key or existing_audio_key,
+                    "path": str(workspace.mm_audio_mp3_path if workspace.mm_audio_mp3_path.exists() else workspace.mm_audio_path),
+                    "exists": bool(audio_key or existing_audio_exists),
+                    "size": int(local_size if 'local_size' in locals() else existing_audio_size),
+                },
+            )
             if not audio_key:
-                raise HTTPException(status_code=500, detail="EMPTY_OR_INVALID_AUDIO")
+                if existing_audio_exists:
+                    audio_key = str(existing_audio_key)
+                else:
+                    # explicit no-op skip: do not fail task, only mark skipped
+                    _policy_upsert(
+                        repo,
+                        task_id,
+                        {
+                            "dub_provider": provider,
+                            "last_step": "dubbing",
+                            "voice_id": final_voice_id,
+                            "dub_status": "skipped",
+                            "dub_error": None,
+                            "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+                        },
+                    )
+                    stored = repo.get(task_id)
+                    detail = _task_to_detail(stored)
+                    return DubResponse(
+                        **detail.dict(exclude={"mm_audio_key"}),
+                        resolved_voice_id=final_voice_id,
+                        resolved_edge_voice=edge_voice,
+                        audio_sha256=None,
+                        mm_audio_key=None,
+                    )
             _policy_upsert(repo, 
                 task_id,
                 {
@@ -4142,7 +4252,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "dub_provider": provider,
                     "last_step": "dubbing",
                     "voice_id": final_voice_id,
-                    "dub_status": "ready",
+                    "dub_status": "skipped",
                     "dub_error": None,
                     "audio_sha256": audio_sha256,
                     "dub_generated_at": datetime.now(timezone.utc).isoformat(),
@@ -4172,7 +4282,65 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             if workspace.mm_audio_mp3_path.exists()
             else workspace.mm_audio_path
         )
+        executed = True
+        skip_reason = None
         if not audio_path.exists():
+            executed = False
+            skip_reason = "existing_artifact_reused" if existing_audio_exists else "output_missing_after_execute"
+        logger.info(
+            "DUB3_DECISION",
+            extra={
+                "task_id": task_id,
+                "decision": "executed" if executed else "skipped",
+                "reason": skip_reason or "fresh_output_expected",
+            },
+        )
+        if not audio_path.exists():
+            logger.info(
+                "DUB3_OUTPUT_CHECK",
+                extra={
+                    "task_id": task_id,
+                    "decision": "skipped" if existing_audio_exists else "executed",
+                    "key": existing_audio_key,
+                    "path": str(audio_path),
+                    "exists": existing_audio_exists,
+                    "size": existing_audio_size,
+                },
+            )
+            if existing_audio_exists:
+                audio_key = str(existing_audio_key)
+                local_size = int(existing_audio_size or 0)
+                local_duration = float((task_after.get("mm_audio_duration_ms") or 0) / 1000.0)
+                audio_sha256 = task_after.get("audio_sha256")
+                _policy_upsert(
+                    repo,
+                    task_id,
+                    {
+                        "mm_audio_path": audio_key,
+                        "mm_audio_key": audio_key,
+                        "mm_audio_provider": provider,
+                        "mm_audio_voice_id": final_voice_id,
+                        "mm_audio_bytes": local_size if local_size > 0 else task_after.get("mm_audio_bytes"),
+                        "mm_audio_duration_ms": int(local_duration * 1000) if local_duration > 0 else task_after.get("mm_audio_duration_ms"),
+                        "mm_audio_mime": "audio/mpeg",
+                        "dub_provider": provider,
+                        "last_step": "dubbing",
+                        "voice_id": final_voice_id,
+                        "dub_status": "skipped",
+                        "dub_error": None,
+                        "audio_sha256": audio_sha256,
+                        "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+                stored = repo.get(task_id)
+                detail = _task_to_detail(stored)
+                return DubResponse(
+                    **detail.dict(exclude={"mm_audio_key"}),
+                    resolved_voice_id=final_voice_id,
+                    resolved_edge_voice=edge_voice,
+                    audio_sha256=audio_sha256,
+                    mm_audio_key=audio_key,
+                )
             raise HTTPException(status_code=500, detail="Dubbing output missing")
 
         try:
@@ -4183,6 +4351,17 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         storage = get_storage_service()
         storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
         audio_sha256 = _sha256_file(audio_path)
+        logger.info(
+            "DUB3_OUTPUT_CHECK",
+            extra={
+                "task_id": task_id,
+                "decision": "executed",
+                "key": audio_key,
+                "path": str(audio_path),
+                "exists": True,
+                "size": local_size,
+            },
+        )
         logger.info(
             "DUB3_UPLOAD_DONE",
             extra={

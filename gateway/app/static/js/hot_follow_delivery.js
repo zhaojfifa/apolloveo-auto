@@ -7,6 +7,11 @@
   const publishUrl = document.getElementById("hf-publish-url");
   const publishNotes = document.getElementById("hf-publish-notes");
   const publishMsg = document.getElementById("hf-publish-msg");
+  const composedBadgeEl = document.getElementById("hf-composed-badge");
+  const composedReasonEl = document.getElementById("hf-composed-reason");
+  const scenePackStatusEl = document.getElementById("hf-scene-pack-status");
+  const scenePackReasonEl = document.getElementById("hf-scene-pack-reason");
+  const scenePackActionEl = document.getElementById("hf-scene-pack-action");
 
   if (!taskId) return;
 
@@ -20,6 +25,24 @@
       const data = await res.json();
       const deliverables = data.deliverables || {};
       const keys = Object.keys(deliverables);
+      const composedReady = Boolean(data.composed_ready);
+      const composedReason = data.composed_reason || "final.missing";
+      if (composedBadgeEl) {
+        composedBadgeEl.textContent = composedReady ? "✅ Composed: Ready" : "⚠️ Not Ready";
+        composedBadgeEl.classList.toggle("text-green-700", composedReady);
+        composedBadgeEl.classList.toggle("text-amber-700", !composedReady);
+      }
+      if (composedReasonEl) composedReasonEl.textContent = composedReason;
+      if (scenePackStatusEl) scenePackStatusEl.textContent = data.scene_pack_pending_reason ? "pending" : "ready";
+      if (scenePackReasonEl) scenePackReasonEl.textContent = data.scene_pack_pending_reason || "";
+      if (scenePackActionEl) {
+        if (data.scene_pack_pending_reason && data.scene_pack_action_url) {
+          scenePackActionEl.href = data.scene_pack_action_url;
+          scenePackActionEl.classList.remove("hidden");
+        } else {
+          scenePackActionEl.classList.add("hidden");
+        }
+      }
       if (!keys.length) {
         if (emptyEl) emptyEl.style.display = "block";
         return;

@@ -40,6 +40,8 @@
   const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
   const composedBadgeEl = document.getElementById("hf_composed_badge");
   const composedReasonEl = document.getElementById("hf_composed_reason");
+  const composePlanTextEl = document.getElementById("hf_compose_plan_text");
+  const sceneOutputsTextEl = document.getElementById("hf_scene_outputs_text");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
@@ -226,6 +228,15 @@
       composedBadgeEl.classList.toggle("text-amber-700", !ready);
     }
     if (composedReasonEl) composedReasonEl.textContent = reasonTextMap[reason] || reason;
+    const composePlan = (currentHub && currentHub.compose_plan) || {};
+    const sceneOutputs = (currentHub && currentHub.scene_outputs) || [];
+    if (composePlanTextEl) {
+      composePlanTextEl.textContent =
+        `Plan: mute=${!!composePlan.mute}, overlay_subtitles=${!!composePlan.overlay_subtitles}, cleanup_mode=${composePlan.cleanup_mode || "none"}, target_lang=${composePlan.target_lang || "-"}`;
+    }
+    if (sceneOutputsTextEl) {
+      sceneOutputsTextEl.textContent = `Scene outputs: ${Array.isArray(sceneOutputs) ? sceneOutputs.length : 0}`;
+    }
   }
 
   function renderScenePack() {
