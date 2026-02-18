@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import threading
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -176,6 +177,29 @@ from ..core.workspace import (
 logger = logging.getLogger(__name__)
 
 OP_HEADER_KEY = "X-OP-KEY"
+COMPOSE_RETRY_AFTER_MS = 1500
+_COMPOSE_LOCKS_GUARD = threading.Lock()
+_COMPOSE_LOCKS: dict[str, threading.Lock] = {}
+
+
+def _task_compose_lock(task_id: str) -> threading.Lock:
+    with _COMPOSE_LOCKS_GUARD:
+        lock = _COMPOSE_LOCKS.get(task_id)
+        if lock is None:
+            lock = threading.Lock()
+            _COMPOSE_LOCKS[task_id] = lock
+        return lock
+
+
+def _compose_in_progress_response(task_id: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error": "compose_in_progress",
+            "retry_after_ms": COMPOSE_RETRY_AFTER_MS,
+            "task_id": task_id,
+        },
+    )
 
 
 class DubProviderRequest(BaseModel):
@@ -3706,6 +3730,20 @@ def compose_hot_follow_final_video(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    lock = _task_compose_lock(task_id)
+    if not lock.acquire(blocking=False):
+        current = repo.get(task_id) or task
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "compose_status": "running",
+                "compose_last_status": "running",
+                "compose_last_started_at": current.get("compose_last_started_at") or datetime.now(timezone.utc).isoformat(),
+                "compose_last_finished_at": None,
+            },
+        )
+        return _compose_in_progress_response(task_id)
     current_for_plan = repo.get(task_id) or task
     current_plan = dict(current_for_plan.get("compose_plan") or {})
     compose_plan = {
@@ -3714,24 +3752,24 @@ def compose_hot_follow_final_video(
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("content_lang") or "my"),
     }
-    _policy_upsert(
-        repo,
-        task_id,
-        {
-            "status": "processing",
-            "last_step": "compose",
-            "compose_status": "running",
-            "compose_error": None,
-            "compose_error_reason": None,
-            "compose_last_status": "running",
-            "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
-            "compose_last_finished_at": None,
-            "compose_last_error": None,
-            "compose_plan": compose_plan,
-            "scene_outputs": current_for_plan.get("scene_outputs") or [],
-        },
-    )
     try:
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "status": "processing",
+                "last_step": "compose",
+                "compose_status": "running",
+                "compose_error": None,
+                "compose_error_reason": None,
+                "compose_last_status": "running",
+                "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
+                "compose_last_finished_at": None,
+                "compose_last_error": None,
+                "compose_plan": compose_plan,
+                "scene_outputs": current_for_plan.get("scene_outputs") or [],
+            },
+        )
         updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
         _policy_upsert(repo, task_id, updates)
         latest = repo.get(task_id) or task
@@ -3781,6 +3819,8 @@ def compose_hot_follow_final_video(
             },
         )
         raise HTTPException(status_code=409, detail=detail) from exc
+    finally:
+        lock.release()
 
 
 @api_router.post("/tasks/{task_id}/compose")
@@ -3794,6 +3834,20 @@ def compose_task(
         raise HTTPException(status_code=404, detail="Task not found")
 
     req = payload or ComposeTaskRequest()
+    lock = _task_compose_lock(task_id)
+    if not lock.acquire(blocking=False):
+        current = repo.get(task_id) or task
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "compose_status": "running",
+                "compose_last_status": "running",
+                "compose_last_started_at": current.get("compose_last_started_at") or datetime.now(timezone.utc).isoformat(),
+                "compose_last_finished_at": None,
+            },
+        )
+        return _compose_in_progress_response(task_id)
     if req.bgm_mix is not None:
         mix = max(0.0, min(1.0, float(req.bgm_mix)))
         config = dict(task.get("config") or {})
@@ -3814,6 +3868,7 @@ def compose_task(
     final_meta = object_head(str(final_key)) if final_key else None
     final_size, _ = media_meta_from_head(final_meta)
     if final_key and object_exists(str(final_key)) and final_size >= MIN_VIDEO_BYTES and not req.force:
+        lock.release()
         return {
             "task_id": task_id,
             "final_url": _task_endpoint(task_id, "final"),
@@ -3830,24 +3885,24 @@ def compose_task(
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("content_lang") or "my"),
     }
-    _policy_upsert(
-        repo,
-        task_id,
-        {
-            "status": "processing",
-            "last_step": "compose",
-            "compose_status": "running",
-            "compose_error": None,
-            "compose_error_reason": None,
-            "compose_last_status": "running",
-            "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
-            "compose_last_finished_at": None,
-            "compose_last_error": None,
-            "compose_plan": compose_plan,
-            "scene_outputs": current_for_plan.get("scene_outputs") or [],
-        },
-    )
     try:
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "status": "processing",
+                "last_step": "compose",
+                "compose_status": "running",
+                "compose_error": None,
+                "compose_error_reason": None,
+                "compose_last_status": "running",
+                "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
+                "compose_last_finished_at": None,
+                "compose_last_error": None,
+                "compose_plan": compose_plan,
+                "scene_outputs": current_for_plan.get("scene_outputs") or [],
+            },
+        )
         updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
         _policy_upsert(repo, task_id, updates)
         latest = repo.get(task_id) or task
@@ -3898,6 +3953,8 @@ def compose_task(
             },
         )
         raise HTTPException(status_code=409, detail=detail) from exc
+    finally:
+        lock.release()
 
 
 @api_router.post("/hot_follow/tasks/{task_id}/dub", response_model=DubResponse)
