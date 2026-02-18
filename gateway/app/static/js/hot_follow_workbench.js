@@ -33,6 +33,7 @@
   const tabSourceEl = document.getElementById("hf-tab-source");
   const tabFinalEl = document.getElementById("hf-tab-final");
   const composeConfirmEl = document.getElementById("hf_compose_confirm");
+  const overlaySubtitlesEl = document.getElementById("hf_overlay_subtitles");
   const composeBtnEl = document.getElementById("hf_compose_btn");
   const composeMsgEl = document.getElementById("hf_compose_msg");
   const composeFinalBlockEl = document.getElementById("hf_compose_final_block");
@@ -238,6 +239,7 @@
     if (sceneOutputsTextEl) {
       sceneOutputsTextEl.textContent = `Scene outputs: ${Array.isArray(sceneOutputs) ? sceneOutputs.length : 0}`;
     }
+    if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
   }
 
   function renderScenePack() {
@@ -336,6 +338,16 @@
     return res.json();
   }
 
+  async function patchComposePlan(payload) {
+    const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/compose_plan`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload || {}),
+    });
+    if (!res.ok) throw new Error((await res.text()) || "save compose plan failed");
+    return res.json();
+  }
+
   async function refreshSubtitles() {
     const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/subtitles`, {
       method: "POST",
@@ -390,6 +402,7 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         bgm_mix: Number(bgmMixEl ? (bgmMixEl.value || "0.3") : "0.3"),
+        overlay_subtitles: overlaySubtitlesEl ? !!overlaySubtitlesEl.checked : false,
         force: false,
       }),
     });
@@ -410,14 +423,16 @@
     if (!composeBtnEl) return;
     const media = (currentHub && currentHub.media) || {};
     const audio = (currentHub && currentHub.audio) || {};
+    const hasRaw = Boolean(media.raw_url || media.source_video_url);
     const hasVoiceover = Boolean(media.voiceover_url || audio.voiceover_url);
     const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
-    const enabled = hasVoiceover && confirmed;
+    const enabled = hasRaw && hasVoiceover && confirmed;
     composeBtnEl.disabled = !enabled;
     composeBtnEl.classList.toggle("opacity-50", !enabled);
     composeBtnEl.classList.toggle("pointer-events-none", !enabled);
     if (composeMsgEl) {
       if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
+      else if (!hasRaw) composeMsgEl.textContent = "Compose disabled: missing raw video.";
       else if (!confirmed) composeMsgEl.textContent = "Compose disabled: check confirmation first.";
       else composeMsgEl.textContent = "";
     }
@@ -446,6 +461,16 @@
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = subtitlesTextEl.value || "-";
   });
   if (composeConfirmEl) composeConfirmEl.addEventListener("change", updateComposeButtonState);
+  if (overlaySubtitlesEl) {
+    overlaySubtitlesEl.addEventListener("change", async () => {
+      try {
+        await patchComposePlan({ overlay_subtitles: !!overlaySubtitlesEl.checked });
+        await loadHub();
+      } catch (e) {
+        if (composeMsgEl) composeMsgEl.textContent = e.message || "save overlay failed";
+      }
+    });
+  }
   if (confirmVoiceoverEl && composeConfirmEl) {
     confirmVoiceoverEl.addEventListener("change", () => {
       composeConfirmEl.checked = !!confirmVoiceoverEl.checked;
