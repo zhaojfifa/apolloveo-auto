@@ -929,6 +929,7 @@ async def run_dub_step(req: DubRequest):
 
 
 async def run_pack_step(req: PackRequest):
+    start_time = time.perf_counter()
     task_id = req.task_id
     workspace = Workspace(task_id)
 

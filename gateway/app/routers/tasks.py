@@ -235,7 +235,13 @@ class ComposeTaskRequest(BaseModel):
     voiceover_url: str | None = None
     bgm_url: str | None = None
     bgm_mix: float | None = None
+    overlay_subtitles: bool | None = None
     force: bool = False
+
+
+class ComposePlanPatchRequest(BaseModel):
+    overlay_subtitles: bool | None = None
+    target_lang: str | None = None
 
 
 pages_router = APIRouter()
@@ -1198,8 +1204,20 @@ def _deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
     return None
 
 
-def _publish_hub_payload(task: dict) -> dict[str, object]:
-    task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
+def _compose_error_parts(task: dict) -> tuple[str | None, str | None]:
+    raw = task.get("compose_error")
+    if isinstance(raw, dict):
+        reason = raw.get("reason")
+        message = raw.get("message")
+        return (str(reason) if reason else None, str(message) if message else None)
+    text = str(raw).strip() if raw is not None else ""
+    if not text:
+        return (None, None)
+    reason = task.get("compose_error_reason")
+    return (str(reason) if reason else "compose_failed", text)
+
+
+def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
     final_meta = object_head(str(final_key)) if final_key and object_exists(str(final_key)) else None
     final_size, final_ctype = media_meta_from_head(final_meta)
@@ -1209,18 +1227,17 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         or task.get("final_video_sha256")
         or None
     )
+    final_exists = bool(final_key and object_exists(str(final_key)) and int(final_size or 0) > 0)
     raw_key = _task_key(task, "raw_path")
     raw_exists = bool(raw_key and object_exists(str(raw_key)))
     voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
     voice_exists = bool(voice_key and object_exists(str(voice_key)))
-    final_exists = bool(final_key and object_exists(str(final_key)) and int(final_size or 0) > 0)
     compose_status = str(task.get("compose_status") or "").lower()
-    composed_ready = bool(
-        compose_status in {"done", "ready", "success", "completed"}
-        and final_exists
-        and final_asset_version
-        and (final_size is None or int(final_size) > 0)
-    )
+    compose_last_status = str(task.get("compose_last_status") or compose_status).lower()
+    compose_done = compose_last_status in {"done", "ready", "success", "completed"}
+    compose_error_reason, compose_error_message = _compose_error_parts(task)
+
+    composed_ready = bool(final_exists and compose_done and compose_error_reason is None)
     if composed_ready:
         composed_reason = "ready"
     elif not raw_exists:
@@ -1229,7 +1246,7 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         composed_reason = "missing_voiceover"
     elif compose_status in {"running", "processing", "queued"}:
         composed_reason = "compose_in_progress"
-    elif compose_status in {"failed", "error"}:
+    elif compose_error_reason or compose_status in {"failed", "error"}:
         composed_reason = "compose_failed"
     else:
         composed_reason = "final_missing"
@@ -1243,6 +1260,20 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         "updated_at": task.get("final_updated_at") or task.get("updated_at"),
         "content_type": task.get("final_mime") or final_ctype or "video/mp4",
     }
+    return {
+        "composed_ready": composed_ready,
+        "composed_reason": composed_reason,
+        "final": final_info,
+        "compose_error_reason": compose_error_reason,
+        "compose_error_message": compose_error_message,
+        "raw_exists": raw_exists,
+        "voice_exists": voice_exists,
+    }
+
+
+def _publish_hub_payload(task: dict) -> dict[str, object]:
+    task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
+    composed = _compute_composed_state(task, task_id)
 
     deliverables = {}
     for key, label in (
@@ -1275,9 +1306,9 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         "task_id": task_id,
         "gate_enabled": _op_gate_enabled(),
         "deliverables": deliverables,
-        "composed_ready": composed_ready,
-        "composed_reason": composed_reason,
-        "final": final_info,
+        "composed_ready": bool(composed.get("composed_ready")),
+        "composed_reason": str(composed.get("composed_reason") or "final_missing"),
+        "final": composed.get("final") or {"exists": False},
         "scene_pack_pending_reason": scene_pack_pending_reason,
         "scene_pack_action_url": f"/tasks/{task_id}",
         "copy_bundle": _build_copy_bundle(task),
@@ -3113,6 +3144,7 @@ def get_hot_follow_workbench_hub(
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
         scene_outputs = []
+    composed = _compute_composed_state(task, task_id)
     parse_state, parse_summary = _hf_pipeline_state(task, "parse")
     subtitles_state, subtitles_summary = _hf_pipeline_state(task, "subtitles")
     dub_state, dub_summary = _hf_pipeline_state(task, "audio")
@@ -3123,13 +3155,10 @@ def get_hot_follow_workbench_hub(
     raw_url = _task_endpoint(task_id, "raw") if raw_key and object_exists(raw_key) else None
     mute_key = _task_key(task, "mute_video_key") or _task_key(task, "mute_video_path")
     mute_url = _task_endpoint(task_id, "raw") if mute_key and object_exists(str(mute_key)) else raw_url
-    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
-    final_meta = object_head(str(final_key)) if final_key else None
-    final_size, _ = media_meta_from_head(final_meta)
-    final_etag = final_meta.get("etag") if isinstance(final_meta, dict) else None
-    final_asset_version = task.get("final_asset_version") or final_etag or task.get("final_video_sha256") or None
-    final_exists = bool(final_key and object_exists(str(final_key)) and int(final_size or 0) > 0)
-    final_url = _task_endpoint(task_id, "final") if final_key and final_size >= MIN_VIDEO_BYTES and object_exists(str(final_key)) else None
+    final_info = composed.get("final") or {}
+    final_exists = bool(final_info.get("exists"))
+    final_size = int(final_info.get("size_bytes") or 0)
+    final_url = _task_endpoint(task_id, "final") if final_exists and final_size >= MIN_VIDEO_BYTES else None
     scene_key = _task_key(task, "scenes_key")
     scenes_url = _task_endpoint(task_id, "scenes") if scene_key and object_exists(scene_key) else None
     subtitles_text = _hf_load_subtitles_text(task_id, task)
@@ -3162,35 +3191,8 @@ def get_hot_follow_workbench_hub(
         "ffmpeg_cmd": task.get("compose_last_ffmpeg_cmd"),
         "error": task.get("compose_last_error") or task.get("compose_error"),
     }
-    final_info = {
-        "exists": final_exists,
-        "key": str(final_key) if final_key else None,
-        "size_bytes": int(task.get("final_video_bytes") or final_size or 0) if final_exists else None,
-        "duration_ms": int(task.get("final_duration_ms")) if task.get("final_duration_ms") is not None else None,
-        "asset_version": str(final_asset_version) if final_asset_version else None,
-        "updated_at": task.get("final_updated_at") or task.get("updated_at"),
-    }
-    raw_exists = bool(raw_key and object_exists(str(raw_key)))
-    voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
-    voice_exists = bool(voice_key and object_exists(str(voice_key)))
-    composed_ready = bool(
-        compose_last.get("status") == "done"
-        and final_info.get("exists") is True
-        and final_info.get("asset_version")
-        and (final_info.get("size_bytes") is None or int(final_info.get("size_bytes")) > 0)
-    )
-    if composed_ready:
-        composed_reason = "ready"
-    elif not raw_exists:
-        composed_reason = "missing_raw"
-    elif not voice_exists:
-        composed_reason = "missing_voiceover"
-    elif compose_last.get("status") == "running":
-        composed_reason = "compose_in_progress"
-    elif compose_last.get("status") == "failed":
-        composed_reason = "compose_failed"
-    else:
-        composed_reason = "final_missing"
+    composed_ready = bool(composed.get("composed_ready"))
+    composed_reason = str(composed.get("composed_reason") or "final_missing")
 
     pipeline = [
         {"key": "parse", "label": "Parse", "status": parse_state, "updated_at": task.get("updated_at"), "error": task.get("error_message"), "message": parse_summary},
@@ -3260,7 +3262,7 @@ def get_hot_follow_workbench_hub(
         "errors": {
             "audio": {"reason": task.get("error_reason"), "message": task.get("dub_error")},
             "pack": {"reason": task.get("error_reason"), "message": task.get("pack_error")},
-            "compose": {"reason": task.get("error_reason"), "message": task.get("compose_error")},
+            "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
         },
     }
 
@@ -3324,6 +3326,28 @@ def patch_hot_follow_audio_config(
     }
 
 
+@api_router.patch("/hot_follow/tasks/{task_id}/compose_plan")
+def patch_hot_follow_compose_plan(
+    task_id: str,
+    payload: ComposePlanPatchRequest,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    plan = dict(task.get("compose_plan") or {})
+    if "overlay_subtitles" not in plan:
+        plan["overlay_subtitles"] = False
+    if "target_lang" not in plan:
+        plan["target_lang"] = task.get("content_lang") or "my"
+    if payload.overlay_subtitles is not None:
+        plan["overlay_subtitles"] = bool(payload.overlay_subtitles)
+    if payload.target_lang is not None and str(payload.target_lang).strip():
+        plan["target_lang"] = str(payload.target_lang).strip()
+    _policy_upsert(repo, task_id, {"compose_plan": plan})
+    return {"task_id": task_id, "compose_plan": plan}
+
+
 @api_router.patch("/hot_follow/tasks/{task_id}/subtitles")
 def patch_hot_follow_subtitles(
     task_id: str,
@@ -3360,6 +3384,9 @@ def patch_hot_follow_subtitles(
 
 
 def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
+    def _compose_fail(reason: str, message: str, status_code: int = 409):
+        raise HTTPException(status_code=status_code, detail={"reason": reason, "message": message})
+
     storage = get_storage_service()
     video_key = (
         _task_key(task, "mute_video_key")
@@ -3368,9 +3395,9 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     )
     audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
     if not video_key:
-        raise HTTPException(status_code=409, detail="missing video source for compose")
+        _compose_fail("missing_raw", "missing video source for compose")
     if not audio_key:
-        raise HTTPException(status_code=409, detail="missing voiceover audio for compose")
+        _compose_fail("missing_voiceover", "missing voiceover audio for compose")
     try:
         assert_artifact_ready(
             kind="video",
@@ -3379,7 +3406,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             head_fn=object_head,
         )
     except Exception:
-        raise HTTPException(status_code=409, detail="video source not ready")
+        _compose_fail("missing_raw", "video source not ready")
     try:
         assert_artifact_ready(
             kind="audio",
@@ -3388,11 +3415,11 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             head_fn=object_head,
         )
     except Exception:
-        raise HTTPException(status_code=409, detail="voiceover audio invalid")
+        _compose_fail("missing_voiceover", "voiceover audio invalid")
 
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
-        raise HTTPException(status_code=500, detail="ffmpeg not found in PATH")
+        _compose_fail("compose_failed", "ffmpeg not found in PATH")
 
     config = dict(task.get("config") or {})
     bgm = dict(config.get("bgm") or {})
@@ -3414,6 +3441,9 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     except Exception:
         bgm_mix = 0.3
     bgm_mix = max(0.0, min(1.0, bgm_mix))
+    compose_plan = dict(task.get("compose_plan") or {})
+    overlay_subtitles = bool(compose_plan.get("overlay_subtitles"))
+    target_lang = str(compose_plan.get("target_lang") or task.get("content_lang") or "my")
     logger.info(
         "COMPOSE_START",
         extra={
@@ -3422,6 +3452,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "audio_key": str(audio_key),
             "bgm_key": str(bgm_key) if bgm_key else None,
             "mix": bgm_mix,
+            "overlay_subtitles": overlay_subtitles,
+            "target_lang": target_lang,
         },
     )
 
@@ -3432,12 +3464,51 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         video_path = tmp / "video_input.mp4"
         voice_path = tmp / "voice_input.mp3"
         final_path = tmp / "final_compose.mp4"
+        subtitle_path = tmp / "subs_target.srt"
         storage.download_file(str(video_key), str(video_path))
         storage.download_file(str(audio_key), str(voice_path))
         try:
             assert_local_audio_ok(voice_path)
         except ValueError:
-            raise HTTPException(status_code=409, detail="voiceover audio invalid")
+            _compose_fail("missing_voiceover", "voiceover audio invalid")
+
+        def _minimal_srt(text: str) -> str:
+            body = (text or "").strip()
+            if not body:
+                return ""
+            if "-->" in body:
+                return body if body.endswith("\n") else f"{body}\n"
+            return "1\n00:00:00,000 --> 00:59:59,000\n" + body + "\n"
+
+        if overlay_subtitles:
+            font_ok = False
+            fc_list = shutil.which("fc-list")
+            if fc_list:
+                proc_font = subprocess.run([fc_list], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                if proc_font.returncode == 0 and "Noto Sans Myanmar" in (proc_font.stdout or ""):
+                    font_ok = True
+            if not font_ok:
+                _compose_fail("font_missing", "Noto Sans Myanmar not found")
+            subtitle_key_candidates = []
+            lang_norm = target_lang.lower().strip()
+            if lang_norm in {"my", "mm"}:
+                subtitle_key_candidates.append(_task_key(task, "mm_srt_path"))
+            subtitle_key_candidates.append(_task_key(task, f"{lang_norm}_srt_path"))
+            subtitle_key_candidates.append(_task_key(task, "mm_srt_path"))
+            subtitle_key_candidates = [str(k) for k in subtitle_key_candidates if k]
+            loaded_subs = False
+            for s_key in subtitle_key_candidates:
+                if object_exists(str(s_key)):
+                    storage.download_file(str(s_key), str(subtitle_path))
+                    loaded_subs = subtitle_path.exists() and subtitle_path.stat().st_size > 0
+                    if loaded_subs:
+                        break
+            if not loaded_subs:
+                fallback_text = _hf_load_subtitles_text(task_id, task)
+                srt_text = _minimal_srt(fallback_text)
+                if not srt_text:
+                    _compose_fail("compose_failed", "overlay_subtitles enabled but subtitles missing")
+                subtitle_path.write_text(srt_text, encoding="utf-8")
 
         bgm_path = None
         if bgm_key:
@@ -3450,6 +3521,15 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 f"[2:a]volume={bgm_mix}[bgm];"
                 "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2[mix]"
             )
+            vf_args = []
+            video_codec_args = ["-c:v", "copy"]
+            if overlay_subtitles:
+                subtitle_filter = (
+                    f"subtitles={str(subtitle_path)}:"
+                    "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
+                )
+                vf_args = ["-vf", subtitle_filter]
+                video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"]
             cmd = [
                 ffmpeg,
                 "-y",
@@ -3461,12 +3541,12 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 str(bgm_path),
                 "-filter_complex",
                 filter_complex,
+                *vf_args,
                 "-map",
                 "0:v:0",
                 "-map",
                 "[mix]",
-                "-c:v",
-                "copy",
+                *video_codec_args,
                 "-c:a",
                 "aac",
                 "-shortest",
@@ -3478,9 +3558,18 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             ffmpeg_cmd_used = " ".join(cmd)
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
-                raise HTTPException(status_code=500, detail=f"compose ffmpeg failed: {proc.stderr[-800:]}")
+                _compose_fail("compose_failed", f"compose ffmpeg failed: {proc.stderr[-800:]}")
         else:
             filter_complex = "[1:a]volume=1.0[mix]"
+            vf_args = []
+            video_codec_args = ["-c:v", "copy"]
+            if overlay_subtitles:
+                subtitle_filter = (
+                    f"subtitles={str(subtitle_path)}:"
+                    "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
+                )
+                vf_args = ["-vf", subtitle_filter]
+                video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"]
             cmd = [
                 ffmpeg,
                 "-y",
@@ -3490,12 +3579,12 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 str(voice_path),
                 "-filter_complex",
                 filter_complex,
+                *vf_args,
                 "-map",
                 "0:v:0",
                 "-map",
                 "[mix]",
-                "-c:v",
-                "copy",
+                *video_codec_args,
                 "-c:a",
                 "aac",
                 "-shortest",
@@ -3516,6 +3605,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     str(voice_path),
                     "-filter_complex",
                     filter_complex,
+                    *vf_args,
                     "-map",
                     "0:v:0",
                     "-map",
@@ -3537,12 +3627,12 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 ffmpeg_cmd_used = " ".join(cmd_fallback)
                 proc2 = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 if proc2.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
-                    raise HTTPException(status_code=500, detail=f"compose ffmpeg failed: {proc2.stderr[-800:]}")
+                    _compose_fail("compose_failed", f"compose ffmpeg failed: {proc2.stderr[-800:]}")
 
         try:
             final_size, final_duration = assert_local_video_ok(final_path)
         except ValueError:
-            raise HTTPException(status_code=500, detail="compose output invalid")
+            _compose_fail("compose_failed", "compose output invalid")
         logger.info(
             "COMPOSE_OUTPUT_READY",
             extra={
@@ -3564,14 +3654,14 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         )
         uploaded_key = storage.upload_file(str(final_path), final_key, content_type="video/mp4")
         if not uploaded_key:
-            raise HTTPException(status_code=500, detail="compose upload failed")
+            _compose_fail("compose_failed", "compose upload failed")
         if not object_exists(final_key):
-            raise HTTPException(status_code=500, detail="compose upload verify failed: missing final object")
+            _compose_fail("compose_failed", "compose upload verify failed: missing final object")
         uploaded_meta = object_head(final_key)
         uploaded_size, _ = media_meta_from_head(uploaded_meta)
         final_etag = uploaded_meta.get("etag") if isinstance(uploaded_meta, dict) else None
         if uploaded_size < MIN_VIDEO_BYTES:
-            raise HTTPException(status_code=500, detail="compose upload verify failed: invalid final object")
+            _compose_fail("compose_failed", "compose upload verify failed: invalid final object")
         logger.info(
             "COMPOSE_DONE",
             extra={
@@ -3595,6 +3685,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "compose_version": int(task.get("compose_version") or 0) + 1,
             "compose_status": "done",
             "compose_error": None,
+            "compose_error_reason": None,
             "compose_last_status": "done",
             "compose_last_started_at": compose_started_at,
             "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
@@ -3615,6 +3706,14 @@ def compose_hot_follow_final_video(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    current_for_plan = repo.get(task_id) or task
+    current_plan = dict(current_for_plan.get("compose_plan") or {})
+    compose_plan = {
+        "mute": bool(current_plan.get("mute", True)),
+        "overlay_subtitles": bool(current_plan.get("overlay_subtitles", False)),
+        "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
+        "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("content_lang") or "my"),
+    }
     _policy_upsert(
         repo,
         task_id,
@@ -3623,17 +3722,13 @@ def compose_hot_follow_final_video(
             "last_step": "compose",
             "compose_status": "running",
             "compose_error": None,
+            "compose_error_reason": None,
             "compose_last_status": "running",
             "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
             "compose_last_finished_at": None,
             "compose_last_error": None,
-            "compose_plan": {
-                "mute": True,
-                "overlay_subtitles": False,
-                "cleanup_mode": "none",
-                "target_lang": (repo.get(task_id) or task).get("content_lang") or "my",
-            },
-            "scene_outputs": (repo.get(task_id) or task).get("scene_outputs") or [],
+            "compose_plan": compose_plan,
+            "scene_outputs": current_for_plan.get("scene_outputs") or [],
         },
     )
     try:
@@ -3649,15 +3744,17 @@ def compose_hot_follow_final_video(
             "compose_status": latest.get("compose_status"),
         }
     except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, dict) else {"reason": "compose_failed", "message": str(exc.detail)}
         _policy_upsert(
             repo,
             task_id,
             {
                 "compose_status": "failed",
-                "compose_error": str(exc.detail),
+                "compose_error": detail,
+                "compose_error_reason": detail.get("reason"),
                 "compose_last_status": "failed",
                 "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-                "compose_last_error": str(exc.detail),
+                "compose_last_error": detail.get("message") or str(exc.detail),
                 "status": "failed",
                 "last_step": "compose",
                 "final_video_key": None,
@@ -3666,22 +3763,24 @@ def compose_hot_follow_final_video(
         )
         raise
     except Exception as exc:
+        detail = {"reason": "compose_failed", "message": str(exc)}
         _policy_upsert(
             repo,
             task_id,
             {
                 "compose_status": "failed",
-                "compose_error": str(exc),
+                "compose_error": detail,
+                "compose_error_reason": detail.get("reason"),
                 "compose_last_status": "failed",
                 "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-                "compose_last_error": str(exc),
+                "compose_last_error": detail.get("message"),
                 "status": "failed",
                 "last_step": "compose",
                 "final_video_key": None,
                 "final_video_path": None,
             },
         )
-        raise HTTPException(status_code=500, detail=f"compose failed: {exc}") from exc
+        raise HTTPException(status_code=409, detail=detail) from exc
 
 
 @api_router.post("/tasks/{task_id}/compose")
@@ -3703,6 +3802,13 @@ def compose_task(
         config["bgm"] = bgm
         _policy_upsert(repo, task_id, {"config": config})
         task = repo.get(task_id) or task
+    if req.overlay_subtitles is not None:
+        plan = dict(task.get("compose_plan") or {})
+        if "target_lang" not in plan:
+            plan["target_lang"] = task.get("content_lang") or "my"
+        plan["overlay_subtitles"] = bool(req.overlay_subtitles)
+        _policy_upsert(repo, task_id, {"compose_plan": plan})
+        task = repo.get(task_id) or task
 
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
     final_meta = object_head(str(final_key)) if final_key else None
@@ -3716,6 +3822,14 @@ def compose_task(
             "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
         }
 
+    current_for_plan = repo.get(task_id) or task
+    current_plan = dict(current_for_plan.get("compose_plan") or {})
+    compose_plan = {
+        "mute": bool(current_plan.get("mute", True)),
+        "overlay_subtitles": bool(current_plan.get("overlay_subtitles", False)),
+        "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
+        "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("content_lang") or "my"),
+    }
     _policy_upsert(
         repo,
         task_id,
@@ -3724,17 +3838,13 @@ def compose_task(
             "last_step": "compose",
             "compose_status": "running",
             "compose_error": None,
+            "compose_error_reason": None,
             "compose_last_status": "running",
             "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
             "compose_last_finished_at": None,
             "compose_last_error": None,
-            "compose_plan": {
-                "mute": True,
-                "overlay_subtitles": False,
-                "cleanup_mode": "none",
-                "target_lang": (repo.get(task_id) or task).get("content_lang") or "my",
-            },
-            "scene_outputs": (repo.get(task_id) or task).get("scene_outputs") or [],
+            "compose_plan": compose_plan,
+            "scene_outputs": current_for_plan.get("scene_outputs") or [],
         },
     )
     try:
@@ -3751,15 +3861,17 @@ def compose_task(
             "compose_status": latest.get("compose_status"),
         }
     except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, dict) else {"reason": "compose_failed", "message": str(exc.detail)}
         _policy_upsert(
             repo,
             task_id,
             {
                 "compose_status": "failed",
-                "compose_error": str(exc.detail),
+                "compose_error": detail,
+                "compose_error_reason": detail.get("reason"),
                 "compose_last_status": "failed",
                 "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-                "compose_last_error": str(exc.detail),
+                "compose_last_error": detail.get("message") or str(exc.detail),
                 "status": "failed",
                 "last_step": "compose",
                 "final_video_key": None,
@@ -3768,22 +3880,24 @@ def compose_task(
         )
         raise
     except Exception as exc:
+        detail = {"reason": "compose_failed", "message": str(exc)}
         _policy_upsert(
             repo,
             task_id,
             {
                 "compose_status": "failed",
-                "compose_error": str(exc),
+                "compose_error": detail,
+                "compose_error_reason": detail.get("reason"),
                 "compose_last_status": "failed",
                 "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-                "compose_last_error": str(exc),
+                "compose_last_error": detail.get("message"),
                 "status": "failed",
                 "last_step": "compose",
                 "final_video_key": None,
                 "final_video_path": None,
             },
         )
-        raise HTTPException(status_code=500, detail=f"compose failed: {exc}") from exc
+        raise HTTPException(status_code=409, detail=detail) from exc
 
 
 @api_router.post("/hot_follow/tasks/{task_id}/dub", response_model=DubResponse)
