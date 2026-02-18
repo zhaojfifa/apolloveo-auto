@@ -50,6 +50,7 @@
   let activeTab = "source";
   let hubLoading = false;
   let pollTimer = null;
+  let composeSubmitting = false;
 
   function escapeHtml(s) {
     return String(s || "")
@@ -294,6 +295,9 @@
 
   function renderHub(data) {
     currentHub = data || {};
+    const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
+    const composeLastStatus = String(composeLast.status || "").toLowerCase();
+    if (!["running", "processing", "queued"].includes(composeLastStatus)) composeSubmitting = false;
     renderPipeline();
     renderMedia();
     renderSubtitles();
@@ -397,6 +401,8 @@
     const voiceUrl = media.voiceover_url || audio.voiceover_url || null;
     if (composeConfirmEl && !composeConfirmEl.checked) throw new Error("Please confirm before composing.");
     if (!voiceUrl) throw new Error("No voiceover yet; run Re-Run Audio first.");
+    composeSubmitting = true;
+    updateComposeButtonState();
     const res = await fetch(composeUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -406,6 +412,18 @@
         force: false,
       }),
     });
+    if (res.status === 409) {
+      let payload = null;
+      try { payload = await res.json(); } catch (_) { payload = null; }
+      const inProgress = payload && payload.error === "compose_in_progress";
+      if (inProgress) {
+        if (composeMsgEl) composeMsgEl.textContent = "合成中…";
+        await loadHub();
+        updateComposeButtonState();
+        return { in_progress: true, retry_after_ms: payload.retry_after_ms || 1500 };
+      }
+      throw new Error((payload && (payload.message || payload.detail)) || "compose conflict");
+    }
     if (!res.ok) throw new Error((await res.text()) || "compose failed");
     const data = await res.json();
     await loadHub();
@@ -416,6 +434,8 @@
     setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose-action)", finalMeta.asset_version || null);
     if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
     setLink(composeFinalLinkEl, finalUrl);
+    composeSubmitting = false;
+    updateComposeButtonState();
     return data;
   }
 
@@ -426,12 +446,17 @@
     const hasRaw = Boolean(media.raw_url || media.source_video_url);
     const hasVoiceover = Boolean(media.voiceover_url || audio.voiceover_url);
     const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
-    const enabled = hasRaw && hasVoiceover && confirmed;
+    const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
+    const composeRunning = ["running", "processing", "queued"].includes(String(composeLast.status || "").toLowerCase());
+    const enabled = hasRaw && hasVoiceover && confirmed && !composeSubmitting && !composeRunning;
+    if (!composeBtnEl.dataset.defaultText) composeBtnEl.dataset.defaultText = composeBtnEl.textContent || "Compose Final";
     composeBtnEl.disabled = !enabled;
     composeBtnEl.classList.toggle("opacity-50", !enabled);
     composeBtnEl.classList.toggle("pointer-events-none", !enabled);
+    composeBtnEl.textContent = composeRunning || composeSubmitting ? "合成中…" : (composeBtnEl.dataset.defaultText || "Compose Final");
     if (composeMsgEl) {
-      if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
+      if (composeRunning || composeSubmitting) composeMsgEl.textContent = "合成中…";
+      else if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
       else if (!hasRaw) composeMsgEl.textContent = "Compose disabled: missing raw video.";
       else if (!confirmed) composeMsgEl.textContent = "Compose disabled: check confirmation first.";
       else composeMsgEl.textContent = "";
@@ -586,8 +611,11 @@
         await runAction(action);
         if (action === "compose" && composeMsgEl) composeMsgEl.textContent = "Compose requested.";
       } catch (err) {
+        if (action === "compose") composeSubmitting = false;
         if (action === "compose" && composeMsgEl) composeMsgEl.textContent = err.message || "compose failed";
         if (statusEl) statusEl.textContent = err.message || "action failed";
+      } finally {
+        if (action === "compose") updateComposeButtonState();
       }
     });
   });
