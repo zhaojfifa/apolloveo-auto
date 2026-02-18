@@ -196,6 +196,7 @@ def _compose_in_progress_response(task_id: str) -> JSONResponse:
         status_code=409,
         content={
             "error": "compose_in_progress",
+            "status": "running",
             "retry_after_ms": COMPOSE_RETRY_AFTER_MS,
             "task_id": task_id,
         },
@@ -1270,6 +1271,8 @@ def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         composed_reason = "missing_voiceover"
     elif compose_status in {"running", "processing", "queued"}:
         composed_reason = "compose_in_progress"
+    elif compose_error_reason in {"subtitles_missing", "font_missing"}:
+        composed_reason = compose_error_reason
     elif compose_error_reason or compose_status in {"failed", "error"}:
         composed_reason = "compose_failed"
     else:
@@ -3161,9 +3164,9 @@ def get_hot_follow_workbench_hub(
     if not compose_plan:
         compose_plan = {
             "mute": True,
-            "overlay_subtitles": False,
+            "overlay_subtitles": True,
             "cleanup_mode": "none",
-            "target_lang": task.get("content_lang") or "my",
+            "target_lang": task.get("target_lang") or task.get("content_lang") or "mm",
         }
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
@@ -3361,9 +3364,9 @@ def patch_hot_follow_compose_plan(
         raise HTTPException(status_code=404, detail="Task not found")
     plan = dict(task.get("compose_plan") or {})
     if "overlay_subtitles" not in plan:
-        plan["overlay_subtitles"] = False
+        plan["overlay_subtitles"] = True
     if "target_lang" not in plan:
-        plan["target_lang"] = task.get("content_lang") or "my"
+        plan["target_lang"] = task.get("target_lang") or task.get("content_lang") or "mm"
     if payload.overlay_subtitles is not None:
         plan["overlay_subtitles"] = bool(payload.overlay_subtitles)
     if payload.target_lang is not None and str(payload.target_lang).strip():
@@ -3408,8 +3411,46 @@ def patch_hot_follow_subtitles(
 
 
 def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
-    def _compose_fail(reason: str, message: str, status_code: int = 409):
-        raise HTTPException(status_code=status_code, detail={"reason": reason, "message": message})
+    def _compose_fail(reason: str, message: str, status_code: int = 409, *, ffmpeg_cmd: str | None = None, stderr_tail: str | None = None):
+        detail: dict[str, Any] = {"reason": reason, "message": message}
+        if ffmpeg_cmd:
+            detail["ffmpeg_cmd"] = ffmpeg_cmd
+        if stderr_tail:
+            detail["stderr_tail"] = stderr_tail
+        raise HTTPException(status_code=status_code, detail=detail)
+
+    def _normalize_target_lang(value: str | None) -> str:
+        v = str(value or "").strip().lower()
+        if not v:
+            return "mm"
+        return "mm" if v == "my" else v
+
+    def _resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> str | None:
+        lang_norm = _normalize_target_lang(lang)
+        candidates: list[str] = []
+        if lang_norm == "mm":
+            mm_path = _task_key(task_obj, "mm_srt_path")
+            if mm_path:
+                candidates.append(str(mm_path))
+            candidates.append(deliver_key(task_code, "mm.srt"))
+        else:
+            lang_path = _task_key(task_obj, f"{lang_norm}_srt_path")
+            if lang_path:
+                candidates.append(str(lang_path))
+            candidates.append(deliver_key(task_code, f"{lang_norm}.srt"))
+            mm_path = _task_key(task_obj, "mm_srt_path")
+            if mm_path:
+                candidates.append(str(mm_path))
+            candidates.append(deliver_key(task_code, "mm.srt"))
+        for key in candidates:
+            if key and object_exists(str(key)):
+                return str(key)
+        return None
+
+    def _escape_subtitles_path(path: Path) -> str:
+        # ffmpeg subtitles filter expects escaped path in filter expression
+        raw = str(path).replace("\\", "/")
+        return raw.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
     storage = get_storage_service()
     video_key = (
@@ -3467,7 +3508,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     bgm_mix = max(0.0, min(1.0, bgm_mix))
     compose_plan = dict(task.get("compose_plan") or {})
     overlay_subtitles = bool(compose_plan.get("overlay_subtitles"))
-    target_lang = str(compose_plan.get("target_lang") or task.get("content_lang") or "my")
+    target_lang = str(compose_plan.get("target_lang") or task.get("target_lang") or task.get("content_lang") or "mm")
     logger.info(
         "COMPOSE_START",
         extra={
@@ -3513,25 +3554,16 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     font_ok = True
             if not font_ok:
                 _compose_fail("font_missing", "Noto Sans Myanmar not found")
-            subtitle_key_candidates = []
-            lang_norm = target_lang.lower().strip()
-            if lang_norm in {"my", "mm"}:
-                subtitle_key_candidates.append(_task_key(task, "mm_srt_path"))
-            subtitle_key_candidates.append(_task_key(task, f"{lang_norm}_srt_path"))
-            subtitle_key_candidates.append(_task_key(task, "mm_srt_path"))
-            subtitle_key_candidates = [str(k) for k in subtitle_key_candidates if k]
             loaded_subs = False
-            for s_key in subtitle_key_candidates:
-                if object_exists(str(s_key)):
-                    storage.download_file(str(s_key), str(subtitle_path))
-                    loaded_subs = subtitle_path.exists() and subtitle_path.stat().st_size > 0
-                    if loaded_subs:
-                        break
+            subtitle_key = _resolve_target_srt_key(task, task_id, target_lang)
+            if subtitle_key:
+                storage.download_file(str(subtitle_key), str(subtitle_path))
+                loaded_subs = subtitle_path.exists() and subtitle_path.stat().st_size > 0
             if not loaded_subs:
                 fallback_text = _hf_load_subtitles_text(task_id, task)
                 srt_text = _minimal_srt(fallback_text)
                 if not srt_text:
-                    _compose_fail("compose_failed", "overlay_subtitles enabled but subtitles missing")
+                    _compose_fail("subtitles_missing", "overlay_subtitles enabled but subtitles missing")
                 subtitle_path.write_text(srt_text, encoding="utf-8")
 
         bgm_path = None
@@ -3540,20 +3572,29 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             storage.download_file(str(bgm_key), str(bgm_path))
 
         if bgm_path and bgm_path.exists():
-            filter_complex = (
-                f"[1:a]volume=1.0[voice];"
-                f"[2:a]volume={bgm_mix}[bgm];"
-                "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2[mix]"
-            )
-            vf_args = []
-            video_codec_args = ["-c:v", "copy"]
             if overlay_subtitles:
+                fontsdir = "/usr/share/fonts" if Path("/usr/share/fonts").exists() else str(subtitle_path.parent)
                 subtitle_filter = (
-                    f"subtitles={str(subtitle_path)}:"
+                    f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
+                    f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
-                vf_args = ["-vf", subtitle_filter]
-                video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"]
+                filter_complex = (
+                    f"[0:v]{subtitle_filter}[v];"
+                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0[voice];"
+                    f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
+                    "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+                )
+                map_video = "[v]"
+                video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+            else:
+                filter_complex = (
+                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0[voice];"
+                    f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
+                    "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+                )
+                map_video = "0:v:0"
+                video_codec_args = ["-c:v", "copy"]
             cmd = [
                 ffmpeg,
                 "-y",
@@ -3565,9 +3606,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 str(bgm_path),
                 "-filter_complex",
                 filter_complex,
-                *vf_args,
                 "-map",
-                "0:v:0",
+                map_video,
                 "-map",
                 "[mix]",
                 *video_codec_args,
@@ -3582,18 +3622,25 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             ffmpeg_cmd_used = " ".join(cmd)
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
-                _compose_fail("compose_failed", f"compose ffmpeg failed: {proc.stderr[-800:]}")
+                _compose_fail("compose_failed", "compose ffmpeg failed", ffmpeg_cmd=ffmpeg_cmd_used, stderr_tail=(proc.stderr or "")[-800:])
         else:
-            filter_complex = "[1:a]volume=1.0[mix]"
-            vf_args = []
-            video_codec_args = ["-c:v", "copy"]
             if overlay_subtitles:
+                fontsdir = "/usr/share/fonts" if Path("/usr/share/fonts").exists() else str(subtitle_path.parent)
                 subtitle_filter = (
-                    f"subtitles={str(subtitle_path)}:"
+                    f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
+                    f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
-                vf_args = ["-vf", subtitle_filter]
-                video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"]
+                filter_complex = (
+                    f"[0:v]{subtitle_filter}[v];"
+                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0,alimiter=limit=0.95[mix]"
+                )
+                map_video = "[v]"
+                video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+            else:
+                filter_complex = "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0,alimiter=limit=0.95[mix]"
+                map_video = "0:v:0"
+                video_codec_args = ["-c:v", "copy"]
             cmd = [
                 ffmpeg,
                 "-y",
@@ -3603,9 +3650,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 str(voice_path),
                 "-filter_complex",
                 filter_complex,
-                *vf_args,
                 "-map",
-                "0:v:0",
+                map_video,
                 "-map",
                 "[mix]",
                 *video_codec_args,
@@ -3629,9 +3675,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     str(voice_path),
                     "-filter_complex",
                     filter_complex,
-                    *vf_args,
                     "-map",
-                    "0:v:0",
+                    map_video,
                     "-map",
                     "[mix]",
                     "-c:v",
@@ -3651,7 +3696,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 ffmpeg_cmd_used = " ".join(cmd_fallback)
                 proc2 = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 if proc2.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
-                    _compose_fail("compose_failed", f"compose ffmpeg failed: {proc2.stderr[-800:]}")
+                    _compose_fail("compose_failed", "compose ffmpeg failed", ffmpeg_cmd=ffmpeg_cmd_used, stderr_tail=(proc2.stderr or "")[-800:])
 
         try:
             final_size, final_duration = assert_local_video_ok(final_path)
@@ -3748,9 +3793,9 @@ def compose_hot_follow_final_video(
     current_plan = dict(current_for_plan.get("compose_plan") or {})
     compose_plan = {
         "mute": bool(current_plan.get("mute", True)),
-        "overlay_subtitles": bool(current_plan.get("overlay_subtitles", False)),
+        "overlay_subtitles": bool(current_plan.get("overlay_subtitles", True)),
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
-        "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("content_lang") or "my"),
+        "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
     }
     try:
         _policy_upsert(
@@ -3859,7 +3904,7 @@ def compose_task(
     if req.overlay_subtitles is not None:
         plan = dict(task.get("compose_plan") or {})
         if "target_lang" not in plan:
-            plan["target_lang"] = task.get("content_lang") or "my"
+            plan["target_lang"] = task.get("target_lang") or task.get("content_lang") or "mm"
         plan["overlay_subtitles"] = bool(req.overlay_subtitles)
         _policy_upsert(repo, task_id, {"compose_plan": plan})
         task = repo.get(task_id) or task
@@ -3881,9 +3926,9 @@ def compose_task(
     current_plan = dict(current_for_plan.get("compose_plan") or {})
     compose_plan = {
         "mute": bool(current_plan.get("mute", True)),
-        "overlay_subtitles": bool(current_plan.get("overlay_subtitles", False)),
+        "overlay_subtitles": bool(current_plan.get("overlay_subtitles", True)),
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
-        "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("content_lang") or "my"),
+        "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
     }
     try:
         _policy_upsert(

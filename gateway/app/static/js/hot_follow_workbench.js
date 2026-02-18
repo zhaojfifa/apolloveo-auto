@@ -222,6 +222,8 @@
       "final_missing": "尚未生成最终成片",
       "compose_in_progress": "合成中…",
       "compose_failed": "合成失败，可重试",
+      "subtitles_missing": "缺少目标字幕",
+      "font_missing": "缺少字幕字体",
       "missing_voiceover": "缺少配音",
       "missing_raw": "缺少源视频",
     };
