@@ -43,6 +43,8 @@
   let currentHub = null;
   let subtitleDirty = false;
   let activeTab = "source";
+  let hubLoading = false;
+  let pollTimer = null;
 
   function escapeHtml(s) {
     return String(s || "")
@@ -115,32 +117,62 @@
     }
   }
 
+  function normalizeUrl(url) {
+    if (!url) return "";
+    try {
+      return new URL(url, window.location.origin).toString();
+    } catch (_) {
+      return String(url);
+    }
+  }
+
+  function setMediaSrcStable(el, url, label) {
+    if (!el) return;
+    const next = normalizeUrl(url);
+    const prev = el.dataset.currentUrl || "";
+    if (next === prev) return;
+    if (next) {
+      el.src = next;
+      el.dataset.currentUrl = next;
+      console.debug(`[hf-media] ${label} changed`, { prev, next });
+    } else {
+      el.removeAttribute("src");
+      el.dataset.currentUrl = "";
+      console.debug(`[hf-media] ${label} cleared`, { prev });
+    }
+  }
+
+  function shouldPollHub() {
+    if (!currentHub) return true;
+    const compose = getPipelineItem("compose");
+    const composeDone = ["done", "ready", "success", "completed"].includes(String(compose.status || "").toLowerCase());
+    return !composeDone;
+  }
+
+  function refreshPollingState() {
+    if (shouldPollHub()) {
+      if (!pollTimer) {
+        pollTimer = setInterval(() => {
+          if (document.hidden) return;
+          loadHub().catch(() => {});
+        }, 4000);
+      }
+      return;
+    }
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
   function renderMedia() {
     const media = (currentHub && currentHub.media) || {};
     const sourceUrl = media.source_video_url || media.raw_url || null;
     const finalUrl = media.final_url || media.final_video_url || null;
 
-    if (sourceVideoEl) {
-      if (sourceUrl) {
-        if (sourceVideoEl.src !== sourceUrl) sourceVideoEl.src = sourceUrl;
-      } else {
-        sourceVideoEl.removeAttribute("src");
-      }
-    }
-    if (finalVideoEl) {
-      if (finalUrl) {
-        if (finalVideoEl.src !== finalUrl) finalVideoEl.src = finalUrl;
-      } else {
-        finalVideoEl.removeAttribute("src");
-      }
-    }
-    if (composeFinalVideoEl) {
-      if (finalUrl) {
-        if (composeFinalVideoEl.src !== finalUrl) composeFinalVideoEl.src = finalUrl;
-      } else {
-        composeFinalVideoEl.removeAttribute("src");
-      }
-    }
+    setMediaSrcStable(sourceVideoEl, sourceUrl, "sourceUrl");
+    setMediaSrcStable(finalVideoEl, finalUrl, "finalUrl(main)");
+    setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose)");
     if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
     setLink(composeFinalLinkEl, finalUrl);
     setLink(sourceLinkEl, sourceUrl);
@@ -164,13 +196,7 @@
     if (ttsEngineEl && audio.tts_engine) ttsEngineEl.value = audio.tts_engine;
     if (ttsVoiceEl && audio.tts_voice) ttsVoiceEl.value = audio.tts_voice;
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
-    if (voiceoverAudioEl) {
-      if (voiceUrl) {
-        if (voiceoverAudioEl.src !== voiceUrl) voiceoverAudioEl.src = voiceUrl;
-      } else {
-        voiceoverAudioEl.removeAttribute("src");
-      }
-    }
+    setMediaSrcStable(voiceoverAudioEl, voiceUrl, "audioUrl");
     if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
   }
 
@@ -234,12 +260,19 @@
     renderDeliverables();
     renderEvents();
     updateComposeButtonState();
+    refreshPollingState();
   }
 
   async function loadHub() {
-    const res = await fetch(hubUrl);
-    if (!res.ok) throw new Error((await res.text()) || "hub load failed");
-    renderHub(await res.json());
+    if (hubLoading) return;
+    hubLoading = true;
+    try {
+      const res = await fetch(hubUrl);
+      if (!res.ok) throw new Error((await res.text()) || "hub load failed");
+      renderHub(await res.json());
+    } finally {
+      hubLoading = false;
+    }
   }
 
   async function patchAudioConfig(payload) {
@@ -325,7 +358,7 @@
     const hub = currentHub || {};
     const media2 = hub.media || {};
     const finalUrl = media2.final_url || media2.final_video_url || data.final_url || data.final_video_url || null;
-    if (finalUrl && composeFinalVideoEl) composeFinalVideoEl.src = finalUrl;
+    setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose-action)");
     if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
     setLink(composeFinalLinkEl, finalUrl);
     return data;
@@ -495,5 +528,5 @@
   loadHub().then(() => setTab("source")).catch((e) => {
     if (statusEl) statusEl.textContent = e.message || "hub load failed";
   });
-  setInterval(() => { loadHub().catch(() => {}); }, 4000);
+  refreshPollingState();
 })();

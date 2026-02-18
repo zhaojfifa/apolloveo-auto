@@ -594,8 +594,7 @@ def download_mm_txt(
     return _text_or_redirect(txt_key, inline=inline)
 
 
-@pages_router.get("/v1/tasks/{task_id}/audio_mm")
-def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
+def _resolve_audio_meta(task_id: str, repo) -> tuple[str, int, str]:
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="dubbed audio not found")
@@ -625,22 +624,114 @@ def download_audio_mm(task_id: str, repo=Depends(get_task_repository)):
         except Exception:
             continue
     if not chosen_key:
-        return JSONResponse(
-            status_code=404,
-            content={
-                "error": "voiceover_not_ready",
-                "dub_status": dub_status,
-                "mm_audio_key": preferred,
+        raise HTTPException(status_code=404, detail="voiceover_not_ready")
+    content_type = str(chosen_type or _task_value(task, "mm_audio_mime") or "audio/mpeg")
+    return chosen_key, int(chosen_size), content_type
+
+
+@pages_router.head("/v1/tasks/{task_id}/audio_mm")
+def head_audio_mm(task_id: str, repo=Depends(get_task_repository)):
+    try:
+        _, total, content_type = _resolve_audio_meta(task_id, repo)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc.detail)})
+    except Exception as exc:
+        logger.exception("audio_head_failed", extra={"task_id": task_id, "error": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "audio head failed"})
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Type": content_type or "audio/mpeg",
+        "Content-Length": str(total),
+    }
+    logger.info(
+        "AUDIO_STREAM",
+        extra={
+            "task_id": task_id,
+            "has_range": False,
+            "start": 0,
+            "end": total - 1,
+            "total": total,
+            "status": 200,
+            "content_type": headers["Content-Type"],
+        },
+    )
+    return Response(status_code=200, headers=headers)
+
+
+@pages_router.get("/v1/tasks/{task_id}/audio_mm")
+def download_audio_mm(task_id: str, request: Request, repo=Depends(get_task_repository)):
+    try:
+        key, total, content_type = _resolve_audio_meta(task_id, repo)
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc.detail)})
+    except Exception as exc:
+        logger.exception("audio_get_failed", extra={"task_id": task_id, "error": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "audio get failed"})
+
+    range_header = request.headers.get("range")
+    start = 0
+    end = total - 1
+    status_code = 200
+    if range_header:
+        try:
+            start, end = _parse_http_range(range_header, total)
+        except Exception:
+            logger.info(
+                "AUDIO_STREAM",
+                extra={
+                    "task_id": task_id,
+                    "has_range": True,
+                    "range_in": range_header,
+                    "start": None,
+                    "end": None,
+                    "total": total,
+                    "status": 416,
+                    "content_type": content_type,
+                },
+            )
+            return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
+        status_code = 206
+    try:
+        stream, length = stream_object_range(str(key), start=start, end=end)
+    except ValueError:
+        logger.info(
+            "AUDIO_STREAM",
+            extra={
+                "task_id": task_id,
+                "has_range": bool(range_header),
+                "range_in": range_header,
+                "start": start,
+                "end": end,
+                "total": total,
+                "status": 416,
+                "content_type": content_type,
             },
         )
+        return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
+    except Exception as exc:
+        logger.exception("audio_stream_failed", extra={"task_id": task_id, "error": str(exc)})
+        return JSONResponse(status_code=500, content={"detail": "audio stream failed"})
+    headers = {
+        "Accept-Ranges": "bytes",
+        "Content-Type": content_type,
+        "Content-Length": str(length),
+    }
+    if status_code == 206:
+        headers["Content-Range"] = f"bytes {start}-{end}/{total}"
     logger.info(
-        "audio_mm download: task_id=%s key=%s size=%s content_type=%s",
-        task_id,
-        chosen_key,
-        chosen_size,
-        chosen_type,
+        "AUDIO_STREAM",
+        extra={
+            "task_id": task_id,
+            "has_range": bool(range_header),
+            "range_in": range_header,
+            "start": start,
+            "end": end,
+            "total": total,
+            "status": status_code,
+            "content_type": content_type,
+        },
     )
-    return RedirectResponse(url=get_download_url(chosen_key), status_code=302)
+    return StreamingResponse(stream, status_code=status_code, headers=headers, media_type=content_type)
 
 
 def _resolve_final_meta(task_id: str, repo) -> tuple[str, int, str]:
