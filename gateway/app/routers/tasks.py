@@ -3055,6 +3055,16 @@ def get_hot_follow_workbench_hub(
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
     final_meta = object_head(str(final_key)) if final_key else None
     final_size, _ = media_meta_from_head(final_meta)
+    final_etag = None
+    if isinstance(final_meta, dict):
+        final_etag = final_meta.get("etag")
+    final_asset_version = (
+        task.get("final_asset_version")
+        or final_etag
+        or task.get("final_video_sha256")
+        or None
+    )
+    final_exists = bool(final_key and object_exists(str(final_key)) and (final_size is None or final_size > 0))
     final_url = _task_endpoint(task_id, "final") if final_key and final_size >= MIN_VIDEO_BYTES and object_exists(str(final_key)) else None
     scene_key = _task_key(task, "scenes_key")
     scenes_url = _task_endpoint(task_id, "scenes") if scene_key and object_exists(scene_key) else None
@@ -3066,6 +3076,52 @@ def get_hot_follow_workbench_hub(
         if not dub_summary:
             dub_summary = "voiceover artifact invalid"
     deliverables = _hf_deliverables(task_id, task)
+    compose_last_status_raw = str(
+        task.get("compose_last_status")
+        or task.get("compose_status")
+        or ""
+    ).strip().lower()
+    if compose_last_status_raw in {"", "none", "null"}:
+        compose_last_status = "never"
+    elif compose_last_status_raw in {"running", "processing", "queued"}:
+        compose_last_status = "running"
+    elif compose_last_status_raw in {"done", "ready", "success", "completed"}:
+        compose_last_status = "done"
+    elif compose_last_status_raw in {"failed", "error"}:
+        compose_last_status = "failed"
+    else:
+        compose_last_status = "never"
+    compose_last = {
+        "status": compose_last_status,
+        "started_at": task.get("compose_last_started_at"),
+        "finished_at": task.get("compose_last_finished_at"),
+        "ffmpeg_cmd": task.get("compose_last_ffmpeg_cmd"),
+        "error": task.get("compose_last_error") or task.get("compose_error"),
+    }
+    final_info = {
+        "exists": final_exists,
+        "key": str(final_key) if final_key else None,
+        "size_bytes": int(task.get("final_video_bytes") or final_size or 0) if final_exists else None,
+        "duration_ms": int(task.get("final_duration_ms")) if task.get("final_duration_ms") is not None else None,
+        "asset_version": str(final_asset_version) if final_asset_version else None,
+        "updated_at": task.get("final_updated_at") or task.get("updated_at"),
+    }
+    composed_ready = bool(
+        compose_last.get("status") == "done"
+        and final_info.get("exists") is True
+        and final_info.get("asset_version")
+        and (final_info.get("size_bytes") is None or int(final_info.get("size_bytes")) > 0)
+    )
+    if compose_last.get("status") == "never":
+        composed_reason = "compose.never_run"
+    elif compose_last.get("status") == "running":
+        composed_reason = "compose.running"
+    elif compose_last.get("status") == "failed":
+        composed_reason = "compose.failed"
+    elif not final_info.get("exists") or not final_info.get("asset_version"):
+        composed_reason = "final.missing"
+    else:
+        composed_reason = "ready"
 
     pipeline = [
         {"key": "parse", "label": "Parse", "status": parse_state, "updated_at": task.get("updated_at"), "error": task.get("error_message"), "message": parse_summary},
@@ -3124,6 +3180,12 @@ def get_hot_follow_workbench_hub(
         },
         "deliverables": deliverables if isinstance(deliverables, list) else [],
         "events": task.get("events") or [],
+        "composed_ready": composed_ready,
+        "composed_reason": composed_reason,
+        "final": final_info,
+        "compose": {
+            "last": compose_last,
+        },
         "errors": {
             "audio": {"reason": task.get("error_reason"), "message": task.get("dub_error")},
             "pack": {"reason": task.get("error_reason"), "message": task.get("pack_error")},
@@ -3292,6 +3354,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         },
     )
 
+    compose_started_at = task.get("compose_last_started_at") or datetime.now(timezone.utc).isoformat()
+    ffmpeg_cmd_used = None
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         video_path = tmp / "video_input.mp4"
@@ -3340,6 +3404,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 str(final_path),
             ]
             logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd))
+            ffmpeg_cmd_used = " ".join(cmd)
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                 raise HTTPException(status_code=500, detail=f"compose ffmpeg failed: {proc.stderr[-800:]}")
@@ -3365,6 +3430,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 str(final_path),
             ]
             logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd))
+            ffmpeg_cmd_used = " ".join(cmd)
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                 cmd_fallback = [
@@ -3392,6 +3458,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     str(final_path),
                 ]
                 logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd_fallback))
+                ffmpeg_cmd_used = " ".join(cmd_fallback)
                 proc2 = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 if proc2.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                     raise HTTPException(status_code=500, detail=f"compose ffmpeg failed: {proc2.stderr[-800:]}")
@@ -3426,6 +3493,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             raise HTTPException(status_code=500, detail="compose upload verify failed: missing final object")
         uploaded_meta = object_head(final_key)
         uploaded_size, _ = media_meta_from_head(uploaded_meta)
+        final_etag = uploaded_meta.get("etag") if isinstance(uploaded_meta, dict) else None
         if uploaded_size < MIN_VIDEO_BYTES:
             raise HTTPException(status_code=500, detail="compose upload verify failed: invalid final object")
         logger.info(
@@ -3442,12 +3510,19 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "final_video_key": final_key,
             "final_video_path": final_key,
             "final_video_sha256": _sha256_file(final_path),
+            "final_asset_version": str(final_etag or _sha256_file(final_path) or datetime.now(timezone.utc).isoformat()),
+            "final_updated_at": datetime.now(timezone.utc).isoformat(),
             "final_mime": "video/mp4",
             "final_duration_ms": int(final_duration * 1000),
             "final_video_bytes": int(uploaded_size),
             "compose_provider": "ffmpeg",
             "compose_status": "done",
             "compose_error": None,
+            "compose_last_status": "done",
+            "compose_last_started_at": compose_started_at,
+            "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
+            "compose_last_ffmpeg_cmd": ffmpeg_cmd_used,
+            "compose_last_error": None,
             "last_step": "compose",
             "status": "ready",
             "error_message": None,
@@ -3471,6 +3546,10 @@ def compose_hot_follow_final_video(
             "last_step": "compose",
             "compose_status": "running",
             "compose_error": None,
+            "compose_last_status": "running",
+            "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
+            "compose_last_finished_at": None,
+            "compose_last_error": None,
         },
     )
     try:
@@ -3492,6 +3571,9 @@ def compose_hot_follow_final_video(
             {
                 "compose_status": "failed",
                 "compose_error": str(exc.detail),
+                "compose_last_status": "failed",
+                "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
+                "compose_last_error": str(exc.detail),
                 "status": "failed",
                 "last_step": "compose",
                 "final_video_key": None,
@@ -3506,6 +3588,9 @@ def compose_hot_follow_final_video(
             {
                 "compose_status": "failed",
                 "compose_error": str(exc),
+                "compose_last_status": "failed",
+                "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
+                "compose_last_error": str(exc),
                 "status": "failed",
                 "last_step": "compose",
                 "final_video_key": None,
@@ -3555,6 +3640,10 @@ def compose_task(
             "last_step": "compose",
             "compose_status": "running",
             "compose_error": None,
+            "compose_last_status": "running",
+            "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
+            "compose_last_finished_at": None,
+            "compose_last_error": None,
         },
     )
     try:
@@ -3577,6 +3666,9 @@ def compose_task(
             {
                 "compose_status": "failed",
                 "compose_error": str(exc.detail),
+                "compose_last_status": "failed",
+                "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
+                "compose_last_error": str(exc.detail),
                 "status": "failed",
                 "last_step": "compose",
                 "final_video_key": None,
@@ -3591,6 +3683,9 @@ def compose_task(
             {
                 "compose_status": "failed",
                 "compose_error": str(exc),
+                "compose_last_status": "failed",
+                "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
+                "compose_last_error": str(exc),
                 "status": "failed",
                 "last_step": "compose",
                 "final_video_key": None,

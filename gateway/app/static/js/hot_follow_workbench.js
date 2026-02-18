@@ -38,6 +38,8 @@
   const composeFinalBlockEl = document.getElementById("hf_compose_final_block");
   const composeFinalVideoEl = document.getElementById("hf_compose_final_video");
   const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
+  const composedBadgeEl = document.getElementById("hf_composed_badge");
+  const composedReasonEl = document.getElementById("hf_composed_reason");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
@@ -126,24 +128,30 @@
     }
   }
 
-  function setMediaSrcStable(el, url, label) {
+  function setMediaSrcStable(el, url, label, assetVersion) {
     if (!el) return;
-    const next = normalizeUrl(url);
+    const base = normalizeUrl(url);
+    const ver = assetVersion ? String(assetVersion) : "";
+    const next = base && ver ? `${base}${base.includes("?") ? "&" : "?"}av=${encodeURIComponent(ver)}` : base;
     const prev = el.dataset.currentUrl || "";
-    if (next === prev) return;
+    const prevVer = el.dataset.assetVersion || "";
+    if (next === prev && prevVer === ver) return;
     if (next) {
       el.src = next;
       el.dataset.currentUrl = next;
+      el.dataset.assetVersion = ver;
       console.debug(`[hf-media] ${label} changed`, { prev, next });
     } else {
       el.removeAttribute("src");
       el.dataset.currentUrl = "";
+      el.dataset.assetVersion = "";
       console.debug(`[hf-media] ${label} cleared`, { prev });
     }
   }
 
   function shouldPollHub() {
     if (!currentHub) return true;
+    if (currentHub.composed_ready === true) return false;
     const compose = getPipelineItem("compose");
     const composeDone = ["done", "ready", "success", "completed"].includes(String(compose.status || "").toLowerCase());
     return !composeDone;
@@ -167,12 +175,14 @@
 
   function renderMedia() {
     const media = (currentHub && currentHub.media) || {};
+    const finalMeta = (currentHub && currentHub.final) || {};
     const sourceUrl = media.source_video_url || media.raw_url || null;
     const finalUrl = media.final_url || media.final_video_url || null;
+    const finalAssetVersion = finalMeta.asset_version || null;
 
     setMediaSrcStable(sourceVideoEl, sourceUrl, "sourceUrl");
-    setMediaSrcStable(finalVideoEl, finalUrl, "finalUrl(main)");
-    setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose)");
+    setMediaSrcStable(finalVideoEl, finalUrl, "finalUrl(main)", finalAssetVersion);
+    setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose)", finalAssetVersion);
     if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
     setLink(composeFinalLinkEl, finalUrl);
     setLink(sourceLinkEl, sourceUrl);
@@ -198,6 +208,24 @@
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
     setMediaSrcStable(voiceoverAudioEl, voiceUrl, "audioUrl");
     if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
+  }
+
+  function renderComposedReadiness() {
+    const ready = Boolean(currentHub && currentHub.composed_ready);
+    const reason = (currentHub && currentHub.composed_reason) || "compose.never_run";
+    const reasonTextMap = {
+      "compose.never_run": "Compose never run",
+      "compose.running": "Compose running",
+      "compose.failed": "Compose failed",
+      "final.missing": "Final artifact missing",
+      "ready": "Ready",
+    };
+    if (composedBadgeEl) {
+      composedBadgeEl.textContent = ready ? "✅ Composed: Ready" : "⚠️ Not Ready";
+      composedBadgeEl.classList.toggle("text-green-700", ready);
+      composedBadgeEl.classList.toggle("text-amber-700", !ready);
+    }
+    if (composedReasonEl) composedReasonEl.textContent = reasonTextMap[reason] || reason;
   }
 
   function renderScenePack() {
@@ -256,6 +284,7 @@
     renderMedia();
     renderSubtitles();
     renderAudio();
+    renderComposedReadiness();
     renderScenePack();
     renderDeliverables();
     renderEvents();
@@ -358,7 +387,8 @@
     const hub = currentHub || {};
     const media2 = hub.media || {};
     const finalUrl = media2.final_url || media2.final_video_url || data.final_url || data.final_video_url || null;
-    setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose-action)");
+    const finalMeta = (currentHub && currentHub.final) || {};
+    setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose-action)", finalMeta.asset_version || null);
     if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
     setLink(composeFinalLinkEl, finalUrl);
     return data;
