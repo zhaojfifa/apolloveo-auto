@@ -62,8 +62,8 @@
         : "下一步：先回 Workbench 执行 Compose Final。";
     }
     if (hintStatusEl) {
-      const ready = Boolean(data.composed_ready);
-      const scenePending = data.scene_pack_pending_reason ? "（Scene Pack pending，不阻塞发布）" : "";
+      const ready = Boolean(data.composed_ready) && Boolean(data.final && data.final.exists);
+      const scenePending = data.scene_pack_pending_reason ? "（Scene Pack Optional: pending，不阻塞发布）" : "";
       hintStatusEl.textContent = ready
         ? "当前状态：✅ 可发布"
         : `当前状态：⚠️ ${reasonText(data.composed_reason)}${scenePending}`;
@@ -73,7 +73,7 @@
   function renderDeliverables(data) {
     const deliverables = data.deliverables || {};
     const keys = Object.keys(deliverables);
-    const composedReady = Boolean(data.composed_ready);
+    const composedReady = Boolean(data.composed_ready) && Boolean(data.final && data.final.exists);
     const composedReason = data.composed_reason || "final_missing";
 
     if (composedBadgeEl) {

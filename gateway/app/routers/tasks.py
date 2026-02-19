@@ -145,7 +145,7 @@ from gateway.app.services.artifact_storage import (
     stream_object_range,
 )
 from gateway.app.ports.storage_provider import get_storage_service
-from gateway.app.services.scene_split import enqueue_scenes_build
+from gateway.app.services.scene_split import enqueue_scenes_build, run_scenes_build
 from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
 from gateway.app.services.task_state_service import TaskStateService
 from gateway.app.db import SessionLocal
@@ -180,6 +180,8 @@ OP_HEADER_KEY = "X-OP-KEY"
 COMPOSE_RETRY_AFTER_MS = 1500
 _COMPOSE_LOCKS_GUARD = threading.Lock()
 _COMPOSE_LOCKS: dict[str, threading.Lock] = {}
+_SCENE_PACK_LOCKS_GUARD = threading.Lock()
+_SCENE_PACK_LOCKS: dict[str, threading.Lock] = {}
 
 
 def _task_compose_lock(task_id: str) -> threading.Lock:
@@ -191,6 +193,15 @@ def _task_compose_lock(task_id: str) -> threading.Lock:
         return lock
 
 
+def _task_scene_pack_lock(task_id: str) -> threading.Lock:
+    with _SCENE_PACK_LOCKS_GUARD:
+        lock = _SCENE_PACK_LOCKS.get(task_id)
+        if lock is None:
+            lock = threading.Lock()
+            _SCENE_PACK_LOCKS[task_id] = lock
+        return lock
+
+
 def _compose_in_progress_response(task_id: str) -> JSONResponse:
     return JSONResponse(
         status_code=409,
@@ -198,6 +209,18 @@ def _compose_in_progress_response(task_id: str) -> JSONResponse:
             "error": "compose_in_progress",
             "status": "running",
             "retry_after_ms": COMPOSE_RETRY_AFTER_MS,
+            "task_id": task_id,
+        },
+    )
+
+
+def _scene_pack_in_progress_response(task_id: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=409,
+        content={
+            "error": "scene_pack_in_progress",
+            "status": "running",
+            "retry_after_ms": 1500,
             "task_id": task_id,
         },
     )
@@ -272,6 +295,11 @@ class ComposePlanPatchRequest(BaseModel):
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
 api_key_header = APIKeyHeader(name=OP_HEADER_KEY, auto_error=False)
+
+
+@pages_router.get("/favicon.ico", include_in_schema=False)
+def favicon_noop():
+    return Response(status_code=204)
 def _coerce_datetime(value) -> datetime:
     # Pydantic TaskDetail.created_at expects datetime, so guarantee it.
     if isinstance(value, datetime):
@@ -944,8 +972,8 @@ def download_scenes(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Scenes not found")
-    scenes_key = _task_value(task, "scenes_key")
-    scenes_status = str(_task_value(task, "scenes_status") or "").lower()
+    scenes_key = _task_value(task, "scenes_pack_key") or _task_value(task, "scenes_key")
+    scenes_status = str(_task_value(task, "scenes_pack_status") or _task_value(task, "scenes_status") or "").lower()
     if scenes_status == "skipped":
         return _not_ready_response(task, "scenes", ["scenes_skipped"], reason="not_applicable")
     if scenes_status == "failed":
@@ -1043,7 +1071,7 @@ def task_status(task_id: str, repo=Depends(get_task_repository)):
         mm_txt_key = f"{mm_key[:-4]}.txt"
     audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     pack_key = _task_key(task, "pack_key") or _task_key(task, "pack_path")
-    scenes_key = _task_key(task, "scenes_key")
+    scenes_key = _task_key(task, "scenes_pack_key") or _task_key(task, "scenes_key")
 
     return {
         "task_id": str(_task_value(task, "task_id") or _task_value(task, "id") or task_id),
@@ -1201,9 +1229,9 @@ def _deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
             return _signed_op_url(task_id, "pack")
         return None
     if kind == "scenes_zip":
-        scenes_key = _task_value(task, "scenes_key")
+        scenes_key = _task_value(task, "scenes_pack_key") or _task_value(task, "scenes_key")
         scenes_path = _task_value(task, "scenes_path")
-        scenes_status = str(_task_value(task, "scenes_status") or "").lower()
+        scenes_status = str(_task_value(task, "scenes_pack_status") or _task_value(task, "scenes_status") or "").lower()
         if scenes_key and object_exists(str(scenes_key)):
             return _signed_op_url(task_id, "scenes")
         if scenes_path and scenes_status == "ready":
@@ -1230,16 +1258,20 @@ def _deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
 
 
 def _compose_error_parts(task: dict) -> tuple[str | None, str | None]:
+    reason_field = task.get("compose_error_reason")
     raw = task.get("compose_error")
+    if not reason_field and not raw:
+        return (None, None)
     if isinstance(raw, dict):
         reason = raw.get("reason")
         message = raw.get("message")
-        return (str(reason) if reason else None, str(message) if message else None)
+        resolved_reason = str(reason) if reason else (str(reason_field) if reason_field else None)
+        resolved_message = str(message) if message else None
+        return (resolved_reason, resolved_message)
     text = str(raw).strip() if raw is not None else ""
     if not text:
         return (None, None)
-    reason = task.get("compose_error_reason")
-    return (str(reason) if reason else "compose_failed", text)
+    return (str(reason_field) if reason_field else "compose_failed", text)
 
 
 def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
@@ -1286,6 +1318,7 @@ def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         "asset_version": str(final_asset_version) if final_asset_version else None,
         "updated_at": task.get("final_updated_at") or task.get("updated_at"),
         "content_type": task.get("final_mime") or final_ctype or "video/mp4",
+        "url": _task_endpoint(task_id, "final") if final_exists and int(final_size or 0) >= MIN_VIDEO_BYTES else None,
     }
     return {
         "composed_ready": composed_ready,
@@ -1298,9 +1331,44 @@ def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     }
 
 
+def _scene_pack_info(task: dict, task_id: str) -> dict[str, Any]:
+    key = (
+        _task_key(task, "scenes_pack_key")
+        or _task_key(task, "scenes_key")
+        or f"deliver/scenes/{task_id}/scenes.zip"
+    )
+    exists = bool(key and object_exists(str(key)))
+    meta = object_head(str(key)) if exists else None
+    size_bytes, _ = media_meta_from_head(meta)
+    status_raw = str(task.get("scenes_pack_last_status") or task.get("scenes_pack_status") or task.get("scenes_status") or "").lower()
+    if status_raw in {"ready", "done", "success", "completed"}:
+        status = "done"
+    elif status_raw in {"running", "processing", "queued"}:
+        status = "running"
+    elif status_raw in {"failed", "error"}:
+        status = "failed"
+    else:
+        status = "pending"
+    if exists and status != "running":
+        status = "done"
+    return {
+        "exists": exists,
+        "key": str(key) if key else None,
+        "url": _task_endpoint(task_id, "scenes") if exists else None,
+        "size_bytes": int(size_bytes) if size_bytes is not None else None,
+        "asset_version": (meta.get("etag") if isinstance(meta, dict) else None) or task.get("scenes_pack_asset_version"),
+        "status": status,
+        "started_at": task.get("scenes_pack_last_started_at"),
+        "finished_at": task.get("scenes_pack_last_finished_at"),
+        "error": task.get("scenes_pack_error") or task.get("scenes_error"),
+        "error_reason": task.get("scenes_pack_error_reason"),
+    }
+
+
 def _publish_hub_payload(task: dict) -> dict[str, object]:
     task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
     composed = _compute_composed_state(task, task_id)
+    scene_pack = _scene_pack_info(task, task_id)
 
     deliverables = {}
     for key, label in (
@@ -1316,13 +1384,11 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         url = _deliverable_url(task_id, task, key)
         if url:
             deliverables[key] = {"label": label, "url": url}
-    scenes_key = _task_key(task, "scenes_key")
-    scenes_status = str(task.get("scenes_status") or "").lower()
     scene_pack_pending_reason = None
-    if not scenes_key or not object_exists(str(scenes_key)):
-        if scenes_status in {"running", "processing", "queued"}:
+    if not bool(scene_pack.get("exists")):
+        if scene_pack.get("status") == "running":
             scene_pack_pending_reason = "scenes.running"
-        elif scenes_status in {"failed", "error"}:
+        elif scene_pack.get("status") == "failed":
             scene_pack_pending_reason = "scenes.failed"
         else:
             scene_pack_pending_reason = "scenes.not_ready"
@@ -1336,6 +1402,7 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         "composed_ready": bool(composed.get("composed_ready")),
         "composed_reason": str(composed.get("composed_reason") or "final_missing"),
         "final": composed.get("final") or {"exists": False},
+        "scene_pack": scene_pack,
         "scene_pack_pending_reason": scene_pack_pending_reason,
         "scene_pack_action_url": f"/tasks/{task_id}",
         "copy_bundle": _build_copy_bundle(task),
@@ -1591,7 +1658,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             "Scenes ZIP",
             scenes_key,
             _task_endpoint(task_id, "scenes") if scenes_key and object_exists(scenes_key) else None,
-            _hf_deliverable_state(task, scenes_key, "scenes_status"),
+            _hf_deliverable_state(task, scenes_key, "scenes_pack_status" if task.get("scenes_pack_status") else "scenes_status"),
         ),
         _entry(
             "final",
@@ -3165,6 +3232,7 @@ def get_hot_follow_workbench_hub(
         compose_plan = {
             "mute": True,
             "overlay_subtitles": True,
+            "strip_subtitle_streams": True,
             "cleanup_mode": "none",
             "target_lang": task.get("target_lang") or task.get("content_lang") or "mm",
         }
@@ -3186,8 +3254,8 @@ def get_hot_follow_workbench_hub(
     final_exists = bool(final_info.get("exists"))
     final_size = int(final_info.get("size_bytes") or 0)
     final_url = _task_endpoint(task_id, "final") if final_exists and final_size >= MIN_VIDEO_BYTES else None
-    scene_key = _task_key(task, "scenes_key")
-    scenes_url = _task_endpoint(task_id, "scenes") if scene_key and object_exists(scene_key) else None
+    scene_pack = _scene_pack_info(task, task_id)
+    scenes_url = scene_pack.get("url")
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
     audio_cfg = _hf_audio_config(task)
@@ -3272,7 +3340,12 @@ def get_hot_follow_workbench_hub(
             "sha256": task.get("audio_sha256"),
         },
         "scene_pack": {
-            "status": _hf_deliverable_state(task, scene_key, "scenes_status"),
+            "status": scene_pack.get("status") or _hf_deliverable_state(task, _task_key(task, "scenes_key"), "scenes_status"),
+            "exists": bool(scene_pack.get("exists")),
+            "key": scene_pack.get("key"),
+            "asset_version": scene_pack.get("asset_version"),
+            "error": scene_pack.get("error"),
+            "error_reason": scene_pack.get("error_reason"),
             "download_url": scenes_url,
             "scenes_url": scenes_url,
         },
@@ -3365,6 +3438,8 @@ def patch_hot_follow_compose_plan(
     plan = dict(task.get("compose_plan") or {})
     if "overlay_subtitles" not in plan:
         plan["overlay_subtitles"] = True
+    if "strip_subtitle_streams" not in plan:
+        plan["strip_subtitle_streams"] = True
     if "target_lang" not in plan:
         plan["target_lang"] = task.get("target_lang") or task.get("content_lang") or "mm"
     if payload.overlay_subtitles is not None:
@@ -3512,6 +3587,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     bgm_mix = max(0.0, min(1.0, bgm_mix))
     compose_plan = dict(task.get("compose_plan") or {})
     overlay_subtitles = bool(compose_plan.get("overlay_subtitles"))
+    strip_subtitle_streams = bool(compose_plan.get("strip_subtitle_streams", True))
     target_lang = str(compose_plan.get("target_lang") or task.get("target_lang") or task.get("content_lang") or "mm")
     logger.info(
         "COMPOSE_START",
@@ -3522,6 +3598,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "bgm_key": str(bgm_key) if bgm_key else None,
             "mix": bgm_mix,
             "overlay_subtitles": overlay_subtitles,
+            "strip_subtitle_streams": strip_subtitle_streams,
             "target_lang": target_lang,
         },
     )
@@ -3603,6 +3680,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 "-shortest",
                 "-movflags",
                 "+faststart",
+                *(["-sn"] if strip_subtitle_streams else []),
                 str(final_path),
             ]
             logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd))
@@ -3648,6 +3726,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 "-shortest",
                 "-movflags",
                 "+faststart",
+                *(["-sn"] if strip_subtitle_streams else []),
                 str(final_path),
             ]
             logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd))
@@ -3679,6 +3758,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     "-shortest",
                     "-movflags",
                     "+faststart",
+                    *(["-sn"] if strip_subtitle_streams else []),
                     str(final_path),
                 ]
                 logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd_fallback))
@@ -3784,6 +3864,7 @@ def compose_hot_follow_final_video(
     compose_plan = {
         "mute": bool(current_plan.get("mute", True)),
         "overlay_subtitles": bool(current_plan.get("overlay_subtitles", True)),
+        "strip_subtitle_streams": bool(current_plan.get("strip_subtitle_streams", True)),
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
     }
@@ -3917,6 +3998,7 @@ def compose_task(
     compose_plan = {
         "mute": bool(current_plan.get("mute", True)),
         "overlay_subtitles": bool(current_plan.get("overlay_subtitles", True)),
+        "strip_subtitle_streams": bool(current_plan.get("strip_subtitle_streams", True)),
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
     }
@@ -4739,6 +4821,67 @@ def _run_dub_background(task_id: str, payload: DubProviderRequest, repo: ITaskRe
         )
 
 
+def _run_scene_pack_background(task_id: str, repo: ITaskRepository, lock: threading.Lock) -> None:
+    try:
+        def _update(target_task_id: str, fields: dict) -> None:
+            patch = dict(fields)
+            scenes_status = str(patch.get("scenes_status") or "").lower()
+            if scenes_status in {"running", "queued", "processing"}:
+                patch.update(
+                    {
+                        "scenes_pack_status": "running",
+                        "scenes_pack_last_status": "running",
+                        "scenes_pack_last_started_at": patch.get("scenes_pack_last_started_at") or datetime.now(timezone.utc).isoformat(),
+                        "scenes_pack_last_finished_at": None,
+                    }
+                )
+            elif scenes_status in {"ready", "done", "success", "completed"}:
+                scenes_key = patch.get("scenes_key")
+                scenes_meta = object_head(str(scenes_key)) if scenes_key and object_exists(str(scenes_key)) else None
+                patch.update(
+                    {
+                        "scenes_pack_status": "done",
+                        "scenes_pack_last_status": "done",
+                        "scenes_pack_last_finished_at": datetime.now(timezone.utc).isoformat(),
+                        "scenes_pack_key": scenes_key,
+                        "scenes_pack_error_reason": None,
+                        "scenes_pack_error": None,
+                        "scenes_pack_asset_version": (scenes_meta.get("etag") if isinstance(scenes_meta, dict) else None),
+                    }
+                )
+            elif scenes_status in {"error", "failed"}:
+                patch.update(
+                    {
+                        "scenes_pack_status": "failed",
+                        "scenes_pack_last_status": "failed",
+                        "scenes_pack_last_finished_at": datetime.now(timezone.utc).isoformat(),
+                        "scenes_pack_error_reason": "scene_pack_failed",
+                        "scenes_pack_error": {
+                            "reason": "scene_pack_failed",
+                            "message": str(patch.get("scenes_error") or "scene pack generation failed"),
+                        },
+                    }
+                )
+            _policy_upsert(repo, target_task_id, patch)
+
+        run_scenes_build(task_id, _update)
+    except Exception as exc:  # pragma: no cover
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "scenes_pack_status": "failed",
+                "scenes_pack_last_status": "failed",
+                "scenes_pack_last_finished_at": datetime.now(timezone.utc).isoformat(),
+                "scenes_pack_error_reason": "scene_pack_failed",
+                "scenes_pack_error": {"reason": "scene_pack_failed", "message": str(exc)},
+            },
+        )
+        logger.exception("SCENE_PACK_FAIL", extra={"task_id": task_id})
+    finally:
+        lock.release()
+
+
 @api_router.post("/tasks/{task_id}/scenes")
 def build_scenes(
     task_id: str,
@@ -4760,6 +4903,56 @@ def build_scenes(
         update_task=_update,
         background_tasks=background_tasks,
     )
+
+
+@api_router.post("/hot_follow/tasks/{task_id}/scene_pack")
+def build_hot_follow_scene_pack(
+    task_id: str,
+    background_tasks: BackgroundTasks,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    lock = _task_scene_pack_lock(task_id)
+    if not lock.acquire(blocking=False):
+        return _scene_pack_in_progress_response(task_id)
+    current = repo.get(task_id) or task
+    status_raw = str(current.get("scenes_pack_last_status") or current.get("scenes_pack_status") or current.get("scenes_status") or "").lower()
+    if status_raw in {"running", "queued", "processing"}:
+        lock.release()
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "scenes_pack_status": "running",
+                "scenes_pack_last_status": "running",
+                "scenes_pack_last_started_at": current.get("scenes_pack_last_started_at") or datetime.now(timezone.utc).isoformat(),
+                "scenes_pack_last_finished_at": None,
+            },
+        )
+        return _scene_pack_in_progress_response(task_id)
+    _policy_upsert(
+        repo,
+        task_id,
+        {
+            "scenes_pack_status": "running",
+            "scenes_pack_last_status": "running",
+            "scenes_pack_last_started_at": datetime.now(timezone.utc).isoformat(),
+            "scenes_pack_last_finished_at": None,
+            "scenes_pack_error_reason": None,
+            "scenes_pack_error": None,
+            "scenes_status": "running",
+            "scenes_error": None,
+        },
+    )
+    background_tasks.add_task(_run_scene_pack_background, task_id, repo, lock)
+    return {
+        "task_id": task_id,
+        "status": "running",
+        "scene_pack_status": "running",
+        "message": "Scene pack generation started",
+    }
 
 @api_router.post("/tasks/{task_id}/pack")
 def build_pack(
