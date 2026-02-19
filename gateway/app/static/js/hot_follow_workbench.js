@@ -48,9 +48,13 @@
   let currentHub = null;
   let subtitleDirty = false;
   let activeTab = "source";
-  let hubLoading = false;
+  let hubFetching = false;
   let pollTimer = null;
   let composeSubmitting = false;
+  let scenePackSubmitting = false;
+  const POLL_DEFAULT_MS = 2500;
+  const POLL_COMPOSE_MS = 4500;
+  const POLL_HIDDEN_MS = 10000;
 
   function escapeHtml(s) {
     return String(s || "")
@@ -155,24 +159,50 @@
 
   function shouldPollHub() {
     if (!currentHub) return true;
+    const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
+    const composeStatus = String(composeLast.status || "").toLowerCase();
+    if (["running", "processing", "queued"].includes(composeStatus)) return true;
     if (currentHub.composed_ready === true) return false;
-    const compose = getPipelineItem("compose");
-    const composeDone = ["done", "ready", "success", "completed"].includes(String(compose.status || "").toLowerCase());
-    return !composeDone;
+    return true;
+  }
+
+  function getPollIntervalMs() {
+    if (document.hidden) return POLL_HIDDEN_MS;
+    const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
+    const composeStatus = String(composeLast.status || "").toLowerCase();
+    if (["running", "processing", "queued"].includes(composeStatus)) return POLL_COMPOSE_MS;
+    return POLL_DEFAULT_MS;
+  }
+
+  function scheduleHubPoll(delayMs) {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+    if (!shouldPollHub()) return;
+    const waitMs = Math.max(0, Number(delayMs != null ? delayMs : getPollIntervalMs()) || getPollIntervalMs());
+    pollTimer = setTimeout(async () => {
+      if (hubFetching) {
+        scheduleHubPoll(getPollIntervalMs());
+        return;
+      }
+      try {
+        await loadHub();
+      } catch (_) {
+        // keep polling on transient fetch errors
+      } finally {
+        scheduleHubPoll(getPollIntervalMs());
+      }
+    }, waitMs);
   }
 
   function refreshPollingState() {
     if (shouldPollHub()) {
-      if (!pollTimer) {
-        pollTimer = setInterval(() => {
-          if (document.hidden) return;
-          loadHub().catch(() => {});
-        }, 4000);
-      }
+      scheduleHubPoll(getPollIntervalMs());
       return;
     }
     if (pollTimer) {
-      clearInterval(pollTimer);
+      clearTimeout(pollTimer);
       pollTimer = null;
     }
   }
@@ -181,7 +211,7 @@
     const media = (currentHub && currentHub.media) || {};
     const finalMeta = (currentHub && currentHub.final) || {};
     const sourceUrl = media.source_video_url || media.raw_url || null;
-    const finalUrl = media.final_url || media.final_video_url || null;
+    const finalUrl = finalMeta.url || media.final_url || media.final_video_url || null;
     const finalAssetVersion = finalMeta.asset_version || null;
 
     setMediaSrcStable(sourceVideoEl, sourceUrl, "sourceUrl");
@@ -237,7 +267,7 @@
     const sceneOutputs = (currentHub && currentHub.scene_outputs) || [];
     if (composePlanTextEl) {
       composePlanTextEl.textContent =
-        `Plan: mute=${!!composePlan.mute}, overlay_subtitles=${!!composePlan.overlay_subtitles}, cleanup_mode=${composePlan.cleanup_mode || "none"}, target_lang=${composePlan.target_lang || "-"}`;
+        `Plan: mute=${!!composePlan.mute}, overlay_subtitles=${!!composePlan.overlay_subtitles}, strip_subtitle_streams=${composePlan.strip_subtitle_streams !== false}, cleanup_mode=${composePlan.cleanup_mode || "none"}, target_lang=${composePlan.target_lang || "-"}`;
     }
     if (sceneOutputsTextEl) {
       sceneOutputsTextEl.textContent = `Scene outputs: ${Array.isArray(sceneOutputs) ? sceneOutputs.length : 0}`;
@@ -248,7 +278,7 @@
   function renderScenePack() {
     const scene = (currentHub && currentHub.scene_pack) || {};
     const status = scene.status || "pending";
-    const url = scene.download_url || scene.scenes_url || null;
+    const url = scene.url || scene.download_url || scene.scenes_url || null;
     const stateEl = document.querySelector('[data-hf-step-status="scenes"]');
     if (stateEl) stateEl.textContent = status;
     setLink(scenePackDownloadEl, url);
@@ -313,14 +343,14 @@
   }
 
   async function loadHub() {
-    if (hubLoading) return;
-    hubLoading = true;
+    if (hubFetching) return;
+    hubFetching = true;
     try {
       const res = await fetch(hubUrl);
       if (!res.ok) throw new Error((await res.text()) || "hub load failed");
       renderHub(await res.json());
     } finally {
-      hubLoading = false;
+      hubFetching = false;
     }
   }
 
@@ -420,7 +450,7 @@
       const inProgress = payload && payload.error === "compose_in_progress";
       if (inProgress) {
         if (composeMsgEl) composeMsgEl.textContent = "合成中…";
-        await loadHub();
+        scheduleHubPoll(payload.retry_after_ms || 1500);
         updateComposeButtonState();
         return { in_progress: true, retry_after_ms: payload.retry_after_ms || 1500 };
       }
@@ -428,17 +458,42 @@
     }
     if (!res.ok) throw new Error((await res.text()) || "compose failed");
     const data = await res.json();
-    await loadHub();
+    if (data && data.hub) renderHub(data.hub);
+    scheduleHubPoll(1500);
     const hub = currentHub || {};
     const media2 = hub.media || {};
-    const finalUrl = media2.final_url || media2.final_video_url || data.final_url || data.final_video_url || null;
     const finalMeta = (currentHub && currentHub.final) || {};
+    const finalUrl = finalMeta.url || media2.final_url || media2.final_video_url || data.final_url || data.final_video_url || null;
     setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose-action)", finalMeta.asset_version || null);
     if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
     setLink(composeFinalLinkEl, finalUrl);
     composeSubmitting = false;
     updateComposeButtonState();
     return data;
+  }
+
+  async function generateScenePack() {
+    if (scenePackSubmitting) return { in_progress: true };
+    scenePackSubmitting = true;
+    try {
+      const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/scene_pack`, { method: "POST" });
+      if (res.status === 409) {
+        let payload = null;
+        try { payload = await res.json(); } catch (_) { payload = null; }
+        if (payload && payload.error === "scene_pack_in_progress") {
+          if (scenePackHintEl) scenePackHintEl.textContent = "Generating Scene Pack...";
+          scheduleHubPoll(payload.retry_after_ms || 1500);
+          return payload;
+        }
+      }
+      if (!res.ok) throw new Error((await res.text()) || "scene pack failed");
+      const payload = await res.json();
+      if (scenePackHintEl) scenePackHintEl.textContent = "Generating Scene Pack...";
+      scheduleHubPoll(1500);
+      return payload;
+    } finally {
+      scenePackSubmitting = false;
+    }
   }
 
   function updateComposeButtonState() {
@@ -468,7 +523,10 @@
   async function runAction(action) {
     if (action === "compose") {
       await composeFinal();
-      await loadHub();
+      return;
+    }
+    if (action === "scene_pack") {
+      await generateScenePack();
       return;
     }
     if (action === "subtitles") {
@@ -610,11 +668,14 @@
       if (!action) return;
       try {
         if (action === "compose" && statusEl) statusEl.textContent = "Composing final video...";
+        if (action === "scene_pack" && statusEl) statusEl.textContent = "Generating scene pack...";
         await runAction(action);
         if (action === "compose" && composeMsgEl) composeMsgEl.textContent = "Compose requested.";
+        if (action === "scene_pack" && scenePackHintEl) scenePackHintEl.textContent = "Generating Scene Pack...";
       } catch (err) {
         if (action === "compose") composeSubmitting = false;
         if (action === "compose" && composeMsgEl) composeMsgEl.textContent = err.message || "compose failed";
+        if (action === "scene_pack" && scenePackHintEl) scenePackHintEl.textContent = err.message || "scene pack failed";
         if (statusEl) statusEl.textContent = err.message || "action failed";
       } finally {
         if (action === "compose") updateComposeButtonState();
@@ -624,6 +685,9 @@
 
   loadHub().then(() => setTab("source")).catch((e) => {
     if (statusEl) statusEl.textContent = e.message || "hub load failed";
+  });
+  document.addEventListener("visibilitychange", () => {
+    refreshPollingState();
   });
   refreshPollingState();
 })();
