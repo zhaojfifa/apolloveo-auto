@@ -60,9 +60,16 @@
   function renderFinalPreview(data) {
     if (!finalVideoEl || !finalVideoPlaceholderEl) return;
     const finalInfo = data.final || {};
-    const baseUrl = finalInfo.url || (data.deliverables && data.deliverables.final_mp4 && data.deliverables.final_mp4.url) || "";
+    const deliverables = data.deliverables || {};
+    const baseUrl =
+      finalInfo.url ||
+      (deliverables.final && deliverables.final.url) ||
+      (deliverables.final_mp4 && deliverables.final_mp4.url) ||
+      data.final_url ||
+      `/v1/tasks/${encodeURIComponent(taskId)}/final`;
     const nextSrc = withAssetVersion(baseUrl, finalInfo.asset_version);
-    if (finalInfo.exists && nextSrc) {
+    const ready = Boolean(data.composed_ready);
+    if (ready && nextSrc) {
       if (finalVideoSrc !== nextSrc) {
         finalVideoEl.src = nextSrc;
         finalVideoEl.load();
@@ -97,7 +104,7 @@
         : "下一步：先回 Workbench 执行 Compose Final。";
     }
     if (hintStatusEl) {
-      const ready = Boolean(data.composed_ready) && Boolean(data.final && data.final.exists);
+      const ready = Boolean(data.composed_ready);
       const scenePending = data.scene_pack_pending_reason ? "（Scene Pack Optional: pending，不阻塞发布）" : "";
       hintStatusEl.textContent = ready
         ? "当前状态：✅ 可发布"
@@ -108,7 +115,7 @@
   function renderDeliverables(data) {
     const deliverables = data.deliverables || {};
     const keys = Object.keys(deliverables);
-    const composedReady = Boolean(data.composed_ready) && Boolean(data.final && data.final.exists);
+    const composedReady = Boolean(data.composed_ready);
     const composedReason = data.composed_reason || "final_missing";
 
     if (composedBadgeEl) {
@@ -153,20 +160,15 @@
       .map((g) => {
         if (!g.rows.length) return "";
         return `
-          <div class="rounded-xl border border-gray-200 p-3 bg-white flex flex-col gap-2 min-w-0">
-            <div class="text-xs font-semibold text-gray-700">${g.label}</div>
-            <div class="space-y-2">
+          <div class="deliverable-group">
+            <div class="deliverable-group-title">${g.label}</div>
+            <div class="deliverable-list">
               ${g.rows
                 .map(
                   (item) => `
-                    <div class="flex flex-col gap-2 p-2 border rounded-lg bg-slate-50 min-w-0">
-                      <div class="flex items-center justify-between gap-2">
-                        <span class="text-sm font-medium">${item.label || item.key}</span>
-                      </div>
-                      <div class="text-xs text-slate-500 break-all">${item.key || "-"}</div>
-                      <div class="mt-auto flex gap-2 flex-wrap">
-                        <a class="btn-secondary text-xs" href="${item.url}" target="_blank" rel="noopener">Download</a>
-                      </div>
+                    <div class="deliverable-item">
+                      <span class="deliverable-name" title="${item.label || item.key || "-"}">${item.label || item.key || "-"}</span>
+                      <a class="btn-secondary text-xs deliverable-btn" href="${item.url}" target="_blank" rel="noopener">Download</a>
                     </div>
                   `
                 )
