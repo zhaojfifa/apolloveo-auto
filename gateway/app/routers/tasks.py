@@ -3452,6 +3452,10 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         raw = str(path).replace("\\", "/")
         return raw.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
+    def _assert_overlay_cmd(cmd_text: str):
+        if overlay_subtitles and "subtitles=" not in cmd_text:
+            _compose_fail("compose_failed", "overlay_subtitles enabled but ffmpeg cmd missing subtitles filter", ffmpeg_cmd=cmd_text)
+
     storage = get_storage_service()
     video_key = (
         _task_key(task, "mute_video_key")
@@ -3524,6 +3528,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
 
     compose_started_at = task.get("compose_last_started_at") or datetime.now(timezone.utc).isoformat()
     ffmpeg_cmd_used = None
+    bundled_fonts_dir = Path(__file__).resolve().parents[1] / "assets" / "fonts"
+    bundled_myanmar_ttf = bundled_fonts_dir / "NotoSansMyanmar-Regular.ttf"
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp = Path(tmpdir)
         video_path = tmp / "video_input.mp4"
@@ -3537,34 +3543,15 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         except ValueError:
             _compose_fail("missing_voiceover", "voiceover audio invalid")
 
-        def _minimal_srt(text: str) -> str:
-            body = (text or "").strip()
-            if not body:
-                return ""
-            if "-->" in body:
-                return body if body.endswith("\n") else f"{body}\n"
-            return "1\n00:00:00,000 --> 00:59:59,000\n" + body + "\n"
-
         if overlay_subtitles:
-            font_ok = False
-            fc_list = shutil.which("fc-list")
-            if fc_list:
-                proc_font = subprocess.run([fc_list], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-                if proc_font.returncode == 0 and "Noto Sans Myanmar" in (proc_font.stdout or ""):
-                    font_ok = True
-            if not font_ok:
-                _compose_fail("font_missing", "Noto Sans Myanmar not found")
-            loaded_subs = False
+            if not bundled_myanmar_ttf.exists() or bundled_myanmar_ttf.stat().st_size == 0:
+                _compose_fail("font_missing", f"bundled Myanmar font missing: {bundled_myanmar_ttf}")
             subtitle_key = _resolve_target_srt_key(task, task_id, target_lang)
-            if subtitle_key:
-                storage.download_file(str(subtitle_key), str(subtitle_path))
-                loaded_subs = subtitle_path.exists() and subtitle_path.stat().st_size > 0
-            if not loaded_subs:
-                fallback_text = _hf_load_subtitles_text(task_id, task)
-                srt_text = _minimal_srt(fallback_text)
-                if not srt_text:
-                    _compose_fail("subtitles_missing", "overlay_subtitles enabled but subtitles missing")
-                subtitle_path.write_text(srt_text, encoding="utf-8")
+            if not subtitle_key:
+                _compose_fail("subtitles_missing", "overlay_subtitles enabled but target subtitle key is missing")
+            storage.download_file(str(subtitle_key), str(subtitle_path))
+            if not subtitle_path.exists() or subtitle_path.stat().st_size == 0:
+                _compose_fail("subtitles_missing", "overlay_subtitles enabled but subtitle file is empty")
 
         bgm_path = None
         if bgm_key:
@@ -3573,7 +3560,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
 
         if bgm_path and bgm_path.exists():
             if overlay_subtitles:
-                fontsdir = "/usr/share/fonts" if Path("/usr/share/fonts").exists() else str(subtitle_path.parent)
+                fontsdir = bundled_fonts_dir
                 subtitle_filter = (
                     f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
                     f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
@@ -3620,12 +3607,13 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             ]
             logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd))
             ffmpeg_cmd_used = " ".join(cmd)
+            _assert_overlay_cmd(ffmpeg_cmd_used)
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                 _compose_fail("compose_failed", "compose ffmpeg failed", ffmpeg_cmd=ffmpeg_cmd_used, stderr_tail=(proc.stderr or "")[-800:])
         else:
             if overlay_subtitles:
-                fontsdir = "/usr/share/fonts" if Path("/usr/share/fonts").exists() else str(subtitle_path.parent)
+                fontsdir = bundled_fonts_dir
                 subtitle_filter = (
                     f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
                     f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
@@ -3664,6 +3652,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             ]
             logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd))
             ffmpeg_cmd_used = " ".join(cmd)
+            _assert_overlay_cmd(ffmpeg_cmd_used)
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                 cmd_fallback = [
@@ -3694,6 +3683,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 ]
                 logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd_fallback))
                 ffmpeg_cmd_used = " ".join(cmd_fallback)
+                _assert_overlay_cmd(ffmpeg_cmd_used)
                 proc2 = subprocess.run(cmd_fallback, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
                 if proc2.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                     _compose_fail("compose_failed", "compose ffmpeg failed", ffmpeg_cmd=ffmpeg_cmd_used, stderr_tail=(proc2.stderr or "")[-800:])
