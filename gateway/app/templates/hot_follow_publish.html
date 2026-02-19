@@ -38,11 +38,12 @@
               <div class="mt-1 text-gray-500">Soft subtitle streams will be stripped; burned-in subtitles cannot be removed automatically.</div>
             </div>
             <div class="space-y-3">
-              {% if cover_url %}
-                <img class="w-full h-48 rounded-xl object-cover bg-gray-100" src="{{ cover_url }}" alt="cover" />
-              {% else %}
-                <div class="w-full h-48 rounded-xl bg-gray-100 border border-dashed border-gray-300"></div>
-              {% endif %}
+              <video id="hf-final-video" controls playsinline preload="metadata" class="hidden w-full h-48 rounded-xl bg-slate-100"></video>
+              <div id="hf-final-video-placeholder" class="w-full h-48 rounded-xl bg-gray-100 border border-dashed border-gray-300 overflow-hidden">
+                {% if cover_url %}
+                  <img class="w-full h-full object-cover bg-gray-100" src="{{ cover_url }}" alt="cover" />
+                {% endif %}
+              </div>
               <div id="hf-deliverables" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
               <div id="hf-deliverables-empty" class="text-sm text-gray-500" style="display:none;">{{ t("hot.follow.delivery.empty") }}</div>
             </div>
@@ -93,8 +94,9 @@
               <div class="flex justify-between"><span>ID</span><span>{{ task.task_id }}</span></div>
               <div class="flex justify-between"><span>{{ t("label.platform") }}</span><span>{{ task.platform or "-" }}</span></div>
               <div class="flex justify-between"><span>{{ t("hot.follow.step.pack") }}</span><span>{{ task.pack_status or "-" }}</span></div>
-              <div class="flex justify-between"><span>Scene Pack</span><span id="hf-scene-pack-status">-</span></div>
+              <div class="flex justify-between"><span>Scene Pack (Optional)</span><span id="hf-scene-pack-status">-</span></div>
               <div id="hf-scene-pack-reason" class="text-xs text-gray-500"></div>
+              <button id="hf-scene-pack-generate" class="btn-secondary text-xs">Generate Scene Pack</button>
               <a id="hf-scene-pack-action" class="text-xs text-indigo-600 underline hidden" href="#" rel="noopener">Open Workbench</a>
             </div>
           </div>
