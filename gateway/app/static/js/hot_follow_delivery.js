@@ -15,10 +15,6 @@
   const hintSummaryEl = document.getElementById("hf-hint-summary");
   const hintNextEl = document.getElementById("hf-hint-next");
   const hintStatusEl = document.getElementById("hf-hint-status");
-  const finalVideoEl = document.getElementById("hf-final-video");
-  const finalVideoPlaceholderEl = document.getElementById("hf-final-video-placeholder");
-  const scenePackGenerateEl = document.getElementById("hf-scene-pack-generate");
-  let finalVideoSrc = "";
 
   if (!taskId) return;
 
@@ -28,8 +24,6 @@
       final_missing: "尚未生成最终成片",
       compose_in_progress: "合成中…",
       compose_failed: "合成失败，可重试",
-      subtitles_missing: "缺少目标字幕",
-      font_missing: "缺少字幕字体",
       missing_voiceover: "缺少配音",
       missing_raw: "缺少源视频",
     };
@@ -50,44 +44,6 @@
     }));
   }
 
-  function withAssetVersion(url, assetVersion) {
-    if (!url) return "";
-    const ver = assetVersion ? String(assetVersion) : "";
-    if (!ver) return url;
-    return `${url}${url.includes("?") ? "&" : "?"}av=${encodeURIComponent(ver)}`;
-  }
-
-  function renderFinalPreview(data) {
-    if (!finalVideoEl || !finalVideoPlaceholderEl) return;
-    const finalInfo = data.final || {};
-    const deliverables = data.deliverables || {};
-    const baseUrl =
-      finalInfo.url ||
-      (deliverables.final && deliverables.final.url) ||
-      (deliverables.final_mp4 && deliverables.final_mp4.url) ||
-      data.final_url ||
-      `/v1/tasks/${encodeURIComponent(taskId)}/final`;
-    const nextSrc = withAssetVersion(baseUrl, finalInfo.asset_version);
-    const ready = Boolean(data.composed_ready);
-    if (ready && nextSrc) {
-      if (finalVideoSrc !== nextSrc) {
-        finalVideoEl.src = nextSrc;
-        finalVideoEl.load();
-        finalVideoSrc = nextSrc;
-      }
-      finalVideoEl.classList.remove("hidden");
-      finalVideoPlaceholderEl.classList.add("hidden");
-      return;
-    }
-    if (finalVideoSrc) {
-      finalVideoEl.removeAttribute("src");
-      finalVideoEl.load();
-      finalVideoSrc = "";
-    }
-    finalVideoEl.classList.add("hidden");
-    finalVideoPlaceholderEl.classList.remove("hidden");
-  }
-
   function renderHintPanel(data, deliverables) {
     const hasFinal = Boolean(deliverables.final_mp4);
     const hasPack = Boolean(deliverables.pack_zip || deliverables.edit_bundle_zip);
@@ -105,7 +61,7 @@
     }
     if (hintStatusEl) {
       const ready = Boolean(data.composed_ready);
-      const scenePending = data.scene_pack_pending_reason ? "（Scene Pack Optional: pending，不阻塞发布）" : "";
+      const scenePending = data.scene_pack_pending_reason ? "（Scene Pack pending，不阻塞发布）" : "";
       hintStatusEl.textContent = ready
         ? "当前状态：✅ 可发布"
         : `当前状态：⚠️ ${reasonText(data.composed_reason)}${scenePending}`;
@@ -124,30 +80,18 @@
       composedBadgeEl.classList.toggle("text-amber-700", !composedReady);
     }
     if (composedReasonEl) composedReasonEl.textContent = reasonText(composedReason);
-    const scenePack = data.scene_pack || {};
-    const scenePackStatus = (scenePack.status || (data.scene_pack_pending_reason ? "pending" : "ready"));
-    if (scenePackStatusEl) scenePackStatusEl.textContent = scenePackStatus;
-    if (scenePackReasonEl) scenePackReasonEl.textContent = data.scene_pack_pending_reason || scenePack.error_reason || "";
+    if (scenePackStatusEl) scenePackStatusEl.textContent = data.scene_pack_pending_reason ? "pending" : "ready";
+    if (scenePackReasonEl) scenePackReasonEl.textContent = data.scene_pack_pending_reason || "";
     if (scenePackActionEl) {
       if (data.scene_pack_pending_reason && data.scene_pack_action_url) {
         scenePackActionEl.href = data.scene_pack_action_url;
         scenePackActionEl.classList.remove("hidden");
-      } else if (scenePack.url) {
-        scenePackActionEl.href = scenePack.url;
-        scenePackActionEl.textContent = "Download Scene Pack";
-        scenePackActionEl.classList.remove("hidden");
       } else {
-        scenePackActionEl.textContent = "Open Workbench";
         scenePackActionEl.classList.add("hidden");
       }
     }
-    if (scenePackGenerateEl) {
-      scenePackGenerateEl.disabled = scenePackStatus === "running";
-      scenePackGenerateEl.textContent = scenePackStatus === "running" ? "Generating..." : "Generate Scene Pack";
-    }
 
     renderHintPanel(data, deliverables);
-    renderFinalPreview(data);
     if (!keys.length) {
       if (emptyEl) emptyEl.style.display = "block";
       if (listEl) listEl.innerHTML = "";
@@ -160,17 +104,13 @@
       .map((g) => {
         if (!g.rows.length) return "";
         return `
-          <div class="deliverable-group">
-            <div class="deliverable-group-title">${g.label}</div>
-            <div class="deliverable-list">
+          <div class="rounded-xl border border-gray-200 p-3">
+            <div class="text-xs font-semibold text-gray-700 mb-2">${g.label}</div>
+            <div class="space-y-2">
               ${g.rows
                 .map(
-                  (item) => `
-                    <div class="deliverable-item">
-                      <span class="deliverable-name" title="${item.label || item.key || "-"}">${item.label || item.key || "-"}</span>
-                      <a class="btn-secondary text-xs deliverable-btn" href="${item.url}" target="_blank" rel="noopener">Download</a>
-                    </div>
-                  `
+                  (item) =>
+                    `<div class="deliverable"><span>${item.label || item.key}</span><a class="btn-secondary" href="${item.url}" target="_blank" rel="noopener">Download</a></div>`
                 )
                 .join("")}
             </div>
@@ -191,36 +131,6 @@
       renderDeliverables(data);
     } catch (_) {
       if (emptyEl) emptyEl.style.display = "block";
-    }
-  }
-
-  async function generateScenePack() {
-    if (!scenePackGenerateEl) return;
-    scenePackGenerateEl.disabled = true;
-    const prev = scenePackGenerateEl.textContent;
-    scenePackGenerateEl.textContent = "Generating...";
-    try {
-      const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/scene_pack`, { method: "POST" });
-      if (res.status === 409) {
-        const payload = await res.json().catch(() => ({}));
-        if (payload && payload.error === "scene_pack_in_progress") {
-          if (scenePackReasonEl) scenePackReasonEl.textContent = "Scene Pack generation in progress";
-          await loadPublishHub();
-          return;
-        }
-      }
-      if (!res.ok) {
-        const text = await res.text();
-        if (scenePackReasonEl) scenePackReasonEl.textContent = text || "scene pack failed";
-        return;
-      }
-      if (scenePackReasonEl) scenePackReasonEl.textContent = "Scene Pack generation started";
-      await loadPublishHub();
-    } catch (e) {
-      if (scenePackReasonEl) scenePackReasonEl.textContent = e.message || "scene pack failed";
-    } finally {
-      scenePackGenerateEl.disabled = false;
-      scenePackGenerateEl.textContent = prev || "Generate Scene Pack";
     }
   }
 
@@ -255,12 +165,6 @@
     publishBtn.addEventListener("click", (e) => {
       e.preventDefault();
       backfillPublish();
-    });
-  }
-  if (scenePackGenerateEl) {
-    scenePackGenerateEl.addEventListener("click", (e) => {
-      e.preventDefault();
-      generateScenePack();
     });
   }
 
