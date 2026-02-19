@@ -1,7 +1,15 @@
+.deliverables-container,
+#hf-deliverables {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  min-width: 0;
+}
+
 .deliverable-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 10px;
   padding: 0.75rem;
   border: 1px solid #e5e7eb;
   border-radius: 0.75rem;
@@ -18,7 +26,7 @@
 .deliverable-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 10px;
   min-width: 0;
 }
 
@@ -26,8 +34,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-wrap: nowrap;
+  gap: 10px;
   padding: 0.5rem 0.625rem;
   border: 1px solid #e2e8f0;
   border-radius: 0.625rem;
@@ -37,7 +45,7 @@
 
 .deliverable-name {
   min-width: 0;
-  flex: 1 1 12rem;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -47,4 +55,11 @@
 
 .deliverable-btn {
   flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .deliverable-item {
+    flex-wrap: wrap;
+  }
 }
