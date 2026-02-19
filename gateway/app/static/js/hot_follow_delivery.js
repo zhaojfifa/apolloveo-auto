@@ -15,6 +15,10 @@
   const hintSummaryEl = document.getElementById("hf-hint-summary");
   const hintNextEl = document.getElementById("hf-hint-next");
   const hintStatusEl = document.getElementById("hf-hint-status");
+  const finalVideoEl = document.getElementById("hf-final-video");
+  const finalVideoPlaceholderEl = document.getElementById("hf-final-video-placeholder");
+  const scenePackGenerateEl = document.getElementById("hf-scene-pack-generate");
+  let finalVideoSrc = "";
 
   if (!taskId) return;
 
@@ -44,6 +48,37 @@
       label: g.label,
       rows: g.keys.filter((k) => deliverables[k]).map((k) => ({ key: k, ...deliverables[k] })),
     }));
+  }
+
+  function withAssetVersion(url, assetVersion) {
+    if (!url) return "";
+    const ver = assetVersion ? String(assetVersion) : "";
+    if (!ver) return url;
+    return `${url}${url.includes("?") ? "&" : "?"}av=${encodeURIComponent(ver)}`;
+  }
+
+  function renderFinalPreview(data) {
+    if (!finalVideoEl || !finalVideoPlaceholderEl) return;
+    const finalInfo = data.final || {};
+    const baseUrl = finalInfo.url || (data.deliverables && data.deliverables.final_mp4 && data.deliverables.final_mp4.url) || "";
+    const nextSrc = withAssetVersion(baseUrl, finalInfo.asset_version);
+    if (finalInfo.exists && nextSrc) {
+      if (finalVideoSrc !== nextSrc) {
+        finalVideoEl.src = nextSrc;
+        finalVideoEl.load();
+        finalVideoSrc = nextSrc;
+      }
+      finalVideoEl.classList.remove("hidden");
+      finalVideoPlaceholderEl.classList.add("hidden");
+      return;
+    }
+    if (finalVideoSrc) {
+      finalVideoEl.removeAttribute("src");
+      finalVideoEl.load();
+      finalVideoSrc = "";
+    }
+    finalVideoEl.classList.add("hidden");
+    finalVideoPlaceholderEl.classList.remove("hidden");
   }
 
   function renderHintPanel(data, deliverables) {
@@ -82,18 +117,30 @@
       composedBadgeEl.classList.toggle("text-amber-700", !composedReady);
     }
     if (composedReasonEl) composedReasonEl.textContent = reasonText(composedReason);
-    if (scenePackStatusEl) scenePackStatusEl.textContent = data.scene_pack_pending_reason ? "pending" : "ready";
-    if (scenePackReasonEl) scenePackReasonEl.textContent = data.scene_pack_pending_reason || "";
+    const scenePack = data.scene_pack || {};
+    const scenePackStatus = (scenePack.status || (data.scene_pack_pending_reason ? "pending" : "ready"));
+    if (scenePackStatusEl) scenePackStatusEl.textContent = scenePackStatus;
+    if (scenePackReasonEl) scenePackReasonEl.textContent = data.scene_pack_pending_reason || scenePack.error_reason || "";
     if (scenePackActionEl) {
       if (data.scene_pack_pending_reason && data.scene_pack_action_url) {
         scenePackActionEl.href = data.scene_pack_action_url;
         scenePackActionEl.classList.remove("hidden");
+      } else if (scenePack.url) {
+        scenePackActionEl.href = scenePack.url;
+        scenePackActionEl.textContent = "Download Scene Pack";
+        scenePackActionEl.classList.remove("hidden");
       } else {
+        scenePackActionEl.textContent = "Open Workbench";
         scenePackActionEl.classList.add("hidden");
       }
     }
+    if (scenePackGenerateEl) {
+      scenePackGenerateEl.disabled = scenePackStatus === "running";
+      scenePackGenerateEl.textContent = scenePackStatus === "running" ? "Generating..." : "Generate Scene Pack";
+    }
 
     renderHintPanel(data, deliverables);
+    renderFinalPreview(data);
     if (!keys.length) {
       if (emptyEl) emptyEl.style.display = "block";
       if (listEl) listEl.innerHTML = "";
@@ -106,13 +153,22 @@
       .map((g) => {
         if (!g.rows.length) return "";
         return `
-          <div class="rounded-xl border border-gray-200 p-3">
-            <div class="text-xs font-semibold text-gray-700 mb-2">${g.label}</div>
+          <div class="rounded-xl border border-gray-200 p-3 bg-white flex flex-col gap-2 min-w-0">
+            <div class="text-xs font-semibold text-gray-700">${g.label}</div>
             <div class="space-y-2">
               ${g.rows
                 .map(
-                  (item) =>
-                    `<div class="deliverable"><span>${item.label || item.key}</span><a class="btn-secondary" href="${item.url}" target="_blank" rel="noopener">Download</a></div>`
+                  (item) => `
+                    <div class="flex flex-col gap-2 p-2 border rounded-lg bg-slate-50 min-w-0">
+                      <div class="flex items-center justify-between gap-2">
+                        <span class="text-sm font-medium">${item.label || item.key}</span>
+                      </div>
+                      <div class="text-xs text-slate-500 break-all">${item.key || "-"}</div>
+                      <div class="mt-auto flex gap-2 flex-wrap">
+                        <a class="btn-secondary text-xs" href="${item.url}" target="_blank" rel="noopener">Download</a>
+                      </div>
+                    </div>
+                  `
                 )
                 .join("")}
             </div>
@@ -133,6 +189,36 @@
       renderDeliverables(data);
     } catch (_) {
       if (emptyEl) emptyEl.style.display = "block";
+    }
+  }
+
+  async function generateScenePack() {
+    if (!scenePackGenerateEl) return;
+    scenePackGenerateEl.disabled = true;
+    const prev = scenePackGenerateEl.textContent;
+    scenePackGenerateEl.textContent = "Generating...";
+    try {
+      const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/scene_pack`, { method: "POST" });
+      if (res.status === 409) {
+        const payload = await res.json().catch(() => ({}));
+        if (payload && payload.error === "scene_pack_in_progress") {
+          if (scenePackReasonEl) scenePackReasonEl.textContent = "Scene Pack generation in progress";
+          await loadPublishHub();
+          return;
+        }
+      }
+      if (!res.ok) {
+        const text = await res.text();
+        if (scenePackReasonEl) scenePackReasonEl.textContent = text || "scene pack failed";
+        return;
+      }
+      if (scenePackReasonEl) scenePackReasonEl.textContent = "Scene Pack generation started";
+      await loadPublishHub();
+    } catch (e) {
+      if (scenePackReasonEl) scenePackReasonEl.textContent = e.message || "scene pack failed";
+    } finally {
+      scenePackGenerateEl.disabled = false;
+      scenePackGenerateEl.textContent = prev || "Generate Scene Pack";
     }
   }
 
@@ -167,6 +253,12 @@
     publishBtn.addEventListener("click", (e) => {
       e.preventDefault();
       backfillPublish();
+    });
+  }
+  if (scenePackGenerateEl) {
+    scenePackGenerateEl.addEventListener("click", (e) => {
+      e.preventDefault();
+      generateScenePack();
     });
   }
 

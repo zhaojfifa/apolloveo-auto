@@ -52,9 +52,9 @@
   let pollTimer = null;
   let composeSubmitting = false;
   let scenePackSubmitting = false;
-  const POLL_DEFAULT_MS = 2500;
-  const POLL_COMPOSE_MS = 4500;
-  const POLL_HIDDEN_MS = 10000;
+  const POLL_DEFAULT_MS = 4000;
+  const POLL_RUNNING_MS = 6000;
+  const POLL_HIDDEN_MS = 12000;
 
   function escapeHtml(s) {
     return String(s || "")
@@ -159,18 +159,28 @@
 
   function shouldPollHub() {
     if (!currentHub) return true;
-    const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
-    const composeStatus = String(composeLast.status || "").toLowerCase();
-    if (["running", "processing", "queued"].includes(composeStatus)) return true;
+    const runningPipeline = ["subtitles", "dub", "compose"].some((key) => {
+      const item = getPipelineItem(key);
+      const status = String(item.status || "").toLowerCase();
+      return ["running", "processing", "queued"].includes(status);
+    });
+    const scenePack = (currentHub && currentHub.scene_pack) || {};
+    const scenePackRunning = ["running", "processing", "queued"].includes(String(scenePack.status || "").toLowerCase());
+    if (runningPipeline || scenePackRunning) return true;
     if (currentHub.composed_ready === true) return false;
     return true;
   }
 
   function getPollIntervalMs() {
     if (document.hidden) return POLL_HIDDEN_MS;
-    const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
-    const composeStatus = String(composeLast.status || "").toLowerCase();
-    if (["running", "processing", "queued"].includes(composeStatus)) return POLL_COMPOSE_MS;
+    const runningPipeline = ["subtitles", "dub", "compose"].some((key) => {
+      const item = getPipelineItem(key);
+      const status = String(item.status || "").toLowerCase();
+      return ["running", "processing", "queued"].includes(status);
+    });
+    const scenePack = (currentHub && currentHub.scene_pack) || {};
+    const scenePackRunning = ["running", "processing", "queued"].includes(String(scenePack.status || "").toLowerCase());
+    if (runningPipeline || scenePackRunning) return POLL_RUNNING_MS;
     return POLL_DEFAULT_MS;
   }
 
