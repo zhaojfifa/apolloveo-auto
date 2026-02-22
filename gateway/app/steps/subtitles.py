@@ -202,6 +202,41 @@ def build_preview(text: str | None) -> list[str]:
     return preview_lines(text)
 
 
+def _collect_missing_translation_indexes(
+    segments: list[dict],
+    translations: dict[int, str],
+) -> list[int]:
+    source_indexes: list[int] = []
+    for seg in segments:
+        try:
+            source_indexes.append(int(seg.get("index", 0)))
+        except Exception:
+            continue
+
+    translated_indexes = {
+        int(idx)
+        for idx, text in (translations or {}).items()
+        if isinstance(text, str) and text.strip()
+    }
+    return [idx for idx in source_indexes if idx not in translated_indexes]
+
+
+def _build_translation_qa_payload(
+    *,
+    source_count: int,
+    translated_count: int,
+    missing_indexes: list[int],
+    retry_count: int,
+) -> dict:
+    return {
+        "source_count": int(source_count),
+        "translated_count": int(translated_count),
+        "missing_indexes": [int(i) for i in missing_indexes],
+        "retry_count": int(retry_count),
+        "complete": len(missing_indexes) == 0,
+    }
+
+
 def _write_no_subtitles_placeholders(
     *, workspace: Workspace, task_id: str, reason: str, log_stage
 ) -> dict:
@@ -215,6 +250,17 @@ def _write_no_subtitles_placeholders(
     mm_srt_path.write_text("", encoding="utf-8")
     mm_txt_path.parent.mkdir(parents=True, exist_ok=True)
     mm_txt_path.write_text("no Subtitles", encoding="utf-8")
+    translation_qa_path = workspace.subtitles_dir / "translation_qa.json"
+    translation_qa_payload = _build_translation_qa_payload(
+        source_count=0,
+        translated_count=0,
+        missing_indexes=[],
+        retry_count=0,
+    )
+    translation_qa_path.write_text(
+        json.dumps(translation_qa_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
     logger.info(
         "SUB2_SKIP_NO_SUBTITLES",
@@ -246,6 +292,9 @@ def _write_no_subtitles_placeholders(
         "origin_srt": "",
         "mm_srt": "",
         "mm_txt_path": relative_to_workspace(mm_txt_path),
+        "translation_qa_path": relative_to_workspace(translation_qa_path),
+        "translation_qa": translation_qa_payload,
+        "translation_incomplete": False,
         "segments_json": {"scenes": []},
         "origin_preview": [],
         "mm_preview": [],
@@ -532,6 +581,7 @@ async def generate_subtitles(
 
             origin_text = segments_to_srt(segments, "origin")
             translations: dict[int, str] = {}
+            translation_retry_count = 0
             translate_enabled_local = translate_enabled
             if (
                 translate_enabled_local
@@ -607,12 +657,78 @@ async def generate_subtitles(
                 if not translations:
                     logger.warning("Gemini translation failed; fallback to origin only.")
 
+            missing_indexes = (
+                _collect_missing_translation_indexes(segments, translations)
+                if translate_enabled_local
+                else []
+            )
+            if translate_enabled_local and missing_indexes:
+                translation_retry_count = 1
+                retry_start = time.perf_counter()
+                missing_set = set(missing_indexes)
+                missing_segments = [
+                    seg for seg in segments if int(seg.get("index", 0)) in missing_set
+                ]
+                log_stage(
+                    "SUB2_TR_RETRY_MISSING_START",
+                    missing_count=len(missing_segments),
+                )
+                try:
+                    retry_translations = await asyncio.wait_for(
+                        asyncio.to_thread(
+                            translate_segments_with_gemini,
+                            segments=missing_segments,
+                            target_lang=target_lang,
+                            debug_dir=subs_dir(task_id),
+                        ),
+                        timeout=_env_int("SUBTITLES_TR_TIMEOUT_SEC", 120),
+                    )
+                    for idx, text in retry_translations.items():
+                        if isinstance(text, str) and text.strip():
+                            translations[int(idx)] = text
+                    log_stage(
+                        "SUB2_TR_RETRY_MISSING_DONE",
+                        filled_count=len(retry_translations),
+                        duration_ms=int((time.perf_counter() - retry_start) * 1000),
+                    )
+                except Exception as exc:
+                    log_stage(
+                        "SUB2_TR_RETRY_MISSING_FAIL",
+                        error=str(exc),
+                        duration_ms=int((time.perf_counter() - retry_start) * 1000),
+                    )
+
+            missing_indexes = (
+                _collect_missing_translation_indexes(segments, translations)
+                if translate_enabled_local
+                else []
+            )
+            translated_count = len(segments) - len(missing_indexes)
+            translation_qa_payload = _build_translation_qa_payload(
+                source_count=len(segments),
+                translated_count=translated_count,
+                missing_indexes=missing_indexes,
+                retry_count=translation_retry_count,
+            )
+            translation_qa_path = workspace.subtitles_dir / "translation_qa.json"
+            translation_qa_path.write_text(
+                json.dumps(translation_qa_payload, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
+            log_stage(
+                "SUB2_TR_QA_DONE",
+                source_count=translation_qa_payload["source_count"],
+                translated_count=translation_qa_payload["translated_count"],
+                retry_count=translation_qa_payload["retry_count"],
+                complete=translation_qa_payload["complete"],
+            )
+
             for seg in segments:
                 idx = int(seg.get("index", 0))
-                if idx in translations:
-                    seg["mm"] = translations[idx]
+                mm_text = (translations.get(idx) or "").strip() if translations else ""
+                seg["mm"] = mm_text if mm_text else str(seg.get("origin") or "")
 
-            mm_text = segments_to_srt(segments, "mm") if translations else ""
+            mm_text = segments_to_srt(segments, "mm")
             if not mm_text.strip():
                 mm_text = origin_text
 
@@ -673,6 +789,9 @@ async def generate_subtitles(
                 "mm_preview": build_preview(mm_text),
                 "stream_probe": probe_result,
                 "clean_video_generated": clean_generated,
+                "translation_qa_path": relative_to_workspace(translation_qa_path),
+                "translation_qa": translation_qa_payload,
+                "translation_incomplete": not bool(translation_qa_payload["complete"]),
             }
         except Exception as exc:
             log_stage("SUB2_FAIL", error=str(exc))
