@@ -35,6 +35,8 @@
   const subtitlesTextEl = document.getElementById("hf_subtitles_text");
   const subtitlesOriginEl = document.getElementById("hf_subtitles_origin");
   const subtitlesEditedPreviewEl = document.getElementById("hf_subtitles_edited_preview");
+  const translationQaCountsEl = document.getElementById("hf_translation_qa_counts");
+  const translationQaWarningEl = document.getElementById("hf_translation_qa_warning");
   const subtitlesRefreshBtn = document.getElementById("hf_subtitles_refresh_btn");
   const subtitlesSaveBtn = document.getElementById("hf_subtitles_save_btn");
   const subtitlesMsgEl = document.getElementById("hf_subtitles_msg");
@@ -54,11 +56,9 @@
   const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
   const composedBadgeEl = document.getElementById("hf_composed_badge");
   const composedReasonEl = document.getElementById("hf_composed_reason");
-  const translationQaStatusEl = document.getElementById("hf_translation_qa_status");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
-  let currentTaskDetail = null;
   let subtitleDirty = false;
   let activeTab = "source";
   let hubLoading = false;
@@ -209,11 +209,17 @@
 
   function renderSubtitles() {
     const subtitles = (currentHub && currentHub.subtitles) || {};
+    const qa = (currentHub && currentHub.translation_qa) || {};
     const origin = subtitles.origin_text || "";
     const edited = subtitles.edited_text || subtitles.srt_text || "";
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || "-";
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || "-";
     if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = edited || "";
+    const sourceCount = Number.isFinite(Number(qa.source_count)) ? Number(qa.source_count) : 0;
+    const translatedCount = Number.isFinite(Number(qa.translated_count)) ? Number(qa.translated_count) : 0;
+    const hasMismatch = Boolean(qa.has_mismatch) || (sourceCount > 0 && sourceCount !== translatedCount);
+    if (translationQaCountsEl) translationQaCountsEl.textContent = `Translation cues: ${sourceCount} / ${translatedCount}`;
+    if (translationQaWarningEl) translationQaWarningEl.classList.toggle("hidden", !hasMismatch);
   }
 
   function renderAudio() {
@@ -249,14 +255,6 @@
       composedBadgeEl.classList.toggle("text-amber-700", !ready);
     }
     if (composedReasonEl) composedReasonEl.textContent = reasonTextMap[reason] || reason;
-    const qaStatus = (
-      (currentHub && currentHub.translation_qa_status) ||
-      (currentTaskDetail && currentTaskDetail.translation_qa_status) ||
-      "PASS"
-    ).toString().toUpperCase();
-    if (translationQaStatusEl) {
-      translationQaStatusEl.textContent = `Translation QA: ${qaStatus === "WARN" ? "WARN" : "PASS"}`;
-    }
     const composePlan = (currentHub && currentHub.compose_plan) || {};
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
   }
@@ -335,13 +333,6 @@
       const res = await fetch(hubUrl);
       if (!res.ok) throw new Error((await res.text()) || "hub load failed");
       renderHub(await res.json());
-      try {
-        const detailRes = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
-        if (detailRes.ok) {
-          currentTaskDetail = await detailRes.json();
-          renderComposedReadiness();
-        }
-      } catch (_) {}
     } finally {
       hubLoading = false;
     }
