@@ -26,7 +26,6 @@
   const hintSummaryEl = document.getElementById("hf-hint-summary");
   const hintNextEl = document.getElementById("hf-hint-next");
   const hintStatusEl = document.getElementById("hf-hint-status");
-  const translationQaStatusEl = document.getElementById("hf-translation-qa-status");
 
   if (!taskId) return;
 
@@ -92,10 +91,6 @@
       composedBadgeEl.classList.toggle("text-amber-700", !composedReady);
     }
     if (composedReasonEl) composedReasonEl.textContent = reasonText(composedReason);
-    if (translationQaStatusEl) {
-      const qaStatus = String(data.translation_qa_status || "PASS").toUpperCase();
-      translationQaStatusEl.textContent = `Translation QA: ${qaStatus === "WARN" ? "WARN" : "PASS"}`;
-    }
     if (scenePackStatusEl) scenePackStatusEl.textContent = data.scene_pack_pending_reason ? "pending" : "ready";
     if (scenePackReasonEl) scenePackReasonEl.textContent = data.scene_pack_pending_reason || "";
     if (scenePackActionEl) {

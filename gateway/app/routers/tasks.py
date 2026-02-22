@@ -1641,6 +1641,41 @@ def _hf_load_origin_subtitles_text(task: dict) -> str:
     return ""
 
 
+def _count_srt_cues(text: str) -> int:
+    if not isinstance(text, str) or not text.strip():
+        return 0
+    pattern = re.compile(r"^\s*\d+\s*\r?\n\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}", re.MULTILINE)
+    matches = pattern.findall(text)
+    if matches:
+        return len(matches)
+    blocks = [b for b in re.split(r"\r?\n\s*\r?\n", text.strip()) if b.strip()]
+    return len(blocks)
+
+
+def _build_translation_qa_summary(origin_text: str, edited_text: str) -> dict[str, Any]:
+    source_count = _count_srt_cues(origin_text)
+    translated_count = _count_srt_cues(edited_text)
+    has_mismatch = source_count > 0 and translated_count != source_count
+    return {
+        "source_count": source_count,
+        "translated_count": translated_count,
+        "has_mismatch": has_mismatch,
+    }
+
+
+def _build_workbench_debug_payload(
+    include_debug: bool,
+    scene_outputs: list[Any],
+    compose_last: dict[str, Any],
+) -> dict[str, Any]:
+    if not include_debug:
+        return {}
+    return {
+        "scene_outputs": scene_outputs,
+        "compose_last_ffmpeg_cmd": compose_last.get("ffmpeg_cmd"),
+    }
+
+
 def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
     last_step = str(task.get("last_step") or "").lower()
     task_status = str(task.get("status") or "").lower()
@@ -3336,6 +3371,7 @@ def get_hot_follow_publish_hub(
 @api_router.get("/hot_follow/tasks/{task_id}/workbench_hub")
 def get_hot_follow_workbench_hub(
     task_id: str,
+    request: Request | None = None,
     repo=Depends(get_task_repository),
 ):
     task = repo.get(task_id)
@@ -3357,6 +3393,7 @@ def get_hot_follow_workbench_hub(
         }
     compose_plan.setdefault("burned_subtitles_mode", "none")
     compose_plan.setdefault("crop_ratio", 0.18)
+    include_debug = bool(request and request.query_params.get("debug") == "1")
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
         scene_outputs = []
@@ -3383,6 +3420,9 @@ def get_hot_follow_workbench_hub(
     scenes_url = scene_pack.get("url")
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
+    translation_qa = _build_translation_qa_summary(origin_text or "", subtitles_text or "")
+    if translation_qa.get("has_mismatch"):
+        translation_qa_status = "WARN"
     audio_cfg = _hf_audio_config(task)
     if not (audio_cfg.get("voiceover_url") or "").strip() and (task.get("mm_audio_key") or task.get("mm_audio_path")):
         dub_state = "failed"
@@ -3408,7 +3448,6 @@ def get_hot_follow_workbench_hub(
         "status": compose_last_status,
         "started_at": task.get("compose_last_started_at"),
         "finished_at": task.get("compose_last_finished_at"),
-        "ffmpeg_cmd": task.get("compose_last_ffmpeg_cmd"),
         "error": task.get("compose_last_error") or task.get("compose_error"),
     }
     composed_ready = bool(composed.get("composed_ready"))
@@ -3477,8 +3516,8 @@ def get_hot_follow_workbench_hub(
         "deliverables": deliverables if isinstance(deliverables, list) else [],
         "events": task.get("events") or [],
         "translation_qa_status": translation_qa_status,
+        "translation_qa": translation_qa,
         "compose_plan": compose_plan,
-        "scene_outputs": scene_outputs,
         "composed_ready": composed_ready,
         "composed_reason": composed_reason,
         "final": final_info,
@@ -3491,6 +3530,7 @@ def get_hot_follow_workbench_hub(
             "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
         },
     }
+    payload.update(_build_workbench_debug_payload(include_debug, scene_outputs, compose_last))
 
     payload["task"] = {
         "id": task_id,
