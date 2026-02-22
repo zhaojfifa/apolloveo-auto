@@ -32,7 +32,7 @@
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <h2 class="text-lg font-semibold mb-4">{{ t("hot.follow.delivery.deliverables") }}</h2>
             <div id="hf-hint-panel" class="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
-              <div class="font-semibold mb-1">交付提示</div>
+              <div class="font-semibold mb-1" data-i18n="hot_follow_publish_hint_title">交付提示</div>
               <div id="hf-hint-summary">-</div>
               <div id="hf-hint-next" class="mt-1 text-gray-500">-</div>
               <div id="hf-hint-status" class="mt-1">-</div>
@@ -53,14 +53,14 @@
 
         <section class="lg:col-span-5 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h2 class="text-lg font-semibold mb-4">发布中心</h2>
+            <h2 class="text-lg font-semibold mb-4" data-i18n="hot_follow_publish_center_title">发布中心</h2>
             <div class="mb-3">
               <div id="hf-composed-badge" class="text-sm font-semibold text-amber-700">⚠️ Not Ready</div>
               <div id="hf-composed-reason" class="text-xs text-gray-500">final_missing</div>
             </div>
             <div class="space-y-3">
-              <label class="block text-sm font-semibold text-gray-700">发布文案</label>
-              <textarea class="w-full rounded-xl border border-gray-300 px-3 py-2" rows="6" placeholder="输入文案..."></textarea>
+              <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_publish_copy_label">发布文案</label>
+              <textarea class="w-full rounded-xl border border-gray-300 px-3 py-2" rows="6" placeholder="输入文案..." data-i18n-placeholder="hot_follow_publish_copy_placeholder"></textarea>
               <label class="block text-sm font-semibold text-gray-700">Hashtags</label>
               <input class="w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="#hot #trend #remix" />
               <label class="block text-sm font-semibold text-gray-700">{{ t("hot.follow.delivery.notes") }}</label>
@@ -76,7 +76,7 @@
 
         <section class="lg:col-span-3 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h2 class="text-lg font-semibold mb-4">发布回填</h2>
+            <h2 class="text-lg font-semibold mb-4" data-i18n="hot_follow_publish_backfill_title">发布回填</h2>
             <div class="space-y-3">
               <label class="block text-sm font-semibold text-gray-700">{{ t("hot.follow.delivery.published_url") }}</label>
               <input id="hf-publish-url" class="w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="https://..." />
