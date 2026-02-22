@@ -164,7 +164,6 @@ from gateway.app.services.media_validation import (
     assert_local_video_ok,
     deliver_key,
     media_meta_from_head,
-    probe_duration_seconds,
 )
 
 from ..core.workspace import (
@@ -1489,6 +1488,86 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
 
 def _hf_subtitles_override_path(task_id: str) -> Path:
     return task_base_dir(task_id) / "subtitles" / "subtitles_override.srt"
+
+
+def _probe_duration_seconds(path: Path) -> float:
+    """
+    Use ffprobe to get media duration in seconds.
+    Return 0.0 if probe fails.
+    """
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        logger.warning("AUDIO_FIT ffprobe not found for path=%s", path)
+        return 0.0
+    try:
+        proc = subprocess.run(
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(path),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        if proc.returncode != 0:
+            logger.warning("AUDIO_FIT ffprobe failed path=%s err=%s", path, (proc.stderr or "")[-300:])
+            return 0.0
+        duration = float((proc.stdout or "").strip() or 0.0)
+        return duration if duration > 0 else 0.0
+    except Exception as exc:
+        logger.warning("AUDIO_FIT probe exception path=%s err=%s", path, exc)
+        return 0.0
+
+
+def _build_atempo_chain(speed: float) -> str:
+    """
+    Build valid atempo chain.
+    FFmpeg atempo supports only 0.5-2.0 per segment.
+    """
+    s = max(float(speed), 0.01)
+    parts: list[str] = []
+    while s > 2.0:
+        parts.append("atempo=2.0")
+        s /= 2.0
+    while s < 0.5:
+        parts.append("atempo=0.5")
+        s /= 0.5
+    parts.append(f"atempo={s:.6f}")
+    return ",".join(parts)
+
+
+def _build_voice_fit_filter(
+    video_dur: float,
+    voice_dur: float,
+    min_speed: float = 0.90,
+    max_speed: float = 1.25,
+) -> str:
+    del min_speed  # v1.9: do not slow down short voice; keep signature for forward compatibility.
+    base = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo"
+
+    if video_dur <= 0 or voice_dur <= 0:
+        return base
+
+    if voice_dur > video_dur + 0.15:
+        need_speed = voice_dur / video_dur
+        applied_speed = max(1.0, min(need_speed, max_speed))
+        return (
+            f"{base},"
+            f"{_build_atempo_chain(applied_speed)},"
+            f"atrim=0:{video_dur:.6f},"
+            "asetpts=N/SR/TB"
+        )
+
+    if voice_dur < video_dur - 0.15:
+        return f"{base},apad,atrim=0:{video_dur:.6f},asetpts=N/SR/TB"
+
+    return f"{base},atrim=0:{video_dur:.6f},asetpts=N/SR/TB"
 
 
 def _hf_load_subtitles_text(task_id: str, task: dict) -> str:
@@ -3555,19 +3634,6 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         if overlay_subtitles and "subtitles=" not in cmd_text:
             _compose_fail("compose_failed", "overlay_subtitles enabled but ffmpeg cmd missing subtitles filter", ffmpeg_cmd=cmd_text)
 
-    def _build_atempo_filters(target_tempo: float) -> list[str]:
-        tempo = max(float(target_tempo), 0.01)
-        filters: list[str] = []
-        # atempo supports 0.5~2.0 per stage; chain if needed.
-        while tempo > 2.0 + 1e-6:
-            filters.append("atempo=2.0")
-            tempo /= 2.0
-        while tempo < 0.5 - 1e-6:
-            filters.append("atempo=0.5")
-            tempo /= 0.5
-        filters.append(f"atempo={tempo:.6f}")
-        return filters
-
     storage = get_storage_service()
     video_key = (
         _task_key(task, "mute_video_key")
@@ -3667,39 +3733,53 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             assert_local_audio_ok(voice_path)
         except ValueError:
             _compose_fail("missing_voiceover", "voiceover audio invalid")
-        video_duration_sec = float(probe_duration_seconds(video_path) or 0.0)
-        voice_duration_sec = float(probe_duration_seconds(voice_path) or 0.0)
+        video_duration_sec = float(_probe_duration_seconds(video_path) or 0.0)
+        voice_duration_sec = float(_probe_duration_seconds(voice_path) or 0.0)
         if video_duration_sec <= 0:
             _compose_fail("compose_failed", "invalid video duration from ffprobe")
         if voice_duration_sec <= 0:
             _compose_fail("missing_voiceover", "invalid voiceover duration from ffprobe")
+        logger.info(
+            "AUDIO_FIT task=%s video_dur=%.2f voice_dur=%.2f",
+            task_id,
+            video_duration_sec,
+            voice_duration_sec,
+        )
 
         try:
             max_speedup_ratio = float(os.getenv("COMPOSE_AUDIO_MAX_SPEEDUP_RATIO", "1.25") or 1.25)
         except Exception:
             max_speedup_ratio = 1.25
         max_speedup_ratio = max(1.0, min(3.0, max_speedup_ratio))
-        trim_applied = True
+        min_speed_ratio = 0.90
+        need_speed = (voice_duration_sec / video_duration_sec) if video_duration_sec > 0 else 1.0
+        applied_speed = max(1.0, min(need_speed, max_speedup_ratio))
+        if need_speed > 1.0:
+            logger.info(
+                "AUDIO_FIT_SPEED task=%s need_speed=%.3f applied_speed=%.3f",
+                task_id,
+                need_speed,
+                applied_speed,
+            )
+            if need_speed > max_speedup_ratio:
+                logger.warning(
+                    "AUDIO_FIT_OVERFLOW task=%s need_speed=%.3f exceeds max_speed=%.2f",
+                    task_id,
+                    need_speed,
+                    max_speedup_ratio,
+                )
+        voice_filter = _build_voice_fit_filter(
+            video_duration_sec,
+            voice_duration_sec,
+            min_speed=min_speed_ratio,
+            max_speed=max_speedup_ratio,
+        )
+        trim_applied = "atrim=" in voice_filter
         speedup_applied = False
         tempo = 1.0
-        if voice_duration_sec > video_duration_sec + 0.15 and video_duration_sec > 0:
-            ratio = voice_duration_sec / video_duration_sec
-            if ratio <= max_speedup_ratio:
-                tempo = ratio
-                speedup_applied = True
-        voice_fit_filters = [
-            "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo",
-            "volume=1.0",
-        ]
-        if speedup_applied:
-            voice_fit_filters.extend(_build_atempo_filters(tempo))
-        voice_fit_filters.extend(
-            [
-                f"atrim=0:{video_duration_sec:.6f}",
-                "asetpts=N/SR/TB",
-            ]
-        )
-        voice_fit_expr = ",".join(voice_fit_filters)
+        if voice_duration_sec > video_duration_sec + 0.15:
+            tempo = applied_speed
+            speedup_applied = applied_speed > 1.0
         compose_qa_payload = {
             "video_duration_sec": round(video_duration_sec, 4),
             "voice_duration_sec": round(voice_duration_sec, 4),
@@ -3750,7 +3830,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 video_codec_args = ["-c:v", "copy"]
             filter_complex = (
                 f"{video_filter_prefix}"
-                f"[1:a]{voice_fit_expr}[voice];"
+                f"[1:a]{voice_filter},volume=1.0[voice];"
                 f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
                 "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
             )
@@ -3810,7 +3890,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 video_codec_args = ["-c:v", "copy"]
             filter_complex = (
                 f"{video_filter_prefix}"
-                f"[1:a]{voice_fit_expr},alimiter=limit=0.95[mix]"
+                f"[1:a]{voice_filter},volume=1.0[voice];"
+                "[voice]alimiter=limit=0.95[mix]"
             )
             cmd = [
                 ffmpeg,
