@@ -191,6 +191,7 @@ ORIGIN_SRT_ARTIFACT = "subs/origin.srt"
 MM_SRT_ARTIFACT = "subs/mm.srt"
 MM_TXT_ARTIFACT = "subs/mm.txt"
 TRANSLATION_QA_ARTIFACT = "subs/translation_qa.json"
+VOICE_ALIGNMENT_ARTIFACT = "dub/voice_alignment.json"
 
 README_TEMPLATE = """CapCut pack usage
 
@@ -283,6 +284,122 @@ def _ensure_mp3_audio(src_path: Path, dst_path: Path) -> Path:
     if p.returncode != 0 or not dst_path.exists() or dst_path.stat().st_size == 0:
         raise PackError(f"ffmpeg mp3 conversion failed: {p.stderr[-800:]}")
     return dst_path
+
+
+def _parse_srt_time(value: str) -> float:
+    h, m, rest = value.replace(",", ".").split(":")
+    s, ms = rest.split(".")
+    return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
+
+
+def _parse_srt_cues(srt_text: str) -> list[dict]:
+    blocks = [b for b in (srt_text or "").split("\n\n") if b.strip()]
+    cues: list[dict] = []
+    for block in blocks:
+        lines = [line.rstrip() for line in block.splitlines() if line.strip()]
+        if len(lines) < 2:
+            continue
+        first = lines[0].strip()
+        has_index = first.isdigit()
+        time_line = lines[1].strip() if has_index else lines[0].strip()
+        if "-->" not in time_line:
+            continue
+        left, right = [x.strip() for x in time_line.split("-->", 1)]
+        try:
+            start_sec = _parse_srt_time(left)
+            end_sec = _parse_srt_time(right)
+        except Exception:
+            continue
+        text_lines = lines[2:] if has_index else lines[1:]
+        text = "\n".join([t for t in text_lines if t.strip()]).strip()
+        if not text:
+            continue
+        cues.append(
+            {
+                "index": int(first) if has_index else len(cues) + 1,
+                "start": start_sec,
+                "end": end_sec,
+                "text": text,
+                "budget": max(0.0, end_sec - start_sec),
+            }
+        )
+    return cues
+
+
+def _ffmpeg_concat_mp3(inputs: list[Path], output_path: Path) -> None:
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise DubbingError("ffmpeg not found in PATH")
+    if not inputs:
+        raise DubbingError("no audio segments to concatenate")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    list_path = output_path.parent / "segments.concat.txt"
+    with list_path.open("w", encoding="utf-8") as f:
+        for item in inputs:
+            f.write(f"file '{item.as_posix()}'\n")
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        str(list_path),
+        "-c:a",
+        "libmp3lame",
+        str(output_path),
+    ]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.returncode != 0 or not output_path.exists() or output_path.stat().st_size == 0:
+        raise DubbingError(f"ffmpeg concat failed: {p.stderr[-800:]}")
+
+
+def _ffmpeg_atempo(src_path: Path, dst_path: Path, speed: float) -> None:
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise DubbingError("ffmpeg not found in PATH")
+    dst_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(src_path),
+        "-filter:a",
+        f"atempo={speed:.6f}",
+        "-c:a",
+        "libmp3lame",
+        str(dst_path),
+    ]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.returncode != 0 or not dst_path.exists() or dst_path.stat().st_size == 0:
+        raise DubbingError(f"ffmpeg atempo failed: {p.stderr[-800:]}")
+
+
+def _ffmpeg_silence_mp3(out_path: Path, duration_sec: float) -> None:
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise DubbingError("ffmpeg not found in PATH")
+    duration = max(0.0, float(duration_sec))
+    if duration <= 0:
+        return
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-f",
+        "lavfi",
+        "-i",
+        "anullsrc=r=24000:cl=mono",
+        "-t",
+        f"{duration:.6f}",
+        "-c:a",
+        "libmp3lame",
+        str(out_path),
+    ]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.returncode != 0 or not out_path.exists() or out_path.stat().st_size == 0:
+        raise DubbingError(f"ffmpeg silence failed: {p.stderr[-800:]}")
 
 
 def _mix_with_bgm_if_configured(task_id: str, audio_file: Path, workspace: Workspace) -> Path:
@@ -807,20 +924,139 @@ async def run_dub_step(req: DubRequest):
     if not mm_text.strip() or not _clean_text_for_dub(mm_text):
         _fail_dub(req, "MM_TEXT_EMPTY", provider, status_code=400)
 
+    alignment_enabled = _truthy_env("DUB_SEGMENT_ALIGNMENT_ENABLED", "1")
+    cues: list[dict] = []
+    if alignment_enabled and not override_text and workspace.mm_srt_path.exists():
+        try:
+            cues = _parse_srt_cues(workspace.mm_srt_path.read_text(encoding="utf-8"))
+        except Exception:
+            cues = []
+    use_segment_alignment = alignment_enabled and not override_text and bool(cues)
+
     step_timeout_sec = _env_int("DUB_STEP_TIMEOUT_SEC", 900)
+    voice_alignment_payload: dict | None = None
+    voice_alignment_path: Path | None = None
     try:
-        result = await asyncio.wait_for(
-            synthesize_voice(
-                task_id=req.task_id,
-                target_lang=req.target_lang,
-                voice_id=req.voice_id,
-                provider=provider,
-                force=req.force,
-                mm_srt_text=mm_text,
-                workspace=workspace,
-            ),
-            timeout=step_timeout_sec,
-        )
+        if use_segment_alignment:
+            async def _run_segmented_alignment() -> dict:
+                segment_dir = workspace.base_dir / "audio" / "segments"
+                segment_dir.mkdir(parents=True, exist_ok=True)
+                provider_local = provider
+                assembled: list[Path] = []
+                stretch_samples: list[float] = []
+                over_budget_cues = 0
+                max_stretch_applied = 1.0
+
+                for pos, cue in enumerate(cues, start=1):
+                    cue_text = str(cue.get("text") or "").strip()
+                    budget = float(cue.get("budget") or 0.0)
+
+                    if not cue_text or not _clean_text_for_dub(cue_text):
+                        if budget > 0:
+                            silent_path = segment_dir / f"{pos:04d}_silent.mp3"
+                            _ffmpeg_silence_mp3(silent_path, budget)
+                            assembled.append(silent_path)
+                        continue
+
+                    cue_result = await synthesize_voice(
+                        task_id=req.task_id,
+                        target_lang=req.target_lang,
+                        voice_id=req.voice_id,
+                        provider=provider_local,
+                        force=True,
+                        mm_srt_text=cue_text,
+                        workspace=workspace,
+                    )
+                    cue_provider = cue_result.get("provider") if isinstance(cue_result, dict) else None
+                    if isinstance(cue_provider, str) and cue_provider.strip():
+                        provider_local = cue_provider.strip()
+
+                    cue_audio_value = cue_result.get("audio_path") if isinstance(cue_result, dict) else None
+                    cue_audio_path = Path(cue_audio_value) if cue_audio_value else workspace.mm_audio_path
+                    if not cue_audio_path.is_absolute():
+                        cue_audio_path = workspace.mm_audio_path
+                    if not cue_audio_path.exists():
+                        raise DubbingError("TTS_EMPTY_AUDIO: missing per-cue output")
+
+                    cue_raw_mp3 = segment_dir / f"{pos:04d}_raw.mp3"
+                    cue_mp3 = _ensure_mp3_audio(cue_audio_path, cue_raw_mp3)
+                    _, cue_duration = assert_local_audio_ok(cue_mp3)
+                    aligned_segment = cue_mp3
+                    applied_stretch = 1.0
+
+                    if budget > 0:
+                        applied_stretch = max(1.0, cue_duration / budget)
+                        if cue_duration > budget:
+                            applied_stretch = min(applied_stretch, 1.15)
+                            speed = max(0.5, min(2.0, 1.0 / applied_stretch))
+                            fitted_path = segment_dir / f"{pos:04d}_fit.mp3"
+                            _ffmpeg_atempo(cue_mp3, fitted_path, speed)
+                            aligned_segment = fitted_path
+                            _, cue_duration = assert_local_audio_ok(aligned_segment)
+                        max_stretch_applied = max(max_stretch_applied, applied_stretch)
+                        stretch_samples.append(applied_stretch)
+                        if cue_duration > budget + 0.02:
+                            over_budget_cues += 1
+
+                    assembled.append(aligned_segment)
+
+                    if budget > 0 and cue_duration < budget - 0.02:
+                        pad_path = segment_dir / f"{pos:04d}_pad.mp3"
+                        _ffmpeg_silence_mp3(pad_path, budget - cue_duration)
+                        assembled.append(pad_path)
+
+                    if pos < len(cues):
+                        next_start = float(cues[pos].get("start") or 0.0)
+                        current_end = float(cue.get("end") or cue.get("start") or 0.0)
+                        gap = max(0.0, next_start - current_end)
+                        if gap > 0.02:
+                            gap_path = segment_dir / f"{pos:04d}_gap.mp3"
+                            _ffmpeg_silence_mp3(gap_path, gap)
+                            assembled.append(gap_path)
+
+                if not assembled:
+                    raise DubbingError("TTS_EMPTY_AUDIO: no aligned segments")
+
+                aligned_output = workspace.base_dir / "audio" / "mm_audio_aligned.mp3"
+                _ffmpeg_concat_mp3(assembled, aligned_output)
+                if aligned_output != workspace.mm_audio_mp3_path:
+                    shutil.copy2(aligned_output, workspace.mm_audio_mp3_path)
+
+                nonzero = [s for s in stretch_samples if s > 0]
+                avg_rate = (sum(nonzero) / len(nonzero)) if nonzero else 1.0
+                alignment_payload_local = {
+                    "avg_rate": round(float(avg_rate), 4),
+                    "over_budget_cues": int(over_budget_cues),
+                    "max_stretch_applied": round(float(max_stretch_applied), 4),
+                    "aligned": over_budget_cues == 0,
+                }
+                return {
+                    "audio_path": str(aligned_output),
+                    "provider": provider_local,
+                    "voice_alignment": alignment_payload_local,
+                }
+
+            result = await asyncio.wait_for(_run_segmented_alignment(), timeout=step_timeout_sec)
+            voice_alignment_payload = result.get("voice_alignment") if isinstance(result, dict) else None
+        else:
+            result = await asyncio.wait_for(
+                synthesize_voice(
+                    task_id=req.task_id,
+                    target_lang=req.target_lang,
+                    voice_id=req.voice_id,
+                    provider=provider,
+                    force=req.force,
+                    mm_srt_text=mm_text,
+                    workspace=workspace,
+                ),
+                timeout=step_timeout_sec,
+            )
+            voice_alignment_payload = {
+                "avg_rate": 1.0,
+                "over_budget_cues": 0,
+                "max_stretch_applied": 1.0,
+                "aligned": False,
+            }
     except asyncio.TimeoutError:
         _fail_dub(req, "TTS_FAILED_TIMEOUT", provider)
     except asyncio.CancelledError:
@@ -834,6 +1070,20 @@ async def run_dub_step(req: DubRequest):
         _fail_dub(req, f"TTS_FAILED_HTTP_{exc.status_code}", provider)
     except Exception as exc:  # pragma: no cover
         _fail_dub(req, f"TTS_FAILED:{str(exc)[:120]}", provider)
+
+    if voice_alignment_payload is None:
+        voice_alignment_payload = {
+            "avg_rate": 1.0,
+            "over_budget_cues": 0,
+            "max_stretch_applied": 1.0,
+            "aligned": False,
+        }
+    voice_alignment_path = workspace.base_dir / "dub" / "voice_alignment.json"
+    voice_alignment_path.parent.mkdir(parents=True, exist_ok=True)
+    voice_alignment_path.write_text(
+        json.dumps(voice_alignment_payload, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
 
     provider_used = result.get("provider") if isinstance(result, dict) else None
     if isinstance(provider_used, str) and provider_used.strip():
@@ -903,6 +1153,17 @@ async def run_dub_step(req: DubRequest):
         mm_txt_path.parent.mkdir(parents=True, exist_ok=True)
         mm_txt_path.write_text(edited_text, encoding="utf-8")
         _upload_artifact(req.task_id, mm_txt_path, MM_TXT_ARTIFACT)
+    if voice_alignment_path and voice_alignment_path.exists():
+        _upload_artifact(req.task_id, voice_alignment_path, VOICE_ALIGNMENT_ARTIFACT)
+    _update_pipeline_config(
+        req.task_id,
+        {
+            "voice_alignment_avg_rate": str(voice_alignment_payload.get("avg_rate")),
+            "voice_alignment_over_budget_cues": str(voice_alignment_payload.get("over_budget_cues")),
+            "voice_alignment_max_stretch_applied": str(voice_alignment_payload.get("max_stretch_applied")),
+            "voice_alignment_aligned": "true" if voice_alignment_payload.get("aligned") else "false",
+        },
+    )
 
     try:
         audio_url = f"/v1/tasks/{req.task_id}/audio_mm"
@@ -912,6 +1173,7 @@ async def run_dub_step(req: DubRequest):
             "audio_mm_url": audio_url,
             "duration_sec": output_duration,
             "audio_path": (result.get("audio_path") or result.get("path")) if isinstance(result, dict) else None,
+            "voice_alignment": voice_alignment_payload,
         }
         logger.info(
             "DUB3_DONE",
