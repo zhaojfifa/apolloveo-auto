@@ -259,25 +259,92 @@
     return text;
   }
 
-  function applyLocale(locale) {
-    document.documentElement.setAttribute("data-locale", locale);
-    document.querySelectorAll("[data-i18n]").forEach((el) => {
+  function _translateElements(locale, root) {
+    if (!root || !root.querySelectorAll) return;
+    root.querySelectorAll("[data-i18n]").forEach((el) => {
       const key = el.getAttribute("data-i18n");
       el.textContent = t(key);
     });
-    document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    root.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
       const key = el.getAttribute("data-i18n-placeholder");
       el.setAttribute("placeholder", t(key));
     });
-    document.querySelectorAll("[data-i18n-title]").forEach((el) => {
+    root.querySelectorAll("[data-i18n-title]").forEach((el) => {
       const key = el.getAttribute("data-i18n-title");
       el.setAttribute("title", t(key));
     });
   }
 
+  function applyLocaleToRoot(locale, rootEl) {
+    const root = rootEl || document;
+    if (!locale) locale = resolveLocale();
+    if (root === document || root === document.documentElement || root === document.body) {
+      document.documentElement.setAttribute("data-locale", locale);
+    }
+    if (root.nodeType === 1) {
+      if (root.matches("[data-i18n]")) root.textContent = t(root.getAttribute("data-i18n"));
+      if (root.matches("[data-i18n-placeholder]")) root.setAttribute("placeholder", t(root.getAttribute("data-i18n-placeholder")));
+      if (root.matches("[data-i18n-title]")) root.setAttribute("title", t(root.getAttribute("data-i18n-title")));
+    }
+    _translateElements(locale, root);
+  }
+
+  function applyLocale(locale) {
+    applyLocaleToRoot(locale, document);
+  }
+
+  function refresh(rootEl) {
+    const locale = resolveLocale();
+    applyLocaleToRoot(locale, rootEl || document);
+  }
+
+  let observer = null;
+  let observerTimer = null;
+  const pendingRoots = new Set();
+
+  function _queueRefreshRoot(node) {
+    if (!node || !(node.nodeType === 1 || node.nodeType === 9)) return;
+    pendingRoots.add(node);
+    if (observerTimer) return;
+    observerTimer = setTimeout(() => {
+      observerTimer = null;
+      const locale = resolveLocale();
+      pendingRoots.forEach((root) => applyLocaleToRoot(locale, root));
+      pendingRoots.clear();
+    }, 50);
+  }
+
+  function _containsI18nAttrs(node) {
+    if (!node || node.nodeType !== 1) return false;
+    if (
+      node.hasAttribute("data-i18n") ||
+      node.hasAttribute("data-i18n-placeholder") ||
+      node.hasAttribute("data-i18n-title")
+    ) {
+      return true;
+    }
+    return Boolean(
+      node.querySelector("[data-i18n], [data-i18n-placeholder], [data-i18n-title]")
+    );
+  }
+
+  function _ensureObserver() {
+    if (observer || typeof MutationObserver === "undefined" || !document.body) return;
+    observer = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type !== "childList" || !m.addedNodes || !m.addedNodes.length) continue;
+        for (const n of m.addedNodes) {
+          if (_containsI18nAttrs(n)) _queueRefreshRoot(n);
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
   function boot() {
     const locale = resolveLocale();
-    applyLocale(locale);
+    applyLocaleToRoot(locale, document);
+    _ensureObserver();
     document.querySelectorAll("[data-lang-tab]").forEach((el) => {
       el.classList.toggle("active", el.getAttribute("data-lang-tab") === locale);
       el.addEventListener("click", (e) => {
@@ -285,6 +352,7 @@
         const target = el.getAttribute("data-lang-tab");
         if (!target) return;
         setCookie(target);
+        applyLocaleToRoot(target, document);
         setQueryLocale(target);
       });
     });
@@ -294,7 +362,7 @@
     return resolveLocale();
   }
 
-  window.__V185_I18N__ = { t, readLocale, applyLocale };
+  window.__V185_I18N__ = { t, readLocale, applyLocale, applyLocaleToRoot, refresh };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);

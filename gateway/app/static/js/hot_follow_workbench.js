@@ -10,6 +10,11 @@
     const i18n = window.__V185_I18N__ || {};
     if (typeof i18n.applyLocale === "function") i18n.applyLocale(locale);
   }
+  function refreshLocale(rootEl) {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.refresh === "function") i18n.refresh(rootEl || document);
+    else applyLocale(readLocale());
+  }
   function t(key, fallback) {
     const i18n = window.__V185_I18N__ || {};
     if (typeof i18n.t === "function") {
@@ -335,6 +340,7 @@
     renderDeliverables();
     renderEvents();
     updateComposeButtonState();
+    refreshLocale(root || document);
     refreshPollingState();
   }
 
