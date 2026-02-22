@@ -16,6 +16,7 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 from uuid import uuid4
 from typing import Any
 
@@ -163,6 +164,7 @@ from gateway.app.services.media_validation import (
     assert_local_video_ok,
     deliver_key,
     media_meta_from_head,
+    probe_duration_seconds,
 )
 
 from ..core.workspace import (
@@ -3260,6 +3262,10 @@ def get_hot_follow_workbench_hub(
     final_exists = bool(final_info.get("exists"))
     final_size = int(final_info.get("size_bytes") or 0)
     final_url = _task_endpoint(task_id, "final") if final_exists and final_size >= MIN_VIDEO_BYTES else None
+    final_av = str(final_info.get("asset_version") or task.get("final_asset_version") or "").strip()
+    if final_url and final_av:
+        sep = "&" if "?" in final_url else "?"
+        final_url = f"{final_url}{sep}av={quote(final_av, safe='')}"
     scene_pack = _scene_pack_info(task, task_id)
     scenes_url = scene_pack.get("url")
     subtitles_text = _hf_load_subtitles_text(task_id, task)
@@ -3549,6 +3555,19 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         if overlay_subtitles and "subtitles=" not in cmd_text:
             _compose_fail("compose_failed", "overlay_subtitles enabled but ffmpeg cmd missing subtitles filter", ffmpeg_cmd=cmd_text)
 
+    def _build_atempo_filters(target_tempo: float) -> list[str]:
+        tempo = max(float(target_tempo), 0.01)
+        filters: list[str] = []
+        # atempo supports 0.5~2.0 per stage; chain if needed.
+        while tempo > 2.0 + 1e-6:
+            filters.append("atempo=2.0")
+            tempo /= 2.0
+        while tempo < 0.5 - 1e-6:
+            filters.append("atempo=0.5")
+            tempo /= 0.5
+        filters.append(f"atempo={tempo:.6f}")
+        return filters
+
     storage = get_storage_service()
     video_key = (
         _task_key(task, "mute_video_key")
@@ -3640,6 +3659,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         video_path = tmp / "video_input.mp4"
         voice_path = tmp / "voice_input.mp3"
         final_path = tmp / "final_compose.mp4"
+        compose_qa_path = tmp / "compose_qa.json"
         subtitle_path = tmp / "subs_target.srt"
         storage.download_file(str(video_key), str(video_path))
         storage.download_file(str(audio_key), str(voice_path))
@@ -3647,6 +3667,47 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             assert_local_audio_ok(voice_path)
         except ValueError:
             _compose_fail("missing_voiceover", "voiceover audio invalid")
+        video_duration_sec = float(probe_duration_seconds(video_path) or 0.0)
+        voice_duration_sec = float(probe_duration_seconds(voice_path) or 0.0)
+        if video_duration_sec <= 0:
+            _compose_fail("compose_failed", "invalid video duration from ffprobe")
+        if voice_duration_sec <= 0:
+            _compose_fail("missing_voiceover", "invalid voiceover duration from ffprobe")
+
+        try:
+            max_speedup_ratio = float(os.getenv("COMPOSE_AUDIO_MAX_SPEEDUP_RATIO", "1.25") or 1.25)
+        except Exception:
+            max_speedup_ratio = 1.25
+        max_speedup_ratio = max(1.0, min(3.0, max_speedup_ratio))
+        trim_applied = True
+        speedup_applied = False
+        tempo = 1.0
+        if voice_duration_sec > video_duration_sec + 0.15 and video_duration_sec > 0:
+            ratio = voice_duration_sec / video_duration_sec
+            if ratio <= max_speedup_ratio:
+                tempo = ratio
+                speedup_applied = True
+        voice_fit_filters = [
+            "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo",
+            "volume=1.0",
+        ]
+        if speedup_applied:
+            voice_fit_filters.extend(_build_atempo_filters(tempo))
+        voice_fit_filters.extend(
+            [
+                f"atrim=0:{video_duration_sec:.6f}",
+                "asetpts=N/SR/TB",
+            ]
+        )
+        voice_fit_expr = ",".join(voice_fit_filters)
+        compose_qa_payload = {
+            "video_duration_sec": round(video_duration_sec, 4),
+            "voice_duration_sec": round(voice_duration_sec, 4),
+            "speedup_applied": bool(speedup_applied),
+            "tempo": round(float(tempo), 6),
+            "trim_applied": bool(trim_applied),
+        }
+        compose_qa_path.write_text(json.dumps(compose_qa_payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
         if overlay_subtitles:
             if not bundled_myanmar_ttf.exists() or bundled_myanmar_ttf.stat().st_size == 0:
@@ -3689,7 +3750,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 video_codec_args = ["-c:v", "copy"]
             filter_complex = (
                 f"{video_filter_prefix}"
-                "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0[voice];"
+                f"[1:a]{voice_fit_expr}[voice];"
                 f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
                 "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
             )
@@ -3749,7 +3810,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 video_codec_args = ["-c:v", "copy"]
             filter_complex = (
                 f"{video_filter_prefix}"
-                "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0,alimiter=limit=0.95[mix]"
+                f"[1:a]{voice_fit_expr},alimiter=limit=0.95[mix]"
             )
             cmd = [
                 ffmpeg,
@@ -3838,6 +3899,10 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         uploaded_key = storage.upload_file(str(final_path), final_key, content_type="video/mp4")
         if not uploaded_key:
             _compose_fail("compose_failed", "compose upload failed")
+        compose_qa_key = deliver_key(task_id, "compose_qa.json")
+        uploaded_qa_key = storage.upload_file(str(compose_qa_path), compose_qa_key, content_type="application/json")
+        if not uploaded_qa_key or not object_exists(compose_qa_key):
+            _compose_fail("compose_failed", "compose qa upload failed")
         if not object_exists(final_key):
             _compose_fail("compose_failed", "compose upload verify failed: missing final object")
         uploaded_meta = object_head(final_key)
