@@ -3368,7 +3368,7 @@ def get_hot_follow_publish_hub(
     return _publish_hub_payload(task)
 
 
-@api_router.get("/hot_follow/tasks/{task_id}/workbench_hub")
+@api_router.get("/hot_follow/tasks/{task_id}/workbench_hub", response_model=None)
 def get_hot_follow_workbench_hub(
     task_id: str,
     request: Request,
