@@ -43,12 +43,6 @@
   const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
   const composedBadgeEl = document.getElementById("hf_composed_badge");
   const composedReasonEl = document.getElementById("hf_composed_reason");
-  const composePlanTextEl = document.getElementById("hf_compose_plan_text");
-  const sceneOutputsTextEl = document.getElementById("hf_scene_outputs_text");
-  const translationQaTextEl = document.getElementById("hf_translation_qa_text");
-  const translationQaWarnEl = document.getElementById("hf_translation_qa_warn");
-  const voiceAlignmentTextEl = document.getElementById("hf_voice_alignment_text");
-  const burnedModeTextEl = document.getElementById("hf_burned_mode_text");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
@@ -244,47 +238,7 @@
     }
     if (composedReasonEl) composedReasonEl.textContent = reasonTextMap[reason] || reason;
     const composePlan = (currentHub && currentHub.compose_plan) || {};
-    const sceneOutputs = (currentHub && currentHub.scene_outputs) || [];
-    if (composePlanTextEl) {
-      composePlanTextEl.textContent =
-        `Plan: mute=${!!composePlan.mute}, overlay_subtitles=${!!composePlan.overlay_subtitles}, cleanup_mode=${composePlan.cleanup_mode || "none"}, target_lang=${composePlan.target_lang || "-"}`;
-    }
-    if (sceneOutputsTextEl) {
-      sceneOutputsTextEl.textContent = `Scene outputs: ${Array.isArray(sceneOutputs) ? sceneOutputs.length : 0}`;
-    }
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
-
-    const pipelineConfig = (currentTaskDetail && currentTaskDetail.pipeline_config) || {};
-    const translationQa = (currentHub && currentHub.translation_qa) || {};
-    const sourceCount = Number(translationQa.source_count ?? pipelineConfig.translation_source_count);
-    const translatedCount = Number(translationQa.translated_count ?? pipelineConfig.translation_translated_count);
-    const translationIncomplete = Boolean(
-      translationQa.complete === false ||
-      translationQa.incomplete === true ||
-      pipelineConfig.translation_incomplete === "true" ||
-      pipelineConfig.translation_incomplete === true
-    );
-    if (translationQaTextEl) {
-      const left = Number.isFinite(sourceCount) ? sourceCount : "-";
-      const right = Number.isFinite(translatedCount) ? translatedCount : "-";
-      translationQaTextEl.textContent = `Translation QA: source_count=${left}, translated_count=${right}`;
-    }
-    if (translationQaWarnEl) {
-      translationQaWarnEl.textContent = translationIncomplete ? "Warning: translation incomplete" : "";
-    }
-
-    const avgRateRaw = pipelineConfig.voice_alignment_avg_rate;
-    const overBudgetRaw = pipelineConfig.voice_alignment_over_budget_cues;
-    const avgRate = avgRateRaw === undefined || avgRateRaw === null || avgRateRaw === "" ? Number.NaN : Number(avgRateRaw);
-    const overBudget = overBudgetRaw === undefined || overBudgetRaw === null || overBudgetRaw === "" ? Number.NaN : Number(overBudgetRaw);
-    if (voiceAlignmentTextEl) {
-      voiceAlignmentTextEl.textContent = `Voice alignment: avg_rate=${Number.isFinite(avgRate) ? avgRate : "-"}, over_budget_cues=${Number.isFinite(overBudget) ? overBudget : "-"}`;
-    }
-
-    if (burnedModeTextEl) {
-      const burnedMode = composePlan.burned_subtitles_mode || "none";
-      burnedModeTextEl.textContent = `Burned subtitles mode: ${burnedMode}`;
-    }
   }
 
   function renderScenePack() {

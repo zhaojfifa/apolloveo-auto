@@ -15,12 +15,6 @@
   const hintSummaryEl = document.getElementById("hf-hint-summary");
   const hintNextEl = document.getElementById("hf-hint-next");
   const hintStatusEl = document.getElementById("hf-hint-status");
-  const translationQaEl = document.getElementById("hf-translation-qa");
-  const translationQaWarnEl = document.getElementById("hf-translation-qa-warn");
-  const voiceAlignmentEl = document.getElementById("hf-voice-alignment");
-  const burnedModeEl = document.getElementById("hf-burned-mode");
-
-  let currentTaskDetail = null;
 
   if (!taskId) return;
 
@@ -98,7 +92,6 @@
     }
 
     renderHintPanel(data, deliverables);
-    renderDiagnostics(data);
     if (!keys.length) {
       if (emptyEl) emptyEl.style.display = "block";
       if (listEl) listEl.innerHTML = "";
@@ -127,33 +120,8 @@
       .join("");
   }
 
-  function renderDiagnostics(data) {
-    const pipelineConfig = (currentTaskDetail && currentTaskDetail.pipeline_config) || {};
-    const composePlan = ((currentTaskDetail && currentTaskDetail.compose_plan) || data.compose_plan || {});
-
-    const sourceRaw = pipelineConfig.translation_source_count;
-    const translatedRaw = pipelineConfig.translation_translated_count;
-    const sourceCount = sourceRaw === undefined || sourceRaw === null || sourceRaw === "" ? "-" : Number(sourceRaw);
-    const translatedCount = translatedRaw === undefined || translatedRaw === null || translatedRaw === "" ? "-" : Number(translatedRaw);
-    const translationIncomplete = pipelineConfig.translation_incomplete === "true" || pipelineConfig.translation_incomplete === true;
-    if (translationQaEl) translationQaEl.textContent = `Translation QA: source_count=${sourceCount}, translated_count=${translatedCount}`;
-    if (translationQaWarnEl) translationQaWarnEl.textContent = translationIncomplete ? "Warning: translation incomplete" : "";
-
-    const avgRateRaw = pipelineConfig.voice_alignment_avg_rate;
-    const overBudgetRaw = pipelineConfig.voice_alignment_over_budget_cues;
-    const avgRate = avgRateRaw === undefined || avgRateRaw === null || avgRateRaw === "" ? "-" : Number(avgRateRaw);
-    const overBudget = overBudgetRaw === undefined || overBudgetRaw === null || overBudgetRaw === "" ? "-" : Number(overBudgetRaw);
-    if (voiceAlignmentEl) voiceAlignmentEl.textContent = `Voice alignment: avg_rate=${avgRate}, over_budget_cues=${overBudget}`;
-
-    if (burnedModeEl) burnedModeEl.textContent = `Burned subtitles mode: ${composePlan.burned_subtitles_mode || "none"}`;
-  }
-
   async function loadPublishHub() {
     try {
-      try {
-        const detailRes = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
-        if (detailRes.ok) currentTaskDetail = await detailRes.json();
-      } catch (_) {}
       const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/publish_hub`);
       if (!res.ok) {
         if (emptyEl) emptyEl.style.display = "block";
