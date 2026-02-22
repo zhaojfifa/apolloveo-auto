@@ -290,6 +290,8 @@ class ComposeTaskRequest(BaseModel):
 class ComposePlanPatchRequest(BaseModel):
     overlay_subtitles: bool | None = None
     target_lang: str | None = None
+    burned_subtitles_mode: str | None = None
+    crop_ratio: float | None = None
 
 
 pages_router = APIRouter()
@@ -3235,7 +3237,11 @@ def get_hot_follow_workbench_hub(
             "strip_subtitle_streams": True,
             "cleanup_mode": "none",
             "target_lang": task.get("target_lang") or task.get("content_lang") or "mm",
+            "burned_subtitles_mode": "none",
+            "crop_ratio": 0.18,
         }
+    compose_plan.setdefault("burned_subtitles_mode", "none")
+    compose_plan.setdefault("crop_ratio", 0.18)
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
         scene_outputs = []
@@ -3442,10 +3448,22 @@ def patch_hot_follow_compose_plan(
         plan["strip_subtitle_streams"] = True
     if "target_lang" not in plan:
         plan["target_lang"] = task.get("target_lang") or task.get("content_lang") or "mm"
+    if "burned_subtitles_mode" not in plan:
+        plan["burned_subtitles_mode"] = "none"
+    if "crop_ratio" not in plan:
+        plan["crop_ratio"] = 0.18
     if payload.overlay_subtitles is not None:
         plan["overlay_subtitles"] = bool(payload.overlay_subtitles)
     if payload.target_lang is not None and str(payload.target_lang).strip():
         plan["target_lang"] = str(payload.target_lang).strip()
+    if payload.burned_subtitles_mode is not None:
+        mode = str(payload.burned_subtitles_mode).strip().lower()
+        if mode not in {"none", "crop_bottom", "mask_bottom"}:
+            raise HTTPException(status_code=400, detail="invalid burned_subtitles_mode")
+        plan["burned_subtitles_mode"] = mode
+    if payload.crop_ratio is not None:
+        ratio = max(0.01, min(0.5, float(payload.crop_ratio)))
+        plan["crop_ratio"] = ratio
     _policy_upsert(repo, task_id, {"compose_plan": plan})
     return {"task_id": task_id, "compose_plan": plan}
 
@@ -3589,6 +3607,14 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     overlay_subtitles = bool(compose_plan.get("overlay_subtitles"))
     strip_subtitle_streams = bool(compose_plan.get("strip_subtitle_streams", True))
     target_lang = str(compose_plan.get("target_lang") or task.get("target_lang") or task.get("content_lang") or "mm")
+    burned_subtitles_mode = str(compose_plan.get("burned_subtitles_mode") or "none").strip().lower()
+    if burned_subtitles_mode not in {"none", "crop_bottom", "mask_bottom"}:
+        burned_subtitles_mode = "none"
+    try:
+        crop_ratio = float(compose_plan.get("crop_ratio", 0.18) or 0.18)
+    except Exception:
+        crop_ratio = 0.18
+    crop_ratio = max(0.01, min(0.5, crop_ratio))
     logger.info(
         "COMPOSE_START",
         extra={
@@ -3600,6 +3626,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "overlay_subtitles": overlay_subtitles,
             "strip_subtitle_streams": strip_subtitle_streams,
             "target_lang": target_lang,
+            "burned_subtitles_mode": burned_subtitles_mode,
+            "crop_ratio": crop_ratio,
         },
     )
 
@@ -3636,6 +3664,13 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             storage.download_file(str(bgm_key), str(bgm_path))
 
         if bgm_path and bgm_path.exists():
+            video_filters: list[str] = []
+            if burned_subtitles_mode == "crop_bottom":
+                video_filters.append(f"crop=in_w:in_h*(1-{crop_ratio}):0:0")
+            elif burned_subtitles_mode == "mask_bottom":
+                video_filters.append(
+                    f"drawbox=x=0:y=ih-ih*{crop_ratio}:w=iw:h=ih*{crop_ratio}:color=black@1.0:t=fill"
+                )
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
                 subtitle_filter = (
@@ -3643,22 +3678,21 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
-                filter_complex = (
-                    f"[0:v]{subtitle_filter}[v];"
-                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0[voice];"
-                    f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
-                    "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
-                )
+                video_filters.append(subtitle_filter)
+            video_filter_prefix = ""
+            if video_filters:
+                video_filter_prefix = f"[0:v]{','.join(video_filters)}[v];"
                 map_video = "[v]"
                 video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
             else:
-                filter_complex = (
-                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0[voice];"
-                    f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
-                    "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
-                )
                 map_video = "0:v:0"
                 video_codec_args = ["-c:v", "copy"]
+            filter_complex = (
+                f"{video_filter_prefix}"
+                "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0[voice];"
+                f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
+                "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+            )
             cmd = [
                 ffmpeg,
                 "-y",
@@ -3690,6 +3724,13 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                 _compose_fail("compose_failed", "compose ffmpeg failed", ffmpeg_cmd=ffmpeg_cmd_used, stderr_tail=(proc.stderr or "")[-800:])
         else:
+            video_filters: list[str] = []
+            if burned_subtitles_mode == "crop_bottom":
+                video_filters.append(f"crop=in_w:in_h*(1-{crop_ratio}):0:0")
+            elif burned_subtitles_mode == "mask_bottom":
+                video_filters.append(
+                    f"drawbox=x=0:y=ih-ih*{crop_ratio}:w=iw:h=ih*{crop_ratio}:color=black@1.0:t=fill"
+                )
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
                 subtitle_filter = (
@@ -3697,16 +3738,19 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
-                filter_complex = (
-                    f"[0:v]{subtitle_filter}[v];"
-                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0,alimiter=limit=0.95[mix]"
-                )
+                video_filters.append(subtitle_filter)
+            video_filter_prefix = ""
+            if video_filters:
+                video_filter_prefix = f"[0:v]{','.join(video_filters)}[v];"
                 map_video = "[v]"
                 video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
             else:
-                filter_complex = "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0,alimiter=limit=0.95[mix]"
                 map_video = "0:v:0"
                 video_codec_args = ["-c:v", "copy"]
+            filter_complex = (
+                f"{video_filter_prefix}"
+                "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0,alimiter=limit=0.95[mix]"
+            )
             cmd = [
                 ffmpeg,
                 "-y",
@@ -3867,6 +3911,8 @@ def compose_hot_follow_final_video(
         "strip_subtitle_streams": bool(current_plan.get("strip_subtitle_streams", True)),
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
+        "burned_subtitles_mode": str(current_plan.get("burned_subtitles_mode") or "none"),
+        "crop_ratio": max(0.01, min(0.5, float(current_plan.get("crop_ratio", 0.18) or 0.18))),
     }
     try:
         _policy_upsert(
@@ -4001,6 +4047,8 @@ def compose_task(
         "strip_subtitle_streams": bool(current_plan.get("strip_subtitle_streams", True)),
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
+        "burned_subtitles_mode": str(current_plan.get("burned_subtitles_mode") or "none"),
+        "crop_ratio": max(0.01, min(0.5, float(current_plan.get("crop_ratio", 0.18) or 0.18))),
     }
     try:
         _policy_upsert(
