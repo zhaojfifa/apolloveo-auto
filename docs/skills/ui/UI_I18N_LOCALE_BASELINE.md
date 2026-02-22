@@ -144,3 +144,10 @@ git push
 
 
 Rule: All new pages must follow Tasks locale mode (readLocale() + applyLocale()).
+
+## 8. SOP 新页面接入（避免语言切换失效）
+新增 Hot Follow / SOP 页面时，必须遵循以下步骤：
+- 引入 `gateway/app/static/js/i18n_v185.js`，并在页面初始化时执行 `readLocale()` + `applyLocale()`。
+- 所有可见文案使用 `data-i18n` / `data-i18n-placeholder` / `data-i18n-title`，不要在 JS 里写死用户可见字符串。
+- 页面存在异步渲染或 `innerHTML` 替换时，渲染后调用 `window.__V185_I18N__.refresh(rootEl)`。
+- 新增 key 时同时补齐 `zh` 与 `mm`，禁止依赖 fallback 才显示文案。
