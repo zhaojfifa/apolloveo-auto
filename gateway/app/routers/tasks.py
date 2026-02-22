@@ -274,6 +274,7 @@ class HotFollowAudioConfigRequest(BaseModel):
     tts_engine: str | None = None
     tts_voice: str | None = None
     bgm_mix: float | None = None
+    audio_fit_max_speed: float | None = None
 
 
 class HotFollowSubtitlesRequest(BaseModel):
@@ -1470,6 +1471,12 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         mix_val = float(mix if mix is not None else 0.3)
     except Exception:
         mix_val = 0.3
+    fit_raw = config.get("audio_fit_max_speed")
+    try:
+        fit_val = float(fit_raw if fit_raw is not None else 1.25)
+    except Exception:
+        fit_val = 1.25
+    fit_val = max(1.0, min(2.0, fit_val))
     task_id = str(task.get("task_id") or task.get("id") or "")
     voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
     meta = object_head(str(voice_key)) if voice_key else None
@@ -1480,6 +1487,7 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         "tts_voice": task.get("voice_id") or "zh-CN-XiaoxiaoNeural",
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
+        "audio_fit_max_speed": fit_val,
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
         "voiceover_url": voice_url,
         "audio_url": voice_url,
@@ -1568,6 +1576,26 @@ def _build_voice_fit_filter(
         return f"{base},apad,atrim=0:{video_dur:.6f},asetpts=N/SR/TB"
 
     return f"{base},atrim=0:{video_dur:.6f},asetpts=N/SR/TB"
+
+
+def _resolve_audio_fit_max_speed(config: dict | None) -> tuple[float, str]:
+    cfg = dict(config or {})
+    raw = cfg.get("audio_fit_max_speed")
+    source = "operator" if raw is not None else "default"
+    try:
+        value = float(raw if raw is not None else 1.25)
+    except Exception:
+        value = 1.25
+        source = "default"
+    return max(1.0, min(2.0, value)), source
+
+
+def _compute_audio_fit_speeds(video_dur: float, voice_dur: float, max_speed: float) -> tuple[float, float]:
+    if video_dur <= 0 or voice_dur <= 0:
+        return 1.0, 1.0
+    need_speed = voice_dur / video_dur
+    applied_speed = min(max(need_speed, 1.0), max_speed)
+    return need_speed, applied_speed
 
 
 def _hf_load_subtitles_text(task_id: str, task: dict) -> str:
@@ -3497,9 +3525,11 @@ def patch_hot_follow_audio_config(
     if payload.bgm_mix is not None:
         mix = max(0.0, min(1.0, float(payload.bgm_mix)))
         bgm["mix_ratio"] = mix
+    if payload.audio_fit_max_speed is not None:
+        config["audio_fit_max_speed"] = max(1.0, min(2.0, float(payload.audio_fit_max_speed)))
     if bgm:
         config["bgm"] = bgm
-        updates["config"] = config
+    updates["config"] = config
 
     provider = _hf_engine_internal(payload.tts_engine)
     if payload.tts_engine is not None:
@@ -3746,14 +3776,19 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             voice_duration_sec,
         )
 
-        try:
-            max_speedup_ratio = float(os.getenv("COMPOSE_AUDIO_MAX_SPEEDUP_RATIO", "1.25") or 1.25)
-        except Exception:
-            max_speedup_ratio = 1.25
-        max_speedup_ratio = max(1.0, min(3.0, max_speedup_ratio))
+        max_speedup_ratio, max_speed_source = _resolve_audio_fit_max_speed(config)
+        logger.info(
+            "AUDIO_FIT_SPEED_CAP task=%s max_speed=%.2f source=%s",
+            task_id,
+            max_speedup_ratio,
+            max_speed_source,
+        )
         min_speed_ratio = 0.90
-        need_speed = (voice_duration_sec / video_duration_sec) if video_duration_sec > 0 else 1.0
-        applied_speed = max(1.0, min(need_speed, max_speedup_ratio))
+        need_speed, applied_speed = _compute_audio_fit_speeds(
+            video_duration_sec,
+            voice_duration_sec,
+            max_speedup_ratio,
+        )
         if need_speed > 1.0:
             logger.info(
                 "AUDIO_FIT_SPEED task=%s need_speed=%.3f applied_speed=%.3f",
