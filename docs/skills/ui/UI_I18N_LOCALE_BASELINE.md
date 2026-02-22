@@ -67,6 +67,12 @@ API 调用约定：
 - 页面语言切换仅影响 UI 展示，不改变 API 业务参数语义
 - 跳转 URL 必须透传 `ui_locale`，API 请求继续按现有 contract
 
+SOP 页面最低必备翻译 key（Hot Follow）：
+- `hot_follow_new_*`（新建页配置与模式文案）
+- `hot_follow_workbench_*`（Workbench 的 Source/Target、提示与按钮）
+- `hot_follow_publish_*`（Publish/Delivery 的标题与提示）
+- 若新增动态 JS 文案，必须同时补齐 `zh` 与 `mm`，避免出现 `[MISSING:...]`
+
 线上验收标准：
 - 页面不允许出现 `[tasks.xxx]`、`[common.xxx]` 等未渲染 token
 
