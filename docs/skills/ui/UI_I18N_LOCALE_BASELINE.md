@@ -4,6 +4,8 @@
 - /tasks（Board）
 - /tasks/newtasks（Wizard Step 1：场景选择）
 - /tasks/avatar/new、/tasks/hot/new、/tasks/baseline/new（各场景入口页）
+- /tasks/{task_id}（Hot Follow Workbench）
+- /tasks/{task_id}/publish（Hot Follow Publish / Delivery）
 - 后续所有新增页面必须复用同一套语言机制
 
 ## 0. 设计目标（为什么这么做）
@@ -42,8 +44,11 @@
 - /tasks/avatar/new?ui_locale=mm
 - /tasks/hot/new?ui_locale=mm
 - /tasks/baseline/new?ui_locale=mm
+- /tasks/{task_id}?ui_locale=mm
+- /tasks/{task_id}/publish?ui_locale=mm
 
 > 尤其注意：Wizard 的三张卡片跳转必须带 ui_locale，否则会出现“入口页是缅文，下一页变回英文/中文”。
+> Workbench 与 Publish 之间互跳时也必须保留 ui_locale。
 
 ---
 
@@ -56,6 +61,11 @@
 仅允许用于：
 - JS 动态插入的内容
 - 兜底替换（极少数、不可依赖）
+- 必须复用统一 helper：`readLocale()` + `applyLocale()`（与 Tasks 页面一致）
+
+API 调用约定：
+- 页面语言切换仅影响 UI 展示，不改变 API 业务参数语义
+- 跳转 URL 必须透传 `ui_locale`，API 请求继续按现有 contract
 
 线上验收标准：
 - 页面不允许出现 `[tasks.xxx]`、`[common.xxx]` 等未渲染 token

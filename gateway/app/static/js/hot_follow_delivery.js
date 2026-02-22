@@ -10,6 +10,14 @@
     const i18n = window.__V185_I18N__ || {};
     if (typeof i18n.applyLocale === "function") i18n.applyLocale(locale);
   }
+  function t(key, fallback) {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.t === "function") {
+      const text = i18n.t(key);
+      if (typeof text === "string" && !text.startsWith("【MISSING:")) return text;
+    }
+    return fallback;
+  }
   applyLocale(readLocale());
   const taskId = root ? root.getAttribute("data-task-id") : null;
   const listEl = document.getElementById("hf-deliverables");
@@ -32,22 +40,22 @@
 
   function reasonText(reason) {
     const mapping = {
-      ready: "可发布",
-      final_missing: "尚未生成最终成片",
-      compose_in_progress: "合成中…",
-      compose_failed: "合成失败，可重试",
-      missing_voiceover: "缺少配音",
-      missing_raw: "缺少源视频",
+      ready: t("hot_follow_compose_reason_ready", "可发布"),
+      final_missing: t("hot_follow_compose_reason_final_missing", "尚未生成最终成片"),
+      compose_in_progress: t("hot_follow_compose_reason_in_progress", "合成中…"),
+      compose_failed: t("hot_follow_compose_reason_failed", "合成失败，可重试"),
+      missing_voiceover: t("hot_follow_compose_reason_missing_voice", "缺少配音"),
+      missing_raw: t("hot_follow_compose_reason_missing_raw", "缺少源视频"),
     };
     return mapping[reason] || reason || "-";
   }
 
   function groupDeliverables(deliverables) {
     const groups = [
-      { label: "成片", keys: ["final_mp4"] },
-      { label: "剪辑包", keys: ["pack_zip", "edit_bundle_zip"] },
-      { label: "字幕与脚本", keys: ["origin_srt", "mm_srt", "mm_txt"] },
-      { label: "音频素材", keys: ["mm_audio", "bgm_audio"] },
+      { label: t("hot_follow_delivery_group_final", "成片"), keys: ["final_mp4"] },
+      { label: t("hot_follow_delivery_group_pack", "剪辑包"), keys: ["pack_zip", "edit_bundle_zip"] },
+      { label: t("hot_follow_delivery_group_subtitles", "字幕与脚本"), keys: ["origin_srt", "mm_srt", "mm_txt"] },
+      { label: t("hot_follow_delivery_group_audio", "音频素材"), keys: ["mm_audio", "bgm_audio"] },
       { label: "Scene Pack", keys: ["scenes_zip"] },
     ];
     return groups.map((g) => ({
@@ -64,19 +72,19 @@
     const hasBgm = Boolean(deliverables.bgm_audio);
     if (hintSummaryEl) {
       hintSummaryEl.textContent =
-        `本次交付包含：Final ${hasFinal ? "✅" : "❌"} / Pack ${hasPack ? "✅" : "❌"} / Subtitles ${hasSubs ? "✅" : "❌"} / Audio ${hasAudio ? "✅" : "❌"} / BGM ${hasBgm ? "✅" : "❌"}`;
+        `${t("hot_follow_delivery_summary_prefix", "本次交付包含：")}Final ${hasFinal ? "✅" : "❌"} / Pack ${hasPack ? "✅" : "❌"} / Subtitles ${hasSubs ? "✅" : "❌"} / Audio ${hasAudio ? "✅" : "❌"} / BGM ${hasBgm ? "✅" : "❌"}`;
     }
     if (hintNextEl) {
       hintNextEl.textContent = hasFinal
-        ? "下一步：可直接发布成片或下载 pack 继续精修。"
-        : "下一步：先回 Workbench 执行 Compose Final。";
+        ? t("hot_follow_delivery_next_ready", "下一步：可直接发布成片或下载 pack 继续精修。")
+        : t("hot_follow_delivery_next_compose", "下一步：先回 Workbench 执行 Compose Final。");
     }
     if (hintStatusEl) {
       const ready = Boolean(data.composed_ready);
-      const scenePending = data.scene_pack_pending_reason ? "（Scene Pack pending，不阻塞发布）" : "";
+      const scenePending = data.scene_pack_pending_reason ? t("hot_follow_delivery_scene_pending_suffix", "（Scene Pack pending，不阻塞发布）") : "";
       hintStatusEl.textContent = ready
-        ? "当前状态：✅ 可发布"
-        : `当前状态：⚠️ ${reasonText(data.composed_reason)}${scenePending}`;
+        ? t("hot_follow_delivery_status_ready", "当前状态：✅ 可发布")
+        : `${t("hot_follow_delivery_status_prefix", "当前状态：⚠️")} ${reasonText(data.composed_reason)}${scenePending}`;
     }
   }
 
@@ -94,7 +102,9 @@
     if (composedReasonEl) composedReasonEl.textContent = reasonText(composedReason);
     if (translationQaStatusEl) {
       const qaStatus = String(data.translation_qa_status || "PASS").toUpperCase();
-      translationQaStatusEl.textContent = `Translation QA: ${qaStatus === "WARN" ? "WARN" : "PASS"}`;
+      translationQaStatusEl.textContent = qaStatus === "WARN"
+        ? t("hot_follow_translation_qa_warn", "Translation QA: WARN")
+        : t("hot_follow_translation_qa_pass", "Translation QA: PASS");
     }
     if (scenePackStatusEl) scenePackStatusEl.textContent = data.scene_pack_pending_reason ? "pending" : "ready";
     if (scenePackReasonEl) scenePackReasonEl.textContent = data.scene_pack_pending_reason || "";

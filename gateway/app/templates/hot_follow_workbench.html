@@ -37,10 +37,10 @@
               <span class="text-xs text-gray-400">ID: {{ task.task_id }}</span>
             </div>
             <div class="flex flex-wrap gap-2 text-sm mb-4">
-              <button id="hf-tab-source" class="px-3 py-1 rounded-full bg-gray-900 text-white">源视频</button>
-              <button id="hf-tab-final" class="px-3 py-1 rounded-full bg-gray-100 text-gray-600">最终成片</button>
-              <a id="hf_source_video_link" class="px-3 py-1 rounded-full bg-gray-100 text-gray-600 opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener">打开源视频</a>
-              <a id="hf_final_video_link" class="px-3 py-1 rounded-full bg-gray-100 text-gray-600 opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener">打开最终成片</a>
+              <button id="hf-tab-source" class="px-3 py-1 rounded-full bg-gray-900 text-white" data-i18n="hot_follow_workbench_tab_source">源视频</button>
+              <button id="hf-tab-final" class="px-3 py-1 rounded-full bg-gray-100 text-gray-600" data-i18n="hot_follow_workbench_tab_final">最终成片</button>
+              <a id="hf_source_video_link" class="px-3 py-1 rounded-full bg-gray-100 text-gray-600 opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener" data-i18n="hot_follow_workbench_open_source">打开源视频</a>
+              <a id="hf_final_video_link" class="px-3 py-1 rounded-full bg-gray-100 text-gray-600 opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener" data-i18n="hot_follow_workbench_open_final">打开最终成片</a>
             </div>
             <div id="hf_source_video_container" class="w-full h-72 rounded-xl bg-gray-100 border border-dashed border-gray-300 overflow-hidden">
               <video id="hf_source_video" class="w-full h-full object-cover hidden" controls preload="metadata"></video>
@@ -48,7 +48,7 @@
               {% if cover_url %}
                 <img id="hf_source_poster" class="w-full h-full object-cover bg-gray-100" src="{{ cover_url }}" alt="cover" />
               {% else %}
-                <div id="hf_source_poster" class="w-full h-full flex items-center justify-center text-sm text-gray-500">等待源视频</div>
+                <div id="hf_source_poster" class="w-full h-full flex items-center justify-center text-sm text-gray-500" data-i18n="hot_follow_workbench_wait_source">等待源视频</div>
               {% endif %}
             </div>
           </div>
@@ -68,7 +68,7 @@
           </div>
 
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h3 class="text-base font-semibold mb-3">字幕编辑</h3>
+            <h3 class="text-base font-semibold mb-3" data-i18n="hot_follow_workbench_subtitle_edit">字幕编辑</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
               <div class="rounded-xl border border-gray-200 p-3">
                 <div class="text-xs text-gray-500 mb-2">Original</div>
@@ -79,10 +79,10 @@
                 <pre id="hf_subtitles_edited_preview" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
               </div>
             </div>
-            <textarea id="hf_subtitles_text" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" rows="10" placeholder="在此编辑 SRT 文本"></textarea>
+            <textarea id="hf_subtitles_text" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" rows="10" placeholder="在此编辑 SRT 文本" data-i18n-placeholder="hot_follow_workbench_subtitle_placeholder"></textarea>
             <div class="flex items-center gap-3 mt-3">
-              <button id="hf_subtitles_refresh_btn" class="btn-secondary">刷新字幕</button>
-              <button id="hf_subtitles_save_btn" class="btn-secondary">保存字幕</button>
+              <button id="hf_subtitles_refresh_btn" class="btn-secondary" data-i18n="hot_follow_workbench_subtitle_refresh">刷新字幕</button>
+              <button id="hf_subtitles_save_btn" class="btn-secondary" data-i18n="hot_follow_workbench_subtitle_save">保存字幕</button>
               <span id="hf_subtitles_msg" class="text-xs text-gray-500"></span>
             </div>
           </div>
@@ -136,7 +136,7 @@
                     </select>
                   </div>
                   <div class="flex items-center gap-2">
-                    <button id="hf_tts_preview_btn" class="btn-secondary text-xs">试听</button>
+                    <button id="hf_tts_preview_btn" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_tts_preview">试听</button>
                     <button id="hf_rerun_audio_btn" class="btn-secondary text-xs">Re-Run Audio</button>
                   </div>
                   <div>
@@ -212,9 +212,9 @@
               <span class="text-sm text-gray-600">{{ t("hot.follow.step.scenes") }}</span>
               <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="scenes">-</span>
             </div>
-            <div class="text-xs text-gray-500 mt-2" id="hf-scene-pack-hint">可选，未生成时不影响主流程</div>
+            <div class="text-xs text-gray-500 mt-2" id="hf-scene-pack-hint" data-i18n="hot_follow_workbench_scene_pack_hint">可选，未生成时不影响主流程</div>
             <button class="btn-secondary mt-3" data-action="scene_pack">Generate Scene Pack</button>
-            <a id="hf_scene_pack_download" class="btn-secondary mt-4 inline-block opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener">下载 Scene Pack</a>
+            <a id="hf_scene_pack_download" class="btn-secondary mt-4 inline-block opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener" data-i18n="hot_follow_workbench_scene_pack_download">下载 Scene Pack</a>
           </div>
 
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">

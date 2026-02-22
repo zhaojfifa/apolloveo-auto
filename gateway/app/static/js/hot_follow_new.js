@@ -1,4 +1,18 @@
 (function () {
+  function readLocale() {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.readLocale === "function") return i18n.readLocale();
+    const qs = new URLSearchParams(window.location.search || "");
+    return (qs.get("ui_locale") || "zh").toLowerCase();
+  }
+
+  function applyLocale(locale) {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.applyLocale === "function") i18n.applyLocale(locale);
+  }
+
+  applyLocale(readLocale());
+
   const urlEl = document.getElementById("hf-url");
   const platformEl = document.getElementById("hf-platform");
   const probeCard = document.getElementById("hf-probe");
@@ -18,13 +32,8 @@
   let lastProbe = null;
   let debounceTimer = null;
 
-  function getLocale() {
-    const qs = new URLSearchParams(window.location.search || "");
-    return qs.get("ui_locale") || "";
-  }
-
   function withLocale(url) {
-    const loc = getLocale();
+    const loc = readLocale();
     if (!loc) return url;
     return url.includes("?") ? `${url}&ui_locale=${encodeURIComponent(loc)}` : `${url}?ui_locale=${encodeURIComponent(loc)}`;
   }
@@ -77,7 +86,7 @@
 
     const url = (urlEl.value || "").trim();
     const platform = platformEl.value || "auto";
-    const locale = getLocale() || "zh";
+    const locale = readLocale() || "zh";
 
     try {
       const processModeEl = document.querySelector('input[name="process_mode"]:checked');

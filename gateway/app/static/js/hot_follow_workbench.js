@@ -10,6 +10,14 @@
     const i18n = window.__V185_I18N__ || {};
     if (typeof i18n.applyLocale === "function") i18n.applyLocale(locale);
   }
+  function t(key, fallback) {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.t === "function") {
+      const text = i18n.t(key);
+      if (typeof text === "string" && !text.startsWith("【MISSING:")) return text;
+    }
+    return fallback;
+  }
   applyLocale(readLocale());
   const taskId = root ? root.getAttribute("data-task-id") : null;
   if (!taskId) return;
@@ -236,12 +244,12 @@
     const ready = Boolean(currentHub && currentHub.composed_ready) && Boolean(currentHub && currentHub.final && currentHub.final.exists);
     const reason = (currentHub && currentHub.composed_reason) || "final_missing";
     const reasonTextMap = {
-      "ready": "可发布",
-      "final_missing": "尚未生成最终成片",
-      "compose_in_progress": "合成中…",
-      "compose_failed": "合成失败，可重试",
-      "missing_voiceover": "缺少配音",
-      "missing_raw": "缺少源视频",
+      "ready": t("hot_follow_compose_reason_ready", "可发布"),
+      "final_missing": t("hot_follow_compose_reason_final_missing", "尚未生成最终成片"),
+      "compose_in_progress": t("hot_follow_compose_reason_in_progress", "合成中…"),
+      "compose_failed": t("hot_follow_compose_reason_failed", "合成失败，可重试"),
+      "missing_voiceover": t("hot_follow_compose_reason_missing_voice", "缺少配音"),
+      "missing_raw": t("hot_follow_compose_reason_missing_raw", "缺少源视频"),
     };
     if (composedBadgeEl) {
       composedBadgeEl.textContent = ready ? "✅ Composed: Ready" : "⚠️ Not Ready";
@@ -442,7 +450,7 @@
       try { payload = await res.json(); } catch (_) { payload = null; }
       const inProgress = payload && payload.error === "compose_in_progress";
       if (inProgress) {
-        if (composeMsgEl) composeMsgEl.textContent = "合成中…";
+        if (composeMsgEl) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
         await loadHub();
         updateComposeButtonState();
         return { in_progress: true, retry_after_ms: payload.retry_after_ms || 1500 };
@@ -478,9 +486,11 @@
     composeBtnEl.disabled = !enabled;
     composeBtnEl.classList.toggle("opacity-50", !enabled);
     composeBtnEl.classList.toggle("pointer-events-none", !enabled);
-    composeBtnEl.textContent = composeRunning || composeSubmitting ? "合成中…" : (composeBtnEl.dataset.defaultText || "Compose Final");
+    composeBtnEl.textContent = composeRunning || composeSubmitting
+      ? t("hot_follow_compose_running", "合成中…")
+      : (composeBtnEl.dataset.defaultText || "Compose Final");
     if (composeMsgEl) {
-      if (composeRunning || composeSubmitting) composeMsgEl.textContent = "合成中…";
+      if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
       else if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
       else if (!hasRaw) composeMsgEl.textContent = "Compose disabled: missing raw video.";
       else if (!confirmed) composeMsgEl.textContent = "Compose disabled: check confirmation first.";
