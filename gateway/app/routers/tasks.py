@@ -3371,7 +3371,7 @@ def get_hot_follow_publish_hub(
 @api_router.get("/hot_follow/tasks/{task_id}/workbench_hub")
 def get_hot_follow_workbench_hub(
     task_id: str,
-    request: Request | None = None,
+    request: Request,
     repo=Depends(get_task_repository),
 ):
     task = repo.get(task_id)
@@ -3393,7 +3393,7 @@ def get_hot_follow_workbench_hub(
         }
     compose_plan.setdefault("burned_subtitles_mode", "none")
     compose_plan.setdefault("crop_ratio", 0.18)
-    include_debug = bool(request and request.query_params.get("debug") == "1")
+    include_debug = request.query_params.get("debug") == "1"
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
         scene_outputs = []
@@ -4097,6 +4097,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
 @api_router.post("/hot_follow/tasks/{task_id}/compose")
 def compose_hot_follow_final_video(
     task_id: str,
+    request: Request,
     repo=Depends(get_task_repository),
 ):
     task = repo.get(task_id)
@@ -4153,7 +4154,7 @@ def compose_hot_follow_final_video(
             "task_id": task_id,
             "final_url": _task_endpoint(task_id, "final"),
             "final_video_url": _task_endpoint(task_id, "final"),
-            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
+            "hub": get_hot_follow_workbench_hub(task_id, request=request, repo=repo),
             "compose_status": latest.get("compose_status"),
         }
     except HTTPException as exc:
@@ -4201,6 +4202,7 @@ def compose_hot_follow_final_video(
 @api_router.post("/tasks/{task_id}/compose")
 def compose_task(
     task_id: str,
+    request: Request,
     payload: ComposeTaskRequest | None = None,
     repo=Depends(get_task_repository),
 ):
@@ -4249,7 +4251,7 @@ def compose_task(
             "final_url": _task_endpoint(task_id, "final"),
             "final_video_url": _task_endpoint(task_id, "final"),
             "final_key": str(final_key),
-            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
+            "hub": get_hot_follow_workbench_hub(task_id, request=request, repo=repo),
         }
 
     current_for_plan = repo.get(task_id) or task
@@ -4290,7 +4292,7 @@ def compose_task(
             "final_url": _task_endpoint(task_id, "final"),
             "final_video_url": _task_endpoint(task_id, "final"),
             "final_key": str(resolved_key or ""),
-            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
+            "hub": get_hot_follow_workbench_hub(task_id, request=request, repo=repo),
             "compose_status": latest.get("compose_status"),
         }
     except HTTPException as exc:
