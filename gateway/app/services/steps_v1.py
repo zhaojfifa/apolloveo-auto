@@ -190,6 +190,7 @@ RAW_ARTIFACT = "raw/raw.mp4"
 ORIGIN_SRT_ARTIFACT = "subs/origin.srt"
 MM_SRT_ARTIFACT = "subs/mm.srt"
 MM_TXT_ARTIFACT = "subs/mm.txt"
+TRANSLATION_QA_ARTIFACT = "subs/translation_qa.json"
 
 README_TEMPLATE = """CapCut pack usage
 
@@ -555,9 +556,12 @@ async def run_subtitles_step(req: SubtitlesRequest):
         probe = result.get("stream_probe") if isinstance(result, dict) else None
         clean_generated = bool(result.get("clean_video_generated")) if isinstance(result, dict) else False
         no_subtitles_flag = bool(result.get("no_subtitles")) if isinstance(result, dict) else False
+        translation_incomplete = bool(result.get("translation_incomplete")) if isinstance(result, dict) else False
         updates: dict[str, str] = {}
         if no_subtitles_flag:
             updates["no_subtitles"] = "true"
+        if isinstance(result, dict) and "translation_incomplete" in result:
+            updates["translation_incomplete"] = "true" if translation_incomplete else "false"
         if isinstance(probe, dict):
             has_audio = probe.get("has_audio")
             if has_audio is True:
@@ -584,6 +588,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
         origin_key = None
         mm_key = None
         mm_txt_key = None
+        translation_qa_key = None
 
         if workspace.origin_srt_path.exists():
             origin_key = _upload_artifact(req.task_id, workspace.origin_srt_path, ORIGIN_SRT_ARTIFACT)
@@ -594,6 +599,9 @@ async def run_subtitles_step(req: SubtitlesRequest):
             mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
             if mm_txt_path.exists():
                 mm_txt_key = _upload_artifact(req.task_id, mm_txt_path, MM_TXT_ARTIFACT)
+        translation_qa_path = workspace.subtitles_dir / "translation_qa.json"
+        if translation_qa_path.exists():
+            translation_qa_key = _upload_artifact(req.task_id, translation_qa_path, TRANSLATION_QA_ARTIFACT)
 
         subtitles_dir = deliver_dir() / "subtitles" / req.task_id
         subtitles_dir.mkdir(parents=True, exist_ok=True)
@@ -601,6 +609,8 @@ async def run_subtitles_step(req: SubtitlesRequest):
             shutil.copy2(workspace.origin_srt_path, subtitles_dir / "origin.srt")
         if workspace.mm_srt_path.exists():
             shutil.copy2(workspace.mm_srt_path, subtitles_dir / "mm.srt")
+        if translation_qa_path.exists():
+            shutil.copy2(translation_qa_path, subtitles_dir / "translation_qa.json")
         if workspace.segments_json.exists():
             shutil.copy2(workspace.segments_json, subtitles_dir / "subtitles.json")
         subtitles_key = relative_to_workspace(subtitles_dir / "subtitles.json")
@@ -627,6 +637,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
                 "origin_srt_key": origin_key,
                 "mm_srt_key": mm_key,
                 "mm_txt_key": mm_txt_key,
+                "translation_qa_key": translation_qa_key,
                 "subtitles_key": subtitles_key,
             },
         )
