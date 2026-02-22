@@ -45,8 +45,7 @@
   const composedReasonEl = document.getElementById("hf_composed_reason");
   const composePlanTextEl = document.getElementById("hf_compose_plan_text");
   const sceneOutputsTextEl = document.getElementById("hf_scene_outputs_text");
-  const translationQaTextEl = document.getElementById("hf_translation_qa_text");
-  const translationQaWarnEl = document.getElementById("hf_translation_qa_warn");
+  const translationQaStatusEl = document.getElementById("hf_translation_qa_status");
   const voiceAlignmentTextEl = document.getElementById("hf_voice_alignment_text");
   const burnedModeTextEl = document.getElementById("hf_burned_mode_text");
   const previewAudioEl = new Audio();
@@ -254,23 +253,13 @@
     }
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
 
-    const pipelineConfig = (currentTaskDetail && currentTaskDetail.pipeline_config) || {};
-    const translationQa = (currentHub && currentHub.translation_qa) || {};
-    const sourceCount = Number(translationQa.source_count ?? pipelineConfig.translation_source_count);
-    const translatedCount = Number(translationQa.translated_count ?? pipelineConfig.translation_translated_count);
-    const translationIncomplete = Boolean(
-      translationQa.complete === false ||
-      translationQa.incomplete === true ||
-      pipelineConfig.translation_incomplete === "true" ||
-      pipelineConfig.translation_incomplete === true
-    );
-    if (translationQaTextEl) {
-      const left = Number.isFinite(sourceCount) ? sourceCount : "-";
-      const right = Number.isFinite(translatedCount) ? translatedCount : "-";
-      translationQaTextEl.textContent = `Translation QA: source_count=${left}, translated_count=${right}`;
-    }
-    if (translationQaWarnEl) {
-      translationQaWarnEl.textContent = translationIncomplete ? "Warning: translation incomplete" : "";
+    const qaStatus = (
+      (currentHub && currentHub.translation_qa_status) ||
+      (currentTaskDetail && currentTaskDetail.translation_qa_status) ||
+      "PASS"
+    ).toString().toUpperCase();
+    if (translationQaStatusEl) {
+      translationQaStatusEl.textContent = `Translation QA: ${qaStatus === "WARN" ? "WARN" : "PASS"}`;
     }
 
     const avgRateRaw = pipelineConfig.voice_alignment_avg_rate;

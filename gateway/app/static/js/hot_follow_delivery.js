@@ -15,8 +15,7 @@
   const hintSummaryEl = document.getElementById("hf-hint-summary");
   const hintNextEl = document.getElementById("hf-hint-next");
   const hintStatusEl = document.getElementById("hf-hint-status");
-  const translationQaEl = document.getElementById("hf-translation-qa");
-  const translationQaWarnEl = document.getElementById("hf-translation-qa-warn");
+  const translationQaStatusEl = document.getElementById("hf-translation-qa-status");
   const voiceAlignmentEl = document.getElementById("hf-voice-alignment");
   const burnedModeEl = document.getElementById("hf-burned-mode");
 
@@ -131,13 +130,8 @@
     const pipelineConfig = (currentTaskDetail && currentTaskDetail.pipeline_config) || {};
     const composePlan = ((currentTaskDetail && currentTaskDetail.compose_plan) || data.compose_plan || {});
 
-    const sourceRaw = pipelineConfig.translation_source_count;
-    const translatedRaw = pipelineConfig.translation_translated_count;
-    const sourceCount = sourceRaw === undefined || sourceRaw === null || sourceRaw === "" ? "-" : Number(sourceRaw);
-    const translatedCount = translatedRaw === undefined || translatedRaw === null || translatedRaw === "" ? "-" : Number(translatedRaw);
-    const translationIncomplete = pipelineConfig.translation_incomplete === "true" || pipelineConfig.translation_incomplete === true;
-    if (translationQaEl) translationQaEl.textContent = `Translation QA: source_count=${sourceCount}, translated_count=${translatedCount}`;
-    if (translationQaWarnEl) translationQaWarnEl.textContent = translationIncomplete ? "Warning: translation incomplete" : "";
+    const qaStatus = String(data.translation_qa_status || "PASS").toUpperCase();
+    if (translationQaStatusEl) translationQaStatusEl.textContent = `Translation QA: ${qaStatus === "WARN" ? "WARN" : "PASS"}`;
 
     const avgRateRaw = pipelineConfig.voice_alignment_avg_rate;
     const overBudgetRaw = pipelineConfig.voice_alignment_over_budget_cues;

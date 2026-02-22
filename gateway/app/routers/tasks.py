@@ -1373,6 +1373,8 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
     task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
     composed = _compute_composed_state(task, task_id)
     scene_pack = _scene_pack_info(task, task_id)
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    translation_qa_status = "WARN" if pipeline_config.get("translation_incomplete") == "true" else "PASS"
 
     deliverables = {}
     for key, label in (
@@ -1409,6 +1411,7 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         "scene_pack": scene_pack,
         "scene_pack_pending_reason": scene_pack_pending_reason,
         "scene_pack_action_url": f"/tasks/{task_id}",
+        "translation_qa_status": translation_qa_status,
         "copy_bundle": _build_copy_bundle(task),
         "download_code": short_code,
         "mobile": {
@@ -2078,6 +2081,7 @@ def _task_to_detail(task: dict) -> TaskDetail:
     paths = _resolve_download_urls(task)
     status = derive_status(task)
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    translation_qa_status = "WARN" if pipeline_config.get("translation_incomplete") == "true" else "PASS"
 
     payload = {
         "task_id": str(task.get("task_id") or task.get("id")),
@@ -2135,6 +2139,7 @@ def _task_to_detail(task: dict) -> TaskDetail:
         "ops_notes": task.get("ops_notes"),
         "selected_tool_ids": _normalize_selected_tool_ids(task.get("selected_tool_ids")),
         "pipeline_config": pipeline_config,
+        "translation_qa_status": translation_qa_status,
         "no_dub": pipeline_config.get("no_dub") == "true",
         "dub_skip_reason": pipeline_config.get("dub_skip_reason"),
         "subtitle_track_kind": pipeline_config.get("subtitle_track_kind"),
@@ -3338,6 +3343,7 @@ def get_hot_follow_workbench_hub(
         raise HTTPException(status_code=404, detail="Task not found")
     logger.info("hot_follow_hub_hit task=%s kind=%s", task_id, task.get("kind"))
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    translation_qa_status = "WARN" if pipeline_config.get("translation_incomplete") == "true" else "PASS"
     compose_plan = dict(task.get("compose_plan") or {})
     if not compose_plan:
         compose_plan = {
@@ -3470,6 +3476,7 @@ def get_hot_follow_workbench_hub(
         },
         "deliverables": deliverables if isinstance(deliverables, list) else [],
         "events": task.get("events") or [],
+        "translation_qa_status": translation_qa_status,
         "compose_plan": compose_plan,
         "scene_outputs": scene_outputs,
         "composed_ready": composed_ready,
@@ -3634,25 +3641,10 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         return "mm" if v == "my" else v
 
     def _resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> str | None:
-        lang_norm = _normalize_target_lang(lang)
-        candidates: list[str] = []
-        if lang_norm == "mm":
-            mm_path = _task_key(task_obj, "mm_srt_path")
-            if mm_path:
-                candidates.append(str(mm_path))
-            candidates.append(deliver_key(task_code, "mm.srt"))
-        else:
-            lang_path = _task_key(task_obj, f"{lang_norm}_srt_path")
-            if lang_path:
-                candidates.append(str(lang_path))
-            candidates.append(deliver_key(task_code, f"{lang_norm}.srt"))
-            mm_path = _task_key(task_obj, "mm_srt_path")
-            if mm_path:
-                candidates.append(str(mm_path))
-            candidates.append(deliver_key(task_code, "mm.srt"))
-        for key in candidates:
-            if key and object_exists(str(key)):
-                return str(key)
+        # Compose is locked to the persisted translation snapshot to avoid regeneration.
+        mm_key = _task_key(task_obj, "mm_srt_path")
+        if mm_key and object_exists(str(mm_key)):
+            return str(mm_key)
         return None
 
     def _escape_subtitles_path(path: Path) -> str:

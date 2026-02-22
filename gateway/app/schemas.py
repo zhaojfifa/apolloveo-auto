@@ -148,6 +148,7 @@ class TaskSummary(BaseModel):
     ops_notes: Optional[str] = None
     selected_tool_ids: Optional[list[str]] = None
     pipeline_config: Optional[dict[str, str]] = None
+    translation_qa_status: Optional[str] = None
 
     class Config:
         from_attributes = True
