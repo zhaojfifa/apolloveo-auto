@@ -1,24 +1,5 @@
 (function () {
   const root = document.querySelector(".page");
-  function readLocale() {
-    const i18n = window.__V185_I18N__ || {};
-    if (typeof i18n.readLocale === "function") return i18n.readLocale();
-    const qs = new URLSearchParams(window.location.search || "");
-    return (qs.get("ui_locale") || "zh").toLowerCase();
-  }
-  function applyLocale(locale) {
-    const i18n = window.__V185_I18N__ || {};
-    if (typeof i18n.applyLocale === "function") i18n.applyLocale(locale);
-  }
-  function t(key, fallback) {
-    const i18n = window.__V185_I18N__ || {};
-    if (typeof i18n.t === "function") {
-      const text = i18n.t(key);
-      if (typeof text === "string" && !text.startsWith("【MISSING:")) return text;
-    }
-    return fallback;
-  }
-  applyLocale(readLocale());
   const taskId = root ? root.getAttribute("data-task-id") : null;
   const listEl = document.getElementById("hf-deliverables");
   const emptyEl = document.getElementById("hf-deliverables-empty");
@@ -34,27 +15,33 @@
   const hintSummaryEl = document.getElementById("hf-hint-summary");
   const hintNextEl = document.getElementById("hf-hint-next");
   const hintStatusEl = document.getElementById("hf-hint-status");
+  const translationQaEl = document.getElementById("hf-translation-qa");
+  const translationQaWarnEl = document.getElementById("hf-translation-qa-warn");
+  const voiceAlignmentEl = document.getElementById("hf-voice-alignment");
+  const burnedModeEl = document.getElementById("hf-burned-mode");
+
+  let currentTaskDetail = null;
 
   if (!taskId) return;
 
   function reasonText(reason) {
     const mapping = {
-      ready: t("hot_follow_compose_reason_ready", "可发布"),
-      final_missing: t("hot_follow_compose_reason_final_missing", "尚未生成最终成片"),
-      compose_in_progress: t("hot_follow_compose_reason_in_progress", "合成中…"),
-      compose_failed: t("hot_follow_compose_reason_failed", "合成失败，可重试"),
-      missing_voiceover: t("hot_follow_compose_reason_missing_voice", "缺少配音"),
-      missing_raw: t("hot_follow_compose_reason_missing_raw", "缺少源视频"),
+      ready: "可发布",
+      final_missing: "尚未生成最终成片",
+      compose_in_progress: "合成中…",
+      compose_failed: "合成失败，可重试",
+      missing_voiceover: "缺少配音",
+      missing_raw: "缺少源视频",
     };
     return mapping[reason] || reason || "-";
   }
 
   function groupDeliverables(deliverables) {
     const groups = [
-      { label: t("hot_follow_delivery_group_final", "成片"), keys: ["final_mp4"] },
-      { label: t("hot_follow_delivery_group_pack", "剪辑包"), keys: ["pack_zip", "edit_bundle_zip"] },
-      { label: t("hot_follow_delivery_group_subtitles", "字幕与脚本"), keys: ["origin_srt", "mm_srt", "mm_txt"] },
-      { label: t("hot_follow_delivery_group_audio", "音频素材"), keys: ["mm_audio", "bgm_audio"] },
+      { label: "成片", keys: ["final_mp4"] },
+      { label: "剪辑包", keys: ["pack_zip", "edit_bundle_zip"] },
+      { label: "字幕与脚本", keys: ["origin_srt", "mm_srt", "mm_txt"] },
+      { label: "音频素材", keys: ["mm_audio", "bgm_audio"] },
       { label: "Scene Pack", keys: ["scenes_zip"] },
     ];
     return groups.map((g) => ({
@@ -71,19 +58,19 @@
     const hasBgm = Boolean(deliverables.bgm_audio);
     if (hintSummaryEl) {
       hintSummaryEl.textContent =
-        `${t("hot_follow_delivery_summary_prefix", "本次交付包含：")}Final ${hasFinal ? "✅" : "❌"} / Pack ${hasPack ? "✅" : "❌"} / Subtitles ${hasSubs ? "✅" : "❌"} / Audio ${hasAudio ? "✅" : "❌"} / BGM ${hasBgm ? "✅" : "❌"}`;
+        `本次交付包含：Final ${hasFinal ? "✅" : "❌"} / Pack ${hasPack ? "✅" : "❌"} / Subtitles ${hasSubs ? "✅" : "❌"} / Audio ${hasAudio ? "✅" : "❌"} / BGM ${hasBgm ? "✅" : "❌"}`;
     }
     if (hintNextEl) {
       hintNextEl.textContent = hasFinal
-        ? t("hot_follow_delivery_next_ready", "下一步：可直接发布成片或下载 pack 继续精修。")
-        : t("hot_follow_delivery_next_compose", "下一步：先回 Workbench 执行 Compose Final。");
+        ? "下一步：可直接发布成片或下载 pack 继续精修。"
+        : "下一步：先回 Workbench 执行 Compose Final。";
     }
     if (hintStatusEl) {
       const ready = Boolean(data.composed_ready);
-      const scenePending = data.scene_pack_pending_reason ? t("hot_follow_delivery_scene_pending_suffix", "（Scene Pack pending，不阻塞发布）") : "";
+      const scenePending = data.scene_pack_pending_reason ? "（Scene Pack pending，不阻塞发布）" : "";
       hintStatusEl.textContent = ready
-        ? t("hot_follow_delivery_status_ready", "当前状态：✅ 可发布")
-        : `${t("hot_follow_delivery_status_prefix", "当前状态：⚠️")} ${reasonText(data.composed_reason)}${scenePending}`;
+        ? "当前状态：✅ 可发布"
+        : `当前状态：⚠️ ${reasonText(data.composed_reason)}${scenePending}`;
     }
   }
 
@@ -111,6 +98,7 @@
     }
 
     renderHintPanel(data, deliverables);
+    renderDiagnostics(data);
     if (!keys.length) {
       if (emptyEl) emptyEl.style.display = "block";
       if (listEl) listEl.innerHTML = "";
@@ -139,8 +127,33 @@
       .join("");
   }
 
+  function renderDiagnostics(data) {
+    const pipelineConfig = (currentTaskDetail && currentTaskDetail.pipeline_config) || {};
+    const composePlan = ((currentTaskDetail && currentTaskDetail.compose_plan) || data.compose_plan || {});
+
+    const sourceRaw = pipelineConfig.translation_source_count;
+    const translatedRaw = pipelineConfig.translation_translated_count;
+    const sourceCount = sourceRaw === undefined || sourceRaw === null || sourceRaw === "" ? "-" : Number(sourceRaw);
+    const translatedCount = translatedRaw === undefined || translatedRaw === null || translatedRaw === "" ? "-" : Number(translatedRaw);
+    const translationIncomplete = pipelineConfig.translation_incomplete === "true" || pipelineConfig.translation_incomplete === true;
+    if (translationQaEl) translationQaEl.textContent = `Translation QA: source_count=${sourceCount}, translated_count=${translatedCount}`;
+    if (translationQaWarnEl) translationQaWarnEl.textContent = translationIncomplete ? "Warning: translation incomplete" : "";
+
+    const avgRateRaw = pipelineConfig.voice_alignment_avg_rate;
+    const overBudgetRaw = pipelineConfig.voice_alignment_over_budget_cues;
+    const avgRate = avgRateRaw === undefined || avgRateRaw === null || avgRateRaw === "" ? "-" : Number(avgRateRaw);
+    const overBudget = overBudgetRaw === undefined || overBudgetRaw === null || overBudgetRaw === "" ? "-" : Number(overBudgetRaw);
+    if (voiceAlignmentEl) voiceAlignmentEl.textContent = `Voice alignment: avg_rate=${avgRate}, over_budget_cues=${overBudget}`;
+
+    if (burnedModeEl) burnedModeEl.textContent = `Burned subtitles mode: ${composePlan.burned_subtitles_mode || "none"}`;
+  }
+
   async function loadPublishHub() {
     try {
+      try {
+        const detailRes = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
+        if (detailRes.ok) currentTaskDetail = await detailRes.json();
+      } catch (_) {}
       const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/publish_hub`);
       if (!res.ok) {
         if (emptyEl) emptyEl.style.display = "block";
