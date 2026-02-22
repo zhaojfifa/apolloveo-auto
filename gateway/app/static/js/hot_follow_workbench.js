@@ -220,13 +220,17 @@
     const qa = (currentHub && currentHub.translation_qa) || {};
     const origin = subtitles.origin_text || "";
     const edited = subtitles.edited_text || subtitles.srt_text || "";
-    if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || "-";
-    if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || "-";
+    const sourcePlaceholder = t("hot_follow_workbench_source_not_generated", "Source subtitles not generated yet.");
+    const targetPlaceholder = t("hot_follow_workbench_target_not_generated", "Target subtitles not generated yet.");
+    if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
+    if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || targetPlaceholder;
     if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = edited || "";
     const sourceCount = Number.isFinite(Number(qa.source_count)) ? Number(qa.source_count) : 0;
     const translatedCount = Number.isFinite(Number(qa.translated_count)) ? Number(qa.translated_count) : 0;
     const hasMismatch = Boolean(qa.has_mismatch) || (sourceCount > 0 && sourceCount !== translatedCount);
-    if (translationQaCountsEl) translationQaCountsEl.textContent = `Translation cues: ${sourceCount} / ${translatedCount}`;
+    if (translationQaCountsEl) {
+      translationQaCountsEl.textContent = `${t("hot_follow_workbench_translation_cues_prefix", "Translation cues")}: ${sourceCount} / ${translatedCount}`;
+    }
     if (translationQaWarningEl) translationQaWarningEl.classList.toggle("hidden", !hasMismatch);
   }
 

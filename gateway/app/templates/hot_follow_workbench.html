@@ -71,18 +71,18 @@
             <h3 class="text-base font-semibold mb-3" data-i18n="hot_follow_workbench_subtitle_edit">字幕编辑</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
               <div class="rounded-xl border border-gray-200 p-3">
-                <div class="text-xs text-gray-500 mb-2">Original</div>
+                <div class="text-xs text-gray-500 mb-2" data-i18n="hot_follow_workbench_source_label">Original (Source)</div>
                 <pre id="hf_subtitles_origin" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
               </div>
               <div class="rounded-xl border border-gray-200 p-3">
-                <div class="text-xs text-gray-500 mb-2">Target / Edited</div>
+                <div class="text-xs text-gray-500 mb-2" data-i18n="hot_follow_workbench_target_label">Target (Translated / Edited)</div>
                 <pre id="hf_subtitles_edited_preview" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
               </div>
             </div>
             <textarea id="hf_subtitles_text" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" rows="10" placeholder="在此编辑 SRT 文本" data-i18n-placeholder="hot_follow_workbench_subtitle_placeholder"></textarea>
-            <div id="hf_translation_qa_counts" class="text-xs text-gray-500 mt-2">Translation cues: - / -</div>
+            <div id="hf_translation_qa_counts" class="text-xs text-gray-500 mt-2" data-i18n="hot_follow_workbench_translation_cues_default">Translation cues: - / -</div>
             <div id="hf_translation_qa_warning" class="hidden mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              Translation cues mismatch. Please refresh or re-run subtitles.
+              <span data-i18n="hot_follow_workbench_translation_mismatch">Translation cues mismatch. Please refresh or re-run subtitles.</span>
             </div>
             <div class="flex items-center gap-3 mt-3">
               <button id="hf_subtitles_refresh_btn" class="btn-secondary" data-i18n="hot_follow_workbench_subtitle_refresh">刷新字幕</button>
