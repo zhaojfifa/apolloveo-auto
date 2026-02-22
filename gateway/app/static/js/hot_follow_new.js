@@ -18,13 +18,8 @@
   let lastProbe = null;
   let debounceTimer = null;
 
-  function getLocale() {
-    const qs = new URLSearchParams(window.location.search || "");
-    return qs.get("ui_locale") || "";
-  }
-
   function withLocale(url) {
-    const loc = getLocale();
+    const loc = readLocale();
     if (!loc) return url;
     return url.includes("?") ? `${url}&ui_locale=${encodeURIComponent(loc)}` : `${url}?ui_locale=${encodeURIComponent(loc)}`;
   }
@@ -32,6 +27,7 @@
   function setProbeState(ok, msg) {
     probeMsg.textContent = msg || "";
     createBtn.disabled = !ok;
+    refreshLocale(probeCard || document);
   }
 
   async function doProbe() {
@@ -60,6 +56,7 @@
       durationEl.textContent = data.duration_sec ? `${data.duration_sec}s` : "";
       platformTextEl.textContent = data.platform || "";
       setProbeState(true, "");
+      refreshLocale(probeCard || document);
     } catch (e) {
       setProbeState(false, e.message || "probe error");
     }
@@ -77,7 +74,7 @@
 
     const url = (urlEl.value || "").trim();
     const platform = platformEl.value || "auto";
-    const locale = getLocale() || "zh";
+    const locale = readLocale() || "zh";
 
     try {
       const processModeEl = document.querySelector('input[name="process_mode"]:checked');
@@ -152,3 +149,16 @@
     });
   }
 })();
+  function readLocale() {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.readLocale === "function") return i18n.readLocale();
+    const qs = new URLSearchParams(window.location.search || "");
+    return (qs.get("ui_locale") || "zh").toLowerCase();
+  }
+
+  function refreshLocale(rootEl) {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.refresh === "function") i18n.refresh(rootEl || document);
+  }
+
+  refreshLocale(document);
