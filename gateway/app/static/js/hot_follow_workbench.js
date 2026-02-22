@@ -43,6 +43,7 @@
   const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
   const composedBadgeEl = document.getElementById("hf_composed_badge");
   const composedReasonEl = document.getElementById("hf_composed_reason");
+  const translationQaStatusEl = document.getElementById("hf_translation_qa_status");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
@@ -237,6 +238,14 @@
       composedBadgeEl.classList.toggle("text-amber-700", !ready);
     }
     if (composedReasonEl) composedReasonEl.textContent = reasonTextMap[reason] || reason;
+    const qaStatus = (
+      (currentHub && currentHub.translation_qa_status) ||
+      (currentTaskDetail && currentTaskDetail.translation_qa_status) ||
+      "PASS"
+    ).toString().toUpperCase();
+    if (translationQaStatusEl) {
+      translationQaStatusEl.textContent = `Translation QA: ${qaStatus === "WARN" ? "WARN" : "PASS"}`;
+    }
     const composePlan = (currentHub && currentHub.compose_plan) || {};
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
   }
