@@ -1,5 +1,24 @@
 ﻿(function () {
   const root = document.querySelector(".page");
+  function readLocale() {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.readLocale === "function") return i18n.readLocale();
+    const qs = new URLSearchParams(window.location.search || "");
+    return (qs.get("ui_locale") || "zh").toLowerCase();
+  }
+  function applyLocale(locale) {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.applyLocale === "function") i18n.applyLocale(locale);
+  }
+  function t(key, fallback) {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.t === "function") {
+      const text = i18n.t(key);
+      if (typeof text === "string" && !text.startsWith("【MISSING:")) return text;
+    }
+    return fallback;
+  }
+  applyLocale(readLocale());
   const taskId = root ? root.getAttribute("data-task-id") : null;
   if (!taskId) return;
 
@@ -13,6 +32,8 @@
   const ttsPreviewBtn = document.getElementById("hf_tts_preview_btn");
   const bgmFileEl = document.getElementById("hf_bgm_file");
   const bgmMixEl = document.getElementById("hf_bgm_mix");
+  const audioFitCap125El = document.getElementById("hf_audio_fit_cap_125");
+  const audioFitCap200El = document.getElementById("hf_audio_fit_cap_200");
   const rerunAudioBtn = document.getElementById("hf_rerun_audio_btn");
   const voiceoverAudioEl = document.getElementById("hf_voiceover_audio");
   const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
@@ -22,6 +43,8 @@
   const subtitlesTextEl = document.getElementById("hf_subtitles_text");
   const subtitlesOriginEl = document.getElementById("hf_subtitles_origin");
   const subtitlesEditedPreviewEl = document.getElementById("hf_subtitles_edited_preview");
+  const translationQaCountsEl = document.getElementById("hf_translation_qa_counts");
+  const translationQaWarningEl = document.getElementById("hf_translation_qa_warning");
   const subtitlesRefreshBtn = document.getElementById("hf_subtitles_refresh_btn");
   const subtitlesSaveBtn = document.getElementById("hf_subtitles_save_btn");
   const subtitlesMsgEl = document.getElementById("hf_subtitles_msg");
@@ -41,16 +64,9 @@
   const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
   const composedBadgeEl = document.getElementById("hf_composed_badge");
   const composedReasonEl = document.getElementById("hf_composed_reason");
-  const composePlanTextEl = document.getElementById("hf_compose_plan_text");
-  const sceneOutputsTextEl = document.getElementById("hf_scene_outputs_text");
-  const translationQaTextEl = document.getElementById("hf_translation_qa_text");
-  const translationQaWarnEl = document.getElementById("hf_translation_qa_warn");
-  const voiceAlignmentTextEl = document.getElementById("hf_voice_alignment_text");
-  const burnedModeTextEl = document.getElementById("hf_burned_mode_text");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
-  let currentTaskDetail = null;
   let subtitleDirty = false;
   let activeTab = "source";
   let hubLoading = false;
@@ -201,11 +217,21 @@
 
   function renderSubtitles() {
     const subtitles = (currentHub && currentHub.subtitles) || {};
+    const qa = (currentHub && currentHub.translation_qa) || {};
     const origin = subtitles.origin_text || "";
     const edited = subtitles.edited_text || subtitles.srt_text || "";
-    if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || "-";
-    if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || "-";
+    const sourcePlaceholder = t("hot_follow_workbench_source_not_generated", "Source subtitles not generated yet.");
+    const targetPlaceholder = t("hot_follow_workbench_target_not_generated", "Target subtitles not generated yet.");
+    if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
+    if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || targetPlaceholder;
     if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = edited || "";
+    const sourceCount = Number.isFinite(Number(qa.source_count)) ? Number(qa.source_count) : 0;
+    const translatedCount = Number.isFinite(Number(qa.translated_count)) ? Number(qa.translated_count) : 0;
+    const hasMismatch = Boolean(qa.has_mismatch) || (sourceCount > 0 && sourceCount !== translatedCount);
+    if (translationQaCountsEl) {
+      translationQaCountsEl.textContent = `${t("hot_follow_workbench_translation_cues_prefix", "Translation cues")}: ${sourceCount} / ${translatedCount}`;
+    }
+    if (translationQaWarningEl) translationQaWarningEl.classList.toggle("hidden", !hasMismatch);
   }
 
   function renderAudio() {
@@ -215,6 +241,11 @@
     if (ttsEngineEl && audio.tts_engine) ttsEngineEl.value = audio.tts_engine;
     if (ttsVoiceEl && audio.tts_voice) ttsVoiceEl.value = audio.tts_voice;
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
+    const capRaw = Number(audio.audio_fit_max_speed);
+    const cap = Number.isFinite(capRaw) ? capRaw : 1.25;
+    const isFast = cap >= 2.0 - 1e-6;
+    if (audioFitCap125El) audioFitCap125El.checked = !isFast;
+    if (audioFitCap200El) audioFitCap200El.checked = isFast;
     setMediaSrcStable(voiceoverAudioEl, voiceUrl, "audioUrl");
     if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
   }
@@ -223,12 +254,12 @@
     const ready = Boolean(currentHub && currentHub.composed_ready) && Boolean(currentHub && currentHub.final && currentHub.final.exists);
     const reason = (currentHub && currentHub.composed_reason) || "final_missing";
     const reasonTextMap = {
-      "ready": "可发布",
-      "final_missing": "尚未生成最终成片",
-      "compose_in_progress": "合成中…",
-      "compose_failed": "合成失败，可重试",
-      "missing_voiceover": "缺少配音",
-      "missing_raw": "缺少源视频",
+      "ready": t("hot_follow_compose_reason_ready", "可发布"),
+      "final_missing": t("hot_follow_compose_reason_final_missing", "尚未生成最终成片"),
+      "compose_in_progress": t("hot_follow_compose_reason_in_progress", "合成中…"),
+      "compose_failed": t("hot_follow_compose_reason_failed", "合成失败，可重试"),
+      "missing_voiceover": t("hot_follow_compose_reason_missing_voice", "缺少配音"),
+      "missing_raw": t("hot_follow_compose_reason_missing_raw", "缺少源视频"),
     };
     if (composedBadgeEl) {
       composedBadgeEl.textContent = ready ? "✅ Composed: Ready" : "⚠️ Not Ready";
@@ -237,47 +268,7 @@
     }
     if (composedReasonEl) composedReasonEl.textContent = reasonTextMap[reason] || reason;
     const composePlan = (currentHub && currentHub.compose_plan) || {};
-    const sceneOutputs = (currentHub && currentHub.scene_outputs) || [];
-    if (composePlanTextEl) {
-      composePlanTextEl.textContent =
-        `Plan: mute=${!!composePlan.mute}, overlay_subtitles=${!!composePlan.overlay_subtitles}, cleanup_mode=${composePlan.cleanup_mode || "none"}, target_lang=${composePlan.target_lang || "-"}`;
-    }
-    if (sceneOutputsTextEl) {
-      sceneOutputsTextEl.textContent = `Scene outputs: ${Array.isArray(sceneOutputs) ? sceneOutputs.length : 0}`;
-    }
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
-
-    const pipelineConfig = (currentTaskDetail && currentTaskDetail.pipeline_config) || {};
-    const translationQa = (currentHub && currentHub.translation_qa) || {};
-    const sourceCount = Number(translationQa.source_count ?? pipelineConfig.translation_source_count);
-    const translatedCount = Number(translationQa.translated_count ?? pipelineConfig.translation_translated_count);
-    const translationIncomplete = Boolean(
-      translationQa.complete === false ||
-      translationQa.incomplete === true ||
-      pipelineConfig.translation_incomplete === "true" ||
-      pipelineConfig.translation_incomplete === true
-    );
-    if (translationQaTextEl) {
-      const left = Number.isFinite(sourceCount) ? sourceCount : "-";
-      const right = Number.isFinite(translatedCount) ? translatedCount : "-";
-      translationQaTextEl.textContent = `Translation QA: source_count=${left}, translated_count=${right}`;
-    }
-    if (translationQaWarnEl) {
-      translationQaWarnEl.textContent = translationIncomplete ? "Warning: translation incomplete" : "";
-    }
-
-    const avgRateRaw = pipelineConfig.voice_alignment_avg_rate;
-    const overBudgetRaw = pipelineConfig.voice_alignment_over_budget_cues;
-    const avgRate = avgRateRaw === undefined || avgRateRaw === null || avgRateRaw === "" ? Number.NaN : Number(avgRateRaw);
-    const overBudget = overBudgetRaw === undefined || overBudgetRaw === null || overBudgetRaw === "" ? Number.NaN : Number(overBudgetRaw);
-    if (voiceAlignmentTextEl) {
-      voiceAlignmentTextEl.textContent = `Voice alignment: avg_rate=${Number.isFinite(avgRate) ? avgRate : "-"}, over_budget_cues=${Number.isFinite(overBudget) ? overBudget : "-"}`;
-    }
-
-    if (burnedModeTextEl) {
-      const burnedMode = composePlan.burned_subtitles_mode || "none";
-      burnedModeTextEl.textContent = `Burned subtitles mode: ${burnedMode}`;
-    }
   }
 
   function renderScenePack() {
@@ -354,13 +345,6 @@
       const res = await fetch(hubUrl);
       if (!res.ok) throw new Error((await res.text()) || "hub load failed");
       renderHub(await res.json());
-      try {
-        const detailRes = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
-        if (detailRes.ok) {
-          currentTaskDetail = await detailRes.json();
-          renderComposedReadiness();
-        }
-      } catch (_) {}
     } finally {
       hubLoading = false;
     }
@@ -461,7 +445,7 @@
       try { payload = await res.json(); } catch (_) { payload = null; }
       const inProgress = payload && payload.error === "compose_in_progress";
       if (inProgress) {
-        if (composeMsgEl) composeMsgEl.textContent = "合成中…";
+        if (composeMsgEl) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
         await loadHub();
         updateComposeButtonState();
         return { in_progress: true, retry_after_ms: payload.retry_after_ms || 1500 };
@@ -497,9 +481,11 @@
     composeBtnEl.disabled = !enabled;
     composeBtnEl.classList.toggle("opacity-50", !enabled);
     composeBtnEl.classList.toggle("pointer-events-none", !enabled);
-    composeBtnEl.textContent = composeRunning || composeSubmitting ? "合成中…" : (composeBtnEl.dataset.defaultText || "Compose Final");
+    composeBtnEl.textContent = composeRunning || composeSubmitting
+      ? t("hot_follow_compose_running", "合成中…")
+      : (composeBtnEl.dataset.defaultText || "Compose Final");
     if (composeMsgEl) {
-      if (composeRunning || composeSubmitting) composeMsgEl.textContent = "合成中…";
+      if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
       else if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
       else if (!hasRaw) composeMsgEl.textContent = "Compose disabled: missing raw video.";
       else if (!confirmed) composeMsgEl.textContent = "Compose disabled: check confirmation first.";
@@ -562,6 +548,20 @@
   if (bgmMixEl) {
     bgmMixEl.addEventListener("change", async () => {
       try { await patchAudioConfig({ bgm_mix: Number(bgmMixEl.value || "0.3") }); await loadHub(); }
+      catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
+    });
+  }
+  if (audioFitCap125El) {
+    audioFitCap125El.addEventListener("change", async () => {
+      if (!audioFitCap125El.checked) return;
+      try { await patchAudioConfig({ audio_fit_max_speed: 1.25 }); await loadHub(); }
+      catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
+    });
+  }
+  if (audioFitCap200El) {
+    audioFitCap200El.addEventListener("change", async () => {
+      if (!audioFitCap200El.checked) return;
+      try { await patchAudioConfig({ audio_fit_max_speed: 2.0 }); await loadHub(); }
       catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
     });
   }
