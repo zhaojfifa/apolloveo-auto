@@ -184,7 +184,11 @@
     });
   }
 
-  window.__V185_I18N__ = { t };
+  function readLocale() {
+    return resolveLocale();
+  }
+
+  window.__V185_I18N__ = { t, readLocale, applyLocale };
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);

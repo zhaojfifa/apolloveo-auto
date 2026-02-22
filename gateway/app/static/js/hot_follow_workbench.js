@@ -1,5 +1,16 @@
 ﻿(function () {
   const root = document.querySelector(".page");
+  function readLocale() {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.readLocale === "function") return i18n.readLocale();
+    const qs = new URLSearchParams(window.location.search || "");
+    return (qs.get("ui_locale") || "zh").toLowerCase();
+  }
+  function applyLocale(locale) {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.applyLocale === "function") i18n.applyLocale(locale);
+  }
+  applyLocale(readLocale());
   const taskId = root ? root.getAttribute("data-task-id") : null;
   if (!taskId) return;
 
