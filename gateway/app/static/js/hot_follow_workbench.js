@@ -13,6 +13,8 @@
   const ttsPreviewBtn = document.getElementById("hf_tts_preview_btn");
   const bgmFileEl = document.getElementById("hf_bgm_file");
   const bgmMixEl = document.getElementById("hf_bgm_mix");
+  const audioFitCap125El = document.getElementById("hf_audio_fit_cap_125");
+  const audioFitCap200El = document.getElementById("hf_audio_fit_cap_200");
   const rerunAudioBtn = document.getElementById("hf_rerun_audio_btn");
   const voiceoverAudioEl = document.getElementById("hf_voiceover_audio");
   const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
@@ -215,6 +217,11 @@
     if (ttsEngineEl && audio.tts_engine) ttsEngineEl.value = audio.tts_engine;
     if (ttsVoiceEl && audio.tts_voice) ttsVoiceEl.value = audio.tts_voice;
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
+    const capRaw = Number(audio.audio_fit_max_speed);
+    const cap = Number.isFinite(capRaw) ? capRaw : 1.25;
+    const isFast = cap >= 2.0 - 1e-6;
+    if (audioFitCap125El) audioFitCap125El.checked = !isFast;
+    if (audioFitCap200El) audioFitCap200El.checked = isFast;
     setMediaSrcStable(voiceoverAudioEl, voiceUrl, "audioUrl");
     if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
   }
@@ -562,6 +569,20 @@
   if (bgmMixEl) {
     bgmMixEl.addEventListener("change", async () => {
       try { await patchAudioConfig({ bgm_mix: Number(bgmMixEl.value || "0.3") }); await loadHub(); }
+      catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
+    });
+  }
+  if (audioFitCap125El) {
+    audioFitCap125El.addEventListener("change", async () => {
+      if (!audioFitCap125El.checked) return;
+      try { await patchAudioConfig({ audio_fit_max_speed: 1.25 }); await loadHub(); }
+      catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
+    });
+  }
+  if (audioFitCap200El) {
+    audioFitCap200El.addEventListener("change", async () => {
+      if (!audioFitCap200El.checked) return;
+      try { await patchAudioConfig({ audio_fit_max_speed: 2.0 }); await loadHub(); }
       catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
     });
   }

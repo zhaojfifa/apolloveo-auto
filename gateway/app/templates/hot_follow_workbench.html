@@ -147,6 +147,22 @@
                     <label class="block text-xs font-semibold text-gray-600 mb-1">BGM Mix</label>
                     <input id="hf_bgm_mix" type="range" min="0" max="1" step="0.05" value="0.3" class="w-full" />
                   </div>
+                  <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1">Audio Fit Speed Cap</label>
+                    <div class="flex items-center gap-4 text-xs text-gray-700">
+                      <label class="flex items-center gap-1">
+                        <input id="hf_audio_fit_cap_125" name="hf_audio_fit_cap" type="radio" class="rounded border-gray-300" value="1.25" checked />
+                        <span>Normal (1.25x)</span>
+                      </label>
+                      <label class="flex items-center gap-1">
+                        <input id="hf_audio_fit_cap_200" name="hf_audio_fit_cap" type="radio" class="rounded border-gray-300" value="2.0" />
+                        <span>Fast (2.0x)</span>
+                      </label>
+                    </div>
+                    <div class="mt-1 text-[11px] text-gray-500">
+                      Normal preserves naturalness. Fast helps fit long dubbing into short video but may sound rushed.
+                    </div>
+                  </div>
                 </div>
               </div>
               <div data-hf-step="compose">
