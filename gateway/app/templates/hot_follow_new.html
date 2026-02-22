@@ -84,42 +84,42 @@
         <section class="lg:col-span-7 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div class="flex items-center justify-between mb-4">
-              <h2 class="text-lg font-semibold" data-i18n="hot_follow_new_pipeline_config">加工流水线配置</h2>
+              <h2 class="text-lg font-semibold">加工流水线配置</h2>
               <span class="text-xs text-gray-400">Config</span>
             </div>
 
             <div class="space-y-5">
               <div>
-                <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_target_lang">目标语言</label>
+                <label class="block text-sm font-semibold text-gray-700">目标语言</label>
                 <select name="target_lang" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
-                  <option value="zh" data-i18n="lang.zh">中文</option>
+                  <option value="zh">中文</option>
                   <option value="mm">မြန်မာ</option>
                   <option value="en">English</option>
                 </select>
               </div>
 
               <div>
-                <div class="text-sm font-semibold text-gray-700 mb-2" data-i18n="hot_follow_new_process_mode">处理模式</div>
+                <div class="text-sm font-semibold text-gray-700 mb-2">处理模式</div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <label class="flex items-start gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
                     <input type="radio" name="process_mode" value="fast_clone" checked class="mt-1" />
                     <div>
-                      <div class="text-sm font-semibold text-gray-900" data-i18n="hot_follow_new_mode_fast_title">极速复刻</div>
-                      <div class="text-xs text-gray-500" data-i18n="hot_follow_new_mode_fast_desc">优先速度，快速产出</div>
+                      <div class="text-sm font-semibold text-gray-900">极速复刻</div>
+                      <div class="text-xs text-gray-500">优先速度，快速产出</div>
                     </div>
                   </label>
                   <label class="flex items-start gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
                     <input type="radio" name="process_mode" value="smart_rewrite" class="mt-1" />
                     <div>
-                      <div class="text-sm font-semibold text-gray-900" data-i18n="hot_follow_new_mode_smart_title">智能仿写</div>
-                      <div class="text-xs text-gray-500" data-i18n="hot_follow_new_mode_smart_desc">更注重表达优化与适配</div>
+                      <div class="text-sm font-semibold text-gray-900">智能仿写</div>
+                      <div class="text-xs text-gray-500">更注重表达优化与适配</div>
                     </div>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_publish_account">发布账号</label>
+                <label class="block text-sm font-semibold text-gray-700">发布账号</label>
                 <select name="publish_account" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
                   <option value="default">Default</option>
                   <option value="account_a">Account A</option>
@@ -128,7 +128,7 @@
               </div>
 
               <div>
-                <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_task_title">任务标题（可选）</label>
+                <label class="block text-sm font-semibold text-gray-700">任务标题（可选）</label>
                 <input id="hf-task-title" name="task_title" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('label.title.placeholder') }}" />
               </div>
             </div>

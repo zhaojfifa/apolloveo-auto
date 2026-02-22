@@ -16,7 +16,6 @@ import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
-from urllib.parse import quote
 from uuid import uuid4
 from typing import Any
 
@@ -274,7 +273,6 @@ class HotFollowAudioConfigRequest(BaseModel):
     tts_engine: str | None = None
     tts_voice: str | None = None
     bgm_mix: float | None = None
-    audio_fit_max_speed: float | None = None
 
 
 class HotFollowSubtitlesRequest(BaseModel):
@@ -292,8 +290,6 @@ class ComposeTaskRequest(BaseModel):
 class ComposePlanPatchRequest(BaseModel):
     overlay_subtitles: bool | None = None
     target_lang: str | None = None
-    burned_subtitles_mode: str | None = None
-    crop_ratio: float | None = None
 
 
 pages_router = APIRouter()
@@ -1373,8 +1369,6 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
     task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
     composed = _compute_composed_state(task, task_id)
     scene_pack = _scene_pack_info(task, task_id)
-    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-    translation_qa_status = "WARN" if pipeline_config.get("translation_incomplete") == "true" else "PASS"
 
     deliverables = {}
     for key, label in (
@@ -1411,7 +1405,6 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         "scene_pack": scene_pack,
         "scene_pack_pending_reason": scene_pack_pending_reason,
         "scene_pack_action_url": f"/tasks/{task_id}",
-        "translation_qa_status": translation_qa_status,
         "copy_bundle": _build_copy_bundle(task),
         "download_code": short_code,
         "mobile": {
@@ -1474,12 +1467,6 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         mix_val = float(mix if mix is not None else 0.3)
     except Exception:
         mix_val = 0.3
-    fit_raw = config.get("audio_fit_max_speed")
-    try:
-        fit_val = float(fit_raw if fit_raw is not None else 1.25)
-    except Exception:
-        fit_val = 1.25
-    fit_val = max(1.0, min(2.0, fit_val))
     task_id = str(task.get("task_id") or task.get("id") or "")
     voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
     meta = object_head(str(voice_key)) if voice_key else None
@@ -1490,7 +1477,6 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         "tts_voice": task.get("voice_id") or "zh-CN-XiaoxiaoNeural",
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
-        "audio_fit_max_speed": fit_val,
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
         "voiceover_url": voice_url,
         "audio_url": voice_url,
@@ -1499,106 +1485,6 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
 
 def _hf_subtitles_override_path(task_id: str) -> Path:
     return task_base_dir(task_id) / "subtitles" / "subtitles_override.srt"
-
-
-def _probe_duration_seconds(path: Path) -> float:
-    """
-    Use ffprobe to get media duration in seconds.
-    Return 0.0 if probe fails.
-    """
-    ffprobe = shutil.which("ffprobe")
-    if not ffprobe:
-        logger.warning("AUDIO_FIT ffprobe not found for path=%s", path)
-        return 0.0
-    try:
-        proc = subprocess.run(
-            [
-                ffprobe,
-                "-v",
-                "error",
-                "-show_entries",
-                "format=duration",
-                "-of",
-                "default=noprint_wrappers=1:nokey=1",
-                str(path),
-            ],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        if proc.returncode != 0:
-            logger.warning("AUDIO_FIT ffprobe failed path=%s err=%s", path, (proc.stderr or "")[-300:])
-            return 0.0
-        duration = float((proc.stdout or "").strip() or 0.0)
-        return duration if duration > 0 else 0.0
-    except Exception as exc:
-        logger.warning("AUDIO_FIT probe exception path=%s err=%s", path, exc)
-        return 0.0
-
-
-def _build_atempo_chain(speed: float) -> str:
-    """
-    Build valid atempo chain.
-    FFmpeg atempo supports only 0.5-2.0 per segment.
-    """
-    s = max(float(speed), 0.01)
-    parts: list[str] = []
-    while s > 2.0:
-        parts.append("atempo=2.0")
-        s /= 2.0
-    while s < 0.5:
-        parts.append("atempo=0.5")
-        s /= 0.5
-    parts.append(f"atempo={s:.6f}")
-    return ",".join(parts)
-
-
-def _build_voice_fit_filter(
-    video_dur: float,
-    voice_dur: float,
-    min_speed: float = 0.90,
-    max_speed: float = 1.25,
-) -> str:
-    del min_speed  # v1.9: do not slow down short voice; keep signature for forward compatibility.
-    base = "aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo"
-
-    if video_dur <= 0 or voice_dur <= 0:
-        return base
-
-    if voice_dur > video_dur + 0.15:
-        need_speed = voice_dur / video_dur
-        applied_speed = max(1.0, min(need_speed, max_speed))
-        return (
-            f"{base},"
-            f"{_build_atempo_chain(applied_speed)},"
-            f"atrim=0:{video_dur:.6f},"
-            "asetpts=N/SR/TB"
-        )
-
-    if voice_dur < video_dur - 0.15:
-        return f"{base},apad,atrim=0:{video_dur:.6f},asetpts=N/SR/TB"
-
-    return f"{base},atrim=0:{video_dur:.6f},asetpts=N/SR/TB"
-
-
-def _resolve_audio_fit_max_speed(config: dict | None) -> tuple[float, str]:
-    cfg = dict(config or {})
-    raw = cfg.get("audio_fit_max_speed")
-    source = "operator" if raw is not None else "default"
-    try:
-        value = float(raw if raw is not None else 1.25)
-    except Exception:
-        value = 1.25
-        source = "default"
-    return max(1.0, min(2.0, value)), source
-
-
-def _compute_audio_fit_speeds(video_dur: float, voice_dur: float, max_speed: float) -> tuple[float, float]:
-    if video_dur <= 0 or voice_dur <= 0:
-        return 1.0, 1.0
-    need_speed = voice_dur / video_dur
-    applied_speed = min(max(need_speed, 1.0), max_speed)
-    return need_speed, applied_speed
 
 
 def _hf_load_subtitles_text(task_id: str, task: dict) -> str:
@@ -1639,41 +1525,6 @@ def _hf_load_origin_subtitles_text(task: dict) -> str:
             except Exception:
                 return data.decode("utf-8", errors="ignore")
     return ""
-
-
-def _count_srt_cues(text: str) -> int:
-    if not isinstance(text, str) or not text.strip():
-        return 0
-    pattern = re.compile(r"^\s*\d+\s*\r?\n\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}", re.MULTILINE)
-    matches = pattern.findall(text)
-    if matches:
-        return len(matches)
-    blocks = [b for b in re.split(r"\r?\n\s*\r?\n", text.strip()) if b.strip()]
-    return len(blocks)
-
-
-def _build_translation_qa_summary(origin_text: str, edited_text: str) -> dict[str, Any]:
-    source_count = _count_srt_cues(origin_text)
-    translated_count = _count_srt_cues(edited_text)
-    has_mismatch = source_count > 0 and translated_count != source_count
-    return {
-        "source_count": source_count,
-        "translated_count": translated_count,
-        "has_mismatch": has_mismatch,
-    }
-
-
-def _build_workbench_debug_payload(
-    include_debug: bool,
-    scene_outputs: list[Any],
-    compose_last: dict[str, Any],
-) -> dict[str, Any]:
-    if not include_debug:
-        return {}
-    return {
-        "scene_outputs": scene_outputs,
-        "compose_last_ffmpeg_cmd": compose_last.get("ffmpeg_cmd"),
-    }
 
 
 def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
@@ -2116,7 +1967,6 @@ def _task_to_detail(task: dict) -> TaskDetail:
     paths = _resolve_download_urls(task)
     status = derive_status(task)
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-    translation_qa_status = "WARN" if pipeline_config.get("translation_incomplete") == "true" else "PASS"
 
     payload = {
         "task_id": str(task.get("task_id") or task.get("id")),
@@ -2174,7 +2024,6 @@ def _task_to_detail(task: dict) -> TaskDetail:
         "ops_notes": task.get("ops_notes"),
         "selected_tool_ids": _normalize_selected_tool_ids(task.get("selected_tool_ids")),
         "pipeline_config": pipeline_config,
-        "translation_qa_status": translation_qa_status,
         "no_dub": pipeline_config.get("no_dub") == "true",
         "dub_skip_reason": pipeline_config.get("dub_skip_reason"),
         "subtitle_track_kind": pipeline_config.get("subtitle_track_kind"),
@@ -3371,7 +3220,6 @@ def get_hot_follow_publish_hub(
 @api_router.get("/hot_follow/tasks/{task_id}/workbench_hub", response_model=None)
 def get_hot_follow_workbench_hub(
     task_id: str,
-    request: Request,
     repo=Depends(get_task_repository),
 ):
     task = repo.get(task_id)
@@ -3379,7 +3227,6 @@ def get_hot_follow_workbench_hub(
         raise HTTPException(status_code=404, detail="Task not found")
     logger.info("hot_follow_hub_hit task=%s kind=%s", task_id, task.get("kind"))
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-    translation_qa_status = "WARN" if pipeline_config.get("translation_incomplete") == "true" else "PASS"
     compose_plan = dict(task.get("compose_plan") or {})
     if not compose_plan:
         compose_plan = {
@@ -3388,12 +3235,7 @@ def get_hot_follow_workbench_hub(
             "strip_subtitle_streams": True,
             "cleanup_mode": "none",
             "target_lang": task.get("target_lang") or task.get("content_lang") or "mm",
-            "burned_subtitles_mode": "none",
-            "crop_ratio": 0.18,
         }
-    compose_plan.setdefault("burned_subtitles_mode", "none")
-    compose_plan.setdefault("crop_ratio", 0.18)
-    include_debug = request.query_params.get("debug") == "1"
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
         scene_outputs = []
@@ -3412,17 +3254,10 @@ def get_hot_follow_workbench_hub(
     final_exists = bool(final_info.get("exists"))
     final_size = int(final_info.get("size_bytes") or 0)
     final_url = _task_endpoint(task_id, "final") if final_exists and final_size >= MIN_VIDEO_BYTES else None
-    final_av = str(final_info.get("asset_version") or task.get("final_asset_version") or "").strip()
-    if final_url and final_av:
-        sep = "&" if "?" in final_url else "?"
-        final_url = f"{final_url}{sep}av={quote(final_av, safe='')}"
     scene_pack = _scene_pack_info(task, task_id)
     scenes_url = scene_pack.get("url")
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
-    translation_qa = _build_translation_qa_summary(origin_text or "", subtitles_text or "")
-    if translation_qa.get("has_mismatch"):
-        translation_qa_status = "WARN"
     audio_cfg = _hf_audio_config(task)
     if not (audio_cfg.get("voiceover_url") or "").strip() and (task.get("mm_audio_key") or task.get("mm_audio_path")):
         dub_state = "failed"
@@ -3448,6 +3283,7 @@ def get_hot_follow_workbench_hub(
         "status": compose_last_status,
         "started_at": task.get("compose_last_started_at"),
         "finished_at": task.get("compose_last_finished_at"),
+        "ffmpeg_cmd": task.get("compose_last_ffmpeg_cmd"),
         "error": task.get("compose_last_error") or task.get("compose_error"),
     }
     composed_ready = bool(composed.get("composed_ready"))
@@ -3515,9 +3351,8 @@ def get_hot_follow_workbench_hub(
         },
         "deliverables": deliverables if isinstance(deliverables, list) else [],
         "events": task.get("events") or [],
-        "translation_qa_status": translation_qa_status,
-        "translation_qa": translation_qa,
         "compose_plan": compose_plan,
+        "scene_outputs": scene_outputs,
         "composed_ready": composed_ready,
         "composed_reason": composed_reason,
         "final": final_info,
@@ -3530,7 +3365,6 @@ def get_hot_follow_workbench_hub(
             "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
         },
     }
-    payload.update(_build_workbench_debug_payload(include_debug, scene_outputs, compose_last))
 
     payload["task"] = {
         "id": task_id,
@@ -3572,11 +3406,9 @@ def patch_hot_follow_audio_config(
     if payload.bgm_mix is not None:
         mix = max(0.0, min(1.0, float(payload.bgm_mix)))
         bgm["mix_ratio"] = mix
-    if payload.audio_fit_max_speed is not None:
-        config["audio_fit_max_speed"] = max(1.0, min(2.0, float(payload.audio_fit_max_speed)))
     if bgm:
         config["bgm"] = bgm
-    updates["config"] = config
+        updates["config"] = config
 
     provider = _hf_engine_internal(payload.tts_engine)
     if payload.tts_engine is not None:
@@ -3610,22 +3442,10 @@ def patch_hot_follow_compose_plan(
         plan["strip_subtitle_streams"] = True
     if "target_lang" not in plan:
         plan["target_lang"] = task.get("target_lang") or task.get("content_lang") or "mm"
-    if "burned_subtitles_mode" not in plan:
-        plan["burned_subtitles_mode"] = "none"
-    if "crop_ratio" not in plan:
-        plan["crop_ratio"] = 0.18
     if payload.overlay_subtitles is not None:
         plan["overlay_subtitles"] = bool(payload.overlay_subtitles)
     if payload.target_lang is not None and str(payload.target_lang).strip():
         plan["target_lang"] = str(payload.target_lang).strip()
-    if payload.burned_subtitles_mode is not None:
-        mode = str(payload.burned_subtitles_mode).strip().lower()
-        if mode not in {"none", "crop_bottom", "mask_bottom"}:
-            raise HTTPException(status_code=400, detail="invalid burned_subtitles_mode")
-        plan["burned_subtitles_mode"] = mode
-    if payload.crop_ratio is not None:
-        ratio = max(0.01, min(0.5, float(payload.crop_ratio)))
-        plan["crop_ratio"] = ratio
     _policy_upsert(repo, task_id, {"compose_plan": plan})
     return {"task_id": task_id, "compose_plan": plan}
 
@@ -3681,10 +3501,25 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         return "mm" if v == "my" else v
 
     def _resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> str | None:
-        # Compose is locked to the persisted translation snapshot to avoid regeneration.
-        mm_key = _task_key(task_obj, "mm_srt_path")
-        if mm_key and object_exists(str(mm_key)):
-            return str(mm_key)
+        lang_norm = _normalize_target_lang(lang)
+        candidates: list[str] = []
+        if lang_norm == "mm":
+            mm_path = _task_key(task_obj, "mm_srt_path")
+            if mm_path:
+                candidates.append(str(mm_path))
+            candidates.append(deliver_key(task_code, "mm.srt"))
+        else:
+            lang_path = _task_key(task_obj, f"{lang_norm}_srt_path")
+            if lang_path:
+                candidates.append(str(lang_path))
+            candidates.append(deliver_key(task_code, f"{lang_norm}.srt"))
+            mm_path = _task_key(task_obj, "mm_srt_path")
+            if mm_path:
+                candidates.append(str(mm_path))
+            candidates.append(deliver_key(task_code, "mm.srt"))
+        for key in candidates:
+            if key and object_exists(str(key)):
+                return str(key)
         return None
 
     def _escape_subtitles_path(path: Path) -> str:
@@ -3754,14 +3589,6 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     overlay_subtitles = bool(compose_plan.get("overlay_subtitles"))
     strip_subtitle_streams = bool(compose_plan.get("strip_subtitle_streams", True))
     target_lang = str(compose_plan.get("target_lang") or task.get("target_lang") or task.get("content_lang") or "mm")
-    burned_subtitles_mode = str(compose_plan.get("burned_subtitles_mode") or "none").strip().lower()
-    if burned_subtitles_mode not in {"none", "crop_bottom", "mask_bottom"}:
-        burned_subtitles_mode = "none"
-    try:
-        crop_ratio = float(compose_plan.get("crop_ratio", 0.18) or 0.18)
-    except Exception:
-        crop_ratio = 0.18
-    crop_ratio = max(0.01, min(0.5, crop_ratio))
     logger.info(
         "COMPOSE_START",
         extra={
@@ -3773,8 +3600,6 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "overlay_subtitles": overlay_subtitles,
             "strip_subtitle_streams": strip_subtitle_streams,
             "target_lang": target_lang,
-            "burned_subtitles_mode": burned_subtitles_mode,
-            "crop_ratio": crop_ratio,
         },
     )
 
@@ -3787,7 +3612,6 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         video_path = tmp / "video_input.mp4"
         voice_path = tmp / "voice_input.mp3"
         final_path = tmp / "final_compose.mp4"
-        compose_qa_path = tmp / "compose_qa.json"
         subtitle_path = tmp / "subs_target.srt"
         storage.download_file(str(video_key), str(video_path))
         storage.download_file(str(audio_key), str(voice_path))
@@ -3795,66 +3619,6 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             assert_local_audio_ok(voice_path)
         except ValueError:
             _compose_fail("missing_voiceover", "voiceover audio invalid")
-        video_duration_sec = float(_probe_duration_seconds(video_path) or 0.0)
-        voice_duration_sec = float(_probe_duration_seconds(voice_path) or 0.0)
-        if video_duration_sec <= 0:
-            _compose_fail("compose_failed", "invalid video duration from ffprobe")
-        if voice_duration_sec <= 0:
-            _compose_fail("missing_voiceover", "invalid voiceover duration from ffprobe")
-        logger.info(
-            "AUDIO_FIT task=%s video_dur=%.2f voice_dur=%.2f",
-            task_id,
-            video_duration_sec,
-            voice_duration_sec,
-        )
-
-        max_speedup_ratio, max_speed_source = _resolve_audio_fit_max_speed(config)
-        logger.info(
-            "AUDIO_FIT_SPEED_CAP task=%s max_speed=%.2f source=%s",
-            task_id,
-            max_speedup_ratio,
-            max_speed_source,
-        )
-        min_speed_ratio = 0.90
-        need_speed, applied_speed = _compute_audio_fit_speeds(
-            video_duration_sec,
-            voice_duration_sec,
-            max_speedup_ratio,
-        )
-        if need_speed > 1.0:
-            logger.info(
-                "AUDIO_FIT_SPEED task=%s need_speed=%.3f applied_speed=%.3f",
-                task_id,
-                need_speed,
-                applied_speed,
-            )
-            if need_speed > max_speedup_ratio:
-                logger.warning(
-                    "AUDIO_FIT_OVERFLOW task=%s need_speed=%.3f exceeds max_speed=%.2f",
-                    task_id,
-                    need_speed,
-                    max_speedup_ratio,
-                )
-        voice_filter = _build_voice_fit_filter(
-            video_duration_sec,
-            voice_duration_sec,
-            min_speed=min_speed_ratio,
-            max_speed=max_speedup_ratio,
-        )
-        trim_applied = "atrim=" in voice_filter
-        speedup_applied = False
-        tempo = 1.0
-        if voice_duration_sec > video_duration_sec + 0.15:
-            tempo = applied_speed
-            speedup_applied = applied_speed > 1.0
-        compose_qa_payload = {
-            "video_duration_sec": round(video_duration_sec, 4),
-            "voice_duration_sec": round(voice_duration_sec, 4),
-            "speedup_applied": bool(speedup_applied),
-            "tempo": round(float(tempo), 6),
-            "trim_applied": bool(trim_applied),
-        }
-        compose_qa_path.write_text(json.dumps(compose_qa_payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
         if overlay_subtitles:
             if not bundled_myanmar_ttf.exists() or bundled_myanmar_ttf.stat().st_size == 0:
@@ -3872,13 +3636,6 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             storage.download_file(str(bgm_key), str(bgm_path))
 
         if bgm_path and bgm_path.exists():
-            video_filters: list[str] = []
-            if burned_subtitles_mode == "crop_bottom":
-                video_filters.append(f"crop=in_w:in_h*(1-{crop_ratio}):0:0")
-            elif burned_subtitles_mode == "mask_bottom":
-                video_filters.append(
-                    f"drawbox=x=0:y=ih-ih*{crop_ratio}:w=iw:h=ih*{crop_ratio}:color=black@1.0:t=fill"
-                )
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
                 subtitle_filter = (
@@ -3886,21 +3643,22 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
-                video_filters.append(subtitle_filter)
-            video_filter_prefix = ""
-            if video_filters:
-                video_filter_prefix = f"[0:v]{','.join(video_filters)}[v];"
+                filter_complex = (
+                    f"[0:v]{subtitle_filter}[v];"
+                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0[voice];"
+                    f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
+                    "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+                )
                 map_video = "[v]"
                 video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
             else:
+                filter_complex = (
+                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0[voice];"
+                    f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
+                    "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+                )
                 map_video = "0:v:0"
                 video_codec_args = ["-c:v", "copy"]
-            filter_complex = (
-                f"{video_filter_prefix}"
-                f"[1:a]{voice_filter},volume=1.0[voice];"
-                f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
-                "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
-            )
             cmd = [
                 ffmpeg,
                 "-y",
@@ -3932,13 +3690,6 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
                 _compose_fail("compose_failed", "compose ffmpeg failed", ffmpeg_cmd=ffmpeg_cmd_used, stderr_tail=(proc.stderr or "")[-800:])
         else:
-            video_filters: list[str] = []
-            if burned_subtitles_mode == "crop_bottom":
-                video_filters.append(f"crop=in_w:in_h*(1-{crop_ratio}):0:0")
-            elif burned_subtitles_mode == "mask_bottom":
-                video_filters.append(
-                    f"drawbox=x=0:y=ih-ih*{crop_ratio}:w=iw:h=ih*{crop_ratio}:color=black@1.0:t=fill"
-                )
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
                 subtitle_filter = (
@@ -3946,20 +3697,16 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
-                video_filters.append(subtitle_filter)
-            video_filter_prefix = ""
-            if video_filters:
-                video_filter_prefix = f"[0:v]{','.join(video_filters)}[v];"
+                filter_complex = (
+                    f"[0:v]{subtitle_filter}[v];"
+                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0,alimiter=limit=0.95[mix]"
+                )
                 map_video = "[v]"
                 video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
             else:
+                filter_complex = "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0,alimiter=limit=0.95[mix]"
                 map_video = "0:v:0"
                 video_codec_args = ["-c:v", "copy"]
-            filter_complex = (
-                f"{video_filter_prefix}"
-                f"[1:a]{voice_filter},volume=1.0[voice];"
-                "[voice]alimiter=limit=0.95[mix]"
-            )
             cmd = [
                 ffmpeg,
                 "-y",
@@ -4047,10 +3794,6 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         uploaded_key = storage.upload_file(str(final_path), final_key, content_type="video/mp4")
         if not uploaded_key:
             _compose_fail("compose_failed", "compose upload failed")
-        compose_qa_key = deliver_key(task_id, "compose_qa.json")
-        uploaded_qa_key = storage.upload_file(str(compose_qa_path), compose_qa_key, content_type="application/json")
-        if not uploaded_qa_key or not object_exists(compose_qa_key):
-            _compose_fail("compose_failed", "compose qa upload failed")
         if not object_exists(final_key):
             _compose_fail("compose_failed", "compose upload verify failed: missing final object")
         uploaded_meta = object_head(final_key)
@@ -4097,7 +3840,6 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
 @api_router.post("/hot_follow/tasks/{task_id}/compose")
 def compose_hot_follow_final_video(
     task_id: str,
-    request: Request,
     repo=Depends(get_task_repository),
 ):
     task = repo.get(task_id)
@@ -4125,8 +3867,6 @@ def compose_hot_follow_final_video(
         "strip_subtitle_streams": bool(current_plan.get("strip_subtitle_streams", True)),
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
-        "burned_subtitles_mode": str(current_plan.get("burned_subtitles_mode") or "none"),
-        "crop_ratio": max(0.01, min(0.5, float(current_plan.get("crop_ratio", 0.18) or 0.18))),
     }
     try:
         _policy_upsert(
@@ -4154,7 +3894,7 @@ def compose_hot_follow_final_video(
             "task_id": task_id,
             "final_url": _task_endpoint(task_id, "final"),
             "final_video_url": _task_endpoint(task_id, "final"),
-            "hub": get_hot_follow_workbench_hub(task_id, request=request, repo=repo),
+            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
             "compose_status": latest.get("compose_status"),
         }
     except HTTPException as exc:
@@ -4202,7 +3942,6 @@ def compose_hot_follow_final_video(
 @api_router.post("/tasks/{task_id}/compose")
 def compose_task(
     task_id: str,
-    request: Request,
     payload: ComposeTaskRequest | None = None,
     repo=Depends(get_task_repository),
 ):
@@ -4251,7 +3990,7 @@ def compose_task(
             "final_url": _task_endpoint(task_id, "final"),
             "final_video_url": _task_endpoint(task_id, "final"),
             "final_key": str(final_key),
-            "hub": get_hot_follow_workbench_hub(task_id, request=request, repo=repo),
+            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
         }
 
     current_for_plan = repo.get(task_id) or task
@@ -4262,8 +4001,6 @@ def compose_task(
         "strip_subtitle_streams": bool(current_plan.get("strip_subtitle_streams", True)),
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
-        "burned_subtitles_mode": str(current_plan.get("burned_subtitles_mode") or "none"),
-        "crop_ratio": max(0.01, min(0.5, float(current_plan.get("crop_ratio", 0.18) or 0.18))),
     }
     try:
         _policy_upsert(
@@ -4292,7 +4029,7 @@ def compose_task(
             "final_url": _task_endpoint(task_id, "final"),
             "final_video_url": _task_endpoint(task_id, "final"),
             "final_key": str(resolved_key or ""),
-            "hub": get_hot_follow_workbench_hub(task_id, request=request, repo=repo),
+            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
             "compose_status": latest.get("compose_status"),
         }
     except HTTPException as exc:
