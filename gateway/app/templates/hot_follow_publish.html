@@ -32,7 +32,7 @@
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <h2 class="text-lg font-semibold mb-4" data-i18n="hot_follow_delivery_deliverables">{{ t("hot.follow.delivery.deliverables") }}</h2>
             <div id="hf-hint-panel" class="mb-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
-              <div class="font-semibold mb-1" data-i18n="hot_follow_delivery_deliverables">交付提示</div>
+              <div class="font-semibold mb-1" data-i18n="hot_follow_delivery_hint_title">交付提示</div>
               <div id="hf-hint-summary">-</div>
               <div id="hf-hint-next" class="mt-1 text-gray-500">-</div>
               <div id="hf-hint-status" class="mt-1">-</div>
@@ -53,7 +53,7 @@
 
         <section class="lg:col-span-5 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h2 class="text-lg font-semibold mb-4" data-i18n="hot_follow_delivery_publish_center">发布中心</h2>
+            <h2 class="text-lg font-semibold mb-4" data-i18n="hot_follow_publish_center">发布中心</h2>
             <div class="mb-3">
               <div id="hf-composed-badge" class="text-sm font-semibold text-amber-700">⚠️ Not Ready</div>
               <div id="hf-composed-reason" class="text-xs text-gray-500">final_missing</div>
@@ -65,9 +65,9 @@
             <div class="space-y-3">
               <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_publish_copy_label">发布文案</label>
               <textarea class="w-full rounded-xl border border-gray-300 px-3 py-2" rows="6" placeholder="输入文案..."></textarea>
-              <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_delivery_hashtags">Hashtags</label>
-              <input class="w-full rounded-xl border border-gray-300 px-3 py-2" type="text" data-i18n-placeholder="hot_follow_delivery_hashtags_placeholder" placeholder="#hot #trend #remix" />
-              <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_delivery_notes">{{ t("hot.follow.delivery.notes") }}</label>
+              <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_publish_hashtags">Hashtags</label>
+              <input class="w-full rounded-xl border border-gray-300 px-3 py-2" type="text" data-i18n-placeholder="hot_follow_publish_hashtags_placeholder" placeholder="#hot #trend #remix" />
+              <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_publish_notes">{{ t("hot.follow.delivery.notes") }}</label>
               <textarea class="w-full rounded-xl border border-gray-300 px-3 py-2" rows="3" placeholder="{{ t('hot.follow.delivery.notes.placeholder') }}"></textarea>
               <div class="flex flex-wrap gap-2">
                 <span class="px-2 py-1 rounded-full bg-indigo-50 text-indigo-700 text-xs">#hot</span>
@@ -80,14 +80,14 @@
 
         <section class="lg:col-span-3 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h2 class="text-lg font-semibold mb-4" data-i18n="hot_follow_delivery_publish_feedback">发布回填</h2>
+            <h2 class="text-lg font-semibold mb-4" data-i18n="hot_follow_publish_feedback">发布回填</h2>
             <div class="space-y-3">
-              <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_delivery_publish_link">{{ t("hot.follow.delivery.published_url") }}</label>
+              <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_publish_link">{{ t("hot.follow.delivery.published_url") }}</label>
               <input id="hf-publish-url" class="w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="https://..." />
-              <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_delivery_notes">{{ t("hot.follow.delivery.notes") }}</label>
+              <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_publish_notes">{{ t("hot.follow.delivery.notes") }}</label>
               <input id="hf-publish-notes" class="w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('hot.follow.delivery.notes.placeholder') }}" />
               <div class="flex items-center gap-3">
-                <button id="hf-publish" class="btn-primary" data-i18n="hot_follow_delivery_submit">{{ t("hot.follow.delivery.publish_cta") }}</button>
+                <button id="hf-publish" class="btn-primary" data-i18n="hot_follow_publish_submit">{{ t("hot.follow.delivery.publish_cta") }}</button>
                 <span class="text-xs text-gray-500" id="hf-publish-msg"></span>
               </div>
             </div>
@@ -99,9 +99,9 @@
               <div class="flex justify-between"><span>ID</span><span>{{ task.task_id }}</span></div>
               <div class="flex justify-between"><span>{{ t("label.platform") }}</span><span>{{ task.platform or "-" }}</span></div>
               <div class="flex justify-between"><span>{{ t("hot.follow.step.pack") }}</span><span>{{ task.pack_status or "-" }}</span></div>
-              <div class="flex justify-between"><span data-i18n="hot_follow_workbench_scene_pack_optional">Scene Pack (Optional)</span><span id="hf-scene-pack-status">-</span></div>
+              <div class="flex justify-between"><span data-i18n="hot_follow_scene_pack_title">Scene Pack (Optional)</span><span id="hf-scene-pack-status">-</span></div>
               <div id="hf-scene-pack-reason" class="text-xs text-gray-500"></div>
-              <button id="hf-scene-pack-generate" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_scene_pack_generate">Generate Scene Pack</button>
+              <button id="hf-scene-pack-generate" class="btn-secondary text-xs" data-i18n="hot_follow_scene_pack_generate">Generate Scene Pack</button>
               <a id="hf-scene-pack-action" class="text-xs text-indigo-600 underline hidden" href="#" rel="noopener" data-i18n="hot_follow_delivery_open_workbench">Open Workbench</a>
             </div>
           </div>

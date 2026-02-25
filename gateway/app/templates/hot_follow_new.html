@@ -34,14 +34,14 @@
             <div class="space-y-4">
               <div>
                 <label for="hf-url" class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_source_link">{{ t("label.source_url") }}</label>
-                <input id="hf-url" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('label.source_url.placeholder') }}" />
-                <div class="text-xs text-gray-500 mt-1" id="hf-url-hint" data-i18n="hot_follow_new_hint_paste_link"></div>
+                <input id="hf-url" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('label.source_url.placeholder') }}" data-i18n-placeholder="hot_follow_new_source_link_ph" />
+                <div class="text-xs text-gray-500 mt-1" id="hf-url-hint" data-i18n="hot_follow_new_hint"></div>
               </div>
 
               <div>
                 <label for="hf-platform" class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_platform">{{ t("label.platform") }}</label>
                 <select id="hf-platform" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
-                  <option value="auto">Auto</option>
+                  <option value="auto" data-i18n="hot_follow_new_platform_auto">Auto</option>
                   <option value="douyin">{{ t("label.platform_douyin") }}</option>
                   <option value="xhs">{{ t("label.platform_xhs") }}</option>
                   <option value="tiktok">{{ t("label.platform_tiktok") }}</option>
@@ -92,9 +92,9 @@
               <div>
                 <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_target_lang">目标语言</label>
                 <select name="target_lang" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
-                  <option value="zh">中文</option>
-                  <option value="mm">မြန်မာ</option>
-                  <option value="en">English</option>
+                  <option value="zh" data-i18n="lang.zh">中文</option>
+                  <option value="mm" data-i18n="lang.mm">မြန်မာ</option>
+                  <option value="en" data-i18n="lang.en">English</option>
                 </select>
               </div>
 
@@ -129,7 +129,7 @@
 
               <div>
                 <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_task_title">任务标题（可选）</label>
-                <input id="hf-task-title" name="task_title" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('label.title.placeholder') }}" />
+                <input id="hf-task-title" name="task_title" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('label.title.placeholder') }}" data-i18n-placeholder="hot_follow_new_task_title_ph" />
               </div>
             </div>
           </div>
@@ -141,7 +141,7 @@
       <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
         <div class="text-sm text-gray-500">{{ t("hot.follow.new.subtitle") }}</div>
         <div class="flex items-center gap-3">
-          <button id="hf-create" class="btn-primary" disabled data-i18n="hot_follow_new_create_run">{{ t("hot.follow.new.cta") }}</button>
+          <button id="hf-create" class="btn-primary" disabled data-i18n="hot_follow_new_create_and_run">{{ t("hot.follow.new.cta") }}</button>
           <span class="text-xs text-gray-500" id="hf-create-msg"></span>
         </div>
       </div>

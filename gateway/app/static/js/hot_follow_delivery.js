@@ -64,7 +64,7 @@
       { label: t("hot_follow_delivery_group_pack", "Pack"), keys: ["pack_zip", "edit_bundle_zip"] },
       { label: t("hot_follow_delivery_group_subtitles", "Subtitles"), keys: ["origin_srt", "mm_srt", "mm_txt"] },
       { label: t("hot_follow_delivery_group_audio", "Audio"), keys: ["mm_audio", "bgm_audio"] },
-      { label: t("hot_follow_workbench_scene_pack_optional", "Scene Pack (optional)"), keys: ["scenes_zip"] },
+      { label: t("hot_follow_scene_pack_title", "Scene Pack (optional)"), keys: ["scenes_zip"] },
     ];
     return groups.map((g) => ({
       label: g.label,
@@ -79,7 +79,7 @@
     const hasAudio = Boolean(deliverables.mm_audio || deliverables.bgm_audio);
     const hasBgm = Boolean(deliverables.bgm_audio);
     if (hintSummaryEl) {
-      hintSummaryEl.textContent = `${t("hot_follow_delivery_soft_subtitle_hint", "This delivery includes: Final / Pack / Subtitles / Audio / BGM¡­")} (${hasFinal ? "Y" : "N"}/${hasPack ? "Y" : "N"}/${hasSubs ? "Y" : "N"}/${hasAudio ? "Y" : "N"}/${hasBgm ? "Y" : "N"})`;
+      hintSummaryEl.textContent = `${t("hot_follow_delivery_soft_subtitle_hint", "This delivery includes: Final / Pack / Subtitles / Audio / BGMâ€¦")} (${hasFinal ? "Y" : "N"}/${hasPack ? "Y" : "N"}/${hasSubs ? "Y" : "N"}/${hasAudio ? "Y" : "N"}/${hasBgm ? "Y" : "N"})`;
     }
     if (hintNextEl) {
       hintNextEl.textContent = hasFinal

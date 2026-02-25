@@ -374,13 +374,220 @@
     },
   };
 
+  CLIENT_DICT.en = CLIENT_DICT.en || {};
+  Object.assign(CLIENT_DICT.zh, {
+    hot_follow_new_hint: "输入链接，生成热点跟拍任务",
+    hot_follow_new_source_link_ph: "粘贴来源链接 (Douyin/XHS/TK/FB)",
+    hot_follow_new_platform_auto: "自动",
+    hot_follow_new_task_title_ph: "可选标题",
+    hot_follow_new_create_and_run: "创建并运行",
+    hot_follow_workbench_track_hint: "任务进度与步骤控制",
+    hot_follow_workbench_parse: "解析",
+    hot_follow_workbench_subtitles: "字幕",
+    hot_follow_workbench_dubbing: "配音",
+    hot_follow_workbench_compose_hint: "合成从未运行",
+    hot_follow_delivery_hint_title: "交付提示",
+    hot_follow_publish_center: "发布中心",
+    hot_follow_publish_feedback: "发布回填",
+    hot_follow_publish_link: "发布链接",
+    hot_follow_publish_notes: "备注",
+    hot_follow_publish_submit: "回填发布",
+    hot_follow_publish_hashtags: "话题标签",
+    hot_follow_publish_hashtags_placeholder: "输入标签，空格分隔，例如 #hot #trend",
+    hot_follow_scene_pack_title: "分镜（可选）",
+    hot_follow_scene_pack_desc: "可选，未生成时不影响主流程",
+    hot_follow_scene_pack_generate: "生成 Scene Pack",
+    hot_follow_scene_pack_download: "下载 Scene Pack",
+    hot_follow_scenes_title: "场景切片",
+    hot_follow_scenes_desc: "用于运营复用的场景切片。",
+    hot_follow_scenes_generate: "生成场景切片",
+    hot_follow_scenes_download: "下载 Scenes.zip",
+    hot_follow_scene_status_pending: "未就绪",
+    hot_follow_scene_status_done: "已就绪",
+  });
+  Object.assign(CLIENT_DICT.mm, {
+    hot_follow_new_title: "Hot Follow - အသစ်",
+    hot_follow_new_hint: "လင့်ခ်ထည့်၍ Hot Follow တာဝန်ဖန်တီးပါ",
+    hot_follow_new_create_task: "တာဝန်ဖန်တီး",
+    hot_follow_new_source_link: "မူရင်းလင့်ခ်",
+    hot_follow_new_source_link_ph: "လင့်ခ်ကူးထည့်ပါ (Douyin/XHS/TK/FB)",
+    hot_follow_new_platform: "ပလက်ဖောင်း",
+    hot_follow_new_platform_auto: "အလိုအလျောက်",
+    hot_follow_new_link_preview: "လင့်ခ်အစမ်းကြည့်",
+    hot_follow_new_bgm_settings: "BGM သတ်မှတ်ချက်",
+    hot_follow_new_bgm_replace: "မူရင်းအသံအစားထိုး",
+    hot_follow_new_bgm_keep: "မူရင်းအသံထား",
+    hot_follow_new_bgm_mute: "အသံပိတ်",
+    hot_follow_new_bgm_mix_ratio: "BGM ပေါင်းစပ်အချိုး (0-1)",
+    hot_follow_new_pipeline_config: "လုပ်ငန်းစဉ် ချိန်ညှိမှု",
+    hot_follow_new_pipeline_config_badge: "ချိန်ညှိ",
+    hot_follow_new_target_lang: "ပစ်မှတ်ဘာသာ",
+    hot_follow_new_process_mode: "လုပ်ဆောင်မုဒ်",
+    hot_follow_new_mode_fast_title: "မြန်ဆန်ကူးယူ",
+    hot_follow_new_mode_fast_desc: "မြန်နှုန်းဦးစား၊ အမြန်ထုတ်လုပ်",
+    hot_follow_new_mode_smart_title: "ဉာဏ်ရည်ကူးရေး",
+    hot_follow_new_mode_smart_desc: "စာသားတိုးတက်ရေးနှင့် သင့်တော်မှု ဦးစား",
+    hot_follow_new_publish_account: "ထုတ်ဝေ အကောင့်",
+    hot_follow_new_publish_account_default: "မူလ",
+    hot_follow_new_task_title: "ခေါင်းစဉ် (ရွေးချယ်နိုင်)",
+    hot_follow_new_task_title_ph: "ခေါင်းစဉ်ထည့်နိုင်",
+    hot_follow_new_create_and_run: "ဖန်တီးပြီး လုပ်ဆောင်",
+    hot_follow_workbench_title: "Hot Follow - Workbench",
+    hot_follow_workbench_track_hint: "လုပ်ငန်းတိုးတက်မှုနှင့် ထိန်းချုပ်မှု",
+    hot_follow_workbench_tab_source: "မူရင်းဗီဒီယို",
+    hot_follow_workbench_tab_final: "နောက်ဆုံးဗီဒီယို",
+    hot_follow_workbench_open_source: "မူရင်းဖွင့်",
+    hot_follow_workbench_open_final: "နောက်ဆုံးဖွင့်",
+    hot_follow_workbench_pipeline_title: "လုပ်ငန်းစဉ်",
+    hot_follow_workbench_parse: "ခွဲခြမ်း",
+    hot_follow_workbench_subtitles: "စာတန်း",
+    hot_follow_workbench_dubbing: "အသံထည့်",
+    hot_follow_workbench_confirm_voiceover: "အသံကို အတည်ပြုပြီး ပေါင်းစပ်ရန်",
+    hot_follow_workbench_tts_engine: "TTS အင်ဂျင်",
+    hot_follow_workbench_tts_voice: "အသံရွေးချယ်",
+    hot_follow_workbench_tts_preview: "စမ်းနားထောင်",
+    hot_follow_workbench_rerun_audio: "အသံပြန်လုပ်",
+    hot_follow_workbench_bgm_upload: "BGM တင်",
+    hot_follow_workbench_bgm_mix: "BGM ပေါင်းစပ်",
+    hot_follow_workbench_audio_fit_cap: "အသံညှိနှိုင်း အမြန်နှုန်းကန့်သတ်",
+    hot_follow_workbench_audio_fit_cap_normal: "ပုံမှန် (1.25x)",
+    hot_follow_workbench_audio_fit_cap_fast: "မြန် (2.0x)",
+    hot_follow_workbench_audio_fit_cap_hint: "Normal သဘာဝ၊ Fast ရှည်စာကို တိုဗီဒီယိုနှင့် ကိုက်ညီစေသော်လည်း မြန်နိုင်",
+    hot_follow_workbench_compose_title: "ပေါင်းစပ်",
+    hot_follow_workbench_composed_not_ready: "မအဆင်သင့်",
+    hot_follow_workbench_compose_hint: "ပေါင်းစပ်မလုပ်ရသေး",
+    hot_follow_workbench_overlay_target_subtitles: "ဘာသာပြန်စာတန်း ထပ်တင်",
+    hot_follow_workbench_compose_confirm: "အသံ/ပေါင်းစပ် စနစ်များ အဆင်သင့်",
+    hot_follow_workbench_compose_final: "နောက်ဆုံးပေါင်းစပ်",
+    hot_follow_workbench_reparse: "ပြန်ခွဲခြမ်း",
+    hot_follow_workbench_resubtitles: "စာတန်းပြန်လုပ်",
+    hot_follow_workbench_repack: "ပြန်ထုပ်",
+    hot_follow_workbench_input_config: "ထည့်သွင်းချက်",
+    hot_follow_workbench_subtitle_edit: "စာတန်းတည်းဖြတ်",
+    hot_follow_workbench_source_label: "မူရင်း (Source)",
+    hot_follow_workbench_target_label: "ဘာသာပြန် (Target)",
+    hot_follow_workbench_subtitle_placeholder: "SRT စာတန်းကို ဒီမှာ ပြ/တည်းဖြတ်",
+    hot_follow_delivery_title: "Hot Follow - Delivery",
+    hot_follow_delivery_hint_title: "ပို့ဆောင်ညွှန်ကြား",
+    hot_follow_delivery_soft_subtitle_hint: "ပို့ဆောင်ပါဝင်ချက်… နောက်တစ်ဆင့် Workbench မှ Compose Final လုပ်ပါ",
+    hot_follow_publish_center: "ထုတ်ဝေစင်တာ",
+    hot_follow_publish_feedback: "ထုတ်ဝေပြန်ထည့်",
+    hot_follow_publish_link: "ထုတ်ဝေလင့်ခ်",
+    hot_follow_publish_notes: "မှတ်ချက်",
+    hot_follow_publish_submit: "ပြန်ထည့်တင်",
+    hot_follow_publish_hashtags: "ဟတ်ရှ်တဂ်",
+    hot_follow_publish_hashtags_placeholder: "ဟတ်ရှ်တဂ်ထည့်ပါ…",
+    hot_follow_delivery_open_workbench: "Workbench ဖွင့်",
+    hot_follow_scene_pack_title: "စီကွက် (ရွေးချယ်နိုင်)",
+    hot_follow_scene_pack_desc: "မဖြစ်လည်း အဓိကလုပ်ငန်းစဉ် မထိခိုက်",
+    hot_follow_scene_pack_generate: "Scene Pack ဖန်တီး",
+    hot_follow_scene_pack_download: "Scene Pack ဒေါင်း",
+    hot_follow_scenes_title: "Scene ခွဲထုတ်",
+    hot_follow_scenes_desc: "လုပ်ငန်းပြန်သုံးရန် Scene ခွဲထုတ်",
+    hot_follow_scenes_generate: "Scene ခွဲထုတ်ဖန်တီး",
+    hot_follow_scenes_download: "Scenes.zip ဒေါင်း",
+    hot_follow_scene_status_pending: "မအဆင်သင့်",
+    hot_follow_scene_status_done: "အဆင်သင့်",
+  });
+  Object.assign(CLIENT_DICT.en, {
+    hot_follow_new_title: "Hot Follow - New",
+    hot_follow_new_hint: "Paste a link to create a hot follow task",
+    hot_follow_new_create_task: "Create Task",
+    hot_follow_new_source_link: "Source Link",
+    hot_follow_new_source_link_ph: "Paste link (Douyin/XHS/TK/FB)",
+    hot_follow_new_platform: "Platform",
+    hot_follow_new_platform_auto: "Auto",
+    hot_follow_new_link_preview: "Link Preview",
+    hot_follow_new_bgm_settings: "BGM Settings",
+    hot_follow_new_bgm_replace: "Replace audio",
+    hot_follow_new_bgm_keep: "Keep original",
+    hot_follow_new_bgm_mute: "Mute",
+    hot_follow_new_bgm_mix_ratio: "BGM mix ratio (0-1)",
+    hot_follow_new_pipeline_config: "Pipeline Config",
+    hot_follow_new_pipeline_config_badge: "Config",
+    hot_follow_new_target_lang: "Target language",
+    hot_follow_new_process_mode: "Process mode",
+    hot_follow_new_mode_fast_title: "Fast Clone",
+    hot_follow_new_mode_fast_desc: "Prioritize speed, output fast",
+    hot_follow_new_mode_smart_title: "Smart Rewrite",
+    hot_follow_new_mode_smart_desc: "Optimize phrasing and adaptation",
+    hot_follow_new_publish_account: "Publish account",
+    hot_follow_new_publish_account_default: "Default",
+    hot_follow_new_task_title: "Title (optional)",
+    hot_follow_new_task_title_ph: "Optional title",
+    hot_follow_new_create_and_run: "Create & Run",
+    hot_follow_workbench_title: "Hot Follow - Workbench",
+    hot_follow_workbench_track_hint: "Track progress and control steps",
+    hot_follow_workbench_tab_source: "Source",
+    hot_follow_workbench_tab_final: "Final",
+    hot_follow_workbench_open_source: "Open source",
+    hot_follow_workbench_open_final: "Open final",
+    hot_follow_workbench_pipeline_title: "Processing Pipeline",
+    hot_follow_workbench_parse: "Parse",
+    hot_follow_workbench_subtitles: "Subtitles",
+    hot_follow_workbench_dubbing: "Dubbing",
+    hot_follow_workbench_confirm_voiceover: "Confirm voiceover for compose readiness",
+    hot_follow_workbench_tts_engine: "TTS Engine",
+    hot_follow_workbench_tts_voice: "TTS Voice",
+    hot_follow_workbench_tts_preview: "Preview",
+    hot_follow_workbench_rerun_audio: "Re-Run Audio",
+    hot_follow_workbench_bgm_upload: "BGM Upload",
+    hot_follow_workbench_bgm_mix: "BGM Mix",
+    hot_follow_workbench_audio_fit_cap: "Audio fit speed cap",
+    hot_follow_workbench_audio_fit_cap_normal: "Normal (1.25x)",
+    hot_follow_workbench_audio_fit_cap_fast: "Fast (2.0x)",
+    hot_follow_workbench_audio_fit_cap_hint: "Normal preserves naturalness; Fast may sound rushed",
+    hot_follow_workbench_compose_title: "Compose",
+    hot_follow_workbench_composed_not_ready: "Not Ready",
+    hot_follow_workbench_compose_hint: "Compose never run",
+    hot_follow_workbench_overlay_target_subtitles: "Overlay target subtitles",
+    hot_follow_workbench_compose_confirm: "I confirm voiceover and mix settings are ready",
+    hot_follow_workbench_compose_final: "Compose Final",
+    hot_follow_workbench_reparse: "Re-Parse",
+    hot_follow_workbench_resubtitles: "Re-Subtitles",
+    hot_follow_workbench_repack: "Re-Pack",
+    hot_follow_workbench_input_config: "Input Config",
+    hot_follow_workbench_subtitle_edit: "Subtitle Edit",
+    hot_follow_workbench_source_label: "Source",
+    hot_follow_workbench_target_label: "Target",
+    hot_follow_workbench_subtitle_placeholder: "SRT will appear here",
+    hot_follow_delivery_title: "Hot Follow - Delivery",
+    hot_follow_delivery_hint_title: "Delivery hints",
+    hot_follow_delivery_soft_subtitle_hint: "This delivery includes… Next: run Compose Final in Workbench",
+    hot_follow_publish_center: "Publish Center",
+    hot_follow_publish_feedback: "Publish Feedback",
+    hot_follow_publish_link: "Publish link",
+    hot_follow_publish_notes: "Notes",
+    hot_follow_publish_submit: "Submit",
+    hot_follow_publish_hashtags: "Hashtags",
+    hot_follow_publish_hashtags_placeholder: "Enter hashtags…",
+    hot_follow_delivery_open_workbench: "Open workbench",
+    hot_follow_scene_pack_title: "Scene Pack (Optional)",
+    hot_follow_scene_pack_desc: "Optional; does not block main flow",
+    hot_follow_scene_pack_generate: "Generate Scene Pack",
+    hot_follow_scene_pack_download: "Download Scene Pack",
+    hot_follow_scenes_title: "Scene Slices",
+    hot_follow_scenes_desc: "Reusable scene slices for ops",
+    hot_follow_scenes_generate: "Generate Scenes",
+    hot_follow_scenes_download: "Download Scenes.zip",
+    hot_follow_scene_status_pending: "Pending",
+    hot_follow_scene_status_done: "Done",
+  });
+
   function getPayload() {
-    return window.__I18N__ || { locale: "zh", supported: ["zh", "mm"], dict: { zh: {}, mm: {} } };
+    return window.__I18N__ || { locale: "zh", supported: ["zh", "mm", "en"], dict: { zh: {}, mm: {}, en: {} } };
   }
 
   function getSupported() {
     const payload = getPayload();
-    return payload.supported || ["zh", "mm"];
+    const supported = payload.supported || ["zh", "mm", "en"];
+    return ["zh", "mm", "en"].filter((x) => supported.includes(x));
+  }
+
+  function normalizeLocale(locale) {
+    const loc = String(locale || "").toLowerCase();
+    if (loc === "zh" || loc === "mm" || loc === "en") return loc;
+    return "en";
   }
 
   function getQueryLocale() {
@@ -407,12 +614,13 @@
   function resolveLocale() {
     const payload = getPayload();
     const supported = getSupported();
-    const queryLocale = getQueryLocale();
+    const queryLocale = normalizeLocale(getQueryLocale());
     if (supported.includes(queryLocale)) return queryLocale;
-    const cookieLocale = getCookieLocale();
+    const cookieLocale = normalizeLocale(getCookieLocale());
     if (supported.includes(cookieLocale)) return cookieLocale;
-    if (supported.includes(payload.locale)) return payload.locale;
-    return "zh";
+    const payloadLocale = normalizeLocale(payload.locale);
+    if (supported.includes(payloadLocale)) return payloadLocale;
+    return "en";
   }
 
   function getFallbacks() {
@@ -443,7 +651,10 @@
         break;
       }
     }
-    if (!text) text = (CLIENT_DICT.en && CLIENT_DICT.en[key]) || key;
+    if (!text) {
+      console.warn("[i18n-miss]", locale, key);
+      text = (CLIENT_DICT.en && CLIENT_DICT.en[key]) || key;
+    }
     if (vars && typeof text === "string") {
       Object.keys(vars).forEach((k) => {
         text = text.replace(new RegExp(`\\{${k}\\}`, "g"), String(vars[k]));

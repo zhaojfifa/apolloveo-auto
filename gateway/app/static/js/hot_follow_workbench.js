@@ -265,7 +265,7 @@
       "missing_raw": t("hot_follow_compose_reason_missing_raw", "缺少源视频"),
     };
     if (composedBadgeEl) {
-      composedBadgeEl.textContent = ready ? "✅ Composed: Ready" : "⚠️ Not Ready";
+      composedBadgeEl.textContent = ready ? t("hot_follow_scene_status_done", "Done") : t("hot_follow_workbench_composed_not_ready", "Not Ready");
       composedBadgeEl.classList.toggle("text-green-700", ready);
       composedBadgeEl.classList.toggle("text-amber-700", !ready);
     }
@@ -276,14 +276,14 @@
 
   function renderScenePack() {
     const scene = (currentHub && currentHub.scene_pack) || {};
-    const status = scene.status || "pending";
+    const status = scene.status || t("hot_follow_scene_status_pending", "Pending");
     const url = scene.download_url || scene.scenes_url || null;
     const stateEl = document.querySelector('[data-hf-step-status="scenes"]');
     if (stateEl) stateEl.textContent = status;
     setLink(scenePackDownloadEl, url);
     if (scenePackHintEl) {
-      if (url) scenePackHintEl.textContent = "Scene pack ready";
-      else scenePackHintEl.textContent = status === "failed" ? "Scene pack failed" : "Optional and not generated yet";
+      if (url) scenePackHintEl.textContent = t("hot_follow_scene_status_done", "Done");
+      else scenePackHintEl.textContent = status === "failed" ? t("hot_follow_compose_reason_failed", "failed") : t("hot_follow_scene_pack_desc", "Optional; does not block main flow");
     }
   }
 
@@ -292,6 +292,7 @@
     const list = (currentHub && currentHub.deliverables) || [];
     if (!Array.isArray(list) || !list.length) {
       deliverablesGridEl.innerHTML = '<div class="rounded-lg border border-gray-200 p-3 text-sm text-gray-500">No deliverables yet</div>';
+      refreshLocale(deliverablesGridEl);
       return;
     }
     deliverablesGridEl.innerHTML = list.map((d) => {
@@ -314,6 +315,7 @@
         </div>
       `;
     }).join("");
+    refreshLocale(deliverablesGridEl);
   }
 
   function renderEvents() {
@@ -492,7 +494,7 @@
       if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
       else if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
       else if (!hasRaw) composeMsgEl.textContent = "Compose disabled: missing raw video.";
-      else if (!confirmed) composeMsgEl.textContent = "Compose disabled: check confirmation first.";
+      else if (!confirmed) composeMsgEl.textContent = t("hot_follow_workbench_compose_disabled_hint", "Compose disabled: check confirmation first");
       else composeMsgEl.textContent = "";
     }
   }
