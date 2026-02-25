@@ -89,6 +89,62 @@
       hot_follow_delivery_scene_pending_suffix: "（Scene Pack pending，不阻塞发布）",
       hot_follow_delivery_status_ready: "当前状态：✅ 可发布",
       hot_follow_delivery_status_prefix: "当前状态：⚠️",
+      hot_follow_new_title: "热点跟拍 - 新建",
+      hot_follow_new_hint_paste_link: "输入链接，生成热点跟拍任务",
+      hot_follow_new_create_task: "创建任务",
+      hot_follow_new_source_link: "来源链接",
+      hot_follow_new_platform: "平台",
+      hot_follow_new_link_preview: "链接预览",
+      hot_follow_new_pipeline_config_badge: "配置",
+      hot_follow_new_publish_account_default: "默认",
+      hot_follow_new_create_run: "创建并运行",
+      hot_follow_new_bgm_settings: "BGM 设置",
+      hot_follow_new_bgm_mix_ratio: "BGM 混合比例 (0-1)",
+      hot_follow_workbench_title: "热点跟拍 - 工作台",
+      hot_follow_workbench_step_parse: "解析",
+      hot_follow_workbench_step_subtitles: "字幕",
+      hot_follow_workbench_step_dubbing: "配音",
+      hot_follow_workbench_step_compose: "合成",
+      hot_follow_workbench_confirm_voiceover: "确认配音用于合成就绪检查",
+      hot_follow_workbench_tts_engine: "TTS 引擎",
+      hot_follow_workbench_tts_voice: "TTS 音色",
+      hot_follow_workbench_rerun_audio: "重新生成配音",
+      hot_follow_workbench_bgm_upload: "BGM 上传",
+      hot_follow_workbench_bgm_mix: "BGM 混音",
+      hot_follow_workbench_audio_fit_cap: "语速上限",
+      hot_follow_workbench_audio_fit_cap_normal: "正常 (1.25x)",
+      hot_follow_workbench_audio_fit_cap_fast: "快速 (2.0x)",
+      hot_follow_workbench_audio_fit_cap_hint: "正常更自然；快速适合长文本但可能偏赶",
+      hot_follow_workbench_compose_title: "合成",
+      hot_follow_workbench_composed_not_ready: "未就绪",
+      hot_follow_workbench_overlay_target_subtitles: "叠加译文字幕",
+      hot_follow_workbench_compose_confirm: "我确认配音与混音参数已就绪",
+      hot_follow_workbench_compose_final: "合成最终视频",
+      hot_follow_workbench_compose_disabled_hint: "合成不可用：请先确认就绪",
+      hot_follow_workbench_reparse: "重新解析",
+      hot_follow_workbench_resubtitles: "重新字幕",
+      hot_follow_workbench_repack: "重新打包",
+      hot_follow_workbench_scene_pack_optional: "分镜（可选）",
+      hot_follow_workbench_scene_pack_generate: "生成 Scene Pack",
+      hot_follow_workbench_deliverables: "交付物",
+      hot_follow_delivery_title: "热点跟拍 - 交付中心",
+      hot_follow_delivery_deliverables: "交付物",
+      hot_follow_delivery_soft_subtitle_hint: "本次交付包含：Final / Pack / Subtitles / Audio / BGM…",
+      hot_follow_delivery_publish_center: "发布中心",
+      hot_follow_delivery_publish_feedback: "发布回填",
+      hot_follow_delivery_publish_link: "发布链接",
+      hot_follow_delivery_notes: "备注",
+      hot_follow_delivery_submit: "回填发布",
+      hot_follow_delivery_hashtags: "话题标签",
+      hot_follow_delivery_hashtags_placeholder: "输入话题标签...",
+      hot_follow_delivery_open_workbench: "打开工作台",
+      common_buttons_download: "下载",
+      common_status_pending: "pending",
+      common_status_ready: "ready",
+      common_loading: "...",
+      common_ok: "OK",
+      "lang.mm": "缅文",
+      "lang.en": "English",
     },
     mm: {
       scn_apollo_avatar_title: "ApolloAvatar",
@@ -177,6 +233,144 @@
       hot_follow_delivery_scene_pending_suffix: " (Scene Pack pending, ဖြန့်ချိမှုကို မတားဆီးပါ)",
       hot_follow_delivery_status_ready: "လက်ရှိအခြေအနေ - ✅ ဖြန့်ချိနိုင်သည်",
       hot_follow_delivery_status_prefix: "လက်ရှိအခြေအနေ - ⚠️",
+      hot_follow_new_title: "Hot Follow - New",
+      hot_follow_new_hint_paste_link: "Paste a link to create a hot follow task",
+      hot_follow_new_create_task: "Create Task",
+      hot_follow_new_source_link: "Source link",
+      hot_follow_new_platform: "Platform",
+      hot_follow_new_link_preview: "Link Preview",
+      hot_follow_new_pipeline_config_badge: "Config",
+      hot_follow_new_publish_account_default: "Default",
+      hot_follow_new_create_run: "Create & Run",
+      hot_follow_new_bgm_settings: "BGM Settings",
+      hot_follow_new_bgm_mix_ratio: "BGM mix ratio (0-1)",
+      hot_follow_workbench_title: "Hot Follow - Workbench",
+      hot_follow_workbench_step_parse: "Parse",
+      hot_follow_workbench_step_subtitles: "Subtitles",
+      hot_follow_workbench_step_dubbing: "Dubbing",
+      hot_follow_workbench_step_compose: "Compose",
+      hot_follow_workbench_confirm_voiceover: "Confirm voiceover for compose readiness",
+      hot_follow_workbench_tts_engine: "TTS Engine",
+      hot_follow_workbench_tts_voice: "TTS Voice",
+      hot_follow_workbench_rerun_audio: "Re-Run Audio",
+      hot_follow_workbench_bgm_upload: "BGM Upload",
+      hot_follow_workbench_bgm_mix: "BGM Mix",
+      hot_follow_workbench_audio_fit_cap: "Audio Fit Speed Cap",
+      hot_follow_workbench_audio_fit_cap_normal: "Normal (1.25x)",
+      hot_follow_workbench_audio_fit_cap_fast: "Fast (2.0x)",
+      hot_follow_workbench_audio_fit_cap_hint: "Normal preserves naturalness; fast may sound rushed",
+      hot_follow_workbench_compose_title: "Compose",
+      hot_follow_workbench_composed_not_ready: "Not Ready",
+      hot_follow_workbench_overlay_target_subtitles: "Overlay target subtitles",
+      hot_follow_workbench_compose_confirm: "I confirm voiceover and mix settings are ready",
+      hot_follow_workbench_compose_final: "Compose Final",
+      hot_follow_workbench_compose_disabled_hint: "Compose disabled: check confirmation first",
+      hot_follow_workbench_reparse: "Re-Parse",
+      hot_follow_workbench_resubtitles: "Re-Subtitles",
+      hot_follow_workbench_repack: "Re-Pack",
+      hot_follow_workbench_scene_pack_optional: "Scene Pack (optional)",
+      hot_follow_workbench_scene_pack_generate: "Generate Scene Pack",
+      hot_follow_workbench_deliverables: "Deliverables",
+      hot_follow_delivery_title: "Hot Follow - Delivery Center",
+      hot_follow_delivery_deliverables: "Deliverables",
+      hot_follow_delivery_soft_subtitle_hint: "This delivery includes: Final / Pack / Subtitles / Audio / BGM…",
+      hot_follow_delivery_publish_center: "Publish Center",
+      hot_follow_delivery_publish_feedback: "Publish Feedback",
+      hot_follow_delivery_publish_link: "Publish link",
+      hot_follow_delivery_notes: "Notes",
+      hot_follow_delivery_submit: "Submit",
+      hot_follow_delivery_hashtags: "Hashtags",
+      hot_follow_delivery_hashtags_placeholder: "Enter hashtags...",
+      hot_follow_delivery_open_workbench: "Open Workbench",
+      common_buttons_download: "Download",
+      common_status_pending: "pending",
+      common_status_ready: "ready",
+      common_loading: "...",
+      common_ok: "OK",
+      "lang.mm": "မြန်မာ",
+      "lang.en": "English",
+    },
+    en: {
+      hot_follow_new_title: "Hot Follow - New",
+      hot_follow_new_hint_paste_link: "Paste a link to create a hot follow task",
+      hot_follow_new_create_task: "Create Task",
+      hot_follow_new_source_link: "Source link",
+      hot_follow_new_platform: "Platform",
+      hot_follow_new_link_preview: "Link Preview",
+      hot_follow_new_pipeline_config: "Pipeline Config",
+      hot_follow_new_pipeline_config_badge: "Config",
+      hot_follow_new_target_lang: "Target language",
+      hot_follow_new_process_mode: "Process mode",
+      hot_follow_new_mode_fast_title: "Fast",
+      hot_follow_new_mode_fast_desc: "Prioritize speed, faster output",
+      hot_follow_new_mode_smart_title: "Intelligent",
+      hot_follow_new_mode_smart_desc: "Better rewriting & adaptation",
+      hot_follow_new_publish_account: "Publish account",
+      hot_follow_new_publish_account_default: "Default",
+      hot_follow_new_task_title: "Task title (optional)",
+      hot_follow_new_create_run: "Create & Run",
+      hot_follow_new_bgm_settings: "BGM Settings",
+      hot_follow_new_bgm_replace: "Replace audio",
+      hot_follow_new_bgm_keep: "Keep original",
+      hot_follow_new_bgm_mute: "Mute",
+      hot_follow_new_bgm_mix_ratio: "BGM mix ratio (0-1)",
+      hot_follow_workbench_title: "Hot Follow - Workbench",
+      hot_follow_workbench_pipeline_title: "Processing Pipeline",
+      hot_follow_workbench_step_parse: "Parse",
+      hot_follow_workbench_step_subtitles: "Subtitles",
+      hot_follow_workbench_step_dubbing: "Dubbing",
+      hot_follow_workbench_step_compose: "Compose",
+      hot_follow_workbench_confirm_voiceover: "Confirm voiceover for compose readiness",
+      hot_follow_workbench_tts_engine: "TTS Engine",
+      hot_follow_workbench_tts_voice: "TTS Voice",
+      hot_follow_workbench_rerun_audio: "Re-Run Audio",
+      hot_follow_workbench_bgm_upload: "BGM Upload",
+      hot_follow_workbench_bgm_mix: "BGM Mix",
+      hot_follow_workbench_audio_fit_cap: "Audio Fit Speed Cap",
+      hot_follow_workbench_audio_fit_cap_normal: "Normal (1.25x)",
+      hot_follow_workbench_audio_fit_cap_fast: "Fast (2.0x)",
+      hot_follow_workbench_audio_fit_cap_hint: "Normal preserves naturalness; fast may sound rushed",
+      hot_follow_workbench_compose_title: "Compose",
+      hot_follow_workbench_composed_not_ready: "Not Ready",
+      hot_follow_workbench_overlay_target_subtitles: "Overlay target subtitles",
+      hot_follow_workbench_compose_confirm: "I confirm voiceover and mix settings are ready",
+      hot_follow_workbench_compose_final: "Compose Final",
+      hot_follow_workbench_compose_disabled_hint: "Compose disabled: check confirmation first",
+      hot_follow_workbench_reparse: "Re-Parse",
+      hot_follow_workbench_resubtitles: "Re-Subtitles",
+      hot_follow_workbench_repack: "Re-Pack",
+      hot_follow_workbench_input_config: "INPUT CONFIG",
+      hot_follow_workbench_subtitle_edit: "Subtitle Edit",
+      hot_follow_workbench_source_label: "Source",
+      hot_follow_workbench_target_label: "Target",
+      hot_follow_workbench_subtitle_placeholder: "Edit SRT text here",
+      hot_follow_workbench_tab_source: "Source",
+      hot_follow_workbench_tab_final: "Final",
+      hot_follow_workbench_open_source: "Open source",
+      hot_follow_workbench_open_final: "Open final",
+      hot_follow_workbench_scene_pack_optional: "Scene Pack (optional)",
+      hot_follow_workbench_scene_pack_generate: "Generate Scene Pack",
+      hot_follow_workbench_scene_pack_download: "Download Scene Pack",
+      hot_follow_workbench_deliverables: "Deliverables",
+      hot_follow_delivery_title: "Hot Follow - Delivery Center",
+      hot_follow_delivery_deliverables: "Deliverables",
+      hot_follow_delivery_soft_subtitle_hint: "This delivery includes: Final / Pack / Subtitles / Audio / BGM…",
+      hot_follow_delivery_publish_center: "Publish Center",
+      hot_follow_delivery_publish_feedback: "Publish Feedback",
+      hot_follow_delivery_publish_link: "Publish link",
+      hot_follow_delivery_notes: "Notes",
+      hot_follow_delivery_submit: "Submit",
+      hot_follow_delivery_hashtags: "Hashtags",
+      hot_follow_delivery_hashtags_placeholder: "Enter hashtags...",
+      hot_follow_delivery_open_workbench: "Open Workbench",
+      common_buttons_download: "Download",
+      common_status_pending: "pending",
+      common_status_ready: "ready",
+      common_loading: "...",
+      common_ok: "OK",
+      "lang.zh": "Chinese",
+      "lang.mm": "Burmese",
+      "lang.en": "English",
     },
   };
 
@@ -224,8 +418,9 @@
   function getFallbacks() {
     const payload = getPayload();
     return payload.fallbacks || {
-      mm: ["mm", "zh"],
-      zh: ["zh"],
+      mm: ["mm", "en", "zh"],
+      zh: ["zh", "en"],
+      en: ["en", "zh"],
     };
   }
 
@@ -234,7 +429,7 @@
     const locale = resolveLocale();
     const dict = payload.dict || {};
     const fallbacks = getFallbacks();
-    const chain = fallbacks[locale] || [locale, "zh"];
+    const chain = fallbacks[locale] || [locale, "en", "zh"];
     let text;
     for (const loc of chain) {
       const table = dict[loc] || {};
@@ -248,9 +443,7 @@
         break;
       }
     }
-    if (!text) {
-      text = `【MISSING:${key}】`;
-    }
+    if (!text) text = (CLIENT_DICT.en && CLIENT_DICT.en[key]) || key;
     if (vars && typeof text === "string") {
       Object.keys(vars).forEach((k) => {
         text = text.replace(new RegExp(`\\{${k}\\}`, "g"), String(vars[k]));
@@ -275,7 +468,7 @@
     });
   }
 
-  function applyLocaleToRoot(locale, rootEl) {
+  function applyLocale(locale, rootEl) {
     const root = rootEl || document;
     if (!locale) locale = resolveLocale();
     if (root === document || root === document.documentElement || root === document.body) {
@@ -289,15 +482,6 @@
     _translateElements(locale, root);
   }
 
-  function applyLocale(locale) {
-    applyLocaleToRoot(locale, document);
-  }
-
-  function refresh(rootEl) {
-    const locale = resolveLocale();
-    applyLocaleToRoot(locale, rootEl || document);
-  }
-
   let observer = null;
   let observerTimer = null;
   const pendingRoots = new Set();
@@ -309,7 +493,7 @@
     observerTimer = setTimeout(() => {
       observerTimer = null;
       const locale = resolveLocale();
-      pendingRoots.forEach((root) => applyLocaleToRoot(locale, root));
+      pendingRoots.forEach((root) => applyLocale(locale, root));
       pendingRoots.clear();
     }, 50);
   }
@@ -319,16 +503,18 @@
     if (
       node.hasAttribute("data-i18n") ||
       node.hasAttribute("data-i18n-placeholder") ||
-      node.hasAttribute("data-i18n-title")
+      node.hasAttribute("data-i18n-title") ||
+      node.hasAttribute("data-lang-tab")
     ) {
       return true;
     }
     return Boolean(
-      node.querySelector("[data-i18n], [data-i18n-placeholder], [data-i18n-title]")
+      node.querySelector("[data-i18n], [data-i18n-placeholder], [data-i18n-title], [data-lang-tab]")
     );
   }
 
-  function _ensureObserver() {
+  // Observe async-rendered DOM blocks and re-apply locale with debounce.
+  function watchDomI18n() {
     if (observer || typeof MutationObserver === "undefined" || !document.body) return;
     observer = new MutationObserver((mutations) => {
       for (const m of mutations) {
@@ -343,8 +529,8 @@
 
   function boot() {
     const locale = resolveLocale();
-    applyLocaleToRoot(locale, document);
-    _ensureObserver();
+    applyLocale(locale, document);
+    watchDomI18n();
     document.querySelectorAll("[data-lang-tab]").forEach((el) => {
       el.classList.toggle("active", el.getAttribute("data-lang-tab") === locale);
       el.addEventListener("click", (e) => {
@@ -352,7 +538,7 @@
         const target = el.getAttribute("data-lang-tab");
         if (!target) return;
         setCookie(target);
-        applyLocaleToRoot(target, document);
+        applyLocale(target, document);
         setQueryLocale(target);
       });
     });
@@ -362,7 +548,9 @@
     return resolveLocale();
   }
 
-  window.__V185_I18N__ = { t, readLocale, applyLocale, applyLocaleToRoot, refresh };
+  window.__V185_I18N__ = { t, readLocale, applyLocale, watchDomI18n };
+  // Page scripts can force a full i18n pass after dynamic rendering.
+  window.__I18N_REAPPLY__ = () => window.__V185_I18N__.applyLocale(window.__V185_I18N__.readLocale());
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", boot);

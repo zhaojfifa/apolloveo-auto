@@ -28,18 +28,18 @@
         <section class="lg:col-span-5 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div class="flex items-center justify-between mb-4">
-              <h2 class="text-lg font-semibold">{{ t("hot.follow.new.form_title") }}</h2>
+              <h2 class="text-lg font-semibold" data-i18n="hot_follow_new_title">{{ t("hot.follow.new.form_title") }}</h2>
               <span class="text-xs text-gray-400">P1</span>
             </div>
             <div class="space-y-4">
               <div>
-                <label for="hf-url" class="block text-sm font-semibold text-gray-700">{{ t("label.source_url") }}</label>
+                <label for="hf-url" class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_source_link">{{ t("label.source_url") }}</label>
                 <input id="hf-url" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('label.source_url.placeholder') }}" />
-                <div class="text-xs text-gray-500 mt-1" id="hf-url-hint"></div>
+                <div class="text-xs text-gray-500 mt-1" id="hf-url-hint" data-i18n="hot_follow_new_hint_paste_link"></div>
               </div>
 
               <div>
-                <label for="hf-platform" class="block text-sm font-semibold text-gray-700">{{ t("label.platform") }}</label>
+                <label for="hf-platform" class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_platform">{{ t("label.platform") }}</label>
                 <select id="hf-platform" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
                   <option value="auto">Auto</option>
                   <option value="douyin">{{ t("label.platform_douyin") }}</option>
@@ -52,7 +52,7 @@
           </div>
 
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h3 class="text-base font-semibold mb-4">{{ t("hot.follow.new.probe_title") }}</h3>
+            <h3 class="text-base font-semibold mb-4" data-i18n="hot_follow_new_link_preview">{{ t("hot.follow.new.probe_title") }}</h3>
             <div id="hf-probe" class="flex items-center gap-4 rounded-xl border border-dashed border-gray-300 p-4">
               <img id="hf-cover" class="h-20 w-20 rounded-xl bg-gray-100 object-cover" alt="cover" />
               <div>
@@ -65,16 +65,16 @@
           </div>
 
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h3 class="text-base font-semibold mb-4">{{ t("hot.follow.new.bgm_title") }}</h3>
+            <h3 class="text-base font-semibold mb-4" data-i18n="hot_follow_new_bgm_settings">{{ t("hot.follow.new.bgm_title") }}</h3>
             <div class="space-y-4">
               <div class="flex flex-wrap gap-4 text-sm">
-                <label class="inline-flex items-center gap-2"><input type="radio" name="bgm_strategy" value="replace" checked /> {{ t("hot.follow.new.bgm_replace") }}</label>
-                <label class="inline-flex items-center gap-2"><input type="radio" name="bgm_strategy" value="keep" /> {{ t("hot.follow.new.bgm_keep") }}</label>
-                <label class="inline-flex items-center gap-2"><input type="radio" name="bgm_strategy" value="mute" /> {{ t("hot.follow.new.bgm_mute") }}</label>
+                <label class="inline-flex items-center gap-2"><input type="radio" name="bgm_strategy" value="replace" checked /> <span data-i18n="hot_follow_new_bgm_replace">{{ t("hot.follow.new.bgm_replace") }}</span></label>
+                <label class="inline-flex items-center gap-2"><input type="radio" name="bgm_strategy" value="keep" /> <span data-i18n="hot_follow_new_bgm_keep">{{ t("hot.follow.new.bgm_keep") }}</span></label>
+                <label class="inline-flex items-center gap-2"><input type="radio" name="bgm_strategy" value="mute" /> <span data-i18n="hot_follow_new_bgm_mute">{{ t("hot.follow.new.bgm_mute") }}</span></label>
               </div>
               <input id="hf-bgm" type="file" accept="audio/*" />
               <div>
-                <label class="block text-sm font-semibold text-gray-700">{{ t("hot.follow.new.bgm_mix") }}</label>
+                <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_bgm_mix_ratio">{{ t("hot.follow.new.bgm_mix") }}</label>
                 <input id="hf-mix" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="number" min="0" max="1" step="0.05" value="0.8" />
               </div>
             </div>
@@ -84,13 +84,13 @@
         <section class="lg:col-span-7 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div class="flex items-center justify-between mb-4">
-              <h2 class="text-lg font-semibold">加工流水线配置</h2>
-              <span class="text-xs text-gray-400">Config</span>
+              <h2 class="text-lg font-semibold" data-i18n="hot_follow_new_pipeline_config">加工流水线配置</h2>
+              <span class="text-xs text-gray-400" data-i18n="hot_follow_new_pipeline_config_badge">Config</span>
             </div>
 
             <div class="space-y-5">
               <div>
-                <label class="block text-sm font-semibold text-gray-700">目标语言</label>
+                <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_target_lang">目标语言</label>
                 <select name="target_lang" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
                   <option value="zh">中文</option>
                   <option value="mm">မြန်မာ</option>
@@ -99,36 +99,36 @@
               </div>
 
               <div>
-                <div class="text-sm font-semibold text-gray-700 mb-2">处理模式</div>
+                <div class="text-sm font-semibold text-gray-700 mb-2" data-i18n="hot_follow_new_process_mode">处理模式</div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <label class="flex items-start gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
                     <input type="radio" name="process_mode" value="fast_clone" checked class="mt-1" />
                     <div>
-                      <div class="text-sm font-semibold text-gray-900">极速复刻</div>
-                      <div class="text-xs text-gray-500">优先速度，快速产出</div>
+                      <div class="text-sm font-semibold text-gray-900" data-i18n="hot_follow_new_mode_fast_title">极速复刻</div>
+                      <div class="text-xs text-gray-500" data-i18n="hot_follow_new_mode_fast_desc">优先速度，快速产出</div>
                     </div>
                   </label>
                   <label class="flex items-start gap-3 rounded-xl border border-gray-200 p-4 cursor-pointer">
                     <input type="radio" name="process_mode" value="smart_rewrite" class="mt-1" />
                     <div>
-                      <div class="text-sm font-semibold text-gray-900">智能仿写</div>
-                      <div class="text-xs text-gray-500">更注重表达优化与适配</div>
+                      <div class="text-sm font-semibold text-gray-900" data-i18n="hot_follow_new_mode_smart_title">智能仿写</div>
+                      <div class="text-xs text-gray-500" data-i18n="hot_follow_new_mode_smart_desc">更注重表达优化与适配</div>
                     </div>
                   </label>
                 </div>
               </div>
 
               <div>
-                <label class="block text-sm font-semibold text-gray-700">发布账号</label>
+                <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_publish_account">发布账号</label>
                 <select name="publish_account" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
-                  <option value="default">Default</option>
+                  <option value="default" data-i18n="hot_follow_new_publish_account_default">Default</option>
                   <option value="account_a">Account A</option>
                   <option value="account_b">Account B</option>
                 </select>
               </div>
 
               <div>
-                <label class="block text-sm font-semibold text-gray-700">任务标题（可选）</label>
+                <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_task_title">任务标题（可选）</label>
                 <input id="hf-task-title" name="task_title" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('label.title.placeholder') }}" />
               </div>
             </div>
@@ -141,7 +141,7 @@
       <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4">
         <div class="text-sm text-gray-500">{{ t("hot.follow.new.subtitle") }}</div>
         <div class="flex items-center gap-3">
-          <button id="hf-create" class="btn-primary" disabled>{{ t("hot.follow.new.cta") }}</button>
+          <button id="hf-create" class="btn-primary" disabled data-i18n="hot_follow_new_create_run">{{ t("hot.follow.new.cta") }}</button>
           <span class="text-xs text-gray-500" id="hf-create-msg"></span>
         </div>
       </div>
