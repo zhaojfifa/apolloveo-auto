@@ -54,7 +54,7 @@
           </div>
 
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h3 class="text-base font-semibold mb-4">INPUT CONFIG</h3>
+            <h3 class="text-base font-semibold mb-4" data-i18n="hot_follow_workbench_input_config">INPUT CONFIG</h3>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div class="rounded-xl border border-gray-200 p-4">
                 <div class="text-xs text-gray-500">{{ t("label.platform") }}</div>
@@ -94,25 +94,25 @@
 
         <section class="lg:col-span-5 space-y-6">
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h2 class="text-lg font-semibold mb-4">Processing Pipeline</h2>
+            <h2 class="text-lg font-semibold mb-4" data-i18n="hot_follow_workbench_pipeline_title">Processing Pipeline</h2>
             <div id="hf-steps" class="space-y-3">
               <div class="border-b border-gray-100 pb-3" data-hf-step="parse">
                 <div class="flex items-center justify-between">
-                  <span class="font-semibold">{{ t("hot.follow.step.parse") }}</span>
+                  <span class="font-semibold" data-i18n="hot_follow_workbench_step_parse">{{ t("hot.follow.step.parse") }}</span>
                   <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="parse">-</span>
                 </div>
                 <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="parse">-</div>
               </div>
               <div class="border-b border-gray-100 pb-3" data-hf-step="subtitles">
                 <div class="flex items-center justify-between">
-                  <span class="font-semibold">{{ t("hot.follow.step.subtitles") }}</span>
+                  <span class="font-semibold" data-i18n="hot_follow_workbench_step_subtitles">{{ t("hot.follow.step.subtitles") }}</span>
                   <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="subtitles">-</span>
                 </div>
                 <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="subtitles">-</div>
               </div>
               <div class="border-b border-gray-100 pb-3" data-hf-step="audio">
                 <div class="flex items-center justify-between">
-                  <span class="font-semibold">{{ t("hot.follow.step.dub") }}</span>
+                  <span class="font-semibold" data-i18n="hot_follow_workbench_step_dubbing">{{ t("hot.follow.step.dub") }}</span>
                   <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="audio">-</span>
                 </div>
                 <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="audio">-</div>
@@ -120,10 +120,10 @@
                   <audio id="hf_voiceover_audio" controls class="w-full"></audio>
                   <label class="flex items-center gap-2 text-xs text-gray-600">
                     <input id="hf_confirm_voiceover" type="checkbox" class="rounded border-gray-300" />
-                    Confirm voiceover for compose readiness.
+                    <span data-i18n="hot_follow_workbench_confirm_voiceover">Confirm voiceover for compose readiness.</span>
                   </label>
                   <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">TTS Engine</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1" data-i18n="hot_follow_workbench_tts_engine">TTS Engine</label>
                     <select id="hf_tts_engine" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                       <option value="edge_tts">edge_tts</option>
                       <option value="lovo">lovo</option>
@@ -131,7 +131,7 @@
                     </select>
                   </div>
                   <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">TTS Voice</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1" data-i18n="hot_follow_workbench_tts_voice">TTS Voice</label>
                     <select id="hf_tts_voice" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
                       <option value="zh-CN-XiaoxiaoNeural">zh-CN-XiaoxiaoNeural</option>
                       <option value="zh-CN-YunxiNeural">zh-CN-YunxiNeural</option>
@@ -141,29 +141,29 @@
                   </div>
                   <div class="flex items-center gap-2">
                     <button id="hf_tts_preview_btn" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_tts_preview">试听</button>
-                    <button id="hf_rerun_audio_btn" class="btn-secondary text-xs">Re-Run Audio</button>
+                    <button id="hf_rerun_audio_btn" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_rerun_audio">Re-Run Audio</button>
                   </div>
                   <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">BGM Upload</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1" data-i18n="hot_follow_workbench_bgm_upload">BGM Upload</label>
                     <input id="hf_bgm_file" type="file" accept="audio/*" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />
                   </div>
                   <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">BGM Mix</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1" data-i18n="hot_follow_workbench_bgm_mix">BGM Mix</label>
                     <input id="hf_bgm_mix" type="range" min="0" max="1" step="0.05" value="0.3" class="w-full" />
                   </div>
                   <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1">Audio Fit Speed Cap</label>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1" data-i18n="hot_follow_workbench_audio_fit_cap">Audio Fit Speed Cap</label>
                     <div class="flex items-center gap-4 text-xs text-gray-700">
                       <label class="flex items-center gap-1">
                         <input id="hf_audio_fit_cap_125" name="hf_audio_fit_cap" type="radio" class="rounded border-gray-300" value="1.25" checked />
-                        <span>Normal (1.25x)</span>
+                        <span data-i18n="hot_follow_workbench_audio_fit_cap_normal">Normal (1.25x)</span>
                       </label>
                       <label class="flex items-center gap-1">
                         <input id="hf_audio_fit_cap_200" name="hf_audio_fit_cap" type="radio" class="rounded border-gray-300" value="2.0" />
-                        <span>Fast (2.0x)</span>
+                        <span data-i18n="hot_follow_workbench_audio_fit_cap_fast">Fast (2.0x)</span>
                       </label>
                     </div>
-                    <div class="mt-1 text-[11px] text-gray-500">
+                    <div class="mt-1 text-[11px] text-gray-500" data-i18n="hot_follow_workbench_audio_fit_cap_hint">
                       Normal preserves naturalness. Fast helps fit long dubbing into short video but may sound rushed.
                     </div>
                   </div>
@@ -171,24 +171,24 @@
               </div>
               <div data-hf-step="compose">
                 <div class="flex items-center justify-between">
-                  <span class="font-semibold">Compose</span>
+                  <span class="font-semibold" data-i18n="hot_follow_workbench_step_compose">Compose</span>
                   <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="compose">-</span>
                 </div>
                 <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="compose">-</div>
                 <div class="mt-2">
-                  <div id="hf_composed_badge" class="text-xs font-semibold text-amber-700">⚠️ Not Ready</div>
+                  <div id="hf_composed_badge" class="text-xs font-semibold text-amber-700" data-i18n="hot_follow_workbench_composed_not_ready">⚠️ Not Ready</div>
                   <div id="hf_composed_reason" class="text-[11px] text-gray-500">Compose never run</div>
                 </div>
                 <div class="mt-3 space-y-3">
                   <label class="flex items-center gap-2 text-xs text-gray-600">
                     <input id="hf_overlay_subtitles" type="checkbox" class="rounded border-gray-300" />
-                    Overlay target subtitles
+                    <span data-i18n="hot_follow_workbench_overlay_target_subtitles">Overlay target subtitles</span>
                   </label>
                   <label class="flex items-center gap-2 text-xs text-gray-600">
                     <input id="hf_compose_confirm" type="checkbox" class="rounded border-gray-300" />
-                    I confirm voiceover and mix settings are ready.
+                    <span data-i18n="hot_follow_workbench_compose_confirm">I confirm voiceover and mix settings are ready.</span>
                   </label>
-                  <button id="hf_compose_btn" class="btn-secondary" data-action="compose">Compose Final</button>
+                  <button id="hf_compose_btn" class="btn-secondary" data-action="compose" data-i18n="hot_follow_workbench_compose_final">Compose Final</button>
                   <div id="hf_compose_msg" class="text-xs text-gray-500"></div>
                   <div id="hf_compose_final_block" class="hidden rounded-xl border border-gray-200 p-3">
                     <div class="flex items-center justify-between mb-2">
@@ -201,27 +201,27 @@
               </div>
             </div>
             <div class="flex flex-wrap gap-3 mt-4">
-              <button class="btn-secondary" data-action="parse">{{ t("hot.follow.action.parse") }}</button>
-              <button class="btn-secondary" data-action="subtitles">{{ t("hot.follow.action.subtitles") }}</button>
-              <button class="btn-secondary" data-action="pack">{{ t("hot.follow.action.pack") }}</button>
+              <button class="btn-secondary" data-action="parse" data-i18n="hot_follow_workbench_reparse">{{ t("hot.follow.action.parse") }}</button>
+              <button class="btn-secondary" data-action="subtitles" data-i18n="hot_follow_workbench_resubtitles">{{ t("hot.follow.action.subtitles") }}</button>
+              <button class="btn-secondary" data-action="pack" data-i18n="hot_follow_workbench_repack">{{ t("hot.follow.action.pack") }}</button>
             </div>
             <div class="text-xs text-gray-500 mt-2" id="hf_audio_msg"></div>
             <div class="hidden" id="hf-audio-msg"></div>
           </div>
 
           <div id="hf_scene_pack_card" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h3 class="text-base font-semibold mb-3">Scene Pack</h3>
+            <h3 class="text-base font-semibold mb-3" data-i18n="hot_follow_workbench_scene_pack_optional">Scene Pack</h3>
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600">{{ t("hot.follow.step.scenes") }}</span>
               <span class="text-xs rounded-full bg-gray-100 px-2 py-1" data-hf-step-status="scenes">-</span>
             </div>
             <div class="text-xs text-gray-500 mt-2" id="hf-scene-pack-hint" data-i18n="hot_follow_workbench_scene_pack_hint">可选，未生成时不影响主流程</div>
-            <button class="btn-secondary mt-3" data-action="scene_pack">Generate Scene Pack</button>
+            <button class="btn-secondary mt-3" data-action="scene_pack" data-i18n="hot_follow_workbench_scene_pack_generate">Generate Scene Pack</button>
             <a id="hf_scene_pack_download" class="btn-secondary mt-4 inline-block opacity-50 pointer-events-none" href="#" target="_blank" rel="noopener" data-i18n="hot_follow_workbench_scene_pack_download">下载 Scene Pack</a>
           </div>
 
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
-            <h3 class="text-base font-semibold mb-3">Deliverables</h3>
+            <h3 class="text-base font-semibold mb-3" data-i18n="hot_follow_workbench_deliverables">Deliverables</h3>
             <div id="hf_deliverables_grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
           </div>
         </section>

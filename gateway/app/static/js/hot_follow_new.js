@@ -18,6 +18,19 @@
   let lastProbe = null;
   let debounceTimer = null;
 
+  function readLocale() {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.readLocale === "function") return i18n.readLocale();
+    const qs = new URLSearchParams(window.location.search || "");
+    return (qs.get("ui_locale") || "zh").toLowerCase();
+  }
+
+  function refreshLocale(rootEl) {
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.applyLocale === "function") i18n.applyLocale(readLocale(), rootEl || document);
+    else if (typeof window.__I18N_REAPPLY__ === "function") window.__I18N_REAPPLY__();
+  }
+
   function withLocale(url) {
     const loc = readLocale();
     if (!loc) return url;
@@ -136,29 +149,14 @@
     }
   }
 
-  if (urlEl) {
-    urlEl.addEventListener("input", scheduleProbe);
-  }
-  if (platformEl) {
-    platformEl.addEventListener("change", scheduleProbe);
-  }
+  if (urlEl) urlEl.addEventListener("input", scheduleProbe);
+  if (platformEl) platformEl.addEventListener("change", scheduleProbe);
   if (createBtn) {
     createBtn.addEventListener("click", (e) => {
       e.preventDefault();
       createTask();
     });
   }
-})();
-  function readLocale() {
-    const i18n = window.__V185_I18N__ || {};
-    if (typeof i18n.readLocale === "function") return i18n.readLocale();
-    const qs = new URLSearchParams(window.location.search || "");
-    return (qs.get("ui_locale") || "zh").toLowerCase();
-  }
-
-  function refreshLocale(rootEl) {
-    const i18n = window.__V185_I18N__ || {};
-    if (typeof i18n.refresh === "function") i18n.refresh(rootEl || document);
-  }
 
   refreshLocale(document);
+})();

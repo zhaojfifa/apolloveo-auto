@@ -6,20 +6,18 @@
     const qs = new URLSearchParams(window.location.search || "");
     return (qs.get("ui_locale") || "zh").toLowerCase();
   }
-  function applyLocale(locale) {
+  function applyLocale(locale, rootEl) {
     const i18n = window.__V185_I18N__ || {};
-    if (typeof i18n.applyLocale === "function") i18n.applyLocale(locale);
+    if (typeof i18n.applyLocale === "function") i18n.applyLocale(locale, rootEl || document);
   }
   function refreshLocale(rootEl) {
-    const i18n = window.__V185_I18N__ || {};
-    if (typeof i18n.refresh === "function") i18n.refresh(rootEl || document);
-    else applyLocale(readLocale());
+    applyLocale(readLocale(), rootEl || document);
   }
   function t(key, fallback) {
     const i18n = window.__V185_I18N__ || {};
     if (typeof i18n.t === "function") {
       const text = i18n.t(key);
-      if (typeof text === "string" && !text.startsWith("【MISSING:")) return text;
+      if (typeof text === "string" && text.indexOf("MISSING:") === -1) return text;
     }
     return fallback;
   }
