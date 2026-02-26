@@ -105,6 +105,7 @@
   const freezeTailEnabledEl = document.getElementById("hf_freeze_tail_enabled");
   const composeBtnEl = document.getElementById("hf_compose_btn");
   const composeMsgEl = document.getElementById("hf_compose_msg");
+  const composeReadinessSectionEl = document.getElementById("hf_compose_readiness_section");
   const composeFinalBlockEl = document.getElementById("hf_compose_final_block");
   const composeFinalVideoEl = document.getElementById("hf_compose_final_video");
   const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
@@ -301,14 +302,19 @@
     const done = isComposeDone(currentHub);
     const readyGate = (currentHub && currentHub.ready_gate) || {};
     const ready = done || Boolean(readyGate.compose_ready);
+    const composeStateEl = document.querySelector('[data-hf-step-status="compose"]');
+    const composeSummaryEl = document.querySelector('[data-hf-step-summary="compose"]');
+    if (done && composeStateEl) composeStateEl.textContent = "done";
+    if (done && composeSummaryEl) composeSummaryEl.textContent = t("hot_follow_compose_reason_ready", "已完成");
     if (composedBadgeEl) {
       composedBadgeEl.textContent = ready ? t("hot_follow_scene_status_done", "Done") : t("hot_follow_workbench_composed_not_ready", "Not Ready");
       composedBadgeEl.classList.toggle("text-green-700", ready);
       composedBadgeEl.classList.toggle("text-amber-700", !ready);
     }
-    if (composedReasonEl) composedReasonEl.textContent = done ? t("hot_follow_compose_reason_ready", "已完成") : t("hot_follow_workbench_composed_not_ready", "未就绪");
+    if (composedReasonEl) composedReasonEl.textContent = done ? t("hot_follow_compose_reason_ready", "已就绪（已完成）") : t("hot_follow_workbench_composed_not_ready", "未就绪");
+    if (composeReadinessSectionEl) composeReadinessSectionEl.classList.toggle("hidden", done);
     if (done && composeFinalBlockEl) composeFinalBlockEl.classList.remove("hidden");
-    if (done && composeFinalLinkEl && !composeFinalLinkEl.href) setLink(composeFinalLinkEl, finalUrl);
+    if (done && composeFinalLinkEl) setLink(composeFinalLinkEl, finalUrl);
     const composePlan = (currentHub && currentHub.compose_plan) || {};
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
     if (freezeTailEnabledEl) freezeTailEnabledEl.checked = Boolean(composePlan.freeze_tail_enabled);
@@ -550,7 +556,7 @@
     composeBtnEl.classList.toggle("pointer-events-none", !enabled);
     composeBtnEl.textContent = composeRunning || composeSubmitting
       ? t("hot_follow_compose_running", "合成中…")
-      : (composeBtnEl.dataset.defaultText || "Compose Final");
+      : (done ? "重新合成" : (composeBtnEl.dataset.defaultText || "Compose Final"));
     if (composeMsgEl) {
       if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
       else if (done) composeMsgEl.textContent = "";
