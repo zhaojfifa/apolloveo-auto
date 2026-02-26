@@ -499,6 +499,8 @@ def generate_scenes_package(
 def _task_value(task: object, field: str) -> str | None:
     if isinstance(task, dict):
         value = task.get(field)
+        if value is None and isinstance(task.get("deliverables"), dict):
+            value = task.get("deliverables", {}).get(field)
     else:
         value = getattr(task, field, None)
     return str(value) if value else None
@@ -506,18 +508,26 @@ def _task_value(task: object, field: str) -> str | None:
 
 def run_scenes_build(task_id: str, update_task) -> dict:
     start_time = time.perf_counter()
+    logger.info("scenes.build.start", extra={"task_id": task_id})
     update_task(task_id, {"scenes_status": "running", "scenes_error": None})
     try:
         result = generate_scenes_package(task_id)
+        scenes_key = result.get("scenes_key")
         update_task(
             task_id,
             {
                 "scenes_status": "ready",
-                "scenes_key": result.get("scenes_key"),
+                "scenes_key": scenes_key,
+                "scene_pack_key": scenes_key,
                 "scenes_count": result.get("scenes_count"),
                 "scenes_error": None,
+                "deliverables": {
+                    "scenes_key": scenes_key,
+                    "scene_pack_key": scenes_key,
+                },
             },
         )
+        logger.info("scenes.build.done", extra={"task_id": task_id, "scenes_key": scenes_key})
         return result
     except Exception as exc:  # pragma: no cover - defensive logging
         update_task(task_id, {"scenes_status": "error", "scenes_error": str(exc)})
@@ -540,11 +550,13 @@ def enqueue_scenes_build(
     background_tasks,
 ) -> dict:
     scenes_key = _task_value(task, "scenes_key")
-    if scenes_key and object_exists(str(scenes_key)):
+    if scenes_key:
+        logger.info("scenes already exists, reuse", extra={"task_id": task_id, "scenes_key": scenes_key})
         return {
             "task_id": task_id,
             "status": "already_ready",
             "scenes_key": scenes_key,
+            "scene_pack_key": scenes_key,
             "message": "Scenes already ready",
             "error": None,
         }

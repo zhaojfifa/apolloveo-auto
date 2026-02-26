@@ -12,6 +12,7 @@
   const scenePackStatusEl = document.getElementById("hf-scene-pack-status");
   const scenePackReasonEl = document.getElementById("hf-scene-pack-reason");
   const scenePackActionEl = document.getElementById("hf-scene-pack-action");
+  const scenePackGenerateBtn = document.getElementById("hf-scene-pack-generate");
   const hintSummaryEl = document.getElementById("hf-hint-summary");
   const hintNextEl = document.getElementById("hf-hint-next");
   const hintStatusEl = document.getElementById("hf-hint-status");
@@ -215,6 +216,20 @@
     publishBtn.addEventListener("click", (e) => {
       e.preventDefault();
       backfillPublish();
+    });
+  }
+
+  if (scenePackGenerateBtn) {
+    scenePackGenerateBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      scenePackGenerateBtn.disabled = true;
+      try {
+        const res = await fetch(`/api/tasks/${encodeURIComponent(taskId)}/scenes`, { method: "POST" });
+        if (!res.ok) throw new Error(await res.text());
+      } finally {
+        scenePackGenerateBtn.disabled = false;
+        loadPublishHub();
+      }
     });
   }
 

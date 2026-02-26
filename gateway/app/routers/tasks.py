@@ -1333,11 +1333,14 @@ def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
 
 def _scene_pack_info(task: dict, task_id: str) -> dict[str, Any]:
     key = (
-        _task_key(task, "scenes_pack_key")
-        or _task_key(task, "scenes_key")
+        _task_key(task, "scenes_key")
+        or _task_key(task, "scenes_pack_key")
         or f"deliver/scenes/{task_id}/scenes.zip"
     )
+    scenes_key_ready = bool(_task_key(task, "scenes_key"))
     exists = bool(key and object_exists(str(key)))
+    if scenes_key_ready:
+        exists = True
     meta = object_head(str(key)) if exists else None
     size_bytes, _ = media_meta_from_head(meta)
     status_raw = str(task.get("scenes_pack_last_status") or task.get("scenes_pack_status") or task.get("scenes_status") or "").lower()
@@ -1349,7 +1352,9 @@ def _scene_pack_info(task: dict, task_id: str) -> dict[str, Any]:
         status = "failed"
     else:
         status = "pending"
-    if exists and status != "running":
+    if scenes_key_ready:
+        status = "done"
+    elif exists and status != "running":
         status = "done"
     return {
         "exists": exists,
@@ -1658,7 +1663,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             "Scenes ZIP",
             scenes_key,
             _task_endpoint(task_id, "scenes") if scenes_key and object_exists(scenes_key) else None,
-            _hf_deliverable_state(task, scenes_key, "scenes_pack_status" if task.get("scenes_pack_status") else "scenes_status"),
+            "done" if scenes_key else _hf_deliverable_state(task, scenes_key, "scenes_status"),
         ),
         _entry(
             "final",
@@ -1739,7 +1744,12 @@ def _hf_task_status_shape(task: dict) -> dict[str, str]:
     }
 def _task_value(task: dict, field: str) -> Optional[str]:
     if isinstance(task, dict):
-        return task.get(field)
+        value = task.get(field)
+        if value is None:
+            deliverables = task.get("deliverables")
+            if isinstance(deliverables, dict):
+                value = deliverables.get(field)
+        return value
     return getattr(task, field, None)
 
 
@@ -1924,7 +1934,7 @@ def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
         pack_url = _task_endpoint(task_id, "pack")
     elif task.get("pack_path"):
         pack_url = _task_endpoint(task_id, "pack")
-    scenes_url = _task_endpoint(task_id, "scenes") if task.get("scenes_key") else None
+    scenes_url = _task_endpoint(task_id, "scenes") if _task_value(task, "scenes_key") else None
 
     return {
         "raw_path": raw_url,
@@ -4894,7 +4904,14 @@ def build_scenes(
         raise HTTPException(status_code=404, detail="Task not found")
 
     def _update(task_id: str, fields: dict) -> None:
-        _policy_upsert(repo, task_id, fields)
+        patch = dict(fields or {})
+        if isinstance(patch.get("deliverables"), dict):
+            current = repo.get(task_id) or {}
+            current_deliverables = current.get("deliverables") if isinstance(current.get("deliverables"), dict) else {}
+            merged_deliverables = dict(current_deliverables)
+            merged_deliverables.update(patch.get("deliverables") or {})
+            patch["deliverables"] = merged_deliverables
+        _policy_upsert(repo, task_id, patch)
 
     return enqueue_scenes_build(
         task_id,
@@ -4905,54 +4922,18 @@ def build_scenes(
     )
 
 
-@api_router.post("/hot_follow/tasks/{task_id}/scene_pack")
+@api_router.post("/hot_follow/tasks/{task_id}/scene_pack", deprecated=True)
 def build_hot_follow_scene_pack(
     task_id: str,
     background_tasks: BackgroundTasks,
     repo=Depends(get_task_repository),
 ):
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    lock = _task_scene_pack_lock(task_id)
-    if not lock.acquire(blocking=False):
-        return _scene_pack_in_progress_response(task_id)
-    current = repo.get(task_id) or task
-    status_raw = str(current.get("scenes_pack_last_status") or current.get("scenes_pack_status") or current.get("scenes_status") or "").lower()
-    if status_raw in {"running", "queued", "processing"}:
-        lock.release()
-        _policy_upsert(
-            repo,
-            task_id,
-            {
-                "scenes_pack_status": "running",
-                "scenes_pack_last_status": "running",
-                "scenes_pack_last_started_at": current.get("scenes_pack_last_started_at") or datetime.now(timezone.utc).isoformat(),
-                "scenes_pack_last_finished_at": None,
-            },
-        )
-        return _scene_pack_in_progress_response(task_id)
-    _policy_upsert(
-        repo,
-        task_id,
-        {
-            "scenes_pack_status": "running",
-            "scenes_pack_last_status": "running",
-            "scenes_pack_last_started_at": datetime.now(timezone.utc).isoformat(),
-            "scenes_pack_last_finished_at": None,
-            "scenes_pack_error_reason": None,
-            "scenes_pack_error": None,
-            "scenes_status": "running",
-            "scenes_error": None,
-        },
-    )
-    background_tasks.add_task(_run_scene_pack_background, task_id, repo, lock)
-    return {
-        "task_id": task_id,
-        "status": "running",
-        "scene_pack_status": "running",
-        "message": "Scene pack generation started",
-    }
+    logger.warning("scenes endpoint deprecated: use /api/tasks/{task_id}/scenes", extra={"task_id": task_id})
+    result = build_scenes(task_id=task_id, background_tasks=background_tasks, payload=None, repo=repo)
+    if isinstance(result, dict):
+        result["deprecated_endpoint"] = "/api/hot_follow/tasks/{task_id}/scene_pack"
+        result["use_endpoint"] = "/api/tasks/{task_id}/scenes"
+    return result
 
 @api_router.post("/tasks/{task_id}/pack")
 def build_pack(
