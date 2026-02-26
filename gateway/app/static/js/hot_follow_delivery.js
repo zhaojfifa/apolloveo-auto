@@ -16,6 +16,9 @@
   const hintSummaryEl = document.getElementById("hf-hint-summary");
   const hintNextEl = document.getElementById("hf-hint-next");
   const hintStatusEl = document.getElementById("hf-hint-status");
+  const finalVideoEl = document.getElementById("hf-final-video");
+  const finalVideoPlaceholderEl = document.getElementById("hf-final-video-placeholder");
+  const finalReadyLineEl = document.getElementById("hf-final-ready-line");
   const translationQaEl = document.getElementById("hf-translation-qa");
   const translationQaWarnEl = document.getElementById("hf-translation-qa-warn");
   const voiceAlignmentEl = document.getElementById("hf-voice-alignment");
@@ -122,6 +125,23 @@
 
     renderHintPanel(data, deliverables);
     renderDiagnostics(data);
+
+    const finalInfo = data.final || {};
+    const finalUrl = finalInfo.url || null;
+    if (finalVideoEl) {
+      if (finalUrl) {
+        finalVideoEl.src = finalUrl;
+        finalVideoEl.classList.remove("hidden");
+        if (finalVideoPlaceholderEl) finalVideoPlaceholderEl.classList.add("hidden");
+        if (finalReadyLineEl) finalReadyLineEl.classList.remove("hidden");
+      } else {
+        finalVideoEl.removeAttribute("src");
+        finalVideoEl.classList.add("hidden");
+        if (finalVideoPlaceholderEl) finalVideoPlaceholderEl.classList.remove("hidden");
+        if (finalReadyLineEl) finalReadyLineEl.classList.add("hidden");
+      }
+    }
+
     if (!keys.length) {
       if (emptyEl) emptyEl.style.display = "block";
       if (listEl) listEl.innerHTML = "";
@@ -137,7 +157,7 @@
           <div class="rounded-xl border border-gray-200 p-3">
             <div class="text-xs font-semibold text-gray-700 mb-2">${g.label}</div>
             <div class="space-y-2">
-              ${g.rows.map((item) => `<div class="deliverable"><span>${item.label || item.key}</span><a class="btn-secondary" href="${item.url}" target="_blank" rel="noopener">${t("common_buttons_download", "Download")}</a></div>`).join("")}
+              ${g.rows.map((item) => `<div class="deliverable"><span>${item.label || item.key}</span><a class="btn-secondary" href="${item.url}" target="_blank" rel="noopener">${t("common_buttons_download", "Download")}</a>${item.description ? `<div class="text-[11px] text-gray-500 mt-1">${item.description}</div>` : ""}</div>`).join("")}
             </div>
           </div>
         `;
