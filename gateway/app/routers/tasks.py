@@ -3596,6 +3596,12 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         raw = str(path).replace("\\", "/")
         return raw.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
+    def _bgm_filter_expr() -> str:
+        base = f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}"
+        if compose_policy == "match_video":
+            base += f",atrim=0:{video_duration:.3f}"
+        return base + "[bgm];"
+
     def _assert_overlay_cmd(cmd_text: str):
         if overlay_subtitles and "subtitles=" not in cmd_text:
             _compose_fail("compose_failed", "overlay_subtitles enabled but ffmpeg cmd missing subtitles filter", ffmpeg_cmd=cmd_text)
@@ -3776,8 +3782,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                         )
                         + "[voice];"
                     )
+                    + _bgm_filter_expr()
                     +
-                    f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
                     "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
                 )
                 map_video = "[v]"
@@ -3793,8 +3799,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                         )
                         + "[voice];"
                     )
+                    + _bgm_filter_expr()
                     +
-                    f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
                     "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
                 )
                 map_video = "0:v:0"
@@ -3894,7 +3900,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     ffmpeg,
                     "-y",
                     "-i",
-                    str(video_path),
+                    str(video_input_path),
                     "-i",
                     str(voice_path),
                     "-filter_complex",
@@ -3928,6 +3934,60 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             final_size, final_duration = assert_local_video_ok(final_path)
         except ValueError:
             _compose_fail("compose_failed", "compose output invalid")
+
+        ffprobe = shutil.which("ffprobe")
+        if ffprobe:
+            probe_cmd = [
+                ffprobe,
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(final_path),
+            ]
+            probe = subprocess.run(probe_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if probe.returncode == 0:
+                try:
+                    final_duration = float((probe.stdout or "").strip() or final_duration)
+                except Exception:
+                    pass
+
+        if compose_policy == "match_video" and abs(float(final_duration) - float(video_duration)) > 1.0:
+            logger.warning(
+                "COMPOSE_DURATION_MISMATCH",
+                extra={
+                    "task_id": task_id,
+                    "source_duration": video_duration,
+                    "final_duration": final_duration,
+                },
+            )
+            clamp_path = tmp / "final_compose_clamped.mp4"
+            clamp_cmd = [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(final_path),
+                "-t",
+                f"{video_duration:.3f}",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "20",
+                "-c:a",
+                "aac",
+                "-movflags",
+                "+faststart",
+                str(clamp_path),
+            ]
+            clamp_proc = subprocess.run(clamp_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if clamp_proc.returncode == 0 and clamp_path.exists() and clamp_path.stat().st_size > 0:
+                final_path = clamp_path
+                final_size, final_duration = assert_local_video_ok(final_path)
+                compose_warning = "Duration mismatch detected; output was clamped to source duration."
         logger.info(
             "COMPOSE_OUTPUT_READY",
             extra={
