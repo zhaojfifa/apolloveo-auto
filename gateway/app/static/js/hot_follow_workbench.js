@@ -277,9 +277,9 @@
   }
 
   function renderScenePack() {
-    const scene = (currentHub && currentHub.scene_pack) || {};
+    const scene = (currentHub && currentHub.scenes) || {};
     const status = scene.status || t("hot_follow_scene_status_pending", "Pending");
-    const url = scene.download_url || scene.scenes_url || null;
+    const url = scene.download_url || null;
     const stateEl = document.querySelector('[data-hf-step-status="scenes"]');
     if (stateEl) stateEl.textContent = status;
     setLink(scenePackDownloadEl, url);

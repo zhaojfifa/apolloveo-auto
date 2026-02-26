@@ -3265,7 +3265,15 @@ def get_hot_follow_workbench_hub(
     final_size = int(final_info.get("size_bytes") or 0)
     final_url = _task_endpoint(task_id, "final") if final_exists and final_size >= MIN_VIDEO_BYTES else None
     scene_pack = _scene_pack_info(task, task_id)
-    scenes_url = scene_pack.get("url")
+    scenes_key = _task_key(task, "scenes_key")
+    scenes_status_raw = str(task.get("scenes_status") or "").lower()
+    if scenes_key:
+        scenes_status = "done"
+    elif scenes_status_raw in {"running", "processing", "queued"}:
+        scenes_status = "running"
+    else:
+        scenes_status = "pending"
+    scenes_url = _task_endpoint(task_id, "scenes") if scenes_key else None
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
     audio_cfg = _hf_audio_config(task)
@@ -3349,15 +3357,21 @@ def get_hot_follow_workbench_hub(
             "error": task.get("dub_error"),
             "sha256": task.get("audio_sha256"),
         },
+        "scenes": {
+            "status": scenes_status,
+            "scenes_key": scenes_key,
+            "download_url": scenes_url,
+        },
         "scene_pack": {
-            "status": scene_pack.get("status") or _hf_deliverable_state(task, _task_key(task, "scenes_key"), "scenes_status"),
-            "exists": bool(scene_pack.get("exists")),
-            "key": scene_pack.get("key"),
+            "status": scenes_status,
+            "exists": bool(scenes_key),
+            "key": scenes_key,
             "asset_version": scene_pack.get("asset_version"),
-            "error": scene_pack.get("error"),
-            "error_reason": scene_pack.get("error_reason"),
+            "error": task.get("scenes_error"),
+            "error_reason": None,
             "download_url": scenes_url,
             "scenes_url": scenes_url,
+            "deprecated": True,
         },
         "deliverables": deliverables if isinstance(deliverables, list) else [],
         "events": task.get("events") or [],
@@ -4928,7 +4942,10 @@ def build_hot_follow_scene_pack(
     background_tasks: BackgroundTasks,
     repo=Depends(get_task_repository),
 ):
-    logger.warning("scenes endpoint deprecated: use /api/tasks/{task_id}/scenes", extra={"task_id": task_id})
+    logger.warning(
+        "deprecated hot_follow scene_pack endpoint called; use /api/tasks/{task_id}/scenes instead",
+        extra={"task_id": task_id},
+    )
     result = build_scenes(task_id=task_id, background_tasks=background_tasks, payload=None, repo=repo)
     if isinstance(result, dict):
         result["deprecated_endpoint"] = "/api/hot_follow/tasks/{task_id}/scene_pack"
