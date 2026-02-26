@@ -1366,11 +1366,15 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
         ("mm_srt", "mm.srt"),
         ("mm_txt", "mm.txt"),
         ("mm_audio", "mm_audio"),
-        ("edit_bundle_zip", "edit_bundle.zip"),
+        ("edit_bundle_zip", "scenes_bundle.zip"),
     ):
         url = _deliverable_url(task_id, task, key)
         if url:
-            deliverables[key] = {"label": label, "url": url}
+            item = {"label": label, "url": url}
+            if key == "edit_bundle_zip":
+                item["artifact"] = "scenes_bundle"
+                item["description"] = "Scenes package for re-editing / advanced workflow"
+            deliverables[key] = item
     scene_pack_pending_reason = None
     if not bool(scene_pack.get("exists")):
         if scene_pack.get("status") == "running":
