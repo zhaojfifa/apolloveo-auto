@@ -405,6 +405,13 @@
     hot_follow_scenes_download: "下载 Scenes.zip",
     hot_follow_scene_status_pending: "未就绪",
     hot_follow_scene_status_done: "已就绪",
+    hot_follow_ops_tips_title: "运营提示",
+    hot_follow_ops_tip_speed: "建议语速：1.25（更自然）",
+    hot_follow_ops_tip_edit_rerun: "若音频过长，优先编辑译文字幕并重跑配音，避免极端提速。",
+    hot_follow_ops_tip_overlay: "v1.9 暂不支持去除硬字幕，请使用 A 档遮挡（黑条/描边）覆盖字幕区域。",
+    hot_follow_workbench_dub_outdated: "配音需更新",
+    hot_follow_workbench_freeze_tail_toggle: "末帧停留以匹配音频（freeze tail）",
+    hot_follow_workbench_freeze_tail_cap_hint: "freeze tail 最多 8 秒，超出自动回退为匹配视频时长。",
   });
   Object.assign(CLIENT_DICT.mm, {
     hot_follow_new_title: "Hot Follow - အသစ်",
@@ -489,6 +496,13 @@
     hot_follow_scenes_download: "Scenes.zip ဒေါင်း",
     hot_follow_scene_status_pending: "မအဆင်သင့်",
     hot_follow_scene_status_done: "အဆင်သင့်",
+    hot_follow_ops_tips_title: "Ops Tips",
+    hot_follow_ops_tip_speed: "အကြံပြုနှုန်း: 1.25 (ပိုသဘာဝ)",
+    hot_follow_ops_tip_edit_rerun: "အသံရှည်လွန်းပါက ဘာသာပြန်စာတန်းကိုပြင်ပြီး dubbing ပြန် chạy လုပ်ပါ။",
+    hot_follow_ops_tip_overlay: "v1.9 မှာ hard subtitles မဖယ်ရှားနိုင်ပါ။ A-tier overlay (black box/stroke) သုံးပါ။",
+    hot_follow_workbench_dub_outdated: "Dub is out of date",
+    hot_follow_workbench_freeze_tail_toggle: "Hold last frame to match audio (freeze tail)",
+    hot_follow_workbench_freeze_tail_cap_hint: "Freeze tail cap: 8s; fallback to match video if exceeded.",
   });
   Object.assign(CLIENT_DICT.en, {
     hot_follow_new_title: "Hot Follow - New",
@@ -573,6 +587,13 @@
     hot_follow_scenes_download: "Download Scenes.zip",
     hot_follow_scene_status_pending: "Pending",
     hot_follow_scene_status_done: "Done",
+    hot_follow_ops_tips_title: "Ops Tips",
+    hot_follow_ops_tip_speed: "Recommended speed: 1.25 (more natural).",
+    hot_follow_ops_tip_edit_rerun: "If audio is too long, edit translated subtitles and rerun dubbing instead of extreme speed-up.",
+    hot_follow_ops_tip_overlay: "Hard subtitles cannot be removed in v1.9. Use A-tier overlay (black box/stroke).",
+    hot_follow_workbench_dub_outdated: "Dub is out of date",
+    hot_follow_workbench_freeze_tail_toggle: "Hold last frame to match audio (freeze tail)",
+    hot_follow_workbench_freeze_tail_cap_hint: "Freeze tail cap: 8s; fallback to match video if exceeded.",
   });
 
   function getPayload() {

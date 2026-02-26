@@ -207,6 +207,7 @@ class DubProviderRequest(BaseModel):
     provider: str | None = None
     voice_id: str | None = None
     mm_text: str | None = None
+    tts_speed: float | None = None
 
 
 class EditedTextRequest(BaseModel):
@@ -250,6 +251,7 @@ class HotFollowAudioConfigRequest(BaseModel):
     tts_engine: str | None = None
     tts_voice: str | None = None
     bgm_mix: float | None = None
+    audio_fit_max_speed: float | None = None
 
 
 class HotFollowSubtitlesRequest(BaseModel):
@@ -261,12 +263,15 @@ class ComposeTaskRequest(BaseModel):
     bgm_url: str | None = None
     bgm_mix: float | None = None
     overlay_subtitles: bool | None = None
+    freeze_tail_enabled: bool | None = None
     force: bool = False
 
 
 class ComposePlanPatchRequest(BaseModel):
     overlay_subtitles: bool | None = None
     target_lang: str | None = None
+    freeze_tail_enabled: bool | None = None
+    freeze_tail_cap_sec: int | None = None
 
 
 pages_router = APIRouter()
@@ -1450,6 +1455,12 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
     except Exception:
         mix_val = 0.3
     task_id = str(task.get("task_id") or task.get("id") or "")
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    try:
+        audio_fit_max_speed = float(pipeline_config.get("audio_fit_max_speed") or 1.25)
+    except Exception:
+        audio_fit_max_speed = 1.25
+    audio_fit_max_speed = max(1.0, min(1.6, audio_fit_max_speed))
     voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
     meta = object_head(str(voice_key)) if voice_key else None
     size, _ = media_meta_from_head(meta)
@@ -1462,6 +1473,7 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
         "voiceover_url": voice_url,
         "audio_url": voice_url,
+        "audio_fit_max_speed": audio_fit_max_speed,
     }
 
 
@@ -3261,7 +3273,13 @@ def get_hot_follow_workbench_hub(
             "strip_subtitle_streams": True,
             "cleanup_mode": "none",
             "target_lang": task.get("target_lang") or task.get("content_lang") or "mm",
+            "freeze_tail_enabled": False,
+            "freeze_tail_cap_sec": 8,
+            "compose_policy": "match_video",
         }
+    compose_plan.setdefault("freeze_tail_enabled", False)
+    compose_plan.setdefault("freeze_tail_cap_sec", 8)
+    compose_plan["compose_policy"] = "freeze_tail" if bool(compose_plan.get("freeze_tail_enabled")) else "match_video"
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
         scene_outputs = []
@@ -3392,6 +3410,7 @@ def get_hot_follow_workbench_hub(
         "final": final_info,
         "compose": {
             "last": compose_last,
+            "warning": task.get("compose_warning"),
         },
         "errors": {
             "audio": {"reason": task.get("error_reason"), "message": task.get("dub_error")},
@@ -3449,6 +3468,11 @@ def patch_hot_follow_audio_config(
         updates["dub_provider"] = provider
     if payload.tts_voice is not None:
         updates["voice_id"] = payload.tts_voice.strip() or None
+    if payload.audio_fit_max_speed is not None:
+        speed = max(1.0, min(1.6, float(payload.audio_fit_max_speed)))
+        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+        pipeline_config["audio_fit_max_speed"] = f"{speed:.2f}"
+        updates["pipeline_config"] = pipeline_config_to_storage(pipeline_config)
 
     if updates:
         _policy_upsert(repo, task_id, updates)
@@ -3476,10 +3500,21 @@ def patch_hot_follow_compose_plan(
         plan["strip_subtitle_streams"] = True
     if "target_lang" not in plan:
         plan["target_lang"] = task.get("target_lang") or task.get("content_lang") or "mm"
+    if "freeze_tail_enabled" not in plan:
+        plan["freeze_tail_enabled"] = False
+    if "freeze_tail_cap_sec" not in plan:
+        plan["freeze_tail_cap_sec"] = 8
+    if "compose_policy" not in plan:
+        plan["compose_policy"] = "match_video"
     if payload.overlay_subtitles is not None:
         plan["overlay_subtitles"] = bool(payload.overlay_subtitles)
     if payload.target_lang is not None and str(payload.target_lang).strip():
         plan["target_lang"] = str(payload.target_lang).strip()
+    if payload.freeze_tail_enabled is not None:
+        plan["freeze_tail_enabled"] = bool(payload.freeze_tail_enabled)
+    if payload.freeze_tail_cap_sec is not None:
+        plan["freeze_tail_cap_sec"] = max(1, min(30, int(payload.freeze_tail_cap_sec)))
+    plan["compose_policy"] = "freeze_tail" if bool(plan.get("freeze_tail_enabled")) else "match_video"
     _policy_upsert(repo, task_id, {"compose_plan": plan})
     return {"task_id": task_id, "compose_plan": plan}
 
@@ -3623,6 +3658,13 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     overlay_subtitles = bool(compose_plan.get("overlay_subtitles"))
     strip_subtitle_streams = bool(compose_plan.get("strip_subtitle_streams", True))
     target_lang = str(compose_plan.get("target_lang") or task.get("target_lang") or task.get("content_lang") or "mm")
+    freeze_tail_enabled = bool(compose_plan.get("freeze_tail_enabled", False))
+    try:
+        freeze_tail_cap_sec = max(1.0, min(30.0, float(compose_plan.get("freeze_tail_cap_sec") or 8.0)))
+    except Exception:
+        freeze_tail_cap_sec = 8.0
+    compose_policy = "freeze_tail" if freeze_tail_enabled else "match_video"
+    compose_warning = None
     logger.info(
         "COMPOSE_START",
         extra={
@@ -3634,6 +3676,9 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "overlay_subtitles": overlay_subtitles,
             "strip_subtitle_streams": strip_subtitle_streams,
             "target_lang": target_lang,
+            "freeze_tail_enabled": freeze_tail_enabled,
+            "freeze_tail_cap_sec": freeze_tail_cap_sec,
+            "compose_policy": compose_policy,
         },
     )
 
@@ -3649,10 +3694,53 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         subtitle_path = tmp / "subs_target.srt"
         storage.download_file(str(video_key), str(video_path))
         storage.download_file(str(audio_key), str(voice_path))
+        video_size, video_duration = assert_local_video_ok(video_path)
         try:
-            assert_local_audio_ok(voice_path)
+            _, voice_duration = assert_local_audio_ok(voice_path)
         except ValueError:
             _compose_fail("missing_voiceover", "voiceover audio invalid")
+
+        video_input_path = video_path
+        hold_sec = 0.0
+        if freeze_tail_enabled and voice_duration > video_duration:
+            required_hold = max(0.0, voice_duration - video_duration)
+            if required_hold <= freeze_tail_cap_sec:
+                hold_sec = required_hold
+            else:
+                compose_policy = "match_video"
+                compose_warning = (
+                    f"freeze tail required {required_hold:.2f}s > cap {freeze_tail_cap_sec:.2f}s; fallback to match_video"
+                )
+        else:
+            compose_policy = "match_video" if not freeze_tail_enabled else compose_policy
+
+        if hold_sec > 0:
+            freeze_video_path = tmp / "video_input_freeze_tail.mp4"
+            freeze_cmd = [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(video_path),
+                "-vf",
+                f"tpad=stop_mode=clone:stop_duration={hold_sec:.3f}",
+                "-an",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "veryfast",
+                "-crf",
+                "20",
+                "-pix_fmt",
+                "yuv420p",
+                str(freeze_video_path),
+            ]
+            freeze_proc = subprocess.run(freeze_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if freeze_proc.returncode == 0 and freeze_video_path.exists() and freeze_video_path.stat().st_size > 0:
+                video_input_path = freeze_video_path
+                compose_policy = "freeze_tail"
+            else:
+                compose_policy = "match_video"
+                compose_warning = "freeze tail render failed; fallback to match_video"
 
         if overlay_subtitles:
             if not bundled_myanmar_ttf.exists() or bundled_myanmar_ttf.stat().st_size == 0:
@@ -3679,7 +3767,16 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 )
                 filter_complex = (
                     f"[0:v]{subtitle_filter}[v];"
-                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0[voice];"
+                    + (
+                        f"[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
+                        + (
+                            f",atrim=0:{video_duration:.3f},afade=t=out:st={max(video_duration-0.35,0.0):.3f}:d=0.35"
+                            if compose_policy == "match_video" and voice_duration > video_duration
+                            else ""
+                        )
+                        + "[voice];"
+                    )
+                    +
                     f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
                     "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
                 )
@@ -3687,7 +3784,16 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
             else:
                 filter_complex = (
-                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0[voice];"
+                    (
+                        "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
+                        + (
+                            f",atrim=0:{video_duration:.3f},afade=t=out:st={max(video_duration-0.35,0.0):.3f}:d=0.35"
+                            if compose_policy == "match_video" and voice_duration > video_duration
+                            else ""
+                        )
+                        + "[voice];"
+                    )
+                    +
                     f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}[bgm];"
                     "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
                 )
@@ -3697,7 +3803,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 ffmpeg,
                 "-y",
                 "-i",
-                str(video_path),
+                str(video_input_path),
                 "-i",
                 str(voice_path),
                 "-i",
@@ -3733,19 +3839,35 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 )
                 filter_complex = (
                     f"[0:v]{subtitle_filter}[v];"
-                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0,alimiter=limit=0.95[mix]"
+                    + (
+                        "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
+                        + (
+                            f",atrim=0:{video_duration:.3f},afade=t=out:st={max(video_duration-0.35,0.0):.3f}:d=0.35"
+                            if compose_policy == "match_video" and voice_duration > video_duration
+                            else ""
+                        )
+                        + ",alimiter=limit=0.95[mix]"
+                    )
                 )
                 map_video = "[v]"
                 video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
             else:
-                filter_complex = "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0,alimiter=limit=0.95[mix]"
+                filter_complex = (
+                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
+                    + (
+                        f",atrim=0:{video_duration:.3f},afade=t=out:st={max(video_duration-0.35,0.0):.3f}:d=0.35"
+                        if compose_policy == "match_video" and voice_duration > video_duration
+                        else ""
+                    )
+                    + ",alimiter=limit=0.95[mix]"
+                )
                 map_video = "0:v:0"
                 video_codec_args = ["-c:v", "copy"]
             cmd = [
                 ffmpeg,
                 "-y",
                 "-i",
-                str(video_path),
+                str(video_input_path),
                 "-i",
                 str(voice_path),
                 "-filter_complex",
@@ -3864,6 +3986,10 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
             "compose_last_ffmpeg_cmd": ffmpeg_cmd_used,
             "compose_last_error": None,
+            "compose_policy": compose_policy,
+            "freeze_tail_enabled": bool(compose_policy == "freeze_tail"),
+            "freeze_tail_cap_sec": int(freeze_tail_cap_sec),
+            "compose_warning": compose_warning,
             "last_step": "compose",
             "status": "ready",
             "error_message": None,
@@ -3901,6 +4027,9 @@ def compose_hot_follow_final_video(
         "strip_subtitle_streams": bool(current_plan.get("strip_subtitle_streams", True)),
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
+        "freeze_tail_enabled": bool(current_plan.get("freeze_tail_enabled", False)),
+        "freeze_tail_cap_sec": int(current_plan.get("freeze_tail_cap_sec") or 8),
+        "compose_policy": "freeze_tail" if bool(current_plan.get("freeze_tail_enabled", False)) else "match_video",
     }
     try:
         _policy_upsert(
@@ -3916,6 +4045,7 @@ def compose_hot_follow_final_video(
                 "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
                 "compose_last_finished_at": None,
                 "compose_last_error": None,
+                "compose_warning": None,
                 "compose_plan": compose_plan,
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
@@ -4011,6 +4141,21 @@ def compose_task(
         if "target_lang" not in plan:
             plan["target_lang"] = task.get("target_lang") or task.get("content_lang") or "mm"
         plan["overlay_subtitles"] = bool(req.overlay_subtitles)
+        if "freeze_tail_enabled" not in plan:
+            plan["freeze_tail_enabled"] = False
+        if "freeze_tail_cap_sec" not in plan:
+            plan["freeze_tail_cap_sec"] = 8
+        plan["compose_policy"] = "freeze_tail" if bool(plan.get("freeze_tail_enabled")) else "match_video"
+        _policy_upsert(repo, task_id, {"compose_plan": plan})
+        task = repo.get(task_id) or task
+    if req.freeze_tail_enabled is not None:
+        plan = dict(task.get("compose_plan") or {})
+        if "target_lang" not in plan:
+            plan["target_lang"] = task.get("target_lang") or task.get("content_lang") or "mm"
+        plan["freeze_tail_enabled"] = bool(req.freeze_tail_enabled)
+        if "freeze_tail_cap_sec" not in plan:
+            plan["freeze_tail_cap_sec"] = 8
+        plan["compose_policy"] = "freeze_tail" if bool(plan.get("freeze_tail_enabled")) else "match_video"
         _policy_upsert(repo, task_id, {"compose_plan": plan})
         task = repo.get(task_id) or task
 
@@ -4035,6 +4180,9 @@ def compose_task(
         "strip_subtitle_streams": bool(current_plan.get("strip_subtitle_streams", True)),
         "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
+        "freeze_tail_enabled": bool(current_plan.get("freeze_tail_enabled", False)),
+        "freeze_tail_cap_sec": int(current_plan.get("freeze_tail_cap_sec") or 8),
+        "compose_policy": "freeze_tail" if bool(current_plan.get("freeze_tail_enabled", False)) else "match_video",
     }
     try:
         _policy_upsert(
@@ -4050,6 +4198,7 @@ def compose_task(
                 "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
                 "compose_last_finished_at": None,
                 "compose_last_error": None,
+                "compose_warning": None,
                 "compose_plan": compose_plan,
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
@@ -4436,6 +4585,12 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             )
 
     req_voice_id = payload.voice_id or None
+    req_tts_speed = None
+    if payload.tts_speed is not None:
+        try:
+            req_tts_speed = max(1.0, min(1.6, float(payload.tts_speed)))
+        except Exception:
+            req_tts_speed = None
     prev_voice_id = task.get("voice_id") if isinstance(task, dict) else getattr(task, "voice_id", None)
     final_voice_id = req_voice_id or prev_voice_id or "mm_female_1"
     mm_text_override = (payload.mm_text or "").strip() or None
@@ -4449,6 +4604,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "text_len": len(mm_text_override or ""),
             "dub_provider": provider,
             "voice_id": final_voice_id,
+            "tts_speed": req_tts_speed,
         },
     )
     workspace = Workspace(task_id)
@@ -4477,6 +4633,16 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     )
 
     try:
+        if req_tts_speed is not None:
+            pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+            pipeline_config["audio_fit_max_speed"] = f"{req_tts_speed:.2f}"
+            _policy_upsert(
+                repo,
+                task_id,
+                {"pipeline_config": pipeline_config_to_storage(pipeline_config)},
+            )
+            task = repo.get(task_id) or task
+
         class TaskAdapter:
             def __init__(
                 self,

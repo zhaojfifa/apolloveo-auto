@@ -143,6 +143,7 @@
                   <div class="flex items-center gap-2">
                     <button id="hf_tts_preview_btn" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_tts_preview">试听</button>
                     <button id="hf_rerun_audio_btn" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_rerun_audio">Re-Run Audio</button>
+                    <span id="hf_dub_outdated_badge" class="hidden text-[11px] rounded bg-amber-100 text-amber-700 px-2 py-1" data-i18n="hot_follow_workbench_dub_outdated">Dub is out of date</span>
                   </div>
                   <div>
                     <label class="block text-xs font-semibold text-gray-600 mb-1" data-i18n="hot_follow_workbench_bgm_upload">BGM Upload</label>
@@ -154,19 +155,19 @@
                   </div>
                   <div>
                     <label class="block text-xs font-semibold text-gray-600 mb-1" data-i18n="hot_follow_workbench_audio_fit_cap">Audio Fit Speed Cap</label>
-                    <div class="flex items-center gap-4 text-xs text-gray-700">
-                      <label class="flex items-center gap-1">
-                        <input id="hf_audio_fit_cap_125" name="hf_audio_fit_cap" type="radio" class="rounded border-gray-300" value="1.25" checked />
-                        <span data-i18n="hot_follow_workbench_audio_fit_cap_normal">Normal (1.25x)</span>
-                      </label>
-                      <label class="flex items-center gap-1">
-                        <input id="hf_audio_fit_cap_200" name="hf_audio_fit_cap" type="radio" class="rounded border-gray-300" value="2.0" />
-                        <span data-i18n="hot_follow_workbench_audio_fit_cap_fast">Fast (2.0x)</span>
-                      </label>
+                    <div class="flex items-center gap-3 text-xs text-gray-700">
+                      <input id="hf_audio_fit_cap_slider" type="range" min="1.0" max="1.6" step="0.05" value="1.25" class="w-full" />
+                      <span id="hf_audio_fit_cap_value" class="min-w-[52px] text-right">1.25x</span>
                     </div>
                     <div class="mt-1 text-[11px] text-gray-500" data-i18n="hot_follow_workbench_audio_fit_cap_hint">
                       Normal preserves naturalness. Fast helps fit long dubbing into short video but may sound rushed.
                     </div>
+                  </div>
+                  <div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-[11px] text-amber-900">
+                    <div class="font-semibold mb-1" data-i18n="hot_follow_ops_tips_title">Ops Tips</div>
+                    <div data-i18n="hot_follow_ops_tip_speed">Recommended speed: 1.25 (more natural).</div>
+                    <div data-i18n="hot_follow_ops_tip_edit_rerun">If audio is too long, edit translated subtitles text and rerun dubbing instead of extreme speed-up.</div>
+                    <div data-i18n="hot_follow_ops_tip_overlay">Hard subtitles cannot be removed in v1.9. Use A-tier overlay (black box / stroke).</div>
                   </div>
                 </div>
               </div>
@@ -185,6 +186,11 @@
                     <input id="hf_overlay_subtitles" type="checkbox" class="rounded border-gray-300" />
                     <span data-i18n="hot_follow_workbench_overlay_target_subtitles">Overlay target subtitles</span>
                   </label>
+                  <label class="flex items-center gap-2 text-xs text-gray-600">
+                    <input id="hf_freeze_tail_enabled" type="checkbox" class="rounded border-gray-300" />
+                    <span data-i18n="hot_follow_workbench_freeze_tail_toggle">Hold last frame to match audio (freeze tail)</span>
+                  </label>
+                  <div class="text-[11px] text-gray-500" data-i18n="hot_follow_workbench_freeze_tail_cap_hint">Freeze tail cap: 8s; if exceeded fallback to match video.</div>
                   <label class="flex items-center gap-2 text-xs text-gray-600">
                     <input id="hf_compose_confirm" type="checkbox" class="rounded border-gray-300" />
                     <span data-i18n="hot_follow_workbench_compose_confirm">I confirm voiceover and mix settings are ready.</span>

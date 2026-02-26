@@ -37,9 +37,10 @@
   const ttsPreviewBtn = document.getElementById("hf_tts_preview_btn");
   const bgmFileEl = document.getElementById("hf_bgm_file");
   const bgmMixEl = document.getElementById("hf_bgm_mix");
-  const audioFitCap125El = document.getElementById("hf_audio_fit_cap_125");
-  const audioFitCap200El = document.getElementById("hf_audio_fit_cap_200");
+  const audioFitCapSliderEl = document.getElementById("hf_audio_fit_cap_slider");
+  const audioFitCapValueEl = document.getElementById("hf_audio_fit_cap_value");
   const rerunAudioBtn = document.getElementById("hf_rerun_audio_btn");
+  const dubOutdatedBadgeEl = document.getElementById("hf_dub_outdated_badge");
   const voiceoverAudioEl = document.getElementById("hf_voiceover_audio");
   const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
   const scenePackDownloadEl = document.getElementById("hf_scene_pack_download");
@@ -62,6 +63,7 @@
   const tabFinalEl = document.getElementById("hf-tab-final");
   const composeConfirmEl = document.getElementById("hf_compose_confirm");
   const overlaySubtitlesEl = document.getElementById("hf_overlay_subtitles");
+  const freezeTailEnabledEl = document.getElementById("hf_freeze_tail_enabled");
   const composeBtnEl = document.getElementById("hf_compose_btn");
   const composeMsgEl = document.getElementById("hf_compose_msg");
   const composeFinalBlockEl = document.getElementById("hf_compose_final_block");
@@ -77,6 +79,7 @@
   let hubLoading = false;
   let pollTimer = null;
   let composeSubmitting = false;
+  let subtitlesChangedSinceDub = false;
 
   function escapeHtml(s) {
     return String(s || "")
@@ -248,9 +251,8 @@
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
     const capRaw = Number(audio.audio_fit_max_speed);
     const cap = Number.isFinite(capRaw) ? capRaw : 1.25;
-    const isFast = cap >= 2.0 - 1e-6;
-    if (audioFitCap125El) audioFitCap125El.checked = !isFast;
-    if (audioFitCap200El) audioFitCap200El.checked = isFast;
+    if (audioFitCapSliderEl) audioFitCapSliderEl.value = String(Math.max(1.0, Math.min(1.6, cap)));
+    if (audioFitCapValueEl) audioFitCapValueEl.textContent = `${Number(audioFitCapSliderEl ? audioFitCapSliderEl.value : cap).toFixed(2)}x`;
     setMediaSrcStable(voiceoverAudioEl, voiceUrl, "audioUrl");
     if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
   }
@@ -274,6 +276,18 @@
     if (composedReasonEl) composedReasonEl.textContent = reasonTextMap[reason] || reason;
     const composePlan = (currentHub && currentHub.compose_plan) || {};
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
+    if (freezeTailEnabledEl) freezeTailEnabledEl.checked = Boolean(composePlan.freeze_tail_enabled);
+  }
+
+  function getSelectedTtsSpeed() {
+    const n = Number(audioFitCapSliderEl ? audioFitCapSliderEl.value : 1.25);
+    if (!Number.isFinite(n)) return 1.25;
+    return Math.max(1.0, Math.min(1.6, n));
+  }
+
+  function renderDubOutdatedBadge() {
+    if (!dubOutdatedBadgeEl) return;
+    dubOutdatedBadgeEl.classList.toggle("hidden", !subtitlesChangedSinceDub);
   }
 
   function renderScenePack() {
@@ -342,6 +356,8 @@
     renderDeliverables();
     renderEvents();
     updateComposeButtonState();
+    const composeWarning = ((currentHub && currentHub.compose) || {}).warning;
+    if (composeMsgEl && composeWarning) composeMsgEl.textContent = String(composeWarning);
     refreshLocale(root || document);
     refreshPollingState();
   }
@@ -421,6 +437,7 @@
       provider: provider === "edge_tts" ? "edge-tts" : provider,
       voice_id: voiceId || null,
       mm_text: dubText || "",
+      tts_speed: getSelectedTtsSpeed(),
     };
     const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/dub`, {
       method: "POST",
@@ -521,6 +538,8 @@
   if (tabFinalEl) tabFinalEl.addEventListener("click", (e) => { e.preventDefault(); setTab("final"); });
   if (subtitlesTextEl) subtitlesTextEl.addEventListener("input", () => {
     subtitleDirty = true;
+    subtitlesChangedSinceDub = true;
+    renderDubOutdatedBadge();
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = subtitlesTextEl.value || "-";
   });
   if (composeConfirmEl) composeConfirmEl.addEventListener("change", updateComposeButtonState);
@@ -531,6 +550,16 @@
         await loadHub();
       } catch (e) {
         if (composeMsgEl) composeMsgEl.textContent = e.message || "save overlay failed";
+      }
+    });
+  }
+  if (freezeTailEnabledEl) {
+    freezeTailEnabledEl.addEventListener("change", async () => {
+      try {
+        await patchComposePlan({ freeze_tail_enabled: !!freezeTailEnabledEl.checked, freeze_tail_cap_sec: 8 });
+        await loadHub();
+      } catch (e) {
+        if (composeMsgEl) composeMsgEl.textContent = e.message || "save freeze-tail failed";
       }
     });
   }
@@ -559,17 +588,12 @@
       catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
     });
   }
-  if (audioFitCap125El) {
-    audioFitCap125El.addEventListener("change", async () => {
-      if (!audioFitCap125El.checked) return;
-      try { await patchAudioConfig({ audio_fit_max_speed: 1.25 }); await loadHub(); }
-      catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
+  if (audioFitCapSliderEl) {
+    audioFitCapSliderEl.addEventListener("input", () => {
+      if (audioFitCapValueEl) audioFitCapValueEl.textContent = `${Number(audioFitCapSliderEl.value || "1.25").toFixed(2)}x`;
     });
-  }
-  if (audioFitCap200El) {
-    audioFitCap200El.addEventListener("change", async () => {
-      if (!audioFitCap200El.checked) return;
-      try { await patchAudioConfig({ audio_fit_max_speed: 2.0 }); await loadHub(); }
+    audioFitCapSliderEl.addEventListener("change", async () => {
+      try { await patchAudioConfig({ audio_fit_max_speed: getSelectedTtsSpeed() }); await loadHub(); }
       catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
     });
   }
@@ -596,9 +620,12 @@
           tts_engine: ttsEngineEl ? ttsEngineEl.value : null,
           tts_voice: ttsVoiceEl ? ttsVoiceEl.value : null,
           bgm_mix: bgmMixEl ? Number(bgmMixEl.value || "0.3") : null,
+          audio_fit_max_speed: getSelectedTtsSpeed(),
         });
         await rerunAudio();
         await loadHub();
+        subtitlesChangedSinceDub = false;
+        renderDubOutdatedBadge();
         if (audioMsgEl) audioMsgEl.textContent = "Audio rerun requested";
       } catch (err) {
         if (audioMsgEl) audioMsgEl.textContent = err.message || "rerun failed";
@@ -645,8 +672,10 @@
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Saving...";
         await patchSubtitles(subtitlesTextEl ? subtitlesTextEl.value : "");
         subtitleDirty = false;
+        subtitlesChangedSinceDub = true;
+        renderDubOutdatedBadge();
         await loadHub();
-        if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Saved";
+        if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Saved. You can now rerun dubbing to match the updated text.";
       } catch (err) {
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = err.message || "save failed";
       }
@@ -675,5 +704,6 @@
   loadHub().then(() => setTab("source")).catch((e) => {
     if (statusEl) statusEl.textContent = e.message || "hub load failed";
   });
+  renderDubOutdatedBadge();
   refreshPollingState();
 })();
