@@ -98,6 +98,7 @@
   }
 
   function renderHintPanel(data, deliverables) {
+    const readyGate = (data && data.ready_gate) || {};
     const hasFinal = Boolean(deliverables.final_mp4);
     const hasPack = Boolean(deliverables.pack_zip || deliverables.edit_bundle_zip);
     const hasSubs = Boolean(deliverables.origin_srt || deliverables.mm_srt || deliverables.mm_txt);
@@ -112,7 +113,7 @@
         : t("hot_follow_delivery_next_compose", "Next: return to Workbench and run Compose Final.");
     }
     if (hintStatusEl) {
-      const ready = Boolean(data.composed_ready);
+      const ready = Boolean(readyGate.publish_ready);
       const scenePending = data.scene_pack_pending_reason ? ` ${t("hot_follow_delivery_scene_pending_suffix", "(Scene Pack pending, does not block publish)")}` : "";
       hintStatusEl.textContent = ready
         ? t("hot_follow_delivery_status_ready", "Status: ready to publish")
@@ -123,7 +124,8 @@
   function renderDeliverables(data) {
     const deliverables = data.deliverables || {};
     const keys = Object.keys(deliverables);
-    const composedReady = Boolean(data.composed_ready);
+    const readyGate = (data && data.ready_gate) || {};
+    const composedReady = Boolean(readyGate.publish_ready);
     const composedReason = data.composed_reason || "final_missing";
 
     if (composedBadgeEl) {
