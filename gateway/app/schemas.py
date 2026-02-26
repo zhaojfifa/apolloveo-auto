@@ -119,7 +119,13 @@ class TaskSummary(BaseModel):
     scenes_path: Optional[str] = None
     scenes_status: Optional[str] = None
     scenes_key: Optional[str] = None
-    scenes_error: Optional[str] = None
+    scenes_error: Optional[Any] = None
+    scenes_started_at: Optional[str] = None
+    scenes_finished_at: Optional[str] = None
+    scenes_elapsed_ms: Optional[int] = None
+    scenes_attempt: Optional[int] = None
+    scenes_run_id: Optional[str] = None
+    scenes_error_message: Optional[str] = None
     subtitles_status: Optional[str] = None
     subtitles_key: Optional[str] = None
     subtitles_error: Optional[str] = None

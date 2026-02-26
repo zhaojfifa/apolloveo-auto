@@ -34,7 +34,7 @@ from gateway.app.schemas import (
     TaskSummary,
 )
 from gateway.app.services.artifact_storage import object_exists
-from gateway.app.services.scene_split import enqueue_scenes_build
+from gateway.app.services.scenes_service import ScenesService
 from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
 from gateway.app.steps.pipeline_v1 import run_pipeline_background
 from gateway.app.services.steps_v1 import (
@@ -467,22 +467,37 @@ def build_scenes(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    def _update(task_id: str, fields: dict) -> None:
-        t = db.query(models.Task).filter(models.Task.id == task_id).first()
-        if not t:
-            return
-        for key, value in fields.items():
-            if hasattr(t, key):
-                setattr(t, key, value)
-        db.commit()
+    class _DbRepo:
+        def get(self, _task_id: str):
+            row = db.query(models.Task).filter(models.Task.id == _task_id).first()
+            if not row:
+                return None
+            return {
+                "task_id": row.id,
+                "scenes_key": row.scenes_key,
+                "scenes_error": row.scenes_error,
+                "scenes_status": row.scenes_status,
+                "events": list(getattr(row, "events", None) or []),
+                "deliverables": {},
+                "scenes_started_at": getattr(row, "scenes_started_at", None),
+                "scenes_finished_at": getattr(row, "scenes_finished_at", None),
+                "scenes_elapsed_ms": getattr(row, "scenes_elapsed_ms", None),
+                "scenes_attempt": getattr(row, "scenes_attempt", None),
+                "scenes_run_id": getattr(row, "scenes_run_id", None),
+                "scenes_error_message": getattr(row, "scenes_error_message", None),
+            }
 
-    return enqueue_scenes_build(
-        task_id,
-        task=task,
-        object_exists=object_exists,
-        update_task=_update,
-        background_tasks=background_tasks,
-    )
+        def upsert(self, _task_id: str, fields: dict):
+            row = db.query(models.Task).filter(models.Task.id == _task_id).first()
+            if not row:
+                return None
+            for key, value in (fields or {}).items():
+                if hasattr(row, key):
+                    setattr(row, key, value)
+            db.commit()
+            return self.get(_task_id)
+
+    return ScenesService.enqueue_scenes_build(task_id, repo=_DbRepo(), background_tasks=background_tasks)
 
 
 @router.post("/{task_id}/subtitles")
