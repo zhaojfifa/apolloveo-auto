@@ -27,8 +27,8 @@ class _Repo:
         return cur
 
 
-def test_hot_follow_publish_hub_includes_final_preview_url_and_ready(monkeypatch):
-    task_id = "hf-publish-hub-final-01"
+def test_hot_follow_workbench_ready_gate_backfills_compose_when_final_exists(monkeypatch):
+    task_id = "hf-workbench-ready-gate-01"
     repo = _Repo()
     repo.upsert(
         task_id,
@@ -36,9 +36,9 @@ def test_hot_follow_publish_hub_includes_final_preview_url_and_ready(monkeypatch
             "task_id": task_id,
             "kind": "hot_follow",
             "status": "processing",
-            "scenes_status": "running",
             "compose_status": "pending",
             "compose_last_status": "pending",
+            "final": {"exists": True},
         },
     )
 
@@ -54,24 +54,24 @@ def test_hot_follow_publish_hub_includes_final_preview_url_and_ready(monkeypatch
         }
 
     monkeypatch.setattr(tasks_router, "_compute_composed_state", _fake_composed)
+    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
 
     app = FastAPI()
     app.include_router(tasks_router.api_router)
     app.dependency_overrides[get_task_repository] = lambda: repo
 
     with TestClient(app) as client:
-        res = client.get(f"/api/hot_follow/tasks/{task_id}/publish_hub")
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
         assert res.status_code == 200
         data = res.json()
 
-    assert data["media"]["final_video_url"].endswith(f"/v1/tasks/{task_id}/final")
-    assert data["final_video_url"].endswith(f"/v1/tasks/{task_id}/final")
-    assert data["composed_ready"] is True
-    assert data["composed_reason"] == "ready"
+    assert data.get("ready_gate", {}).get("compose_ready") is True
     assert data.get("ready_gate", {}).get("publish_ready") is True
-    assert data["scene_pack_pending_reason"] in {"scenes.running", "scenes.not_ready", "scenes.failed"}
-    assert (data.get("deliverables", {}).get("final_mp4") or {}).get("url") == data["final_video_url"]
+    assert data.get("composed_ready") is True
+    assert data.get("composed_reason") == "ready"
+    assert str(data.get("final_video_url") or "").endswith(f"/v1/tasks/{task_id}/final")
 
     saved = repo.get(task_id) or {}
     assert str(saved.get("compose_status")).lower() == "done"
     assert str(saved.get("compose_last_status")).lower() == "done"
+

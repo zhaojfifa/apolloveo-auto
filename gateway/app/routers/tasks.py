@@ -65,6 +65,7 @@ from ..services.steps_v1 import (
     run_dub_step as run_dub_step_v1,
 )
 from gateway.app.services.status_policy.service import policy_upsert
+from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 from gateway.app.services.parse import detect_platform
 from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 
@@ -3368,10 +3369,10 @@ def get_hot_follow_publish_hub(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    payload = _publish_hub_payload(task)
+    payload = compute_hot_follow_state(task, _publish_hub_payload(task))
     if _backfill_compose_done_if_final_ready(repo, task_id, task, bool(payload.get("composed_ready"))):
         task = repo.get(task_id) or task
-        payload = _publish_hub_payload(task)
+        payload = compute_hot_follow_state(task, _publish_hub_payload(task))
     return payload
 
 
@@ -3577,13 +3578,10 @@ def get_hot_follow_workbench_hub(
         "synthesis": {"status": pack_state, "summary": pack_summary, "updated_at": task.get("updated_at")},
         "compose": {"status": compose_state, "summary": compose_summary, "updated_at": task.get("updated_at")},
     }
+    payload = compute_hot_follow_state(task, payload)
     if _backfill_compose_done_if_final_ready(repo, task_id, task, bool(payload.get("composed_ready"))):
         latest = repo.get(task_id) or task
-        latest_status = str(latest.get("compose_status") or "").strip().lower()
-        if _compose_done_like(latest_status):
-            payload["compose"]["last"]["status"] = "done"
-            payload["compose"]["last"]["finished_at"] = latest.get("compose_last_finished_at") or payload["compose"]["last"].get("finished_at")
-            payload["compose"]["last"]["error"] = None
+        payload = compute_hot_follow_state(latest, payload)
     return payload
 
 

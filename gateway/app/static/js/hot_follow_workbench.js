@@ -204,7 +204,8 @@
 
   function shouldPollHub() {
     if (!currentHub) return true;
-    if (currentHub.composed_ready === true) return false;
+    const readyGate = (currentHub && currentHub.ready_gate) || {};
+    if (readyGate.compose_ready === true) return false;
     const compose = getPipelineItem("compose");
     const composeDone = ["done", "ready", "success", "completed"].includes(String(compose.status || "").toLowerCase());
     return !composeDone;
@@ -277,7 +278,8 @@
   }
 
   function renderComposedReadiness(finalUrl) {
-    const ready = Boolean(finalUrl);
+    const readyGate = (currentHub && currentHub.ready_gate) || {};
+    const ready = Boolean(readyGate.compose_ready);
     if (composedBadgeEl) {
       composedBadgeEl.textContent = ready ? t("hot_follow_scene_status_done", "Done") : t("hot_follow_workbench_composed_not_ready", "Not Ready");
       composedBadgeEl.classList.toggle("text-green-700", ready);
