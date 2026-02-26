@@ -34,7 +34,7 @@ from gateway.app.schemas import (
     TaskSummary,
 )
 from gateway.app.services.artifact_storage import object_exists
-from gateway.app.services.scenes_service import ScenesService
+from gateway.app.services.scenes_service import build_scenes_for_task
 from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
 from gateway.app.steps.pipeline_v1 import run_pipeline_background
 from gateway.app.services.steps_v1 import (
@@ -497,7 +497,7 @@ def build_scenes(
             db.commit()
             return self.get(_task_id)
 
-    return ScenesService.enqueue_scenes_build(task_id, repo=_DbRepo(), background_tasks=background_tasks)
+    return build_scenes_for_task(task_id, repo=_DbRepo(), background_tasks=background_tasks, payload=payload)
 
 
 @router.post("/{task_id}/subtitles")
