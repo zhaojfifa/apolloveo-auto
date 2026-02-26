@@ -43,6 +43,23 @@
     window.__HF_LAST_FINAL_URL__ = finalUrl;
     return finalUrl;
   }
+  function isDoneStatus(value) {
+    return String(value || "").toLowerCase() === "done";
+  }
+  function isComposeDone(hub) {
+    const data = hub || {};
+    const task = (data && data.task) || {};
+    const compose = (data && data.compose) || {};
+    const composeLast = (compose && compose.last) || {};
+    const pipeline = Array.isArray(data.pipeline) ? data.pipeline : [];
+    return Boolean(
+      ((data.final || {}).exists === true)
+      || data.final_key || data.final_url
+      || task.final_key || task.final_url
+      || isDoneStatus(composeLast.status)
+      || pipeline.some((it) => it && it.key === "compose" && isDoneStatus(it.status))
+    );
+  }
   applyLocale(readLocale());
   const taskId = root ? root.getAttribute("data-task-id") : null;
   if (!taskId) return;
@@ -86,6 +103,7 @@
   const freezeTailEnabledEl = document.getElementById("hf_freeze_tail_enabled");
   const composeBtnEl = document.getElementById("hf_compose_btn");
   const composeMsgEl = document.getElementById("hf_compose_msg");
+  const composeReadinessSectionEl = document.getElementById("hf_compose_readiness_section");
   const composeFinalBlockEl = document.getElementById("hf_compose_final_block");
   const composeFinalVideoEl = document.getElementById("hf_compose_final_video");
   const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
@@ -204,10 +222,9 @@
 
   function shouldPollHub() {
     if (!currentHub) return true;
-    const readyGate = (currentHub && currentHub.ready_gate) || {};
-    if (readyGate.compose_ready === true) return false;
+    if (isComposeDone(currentHub)) return false;
     const compose = getPipelineItem("compose");
-    const composeDone = ["done", "ready", "success", "completed"].includes(String(compose.status || "").toLowerCase());
+    const composeDone = isDoneStatus(compose.status);
     return !composeDone;
   }
 
@@ -278,14 +295,22 @@
   }
 
   function renderComposedReadiness(finalUrl) {
+    const done = isComposeDone(currentHub);
     const readyGate = (currentHub && currentHub.ready_gate) || {};
-    const ready = Boolean(readyGate.compose_ready);
+    const ready = done || Boolean(readyGate.compose_ready || (currentHub && currentHub.composed_ready));
+    const composeStateEl = document.querySelector('[data-hf-step-status="compose"]');
+    const composeSummaryEl = document.querySelector('[data-hf-step-summary="compose"]');
+    if (done && composeStateEl) composeStateEl.textContent = "done";
+    if (done && composeSummaryEl) composeSummaryEl.textContent = t("hot_follow_compose_reason_ready", "已就绪（已完成）");
     if (composedBadgeEl) {
       composedBadgeEl.textContent = ready ? t("hot_follow_scene_status_done", "Done") : t("hot_follow_workbench_composed_not_ready", "Not Ready");
       composedBadgeEl.classList.toggle("text-green-700", ready);
       composedBadgeEl.classList.toggle("text-amber-700", !ready);
     }
-    if (composedReasonEl) composedReasonEl.textContent = ready ? t("hot_follow_compose_reason_ready", "可发布") : t("hot_follow_workbench_composed_not_ready", "未就绪");
+    if (composedReasonEl) composedReasonEl.textContent = done ? t("hot_follow_compose_reason_ready", "已就绪（已完成）") : t("hot_follow_workbench_composed_not_ready", "未就绪");
+    if (composeReadinessSectionEl) composeReadinessSectionEl.classList.toggle("hidden", done);
+    if (done && composeFinalBlockEl) composeFinalBlockEl.classList.remove("hidden");
+    if (done && composeFinalLinkEl) setLink(composeFinalLinkEl, finalUrl);
     const composePlan = (currentHub && currentHub.compose_plan) || {};
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
     if (freezeTailEnabledEl) freezeTailEnabledEl.checked = Boolean(composePlan.freeze_tail_enabled);
@@ -380,7 +405,8 @@
     if (hubLoading) return;
     hubLoading = true;
     try {
-      const res = await fetch(hubUrl);
+      const bust = `${hubUrl}${hubUrl.includes("?") ? "&" : "?"}t=${Date.now()}`;
+      const res = await fetch(bust, { cache: "no-store", credentials: "same-origin" });
       if (!res.ok) throw new Error((await res.text()) || "hub load failed");
       renderHub(await res.json());
     } finally {
@@ -507,6 +533,7 @@
 
   function updateComposeButtonState() {
     if (!composeBtnEl) return;
+    const done = isComposeDone(currentHub);
     const media = (currentHub && currentHub.media) || {};
     const audio = (currentHub && currentHub.audio) || {};
     const hasRaw = Boolean(media.raw_url || media.source_video_url);
@@ -514,18 +541,24 @@
     const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
     const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
     const composeRunning = ["running", "processing", "queued"].includes(String(composeLast.status || "").toLowerCase());
-    const enabled = hasRaw && hasVoiceover && confirmed && !composeSubmitting && !composeRunning;
+    const readyGate = (currentHub && currentHub.ready_gate) || {};
+    const composeGateReady = Boolean(readyGate.compose_ready || (currentHub && currentHub.composed_ready));
+    const enabled = done
+      ? !composeSubmitting && !composeRunning
+      : hasRaw && hasVoiceover && confirmed && composeGateReady && !composeSubmitting && !composeRunning;
     if (!composeBtnEl.dataset.defaultText) composeBtnEl.dataset.defaultText = composeBtnEl.textContent || "Compose Final";
     composeBtnEl.disabled = !enabled;
     composeBtnEl.classList.toggle("opacity-50", !enabled);
     composeBtnEl.classList.toggle("pointer-events-none", !enabled);
     composeBtnEl.textContent = composeRunning || composeSubmitting
       ? t("hot_follow_compose_running", "合成中…")
-      : (composeBtnEl.dataset.defaultText || "Compose Final");
+      : (done ? "重新合成" : (composeBtnEl.dataset.defaultText || "Compose Final"));
     if (composeMsgEl) {
       if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
+      else if (done) composeMsgEl.textContent = "";
       else if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
       else if (!hasRaw) composeMsgEl.textContent = "Compose disabled: missing raw video.";
+      else if (!composeGateReady) composeMsgEl.textContent = t("hot_follow_workbench_composed_not_ready", "未就绪");
       else if (!confirmed) composeMsgEl.textContent = t("hot_follow_workbench_compose_disabled_hint", "Compose disabled: check confirmation first");
       else composeMsgEl.textContent = "";
     }
