@@ -27,7 +27,21 @@
   function pickFinalVideoUrl(task) {
     if (typeof window.__HF_PICK_FINAL_URL__ === "function") return window.__HF_PICK_FINAL_URL__(task);
     const media = (task && task.media) || {};
-    return media.final_video_url || media.final_url || (task && task.final_video_url) || (task && task.final_url) || null;
+    let url = media.final_video_url || media.final_url || (task && task.final_video_url) || (task && task.final_url) || null;
+    if (!url) {
+      const id = (task && task.task_id) || (task && task.task && task.task.task_id) || (task && task.id) || (task && task.task && task.task.id) || null;
+      if (id) url = `${window.location.origin}/v1/tasks/${encodeURIComponent(id)}/final`;
+    }
+    return url;
+  }
+  function resolveFinalUrl(currentHubOrData) {
+    const finalUrl = pickFinalVideoUrl(currentHubOrData)
+      || pickFinalVideoUrl((currentHubOrData && currentHubOrData.task) || null)
+      || pickFinalVideoUrl(window.__TASK_JSON__ || null)
+      || null;
+    window.__HF_LAST_HUB__ = currentHubOrData || null;
+    window.__HF_LAST_FINAL_URL__ = finalUrl;
+    return finalUrl;
   }
   applyLocale(readLocale());
   const taskId = root ? root.getAttribute("data-task-id") : null;
@@ -212,11 +226,10 @@
     }
   }
 
-  function renderMedia() {
+  function renderMedia(finalUrl) {
     const media = (currentHub && currentHub.media) || {};
     const finalMeta = (currentHub && currentHub.final) || {};
     const sourceUrl = media.source_video_url || media.raw_url || null;
-    const finalUrl = pickFinalVideoUrl(currentHub);
     const finalAssetVersion = finalMeta.asset_version || null;
 
     setMediaSrcStable(sourceVideoEl, sourceUrl, "sourceUrl");
@@ -263,8 +276,8 @@
     if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
   }
 
-  function renderComposedReadiness() {
-    const ready = Boolean(pickFinalVideoUrl(currentHub));
+  function renderComposedReadiness(finalUrl) {
+    const ready = Boolean(finalUrl);
     if (composedBadgeEl) {
       composedBadgeEl.textContent = ready ? t("hot_follow_scene_status_done", "Done") : t("hot_follow_workbench_composed_not_ready", "Not Ready");
       composedBadgeEl.classList.toggle("text-green-700", ready);
@@ -341,14 +354,16 @@
 
   function renderHub(data) {
     currentHub = data || {};
+    const currentHubOrData = currentHub || data || {};
+    const finalUrl = resolveFinalUrl(currentHubOrData);
     const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
     const composeLastStatus = String(composeLast.status || "").toLowerCase();
     if (!["running", "processing", "queued"].includes(composeLastStatus)) composeSubmitting = false;
     renderPipeline();
-    renderMedia();
+    renderMedia(finalUrl);
     renderSubtitles();
     renderAudio();
-    renderComposedReadiness();
+    renderComposedReadiness(finalUrl);
     renderScenePack();
     renderDeliverables();
     renderEvents();
@@ -478,7 +493,7 @@
     const data = await res.json();
     await loadHub();
     const hub = currentHub || {};
-    const finalUrl = pickFinalVideoUrl(hub) || pickFinalVideoUrl(data);
+    const finalUrl = resolveFinalUrl(hub || data);
     const finalMeta = (currentHub && currentHub.final) || {};
     setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose-action)", finalMeta.asset_version || null);
     if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);

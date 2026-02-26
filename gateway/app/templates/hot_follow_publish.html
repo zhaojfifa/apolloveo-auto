@@ -39,12 +39,12 @@
               <div class="mt-1 text-gray-500" data-i18n="hot_follow_delivery_soft_subtitle_hint">Soft subtitle streams will be stripped; burned-in subtitles cannot be removed automatically.</div>
             </div>
             <div class="space-y-3">
-              <video id="hf-final-video" controls playsinline preload="metadata" class="hidden w-full h-48 rounded-xl bg-slate-100"></video>
-              <div id="hf-final-ready-line" class="hidden text-xs text-green-700">Final video ready for publishing.</div>
-              <div id="hf-final-video-placeholder" class="w-full h-48 rounded-xl bg-gray-100 border border-dashed border-gray-300 overflow-hidden">
-                {% if cover_url %}
-                  <img class="w-full h-full object-cover bg-gray-100" src="{{ cover_url }}" alt="cover" />
-                {% endif %}
+              <div id="hf_final_preview_box" class="w-full">
+                <div class="w-full h-48 rounded-xl bg-gray-100 border border-dashed border-gray-300 overflow-hidden">
+                  {% if cover_url %}
+                    <img class="w-full h-full object-cover bg-gray-100" src="{{ cover_url }}" alt="cover" />
+                  {% endif %}
+                </div>
               </div>
               <div id="hf-deliverables" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
               <div id="hf-deliverables-empty" class="text-sm text-gray-500" style="display:none;">{{ t("hot.follow.delivery.empty") }}</div>
