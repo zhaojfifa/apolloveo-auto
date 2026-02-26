@@ -1352,19 +1352,96 @@ def _scene_pack_info(task: dict, task_id: str) -> dict[str, Any]:
     }
 
 
-def _resolve_final_preview_url(task_id: str, hub: dict[str, Any] | None = None) -> str | None:
+def _compose_done_like(status: Any) -> bool:
+    return str(status or "").strip().lower() in {"done", "ready", "success", "completed"}
+
+
+def _deliverables_final_url(deliverables: Any) -> str | None:
+    if isinstance(deliverables, dict):
+        final_item = deliverables.get("final_mp4")
+        if isinstance(final_item, dict):
+            url = final_item.get("url")
+            if url:
+                return str(url)
+    if isinstance(deliverables, list):
+        for item in deliverables:
+            if not isinstance(item, dict):
+                continue
+            kind = str(item.get("kind") or "").strip().lower()
+            key = str(item.get("key") or "").strip().lower()
+            label = str(item.get("label") or item.get("title") or "").strip().lower()
+            if kind == "final" or key.endswith("final.mp4") or "final video" in label or label == "final.mp4":
+                url = item.get("url")
+                if url:
+                    return str(url)
+    return None
+
+
+def _resolve_hub_final_url(task_id: str, hub: dict[str, Any] | None = None) -> str | None:
     payload = hub or {}
     media = payload.get("media") if isinstance(payload.get("media"), dict) else {}
+    extra = payload.get("extra") if isinstance(payload.get("extra"), dict) else {}
     url = (
-        media.get("final_video_url")
+        _deliverables_final_url(payload.get("deliverables"))
+        or media.get("final_url")
+        or media.get("final_video_url")
+        or payload.get("final_url")
         or payload.get("final_video_url")
+        or extra.get("final_video_url")
         or None
     )
     if url:
         return str(url)
-    if not task_id:
-        return None
-    return _task_endpoint(task_id, "final")
+    final_info = payload.get("final") if isinstance(payload.get("final"), dict) else {}
+    final_exists_hint = bool(final_info.get("exists"))
+    compose_like_done = _compose_done_like(payload.get("compose_status")) or _compose_done_like(payload.get("compose_last_status"))
+    if final_exists_hint or compose_like_done:
+        return _task_endpoint(task_id, "final")
+    return None
+
+
+def _backfill_compose_done_if_final_ready(repo, task_id: str, task: dict, composed_ready: bool) -> bool:
+    if not composed_ready:
+        return False
+    compose_status = str(task.get("compose_status") or "").strip().lower()
+    compose_last_status = str(task.get("compose_last_status") or "").strip().lower()
+    pipeline_compose_status = ""
+    pipeline = task.get("pipeline")
+    if isinstance(pipeline, dict):
+        compose_node = pipeline.get("compose")
+        if isinstance(compose_node, dict):
+            pipeline_compose_status = str(compose_node.get("status") or "").strip().lower()
+    if _compose_done_like(compose_status) and _compose_done_like(compose_last_status or compose_status) and (
+        not pipeline_compose_status or _compose_done_like(pipeline_compose_status)
+    ):
+        return False
+    now = datetime.now(timezone.utc).isoformat()
+    updates: dict[str, Any] = {
+        "compose_status": "done",
+        "compose_last_status": "done",
+        "compose_error": None,
+        "compose_error_reason": None,
+        "compose_last_error": None,
+        "compose_last_finished_at": now,
+        "updated_at": now,
+    }
+    if not task.get("compose_last_started_at"):
+        updates["compose_last_started_at"] = now
+    task_status = str(task.get("status") or "").strip().lower()
+    if task_status in {"", "pending", "processing", "running", "queued", "failed", "error"}:
+        updates["status"] = "ready"
+    if isinstance(pipeline, dict):
+        patched_pipeline = dict(pipeline)
+        compose_node = patched_pipeline.get("compose")
+        compose_dict = dict(compose_node) if isinstance(compose_node, dict) else {}
+        compose_dict["status"] = "done"
+        compose_dict["state"] = "done"
+        compose_dict["updated_at"] = now
+        patched_pipeline["compose"] = compose_dict
+        updates["pipeline"] = patched_pipeline
+    _policy_upsert(repo, task_id, updates)
+    logger.info("hot_follow_compose_backfill_done", extra={"task_id": task_id})
+    return True
 
 
 def _publish_hub_payload(task: dict) -> dict[str, object]:
@@ -1400,11 +1477,20 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
             scene_pack_pending_reason = "scenes.not_ready"
     short_code = _download_code(task_id)
     short_url = f"/d/{short_code}"
-    final_preview_url = _resolve_final_preview_url(task_id, {
-        "final_video_url": (composed.get("final") or {}).get("url"),
-    })
-    composed_ready = bool(final_preview_url)
+    final_payload_probe = {
+        "deliverables": deliverables,
+        "media": {"final_video_url": (composed.get("final") or {}).get("url"), "final_url": (composed.get("final") or {}).get("url")},
+        "final": composed.get("final") or {"exists": False},
+        "compose_status": task.get("compose_status"),
+        "compose_last_status": task.get("compose_last_status"),
+    }
+    final_preview_url = _resolve_hub_final_url(task_id, final_payload_probe)
+    composed_ready = bool(final_preview_url or (composed.get("final") or {}).get("exists"))
     composed_reason = "ready" if composed_ready else "not_ready"
+    if final_preview_url:
+        final_item = dict(deliverables.get("final_mp4") or {"label": "final.mp4"})
+        final_item["url"] = final_preview_url
+        deliverables["final_mp4"] = final_item
 
     return {
         "task_id": task_id,
@@ -1413,6 +1499,7 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
             "final_video_url": final_preview_url,
             "final_url": final_preview_url,
         },
+        "final_url": final_preview_url,
         "final_video_url": final_preview_url,
         "deliverables": deliverables,
         "composed_ready": composed_ready,
@@ -3281,7 +3368,11 @@ def get_hot_follow_publish_hub(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    return _publish_hub_payload(task)
+    payload = _publish_hub_payload(task)
+    if _backfill_compose_done_if_final_ready(repo, task_id, task, bool(payload.get("composed_ready"))):
+        task = repo.get(task_id) or task
+        payload = _publish_hub_payload(task)
+    return payload
 
 
 @api_router.get("/hot_follow/tasks/{task_id}/workbench_hub", response_model=None)
@@ -3324,9 +3415,6 @@ def get_hot_follow_workbench_hub(
     mute_key = _task_key(task, "mute_video_key") or _task_key(task, "mute_video_path")
     mute_url = _task_endpoint(task_id, "raw") if mute_key and object_exists(str(mute_key)) else raw_url
     final_info = composed.get("final") or {}
-    final_exists = bool(final_info.get("exists"))
-    final_size = int(final_info.get("size_bytes") or 0)
-    final_url = _task_endpoint(task_id, "final") if final_exists and final_size >= MIN_VIDEO_BYTES else None
     scene_pack = _scene_pack_info(task, task_id)
     scenes_key = _task_key(task, "scenes_key")
     scenes_status = _scenes_status_from_ssot(task)
@@ -3391,8 +3479,8 @@ def get_hot_follow_workbench_hub(
             "mute_video_url": mute_url,
             "voiceover_url": audio_cfg.get("voiceover_url") or audio_cfg.get("audio_url"),
             "bgm_url": audio_cfg.get("bgm_url"),
-            "final_url": final_url,
-            "final_video_url": final_url,
+            "final_url": None,
+            "final_video_url": None,
         },
         "pipeline": pipeline,
         "subtitles": {
@@ -3447,6 +3535,26 @@ def get_hot_follow_workbench_hub(
             "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
         },
     }
+    final_url = _resolve_hub_final_url(task_id, payload)
+    if final_url:
+        payload["media"]["final_url"] = final_url
+        payload["media"]["final_video_url"] = final_url
+    payload["final_url"] = final_url
+    payload["final_video_url"] = final_url
+    final_exists = bool((payload.get("final") or {}).get("exists"))
+    composed_ready = bool(final_url or final_exists)
+    payload["composed_ready"] = composed_ready
+    payload["composed_reason"] = "ready" if composed_ready else "not_ready"
+    if isinstance(payload.get("deliverables"), list):
+        for item in payload["deliverables"]:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("kind") or "").strip().lower() == "final":
+                item["url"] = final_url
+                if composed_ready:
+                    item["status"] = "done"
+                    item["state"] = "done"
+                break
 
     payload["task"] = {
         "id": task_id,
@@ -3469,6 +3577,13 @@ def get_hot_follow_workbench_hub(
         "synthesis": {"status": pack_state, "summary": pack_summary, "updated_at": task.get("updated_at")},
         "compose": {"status": compose_state, "summary": compose_summary, "updated_at": task.get("updated_at")},
     }
+    if _backfill_compose_done_if_final_ready(repo, task_id, task, bool(payload.get("composed_ready"))):
+        latest = repo.get(task_id) or task
+        latest_status = str(latest.get("compose_status") or "").strip().lower()
+        if _compose_done_like(latest_status):
+            payload["compose"]["last"]["status"] = "done"
+            payload["compose"]["last"]["finished_at"] = latest.get("compose_last_finished_at") or payload["compose"]["last"].get("finished_at")
+            payload["compose"]["last"]["error"] = None
     return payload
 
 

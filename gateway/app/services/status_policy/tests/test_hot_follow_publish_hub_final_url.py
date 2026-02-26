@@ -37,11 +37,23 @@ def test_hot_follow_publish_hub_includes_final_preview_url_and_ready(monkeypatch
             "kind": "hot_follow",
             "status": "processing",
             "scenes_status": "running",
+            "compose_status": "pending",
+            "compose_last_status": "pending",
         },
     )
 
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
+    def _fake_composed(_task, _task_id):
+        return {
+            "composed_ready": False,
+            "composed_reason": "final_missing",
+            "final": {"exists": True, "url": None, "size_bytes": 0},
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": True,
+        }
+
+    monkeypatch.setattr(tasks_router, "_compute_composed_state", _fake_composed)
 
     app = FastAPI()
     app.include_router(tasks_router.api_router)
@@ -57,4 +69,8 @@ def test_hot_follow_publish_hub_includes_final_preview_url_and_ready(monkeypatch
     assert data["composed_ready"] is True
     assert data["composed_reason"] == "ready"
     assert data["scene_pack_pending_reason"] in {"scenes.running", "scenes.not_ready", "scenes.failed"}
+    assert (data.get("deliverables", {}).get("final_mp4") or {}).get("url") == data["final_video_url"]
 
+    saved = repo.get(task_id) or {}
+    assert str(saved.get("compose_status")).lower() == "done"
+    assert str(saved.get("compose_last_status")).lower() == "done"
