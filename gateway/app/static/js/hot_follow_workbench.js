@@ -11,13 +11,15 @@
     if (typeof i18n.applyLocale === "function") i18n.applyLocale(locale, rootEl || document);
   }
   function refreshLocale(rootEl) {
-    applyLocale(readLocale(), rootEl || document);
+    const i18n = window.__V185_I18N__ || {};
+    if (typeof i18n.applyLocaleFor === "function") i18n.applyLocaleFor(rootEl || document);
+    else applyLocale(readLocale(), rootEl || document);
   }
   function t(key, fallback) {
     const i18n = window.__V185_I18N__ || {};
     if (typeof i18n.t === "function") {
       const text = i18n.t(key);
-      if (typeof text === "string" && text.indexOf("MISSING:") === -1) return text;
+      if (typeof text === "string" && text.trim() !== "" && text.indexOf("MISSING:") === -1) return text;
     }
     return fallback;
   }

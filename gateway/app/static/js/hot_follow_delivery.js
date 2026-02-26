@@ -33,7 +33,8 @@
 
   function refreshLocale(rootEl) {
     const i18n = window.__V185_I18N__ || {};
-    if (typeof i18n.applyLocale === "function") i18n.applyLocale(readLocale(), rootEl || document);
+    if (typeof i18n.applyLocaleFor === "function") i18n.applyLocaleFor(rootEl || document);
+    else if (typeof i18n.applyLocale === "function") i18n.applyLocale(readLocale(), rootEl || document);
     else if (typeof window.__I18N_REAPPLY__ === "function") window.__I18N_REAPPLY__();
   }
 
@@ -41,7 +42,7 @@
     const i18n = window.__V185_I18N__ || {};
     if (typeof i18n.t === "function") {
       const text = i18n.t(key, vars);
-      if (typeof text === "string" && text.indexOf("MISSING:") === -1) return text;
+      if (typeof text === "string" && text.trim() !== "" && text.indexOf("MISSING:") === -1) return text;
     }
     return fallback;
   }

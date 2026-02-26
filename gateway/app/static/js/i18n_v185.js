@@ -625,36 +625,41 @@
   }
 
   function getFallbacks() {
-    const payload = getPayload();
-    return payload.fallbacks || {
+    return {
       mm: ["mm", "en", "zh"],
       zh: ["zh", "en"],
       en: ["en", "zh"],
     };
   }
 
-  function t(key, vars) {
+  function _debugEnabled() {
+    const qs = new URLSearchParams(window.location.search || "");
+    return qs.get("debug") === "1";
+  }
+
+  function tOrFallback(key, vars, localeOverride) {
     const payload = getPayload();
-    const locale = resolveLocale();
+    const locale = normalizeLocale(localeOverride || resolveLocale());
     const dict = payload.dict || {};
     const fallbacks = getFallbacks();
-    const chain = fallbacks[locale] || [locale, "en", "zh"];
+    const chain = fallbacks[locale] || [locale, "en", "zh", ""];
     let text;
     for (const loc of chain) {
+      if (!loc) continue;
       const table = dict[loc] || {};
-      if (table[key]) {
+      if (typeof table[key] === "string" && table[key] !== "") {
         text = table[key];
         break;
       }
       const clientTable = CLIENT_DICT[loc] || {};
-      if (clientTable[key]) {
+      if (typeof clientTable[key] === "string" && clientTable[key] !== "") {
         text = clientTable[key];
         break;
       }
     }
     if (!text) {
-      console.warn("[i18n-miss]", locale, key);
-      text = (CLIENT_DICT.en && CLIENT_DICT.en[key]) || key;
+      if (_debugEnabled()) console.warn("[i18n-miss]", locale, key);
+      text = "";
     }
     if (vars && typeof text === "string") {
       Object.keys(vars).forEach((k) => {
@@ -664,19 +669,38 @@
     return text;
   }
 
+  function t(key, vars) {
+    return tOrFallback(key, vars, resolveLocale());
+  }
+
+  function _looksHumanReadable(text, key) {
+    const v = String(text || "").trim();
+    if (!v) return false;
+    if (v === key) return false;
+    if (v.startsWith("hot_follow_") || v.startsWith("【MISSING:")) return false;
+    return true;
+  }
+
   function _translateElements(locale, root) {
     if (!root || !root.querySelectorAll) return;
     root.querySelectorAll("[data-i18n]").forEach((el) => {
       const key = el.getAttribute("data-i18n");
-      el.textContent = t(key);
+      const translated = tOrFallback(key, null, locale);
+      if (translated) {
+        el.textContent = translated;
+      } else if (!_looksHumanReadable(el.textContent, key)) {
+        el.textContent = tOrFallback(key, null, "en") || tOrFallback(key, null, "zh") || "";
+      }
     });
     root.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
       const key = el.getAttribute("data-i18n-placeholder");
-      el.setAttribute("placeholder", t(key));
+      const translated = tOrFallback(key, null, locale) || tOrFallback(key, null, "en") || tOrFallback(key, null, "zh") || "";
+      if (translated) el.setAttribute("placeholder", translated);
     });
     root.querySelectorAll("[data-i18n-title]").forEach((el) => {
       const key = el.getAttribute("data-i18n-title");
-      el.setAttribute("title", t(key));
+      const translated = tOrFallback(key, null, locale) || tOrFallback(key, null, "en") || tOrFallback(key, null, "zh") || "";
+      if (translated) el.setAttribute("title", translated);
     });
   }
 
@@ -692,6 +716,10 @@
       if (root.matches("[data-i18n-title]")) root.setAttribute("title", t(root.getAttribute("data-i18n-title")));
     }
     _translateElements(locale, root);
+  }
+
+  function applyLocaleFor(rootEl) {
+    applyLocale(resolveLocale(), rootEl || document);
   }
 
   let observer = null;
@@ -760,7 +788,7 @@
     return resolveLocale();
   }
 
-  window.__V185_I18N__ = { t, readLocale, applyLocale, watchDomI18n };
+  window.__V185_I18N__ = { t, tOrFallback, readLocale, applyLocale, applyLocaleFor, watchDomI18n };
   // Page scripts can force a full i18n pass after dynamic rendering.
   window.__I18N_REAPPLY__ = () => window.__V185_I18N__.applyLocale(window.__V185_I18N__.readLocale());
 

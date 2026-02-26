@@ -27,7 +27,8 @@
 
   function refreshLocale(rootEl) {
     const i18n = window.__V185_I18N__ || {};
-    if (typeof i18n.applyLocale === "function") i18n.applyLocale(readLocale(), rootEl || document);
+    if (typeof i18n.applyLocaleFor === "function") i18n.applyLocaleFor(rootEl || document);
+    else if (typeof i18n.applyLocale === "function") i18n.applyLocale(readLocale(), rootEl || document);
     else if (typeof window.__I18N_REAPPLY__ === "function") window.__I18N_REAPPLY__();
   }
 
