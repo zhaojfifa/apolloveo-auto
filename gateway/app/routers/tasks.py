@@ -66,6 +66,7 @@ from ..services.steps_v1 import (
 )
 from gateway.app.services.status_policy.service import policy_upsert
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
+from gateway.app.services.status_policy.utils import normalize_task_steps_for_read
 from gateway.app.services.parse import detect_platform
 from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 
@@ -3251,7 +3252,7 @@ def save_mm_edited(task_id: str, payload: EditedTextRequest, repo=Depends(get_ta
 
 
 @api_router.get("/tasks/{task_id}", response_model=TaskDetail)
-def get_task(task_id: str, repo=Depends(get_task_repository)):
+def get_task(task_id: str, response: Response, repo=Depends(get_task_repository)):
     """Retrieve a single task by id."""
 
     t = repo.get(task_id)
@@ -3312,6 +3313,10 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     payload["stale"] = stale
     payload["stale_reason"] = "running_but_not_updated" if stale else None
     payload["stale_for_seconds"] = stale_for
+    payload.update(normalize_task_steps_for_read(payload))
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     shape = _hf_task_status_shape(t)
 
     logger.info(

@@ -380,7 +380,7 @@
     if (hubLoading) return;
     hubLoading = true;
     try {
-      const res = await fetch(hubUrl);
+      const res = await fetch(hubUrl, { cache: "no-store", credentials: "same-origin" });
       if (!res.ok) throw new Error((await res.text()) || "hub load failed");
       renderHub(await res.json());
     } finally {
@@ -701,9 +701,7 @@
       const action = btn.getAttribute("data-action");
       if (!action) return;
       try {
-        if (action === "compose" && statusEl) statusEl.textContent = "Composing final video...";
         await runAction(action);
-        if (action === "compose" && composeMsgEl) composeMsgEl.textContent = "Compose requested.";
       } catch (err) {
         if (action === "compose") composeSubmitting = false;
         if (action === "compose" && composeMsgEl) composeMsgEl.textContent = err.message || "compose failed";

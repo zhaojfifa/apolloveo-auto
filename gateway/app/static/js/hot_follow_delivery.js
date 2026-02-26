@@ -203,10 +203,10 @@
   async function loadPublishHub() {
     try {
       try {
-        const detailRes = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`);
+        const detailRes = await fetch(`/api/tasks/${encodeURIComponent(taskId)}`, { cache: "no-store", credentials: "same-origin" });
         if (detailRes.ok) currentTaskDetail = await detailRes.json();
       } catch (_) {}
-      const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/publish_hub`);
+      const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/publish_hub`, { cache: "no-store", credentials: "same-origin" });
       if (!res.ok) {
         if (emptyEl) emptyEl.style.display = "block";
         return;
