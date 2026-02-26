@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from .registry import get_status_policy
-from .utils import coerce_final_status
+from .utils import apply_monotonic_step_policy, coerce_final_status
 
 
 def policy_upsert(
@@ -24,6 +24,8 @@ def policy_upsert(
         updates=dict(updates or {}),
         force=force,
     ) or {}
+
+    filtered = apply_monotonic_step_policy(cur, filtered, force=force)
 
     filtered = coerce_final_status(
         kind=(cur.get("category_key") or cur.get("platform") or cur.get("kind")),
