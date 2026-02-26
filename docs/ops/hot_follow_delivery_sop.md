@@ -44,3 +44,12 @@
 - Download `final.mp4` for direct publish.
 - Download pack/subtitles/audio as needed by editing or archive workflows.
 - Complete publish backfill (`publish_url` / notes) after external posting.
+
+## 8. Hard Subtitle Handling (v1.9)
+- Hard subtitles in source videos are not removable in v1.9.
+- Prefer **A-tier overlay** in compose:
+  - Keep `overlay_subtitles` enabled.
+  - Cover original subtitle area with black box / heavy stroke style.
+  - Keep target subtitle text concise and readable.
+- Use **B-tier simple crop** in CapCut/剪映 only when overlay cannot satisfy visual QA.
+- If dubbing is too long, edit translated subtitles text and rerun dubbing (preferred over aggressive speed-up).
