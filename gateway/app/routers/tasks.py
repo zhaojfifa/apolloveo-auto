@@ -145,7 +145,7 @@ from gateway.app.services.artifact_storage import (
     stream_object_range,
 )
 from gateway.app.ports.storage_provider import get_storage_service
-from gateway.app.services.scenes_service import ScenesService
+from gateway.app.services.scenes_service import build_scenes_for_task
 from gateway.app.services.publish_service import publish_task_pack, resolve_download_url
 from gateway.app.services.task_state_service import TaskStateService
 from gateway.app.db import SessionLocal
@@ -1754,7 +1754,7 @@ def _scenes_status_from_ssot(task: dict) -> str:
             code = str(ev.get("code") or "").upper()
             if code in {"SCENES_RUN_DONE"}:
                 return "done"
-            if code in {"SCENES_RUN_FAIL"}:
+            if code in {"SCENES_RUN_FAIL", "SCENES_RUN_FAILED"}:
                 return "failed"
             if code in {"SCENES_ENQUEUE", "SCENES_RUN_START"}:
                 return "running"
@@ -4865,7 +4865,7 @@ def build_scenes(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    return ScenesService.enqueue_scenes_build(task_id, repo=repo, background_tasks=background_tasks)
+    return build_scenes_for_task(task_id, repo=repo, background_tasks=background_tasks, payload=payload)
 
 
 @api_router.post("/hot_follow/tasks/{task_id}/scene_pack", deprecated=True)
@@ -4881,7 +4881,7 @@ def build_hot_follow_scene_pack(
         "deprecated hot_follow scene_pack endpoint called; use /api/tasks/{task_id}/scenes instead",
         extra={"task_id": task_id},
     )
-    result = ScenesService.enqueue_scenes_build(task_id, repo=repo, background_tasks=background_tasks)
+    result = build_scenes_for_task(task_id, repo=repo, background_tasks=background_tasks, payload=None)
     if isinstance(result, dict):
         result["deprecated_endpoint"] = "/api/hot_follow/tasks/{task_id}/scene_pack"
         result["use_endpoint"] = "/api/tasks/{task_id}/scenes"

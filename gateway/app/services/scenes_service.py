@@ -1,4 +1,5 @@
 import logging
+import logging
 import time
 from datetime import datetime, timezone
 from typing import Any
@@ -119,7 +120,7 @@ def _run_scenes_job(task_id: str, repo: Any, run_id: str) -> None:
                 "scenes_elapsed_ms": elapsed_ms,
                 "events": _with_event(
                     latest,
-                    code="SCENES_RUN_FAIL",
+                    code="SCENES_RUN_FAILED",
                     message="Scenes build failed",
                     extra={"task_id": task_id, "run_id": run_id, "error": err},
                 ),
@@ -139,6 +140,7 @@ class ScenesService:
                 "scenes_key": None,
                 "message": "Task not found",
                 "error": "task_not_found",
+                "run_id": None,
             }
 
         scenes_key = _task_value(task, "scenes_key")
@@ -150,6 +152,7 @@ class ScenesService:
                 "scenes_key": str(scenes_key),
                 "message": "Scenes already ready",
                 "error": None,
+                "run_id": None,
             }
 
         status = _derive_scenes_status(task)
@@ -161,6 +164,7 @@ class ScenesService:
                 "scenes_key": None,
                 "message": "Scenes build already running",
                 "error": None,
+                "run_id": task.get("scenes_run_id"),
             }
 
         now = _now_iso()
@@ -199,3 +203,9 @@ class ScenesService:
             "error": None,
             "run_id": run_id,
         }
+
+
+def build_scenes_for_task(task_id: str, repo: Any, background_tasks: Any, payload: Any = None) -> dict[str, Any]:
+    # payload is kept for router compatibility; scenes build currently has no extra options.
+    _ = payload
+    return ScenesService.enqueue_scenes_build(task_id, repo=repo, background_tasks=background_tasks)
