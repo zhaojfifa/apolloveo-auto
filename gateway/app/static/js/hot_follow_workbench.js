@@ -23,6 +23,12 @@
     }
     return fallback;
   }
+
+  function pickFinalVideoUrl(task) {
+    if (typeof window.__HF_PICK_FINAL_URL__ === "function") return window.__HF_PICK_FINAL_URL__(task);
+    const media = (task && task.media) || {};
+    return media.final_video_url || media.final_url || (task && task.final_video_url) || (task && task.final_url) || null;
+  }
   applyLocale(readLocale());
   const taskId = root ? root.getAttribute("data-task-id") : null;
   if (!taskId) return;
@@ -210,7 +216,7 @@
     const media = (currentHub && currentHub.media) || {};
     const finalMeta = (currentHub && currentHub.final) || {};
     const sourceUrl = media.source_video_url || media.raw_url || null;
-    const finalUrl = media.final_url || media.final_video_url || null;
+    const finalUrl = pickFinalVideoUrl(currentHub);
     const finalAssetVersion = finalMeta.asset_version || null;
 
     setMediaSrcStable(sourceVideoEl, sourceUrl, "sourceUrl");
@@ -258,22 +264,13 @@
   }
 
   function renderComposedReadiness() {
-    const ready = Boolean(currentHub && currentHub.composed_ready) && Boolean(currentHub && currentHub.final && currentHub.final.exists);
-    const reason = (currentHub && currentHub.composed_reason) || "final_missing";
-    const reasonTextMap = {
-      "ready": t("hot_follow_compose_reason_ready", "可发布"),
-      "final_missing": t("hot_follow_compose_reason_final_missing", "尚未生成最终成片"),
-      "compose_in_progress": t("hot_follow_compose_reason_in_progress", "合成中…"),
-      "compose_failed": t("hot_follow_compose_reason_failed", "合成失败，可重试"),
-      "missing_voiceover": t("hot_follow_compose_reason_missing_voice", "缺少配音"),
-      "missing_raw": t("hot_follow_compose_reason_missing_raw", "缺少源视频"),
-    };
+    const ready = Boolean(pickFinalVideoUrl(currentHub));
     if (composedBadgeEl) {
       composedBadgeEl.textContent = ready ? t("hot_follow_scene_status_done", "Done") : t("hot_follow_workbench_composed_not_ready", "Not Ready");
       composedBadgeEl.classList.toggle("text-green-700", ready);
       composedBadgeEl.classList.toggle("text-amber-700", !ready);
     }
-    if (composedReasonEl) composedReasonEl.textContent = reasonTextMap[reason] || reason;
+    if (composedReasonEl) composedReasonEl.textContent = ready ? t("hot_follow_compose_reason_ready", "可发布") : t("hot_follow_workbench_composed_not_ready", "未就绪");
     const composePlan = (currentHub && currentHub.compose_plan) || {};
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
     if (freezeTailEnabledEl) freezeTailEnabledEl.checked = Boolean(composePlan.freeze_tail_enabled);
@@ -481,8 +478,7 @@
     const data = await res.json();
     await loadHub();
     const hub = currentHub || {};
-    const media2 = hub.media || {};
-    const finalUrl = media2.final_url || media2.final_video_url || data.final_url || data.final_video_url || null;
+    const finalUrl = pickFinalVideoUrl(hub) || pickFinalVideoUrl(data);
     const finalMeta = (currentHub && currentHub.final) || {};
     setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose-action)", finalMeta.asset_version || null);
     if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);

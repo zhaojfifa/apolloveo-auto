@@ -51,6 +51,12 @@
     return fallback;
   }
 
+  function pickFinalVideoUrl(task) {
+    if (typeof window.__HF_PICK_FINAL_URL__ === "function") return window.__HF_PICK_FINAL_URL__(task);
+    const media = (task && task.media) || {};
+    return media.final_video_url || media.final_url || (task && task.final_video_url) || (task && task.final_url) || null;
+  }
+
   function reasonText(reason) {
     const mapping = {
       ready: t("hot_follow_compose_reason_ready", "Ready"),
@@ -126,8 +132,11 @@
     renderHintPanel(data, deliverables);
     renderDiagnostics(data);
 
-    const finalInfo = data.final || {};
-    const finalUrl = finalInfo.url || null;
+    const finalUrl = pickFinalVideoUrl(data);
+    if (finalUrl) {
+      deliverables.final_mp4 = deliverables.final_mp4 || { label: "final.mp4" };
+      deliverables.final_mp4.url = finalUrl;
+    }
     if (finalVideoEl) {
       if (finalUrl) {
         finalVideoEl.src = finalUrl;
