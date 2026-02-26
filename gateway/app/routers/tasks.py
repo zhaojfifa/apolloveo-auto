@@ -1352,6 +1352,21 @@ def _scene_pack_info(task: dict, task_id: str) -> dict[str, Any]:
     }
 
 
+def _resolve_final_preview_url(task_id: str, hub: dict[str, Any] | None = None) -> str | None:
+    payload = hub or {}
+    media = payload.get("media") if isinstance(payload.get("media"), dict) else {}
+    url = (
+        media.get("final_video_url")
+        or payload.get("final_video_url")
+        or None
+    )
+    if url:
+        return str(url)
+    if not task_id:
+        return None
+    return _task_endpoint(task_id, "final")
+
+
 def _publish_hub_payload(task: dict) -> dict[str, object]:
     task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
     composed = _compute_composed_state(task, task_id)
@@ -1385,13 +1400,23 @@ def _publish_hub_payload(task: dict) -> dict[str, object]:
             scene_pack_pending_reason = "scenes.not_ready"
     short_code = _download_code(task_id)
     short_url = f"/d/{short_code}"
+    final_preview_url = _resolve_final_preview_url(task_id, {
+        "final_video_url": (composed.get("final") or {}).get("url"),
+    })
+    composed_ready = bool(final_preview_url)
+    composed_reason = "ready" if composed_ready else "not_ready"
 
     return {
         "task_id": task_id,
         "gate_enabled": _op_gate_enabled(),
+        "media": {
+            "final_video_url": final_preview_url,
+            "final_url": final_preview_url,
+        },
+        "final_video_url": final_preview_url,
         "deliverables": deliverables,
-        "composed_ready": bool(composed.get("composed_ready")),
-        "composed_reason": str(composed.get("composed_reason") or "final_missing"),
+        "composed_ready": composed_ready,
+        "composed_reason": composed_reason,
         "final": composed.get("final") or {"exists": False},
         "scene_pack": scene_pack,
         "scene_pack_pending_reason": scene_pack_pending_reason,
