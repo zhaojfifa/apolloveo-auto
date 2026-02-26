@@ -44,23 +44,21 @@
     return finalUrl;
   }
   function isDoneStatus(value) {
-    return ["done", "ready", "success", "completed"].includes(String(value || "").toLowerCase());
+    return String(value || "").toLowerCase() === "done";
   }
   function isComposeDone(hub) {
     const data = hub || {};
-    const final = (data && data.final) || {};
+    const task = (data && data.task) || {};
     const compose = (data && data.compose) || {};
     const composeLast = (compose && compose.last) || {};
     const pipeline = Array.isArray(data.pipeline) ? data.pipeline : [];
-    const task = (data && data.task) || {};
-    const finalExists = Boolean(final.exists);
-    const hasTaskFinal = Boolean(
-      data.final_key || data.final_url || data.final_video_url
-      || task.final_key || task.final_url || task.final_video_url
+    return Boolean(
+      ((data.final || {}).exists === true)
+      || data.final_key || data.final_url
+      || task.final_key || task.final_url
+      || isDoneStatus(composeLast.status)
+      || pipeline.some((it) => it && it.key === "compose" && isDoneStatus(it.status))
     );
-    const composeDone = isDoneStatus(composeLast.status);
-    const pipelineComposeDone = pipeline.some((it) => it && it.key === "compose" && isDoneStatus(it.status || it.state));
-    return Boolean(finalExists || hasTaskFinal || composeDone || pipelineComposeDone);
   }
   applyLocale(readLocale());
   const taskId = root ? root.getAttribute("data-task-id") : null;
@@ -301,11 +299,11 @@
   function renderComposedReadiness(finalUrl) {
     const done = isComposeDone(currentHub);
     const readyGate = (currentHub && currentHub.ready_gate) || {};
-    const ready = done || Boolean(readyGate.compose_ready);
+    const ready = done || Boolean(readyGate.compose_ready || (currentHub && currentHub.composed_ready));
     const composeStateEl = document.querySelector('[data-hf-step-status="compose"]');
     const composeSummaryEl = document.querySelector('[data-hf-step-summary="compose"]');
     if (done && composeStateEl) composeStateEl.textContent = "done";
-    if (done && composeSummaryEl) composeSummaryEl.textContent = t("hot_follow_compose_reason_ready", "已完成");
+    if (done && composeSummaryEl) composeSummaryEl.textContent = t("hot_follow_compose_reason_ready", "已就绪（已完成）");
     if (composedBadgeEl) {
       composedBadgeEl.textContent = ready ? t("hot_follow_scene_status_done", "Done") : t("hot_follow_workbench_composed_not_ready", "Not Ready");
       composedBadgeEl.classList.toggle("text-green-700", ready);
