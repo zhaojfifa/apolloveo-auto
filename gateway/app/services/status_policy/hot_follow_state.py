@@ -150,12 +150,40 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         compose["last"] = last
     state["compose"] = compose
 
+    audio = _as_dict(state.get("audio"))
+    audio_status = str(
+        audio.get("status")
+        or task.get("dub_status")
+        or ""
+    ).strip().lower()
+    audio_done = audio_status in {"done", "ready", "success", "completed", "skipped"}
+    voiceover_exists = bool(
+        audio.get("voiceover_url")
+        or _as_dict(state.get("media")).get("voiceover_url")
+        or task.get("mm_audio_key")
+        or task.get("mm_audio_path")
+    )
+    tts_voice = str(audio.get("tts_voice") or task.get("voice_id") or "").strip()
+    tts_voice_valid = bool(tts_voice and tts_voice not in {"-", "none", "null"})
+    audio_ready = bool(audio_done and voiceover_exists and tts_voice_valid)
+
+    blocking: list[str] = []
+    if not final_exists:
+        blocking.append("compose_not_done")
+        if not audio_done:
+            blocking.append("audio_not_done")
+        if not voiceover_exists:
+            blocking.append("voiceover_missing")
+        if not tts_voice_valid:
+            blocking.append("tts_voice_invalid")
+
     state["composed_ready"] = final_exists
     state["composed_reason"] = "ready" if final_exists else "not_ready"
     state["ready_gate"] = {
         "final_exists": final_exists,
+        "audio_ready": audio_ready,
         "compose_ready": final_exists,
         "publish_ready": final_exists,
-        "blocking": [] if final_exists else ["compose_not_done"],
+        "blocking": blocking,
     }
     return state

@@ -34,10 +34,12 @@ from gateway.app.services.status_policy.registry import get_status_policy
 from gateway.app.services.status_policy.service import policy_upsert
 from gateway.app.services.status_policy.registry import get_status_policy
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
+from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
 from gateway.app.services.parse import detect_platform, parse_video
 from gateway.app.services.publish_service import publish_task_pack
 from gateway.app.services.scene_split import run_scenes_build
 from gateway.app.services.subtitles import generate_subtitles
+from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, resolve_tts_voice
 from gateway.app.deps import get_task_repository
 from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
@@ -802,7 +804,18 @@ async def run_dub_step(req: DubRequest):
     """Run the dubbing step for the given request."""
 
     start_time = time.perf_counter()
-    provider = os.getenv("DUB_PROVIDER", None)
+    settings = config.get_settings()
+    provider = normalize_provider(getattr(req, "provider", None) or os.getenv("DUB_PROVIDER", None))
+    req.target_lang = normalize_target_lang(req.target_lang)
+    resolved_voice_id, _ = resolve_tts_voice(
+        settings=settings,
+        provider=provider,
+        target_lang=req.target_lang,
+        requested_voice=req.voice_id,
+    )
+    if not resolved_voice_id:
+        _fail_dub(req, "TTS_VOICE_MISSING", provider, status_code=422)
+    req.voice_id = resolved_voice_id
     workspace = Workspace(req.task_id)
     origin_exists = workspace.origin_srt_path.exists()
     mm_exists = workspace.mm_srt_exists()
@@ -908,6 +921,11 @@ async def run_dub_step(req: DubRequest):
 
     override_text = (req.mm_text or "").strip()
     mm_text = override_text or mm_txt_text
+    text_guard = clean_and_analyze_dub_text(mm_text, req.target_lang)
+    mm_text = str(text_guard.get("cleaned_text") or "").strip()
+    warning_text = str(text_guard.get("warning") or "").strip()
+    if warning_text:
+        logger.warning("DUB_TEXT_WARNING task=%s warning=%s", req.task_id, warning_text)
     logger.info(
         "DUB3_TEXT_SOURCE",
         extra={
@@ -919,6 +937,7 @@ async def run_dub_step(req: DubRequest):
             "text_source": "override" if override_text else "mm_srt",
             "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
             "text_len": len(mm_text or ""),
+            "text_warning": warning_text or None,
         },
     )
     if not mm_text.strip() or not _clean_text_for_dub(mm_text):

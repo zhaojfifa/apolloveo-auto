@@ -1,5 +1,6 @@
 from gateway.app.schemas import DubRequest
 from gateway.app.services.steps_v1 import run_dub_step as run_dub_step_v1
+from gateway.app.services.tts_policy import normalize_target_lang
 
 
 async def run_dub_step(task):
@@ -13,13 +14,15 @@ async def run_dub_step(task):
         or getattr(task, "content_lang", None)
         or "my"
     )
+    provider = getattr(task, "dub_provider", None)
     mm_text = getattr(task, "mm_text", None)
     if isinstance(mm_text, str):
         mm_text = mm_text.strip() or None
     req = DubRequest(
         task_id=task_id,
+        provider=provider,
         voice_id=voice_id,
-        target_lang=target_lang,
+        target_lang=normalize_target_lang(target_lang),
         force=force,
         mm_text=mm_text,
     )

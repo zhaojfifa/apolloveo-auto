@@ -68,6 +68,13 @@ from gateway.app.services.status_policy.service import policy_upsert
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 from gateway.app.services.parse import detect_platform
 from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
+from gateway.app.services.tts_policy import (
+    normalize_provider,
+    normalize_target_lang,
+    public_target_lang,
+    resolve_tts_voice,
+)
+from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
 
 
 def _policy_upsert(repo, task_id: str, updates: dict, *, task: dict | None = None, step: str = "router.tasks", force: bool = False):
@@ -1564,6 +1571,7 @@ def _hf_engine_internal(engine: str | None) -> str | None:
 
 
 def _hf_audio_config(task: dict) -> dict[str, Any]:
+    settings = get_settings()
     config = dict(task.get("config") or {})
     bgm = dict(config.get("bgm") or {})
     mix = bgm.get("mix_ratio")
@@ -1582,9 +1590,17 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
     meta = object_head(str(voice_key)) if voice_key else None
     size, _ = media_meta_from_head(meta)
     voice_url = f"/v1/tasks/{task_id}/audio_mm" if task_id and size >= MIN_AUDIO_BYTES else None
+    provider = normalize_provider(task.get("dub_provider") or getattr(settings, "dub_provider", None))
+    target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    resolved_voice, _ = resolve_tts_voice(
+        settings=settings,
+        provider=provider,
+        target_lang=target_lang,
+        requested_voice=task.get("voice_id"),
+    )
     return {
-        "tts_engine": _hf_engine_public(task.get("dub_provider")),
-        "tts_voice": task.get("voice_id") or "zh-CN-XiaoxiaoNeural",
+        "tts_engine": _hf_engine_public(provider),
+        "tts_voice": resolved_voice,
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
@@ -1663,7 +1679,8 @@ def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
             status = "done"
         if status == "pending" and task_status == "processing" and last_step == "dub":
             status = "running"
-        summary = f"dub_provider={task.get('dub_provider') or '-'} voice={task.get('voice_id') or '-'}"
+        audio_cfg = _hf_audio_config(task)
+        summary = f"dub_provider={normalize_provider(task.get('dub_provider') or get_settings().dub_provider)} voice={audio_cfg.get('tts_voice') or 'missing'}"
         return status, summary
     if step == "pack":
         status = _hf_state_from_status(task.get("pack_status"))
@@ -3423,6 +3440,9 @@ def get_hot_follow_workbench_hub(
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
     audio_cfg = _hf_audio_config(task)
+    target_lang_internal = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    text_guard = clean_and_analyze_dub_text(subtitles_text or "", target_lang_internal)
+    audio_warning = str(text_guard.get("warning") or "").strip() or None
     if not (audio_cfg.get("voiceover_url") or "").strip() and (task.get("mm_audio_key") or task.get("mm_audio_path")):
         dub_state = "failed"
         if not dub_summary:
@@ -3471,7 +3491,7 @@ def get_hot_follow_workbench_hub(
             "platform": task.get("platform") or "",
             "source_url": task.get("source_url") or "",
             "title": task.get("title") or "",
-            "target_lang": task.get("content_lang") or "zh",
+            "target_lang": public_target_lang(target_lang_internal),
             "subtitles_mode": pipeline_config.get("subtitles_mode") or "whisper+gemini",
         },
         "media": {
@@ -3501,6 +3521,7 @@ def get_hot_follow_workbench_hub(
             "bgm_mix": audio_cfg.get("bgm_mix"),
             "status": dub_state,
             "error": task.get("dub_error"),
+            "warning": audio_warning,
             "sha256": task.get("audio_sha256"),
         },
         "scenes": {
@@ -3531,7 +3552,7 @@ def get_hot_follow_workbench_hub(
             "warning": task.get("compose_warning"),
         },
         "errors": {
-            "audio": {"reason": task.get("error_reason"), "message": task.get("dub_error")},
+            "audio": {"reason": task.get("error_reason"), "message": task.get("dub_error") or audio_warning},
             "pack": {"reason": task.get("error_reason"), "message": task.get("pack_error")},
             "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
         },
@@ -3596,6 +3617,7 @@ def patch_hot_follow_audio_config(
         raise HTTPException(status_code=404, detail="Task not found")
 
     updates: dict[str, Any] = {}
+    settings = get_settings()
     config = dict(task.get("config") or {})
     bgm = dict(config.get("bgm") or {})
     if payload.bgm_mix is not None:
@@ -3607,9 +3629,22 @@ def patch_hot_follow_audio_config(
 
     provider = _hf_engine_internal(payload.tts_engine)
     if payload.tts_engine is not None:
-        updates["dub_provider"] = provider
+        updates["dub_provider"] = normalize_provider(provider)
     if payload.tts_voice is not None:
-        updates["voice_id"] = payload.tts_voice.strip() or None
+        requested_voice = payload.tts_voice.strip() or None
+        effective_provider = normalize_provider(
+            updates.get("dub_provider") or task.get("dub_provider") or settings.dub_provider
+        )
+        target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+        resolved_voice, _ = resolve_tts_voice(
+            settings=settings,
+            provider=effective_provider,
+            target_lang=target_lang,
+            requested_voice=requested_voice,
+        )
+        if not resolved_voice:
+            raise HTTPException(status_code=422, detail="TTS_VOICE_MISSING")
+        updates["voice_id"] = resolved_voice
     if payload.audio_fit_max_speed is not None:
         speed = max(1.0, min(1.6, float(payload.audio_fit_max_speed)))
         pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
@@ -4746,6 +4781,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         raise HTTPException(status_code=404, detail="Task not found")
 
     settings = get_settings()
+    target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     provider_raw = payload.provider
     if not provider_raw:
         pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
@@ -4774,6 +4810,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         if provider_norm == "edge_tts"
         else ("azure-speech" if provider_norm == "azure_speech" else "lovo")
     )
+    provider = normalize_provider(provider)
 
     if provider == "lovo" and not getattr(settings, "lovo_api_key", None):
         raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
@@ -4786,7 +4823,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 detail="AZURE_SPEECH_KEY and AZURE_SPEECH_REGION are required for azure-speech",
             )
 
-    req_voice_id = payload.voice_id or None
+    req_voice_id = (payload.voice_id or "").strip() or None
     req_tts_speed = None
     if payload.tts_speed is not None:
         try:
@@ -4794,7 +4831,23 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         except Exception:
             req_tts_speed = None
     prev_voice_id = task.get("voice_id") if isinstance(task, dict) else getattr(task, "voice_id", None)
-    final_voice_id = req_voice_id or prev_voice_id or "mm_female_1"
+    final_voice_id, voice_overridden = resolve_tts_voice(
+        settings=settings,
+        provider=provider,
+        target_lang=target_lang,
+        requested_voice=req_voice_id or prev_voice_id,
+    )
+    if not final_voice_id:
+        raise HTTPException(status_code=422, detail="TTS_VOICE_MISSING")
+    if voice_overridden:
+        logger.warning(
+            "DUB_VOICE_OVERRIDE task=%s target_lang=%s requested=%s resolved=%s provider=%s",
+            task_id,
+            target_lang,
+            req_voice_id or prev_voice_id,
+            final_voice_id,
+            provider,
+        )
     mm_text_override = (payload.mm_text or "").strip() or None
     logger.info(
         "DUB3_TEXT_SOURCE",
@@ -4858,7 +4911,9 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 self.id = self.task_id
                 self.tenant_id = t.get("tenant_id") or t.get("tenant") or "default"
                 self.project_id = t.get("project_id") or t.get("project") or "default"
-                self.target_lang = t.get("target_lang") or t.get("content_lang") or "my"
+                self.target_lang = normalize_target_lang(
+                    t.get("target_lang") or t.get("content_lang") or "my"
+                )
                 self.voice_id = voice_override or t.get("voice_id")
                 self.dub_provider = provider
                 self.force_dub = force_dub

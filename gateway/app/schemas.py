@@ -44,6 +44,7 @@ class SubtitlesRequest(BaseModel):
 
 class DubRequest(BaseModel):
     task_id: str
+    provider: str | None = None
     voice_id: str | None = None
     target_lang: str = "my"
     force: bool = False
