@@ -3603,6 +3603,58 @@ def get_hot_follow_workbench_hub(
     if _backfill_compose_done_if_final_ready(repo, task_id, task, bool(payload.get("composed_ready"))):
         latest = repo.get(task_id) or task
         payload = compute_hot_follow_state(latest, payload)
+
+    # UI consistency guard: once final is ready, compose-facing fields must all read done.
+    final_url = str(
+        payload.get("final_url")
+        or (payload.get("media", {}) or {}).get("final_url")
+        or ""
+    ).strip()
+    final_exists = bool((payload.get("final") or {}).get("exists"))
+    composed_ready = bool(final_url or final_exists)
+    if composed_ready:
+        pipeline = payload.get("pipeline")
+        if isinstance(pipeline, list):
+            for step in pipeline:
+                if not isinstance(step, dict):
+                    continue
+                if str(step.get("key") or "").strip().lower() == "compose":
+                    step["status"] = "done"
+                    step["state"] = "done"
+                    step["error"] = None
+                    step["message"] = step.get("message") or "final video merge"
+
+        pipeline_legacy = payload.get("pipeline_legacy")
+        if isinstance(pipeline_legacy, dict):
+            compose_legacy = pipeline_legacy.get("compose")
+            if isinstance(compose_legacy, dict):
+                compose_legacy["status"] = "done"
+
+        compose = payload.get("compose")
+        if isinstance(compose, dict):
+            last = compose.get("last")
+            if isinstance(last, dict):
+                last["status"] = "done"
+
+        deliverables = payload.get("deliverables")
+        if isinstance(deliverables, list):
+            for item in deliverables:
+                if not isinstance(item, dict):
+                    continue
+                if str(item.get("kind") or "").strip().lower() == "final":
+                    item["status"] = "done"
+                    item["state"] = "done"
+                    if final_url:
+                        item["url"] = final_url
+                    break
+
+        media = payload.get("media")
+        if isinstance(media, dict) and final_url:
+            media["final_url"] = final_url
+            media["final_video_url"] = final_url
+
+        payload["composed_ready"] = True
+        payload["composed_reason"] = "ready"
     return payload
 
 
