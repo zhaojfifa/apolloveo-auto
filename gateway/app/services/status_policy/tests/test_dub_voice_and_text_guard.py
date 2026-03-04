@@ -58,3 +58,39 @@ def test_hot_follow_ready_gate_blocks_when_audio_invalid():
     assert gate.get("publish_ready") is False
     assert "audio_not_done" in (gate.get("blocking") or [])
     assert "tts_voice_invalid" in (gate.get("blocking") or [])
+
+
+def test_hot_follow_reconcile_compose_done_from_final_exists():
+    state = compute_hot_follow_state(
+        {"task_id": "hf-1", "compose_status": "pending"},
+        {
+            "task_id": "hf-1",
+            "final": {"exists": True},
+            "compose": {"last": {"status": "pending"}},
+            "pipeline": [{"key": "compose", "status": "pending", "state": "pending", "message": ""}],
+            "media": {},
+        },
+    )
+    gate = state.get("ready_gate") or {}
+    assert state.get("compose_status") == "done"
+    assert (state.get("compose") or {}).get("last", {}).get("status") == "done"
+    assert (state.get("media") or {}).get("final_url") == "/v1/tasks/hf-1/final"
+    assert (state.get("final_url") or "") == "/v1/tasks/hf-1/final"
+    compose_step = next((x for x in (state.get("pipeline") or []) if x.get("key") == "compose"), {})
+    assert compose_step.get("status") == "done"
+    assert compose_step.get("state") == "done"
+    assert "compose_not_done" not in (gate.get("blocking") or [])
+
+
+def test_hot_follow_compose_not_done_kept_when_final_missing():
+    state = compute_hot_follow_state(
+        {"task_id": "hf-2", "compose_status": "pending"},
+        {
+            "task_id": "hf-2",
+            "final": {"exists": False},
+            "audio": {"status": "done", "tts_voice": "my-MM-NilarNeural", "voiceover_url": "/a.mp3"},
+        },
+    )
+    gate = state.get("ready_gate") or {}
+    assert state.get("compose_status") != "done"
+    assert "compose_not_done" in (gate.get("blocking") or [])
