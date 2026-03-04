@@ -2,6 +2,21 @@ import re
 from pathlib import Path
 
 
+def _extract_brace_object(src: str, start: int) -> str:
+    i = src.find("{", start)
+    assert i >= 0, "object start not found"
+    depth = 0
+    for j in range(i, len(src)):
+        ch = src[j]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return src[i + 1 : j]
+    raise AssertionError("object block not closed")
+
+
 def _extract_sop_keys() -> set[str]:
     files = [
         Path("gateway/app/static/js/hot_follow_new.js"),
@@ -23,12 +38,17 @@ def _extract_sop_keys() -> set[str]:
 
 def _extract_locale_keys(locale: str) -> set[str]:
     src = Path("gateway/app/static/js/i18n_v185.js").read_text(encoding="utf-8", errors="ignore")
-    m = re.search(rf"{locale}:\s*\{{([\s\S]*?)\n\s*\}},", src)
+    m = re.search(rf"\b{locale}\s*:\s*\{{", src)
     assert m, f"locale block not found: {locale}"
-    block = m.group(1)
+    block = _extract_brace_object(src, m.start())
     quoted = set(re.findall(r'"([^"]+)"\s*:', block))
     bare = set(re.findall(r"\b([A-Za-z0-9_.]+)\s*:", block))
-    return quoted | bare
+    merged: set[str] = set()
+    for assign in re.finditer(rf"Object\.assign\(\s*CLIENT_DICT\.{locale}\s*,\s*\{{", src):
+        payload = _extract_brace_object(src, assign.start())
+        merged.update(re.findall(r'"([^"]+)"\s*:', payload))
+        merged.update(re.findall(r"\b([A-Za-z0-9_.]+)\s*:", payload))
+    return quoted | bare | merged
 
 
 def test_sop_i18n_keys_exist_for_zh_mm():

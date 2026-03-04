@@ -211,6 +211,89 @@ def _compose_in_progress_response(task_id: str) -> JSONResponse:
     )
 
 
+def _build_atempo_chain(speed: float) -> str:
+    try:
+        value = float(speed)
+    except Exception:
+        value = 1.0
+    value = max(0.5, min(100.0, value))
+    factors: list[float] = []
+    while value > 2.0:
+        factors.append(2.0)
+        value /= 2.0
+    while value < 0.5:
+        factors.append(0.5)
+        value /= 0.5
+    factors.append(value)
+    parts: list[str] = []
+    for factor in factors:
+        if abs(factor - 2.0) < 1e-9:
+            parts.append("atempo=2.0")
+        elif abs(factor - 0.5) < 1e-9:
+            parts.append("atempo=0.5")
+        else:
+            parts.append(f"atempo={factor:.6f}")
+    return ",".join(parts)
+
+
+def _resolve_audio_fit_max_speed(pipeline_config: dict | None) -> tuple[float, str]:
+    cfg = pipeline_config or {}
+    raw = cfg.get("audio_fit_max_speed")
+    source = "default"
+    if raw in (None, "", "null"):
+        speed = 1.25
+    else:
+        source = "operator"
+        try:
+            speed = float(raw)
+        except Exception:
+            speed = 1.25
+    speed = max(1.0, min(2.0, speed))
+    return speed, source
+
+
+def _compute_audio_fit_speeds(source_duration_sec: float, dubbed_duration_sec: float, max_speed: float) -> tuple[float, float]:
+    try:
+        source = float(source_duration_sec)
+    except Exception:
+        source = 0.0
+    try:
+        dubbed = float(dubbed_duration_sec)
+    except Exception:
+        dubbed = 0.0
+    safe_source = max(source, 1e-6)
+    need_speed = max(1.0, dubbed / safe_source)
+    applied_speed = min(max(1.0, float(max_speed or 1.25)), need_speed)
+    return need_speed, applied_speed
+
+
+def _count_srt_cues(srt_text: str | None) -> int:
+    text = str(srt_text or "")
+    if not text.strip():
+        return 0
+    return len(re.findall(r"(?m)^\s*\d+\s*\r?\n\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}", text))
+
+
+def _build_translation_qa_summary(origin_srt_text: str | None, translated_srt_text: str | None) -> dict:
+    source_count = _count_srt_cues(origin_srt_text)
+    translated_count = _count_srt_cues(translated_srt_text)
+    return {
+        "source_count": source_count,
+        "translated_count": translated_count,
+        "has_mismatch": source_count != translated_count,
+    }
+
+
+def _build_workbench_debug_payload(show_debug: bool, scene_outputs: list[dict] | None, compose_last: dict | None) -> dict:
+    if not show_debug:
+        return {}
+    compose = compose_last or {}
+    return {
+        "scene_outputs": list(scene_outputs or []),
+        "compose_last_ffmpeg_cmd": compose.get("ffmpeg_cmd"),
+    }
+
+
 class DubProviderRequest(BaseModel):
     provider: str | None = None
     voice_id: str | None = None
