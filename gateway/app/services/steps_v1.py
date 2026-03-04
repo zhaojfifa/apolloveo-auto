@@ -471,6 +471,46 @@ def _clean_text_for_dub(text: str) -> str:
     return re.sub(r"[\W_]+", "", text or "", flags=re.UNICODE)
 
 
+def _pick_mm_text_fallback(
+    *,
+    override_text: str | None,
+    edited_text: str | None,
+    mm_srt_text: str | None,
+) -> tuple[str | None, str | None]:
+    override = str(override_text or "").strip()
+    if override:
+        return override, "override"
+    edited = str(edited_text or "").strip()
+    if edited:
+        return edited, "edited_text"
+    srt_text = str(mm_srt_text or "").strip()
+    if srt_text:
+        txt = _srt_to_txt(srt_text).strip()
+        if txt:
+            return txt, "mm_srt"
+    return None, None
+
+
+def _resolve_mm_txt_text(
+    *,
+    mm_txt_text: str | None,
+    override_text: str | None,
+    edited_text: str | None,
+    mm_srt_text: str | None,
+) -> tuple[str, bool, str | None]:
+    current = str(mm_txt_text or "").strip()
+    if current and current.lower() != "no subtitles":
+        return current, False, "mm_txt"
+    fallback_text, fallback_source = _pick_mm_text_fallback(
+        override_text=override_text,
+        edited_text=edited_text,
+        mm_srt_text=mm_srt_text,
+    )
+    if fallback_text:
+        return str(fallback_text).strip(), True, fallback_source
+    return current, False, None
+
+
 def _write_no_dub_note(task_id: str, reason: str) -> Path:
     note_path = task_base_dir(task_id) / "dub" / "no_dub.txt"
     note_path.parent.mkdir(parents=True, exist_ok=True)
@@ -908,15 +948,47 @@ async def run_dub_step(req: DubRequest):
         )
 
     mm_txt_path = workspace.mm_txt_path
-    if not mm_txt_path.exists():
-        _fail_dub(req, "MM_TXT_MISSING", provider)
-    try:
-        mm_txt_text = mm_txt_path.read_text(encoding="utf-8")
-    except Exception:
-        _fail_dub(req, "MM_TXT_MISSING", provider)
+    mm_txt_exists = mm_txt_path.exists()
+    mm_txt_text = ""
+    if mm_txt_exists:
+        try:
+            mm_txt_text = mm_txt_path.read_text(encoding="utf-8")
+        except Exception:
+            mm_txt_text = ""
     if mm_txt_text.strip().lower() == "no subtitles":
         _fail_dub(req, "NO_SUBTITLES_MARKER", provider)
+    mm_srt_text = ""
+    if workspace.mm_srt_path.exists():
+        try:
+            mm_srt_text = workspace.mm_srt_path.read_text(encoding="utf-8")
+        except Exception:
+            mm_srt_text = ""
+    mm_txt_resolved, used_fallback, fallback_source = _resolve_mm_txt_text(
+        mm_txt_text=mm_txt_text,
+        override_text=req.mm_text,
+        edited_text=workspace.read_mm_edited_text(),
+        mm_srt_text=mm_srt_text,
+    )
+    if used_fallback and mm_txt_resolved:
+        mm_txt_path.parent.mkdir(parents=True, exist_ok=True)
+        mm_txt_path.write_text(mm_txt_resolved + "\n", encoding="utf-8")
+        mm_txt_key = _upload_artifact(req.task_id, mm_txt_path, MM_TXT_ARTIFACT)
+        if mm_txt_key:
+            _update_task(req.task_id, mm_txt_path=mm_txt_key)
+        logger.info(
+            "DUB3_MM_TXT_FALLBACK",
+            extra={
+                "task_id": req.task_id,
+                "step": "dub",
+                "source": fallback_source,
+                "mm_txt_path": str(mm_txt_path),
+                "mm_txt_key": mm_txt_key,
+            },
+        )
+    mm_txt_text = mm_txt_resolved
     if not mm_txt_text.strip():
+        if not mm_txt_exists:
+            _fail_dub(req, "MM_TXT_MISSING", provider)
         _fail_dub(req, "MM_TXT_EMPTY", provider, status_code=400)
 
     override_text = (req.mm_text or "").strip()
