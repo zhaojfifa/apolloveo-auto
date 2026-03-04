@@ -280,15 +280,38 @@
   function renderComposedReadiness(finalUrl) {
     const readyGate = (currentHub && currentHub.ready_gate) || {};
     const ready = Boolean(readyGate.compose_ready);
-    if (composedBadgeEl) {
-      composedBadgeEl.textContent = ready ? t("hot_follow_scene_status_done", "Done") : t("hot_follow_workbench_composed_not_ready", "Not Ready");
-      composedBadgeEl.classList.toggle("text-green-700", ready);
-      composedBadgeEl.classList.toggle("text-amber-700", !ready);
+    if (!ready) {
+      if (composedBadgeEl) {
+        composedBadgeEl.textContent = t("hot_follow_workbench_composed_not_ready", "Not Ready");
+        composedBadgeEl.classList.remove("hidden", "text-green-700");
+        composedBadgeEl.classList.add("text-amber-700");
+      }
+      if (composedReasonEl) {
+        composedReasonEl.textContent = t("hot_follow_workbench_composed_not_ready", "未就绪");
+        composedReasonEl.classList.remove("hidden");
+      }
     }
-    if (composedReasonEl) composedReasonEl.textContent = ready ? t("hot_follow_compose_reason_ready", "可发布") : t("hot_follow_workbench_composed_not_ready", "未就绪");
     const composePlan = (currentHub && currentHub.compose_plan) || {};
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
     if (freezeTailEnabledEl) freezeTailEnabledEl.checked = Boolean(composePlan.freeze_tail_enabled);
+  }
+
+  function setComposeReadyUI(hub, finalUrl) {
+    const media = (hub && hub.media) || {};
+    const final = (hub && hub.final) || {};
+    const composedReady = Boolean(
+      (hub && hub.composed_ready)
+      || finalUrl
+      || media.final_url
+      || final.exists
+    );
+    const composeStep = ((hub && hub.pipeline) || []).find((x) => x && x.key === "compose") || {};
+    const composeState = String(composeStep.status || composeStep.state || "").toLowerCase();
+    const composeDone = composeState === "done";
+    const hideHint = composeDone || composedReady;
+
+    if (composedBadgeEl) composedBadgeEl.classList.toggle("hidden", hideHint);
+    if (composedReasonEl) composedReasonEl.classList.toggle("hidden", hideHint);
   }
 
   function getSelectedTtsSpeed() {
@@ -366,6 +389,7 @@
     renderSubtitles();
     renderAudio();
     renderComposedReadiness(finalUrl);
+    setComposeReadyUI(currentHub, finalUrl);
     renderScenePack();
     renderDeliverables();
     renderEvents();
