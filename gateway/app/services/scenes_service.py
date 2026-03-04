@@ -5,11 +5,15 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from gateway.app.services.scene_split import generate_scenes_package
+from gateway.app.services import scene_split
 from gateway.app.services.status_policy.service import policy_upsert
 from gateway.app.services.task_events import append_task_event
 
 logger = logging.getLogger(__name__)
+
+
+def generate_scenes_package(task_id: str) -> dict[str, Any]:
+    return scene_split.generate_scenes_package(task_id)
 
 
 def _now_iso() -> str:
