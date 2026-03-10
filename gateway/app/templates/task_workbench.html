@@ -337,6 +337,10 @@
           <div class="muted" id="compose-consistency" style="white-space:pre-wrap;">-</div>
         </div>
         <div class="step-card">
+          <h3>口型同步（增强）</h3>
+          <div class="muted" id="lipsync-placeholder" style="white-space:pre-wrap;">默认关闭</div>
+        </div>
+        <div class="step-card">
           <h3>{{ t("workbench.step.pack.title") }}</h3>
           <p class="muted">{{ t("workbench.step.pack.desc") }}</p>
           <div class="action-row">
@@ -591,6 +595,12 @@
         const burnSourceReady = !!data.mm_srt_path;
         consistencyEl.textContent =
           `compose_status: ${composeStatus}\nfinal_exists: ${finalExists ? "yes" : "no"}\nburn_source_ready: ${burnSourceReady ? "yes" : "no"}`;
+      }
+      const lipsyncEl = document.getElementById("lipsync-placeholder");
+      if (lipsyncEl) {
+        lipsyncEl.textContent = data.lipsync_enabled
+          ? "增强模式已启用（实验）\n增强路线，失败不影响基础成片。"
+          : "默认关闭\n增强路线，当前不默认启用；失败不影响基础成片。";
       }
     }
 

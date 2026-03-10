@@ -2693,6 +2693,7 @@ async def task_workbench_page(
     if actual_provider not in voice_options_by_provider:
         actual_provider = "edge-tts"
     resolved_voice = task.get("voice_id") or None
+    lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     task_json = {
         "task_id": detail.task_id,
         "status": detail.status,
@@ -2729,6 +2730,7 @@ async def task_workbench_page(
         "voice_options_by_provider": voice_options_by_provider,
         "compose_status": task.get("compose_status"),
         "final_exists": final_exists,
+        "lipsync_enabled": lipsync_enabled,
     }
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
 
