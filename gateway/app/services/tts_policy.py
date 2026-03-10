@@ -44,7 +44,7 @@ def _default_voice_for_lang(settings: Any, provider: str, target_lang: str) -> s
         if provider == "edge-tts":
             return settings.edge_tts_voice_map.get("mm_female_1") or "my-MM-NilarNeural"
         if provider == "lovo":
-            return getattr(settings, "lovo_voice_id_mm", None) or "mm_female_1"
+            return getattr(settings, "lovo_speaker_mm_female_1", None) or getattr(settings, "lovo_voice_id_mm", None) or "mm_female_1"
     if lang == "zh":
         return "zh-CN-XiaoxiaoNeural"
     if lang == "en":
@@ -76,7 +76,25 @@ def resolve_tts_voice(
 ) -> tuple[str | None, bool]:
     provider_name = normalize_provider(provider)
     requested = str(requested_voice or "").strip() or None
+    provider_map: dict[str, str] = {}
+    if provider_name == "edge-tts":
+        provider_map = dict(getattr(settings, "edge_tts_voice_map", {}) or {})
+    elif provider_name == "azure-speech":
+        provider_map = dict(getattr(settings, "azure_tts_voice_map", {}) or {})
+    elif provider_name == "lovo":
+        if getattr(settings, "lovo_speaker_mm_female_1", None):
+            provider_map["mm_female_1"] = str(getattr(settings, "lovo_speaker_mm_female_1"))
+        if getattr(settings, "lovo_speaker_mm_male_1", None):
+            provider_map["mm_male_1"] = str(getattr(settings, "lovo_speaker_mm_male_1"))
+
     if requested and is_voice_compatible(target_lang, requested):
+        mapped = provider_map.get(requested)
+        if mapped:
+            return mapped, mapped != requested
+        if requested in provider_map.values():
+            return requested, False
+        if requested.lower().startswith("mm_"):
+            return None, True
         return requested, False
     fallback = _default_voice_for_lang(settings, provider_name, normalize_target_lang(target_lang))
     return fallback, bool(requested and fallback and fallback != requested)

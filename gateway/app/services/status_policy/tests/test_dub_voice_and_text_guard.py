@@ -30,6 +30,25 @@ def test_resolve_tts_voice_mm_rejects_zh_voice():
     assert overridden is True
 
 
+def test_resolve_tts_voice_mm_male_alias_maps_to_provider_voice():
+    settings = SimpleNamespace(
+        edge_tts_voice_map={
+            "mm_female_1": "my-MM-NilarNeural",
+            "mm_male_1": "my-MM-ThihaNeural",
+        },
+        azure_tts_voice_map={},
+        lovo_voice_id_mm="mm_female_1",
+    )
+    voice, overridden = resolve_tts_voice(
+        settings=settings,
+        provider="edge-tts",
+        target_lang="mm",
+        requested_voice="mm_male_1",
+    )
+    assert voice == "my-MM-ThihaNeural"
+    assert overridden is True
+
+
 def test_clean_and_analyze_dub_text_detects_cjk_lines():
     text = """1
 00:00:00,000 --> 00:00:01,000
@@ -67,6 +86,7 @@ def test_hot_follow_reconcile_compose_done_from_final_exists():
             "task_id": "hf-1",
             "final": {"exists": True},
             "compose": {"last": {"status": "pending"}},
+            "audio": {"status": "done", "tts_voice": "my-MM-NilarNeural", "voiceover_url": "/a.mp3", "audio_ready": True},
             "pipeline": [{"key": "compose", "status": "pending", "state": "pending", "message": ""}],
             "media": {},
         },
@@ -94,3 +114,20 @@ def test_hot_follow_compose_not_done_kept_when_final_missing():
     gate = state.get("ready_gate") or {}
     assert state.get("compose_status") != "done"
     assert "compose_not_done" in (gate.get("blocking") or [])
+
+
+def test_hot_follow_final_exists_but_audio_not_ready_stays_blocked():
+    state = compute_hot_follow_state(
+        {"task_id": "hf-3", "compose_status": "pending"},
+        {
+            "task_id": "hf-3",
+            "final": {"exists": True},
+            "compose": {"last": {"status": "pending"}},
+            "audio": {"status": "running", "tts_voice": "mm_male_1", "voiceover_url": "/a.mp3", "audio_ready": False},
+            "pipeline": [{"key": "compose", "status": "pending", "state": "pending", "message": ""}],
+        },
+    )
+    gate = state.get("ready_gate") or {}
+    assert state.get("compose_status") != "done"
+    assert gate.get("compose_ready") is False
+    assert "audio_not_ready" in (gate.get("blocking") or [])
