@@ -2934,7 +2934,6 @@ async def task_workbench_page(
         "publish_url": detail.publish_url,
         "published_at": detail.published_at,
     }
-    task_json.update(_collect_voice_execution_state(task, app_settings))
     if spec.kind == "hot_follow":
         task_json.update(_collect_hot_follow_workbench_ui(task, app_settings))
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
@@ -3103,6 +3102,9 @@ def create_task(
         "kind": payload.kind,
         "source_url": source_text,
         "platform": platform,
+        "voice_id": payload.voice_id,
+        "dub_provider": payload.dub_provider,
+        "config": payload.config or {},
         "account_id": payload.account_id,
         "account_name": payload.account_name,
         "video_type": payload.video_type,
@@ -3158,6 +3160,16 @@ def create_hot_follow_task(
     data["category_key"] = data.get("category_key") or "hot_follow"
     if data.get("auto_start") is None:
         data["auto_start"] = True
+    lang = normalize_target_lang(data.get("content_lang") or data.get("target_lang") or "mm")
+    if lang == "my":
+        data["content_lang"] = "mm"
+        data["voice_id"] = data.get("voice_id") or "mm_male_1"
+        data["dub_provider"] = normalize_provider(data.get("dub_provider") or "edge-tts")
+        config = dict(data.get("config") or {})
+        config["tts_requested_voice"] = data["voice_id"]
+        config["hot_follow_tts_requested_voice"] = data["voice_id"]
+        config["tts_provider"] = data["dub_provider"]
+        data["config"] = config
     normalized = TaskCreate(**data)
     return create_task(normalized, background_tasks=background_tasks, repo=repo)
 

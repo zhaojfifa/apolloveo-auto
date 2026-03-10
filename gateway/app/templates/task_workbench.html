@@ -311,7 +311,11 @@
           <div class="form-grid">
             <div class="field">
               <label for="voice-id">{{ t("workbench.step.dub.voice") }}</label>
-              <select id="voice-id"></select>
+              <select id="voice-id">
+                <option value="mm_female_1">mm_female_1</option>
+                <option value="mm_male_1">mm_male_1</option>
+                <option value="mm_female_2">mm_female_2</option>
+              </select>
             </div>
             <div class="field">
               <label for="dub-provider">{{ t("workbench.step.dub.engine") }}</label>
@@ -326,12 +330,6 @@
             <span id="dub-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <div id="dub-hint" class="muted" style="margin-top:6px;"></div>
-          <div class="muted" style="margin-top:8px;">
-            <div><strong>Requested Voice:</strong> <span id="requested-voice">-</span></div>
-            <div><strong>Actual Provider:</strong> <span id="actual-provider">-</span></div>
-            <div><strong>Resolved Voice:</strong> <span id="resolved-voice">-</span></div>
-            <div><strong>Audio Ready:</strong> <span id="audio-ready">-</span></div>
-          </div>
         </div>
         <div class="step-card">
           <h3>{{ t("workbench.step.pack.title") }}</h3>
@@ -568,59 +566,6 @@
           dubHint.textContent = "";
         }
       }
-
-      const requestedVoiceEl = document.getElementById("requested-voice");
-      if (requestedVoiceEl) requestedVoiceEl.textContent = data.requested_voice || "-";
-      const providerEl = document.getElementById("actual-provider");
-      if (providerEl) providerEl.textContent = data.actual_provider || "-";
-      const resolvedVoiceEl = document.getElementById("resolved-voice");
-      if (resolvedVoiceEl) resolvedVoiceEl.textContent = data.resolved_voice || "-";
-      const audioReadyEl = document.getElementById("audio-ready");
-      if (audioReadyEl) audioReadyEl.textContent = data.audio_ready ? "yes" : "no";
-    }
-
-    function normalizeVoiceProvider(value) {
-      const raw = String(value || "").trim().toLowerCase();
-      if (raw === "edge-tts" || raw === "edge_tts" || raw === "edge") return "edge_tts";
-      if (raw === "lovo") return "lovo";
-      return raw;
-    }
-
-    function renderVoiceOptions(data) {
-      const providerSelect = document.getElementById("dub-provider");
-      const voiceSelect = document.getElementById("voice-id");
-      if (!providerSelect || !voiceSelect) return;
-
-      const provider = normalizeVoiceProvider(providerSelect.value || data.actual_provider || "edge-tts");
-      const optionsByProvider = data.voice_options_by_provider || {};
-      const voiceOptions = Array.isArray(optionsByProvider[provider]) ? optionsByProvider[provider] : [];
-      const requestedVoice = data.requested_voice || "";
-
-      voiceSelect.innerHTML = "";
-      if (!voiceOptions.length) {
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "No Burmese voices available for this provider";
-        voiceSelect.appendChild(opt);
-        voiceSelect.disabled = true;
-        return;
-      }
-
-      voiceSelect.disabled = false;
-      let matched = false;
-      voiceOptions.forEach((item, index) => {
-        const opt = document.createElement("option");
-        opt.value = item.value || "";
-        opt.textContent = item.label || item.value || "";
-        if (requestedVoice && requestedVoice === opt.value) {
-          opt.selected = true;
-          matched = true;
-        } else if (!requestedVoice && index === 0) {
-          opt.selected = true;
-        }
-        voiceSelect.appendChild(opt);
-      });
-      if (!matched && voiceSelect.options.length) voiceSelect.options[0].selected = true;
     }
 
     function applyLocalIngestUI() {
@@ -816,7 +761,6 @@
     updateDownloadsFromTask(window.currentTask);
     updateStatusBadge(window.currentTask);
     updateStepStatuses(window.currentTask);
-    renderVoiceOptions(window.currentTask);
     refreshPublishInfo(window.currentTask);
     renderScenesStatus(window.currentTask);
     applyLocalIngestUI();
@@ -840,11 +784,6 @@
         updateDownloadsFromTask(data);
         updateStatusBadge(data);
         updateStepStatuses(data);
-        const providerSelect = document.getElementById("dub-provider");
-        if (providerSelect && data.actual_provider) {
-          providerSelect.value = data.actual_provider;
-        }
-        renderVoiceOptions(data);
         refreshPublishInfo(data);
         renderScenesStatus(data);
         applyLocalIngestUI();
@@ -989,16 +928,6 @@
       appendLog("Dub audio ready.");
       await refreshTaskState();
     });
-
-    const providerSelect = document.getElementById("dub-provider");
-    if (providerSelect) {
-      if (window.currentTask.actual_provider) {
-        providerSelect.value = window.currentTask.actual_provider;
-      }
-      providerSelect.addEventListener("change", () => {
-        renderVoiceOptions(window.currentTask);
-      });
-    }
     document.getElementById("btn-pack").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
       appendLog(`Calling /api/tasks/${taskId}/pack...`);

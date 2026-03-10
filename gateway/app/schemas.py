@@ -73,6 +73,9 @@ class TaskCreate(BaseModel):
     source_url: constr(strip_whitespace=True, min_length=1)
     platform: Optional[str] = None
     kind: Optional[str] = None
+    voice_id: Optional[str] = None
+    dub_provider: Optional[str] = None
+    config: Optional[dict[str, Any]] = None
     account_id: Optional[str] = None
     account_name: Optional[str] = None
     video_type: Optional[str] = None
