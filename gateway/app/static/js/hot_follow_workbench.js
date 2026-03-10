@@ -65,6 +65,7 @@
   const requestedVoiceEl = document.getElementById("hf_requested_voice");
   const actualProviderEl = document.getElementById("hf_actual_provider");
   const resolvedVoiceEl = document.getElementById("hf_resolved_voice");
+  const audioReadyEl = document.getElementById("hf_audio_ready");
   const dubWarningsEl = document.getElementById("hf_dub_warnings");
   const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
   const scenePackDownloadEl = document.getElementById("hf_scene_pack_download");
@@ -312,6 +313,7 @@
     if (requestedVoiceEl) requestedVoiceEl.textContent = (currentHub && currentHub.requested_voice) || "-";
     if (actualProviderEl) actualProviderEl.textContent = (currentHub && currentHub.actual_provider) || "-";
     if (resolvedVoiceEl) resolvedVoiceEl.textContent = (currentHub && currentHub.resolved_voice) || "-";
+    if (audioReadyEl) audioReadyEl.textContent = (currentHub && currentHub.audio_ready) ? "yes" : "no";
   }
 
   function renderDubWarnings() {
