@@ -2388,6 +2388,15 @@ def _resolve_hot_follow_requested_voice(
     return None
 
 
+def _hot_follow_expected_provider(task: dict, requested_voice: str | None, default_provider: str | None) -> str:
+    provider = normalize_provider(default_provider)
+    target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    if str(task.get("kind") or "").strip().lower() == "hot_follow" and target_lang == "my":
+        if str(requested_voice or "").strip() == "mm_male_1":
+            return "edge-tts"
+    return provider
+
+
 def _voice_state_config(task: dict) -> dict[str, Any]:
     config = dict(task.get("config") or {})
     return {
@@ -2486,9 +2495,13 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     voice_options_by_provider = _build_hot_follow_voice_options(settings, target_lang)
     config_state = _voice_state_config(task)
-    expected_provider = normalize_provider(config_state.get("provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
+    requested_voice = config_state.get("requested_voice") or _resolve_hot_follow_requested_voice(settings, task, config_state.get("provider"))
+    expected_provider = _hot_follow_expected_provider(
+        task,
+        requested_voice,
+        config_state.get("provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None),
+    )
     actual_provider = normalize_provider(task.get("mm_audio_provider") or expected_provider)
-    requested_voice = config_state.get("requested_voice") or _resolve_hot_follow_requested_voice(settings, task, expected_provider)
     expected_resolved_voice, _ = resolve_tts_voice(
         settings=settings,
         provider=expected_provider,
@@ -2547,11 +2560,14 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     final_exists = bool(final_key and object_exists(str(final_key)))
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
+    lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     return {
         **voice_state,
         "compose_status": compose_status,
         "final_exists": final_exists,
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
+        "lipsync_enabled": lipsync_enabled,
+        "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
     }
 
 
@@ -4002,6 +4018,37 @@ def get_hot_follow_workbench_hub(
 
         payload["composed_ready"] = True
         payload["composed_reason"] = "ready"
+    else:
+        pipeline = payload.get("pipeline")
+        if isinstance(pipeline, list):
+            for step in pipeline:
+                if not isinstance(step, dict):
+                    continue
+                if str(step.get("key") or "").strip().lower() == "compose":
+                    step["status"] = "pending"
+                    step["state"] = "pending"
+
+        pipeline_legacy = payload.get("pipeline_legacy")
+        if isinstance(pipeline_legacy, dict):
+            compose_legacy = pipeline_legacy.get("compose")
+            if isinstance(compose_legacy, dict):
+                compose_legacy["status"] = "pending"
+
+        compose = payload.get("compose")
+        if isinstance(compose, dict):
+            last = compose.get("last")
+            if isinstance(last, dict):
+                last["status"] = "pending"
+
+        deliverables = payload.get("deliverables")
+        if isinstance(deliverables, list):
+            for item in deliverables:
+                if not isinstance(item, dict):
+                    continue
+                if str(item.get("kind") or "").strip().lower() == "final":
+                    item["status"] = "pending"
+                    item["state"] = "pending"
+                    break
     payload.update(_collect_hot_follow_workbench_ui(task, get_settings()))
     return payload
 
@@ -4032,8 +4079,10 @@ def patch_hot_follow_audio_config(
         updates["dub_provider"] = normalize_provider(provider)
     if payload.tts_voice is not None:
         requested_voice = payload.tts_voice.strip() or None
-        effective_provider = normalize_provider(
-            updates.get("dub_provider") or task.get("dub_provider") or settings.dub_provider
+        effective_provider = _hot_follow_expected_provider(
+            task,
+            requested_voice,
+            updates.get("dub_provider") or task.get("dub_provider") or settings.dub_provider,
         )
         target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
         resolved_voice, _ = resolve_tts_voice(
@@ -4050,6 +4099,7 @@ def patch_hot_follow_audio_config(
         config["tts_provider"] = effective_provider
         updates["config"] = config
         updates["voice_id"] = requested_voice
+        updates["dub_provider"] = effective_provider
     if payload.audio_fit_max_speed is not None:
         speed = max(1.0, min(1.6, float(payload.audio_fit_max_speed)))
         pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
@@ -5264,6 +5314,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             req_tts_speed = None
     prev_voice_id = task.get("voice_id") if isinstance(task, dict) else getattr(task, "voice_id", None)
     selected_voice_id = req_voice_id or _voice_state_config(task).get("requested_voice") or prev_voice_id
+    provider = _hot_follow_expected_provider(task, selected_voice_id, provider)
     final_voice_id, voice_overridden = resolve_tts_voice(
         settings=settings,
         provider=provider,

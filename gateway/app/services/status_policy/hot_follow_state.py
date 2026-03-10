@@ -171,6 +171,8 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         last["status"] = "done"
         last["error"] = None
         state["compose_status"] = "done"
+    elif last:
+        last["status"] = "pending"
     if last:
         compose["last"] = last
     state["compose"] = compose
@@ -185,6 +187,13 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
                 step["state"] = "done"
                 step["error"] = None
                 step["message"] = step.get("message") or "final video merge"
+    elif pipeline:
+        for step in pipeline:
+            if not isinstance(step, dict):
+                continue
+            if str(step.get("key") or "").strip().lower() == "compose":
+                step["status"] = "pending"
+                step["state"] = "pending"
     state["pipeline"] = pipeline
 
     blocking: list[str] = []

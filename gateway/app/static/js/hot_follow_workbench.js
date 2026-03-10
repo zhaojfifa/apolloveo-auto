@@ -94,6 +94,8 @@
   const burnSubtitleSourceEl = document.getElementById("hf_burn_subtitle_source");
   const composeStatusValueEl = document.getElementById("hf_compose_status_value");
   const finalExistsValueEl = document.getElementById("hf_final_exists_value");
+  const lipsyncStatusValueEl = document.getElementById("hf_lipsync_status_value");
+  const lipsyncHintEl = document.getElementById("hf_lipsync_hint");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
@@ -314,6 +316,13 @@
     if (burnSubtitleSourceEl) burnSubtitleSourceEl.textContent = (currentHub && currentHub.actual_burn_subtitle_source) || "-";
     if (composeStatusValueEl) composeStatusValueEl.textContent = (currentHub && currentHub.compose_status) || (((currentHub && currentHub.compose) || {}).last || {}).status || "-";
     if (finalExistsValueEl) finalExistsValueEl.textContent = (currentHub && currentHub.final_exists) ? "yes" : "no";
+    const lipsyncEnabled = Boolean(currentHub && currentHub.lipsync_enabled);
+    if (lipsyncStatusValueEl) lipsyncStatusValueEl.textContent = lipsyncEnabled ? "Enhanced path enabled (soft-fail)" : "Off";
+    if (lipsyncHintEl) {
+      lipsyncHintEl.textContent = lipsyncEnabled
+        ? "Enhanced path will run before compose. Stub failures do not block the basic path."
+        : "Enhanced path is off by default.";
+    }
   }
 
   function renderAudio() {
