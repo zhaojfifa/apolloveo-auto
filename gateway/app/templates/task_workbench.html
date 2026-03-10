@@ -311,7 +311,11 @@
           <div class="form-grid">
             <div class="field">
               <label for="voice-id">{{ t("workbench.step.dub.voice") }}</label>
-              <select id="voice-id"></select>
+              <select id="voice-id">
+                <option value="mm_female_1">mm_female_1</option>
+                <option value="mm_male_1">mm_male_1</option>
+                <option value="mm_female_2">mm_female_2</option>
+              </select>
             </div>
             <div class="field">
               <label for="dub-provider">{{ t("workbench.step.dub.engine") }}</label>
@@ -326,24 +330,6 @@
             <span id="dub-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <div id="dub-hint" class="muted" style="margin-top:6px;"></div>
-          <div class="muted" style="margin-top:8px;">
-            <div><strong>Burn Subtitle Source:</strong> <span id="actual-burn-subtitle-source">-</span></div>
-            <div><strong>Requested Voice:</strong> <span id="requested-voice">-</span></div>
-            <div><strong>Actual Provider:</strong> <span id="actual-provider">-</span></div>
-            <div><strong>Resolved Voice:</strong> <span id="resolved-voice">-</span></div>
-          </div>
-          <div class="muted" style="margin-top:8px;">
-            <strong>Dub Warning:</strong>
-            <div id="dub-warning-summary" style="white-space:pre-wrap; margin-top:4px;">-</div>
-          </div>
-        </div>
-        <div class="step-card">
-          <h3>Compose Consistency</h3>
-          <div class="muted" id="compose-consistency" style="white-space:pre-wrap;">-</div>
-        </div>
-        <div class="step-card">
-          <h3>口型同步（增强）</h3>
-          <div class="muted" id="lipsync-placeholder" style="white-space:pre-wrap;">默认关闭</div>
         </div>
         <div class="step-card">
           <h3>{{ t("workbench.step.pack.title") }}</h3>
@@ -580,87 +566,6 @@
           dubHint.textContent = "";
         }
       }
-
-      const burnSourceEl = document.getElementById("actual-burn-subtitle-source");
-      if (burnSourceEl) {
-        burnSourceEl.textContent = data.actual_burn_subtitle_source || "-";
-      }
-      const requestedVoiceEl = document.getElementById("requested-voice");
-      if (requestedVoiceEl) {
-        requestedVoiceEl.textContent = data.requested_voice || "-";
-      }
-      const providerEl = document.getElementById("actual-provider");
-      if (providerEl) {
-        providerEl.textContent = data.actual_provider || "-";
-      }
-      const resolvedVoiceEl = document.getElementById("resolved-voice");
-      if (resolvedVoiceEl) {
-        resolvedVoiceEl.textContent = data.resolved_voice || "-";
-      }
-      const dubWarningEl = document.getElementById("dub-warning-summary");
-      if (dubWarningEl) {
-        const warnings = Array.isArray(data.dub_warnings) ? data.dub_warnings : [];
-        if (!warnings.length) {
-          dubWarningEl.textContent = "-";
-        } else {
-          dubWarningEl.textContent = warnings
-            .map((item) => {
-              const code = item.code || "dub_warning";
-              const message = item.message || "";
-              const provider = item.provider ? `provider=${item.provider}` : "";
-              const voiceId = item.voice_id ? `voice=${item.voice_id}` : "";
-              return [code, message, provider, voiceId].filter(Boolean).join(" | ");
-            })
-            .join("\n");
-        }
-      }
-      const consistencyEl = document.getElementById("compose-consistency");
-      if (consistencyEl) {
-        const composeStatus = data.compose_status || "not_started";
-        const finalExists = data.final_exists === true;
-        const burnSourceReady = !!data.mm_srt_path;
-        consistencyEl.textContent =
-          `compose_status: ${composeStatus}\nfinal_exists: ${finalExists ? "yes" : "no"}\nburn_source_ready: ${burnSourceReady ? "yes" : "no"}`;
-      }
-      const lipsyncEl = document.getElementById("lipsync-placeholder");
-      if (lipsyncEl) {
-        lipsyncEl.textContent = data.lipsync_enabled
-          ? "增强模式已启用（实验）\n增强路线，失败不影响基础成片。"
-          : "默认关闭\n增强路线，当前不默认启用；失败不影响基础成片。";
-      }
-    }
-
-    function renderVoiceOptions(data) {
-      const providerSelect = document.getElementById("dub-provider");
-      const voiceSelect = document.getElementById("voice-id");
-      if (!providerSelect || !voiceSelect) return;
-
-      const provider = providerSelect.value || data.actual_provider || "edge-tts";
-      const optionsByProvider = data.voice_options_by_provider || {};
-      const voiceOptions = Array.isArray(optionsByProvider[provider]) ? optionsByProvider[provider] : [];
-      const requestedVoice = data.requested_voice || "";
-      const resolvedVoice = data.resolved_voice || "";
-
-      voiceSelect.innerHTML = "";
-      if (!voiceOptions.length) {
-        const opt = document.createElement("option");
-        opt.value = "";
-        opt.textContent = "当前 provider 无可用缅语声线";
-        voiceSelect.appendChild(opt);
-        voiceSelect.disabled = true;
-        return;
-      }
-
-      voiceSelect.disabled = false;
-      voiceOptions.forEach((item, index) => {
-        const opt = document.createElement("option");
-        opt.value = item.value || "";
-        opt.textContent = item.label || item.value || "";
-        if ((requestedVoice && requestedVoice === opt.value) || (!requestedVoice && !resolvedVoice && index === 0)) {
-          opt.selected = true;
-        }
-        voiceSelect.appendChild(opt);
-      });
     }
 
     function applyLocalIngestUI() {
@@ -856,7 +761,6 @@
     updateDownloadsFromTask(window.currentTask);
     updateStatusBadge(window.currentTask);
     updateStepStatuses(window.currentTask);
-    renderVoiceOptions(window.currentTask);
     refreshPublishInfo(window.currentTask);
     renderScenesStatus(window.currentTask);
     applyLocalIngestUI();
@@ -880,11 +784,6 @@
         updateDownloadsFromTask(data);
         updateStatusBadge(data);
         updateStepStatuses(data);
-        const providerSelect = document.getElementById("dub-provider");
-        if (providerSelect && data.actual_provider) {
-          providerSelect.value = data.actual_provider;
-        }
-        renderVoiceOptions(data);
         refreshPublishInfo(data);
         renderScenesStatus(data);
         applyLocalIngestUI();
@@ -1029,17 +928,6 @@
       appendLog("Dub audio ready.");
       await refreshTaskState();
     });
-
-    const providerSelect = document.getElementById("dub-provider");
-    if (providerSelect) {
-      if (window.currentTask.actual_provider) {
-        providerSelect.value = window.currentTask.actual_provider;
-      }
-      providerSelect.addEventListener("change", () => {
-        renderVoiceOptions(window.currentTask);
-      });
-    }
-
     document.getElementById("btn-pack").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
       appendLog(`Calling /api/tasks/${taskId}/pack...`);

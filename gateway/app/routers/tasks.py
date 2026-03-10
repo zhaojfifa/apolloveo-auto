@@ -2321,21 +2321,73 @@ def _repo_upsert(repo, task_id: str, patch: dict) -> None:
 
 def _build_hot_follow_voice_options(settings, target_lang: str | None) -> dict[str, list[dict[str, str]]]:
     if normalize_target_lang(target_lang) != "my":
-        return {"edge-tts": [], "lovo": []}
+        return {"edge_tts": [], "lovo": []}
 
-    options: dict[str, list[dict[str, str]]] = {"edge-tts": [], "lovo": []}
+    options: dict[str, list[dict[str, str]]] = {"edge_tts": [], "lovo": []}
     edge_map = getattr(settings, "edge_tts_voice_map", {}) or {}
     if edge_map.get("mm_female_1"):
-        options["edge-tts"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
+        options["edge_tts"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
     if edge_map.get("mm_male_1"):
-        options["edge-tts"].append({"value": "mm_male_1", "label": "缅语男声（标准）"})
+        options["edge_tts"].append({"value": "mm_male_1", "label": "缅语男声（标准）"})
 
     if getattr(settings, "lovo_speaker_mm_female_1", None):
         options["lovo"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
     return options
 
 
-def _resolve_hot_follow_provider_voice(settings, provider: str | None, requested_voice: str | None) -> str | None:
+def _resolve_hot_follow_requested_voice(
+    settings,
+    task: dict,
+    provider: str | None,
+) -> str | None:
+    config = dict(task.get("config") or {})
+    requested = str(config.get("hot_follow_tts_requested_voice") or "").strip() or None
+    if requested:
+        return requested
+
+    provider_norm = normalize_provider(provider)
+    reverse_edge = {
+        str(v).strip(): str(k).strip()
+        for k, v in ((getattr(settings, "edge_tts_voice_map", {}) or {}).items())
+        if str(k).strip() and str(v).strip()
+    }
+    reverse_azure = {
+        str(v).strip(): str(k).strip()
+        for k, v in ((getattr(settings, "azure_tts_voice_map", {}) or {}).items())
+        if str(k).strip() and str(v).strip()
+    }
+    reverse_lovo = {}
+    if getattr(settings, "lovo_speaker_mm_female_1", None):
+        reverse_lovo[str(getattr(settings, "lovo_speaker_mm_female_1")).strip()] = "mm_female_1"
+    if getattr(settings, "lovo_speaker_mm_male_1", None):
+        reverse_lovo[str(getattr(settings, "lovo_speaker_mm_male_1")).strip()] = "mm_male_1"
+
+    for candidate in (task.get("voice_id"), task.get("mm_audio_voice_id")):
+        voice = str(candidate or "").strip() or None
+        if not voice:
+            continue
+        if voice in {"mm_female_1", "mm_male_1", "mm_female_2"}:
+            return voice
+        if provider_norm == "edge-tts" and voice in reverse_edge:
+            return reverse_edge[voice]
+        if provider_norm == "azure-speech" and voice in reverse_azure:
+            return reverse_azure[voice]
+        if provider_norm == "lovo" and voice in reverse_lovo:
+            return reverse_lovo[voice]
+    return None
+
+
+def _resolve_hot_follow_provider_voice(
+    settings,
+    provider: str | None,
+    requested_voice: str | None,
+    *,
+    task: dict | None = None,
+) -> str | None:
+    if isinstance(task, dict):
+        actual_voice = str(task.get("mm_audio_voice_id") or "").strip() or None
+        if actual_voice:
+            return actual_voice
     requested = str(requested_voice or "").strip() or None
     if not requested:
         return None
@@ -2404,6 +2456,37 @@ def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
         if len(warnings) >= 5:
             break
     return warnings
+
+
+def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+    target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    voice_options_by_provider = _build_hot_follow_voice_options(settings, target_lang)
+    actual_provider = normalize_provider(
+        task.get("mm_audio_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None)
+    )
+    requested_voice = _resolve_hot_follow_requested_voice(settings, task, actual_provider)
+    resolved_voice = _resolve_hot_follow_provider_voice(
+        settings,
+        actual_provider,
+        requested_voice,
+        task=task,
+    )
+    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
+    final_exists = bool(final_key and object_exists(str(final_key)))
+    compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
+    actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
+    return {
+        "target_lang": target_lang,
+        "voice_options_by_provider": voice_options_by_provider,
+        "requested_voice": requested_voice,
+        "actual_provider": actual_provider,
+        "resolved_voice": resolved_voice,
+        "dub_warnings": _build_hot_follow_dub_warnings(task),
+        "lipsync_enabled": os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
+        "compose_status": compose_status,
+        "final_exists": final_exists,
+        "actual_burn_subtitle_source": actual_burn_subtitle_source,
+    }
 
 
 def _merge_probe_into_pipeline_config(
@@ -2737,6 +2820,7 @@ async def task_workbench_page(
         return resp
 
     app_settings = get_settings()
+    spec = resolve_workbench_spec(task)
     env_summary = {
         "workspace_root": app_settings.workspace_root,
         "douyin_api_base": getattr(app_settings, "douyin_api_base", ""),
@@ -2755,18 +2839,6 @@ async def task_workbench_page(
 
     paths = _resolve_download_urls(task)
     detail = _task_to_detail(task)
-    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
-    final_exists = bool(final_key and object_exists(str(final_key)))
-    actual_burn_subtitle_source = "mm.srt" if detail.mm_srt_path else None
-    target_lang = normalize_target_lang(task.get("target_lang") or detail.content_lang or "my")
-    voice_options_by_provider = _build_hot_follow_voice_options(app_settings, target_lang)
-    actual_provider = normalize_provider(task.get("dub_provider") or getattr(app_settings, "dub_provider", None))
-    if actual_provider not in voice_options_by_provider:
-        actual_provider = "edge-tts"
-    requested_voice = task.get("voice_id") or None
-    resolved_voice = _resolve_hot_follow_provider_voice(app_settings, actual_provider, requested_voice)
-    dub_warnings = _build_hot_follow_dub_warnings(task)
-    lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     task_json = {
         "task_id": detail.task_id,
         "status": detail.status,
@@ -2796,20 +2868,10 @@ async def task_workbench_page(
         "publish_key": detail.publish_key,
         "publish_url": detail.publish_url,
         "published_at": detail.published_at,
-        "actual_burn_subtitle_source": actual_burn_subtitle_source,
-        "requested_voice": requested_voice,
-        "actual_provider": actual_provider,
-        "resolved_voice": resolved_voice,
-        "target_lang": target_lang,
-        "voice_options_by_provider": voice_options_by_provider,
-        "dub_warnings": dub_warnings,
-        "compose_status": task.get("compose_status"),
-        "final_exists": final_exists,
-        "lipsync_enabled": lipsync_enabled,
     }
+    if spec.kind == "hot_follow":
+        task_json.update(_collect_hot_follow_workbench_ui(task, app_settings))
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
-
-    spec = resolve_workbench_spec(task)
     return render_template(
         request=request,
         name=spec.template,
@@ -3810,6 +3872,7 @@ def get_hot_follow_workbench_hub(
     if _backfill_compose_done_if_final_ready(repo, task_id, task, bool(payload.get("composed_ready"))):
         latest = repo.get(task_id) or task
         payload = compute_hot_follow_state(latest, payload)
+        task = latest
 
     # UI consistency guard: once final is ready, compose-facing fields must all read done.
     final_url = str(
@@ -3862,6 +3925,7 @@ def get_hot_follow_workbench_hub(
 
         payload["composed_ready"] = True
         payload["composed_reason"] = "ready"
+    payload.update(_collect_hot_follow_workbench_ui(task, get_settings()))
     return payload
 
 
@@ -3903,6 +3967,8 @@ def patch_hot_follow_audio_config(
         )
         if not resolved_voice:
             raise HTTPException(status_code=422, detail="TTS_VOICE_MISSING")
+        config["hot_follow_tts_requested_voice"] = requested_voice
+        updates["config"] = config
         updates["voice_id"] = resolved_voice
     if payload.audio_fit_max_speed is not None:
         speed = max(1.0, min(1.6, float(payload.audio_fit_max_speed)))
@@ -5164,6 +5230,12 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     edge_voice = None
     if provider == "edge-tts":
         edge_voice = settings.edge_tts_voice_map.get(final_voice_id, final_voice_id)
+
+    if req_voice_id:
+        config = dict(task.get("config") or {})
+        config["hot_follow_tts_requested_voice"] = req_voice_id
+        _policy_upsert(repo, task_id, {"config": config})
+        task = repo.get(task_id) or task
 
     logger.info(
         "dub: task=%s req_voice_id=%s prev_voice_id=%s final_voice_id=%s edge_voice=%s",
