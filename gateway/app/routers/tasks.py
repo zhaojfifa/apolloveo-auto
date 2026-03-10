@@ -211,8 +211,7 @@ def _compose_in_progress_response(task_id: str) -> JSONResponse:
     )
 
 
-def _maybe_run_hot_follow_lipsync_stub(task_id: str) -> str | None:
-    enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
+def _maybe_run_hot_follow_lipsync_stub(task_id: str, enabled: bool = False) -> str | None:
     if not enabled:
         return None
     soft_fail = os.getenv("HF_LIPSYNC_SOFT_FAIL", "1").strip().lower() not in ("0", "false", "no")
@@ -378,6 +377,7 @@ class ComposePlanPatchRequest(BaseModel):
     target_lang: str | None = None
     freeze_tail_enabled: bool | None = None
     freeze_tail_cap_sec: int | None = None
+    lipsync_enabled: bool | None = None
 
 
 pages_router = APIRouter()
@@ -2333,10 +2333,10 @@ def _build_hot_follow_voice_options(settings, target_lang: str | None) -> dict[s
 
     options: dict[str, list[dict[str, str]]] = {"edge_tts": [], "lovo": []}
     edge_map = getattr(settings, "edge_tts_voice_map", {}) or {}
-    if edge_map.get("mm_female_1"):
-        options["edge_tts"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
     if edge_map.get("mm_male_1"):
         options["edge_tts"].append({"value": "mm_male_1", "label": "缅语男声（标准）"})
+    if edge_map.get("mm_female_1"):
+        options["edge_tts"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
 
     if getattr(settings, "lovo_speaker_mm_female_1", None):
         options["lovo"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
@@ -2386,15 +2386,25 @@ def _resolve_hot_follow_requested_voice(
             return reverse_azure[voice]
         if provider_norm == "lovo" and voice in reverse_lovo:
             return reverse_lovo[voice]
+    target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    if str(task.get("kind") or "").strip().lower() == "hot_follow" and target_lang == "my":
+        return "mm_male_1"
     return None
 
 
 def _voice_state_config(task: dict) -> dict[str, Any]:
     config = dict(task.get("config") or {})
+    task_kind = str(task.get("kind") or "").strip().lower()
+    target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    provider = normalize_provider(config.get("tts_provider") or task.get("dub_provider") or get_settings().dub_provider)
+    if task_kind == "hot_follow" and target_lang == "my" and not str(config.get("tts_provider") or task.get("dub_provider") or "").strip():
+        provider = "edge-tts"
     return {
         "requested_voice": str(config.get("tts_requested_voice") or config.get("hot_follow_tts_requested_voice") or "").strip() or None,
         "resolved_voice": str(config.get("tts_resolved_voice") or "").strip() or None,
-        "provider": normalize_provider(config.get("tts_provider") or task.get("dub_provider") or get_settings().dub_provider),
+        "provider": provider,
+        "request_token": str(config.get("tts_request_token") or "").strip() or None,
+        "completed_token": str(config.get("tts_completed_token") or "").strip() or None,
     }
 
 
@@ -2524,6 +2534,8 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         audio_ready_reason = "provider_mismatch"
     elif resolved_voice != expected_resolved_voice:
         audio_ready_reason = "voice_mismatch"
+    elif config_state.get("request_token") and config_state.get("completed_token") != config_state.get("request_token"):
+        audio_ready_reason = "dub_not_current"
     audio_ready = audio_ready_reason == "ready"
     return {
         "target_lang": target_lang,
@@ -2544,10 +2556,15 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     final_exists = bool(final_key and object_exists(str(final_key)))
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
+    compose_plan = dict(task.get("compose_plan") or {})
+    lipsync_enabled = bool(compose_plan.get("lipsync_enabled"))
+    if "lipsync_enabled" not in compose_plan:
+        lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     return {
         **voice_state,
         "dub_warnings": _build_hot_follow_dub_warnings(task),
-        "lipsync_enabled": os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
+        "lipsync_enabled": lipsync_enabled,
+        "lipsync_status": "enhanced" if lipsync_enabled else "basic",
         "compose_status": compose_status,
         "final_exists": final_exists,
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
@@ -3169,6 +3186,14 @@ def create_hot_follow_task(
         config["tts_requested_voice"] = data["voice_id"]
         config["hot_follow_tts_requested_voice"] = data["voice_id"]
         config["tts_provider"] = data["dub_provider"]
+        resolved_voice, _ = resolve_tts_voice(
+            settings=get_settings(),
+            provider=data["dub_provider"],
+            target_lang="my",
+            requested_voice=data["voice_id"],
+        )
+        if resolved_voice:
+            config["tts_resolved_voice"] = resolved_voice
         data["config"] = config
     normalized = TaskCreate(**data)
     return create_task(normalized, background_tasks=background_tasks, repo=repo)
@@ -3764,6 +3789,7 @@ def get_hot_follow_workbench_hub(
         }
     compose_plan.setdefault("freeze_tail_enabled", False)
     compose_plan.setdefault("freeze_tail_cap_sec", 8)
+    compose_plan.setdefault("lipsync_enabled", os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"))
     compose_plan["compose_policy"] = "freeze_tail" if bool(compose_plan.get("freeze_tail_enabled")) else "match_video"
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
@@ -4041,10 +4067,13 @@ def patch_hot_follow_audio_config(
         updates["dub_provider"] = normalize_provider(provider)
     if payload.tts_voice is not None:
         requested_voice = payload.tts_voice.strip() or None
-        effective_provider = normalize_provider(
-            updates.get("dub_provider") or task.get("dub_provider") or settings.dub_provider
-        )
         target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+        fallback_provider = _voice_state_config(task).get("provider") or task.get("dub_provider") or settings.dub_provider
+        if str(task.get("kind") or "").strip().lower() == "hot_follow" and target_lang == "my" and not str(updates.get("dub_provider") or task.get("dub_provider") or "").strip():
+            fallback_provider = "edge-tts"
+        effective_provider = normalize_provider(
+            updates.get("dub_provider") or fallback_provider
+        )
         resolved_voice, _ = resolve_tts_voice(
             settings=settings,
             provider=effective_provider,
@@ -4095,6 +4124,8 @@ def patch_hot_follow_compose_plan(
         plan["freeze_tail_enabled"] = False
     if "freeze_tail_cap_sec" not in plan:
         plan["freeze_tail_cap_sec"] = 8
+    if "lipsync_enabled" not in plan:
+        plan["lipsync_enabled"] = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     if "compose_policy" not in plan:
         plan["compose_policy"] = "match_video"
     if payload.overlay_subtitles is not None:
@@ -4105,6 +4136,8 @@ def patch_hot_follow_compose_plan(
         plan["freeze_tail_enabled"] = bool(payload.freeze_tail_enabled)
     if payload.freeze_tail_cap_sec is not None:
         plan["freeze_tail_cap_sec"] = max(1, min(30, int(payload.freeze_tail_cap_sec)))
+    if payload.lipsync_enabled is not None:
+        plan["lipsync_enabled"] = bool(payload.lipsync_enabled)
     plan["compose_policy"] = "freeze_tail" if bool(plan.get("freeze_tail_enabled")) else "match_video"
     _policy_upsert(repo, task_id, {"compose_plan": plan})
     return {"task_id": task_id, "compose_plan": plan}
@@ -4688,6 +4721,7 @@ def compose_hot_follow_final_video(
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
         "freeze_tail_enabled": bool(current_plan.get("freeze_tail_enabled", False)),
         "freeze_tail_cap_sec": int(current_plan.get("freeze_tail_cap_sec") or 8),
+        "lipsync_enabled": bool(current_plan.get("lipsync_enabled", os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"))),
         "compose_policy": "freeze_tail" if bool(current_plan.get("freeze_tail_enabled", False)) else "match_video",
     }
     try:
@@ -4709,7 +4743,7 @@ def compose_hot_follow_final_video(
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
         )
-        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(task_id)
+        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(task_id, bool(compose_plan.get("lipsync_enabled")))
         if lipsync_warning:
             _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
         updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
@@ -4847,6 +4881,7 @@ def compose_task(
         "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
         "freeze_tail_enabled": bool(current_plan.get("freeze_tail_enabled", False)),
         "freeze_tail_cap_sec": int(current_plan.get("freeze_tail_cap_sec") or 8),
+        "lipsync_enabled": bool(current_plan.get("lipsync_enabled", os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"))),
         "compose_policy": "freeze_tail" if bool(current_plan.get("freeze_tail_enabled", False)) else "match_video",
     }
     try:
@@ -4868,7 +4903,7 @@ def compose_task(
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
         )
-        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(task_id)
+        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(task_id, bool(compose_plan.get("lipsync_enabled")))
         if lipsync_warning:
             _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
         updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
@@ -5216,6 +5251,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
 
     settings = get_settings()
     target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    task_kind = str(task.get("kind") or "").strip().lower()
     provider_raw = payload.provider
     if not provider_raw:
         pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
@@ -5226,8 +5262,10 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             provider_raw = "lovo"
         elif dub_mode in {"azure", "azure_tts", "azure-speech"}:
             provider_raw = "azure-speech"
+        elif task_kind == "hot_follow" and target_lang == "my":
+            provider_raw = "edge-tts"
         else:
-            provider_raw = getattr(settings, "dub_provider", None) or (
+            provider_raw = task.get("dub_provider") or getattr(settings, "dub_provider", None) or (
                 "lovo" if getattr(settings, "lovo_api_key", None) else "edge-tts"
             )
     if not provider_raw:
@@ -5266,6 +5304,8 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             req_tts_speed = None
     prev_voice_id = task.get("voice_id") if isinstance(task, dict) else getattr(task, "voice_id", None)
     selected_voice_id = req_voice_id or _voice_state_config(task).get("requested_voice") or prev_voice_id
+    if not selected_voice_id and task_kind == "hot_follow" and target_lang == "my":
+        selected_voice_id = "mm_male_1"
     final_voice_id, voice_overridden = resolve_tts_voice(
         settings=settings,
         provider=provider,
@@ -5327,11 +5367,24 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     if provider == "edge-tts":
         edge_voice = settings.edge_tts_voice_map.get(final_voice_id, final_voice_id)
 
+    request_token = datetime.now(timezone.utc).isoformat()
     config = dict(task.get("config") or {})
     config["tts_requested_voice"] = selected_voice_id
     config["hot_follow_tts_requested_voice"] = selected_voice_id
     config["tts_resolved_voice"] = final_voice_id
     config["tts_provider"] = provider
+    config["tts_request_token"] = request_token
+    config["tts_completed_token"] = None
+    for stale_path in (
+        workspace.mm_audio_primary_path,
+        workspace.mm_audio_mp3_path,
+        workspace.mm_audio_legacy_path,
+    ):
+        try:
+            if stale_path.exists():
+                stale_path.unlink()
+        except Exception:
+            logger.warning("DUB3_STALE_AUDIO_CLEANUP_FAIL task=%s path=%s", task_id, stale_path)
     _policy_upsert(
         repo,
         task_id,
@@ -5507,7 +5560,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "dub_error": None,
                     "audio_sha256": audio_sha256,
                     "dub_generated_at": datetime.now(timezone.utc).isoformat(),
-                    "config": config,
+                    "config": {**config, "tts_completed_token": request_token},
                 },
             )
             stored = repo.get(task_id)
@@ -5672,7 +5725,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "dub_error": None,
             "audio_sha256": audio_sha256,
             "dub_generated_at": datetime.now(timezone.utc).isoformat(),
-            "config": config,
+            "config": {**config, "tts_completed_token": request_token},
         },
     )
 

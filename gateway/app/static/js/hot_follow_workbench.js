@@ -97,6 +97,8 @@
   const burnSubtitleSourceEl = document.getElementById("hf_burn_subtitle_source");
   const composeStatusValueEl = document.getElementById("hf_compose_status_value");
   const finalExistsValueEl = document.getElementById("hf_final_exists_value");
+  const lipsyncEnabledEl = document.getElementById("hf_lipsync_enabled");
+  const lipsyncStatusEl = document.getElementById("hf_lipsync_status");
   const lipsyncPlaceholderEl = document.getElementById("hf_lipsync_placeholder");
   const previewAudioEl = new Audio();
 
@@ -339,8 +341,13 @@
   }
 
   function renderLipsyncPlaceholder() {
+    const enabled = Boolean(currentHub && currentHub.lipsync_enabled);
+    if (lipsyncEnabledEl) lipsyncEnabledEl.checked = enabled;
+    if (lipsyncStatusEl) {
+      lipsyncStatusEl.textContent = enabled ? "Enhanced path enabled (soft-fail)" : "Off";
+    }
     if (!lipsyncPlaceholderEl) return;
-    lipsyncPlaceholderEl.textContent = (currentHub && currentHub.lipsync_enabled)
+    lipsyncPlaceholderEl.textContent = enabled
       ? "增强模式已启用（实验）\n增强路线，失败不影响基础成片。"
       : "默认关闭\n增强路线，当前默认不启用；失败不影响基础成片。";
   }
@@ -367,6 +374,7 @@
     const composePlan = (currentHub && currentHub.compose_plan) || {};
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
     if (freezeTailEnabledEl) freezeTailEnabledEl.checked = Boolean(composePlan.freeze_tail_enabled);
+    if (lipsyncEnabledEl) lipsyncEnabledEl.checked = Boolean(composePlan.lipsync_enabled);
   }
 
   function getSelectedTtsSpeed() {
@@ -653,6 +661,16 @@
         await loadHub();
       } catch (e) {
         if (composeMsgEl) composeMsgEl.textContent = e.message || "save freeze-tail failed";
+      }
+    });
+  }
+  if (lipsyncEnabledEl) {
+    lipsyncEnabledEl.addEventListener("change", async () => {
+      try {
+        await patchComposePlan({ lipsync_enabled: !!lipsyncEnabledEl.checked });
+        await loadHub();
+      } catch (e) {
+        if (composeMsgEl) composeMsgEl.textContent = e.message || "save lipsync setting failed";
       }
     });
   }
