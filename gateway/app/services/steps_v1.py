@@ -357,6 +357,19 @@ def _ffmpeg_concat_mp3(inputs: list[Path], output_path: Path) -> None:
         raise DubbingError(f"ffmpeg concat failed: {p.stderr[-800:]}")
 
 
+def _build_atempo_chain(speed: float) -> str:
+    value = max(0.5, float(speed))
+    parts: list[str] = []
+    while value > 2.0 + 1e-9:
+        parts.append("atempo=2.0")
+        value /= 2.0
+    while value < 0.5 - 1e-9:
+        parts.append("atempo=0.5")
+        value /= 0.5
+    parts.append(f"atempo={value:.6f}")
+    return ",".join(parts)
+
+
 def _ffmpeg_atempo(src_path: Path, dst_path: Path, speed: float) -> None:
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
@@ -368,7 +381,7 @@ def _ffmpeg_atempo(src_path: Path, dst_path: Path, speed: float) -> None:
         "-i",
         str(src_path),
         "-filter:a",
-        f"atempo={speed:.6f}",
+        _build_atempo_chain(speed),
         "-c:a",
         "libmp3lame",
         str(dst_path),
@@ -1079,7 +1092,8 @@ async def run_dub_step(req: DubRequest):
                         applied_stretch = max(1.0, cue_duration / budget)
                         if cue_duration > budget:
                             applied_stretch = min(applied_stretch, 1.15)
-                            speed = max(0.5, min(2.0, 1.0 / applied_stretch))
+                            # Over-budget cues must be sped up to fit, not slowed down.
+                            speed = max(1.0, min(2.0, applied_stretch))
                             fitted_path = segment_dir / f"{pos:04d}_fit.mp3"
                             _ffmpeg_atempo(cue_mp3, fitted_path, speed)
                             aligned_segment = fitted_path
