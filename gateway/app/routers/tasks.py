@@ -2335,6 +2335,77 @@ def _build_hot_follow_voice_options(settings, target_lang: str | None) -> dict[s
     return options
 
 
+def _resolve_hot_follow_provider_voice(settings, provider: str | None, requested_voice: str | None) -> str | None:
+    requested = str(requested_voice or "").strip() or None
+    if not requested:
+        return None
+    provider_norm = normalize_provider(provider)
+    if provider_norm == "edge-tts":
+        return (getattr(settings, "edge_tts_voice_map", {}) or {}).get(requested, requested)
+    if provider_norm == "azure-speech":
+        return (getattr(settings, "azure_tts_voice_map", {}) or {}).get(requested, requested)
+    if provider_norm == "lovo":
+        if requested == "mm_female_1":
+            return getattr(settings, "lovo_speaker_mm_female_1", None) or requested
+    return requested
+
+
+def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
+    warnings: list[dict[str, str | None]] = []
+    seen: set[tuple[str, str, str, str]] = set()
+
+    task_dub_error = str(task.get("dub_error") or "").strip()
+    if task_dub_error:
+        warnings.append(
+            {
+                "code": "dub_error",
+                "message": task_dub_error,
+                "provider": str(task.get("dub_provider") or "").strip() or None,
+                "voice_id": str(task.get("voice_id") or "").strip() or None,
+            }
+        )
+
+    events = task.get("events") or []
+    if not isinstance(events, list):
+        return warnings
+
+    for ev in reversed(events):
+        if not isinstance(ev, dict):
+            continue
+        code = str(ev.get("code") or "").strip()
+        message = str(ev.get("message") or "").strip()
+        extra = ev.get("extra") if isinstance(ev.get("extra"), dict) else {}
+        haystack = " ".join(
+            [
+                code,
+                message,
+                str(extra.get("reason") or ""),
+                str(extra.get("stage") or ""),
+            ]
+        ).lower()
+        if not any(token in haystack for token in ("dub", "tts", "fallback", "retry")):
+            continue
+        if not any(token in haystack for token in ("fail", "fallback", "retry", "error", "timeout")):
+            continue
+        provider = str(extra.get("provider") or extra.get("dub_provider") or "").strip()
+        voice_id = str(extra.get("voice_id") or "").strip()
+        key = (code, message, provider, voice_id)
+        if key in seen:
+            continue
+        seen.add(key)
+        warnings.append(
+            {
+                "code": code or "dub_event",
+                "message": message or str(extra.get("reason") or "").strip() or "dub warning",
+                "provider": provider or None,
+                "voice_id": voice_id or None,
+            }
+        )
+        if len(warnings) >= 5:
+            break
+    return warnings
+
+
 def _merge_probe_into_pipeline_config(
     pipeline_config: dict[str, str], probe: dict[str, Any] | None
 ) -> dict[str, str]:
@@ -2692,7 +2763,9 @@ async def task_workbench_page(
     actual_provider = normalize_provider(task.get("dub_provider") or getattr(app_settings, "dub_provider", None))
     if actual_provider not in voice_options_by_provider:
         actual_provider = "edge-tts"
-    resolved_voice = task.get("voice_id") or None
+    requested_voice = task.get("voice_id") or None
+    resolved_voice = _resolve_hot_follow_provider_voice(app_settings, actual_provider, requested_voice)
+    dub_warnings = _build_hot_follow_dub_warnings(task)
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     task_json = {
         "task_id": detail.task_id,
@@ -2724,10 +2797,12 @@ async def task_workbench_page(
         "publish_url": detail.publish_url,
         "published_at": detail.published_at,
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
+        "requested_voice": requested_voice,
         "actual_provider": actual_provider,
         "resolved_voice": resolved_voice,
         "target_lang": target_lang,
         "voice_options_by_provider": voice_options_by_provider,
+        "dub_warnings": dub_warnings,
         "compose_status": task.get("compose_status"),
         "final_exists": final_exists,
         "lipsync_enabled": lipsync_enabled,

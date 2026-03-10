@@ -328,8 +328,13 @@
           <div id="dub-hint" class="muted" style="margin-top:6px;"></div>
           <div class="muted" style="margin-top:8px;">
             <div><strong>Burn Subtitle Source:</strong> <span id="actual-burn-subtitle-source">-</span></div>
+            <div><strong>Requested Voice:</strong> <span id="requested-voice">-</span></div>
             <div><strong>Actual Provider:</strong> <span id="actual-provider">-</span></div>
             <div><strong>Resolved Voice:</strong> <span id="resolved-voice">-</span></div>
+          </div>
+          <div class="muted" style="margin-top:8px;">
+            <strong>Dub Warning:</strong>
+            <div id="dub-warning-summary" style="white-space:pre-wrap; margin-top:4px;">-</div>
           </div>
         </div>
         <div class="step-card">
@@ -580,6 +585,10 @@
       if (burnSourceEl) {
         burnSourceEl.textContent = data.actual_burn_subtitle_source || "-";
       }
+      const requestedVoiceEl = document.getElementById("requested-voice");
+      if (requestedVoiceEl) {
+        requestedVoiceEl.textContent = data.requested_voice || "-";
+      }
       const providerEl = document.getElementById("actual-provider");
       if (providerEl) {
         providerEl.textContent = data.actual_provider || "-";
@@ -587,6 +596,23 @@
       const resolvedVoiceEl = document.getElementById("resolved-voice");
       if (resolvedVoiceEl) {
         resolvedVoiceEl.textContent = data.resolved_voice || "-";
+      }
+      const dubWarningEl = document.getElementById("dub-warning-summary");
+      if (dubWarningEl) {
+        const warnings = Array.isArray(data.dub_warnings) ? data.dub_warnings : [];
+        if (!warnings.length) {
+          dubWarningEl.textContent = "-";
+        } else {
+          dubWarningEl.textContent = warnings
+            .map((item) => {
+              const code = item.code || "dub_warning";
+              const message = item.message || "";
+              const provider = item.provider ? `provider=${item.provider}` : "";
+              const voiceId = item.voice_id ? `voice=${item.voice_id}` : "";
+              return [code, message, provider, voiceId].filter(Boolean).join(" | ");
+            })
+            .join("\n");
+        }
       }
       const consistencyEl = document.getElementById("compose-consistency");
       if (consistencyEl) {
@@ -612,6 +638,7 @@
       const provider = providerSelect.value || data.actual_provider || "edge-tts";
       const optionsByProvider = data.voice_options_by_provider || {};
       const voiceOptions = Array.isArray(optionsByProvider[provider]) ? optionsByProvider[provider] : [];
+      const requestedVoice = data.requested_voice || "";
       const resolvedVoice = data.resolved_voice || "";
 
       voiceSelect.innerHTML = "";
@@ -629,7 +656,7 @@
         const opt = document.createElement("option");
         opt.value = item.value || "";
         opt.textContent = item.label || item.value || "";
-        if ((resolvedVoice && resolvedVoice === opt.value) || (!resolvedVoice && index === 0)) {
+        if ((requestedVoice && requestedVoice === opt.value) || (!requestedVoice && !resolvedVoice && index === 0)) {
           opt.selected = true;
         }
         voiceSelect.appendChild(opt);
