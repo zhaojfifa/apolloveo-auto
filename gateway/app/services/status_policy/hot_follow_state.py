@@ -143,29 +143,6 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
             )
         state["deliverables"] = patched
 
-    compose = dict(_as_dict(state.get("compose")))
-    last = dict(_as_dict(compose.get("last")))
-    if final_exists:
-        last["status"] = "done"
-        last["error"] = None
-        state["compose_status"] = "done"
-    if last:
-        compose["last"] = last
-    state["compose"] = compose
-
-    # Reconcile compose step from final asset evidence for hub consumers.
-    pipeline = list(_as_list(state.get("pipeline")))
-    if final_exists and pipeline:
-        for step in pipeline:
-            if not isinstance(step, dict):
-                continue
-            if str(step.get("key") or "").strip().lower() == "compose":
-                step["status"] = "done"
-                step["state"] = "done"
-                step["error"] = None
-                step["message"] = step.get("message") or "final video merge"
-    state["pipeline"] = pipeline
-
     audio = _as_dict(state.get("audio"))
     audio_status = str(
         audio.get("status")
@@ -181,10 +158,37 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
     )
     tts_voice = str(audio.get("tts_voice") or task.get("voice_id") or "").strip()
     tts_voice_valid = bool(tts_voice and tts_voice not in {"-", "none", "null"})
-    audio_ready = bool(audio_done and voiceover_exists and tts_voice_valid)
+    audio_ready_hint = audio.get("audio_ready")
+    if audio_ready_hint is None:
+        audio_ready = bool(audio_done and voiceover_exists and tts_voice_valid)
+    else:
+        audio_ready = bool(audio_ready_hint)
+    compose_ready = bool(final_exists and audio_ready)
+
+    compose = dict(_as_dict(state.get("compose")))
+    last = dict(_as_dict(compose.get("last")))
+    if compose_ready:
+        last["status"] = "done"
+        last["error"] = None
+        state["compose_status"] = "done"
+    if last:
+        compose["last"] = last
+    state["compose"] = compose
+
+    pipeline = list(_as_list(state.get("pipeline")))
+    if compose_ready and pipeline:
+        for step in pipeline:
+            if not isinstance(step, dict):
+                continue
+            if str(step.get("key") or "").strip().lower() == "compose":
+                step["status"] = "done"
+                step["state"] = "done"
+                step["error"] = None
+                step["message"] = step.get("message") or "final video merge"
+    state["pipeline"] = pipeline
 
     blocking: list[str] = []
-    if not final_exists:
+    if not compose_ready:
         blocking.append("compose_not_done")
         if not audio_done:
             blocking.append("audio_not_done")
@@ -192,16 +196,26 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
             blocking.append("voiceover_missing")
         if not tts_voice_valid:
             blocking.append("tts_voice_invalid")
+        if final_exists and not audio_ready:
+            blocking.append("audio_not_ready")
     else:
         blocking = [b for b in blocking if b != "compose_not_done"]
 
-    state["composed_ready"] = final_exists
-    state["composed_reason"] = "ready" if final_exists else "not_ready"
+    state["composed_ready"] = compose_ready
+    state["composed_reason"] = "ready" if compose_ready else "not_ready"
+    if isinstance(state.get("deliverables"), list):
+        for item in state.get("deliverables") or []:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("kind") or "").strip().lower() == "final":
+                item["status"] = "done" if compose_ready else "pending"
+                item["state"] = "done" if compose_ready else "pending"
+                break
     state["ready_gate"] = {
         "final_exists": final_exists,
         "audio_ready": audio_ready,
-        "compose_ready": final_exists,
-        "publish_ready": final_exists,
+        "compose_ready": compose_ready,
+        "publish_ready": compose_ready,
         "blocking": blocking,
     }
     return state

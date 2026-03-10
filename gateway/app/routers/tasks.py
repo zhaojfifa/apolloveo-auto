@@ -1377,18 +1377,26 @@ def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     raw_exists = bool(raw_key and object_exists(str(raw_key)))
     voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
     voice_exists = bool(voice_key and object_exists(str(voice_key)))
+    voice_state = _collect_voice_execution_state(task, get_settings())
     compose_status = str(task.get("compose_status") or "").lower()
     compose_last_status = str(task.get("compose_last_status") or compose_status).lower()
     compose_done = compose_last_status in {"done", "ready", "success", "completed"}
     compose_error_reason, compose_error_message = _compose_error_parts(task)
 
-    composed_ready = bool(final_exists and compose_done and compose_error_reason is None)
+    composed_ready = bool(
+        final_exists
+        and compose_done
+        and compose_error_reason is None
+        and bool(voice_state.get("audio_ready"))
+    )
     if composed_ready:
         composed_reason = "ready"
     elif not raw_exists:
         composed_reason = "missing_raw"
     elif not voice_exists:
         composed_reason = "missing_voiceover"
+    elif not voice_state.get("audio_ready"):
+        composed_reason = str(voice_state.get("audio_ready_reason") or "audio_not_ready")
     elif compose_status in {"running", "processing", "queued"}:
         composed_reason = "compose_in_progress"
     elif compose_error_reason in {"subtitles_missing", "font_missing"}:
@@ -1416,6 +1424,8 @@ def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         "compose_error_message": compose_error_message,
         "raw_exists": raw_exists,
         "voice_exists": voice_exists,
+        "audio_ready": bool(voice_state.get("audio_ready")),
+        "audio_ready_reason": voice_state.get("audio_ready_reason"),
     }
 
 
@@ -1773,12 +1783,17 @@ def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
         return status, summary
     if step == "audio":
         status = _hf_state_from_status(task.get("dub_status"))
-        if status == "pending" and (task.get("mm_audio_key") or task.get("mm_audio_path")):
+        voice_state = _collect_voice_execution_state(task, get_settings())
+        if status == "pending" and voice_state.get("audio_ready"):
             status = "done"
         if status == "pending" and task_status == "processing" and last_step == "dub":
             status = "running"
         audio_cfg = _hf_audio_config(task)
-        summary = f"dub_provider={normalize_provider(task.get('dub_provider') or get_settings().dub_provider)} voice={audio_cfg.get('tts_voice') or 'missing'}"
+        summary = (
+            f"dub_provider={voice_state.get('actual_provider') or normalize_provider(task.get('dub_provider') or get_settings().dub_provider)} "
+            f"voice={voice_state.get('resolved_voice') or audio_cfg.get('tts_voice') or 'missing'} "
+            f"audio_ready={'yes' if voice_state.get('audio_ready') else 'no'}"
+        )
         return status, summary
     if step == "pack":
         status = _hf_state_from_status(task.get("pack_status"))
@@ -2399,6 +2414,8 @@ def _resolve_hot_follow_provider_voice(
     if provider_norm == "lovo":
         if requested == "mm_female_1":
             return getattr(settings, "lovo_speaker_mm_female_1", None) or requested
+        if requested == "mm_male_1":
+            return getattr(settings, "lovo_speaker_mm_male_1", None) or requested
     return requested
 
 
@@ -2458,29 +2475,66 @@ def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
     return warnings
 
 
-def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     voice_options_by_provider = _build_hot_follow_voice_options(settings, target_lang)
-    actual_provider = normalize_provider(
-        task.get("mm_audio_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None)
+    expected_provider = normalize_provider(task.get("dub_provider") or getattr(settings, "dub_provider", None))
+    actual_provider = normalize_provider(task.get("mm_audio_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
+    requested_voice = _resolve_hot_follow_requested_voice(settings, task, expected_provider)
+    expected_resolved_voice, _ = resolve_tts_voice(
+        settings=settings,
+        provider=expected_provider,
+        target_lang=target_lang,
+        requested_voice=requested_voice or task.get("voice_id"),
     )
-    requested_voice = _resolve_hot_follow_requested_voice(settings, task, actual_provider)
     resolved_voice = _resolve_hot_follow_provider_voice(
         settings,
         actual_provider,
         requested_voice,
         task=task,
     )
-    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
-    final_exists = bool(final_key and object_exists(str(final_key)))
-    compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
-    actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
+    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
+    audio_exists = bool(audio_key and object_exists(str(audio_key)))
+    dub_status = str(task.get("dub_status") or "").strip().lower()
+    dub_running = dub_status in {"queued", "running", "processing"}
+    dub_done = dub_status in {"ready", "done", "success", "completed", "skipped"}
+    audio_ready_reason = "ready"
+    if dub_running:
+        audio_ready_reason = "dub_running"
+    elif not audio_exists:
+        audio_ready_reason = "audio_missing"
+    elif not dub_done:
+        audio_ready_reason = "dub_not_done"
+    elif not expected_resolved_voice:
+        audio_ready_reason = "voice_unresolved"
+    elif not resolved_voice:
+        audio_ready_reason = "resolved_voice_missing"
+    elif normalize_provider(actual_provider) != normalize_provider(expected_provider):
+        audio_ready_reason = "provider_mismatch"
+    elif resolved_voice != expected_resolved_voice:
+        audio_ready_reason = "voice_mismatch"
+    audio_ready = audio_ready_reason == "ready"
     return {
         "target_lang": target_lang,
         "voice_options_by_provider": voice_options_by_provider,
         "requested_voice": requested_voice,
         "actual_provider": actual_provider,
         "resolved_voice": resolved_voice,
+        "expected_provider": expected_provider,
+        "expected_resolved_voice": expected_resolved_voice,
+        "audio_ready": audio_ready,
+        "audio_ready_reason": audio_ready_reason,
+    }
+
+
+def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+    voice_state = _collect_voice_execution_state(task, settings)
+    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
+    final_exists = bool(final_key and object_exists(str(final_key)))
+    compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
+    actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
+    return {
+        **voice_state,
         "dub_warnings": _build_hot_follow_dub_warnings(task),
         "lipsync_enabled": os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
         "compose_status": compose_status,
@@ -2869,6 +2923,7 @@ async def task_workbench_page(
         "publish_url": detail.publish_url,
         "published_at": detail.published_at,
     }
+    task_json.update(_collect_voice_execution_state(task, app_settings))
     if spec.kind == "hot_follow":
         task_json.update(_collect_hot_follow_workbench_ui(task, app_settings))
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
@@ -3709,6 +3764,7 @@ def get_hot_follow_workbench_hub(
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
     audio_cfg = _hf_audio_config(task)
+    voice_state = _collect_voice_execution_state(task, get_settings())
     target_lang_internal = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     text_guard = clean_and_analyze_dub_text(subtitles_text or "", target_lang_internal)
     audio_warning = str(text_guard.get("warning") or "").strip() or None
@@ -3792,6 +3848,10 @@ def get_hot_follow_workbench_hub(
             "error": task.get("dub_error"),
             "warning": audio_warning,
             "sha256": task.get("audio_sha256"),
+            "audio_ready": bool(voice_state.get("audio_ready")),
+            "requested_voice": voice_state.get("requested_voice"),
+            "actual_provider": voice_state.get("actual_provider"),
+            "resolved_voice": voice_state.get("resolved_voice"),
         },
         "scenes": {
             "status": scenes_status,
@@ -3833,7 +3893,7 @@ def get_hot_follow_workbench_hub(
     payload["final_url"] = final_url
     payload["final_video_url"] = final_url
     final_exists = bool((payload.get("final") or {}).get("exists"))
-    composed_ready = bool(final_url or final_exists)
+    composed_ready = bool(composed_ready)
     payload["composed_ready"] = composed_ready
     payload["composed_reason"] = "ready" if composed_ready else "not_ready"
     if isinstance(payload.get("deliverables"), list):
@@ -3845,6 +3905,9 @@ def get_hot_follow_workbench_hub(
                 if composed_ready:
                     item["status"] = "done"
                     item["state"] = "done"
+                else:
+                    item["status"] = "pending"
+                    item["state"] = "pending"
                 break
 
     payload["task"] = {
@@ -3881,7 +3944,7 @@ def get_hot_follow_workbench_hub(
         or ""
     ).strip()
     final_exists = bool((payload.get("final") or {}).get("exists"))
-    composed_ready = bool(final_url or final_exists)
+    composed_ready = bool((payload.get("ready_gate") or {}).get("compose_ready"))
     if composed_ready:
         pipeline = payload.get("pipeline")
         if isinstance(pipeline, list):
@@ -4109,6 +4172,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             _compose_fail("compose_failed", "overlay_subtitles enabled but ffmpeg cmd missing subtitles filter", ffmpeg_cmd=cmd_text)
 
     storage = get_storage_service()
+    voice_state = _collect_voice_execution_state(task, get_settings())
     video_key = (
         _task_key(task, "mute_video_key")
         or _task_key(task, "mute_video_path")
@@ -4119,6 +4183,11 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         _compose_fail("missing_raw", "missing video source for compose")
     if not audio_key:
         _compose_fail("missing_voiceover", "missing voiceover audio for compose")
+    if not bool(voice_state.get("audio_ready")):
+        _compose_fail(
+            "missing_voiceover",
+            f"voiceover audio not ready: {voice_state.get('audio_ready_reason') or 'audio_not_ready'}",
+        )
     try:
         assert_artifact_ready(
             kind="video",
