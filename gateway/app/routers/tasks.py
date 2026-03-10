@@ -211,6 +211,21 @@ def _compose_in_progress_response(task_id: str) -> JSONResponse:
     )
 
 
+def _maybe_run_hot_follow_lipsync_stub(task_id: str) -> str | None:
+    enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
+    if not enabled:
+        return None
+    soft_fail = os.getenv("HF_LIPSYNC_SOFT_FAIL", "1").strip().lower() not in ("0", "false", "no")
+    message = "Lipsync stub enabled, but no provider is wired in v1.9; continuing basic compose."
+    if soft_fail:
+        logger.warning("HF_LIPSYNC_STUB_SOFT_FAIL task=%s message=%s", task_id, message)
+        return message
+    raise HTTPException(
+        status_code=409,
+        detail={"reason": "lipsync_stub_blocked", "message": message},
+    )
+
+
 def _build_atempo_chain(speed: float) -> str:
     try:
         value = float(speed)
@@ -2653,6 +2668,11 @@ async def task_workbench_page(
 
     paths = _resolve_download_urls(task)
     detail = _task_to_detail(task)
+    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
+    final_exists = bool(final_key and object_exists(str(final_key)))
+    actual_burn_subtitle_source = "mm.srt" if detail.mm_srt_path else None
+    actual_provider = task.get("dub_provider") or None
+    resolved_voice = task.get("voice_id") or None
     task_json = {
         "task_id": detail.task_id,
         "status": detail.status,
@@ -2682,6 +2702,11 @@ async def task_workbench_page(
         "publish_key": detail.publish_key,
         "publish_url": detail.publish_url,
         "published_at": detail.published_at,
+        "actual_burn_subtitle_source": actual_burn_subtitle_source,
+        "actual_provider": actual_provider,
+        "resolved_voice": resolved_voice,
+        "compose_status": task.get("compose_status"),
+        "final_exists": final_exists,
     }
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
 
@@ -4080,6 +4105,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 fontsdir = bundled_fonts_dir
                 subtitle_filter = (
                     f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
+                    "charenc=UTF-8:"
                     f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
@@ -4152,6 +4178,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 fontsdir = bundled_fonts_dir
                 subtitle_filter = (
                     f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
+                    "charenc=UTF-8:"
                     f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
@@ -4422,7 +4449,13 @@ def compose_hot_follow_final_video(
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
         )
+        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(task_id)
+        if lipsync_warning:
+            _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
         updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
+        if lipsync_warning:
+            current_warning = str(updates.get("compose_warning") or "").strip()
+            updates["compose_warning"] = f"{current_warning} {lipsync_warning}".strip() if current_warning else lipsync_warning
         _policy_upsert(repo, task_id, updates)
         latest = repo.get(task_id) or task
         return {
@@ -4575,7 +4608,13 @@ def compose_task(
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
         )
+        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(task_id)
+        if lipsync_warning:
+            _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
         updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
+        if lipsync_warning:
+            current_warning = str(updates.get("compose_warning") or "").strip()
+            updates["compose_warning"] = f"{current_warning} {lipsync_warning}".strip() if current_warning else lipsync_warning
         _policy_upsert(repo, task_id, updates)
         latest = repo.get(task_id) or task
         resolved_key = _task_key(latest, "final_video_key") or _task_key(latest, "final_video_path")
@@ -4974,6 +5013,20 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     )
     if not final_voice_id:
         raise HTTPException(status_code=422, detail="TTS_VOICE_MISSING")
+    if provider == "lovo":
+        supported_voices = ["mm_female_1"]
+        resolved_voice_norm = str(final_voice_id or "").strip()
+        if resolved_voice_norm not in supported_voices:
+            raise HTTPException(
+                status_code=422,
+                detail={
+                    "reason": "unsupported_voice_provider_combo",
+                    "provider": provider,
+                    "requested_voice": req_voice_id or prev_voice_id,
+                    "resolved_voice": final_voice_id,
+                    "supported_voices": supported_voices,
+                },
+            )
     if voice_overridden:
         logger.warning(
             "DUB_VOICE_OVERRIDE task=%s target_lang=%s requested=%s resolved=%s provider=%s",

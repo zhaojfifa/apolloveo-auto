@@ -330,6 +330,15 @@
             <span id="dub-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <div id="dub-hint" class="muted" style="margin-top:6px;"></div>
+          <div class="muted" style="margin-top:8px;">
+            <div><strong>Burn Subtitle Source:</strong> <span id="actual-burn-subtitle-source">-</span></div>
+            <div><strong>Actual Provider:</strong> <span id="actual-provider">-</span></div>
+            <div><strong>Resolved Voice:</strong> <span id="resolved-voice">-</span></div>
+          </div>
+        </div>
+        <div class="step-card">
+          <h3>Compose Consistency</h3>
+          <div class="muted" id="compose-consistency" style="white-space:pre-wrap;">-</div>
         </div>
         <div class="step-card">
           <h3>{{ t("workbench.step.pack.title") }}</h3>
@@ -377,7 +386,7 @@
               </div>
               <div>
                 <div class="copy-row" style="justify-content:space-between;">
-                  <label style="margin:0;">{{ t("workbench.compare.mm") }}</label>
+                  <label style="margin:0;">Burn Subtitle Preview</label>
                   <button type="button" id="btn-copy-mm" class="copy-btn">{{ t("action.copy") }}</button>
                 </div>
                 <pre id="mm-text" class="output"></pre>
@@ -565,6 +574,27 @@
         } else {
           dubHint.textContent = "";
         }
+      }
+
+      const burnSourceEl = document.getElementById("actual-burn-subtitle-source");
+      if (burnSourceEl) {
+        burnSourceEl.textContent = data.actual_burn_subtitle_source || "-";
+      }
+      const providerEl = document.getElementById("actual-provider");
+      if (providerEl) {
+        providerEl.textContent = data.actual_provider || "-";
+      }
+      const resolvedVoiceEl = document.getElementById("resolved-voice");
+      if (resolvedVoiceEl) {
+        resolvedVoiceEl.textContent = data.resolved_voice || "-";
+      }
+      const consistencyEl = document.getElementById("compose-consistency");
+      if (consistencyEl) {
+        const composeStatus = data.compose_status || "not_started";
+        const finalExists = data.final_exists === true;
+        const burnSourceReady = !!data.mm_srt_path;
+        consistencyEl.textContent =
+          `compose_status: ${composeStatus}\nfinal_exists: ${finalExists ? "yes" : "no"}\nburn_source_ready: ${burnSourceReady ? "yes" : "no"}`;
       }
     }
 
@@ -1048,6 +1078,7 @@
       if (statusEl) statusEl.textContent = "Loading...";
 
       const originUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=origin_srt`;
+      const mmSrtUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_srt`;
       const mmTxtUrl = `/api/tasks/${encodeURIComponent(taskId)}/text?kind=mm_txt`;
 
       const originText = await fetchTextOrFallback(
@@ -1055,18 +1086,22 @@
         "Unable to load origin subtitles in-browser (possible CORS redirect). Use Downloads -> origin.srt."
       );
       const mmText = await fetchTextOrFallback(
+        mmSrtUrl,
+        "Unable to load burn subtitles in-browser (possible CORS redirect). Use Downloads -> mm.srt."
+      );
+      const mmTxtText = await fetchTextOrFallback(
         mmTxtUrl,
         "Unable to load mm text in-browser (possible CORS redirect). Use Downloads -> mm.txt."
       );
       originPre.textContent = originText || "";
       mmPre.textContent = mmText || "";
-      if (publishText && !publishText.value) publishText.value = mmText || "";
-      const mmTextTrimmed = (mmText || "").trim();
+      if (publishText && !publishText.value) publishText.value = mmTxtText || "";
+      const mmTextTrimmed = (mmTxtText || "").trim();
       const mmTextAvailable =
         mmTextTrimmed &&
         !mmTextTrimmed.startsWith("Unable to load") &&
         !mmTextTrimmed.startsWith("Failed to load");
-      latestMmText = mmTextAvailable ? mmText : "";
+      latestMmText = mmTextAvailable ? mmTxtText : "";
       originPre.setAttribute("data-loaded", "1");
 
       try {
