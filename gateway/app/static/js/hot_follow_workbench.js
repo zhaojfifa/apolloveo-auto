@@ -109,6 +109,8 @@
   let pollTimer = null;
   let composeSubmitting = false;
   let subtitlesChangedSinceDub = false;
+  let pendingVoiceSelection = null;
+  let pendingEngineSelection = null;
 
   function escapeHtml(s) {
     return String(s || "")
@@ -281,10 +283,20 @@
 
   function renderVoiceOptions(selectedProvider) {
     if (!ttsVoiceEl) return;
-    const providerKey = normalizeEngineKey(selectedProvider || (ttsEngineEl && ttsEngineEl.value) || "edge_tts");
+    let providerKey = normalizeEngineKey(selectedProvider || pendingEngineSelection || (ttsEngineEl && ttsEngineEl.value) || "edge_tts");
     const optionsByProvider = (currentHub && currentHub.voice_options_by_provider) || ((window.__TASK_JSON__ || {}).voice_options_by_provider) || {};
-    const options = Array.isArray(optionsByProvider[providerKey]) ? optionsByProvider[providerKey] : [];
-    const requestedVoice = ((currentHub && currentHub.requested_voice) || (window.__TASK_JSON__ || {}).requested_voice || "").trim();
+    let options = Array.isArray(optionsByProvider[providerKey]) ? optionsByProvider[providerKey] : [];
+    if (!options.length && providerKey !== "edge_tts") {
+      providerKey = "edge_tts";
+      options = Array.isArray(optionsByProvider[providerKey]) ? optionsByProvider[providerKey] : [];
+      if (ttsEngineEl) ttsEngineEl.value = providerKey;
+    }
+    const requestedVoice = String(
+      pendingVoiceSelection
+      || (currentHub && currentHub.requested_voice)
+      || (window.__TASK_JSON__ || {}).requested_voice
+      || ""
+    ).trim();
     ttsVoiceEl.innerHTML = "";
     if (!options.length) {
       const opt = document.createElement("option");
@@ -309,6 +321,7 @@
       ttsVoiceEl.appendChild(opt);
     });
     if (!matched && ttsVoiceEl.options.length) ttsVoiceEl.options[0].selected = true;
+    if (ttsVoiceEl.value) pendingVoiceSelection = ttsVoiceEl.value;
   }
 
   function renderVoiceMeta() {
@@ -356,8 +369,12 @@
     const audio = (currentHub && currentHub.audio) || {};
     const media = (currentHub && currentHub.media) || {};
     const voiceUrl = media.voiceover_url || audio.voiceover_url || audio.audio_url || null;
-    if (ttsEngineEl && audio.tts_engine) ttsEngineEl.value = audio.tts_engine;
-    renderVoiceOptions(audio.tts_engine);
+    const engine = normalizeEngineKey((currentHub && currentHub.actual_provider) || audio.tts_engine || pendingEngineSelection || "edge_tts");
+    if (ttsEngineEl) ttsEngineEl.value = engine === "azure_speech" ? "edge_tts" : engine;
+    if ((currentHub && currentHub.requested_voice) && pendingVoiceSelection === (currentHub && currentHub.requested_voice)) {
+      pendingVoiceSelection = null;
+    }
+    renderVoiceOptions(ttsEngineEl ? ttsEngineEl.value : engine);
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
     const capRaw = Number(audio.audio_fit_max_speed);
     const cap = Number.isFinite(capRaw) ? capRaw : 1.25;
@@ -683,6 +700,8 @@
 
   if (ttsEngineEl) {
     ttsEngineEl.addEventListener("change", async () => {
+      pendingEngineSelection = ttsEngineEl.value;
+      pendingVoiceSelection = null;
       renderVoiceOptions(ttsEngineEl.value);
       try { await patchAudioConfig({ tts_engine: ttsEngineEl.value }); await loadHub(); }
       catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
@@ -690,6 +709,7 @@
   }
   if (ttsVoiceEl) {
     ttsVoiceEl.addEventListener("change", async () => {
+      pendingVoiceSelection = ttsVoiceEl.value || null;
       try { await patchAudioConfig({ tts_voice: ttsVoiceEl.value }); await loadHub(); }
       catch (e) { if (audioMsgEl) audioMsgEl.textContent = e.message || "save failed"; }
     });
@@ -727,6 +747,8 @@
     rerunAudioBtn.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
+        pendingEngineSelection = ttsEngineEl ? ttsEngineEl.value : null;
+        pendingVoiceSelection = ttsVoiceEl ? ttsVoiceEl.value : null;
         if (audioMsgEl) audioMsgEl.textContent = "Rerunning audio...";
         await patchAudioConfig({
           tts_engine: ttsEngineEl ? ttsEngineEl.value : null,

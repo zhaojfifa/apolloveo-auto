@@ -5314,6 +5314,13 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     )
     if not final_voice_id:
         raise HTTPException(status_code=422, detail="TTS_VOICE_MISSING")
+    logger.info(
+        "HF_DUB_REQUEST task=%s provider=%s requested_voice=%s resolved_voice=%s",
+        task_id,
+        provider,
+        selected_voice_id,
+        final_voice_id,
+    )
     if provider == "lovo":
         supported_voices = ["mm_female_1"]
         resolved_voice_norm = str(final_voice_id or "").strip()
