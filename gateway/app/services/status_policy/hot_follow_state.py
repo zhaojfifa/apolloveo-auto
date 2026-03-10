@@ -149,7 +149,7 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         or task.get("dub_status")
         or ""
     ).strip().lower()
-    audio_done = audio_status in {"done", "ready", "success", "completed", "skipped"}
+    audio_done = audio_status in {"done", "ready", "success", "completed"}
     voiceover_exists = bool(
         audio.get("voiceover_url")
         or _as_dict(state.get("media")).get("voiceover_url")

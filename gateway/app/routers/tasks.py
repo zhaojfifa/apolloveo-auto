@@ -745,9 +745,8 @@ def _resolve_audio_meta(task_id: str, repo) -> tuple[str, int, str]:
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="dubbed audio not found")
-    preferred = _task_value(task, "mm_audio_key")
-    fallback = deliver_key(task_id, "audio_mm.mp3")
-    candidates = [str(k) for k in [preferred, fallback] if k]
+    preferred = _task_value(task, "mm_audio_key") or _task_value(task, "mm_audio_path")
+    candidates = [str(k) for k in [preferred] if k]
     seen = set()
     chosen_key = None
     chosen_size = 0
@@ -1375,7 +1374,7 @@ def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     final_exists = bool(final_key and object_exists(str(final_key)) and int(final_size or 0) > 0)
     raw_key = _task_key(task, "raw_path")
     raw_exists = bool(raw_key and object_exists(str(raw_key)))
-    voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
+    voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     voice_exists = bool(voice_key and object_exists(str(voice_key)))
     voice_state = _collect_voice_execution_state(task, get_settings())
     compose_status = str(task.get("compose_status") or "").lower()
@@ -1694,21 +1693,15 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
     except Exception:
         audio_fit_max_speed = 1.25
     audio_fit_max_speed = max(1.0, min(1.6, audio_fit_max_speed))
-    voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
+    voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     meta = object_head(str(voice_key)) if voice_key else None
     size, _ = media_meta_from_head(meta)
     voice_url = f"/v1/tasks/{task_id}/audio_mm" if task_id and size >= MIN_AUDIO_BYTES else None
-    provider = normalize_provider(task.get("dub_provider") or getattr(settings, "dub_provider", None))
-    target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
-    resolved_voice, _ = resolve_tts_voice(
-        settings=settings,
-        provider=provider,
-        target_lang=target_lang,
-        requested_voice=task.get("voice_id"),
-    )
+    voice_state = _collect_voice_execution_state(task, settings)
+    provider = normalize_provider(voice_state.get("expected_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
     return {
         "tts_engine": _hf_engine_public(provider),
-        "tts_voice": resolved_voice,
+        "tts_voice": voice_state.get("resolved_voice"),
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
@@ -2356,7 +2349,11 @@ def _resolve_hot_follow_requested_voice(
     provider: str | None,
 ) -> str | None:
     config = dict(task.get("config") or {})
-    requested = str(config.get("hot_follow_tts_requested_voice") or "").strip() or None
+    requested = str(
+        config.get("tts_requested_voice")
+        or config.get("hot_follow_tts_requested_voice")
+        or ""
+    ).strip() or None
     if requested:
         return requested
 
@@ -2390,6 +2387,15 @@ def _resolve_hot_follow_requested_voice(
         if provider_norm == "lovo" and voice in reverse_lovo:
             return reverse_lovo[voice]
     return None
+
+
+def _voice_state_config(task: dict) -> dict[str, Any]:
+    config = dict(task.get("config") or {})
+    return {
+        "requested_voice": str(config.get("tts_requested_voice") or config.get("hot_follow_tts_requested_voice") or "").strip() or None,
+        "resolved_voice": str(config.get("tts_resolved_voice") or "").strip() or None,
+        "provider": normalize_provider(config.get("tts_provider") or task.get("dub_provider") or get_settings().dub_provider),
+    }
 
 
 def _resolve_hot_follow_provider_voice(
@@ -2478,26 +2484,31 @@ def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
 def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     voice_options_by_provider = _build_hot_follow_voice_options(settings, target_lang)
-    expected_provider = normalize_provider(task.get("dub_provider") or getattr(settings, "dub_provider", None))
-    actual_provider = normalize_provider(task.get("mm_audio_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
-    requested_voice = _resolve_hot_follow_requested_voice(settings, task, expected_provider)
+    config_state = _voice_state_config(task)
+    expected_provider = normalize_provider(config_state.get("provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
+    actual_provider = normalize_provider(task.get("mm_audio_provider") or expected_provider)
+    requested_voice = config_state.get("requested_voice") or _resolve_hot_follow_requested_voice(settings, task, expected_provider)
     expected_resolved_voice, _ = resolve_tts_voice(
         settings=settings,
         provider=expected_provider,
         target_lang=target_lang,
-        requested_voice=requested_voice or task.get("voice_id"),
+        requested_voice=requested_voice,
     )
-    resolved_voice = _resolve_hot_follow_provider_voice(
-        settings,
-        actual_provider,
-        requested_voice,
-        task=task,
+    resolved_voice = (
+        str(task.get("mm_audio_voice_id") or "").strip()
+        or str(config_state.get("resolved_voice") or "").strip()
+        or _resolve_hot_follow_provider_voice(
+            settings,
+            actual_provider,
+            requested_voice,
+            task=task,
+        )
     )
     audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     audio_exists = bool(audio_key and object_exists(str(audio_key)))
     dub_status = str(task.get("dub_status") or "").strip().lower()
     dub_running = dub_status in {"queued", "running", "processing"}
-    dub_done = dub_status in {"ready", "done", "success", "completed", "skipped"}
+    dub_done = dub_status in {"ready", "done", "success", "completed"}
     audio_ready_reason = "ready"
     if dub_running:
         audio_ready_reason = "dub_running"
@@ -4030,9 +4041,12 @@ def patch_hot_follow_audio_config(
         )
         if not resolved_voice:
             raise HTTPException(status_code=422, detail="TTS_VOICE_MISSING")
+        config["tts_requested_voice"] = requested_voice
         config["hot_follow_tts_requested_voice"] = requested_voice
+        config["tts_resolved_voice"] = resolved_voice
+        config["tts_provider"] = effective_provider
         updates["config"] = config
-        updates["voice_id"] = resolved_voice
+        updates["voice_id"] = requested_voice
     if payload.audio_fit_max_speed is not None:
         speed = max(1.0, min(1.6, float(payload.audio_fit_max_speed)))
         pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
@@ -4178,7 +4192,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         or _task_key(task, "mute_video_path")
         or _task_key(task, "raw_path")
     )
-    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
+    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     if not video_key:
         _compose_fail("missing_raw", "missing video source for compose")
     if not audio_key:
@@ -5239,11 +5253,12 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         except Exception:
             req_tts_speed = None
     prev_voice_id = task.get("voice_id") if isinstance(task, dict) else getattr(task, "voice_id", None)
+    selected_voice_id = req_voice_id or _voice_state_config(task).get("requested_voice") or prev_voice_id
     final_voice_id, voice_overridden = resolve_tts_voice(
         settings=settings,
         provider=provider,
         target_lang=target_lang,
-        requested_voice=req_voice_id or prev_voice_id,
+        requested_voice=selected_voice_id,
     )
     if not final_voice_id:
         raise HTTPException(status_code=422, detail="TTS_VOICE_MISSING")
@@ -5256,7 +5271,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 detail={
                     "reason": "unsupported_voice_provider_combo",
                     "provider": provider,
-                    "requested_voice": req_voice_id or prev_voice_id,
+                    "requested_voice": selected_voice_id,
                     "resolved_voice": final_voice_id,
                     "supported_voices": supported_voices,
                 },
@@ -5300,11 +5315,29 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     if provider == "edge-tts":
         edge_voice = settings.edge_tts_voice_map.get(final_voice_id, final_voice_id)
 
-    if req_voice_id:
-        config = dict(task.get("config") or {})
-        config["hot_follow_tts_requested_voice"] = req_voice_id
-        _policy_upsert(repo, task_id, {"config": config})
-        task = repo.get(task_id) or task
+    config = dict(task.get("config") or {})
+    config["tts_requested_voice"] = selected_voice_id
+    config["hot_follow_tts_requested_voice"] = selected_voice_id
+    config["tts_resolved_voice"] = final_voice_id
+    config["tts_provider"] = provider
+    _policy_upsert(
+        repo,
+        task_id,
+        {
+            "config": config,
+            "dub_provider": provider,
+            "voice_id": selected_voice_id,
+            "last_step": "dub",
+            "dub_status": "running",
+            "dub_error": None,
+            "mm_audio_key": None,
+            "mm_audio_path": None,
+            "mm_audio_provider": None,
+            "mm_audio_voice_id": None,
+            "audio_sha256": None,
+        },
+    )
+    task = repo.get(task_id) or task
 
     logger.info(
         "dub: task=%s req_voice_id=%s prev_voice_id=%s final_voice_id=%s edge_voice=%s",
@@ -5359,7 +5392,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         await run_dub_step_ssot(task_adapter)
 
         task_after = repo.get(task_id) or {}
-        existing_audio_key = task_after.get("mm_audio_key") or task_after.get("mm_audio_path") or deliver_key(task_id, "audio_mm.mp3")
+        existing_audio_key = task_after.get("mm_audio_key") or task_after.get("mm_audio_path")
         existing_audio_exists = bool(existing_audio_key and object_exists(str(existing_audio_key)))
         existing_audio_size = 0
         if existing_audio_key:
@@ -5424,31 +5457,27 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 },
             )
             if not audio_key:
-                if existing_audio_exists:
-                    audio_key = str(existing_audio_key)
-                else:
-                    # skip is only valid when previous output exists
-                    _policy_upsert(
-                        repo,
-                        task_id,
-                        {
-                            "dub_provider": provider,
-                            "last_step": "dub",
-                            "voice_id": final_voice_id,
-                            "dub_status": "failed",
-                            "dub_error": "output_missing",
-                            "dub_generated_at": datetime.now(timezone.utc).isoformat(),
-                        },
-                    )
-                    stored = repo.get(task_id)
-                    detail = _task_to_detail(stored)
-                    return DubResponse(
-                        **detail.dict(exclude={"mm_audio_key"}),
-                        resolved_voice_id=final_voice_id,
-                        resolved_edge_voice=edge_voice,
-                        audio_sha256=None,
-                        mm_audio_key=None,
-                    )
+                _policy_upsert(
+                    repo,
+                    task_id,
+                    {
+                        "dub_provider": provider,
+                        "last_step": "dub",
+                        "voice_id": selected_voice_id,
+                        "dub_status": "failed",
+                        "dub_error": "output_missing",
+                        "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+                stored = repo.get(task_id)
+                detail = _task_to_detail(stored)
+                return DubResponse(
+                    **detail.dict(exclude={"mm_audio_key"}),
+                    resolved_voice_id=final_voice_id,
+                    resolved_edge_voice=edge_voice,
+                    audio_sha256=None,
+                    mm_audio_key=None,
+                )
             _policy_upsert(repo, 
                 task_id,
                 {
@@ -5461,11 +5490,12 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "mm_audio_mime": "audio/mpeg" if audio_key else None,
                     "dub_provider": provider,
                     "last_step": "dubbing",
-                    "voice_id": final_voice_id,
+                    "voice_id": selected_voice_id,
                     "dub_status": "skipped",
                     "dub_error": None,
                     "audio_sha256": audio_sha256,
                     "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+                    "config": config,
                 },
             )
             stored = repo.get(task_id)
@@ -5496,7 +5526,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         skip_reason = None
         if not audio_path.exists():
             executed = False
-            skip_reason = "existing_artifact_reused" if existing_audio_exists else "output_missing_after_execute"
+            skip_reason = "output_missing_after_execute"
         logger.info(
             "DUB3_DECISION",
             extra={
@@ -5510,51 +5540,13 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "DUB3_OUTPUT_CHECK",
                 extra={
                     "task_id": task_id,
-                    "decision": "skipped" if existing_audio_exists else "executed",
+                    "decision": "executed",
                     "key": existing_audio_key,
                     "path": str(audio_path),
                     "exists": existing_audio_exists,
                     "size": existing_audio_size,
                 },
             )
-            if existing_audio_exists:
-                logger.info(
-                    "DUB3_SKIP",
-                    extra={"task_id": task_id, "reason": "existing_artifact_reused"},
-                )
-                audio_key = str(existing_audio_key)
-                local_size = int(existing_audio_size or 0)
-                local_duration = float((task_after.get("mm_audio_duration_ms") or 0) / 1000.0)
-                audio_sha256 = task_after.get("audio_sha256")
-                _policy_upsert(
-                    repo,
-                    task_id,
-                    {
-                        "mm_audio_path": audio_key,
-                        "mm_audio_key": audio_key,
-                        "mm_audio_provider": provider,
-                        "mm_audio_voice_id": final_voice_id,
-                        "mm_audio_bytes": local_size if local_size > 0 else task_after.get("mm_audio_bytes"),
-                        "mm_audio_duration_ms": int(local_duration * 1000) if local_duration > 0 else task_after.get("mm_audio_duration_ms"),
-                        "mm_audio_mime": "audio/mpeg",
-                        "dub_provider": provider,
-                        "last_step": "dubbing",
-                        "voice_id": final_voice_id,
-                        "dub_status": "skipped",
-                        "dub_error": None,
-                        "audio_sha256": audio_sha256,
-                        "dub_generated_at": datetime.now(timezone.utc).isoformat(),
-                    },
-                )
-                stored = repo.get(task_id)
-                detail = _task_to_detail(stored)
-                return DubResponse(
-                    **detail.dict(exclude={"mm_audio_key"}),
-                    resolved_voice_id=final_voice_id,
-                    resolved_edge_voice=edge_voice,
-                    audio_sha256=audio_sha256,
-                    mm_audio_key=audio_key,
-                )
             _policy_upsert(
                 repo,
                 task_id,
@@ -5562,6 +5554,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "dub_status": "failed",
                     "dub_error": "output_missing",
                     "last_step": "dub",
+                    "voice_id": selected_voice_id,
                 },
             )
             stored = repo.get(task_id)
@@ -5584,6 +5577,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "dub_status": "failed",
                     "dub_error": "output_missing",
                     "last_step": "dub",
+                    "voice_id": selected_voice_id,
                 },
             )
             stored = repo.get(task_id)
@@ -5661,11 +5655,12 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "mm_audio_mime": "audio/mpeg",
             "dub_provider": provider,
             "last_step": "dubbing",
-            "voice_id": final_voice_id,
+            "voice_id": selected_voice_id,
             "dub_status": "ready",
             "dub_error": None,
             "audio_sha256": audio_sha256,
             "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+            "config": config,
         },
     )
 
