@@ -2319,6 +2319,22 @@ def _repo_upsert(repo, task_id: str, patch: dict) -> None:
     _policy_upsert(repo, task_id, patch)
 
 
+def _build_hot_follow_voice_options(settings, target_lang: str | None) -> dict[str, list[dict[str, str]]]:
+    if normalize_target_lang(target_lang) != "my":
+        return {"edge-tts": [], "lovo": []}
+
+    options: dict[str, list[dict[str, str]]] = {"edge-tts": [], "lovo": []}
+    edge_map = getattr(settings, "edge_tts_voice_map", {}) or {}
+    if edge_map.get("mm_female_1"):
+        options["edge-tts"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
+    if edge_map.get("mm_male_1"):
+        options["edge-tts"].append({"value": "mm_male_1", "label": "缅语男声（标准）"})
+
+    if getattr(settings, "lovo_speaker_mm_female_1", None):
+        options["lovo"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
+    return options
+
+
 def _merge_probe_into_pipeline_config(
     pipeline_config: dict[str, str], probe: dict[str, Any] | None
 ) -> dict[str, str]:
@@ -2671,7 +2687,11 @@ async def task_workbench_page(
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
     final_exists = bool(final_key and object_exists(str(final_key)))
     actual_burn_subtitle_source = "mm.srt" if detail.mm_srt_path else None
-    actual_provider = task.get("dub_provider") or None
+    target_lang = normalize_target_lang(task.get("target_lang") or detail.content_lang or "my")
+    voice_options_by_provider = _build_hot_follow_voice_options(app_settings, target_lang)
+    actual_provider = normalize_provider(task.get("dub_provider") or getattr(app_settings, "dub_provider", None))
+    if actual_provider not in voice_options_by_provider:
+        actual_provider = "edge-tts"
     resolved_voice = task.get("voice_id") or None
     task_json = {
         "task_id": detail.task_id,
@@ -2705,6 +2725,8 @@ async def task_workbench_page(
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
         "actual_provider": actual_provider,
         "resolved_voice": resolved_voice,
+        "target_lang": target_lang,
+        "voice_options_by_provider": voice_options_by_provider,
         "compose_status": task.get("compose_status"),
         "final_exists": final_exists,
     }

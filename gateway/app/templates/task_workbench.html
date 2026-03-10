@@ -311,11 +311,7 @@
           <div class="form-grid">
             <div class="field">
               <label for="voice-id">{{ t("workbench.step.dub.voice") }}</label>
-              <select id="voice-id">
-                <option value="mm_female_1">mm_female_1</option>
-                <option value="mm_male_1">mm_male_1</option>
-                <option value="mm_female_2">mm_female_2</option>
-              </select>
+              <select id="voice-id"></select>
             </div>
             <div class="field">
               <label for="dub-provider">{{ t("workbench.step.dub.engine") }}</label>
@@ -598,6 +594,38 @@
       }
     }
 
+    function renderVoiceOptions(data) {
+      const providerSelect = document.getElementById("dub-provider");
+      const voiceSelect = document.getElementById("voice-id");
+      if (!providerSelect || !voiceSelect) return;
+
+      const provider = providerSelect.value || data.actual_provider || "edge-tts";
+      const optionsByProvider = data.voice_options_by_provider || {};
+      const voiceOptions = Array.isArray(optionsByProvider[provider]) ? optionsByProvider[provider] : [];
+      const resolvedVoice = data.resolved_voice || "";
+
+      voiceSelect.innerHTML = "";
+      if (!voiceOptions.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = "当前 provider 无可用缅语声线";
+        voiceSelect.appendChild(opt);
+        voiceSelect.disabled = true;
+        return;
+      }
+
+      voiceSelect.disabled = false;
+      voiceOptions.forEach((item, index) => {
+        const opt = document.createElement("option");
+        opt.value = item.value || "";
+        opt.textContent = item.label || item.value || "";
+        if ((resolvedVoice && resolvedVoice === opt.value) || (!resolvedVoice && index === 0)) {
+          opt.selected = true;
+        }
+        voiceSelect.appendChild(opt);
+      });
+    }
+
     function applyLocalIngestUI() {
       if (ingestMode !== "local") return;
       const parseBtn = document.getElementById("btn-parse");
@@ -791,6 +819,7 @@
     updateDownloadsFromTask(window.currentTask);
     updateStatusBadge(window.currentTask);
     updateStepStatuses(window.currentTask);
+    renderVoiceOptions(window.currentTask);
     refreshPublishInfo(window.currentTask);
     renderScenesStatus(window.currentTask);
     applyLocalIngestUI();
@@ -814,6 +843,11 @@
         updateDownloadsFromTask(data);
         updateStatusBadge(data);
         updateStepStatuses(data);
+        const providerSelect = document.getElementById("dub-provider");
+        if (providerSelect && data.actual_provider) {
+          providerSelect.value = data.actual_provider;
+        }
+        renderVoiceOptions(data);
         refreshPublishInfo(data);
         renderScenesStatus(data);
         applyLocalIngestUI();
@@ -958,6 +992,16 @@
       appendLog("Dub audio ready.");
       await refreshTaskState();
     });
+
+    const providerSelect = document.getElementById("dub-provider");
+    if (providerSelect) {
+      if (window.currentTask.actual_provider) {
+        providerSelect.value = window.currentTask.actual_provider;
+      }
+      providerSelect.addEventListener("change", () => {
+        renderVoiceOptions(window.currentTask);
+      });
+    }
 
     document.getElementById("btn-pack").addEventListener("click", async () => {
       const taskId = window.currentTask.task_id;
