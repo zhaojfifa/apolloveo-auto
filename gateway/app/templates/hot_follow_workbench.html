@@ -142,6 +142,11 @@
                     <button id="hf_rerun_audio_btn" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_rerun_audio">Re-Run Audio</button>
                     <span id="hf_dub_outdated_badge" class="hidden text-[11px] rounded bg-amber-100 text-amber-700 px-2 py-1" data-i18n="hot_follow_workbench_dub_outdated">Dub is out of date</span>
                   </div>
+                  <div id="hf_no_dub_warning" class="hidden rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900 space-y-1">
+                    <div class="font-semibold">未检测到可配音语音内容，已跳过配音</div>
+                    <div id="hf_no_dub_reason">-</div>
+                    <div class="text-[11px]">当前素材更像无人声 / ASMR 素材。如需继续，请手工编辑字幕文本后再生成配音。</div>
+                  </div>
                   <div>
                     <label class="block text-xs font-semibold text-gray-600 mb-1" data-i18n="hot_follow_workbench_bgm_upload">BGM Upload</label>
                     <input id="hf_bgm_file" type="file" accept="audio/*" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" />

@@ -61,6 +61,8 @@
   const audioFitCapValueEl = document.getElementById("hf_audio_fit_cap_value");
   const rerunAudioBtn = document.getElementById("hf_rerun_audio_btn");
   const dubOutdatedBadgeEl = document.getElementById("hf_dub_outdated_badge");
+  const noDubWarningEl = document.getElementById("hf_no_dub_warning");
+  const noDubReasonEl = document.getElementById("hf_no_dub_reason");
   const voiceoverAudioEl = document.getElementById("hf_voiceover_audio");
   const requestedVoiceEl = document.getElementById("hf_requested_voice");
   const expectedProviderEl = document.getElementById("hf_expected_provider");
@@ -338,6 +340,30 @@
     }
   }
 
+  function hasManualOverrideText() {
+    const currentText = subtitlesTextEl ? String(subtitlesTextEl.value || "").trim() : "";
+    return currentText.length > 0;
+  }
+
+  function renderNoDubState() {
+    const noDub = Boolean(currentHub && currentHub.no_dub);
+    const noDubReason = (currentHub && currentHub.no_dub_reason) || "no_speech_detected";
+    const noDubMessage = (currentHub && currentHub.no_dub_message) || "未检测到可配音语音内容，已跳过配音。";
+    if (noDubWarningEl) noDubWarningEl.classList.toggle("hidden", !noDub);
+    if (noDubReasonEl) {
+      const detail = noDubReason === "empty_transcript"
+        ? `${noDubMessage} 当前转写为空。`
+        : `${noDubMessage} 当前素材更像无人声 / ASMR 素材。`;
+      noDubReasonEl.textContent = noDub ? detail : "-";
+    }
+    if (rerunAudioBtn) {
+      const disabled = noDub && !hasManualOverrideText();
+      rerunAudioBtn.disabled = disabled;
+      rerunAudioBtn.classList.toggle("opacity-50", disabled);
+      rerunAudioBtn.classList.toggle("pointer-events-none", disabled);
+    }
+  }
+
   function renderConsistencyPanel() {
     if (burnSubtitleSourceEl) burnSubtitleSourceEl.textContent = (currentHub && currentHub.actual_burn_subtitle_source) || "-";
     if (composeStatusValueEl) composeStatusValueEl.textContent = (currentHub && currentHub.compose_status) || (((currentHub && currentHub.compose) || {}).last || {}).status || "-";
@@ -374,6 +400,7 @@
     setMediaSrcStable(voiceoverAudioEl, voiceUrl, "audioUrl");
     if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
     renderVoiceMeta();
+    renderNoDubState();
   }
 
   function renderComposedReadiness() {
@@ -534,6 +561,9 @@
   }
 
   async function rerunAudio() {
+    if (currentHub && currentHub.no_dub && !hasManualOverrideText()) {
+      throw new Error("未检测到可配音语音内容，请先手工编辑字幕文本后再生成配音。");
+    }
     const provider = ttsEngineEl ? ttsEngineEl.value : null;
     const voiceId = ttsVoiceEl ? ttsVoiceEl.value : null;
     const subtitles = (currentHub && currentHub.subtitles) || {};
@@ -617,6 +647,7 @@
       : (composeBtnEl.dataset.defaultText || "Compose Final");
     if (composeMsgEl) {
       if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
+      else if (currentHub && currentHub.no_dub) composeMsgEl.textContent = "Compose disabled: no spoken speech detected for dubbing.";
       else if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
       else if (!hasRaw) composeMsgEl.textContent = "Compose disabled: missing raw video.";
       else if (!confirmed) composeMsgEl.textContent = t("hot_follow_workbench_compose_disabled_hint", "Compose disabled: check confirmation first");
@@ -646,6 +677,7 @@
     subtitleDirty = true;
     subtitlesChangedSinceDub = true;
     renderDubOutdatedBadge();
+    renderNoDubState();
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = subtitlesTextEl.value || "-";
   });
   if (composeConfirmEl) composeConfirmEl.addEventListener("change", updateComposeButtonState);

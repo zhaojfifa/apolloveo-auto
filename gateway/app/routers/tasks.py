@@ -1753,8 +1753,11 @@ def _hf_subtitles_override_path(task_id: str) -> Path:
 
 
 def _hf_load_subtitles_text(task_id: str, task: dict) -> str:
-    override_path = _hf_subtitles_override_path(task_id)
-    if override_path.exists():
+    try:
+        override_path = _hf_subtitles_override_path(task_id)
+    except Exception:
+        override_path = None
+    if override_path and override_path.exists():
         try:
             return override_path.read_text(encoding="utf-8")
         except Exception:
@@ -1793,13 +1796,95 @@ def _hf_load_origin_subtitles_text(task: dict) -> str:
 
 
 def _hf_load_normalized_source_text(task_id: str) -> str:
-    normalized_path = task_base_dir(task_id) / "subtitles" / "origin_normalized.srt"
+    try:
+        normalized_path = task_base_dir(task_id) / "subtitles" / "origin_normalized.srt"
+    except Exception:
+        return ""
     if normalized_path.exists():
         try:
             return normalized_path.read_text(encoding="utf-8")
         except Exception:
             return normalized_path.read_text(encoding="utf-8", errors="ignore")
     return ""
+
+
+def _hf_has_usable_dub_text(text: str | None) -> bool:
+    value = str(text or "").strip()
+    if not value:
+        return False
+    folded = value.lower()
+    if folded in {"no subtitles", "no_subtitles_marker", "no subtitles marker"}:
+        return False
+    if "NO_SUBTITLES_MARKER" in value:
+        return False
+    return True
+
+
+def _hf_no_speech_title_hint(task: dict) -> bool:
+    title = str(task.get("title") or task.get("source_title") or "").strip().lower()
+    if not title:
+        return False
+    return any(token in title for token in ("无人声", "asmr", "涂抹音", "无语音", "no voice"))
+
+
+def _hf_write_no_dub_note(task_id: str, reason: str) -> None:
+    note_path = task_base_dir(task_id) / "dub" / "no_dub.txt"
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+    note_path.write_text(f"reason={reason}\n", encoding="utf-8")
+
+
+def _hf_clear_no_dub_note(task_id: str) -> None:
+    note_path = task_base_dir(task_id) / "dub" / "no_dub.txt"
+    try:
+        if note_path.exists():
+            note_path.unlink()
+    except Exception:
+        logger.warning("hf_no_dub_note_cleanup_failed", extra={"task_id": task_id, "path": str(note_path)})
+
+
+def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | None = None) -> dict[str, Any]:
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    origin_text = _hf_load_origin_subtitles_text(task)
+    normalized_source_text = _hf_load_normalized_source_text(task_id)
+    edited_text = _hf_load_subtitles_text(task_id, task)
+    manual_override_text = str(manual_text or "").strip()
+    origin_has_text = _hf_has_usable_dub_text(origin_text)
+    normalized_has_text = _hf_has_usable_dub_text(normalized_source_text)
+    edited_has_text = _hf_has_usable_dub_text(edited_text)
+    manual_has_text = _hf_has_usable_dub_text(manual_override_text)
+    no_subtitles_flag = pipeline_config.get("no_subtitles") == "true"
+    no_dub_flag = pipeline_config.get("no_dub") == "true"
+    try:
+        no_dub_note = (task_base_dir(task_id) / "dub" / "no_dub.txt").exists()
+    except Exception:
+        no_dub_note = False
+    title_hint = _hf_no_speech_title_hint(task)
+    all_empty = not any((origin_has_text, normalized_has_text, edited_has_text, manual_has_text))
+    no_dub = False
+    reason = None
+    if manual_has_text or edited_has_text:
+        no_dub = False
+    elif no_subtitles_flag or no_dub_note or no_dub_flag:
+        no_dub = True
+        reason = str(pipeline_config.get("dub_skip_reason") or "").strip() or "no_speech_detected"
+    elif all_empty:
+        no_dub = True
+        reason = "no_speech_detected" if title_hint else "empty_transcript"
+    message = None
+    if no_dub:
+        if reason == "empty_transcript":
+            message = "未检测到可配音语音内容，已跳过配音。"
+        else:
+            message = "当前素材更像无人声 / ASMR 素材，已跳过配音。"
+    return {
+        "no_dub": no_dub,
+        "no_dub_reason": reason,
+        "no_dub_message": message,
+        "manual_override_available": manual_has_text or edited_has_text,
+        "origin_text": origin_text,
+        "normalized_source_text": normalized_source_text,
+        "edited_text": edited_text,
+    }
 
 
 def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
@@ -1824,16 +1909,22 @@ def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
     if step == "audio":
         status = _hf_state_from_status(task.get("dub_status"))
         voice_state = _collect_voice_execution_state(task, get_settings())
+        no_dub_state = _hf_detect_no_dub_candidate(str(task.get("task_id") or task.get("id") or ""), task)
         if status == "pending" and voice_state.get("audio_ready"):
             status = "done"
+        if str(task.get("dub_status") or "").strip().lower() == "skipped":
+            status = "skipped"
         if status == "pending" and task_status == "processing" and last_step == "dub":
             status = "running"
-        audio_cfg = _hf_audio_config(task)
-        summary = (
-            f"dub_provider={voice_state.get('actual_provider') or normalize_provider(task.get('dub_provider') or get_settings().dub_provider)} "
-            f"voice={voice_state.get('resolved_voice') or audio_cfg.get('tts_voice') or 'missing'} "
-            f"audio_ready={'yes' if voice_state.get('audio_ready') else 'no'}"
-        )
+        if no_dub_state.get("no_dub"):
+            summary = f"no_dub={no_dub_state.get('no_dub_reason') or 'no_speech_detected'}"
+        else:
+            audio_cfg = _hf_audio_config(task)
+            summary = (
+                f"dub_provider={voice_state.get('actual_provider') or normalize_provider(task.get('dub_provider') or get_settings().dub_provider)} "
+                f"voice={voice_state.get('resolved_voice') or audio_cfg.get('tts_voice') or 'missing'} "
+                f"audio_ready={'yes' if voice_state.get('audio_ready') else 'no'}"
+            )
         return status, summary
     if step == "pack":
         status = _hf_state_from_status(task.get("pack_status"))
@@ -2544,6 +2635,7 @@ def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
 
 
 def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
+    task_id = str(task.get("task_id") or task.get("id") or "")
     target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     voice_options_by_provider = _build_hot_follow_voice_options(settings, target_lang)
     config_state = _voice_state_config(task)
@@ -2575,8 +2667,11 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     dub_status = str(task.get("dub_status") or "").strip().lower()
     dub_running = dub_status in {"queued", "running", "processing"}
     dub_done = dub_status in {"ready", "done", "success", "completed"}
+    no_dub_state = _hf_detect_no_dub_candidate(task_id, task)
     audio_ready_reason = "ready"
-    if dub_running:
+    if no_dub_state.get("no_dub"):
+        audio_ready_reason = "no_dub_candidate"
+    elif dub_running:
         audio_ready_reason = "dub_running"
     elif not audio_exists:
         audio_ready_reason = "audio_missing"
@@ -2603,6 +2698,9 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         "expected_resolved_voice": expected_resolved_voice,
         "audio_ready": audio_ready,
         "audio_ready_reason": audio_ready_reason,
+        "no_dub": bool(no_dub_state.get("no_dub")),
+        "no_dub_reason": no_dub_state.get("no_dub_reason"),
+        "no_dub_message": no_dub_state.get("no_dub_message"),
     }
 
 
@@ -2728,10 +2826,8 @@ def auto_run_pipeline(task_id: str, repo) -> None:
             logger.info("AUTO_PIPELINE_SKIP", extra={"task_id": task_id, "step": "subtitles"})
 
         task = repo.get(task_id) or task
-        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-        no_dub = pipeline_config.get("no_dub") == "true"
         has_audio = bool(task.get("mm_audio_path") or task.get("mm_audio_key"))
-        if not has_audio and not no_dub:
+        if not has_audio:
             logger.info("AUTO_PIPELINE_STEP", extra={"task_id": task_id, "step": "dub"})
             payload = DubProviderRequest()
             asyncio.run(_run_dub_job(task_id, payload, repo))
@@ -5493,6 +5589,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "tts_speed": req_tts_speed,
         },
     )
+    no_dub_state = _hf_detect_no_dub_candidate(task_id, task, mm_text_override)
     workspace = Workspace(task_id)
     audio_present = False
     if isinstance(task, dict):
@@ -5517,6 +5614,67 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     config["tts_provider"] = provider
     config["tts_request_token"] = request_token
     config["tts_completed_token"] = None
+
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+
+    def _mark_hot_follow_no_dub(reason: str, message: str) -> DubResponse:
+        pipeline_updates = dict(pipeline_config)
+        pipeline_updates["no_dub"] = "true"
+        pipeline_updates["dub_skip_reason"] = reason
+        _hf_write_no_dub_note(task_id, reason)
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "config": config,
+                "pipeline_config": pipeline_config_to_storage(pipeline_updates),
+                "dub_provider": provider,
+                "voice_id": selected_voice_id,
+                "last_step": "dub",
+                "dub_status": "skipped",
+                "dub_error": None,
+                "mm_audio_key": None,
+                "mm_audio_path": None,
+                "mm_audio_provider": None,
+                "mm_audio_voice_id": None,
+                "audio_sha256": None,
+                "compose_status": "pending",
+                "compose_last_status": "pending",
+                "compose_error": {"reason": "no_dub_candidate", "message": message},
+                "compose_error_reason": "no_dub_candidate",
+                "compose_warning": message,
+                "final_video_key": None,
+                "final_video_path": None,
+                "final_video_sha256": None,
+            },
+        )
+        stored = repo.get(task_id)
+        detail = _task_to_detail(stored)
+        return DubResponse(
+            **detail.dict(exclude={"mm_audio_key"}),
+            resolved_voice_id=final_voice_id,
+            resolved_edge_voice=edge_voice,
+            audio_sha256=None,
+            mm_audio_key=None,
+        )
+
+    if no_dub_state.get("no_dub"):
+        logger.info(
+            "DUB3_SKIP_NO_SPEECH",
+            extra={
+                "task_id": task_id,
+                "reason": no_dub_state.get("no_dub_reason") or "no_speech_detected",
+                "message": no_dub_state.get("no_dub_message"),
+            },
+        )
+        return _mark_hot_follow_no_dub(
+            str(no_dub_state.get("no_dub_reason") or "no_speech_detected"),
+            str(no_dub_state.get("no_dub_message") or "No spoken speech detected in source video; dubbing is skipped."),
+        )
+
+    _hf_clear_no_dub_note(task_id)
+    pipeline_config.pop("no_dub", None)
+    pipeline_config.pop("dub_skip_reason", None)
     for stale_path in (
         workspace.mm_audio_primary_path,
         workspace.mm_audio_mp3_path,
@@ -5532,6 +5690,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         task_id,
         {
             "config": config,
+            "pipeline_config": pipeline_config_to_storage(pipeline_config),
             "dub_provider": provider,
             "voice_id": selected_voice_id,
             "last_step": "dub",
@@ -5671,94 +5830,9 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "DUB3_SKIP",
                 extra={"task_id": task_id, "reason": "no_dub_mode"},
             )
-            audio_key = task_after.get("mm_audio_key") or task_after.get("mm_audio_path")
-            audio_sha256 = None
-            if not audio_key:
-                audio_path = (
-                    workspace.mm_audio_mp3_path
-                    if workspace.mm_audio_mp3_path.exists()
-                    else workspace.mm_audio_path
-                )
-                if audio_path.exists():
-                    try:
-                        local_size, local_duration = assert_local_audio_ok(audio_path)
-                    except ValueError:
-                        local_size, local_duration = 0, 0.0
-                    audio_key = deliver_key(task_id, "audio_mm.mp3")
-                    storage = get_storage_service()
-                    if local_size > 0:
-                        storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
-                        audio_sha256 = _sha256_file(audio_path)
-                        logger.info(
-                            "DUB3_UPLOAD_DONE",
-                            extra={
-                                "task_id": task_id,
-                                "step": "dub",
-                                "stage": "DUB3_UPLOAD_DONE",
-                                "output_size": local_size,
-                                "duration_sec": local_duration,
-                                "uploaded_key": audio_key,
-                            },
-                        )
-                    else:
-                        audio_key = None
-            logger.info(
-                "DUB3_OUTPUT_CHECK",
-                extra={
-                    "task_id": task_id,
-                    "decision": "skipped",
-                    "key": audio_key or existing_audio_key,
-                    "path": str(workspace.mm_audio_mp3_path if workspace.mm_audio_mp3_path.exists() else workspace.mm_audio_path),
-                    "exists": bool(audio_key or existing_audio_exists),
-                    "size": int(local_size if 'local_size' in locals() else existing_audio_size),
-                },
-            )
-            if not audio_key:
-                return _mark_hot_follow_dub_failed("output_missing", "no audio artifact after no_dub flow")
-            if normalize_provider(provider) != normalize_provider(expected_provider):
-                return _mark_hot_follow_dub_failed("provider_mismatch", f"expected {expected_provider}, got {provider}")
-            if expected_resolved_voice and final_voice_id != expected_resolved_voice:
-                return _mark_hot_follow_dub_failed(
-                    "voice_mismatch",
-                    f"expected {expected_resolved_voice}, got {final_voice_id}",
-                )
-            _policy_upsert(repo, 
-                task_id,
-                {
-                    "mm_audio_path": audio_key,
-                    "mm_audio_key": audio_key,
-                    "mm_audio_provider": provider,
-                    "mm_audio_voice_id": final_voice_id,
-                    "mm_audio_bytes": local_size if 'local_size' in locals() else None,
-                    "mm_audio_duration_ms": int(local_duration * 1000) if 'local_duration' in locals() else None,
-                    "mm_audio_mime": "audio/mpeg" if audio_key else None,
-                    "dub_provider": provider,
-                    "last_step": "dubbing",
-                    "voice_id": selected_voice_id,
-                    "dub_status": "skipped",
-                    "dub_error": None,
-                    "audio_sha256": audio_sha256,
-                    "dub_generated_at": datetime.now(timezone.utc).isoformat(),
-                    "config": {**config, "tts_completed_token": request_token},
-                },
-            )
-            stored = repo.get(task_id)
-            detail = _task_to_detail(stored)
-            logger.info(
-                "DUB3_DONE",
-                extra={
-                    "task_id": task_id,
-                    "step": "dub",
-                    "stage": "DUB3_DONE",
-                    "uploaded_key": audio_key,
-                },
-            )
-            return DubResponse(
-                **detail.dict(exclude={"mm_audio_key"}),
-                resolved_voice_id=final_voice_id,
-                resolved_edge_voice=edge_voice,
-                audio_sha256=audio_sha256,
-                mm_audio_key=audio_key,
+            return _mark_hot_follow_no_dub(
+                str(pipeline_config.get("dub_skip_reason") or "no_speech_detected"),
+                "未检测到可配音语音内容，已跳过配音。",
             )
 
         audio_path = (
