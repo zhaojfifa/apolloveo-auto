@@ -783,6 +783,9 @@ async def run_subtitles_step(req: SubtitlesRequest):
             shutil.copy2(workspace.mm_srt_path, subtitles_dir / "mm.srt")
         if translation_qa_path.exists():
             shutil.copy2(translation_qa_path, subtitles_dir / "translation_qa.json")
+        normalized_source_path = workspace.subtitles_dir / "origin_normalized.srt"
+        if normalized_source_path.exists():
+            shutil.copy2(normalized_source_path, subtitles_dir / "origin_normalized.srt")
         if workspace.segments_json.exists():
             shutil.copy2(workspace.segments_json, subtitles_dir / "subtitles.json")
         subtitles_key = relative_to_workspace(subtitles_dir / "subtitles.json")

@@ -69,13 +69,17 @@
 
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <h3 class="text-base font-semibold mb-3" data-i18n="hot_follow_workbench_subtitle_edit">字幕编辑</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
               <div class="rounded-xl border border-gray-200 p-3">
-                <div class="text-xs text-gray-500 mb-2" data-i18n="hot_follow_workbench_source_label">Original (Source)</div>
+                <div class="text-xs text-gray-500 mb-2">Raw Recognized Source</div>
                 <pre id="hf_subtitles_origin" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
               </div>
               <div class="rounded-xl border border-gray-200 p-3">
-                <div class="text-xs text-gray-500 mb-2">Burn Subtitle Preview</div>
+                <div class="text-xs text-gray-500 mb-2">Normalized Source</div>
+                <pre id="hf_subtitles_normalized_preview" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
+              </div>
+              <div class="rounded-xl border border-gray-200 p-3">
+                <div class="text-xs text-gray-500 mb-2">Translation / Burn Subtitle Preview</div>
                 <pre id="hf_subtitles_edited_preview" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
               </div>
             </div>
@@ -163,8 +167,14 @@
                     <div data-i18n="hot_follow_ops_tip_overlay">Hard subtitles cannot be removed in v1.9. Use A-tier overlay (black box / stroke).</div>
                   </div>
                   <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
+                    <div><span class="font-semibold">Requested Voice:</span> <span id="hf_requested_voice">-</span></div>
+                    <div><span class="font-semibold">Expected Provider:</span> <span id="hf_expected_provider">-</span></div>
+                    <div><span class="font-semibold">Expected Resolved Voice:</span> <span id="hf_expected_resolved_voice">-</span></div>
                     <div><span class="font-semibold">Actual Provider:</span> <span id="hf_actual_provider">-</span></div>
                     <div><span class="font-semibold">Resolved Voice:</span> <span id="hf_resolved_voice">-</span></div>
+                    <div><span class="font-semibold">Audio Ready:</span> <span id="hf_audio_ready_value">-</span></div>
+                    <div><span class="font-semibold">Audio Ready Reason:</span> <span id="hf_audio_ready_reason">-</span></div>
+                    <div><span class="font-semibold">Dub Warnings:</span> <span id="hf_dub_warnings">-</span></div>
                   </div>
                 </div>
               </div>
@@ -194,10 +204,12 @@
                     <div><span class="font-semibold">Burn Subtitle Source:</span> <span id="hf_burn_subtitle_source">-</span></div>
                     <div><span class="font-semibold">Compose Status:</span> <span id="hf_compose_status_value">-</span></div>
                     <div><span class="font-semibold">Final Exists:</span> <span id="hf_final_exists_value">-</span></div>
+                    <div><span class="font-semibold">Compose Video Source:</span> <span id="hf_compose_video_source_value">-</span></div>
                   </div>
                   <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
                     <div><span class="font-semibold">Lipsync / Alignment:</span> <span id="hf_lipsync_status_value">-</span></div>
                     <div id="hf_lipsync_hint" class="text-[11px] text-gray-500">Enhanced path is off by default.</div>
+                    <div><span class="font-semibold">Lipsync Warning:</span> <span id="hf_lipsync_warning_value">-</span></div>
                   </div>
                   <div id="hf_compose_final_block" class="hidden rounded-xl border border-gray-200 p-3">
                     <div class="flex items-center justify-between mb-2">

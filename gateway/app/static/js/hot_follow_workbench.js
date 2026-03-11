@@ -62,14 +62,21 @@
   const rerunAudioBtn = document.getElementById("hf_rerun_audio_btn");
   const dubOutdatedBadgeEl = document.getElementById("hf_dub_outdated_badge");
   const voiceoverAudioEl = document.getElementById("hf_voiceover_audio");
+  const requestedVoiceEl = document.getElementById("hf_requested_voice");
+  const expectedProviderEl = document.getElementById("hf_expected_provider");
+  const expectedResolvedVoiceEl = document.getElementById("hf_expected_resolved_voice");
   const actualProviderEl = document.getElementById("hf_actual_provider");
   const resolvedVoiceEl = document.getElementById("hf_resolved_voice");
+  const audioReadyValueEl = document.getElementById("hf_audio_ready_value");
+  const audioReadyReasonEl = document.getElementById("hf_audio_ready_reason");
+  const dubWarningsEl = document.getElementById("hf_dub_warnings");
   const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
   const scenePackDownloadEl = document.getElementById("hf_scene_pack_download");
   const scenePackHintEl = document.getElementById("hf-scene-pack-hint");
   const deliverablesGridEl = document.getElementById("hf_deliverables_grid");
   const subtitlesTextEl = document.getElementById("hf_subtitles_text");
   const subtitlesOriginEl = document.getElementById("hf_subtitles_origin");
+  const subtitlesNormalizedPreviewEl = document.getElementById("hf_subtitles_normalized_preview");
   const subtitlesEditedPreviewEl = document.getElementById("hf_subtitles_edited_preview");
   const translationQaCountsEl = document.getElementById("hf_translation_qa_counts");
   const translationQaWarningEl = document.getElementById("hf_translation_qa_warning");
@@ -94,8 +101,10 @@
   const burnSubtitleSourceEl = document.getElementById("hf_burn_subtitle_source");
   const composeStatusValueEl = document.getElementById("hf_compose_status_value");
   const finalExistsValueEl = document.getElementById("hf_final_exists_value");
+  const composeVideoSourceValueEl = document.getElementById("hf_compose_video_source_value");
   const lipsyncStatusValueEl = document.getElementById("hf_lipsync_status_value");
   const lipsyncHintEl = document.getElementById("hf_lipsync_hint");
+  const lipsyncWarningValueEl = document.getElementById("hf_lipsync_warning_value");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
@@ -251,11 +260,13 @@
   function renderSubtitles() {
     const subtitles = (currentHub && currentHub.subtitles) || {};
     const qa = (currentHub && currentHub.translation_qa) || {};
-    const origin = subtitles.origin_text || "";
+    const origin = subtitles.raw_source_text || subtitles.origin_text || "";
+    const normalized = subtitles.normalized_source_text || origin || "";
     const edited = subtitles.edited_text || subtitles.srt_text || "";
     const sourcePlaceholder = t("hot_follow_workbench_source_not_generated", "Source subtitles not generated yet.");
     const targetPlaceholder = t("hot_follow_workbench_target_not_generated", "Target subtitles not generated yet.");
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
+    if (subtitlesNormalizedPreviewEl) subtitlesNormalizedPreviewEl.textContent = normalized || sourcePlaceholder;
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || targetPlaceholder;
     if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = edited || "";
     const sourceCount = Number.isFinite(Number(qa.source_count)) ? Number(qa.source_count) : 0;
@@ -308,21 +319,45 @@
   }
 
   function renderVoiceMeta() {
+    if (requestedVoiceEl) requestedVoiceEl.textContent = (currentHub && currentHub.requested_voice) || "-";
+    if (expectedProviderEl) expectedProviderEl.textContent = (currentHub && currentHub.expected_provider) || "-";
+    if (expectedResolvedVoiceEl) expectedResolvedVoiceEl.textContent = (currentHub && currentHub.expected_resolved_voice) || "-";
     if (actualProviderEl) actualProviderEl.textContent = (currentHub && currentHub.actual_provider) || "-";
     if (resolvedVoiceEl) resolvedVoiceEl.textContent = (currentHub && currentHub.resolved_voice) || "-";
+    if (audioReadyValueEl) audioReadyValueEl.textContent = (currentHub && currentHub.audio_ready) ? "yes" : "no";
+    if (audioReadyReasonEl) audioReadyReasonEl.textContent = (currentHub && currentHub.audio_ready_reason) || "-";
+    if (dubWarningsEl) {
+      const warnings = (currentHub && currentHub.dub_warnings) || [];
+      dubWarningsEl.textContent = Array.isArray(warnings) && warnings.length
+        ? warnings.map((item) => {
+            const code = item && item.code ? String(item.code) : "warning";
+            const message = item && item.message ? String(item.message) : "";
+            return `${code}: ${message}`.trim();
+          }).join(" | ")
+        : "-";
+    }
   }
 
   function renderConsistencyPanel() {
     if (burnSubtitleSourceEl) burnSubtitleSourceEl.textContent = (currentHub && currentHub.actual_burn_subtitle_source) || "-";
     if (composeStatusValueEl) composeStatusValueEl.textContent = (currentHub && currentHub.compose_status) || (((currentHub && currentHub.compose) || {}).last || {}).status || "-";
     if (finalExistsValueEl) finalExistsValueEl.textContent = (currentHub && currentHub.final_exists) ? "yes" : "no";
+    if (composeVideoSourceValueEl) composeVideoSourceValueEl.textContent = (currentHub && currentHub.compose_video_source) || "basic";
     const lipsyncEnabled = Boolean(currentHub && currentHub.lipsync_enabled);
-    if (lipsyncStatusValueEl) lipsyncStatusValueEl.textContent = lipsyncEnabled ? "Enhanced path enabled (soft-fail)" : "Off";
+    const lipsyncStatus = (currentHub && currentHub.lipsync_status) || (lipsyncEnabled ? "pending" : "off");
+    if (lipsyncStatusValueEl) lipsyncStatusValueEl.textContent = lipsyncStatus;
     if (lipsyncHintEl) {
-      lipsyncHintEl.textContent = lipsyncEnabled
-        ? "Enhanced path will run before compose. Stub failures do not block the basic path."
-        : "Enhanced path is off by default.";
+      if (!lipsyncEnabled) {
+        lipsyncHintEl.textContent = "Enhanced path is off by default.";
+      } else if (lipsyncStatus === "done") {
+        lipsyncHintEl.textContent = "Enhanced path completed before compose and the final can use the enhanced visual source.";
+      } else if (lipsyncStatus === "fallback_basic" || lipsyncStatus === "failed") {
+        lipsyncHintEl.textContent = "Enhanced path did not complete; compose fell back to the stable basic source.";
+      } else {
+        lipsyncHintEl.textContent = "Enhanced path will run before compose. Stub failures do not block the basic path.";
+      }
     }
+    if (lipsyncWarningValueEl) lipsyncWarningValueEl.textContent = (currentHub && currentHub.lipsync_warning) || "-";
   }
 
   function renderAudio() {

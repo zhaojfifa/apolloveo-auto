@@ -25,6 +25,7 @@ from gateway.app.core.workspace import (
     relative_to_workspace,
     subs_dir,
 )
+from gateway.app.deps import get_task_repository
 from gateway.app.providers.gemini_subtitles import (
     GeminiSubtitlesError,
     translate_segments_with_gemini,
@@ -32,6 +33,107 @@ from gateway.app.providers.gemini_subtitles import (
 from gateway.app.providers.whisper_singleton import transcribe
 
 logger = logging.getLogger(__name__)
+
+
+HOT_FOLLOW_BEAUTY_PROTECTED_ENGLISH: dict[str, str] = {
+    "haggard": "haggard",
+    "bling bling": "bling bling",
+    "matte": "matte",
+    "gloss": "gloss",
+    "lip gloss": "lip gloss",
+    "lip glaze": "lip glaze",
+    "lip mud": "lip mud",
+    "lip tint": "lip tint",
+    "velvet": "velvet",
+    "mirror gloss": "mirror gloss",
+    "shimmer": "shimmer",
+    "glitter": "glitter",
+    "dual-ended": "dual-ended",
+    "double-ended": "double-ended",
+    "cushion": "cushion",
+    "primer": "primer",
+    "setting spray": "setting spray",
+    "spf": "SPF",
+    "pa+++": "PA+++",
+}
+
+HOT_FOLLOW_BEAUTY_CN_REPLACEMENTS: dict[str, str] = {
+    "布灵布灵": "bling bling",
+    "雅光": "哑光",
+    "亚光": "哑光",
+    "亮闪": "爆闪",
+    "细钻": "细闪",
+    "沉膜": "成膜",
+    "速干沉膜": "速干成膜",
+    "不粘杯": "不沾杯",
+    "不占杯": "不沾杯",
+    "双头口红": "双头唇釉",
+    "hagard": "haggard",
+    "哈格德": "haggard",
+}
+
+
+def _hot_follow_normalized_srt_path(task_id: str) -> Path:
+    return subs_dir(task_id) / "origin_normalized.srt"
+
+
+def _extract_hot_follow_metadata_hints(task_id: str) -> dict[str, list[str]]:
+    repo = get_task_repository()
+    task = repo.get(task_id) or {}
+    if str(task.get("kind") or "").strip().lower() != "hot_follow":
+        return {"protected_terms": [], "hashtags": []}
+    raw_parts = [
+        str(task.get("title") or "").strip(),
+        str(task.get("source_url") or "").strip(),
+        str(task.get("note") or "").strip(),
+        str(task.get("template") or "").strip(),
+        str(task.get("category_key") or "").strip(),
+    ]
+    raw_text = " ".join([part for part in raw_parts if part]).strip()
+    hashtags = re.findall(r"#([A-Za-z][A-Za-z0-9_\-\+]{1,32})", raw_text)
+    protected_terms: list[str] = []
+    seen: set[str] = set()
+    for token in hashtags:
+        cleaned = token.strip()
+        lower = cleaned.lower()
+        if lower and lower not in seen:
+            seen.add(lower)
+            protected_terms.append(cleaned)
+    for token in re.findall(r"\b[A-Za-z][A-Za-z0-9\-\+]{1,32}\b", raw_text):
+        lower = token.lower()
+        if lower in seen:
+            continue
+        if lower in HOT_FOLLOW_BEAUTY_PROTECTED_ENGLISH:
+            continue
+        seen.add(lower)
+        protected_terms.append(token)
+    return {"protected_terms": protected_terms, "hashtags": hashtags}
+
+
+def _normalize_hot_follow_source_text(text: str, hints: dict[str, list[str]] | None = None) -> tuple[str, list[str]]:
+    original = str(text or "")
+    normalized = original
+    applied: list[str] = []
+
+    for src, dst in sorted(HOT_FOLLOW_BEAUTY_CN_REPLACEMENTS.items(), key=lambda item: len(item[0]), reverse=True):
+        if src in normalized:
+            normalized = normalized.replace(src, dst)
+            applied.append(f"{src}->{dst}")
+
+    english_terms = dict(HOT_FOLLOW_BEAUTY_PROTECTED_ENGLISH)
+    for token in (hints or {}).get("protected_terms") or []:
+        cleaned = str(token or "").strip()
+        if cleaned:
+            english_terms.setdefault(cleaned.lower(), cleaned)
+
+    for src, canonical in sorted(english_terms.items(), key=lambda item: len(item[0]), reverse=True):
+        pattern = re.compile(re.escape(src), re.IGNORECASE)
+        if pattern.search(normalized):
+            normalized = pattern.sub(canonical, normalized)
+            applied.append(canonical)
+
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized or original, applied
 
 
 _SRT_TIME_RE = re.compile(
@@ -579,7 +681,21 @@ async def generate_subtitles(
                     log_stage=log_stage,
                 )
 
-            origin_text = segments_to_srt(segments, "origin")
+            raw_segments = [dict(seg) for seg in segments]
+            origin_text = segments_to_srt(raw_segments, "origin")
+            metadata_hints = _extract_hot_follow_metadata_hints(task_id)
+            normalization_applied: list[str] = []
+            normalized_segments: list[dict] = []
+            for seg in raw_segments:
+                seg_copy = dict(seg)
+                raw_origin = str(seg_copy.get("origin") or "")
+                normalized_origin, applied_terms = _normalize_hot_follow_source_text(raw_origin, metadata_hints)
+                seg_copy["origin_raw"] = raw_origin
+                seg_copy["origin_normalized"] = normalized_origin
+                seg_copy["origin"] = normalized_origin
+                normalization_applied.extend(applied_terms)
+                normalized_segments.append(seg_copy)
+            normalized_source_text = segments_to_srt(normalized_segments, "origin")
             translations: dict[int, str] = {}
             translation_retry_count = 0
             translate_enabled_local = translate_enabled
@@ -609,7 +725,7 @@ async def generate_subtitles(
                         translations = await asyncio.wait_for(
                             asyncio.to_thread(
                                 translate_segments_with_gemini,
-                                segments=segments,
+                                segments=normalized_segments,
                                 target_lang=target_lang,
                                 debug_dir=subs_dir(task_id),
                             ),
@@ -658,7 +774,7 @@ async def generate_subtitles(
                     logger.warning("Gemini translation failed; fallback to origin only.")
 
             missing_indexes = (
-                _collect_missing_translation_indexes(segments, translations)
+                _collect_missing_translation_indexes(normalized_segments, translations)
                 if translate_enabled_local
                 else []
             )
@@ -667,7 +783,7 @@ async def generate_subtitles(
                 retry_start = time.perf_counter()
                 missing_set = set(missing_indexes)
                 missing_segments = [
-                    seg for seg in segments if int(seg.get("index", 0)) in missing_set
+                    seg for seg in normalized_segments if int(seg.get("index", 0)) in missing_set
                 ]
                 log_stage(
                     "SUB2_TR_RETRY_MISSING_START",
@@ -699,13 +815,13 @@ async def generate_subtitles(
                     )
 
             missing_indexes = (
-                _collect_missing_translation_indexes(segments, translations)
+                _collect_missing_translation_indexes(normalized_segments, translations)
                 if translate_enabled_local
                 else []
             )
-            translated_count = len(segments) - len(missing_indexes)
+            translated_count = len(normalized_segments) - len(missing_indexes)
             translation_qa_payload = _build_translation_qa_payload(
-                source_count=len(segments),
+                source_count=len(normalized_segments),
                 translated_count=translated_count,
                 missing_indexes=missing_indexes,
                 retry_count=translation_retry_count,
@@ -723,24 +839,24 @@ async def generate_subtitles(
                 complete=translation_qa_payload["complete"],
             )
 
-            for seg in segments:
+            for seg in normalized_segments:
                 idx = int(seg.get("index", 0))
                 mm_text = (translations.get(idx) or "").strip() if translations else ""
-                seg["mm"] = mm_text if mm_text else str(seg.get("origin") or "")
+                seg["mm"] = mm_text if mm_text else str(seg.get("origin_normalized") or seg.get("origin") or "")
 
-            mm_text = segments_to_srt(segments, "mm")
+            mm_text = segments_to_srt(normalized_segments, "mm")
             if not mm_text.strip():
-                mm_text = origin_text
+                mm_text = normalized_source_text or origin_text
 
             scenes_payload = {
                 "version": "1.8",
                 "language": "origin",
-                "segments": segments,
+                "segments": normalized_segments,
                 "scenes": [
                     {
                         "scene_id": 1,
-                        "start": segments[0]["start"],
-                        "end": segments[-1]["end"],
+                        "start": normalized_segments[0]["start"],
+                        "end": normalized_segments[-1]["end"],
                         "title": "",
                         "mm_title": "",
                     }
@@ -750,14 +866,21 @@ async def generate_subtitles(
 
             origin_srt_path = workspace.write_origin_srt(origin_text)
             mm_srt_path = workspace.write_mm_srt(mm_text)
+            normalized_srt_path = _hot_follow_normalized_srt_path(task_id)
+            normalized_srt_path.parent.mkdir(parents=True, exist_ok=True)
+            normalized_srt_path.write_text(normalized_source_text, encoding="utf-8")
             origin_txt_path = origin_srt_path.with_suffix(".txt")
             mm_txt_path = mm_srt_path.with_suffix(".txt")
+            normalized_txt_path = normalized_srt_path.with_suffix(".txt")
             _write_txt_from_srt(origin_txt_path, origin_text)
             _write_txt_from_srt(mm_txt_path, mm_text)
+            _write_txt_from_srt(normalized_txt_path, normalized_source_text)
             log_stage(
                 "SUB2_WRITE_DONE",
                 origin_srt_path=str(origin_srt_path),
                 origin_srt_size=origin_srt_path.stat().st_size if origin_srt_path.exists() else None,
+                normalized_srt_path=str(normalized_srt_path),
+                normalized_srt_size=normalized_srt_path.stat().st_size if normalized_srt_path.exists() else None,
                 mm_srt_path=str(mm_srt_path),
                 mm_srt_size=mm_srt_path.stat().st_size if mm_srt_path.exists() else None,
                 mm_txt_path=str(mm_txt_path),
@@ -770,28 +893,33 @@ async def generate_subtitles(
                     "task_id": task_id,
                     "origin_srt_len": len(origin_text or ""),
                     "mm_srt_len": len(mm_text or ""),
-                    "segments_count": len(segments),
+                    "segments_count": len(normalized_segments),
                 },
             )
             log_stage(
                 "SUB2_DONE",
                 origin_srt_len=len(origin_text or ""),
+                normalized_srt_len=len(normalized_source_text or ""),
                 mm_srt_len=len(mm_text or ""),
-                segments_count=len(segments),
+                segments_count=len(normalized_segments),
             )
             return {
                 "task_id": task_id,
                 "origin_srt": origin_text,
+                "normalized_source_srt": normalized_source_text,
                 "mm_srt": mm_text,
                 "mm_txt_path": relative_to_workspace(mm_txt_path),
                 "segments_json": scenes_payload,
                 "origin_preview": build_preview(origin_text),
+                "normalized_source_preview": build_preview(normalized_source_text),
                 "mm_preview": build_preview(mm_text),
                 "stream_probe": probe_result,
                 "clean_video_generated": clean_generated,
                 "translation_qa_path": relative_to_workspace(translation_qa_path),
                 "translation_qa": translation_qa_payload,
                 "translation_incomplete": not bool(translation_qa_payload["complete"]),
+                "metadata_hints": metadata_hints,
+                "normalization_applied": sorted(set(normalization_applied)),
             }
         except Exception as exc:
             log_stage("SUB2_FAIL", error=str(exc))

@@ -211,18 +211,52 @@ def _compose_in_progress_response(task_id: str) -> JSONResponse:
     )
 
 
-def _maybe_run_hot_follow_lipsync_stub(task_id: str, enabled: bool = False) -> str | None:
+def _run_hot_follow_lipsync_stub(task_id: str, task: dict, enabled: bool = False) -> dict[str, Any]:
     if not enabled:
-        return None
+        return {
+            "enabled": False,
+            "status": "off",
+            "warning": None,
+            "compose_video_source": "basic",
+        }
+
     soft_fail = os.getenv("HF_LIPSYNC_SOFT_FAIL", "1").strip().lower() not in ("0", "false", "no")
-    message = "Lipsync stub enabled, but no provider is wired in v1.9; continuing basic compose."
-    if soft_fail:
-        logger.warning("HF_LIPSYNC_STUB_SOFT_FAIL task=%s message=%s", task_id, message)
-        return message
-    raise HTTPException(
-        status_code=409,
-        detail={"reason": "lipsync_stub_blocked", "message": message},
+    voice_state = _collect_voice_execution_state(task, get_settings())
+    video_key = (
+        _task_key(task, "mute_video_key")
+        or _task_key(task, "mute_video_path")
+        or _task_key(task, "raw_path")
     )
+    if not video_key or not object_exists(str(video_key)):
+        message = "Lipsync enhanced path skipped: source video missing."
+        if soft_fail:
+            logger.warning("HF_LIPSYNC_STUB_SOFT_FAIL task=%s message=%s", task_id, message)
+            return {
+                "enabled": True,
+                "status": "fallback_basic",
+                "warning": message,
+                "compose_video_source": "basic",
+            }
+        raise HTTPException(status_code=409, detail={"reason": "lipsync_video_missing", "message": message})
+    if not bool(voice_state.get("audio_ready")):
+        message = f"Lipsync enhanced path skipped: audio not ready ({voice_state.get('audio_ready_reason') or 'audio_not_ready'})."
+        if soft_fail:
+            logger.warning("HF_LIPSYNC_STUB_SOFT_FAIL task=%s message=%s", task_id, message)
+            return {
+                "enabled": True,
+                "status": "fallback_basic",
+                "warning": message,
+                "compose_video_source": "basic",
+            }
+        raise HTTPException(status_code=409, detail={"reason": "lipsync_audio_not_ready", "message": message})
+
+    logger.info("HF_LIPSYNC_STUB_DONE task=%s mode=enhanced_stub", task_id)
+    return {
+        "enabled": True,
+        "status": "done",
+        "warning": "Enhanced path uses the v1.9 stub slot; provider wiring can be inserted later.",
+        "compose_video_source": "enhanced",
+    }
 
 
 def _build_atempo_chain(speed: float) -> str:
@@ -1361,7 +1395,12 @@ def _compose_error_parts(task: dict) -> tuple[str | None, str | None]:
 
 
 def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
-    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
+    voice_state = _collect_voice_execution_state(task, get_settings())
+    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
+    if not final_key and bool(voice_state.get("audio_ready")) and _compose_done_like(
+        task.get("compose_last_status") or task.get("compose_status")
+    ):
+        final_key = deliver_key(task_id, "final.mp4")
     final_meta = object_head(str(final_key)) if final_key and object_exists(str(final_key)) else None
     final_size, final_ctype = media_meta_from_head(final_meta)
     final_asset_version = (
@@ -1375,7 +1414,6 @@ def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     raw_exists = bool(raw_key and object_exists(str(raw_key)))
     voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     voice_exists = bool(voice_key and object_exists(str(voice_key)))
-    voice_state = _collect_voice_execution_state(task, get_settings())
     compose_status = str(task.get("compose_status") or "").lower()
     compose_last_status = str(task.get("compose_last_status") or compose_status).lower()
     compose_done = compose_last_status in {"done", "ready", "success", "completed"}
@@ -1751,6 +1789,16 @@ def _hf_load_origin_subtitles_text(task: dict) -> str:
                 return data.decode("utf-8")
             except Exception:
                 return data.decode("utf-8", errors="ignore")
+    return ""
+
+
+def _hf_load_normalized_source_text(task_id: str) -> str:
+    normalized_path = task_base_dir(task_id) / "subtitles" / "origin_normalized.srt"
+    if normalized_path.exists():
+        try:
+            return normalized_path.read_text(encoding="utf-8")
+        except Exception:
+            return normalized_path.read_text(encoding="utf-8", errors="ignore")
     return ""
 
 
@@ -2564,14 +2612,23 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     final_exists = bool(final_key and object_exists(str(final_key)))
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
-    lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
+    compose_plan = dict(task.get("compose_plan") or {})
+    lipsync_enabled = bool(compose_plan.get("lipsync_enabled"))
+    if not lipsync_enabled:
+        lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
+    lipsync_status = str(compose_plan.get("lipsync_status") or "").strip() or ("pending" if lipsync_enabled else "off")
+    lipsync_warning = str(compose_plan.get("lipsync_warning") or "").strip() or None
+    compose_video_source = str(compose_plan.get("compose_video_source") or "basic").strip() or "basic"
     return {
         **voice_state,
         "compose_status": compose_status,
         "final_exists": final_exists,
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
+        "dub_warnings": _build_hot_follow_dub_warnings(task),
         "lipsync_enabled": lipsync_enabled,
-        "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
+        "lipsync_status": lipsync_status,
+        "lipsync_warning": lipsync_warning,
+        "compose_video_source": compose_video_source,
     }
 
 
@@ -3830,6 +3887,7 @@ def get_hot_follow_workbench_hub(
     scenes_url = _task_endpoint(task_id, "scenes") if scenes_key else None
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
+    normalized_source_text = _hf_load_normalized_source_text(task_id)
     audio_cfg = _hf_audio_config(task)
     voice_state = _collect_voice_execution_state(task, get_settings())
     target_lang_internal = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
@@ -3898,6 +3956,8 @@ def get_hot_follow_workbench_hub(
         "pipeline": pipeline,
         "subtitles": {
             "origin_text": origin_text or "",
+            "raw_source_text": origin_text or "",
+            "normalized_source_text": normalized_source_text or origin_text or "",
             "edited_text": subtitles_text or "",
             "srt_text": subtitles_text or "",
             "status": subtitles_state,
@@ -3916,9 +3976,13 @@ def get_hot_follow_workbench_hub(
             "warning": audio_warning,
             "sha256": task.get("audio_sha256"),
             "audio_ready": bool(voice_state.get("audio_ready")),
+            "audio_ready_reason": voice_state.get("audio_ready_reason"),
             "requested_voice": voice_state.get("requested_voice"),
+            "expected_provider": voice_state.get("expected_provider"),
+            "expected_resolved_voice": voice_state.get("expected_resolved_voice"),
             "actual_provider": voice_state.get("actual_provider"),
             "resolved_voice": voice_state.get("resolved_voice"),
+            "dub_warnings": _build_hot_follow_dub_warnings(task),
         },
         "scenes": {
             "status": scenes_status,
@@ -4375,13 +4439,24 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         subtitle_path = tmp / "subs_target.srt"
         storage.download_file(str(video_key), str(video_path))
         storage.download_file(str(audio_key), str(voice_path))
-        video_size, video_duration = assert_local_video_ok(video_path)
+        compose_video_source_used = str(compose_plan.get("compose_video_source") or "basic").strip().lower() or "basic"
+        compose_visual_path = video_path
+        if compose_video_source_used == "enhanced":
+            enhanced_visual_path = tmp / "video_input_enhanced.mp4"
+            try:
+                shutil.copyfile(video_path, enhanced_visual_path)
+                compose_visual_path = enhanced_visual_path
+            except Exception:
+                compose_video_source_used = "basic"
+                fallback_message = "Lipsync enhanced source preparation failed; fallback to basic compose source."
+                compose_warning = f"{compose_warning} {fallback_message}".strip() if compose_warning else fallback_message
+        video_size, video_duration = assert_local_video_ok(compose_visual_path)
         try:
             _, voice_duration = assert_local_audio_ok(voice_path)
         except ValueError:
             _compose_fail("missing_voiceover", "voiceover audio invalid")
 
-        video_input_path = video_path
+        video_input_path = compose_visual_path
         hold_sec = 0.0
         if freeze_tail_enabled and voice_duration > video_duration:
             required_hold = max(0.0, voice_duration - video_duration)
@@ -4724,6 +4799,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "compose_last_ffmpeg_cmd": ffmpeg_cmd_used,
             "compose_last_error": None,
             "compose_policy": compose_policy,
+            "compose_video_source": compose_video_source_used,
             "freeze_tail_enabled": bool(compose_policy == "freeze_tail"),
             "freeze_tail_cap_sec": int(freeze_tail_cap_sec),
             "compose_warning": compose_warning,
@@ -4767,6 +4843,10 @@ def compose_hot_follow_final_video(
         "freeze_tail_enabled": bool(current_plan.get("freeze_tail_enabled", False)),
         "freeze_tail_cap_sec": int(current_plan.get("freeze_tail_cap_sec") or 8),
         "compose_policy": "freeze_tail" if bool(current_plan.get("freeze_tail_enabled", False)) else "match_video",
+        "lipsync_enabled": os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
+        "lipsync_status": "running" if os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes") else "off",
+        "lipsync_warning": None,
+        "compose_video_source": "basic",
     }
     try:
         _policy_upsert(
@@ -4787,13 +4867,27 @@ def compose_hot_follow_final_video(
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
         )
-        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(
+        lipsync_state = _run_hot_follow_lipsync_stub(
             task_id,
-            os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
+            repo.get(task_id) or task,
+            bool(compose_plan.get("lipsync_enabled")),
         )
+        compose_plan["lipsync_enabled"] = bool(lipsync_state.get("enabled"))
+        compose_plan["lipsync_status"] = str(lipsync_state.get("status") or "off")
+        compose_plan["lipsync_warning"] = lipsync_state.get("warning")
+        compose_plan["compose_video_source"] = str(lipsync_state.get("compose_video_source") or "basic")
+        _policy_upsert(repo, task_id, {"compose_plan": compose_plan})
+        lipsync_warning = str(lipsync_state.get("warning") or "").strip() or None
         if lipsync_warning:
             _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
         updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
+        compose_plan["compose_video_source"] = str(updates.get("compose_video_source") or compose_plan.get("compose_video_source") or "basic")
+        if compose_plan.get("lipsync_status") == "done" and compose_plan["compose_video_source"] != "enhanced":
+            compose_plan["lipsync_status"] = "fallback_basic"
+            fallback_message = "Enhanced path could not provide a visual source; compose used the stable basic path."
+            compose_plan["lipsync_warning"] = f"{compose_plan.get('lipsync_warning') or ''} {fallback_message}".strip()
+            lipsync_warning = compose_plan["lipsync_warning"]
+        updates["compose_plan"] = compose_plan
         if lipsync_warning:
             current_warning = str(updates.get("compose_warning") or "").strip()
             updates["compose_warning"] = f"{current_warning} {lipsync_warning}".strip() if current_warning else lipsync_warning
@@ -4949,16 +5043,7 @@ def compose_task(
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
         )
-        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(
-            task_id,
-            os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
-        )
-        if lipsync_warning:
-            _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
         updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
-        if lipsync_warning:
-            current_warning = str(updates.get("compose_warning") or "").strip()
-            updates["compose_warning"] = f"{current_warning} {lipsync_warning}".strip() if current_warning else lipsync_warning
         _policy_upsert(repo, task_id, updates)
         latest = repo.get(task_id) or task
         resolved_key = _task_key(latest, "final_video_key") or _task_key(latest, "final_video_path")
@@ -5452,6 +5537,16 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "last_step": "dub",
             "dub_status": "running",
             "dub_error": None,
+            "compose_status": "pending",
+            "compose_last_status": "pending",
+            "compose_error": None,
+            "compose_error_reason": None,
+            "compose_warning": None,
+            "final_video_key": None,
+            "final_video_path": None,
+            "final_video_sha256": None,
+            "final_asset_version": None,
+            "final_updated_at": None,
             "mm_audio_key": None,
             "mm_audio_path": None,
             "mm_audio_provider": None,
@@ -5469,6 +5564,46 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         final_voice_id,
         edge_voice,
     )
+
+    expected_provider = _hot_follow_expected_provider(task, selected_voice_id, provider)
+    expected_resolved_voice, _ = resolve_tts_voice(
+        settings=settings,
+        provider=expected_provider,
+        target_lang=target_lang,
+        requested_voice=selected_voice_id,
+    )
+
+    def _mark_hot_follow_dub_failed(reason: str, message: str) -> DubResponse:
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "dub_status": "failed",
+                "dub_error": f"{reason}: {message}",
+                "last_step": "dub",
+                "voice_id": selected_voice_id,
+                "mm_audio_key": None,
+                "mm_audio_path": None,
+                "mm_audio_provider": None,
+                "mm_audio_voice_id": None,
+                "compose_status": "pending",
+                "compose_last_status": "pending",
+                "compose_error": None,
+                "compose_error_reason": None,
+                "final_video_key": None,
+                "final_video_path": None,
+                "final_video_sha256": None,
+            },
+        )
+        stored = repo.get(task_id)
+        detail = _task_to_detail(stored)
+        return DubResponse(
+            **detail.dict(exclude={"mm_audio_key"}),
+            resolved_voice_id=final_voice_id,
+            resolved_edge_voice=edge_voice,
+            audio_sha256=None,
+            mm_audio_key=None,
+        )
 
     try:
         if req_tts_speed is not None:
@@ -5579,26 +5714,13 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 },
             )
             if not audio_key:
-                _policy_upsert(
-                    repo,
-                    task_id,
-                    {
-                        "dub_provider": provider,
-                        "last_step": "dub",
-                        "voice_id": selected_voice_id,
-                        "dub_status": "failed",
-                        "dub_error": "output_missing",
-                        "dub_generated_at": datetime.now(timezone.utc).isoformat(),
-                    },
-                )
-                stored = repo.get(task_id)
-                detail = _task_to_detail(stored)
-                return DubResponse(
-                    **detail.dict(exclude={"mm_audio_key"}),
-                    resolved_voice_id=final_voice_id,
-                    resolved_edge_voice=edge_voice,
-                    audio_sha256=None,
-                    mm_audio_key=None,
+                return _mark_hot_follow_dub_failed("output_missing", "no audio artifact after no_dub flow")
+            if normalize_provider(provider) != normalize_provider(expected_provider):
+                return _mark_hot_follow_dub_failed("provider_mismatch", f"expected {expected_provider}, got {provider}")
+            if expected_resolved_voice and final_voice_id != expected_resolved_voice:
+                return _mark_hot_follow_dub_failed(
+                    "voice_mismatch",
+                    f"expected {expected_resolved_voice}, got {final_voice_id}",
                 )
             _policy_upsert(repo, 
                 task_id,
@@ -5669,52 +5791,36 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "size": existing_audio_size,
                 },
             )
-            _policy_upsert(
-                repo,
-                task_id,
-                {
-                    "dub_status": "failed",
-                    "dub_error": "output_missing",
-                    "last_step": "dub",
-                    "voice_id": selected_voice_id,
-                },
-            )
-            stored = repo.get(task_id)
-            detail = _task_to_detail(stored)
-            return DubResponse(
-                **detail.dict(exclude={"mm_audio_key"}),
-                resolved_voice_id=final_voice_id,
-                resolved_edge_voice=edge_voice,
-                audio_sha256=task_after.get("audio_sha256"),
-                mm_audio_key=task_after.get("mm_audio_key") or task_after.get("mm_audio_path"),
-            )
+            return _mark_hot_follow_dub_failed("output_missing", "fresh dub output is missing")
 
         try:
             local_size, local_duration = assert_local_audio_ok(audio_path)
         except ValueError:
-            _policy_upsert(
-                repo,
-                task_id,
-                {
-                    "dub_status": "failed",
-                    "dub_error": "output_missing",
-                    "last_step": "dub",
-                    "voice_id": selected_voice_id,
-                },
-            )
-            stored = repo.get(task_id)
-            detail = _task_to_detail(stored)
-            return DubResponse(
-                **detail.dict(exclude={"mm_audio_key"}),
-                resolved_voice_id=final_voice_id,
-                resolved_edge_voice=edge_voice,
-                audio_sha256=task_after.get("audio_sha256"),
-                mm_audio_key=task_after.get("mm_audio_key") or task_after.get("mm_audio_path"),
-            )
+            return _mark_hot_follow_dub_failed("audio_invalid", "dub output is not probeable audio")
+        if local_size < MIN_AUDIO_BYTES or local_duration <= 0.15:
+            return _mark_hot_follow_dub_failed("audio_invalid", "dub output is too small or too short")
         audio_key = deliver_key(task_id, "audio_mm.mp3")
         storage = get_storage_service()
         storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
         audio_sha256 = _sha256_file(audio_path)
+        if not object_exists(str(audio_key)):
+            return _mark_hot_follow_dub_failed("upload_missing", "uploaded dub artifact is missing")
+        try:
+            assert_artifact_ready(
+                kind="audio",
+                key=str(audio_key),
+                exists_fn=object_exists,
+                head_fn=object_head,
+            )
+        except Exception:
+            return _mark_hot_follow_dub_failed("upload_invalid", "uploaded dub artifact is invalid")
+        if normalize_provider(provider) != normalize_provider(expected_provider):
+            return _mark_hot_follow_dub_failed("provider_mismatch", f"expected {expected_provider}, got {provider}")
+        if expected_resolved_voice and final_voice_id != expected_resolved_voice:
+            return _mark_hot_follow_dub_failed(
+                "voice_mismatch",
+                f"expected {expected_resolved_voice}, got {final_voice_id}",
+            )
         logger.info(
             "DUB3_OUTPUT_CHECK",
             extra={
@@ -5747,6 +5853,10 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "dub_error": f"{exc.status_code}: {exc.detail}",
                 "mm_audio_key": None,
                 "mm_audio_path": None,
+                "compose_status": "pending",
+                "compose_last_status": "pending",
+                "final_video_key": None,
+                "final_video_path": None,
             },
         )
         raise
@@ -5759,6 +5869,10 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "dub_error": str(exc),
                 "mm_audio_key": None,
                 "mm_audio_path": None,
+                "compose_status": "pending",
+                "compose_last_status": "pending",
+                "final_video_key": None,
+                "final_video_path": None,
             },
         )
         logger.exception("DUB3_FAIL", extra={"task_id": task_id, "step": "dub", "phase": "exception"})
