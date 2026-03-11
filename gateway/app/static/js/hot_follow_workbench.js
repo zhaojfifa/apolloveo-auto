@@ -277,7 +277,7 @@
 
   function renderVoiceOptions(selectedProvider) {
     if (!ttsVoiceEl) return;
-    const providerKey = normalizeEngineKey(selectedProvider || (ttsEngineEl && ttsEngineEl.value) || "edge_tts");
+    const providerKey = normalizeEngineKey(selectedProvider || (ttsEngineEl && ttsEngineEl.value) || "azure_speech");
     const optionsByProvider = (currentHub && currentHub.voice_options_by_provider) || ((window.__TASK_JSON__ || {}).voice_options_by_provider) || {};
     const options = Array.isArray(optionsByProvider[providerKey]) ? optionsByProvider[providerKey] : [];
     const requestedVoice = ((currentHub && currentHub.requested_voice) || (window.__TASK_JSON__ || {}).requested_voice || "").trim();
@@ -329,8 +329,8 @@
     const audio = (currentHub && currentHub.audio) || {};
     const media = (currentHub && currentHub.media) || {};
     const voiceUrl = media.voiceover_url || audio.voiceover_url || audio.audio_url || null;
-    if (ttsEngineEl && audio.tts_engine) ttsEngineEl.value = audio.tts_engine;
-    renderVoiceOptions(audio.tts_engine);
+    if (ttsEngineEl) ttsEngineEl.value = audio.tts_engine || "azure_speech";
+    renderVoiceOptions(audio.tts_engine || "azure_speech");
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
     const capRaw = Number(audio.audio_fit_max_speed);
     const cap = Number.isFinite(capRaw) ? capRaw : 1.25;
@@ -506,7 +506,7 @@
     const fallbackText = subtitles.edited_text || subtitles.srt_text || subtitles.origin_text || "";
     const dubText = (textareaText || "").trim() ? textareaText : fallbackText;
     const payload = {
-      provider: provider === "edge_tts" ? "edge-tts" : provider,
+      provider: provider === "edge_tts" ? "edge-tts" : (provider === "azure_speech" ? "azure-speech" : provider),
       voice_id: voiceId || null,
       mm_text: dubText || "",
       tts_speed: getSelectedTtsSpeed(),

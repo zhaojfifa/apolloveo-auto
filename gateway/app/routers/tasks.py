@@ -2328,17 +2328,20 @@ def _repo_upsert(repo, task_id: str, patch: dict) -> None:
 
 def _build_hot_follow_voice_options(settings, target_lang: str | None) -> dict[str, list[dict[str, str]]]:
     if normalize_target_lang(target_lang) != "my":
-        return {"edge_tts": [], "lovo": []}
+        return {"azure_speech": [], "edge_tts": []}
 
-    options: dict[str, list[dict[str, str]]] = {"edge_tts": [], "lovo": []}
+    options: dict[str, list[dict[str, str]]] = {"azure_speech": [], "edge_tts": []}
+    azure_map = getattr(settings, "azure_tts_voice_map", {}) or {}
+    if azure_map.get("mm_female_1"):
+        options["azure_speech"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
+    if azure_map.get("mm_male_1"):
+        options["azure_speech"].append({"value": "mm_male_1", "label": "缅语男声（标准）"})
+
     edge_map = getattr(settings, "edge_tts_voice_map", {}) or {}
     if edge_map.get("mm_female_1"):
         options["edge_tts"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
     if edge_map.get("mm_male_1"):
         options["edge_tts"].append({"value": "mm_male_1", "label": "缅语男声（标准）"})
-
-    if getattr(settings, "lovo_speaker_mm_female_1", None):
-        options["lovo"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
     return options
 
 
@@ -2392,8 +2395,9 @@ def _hot_follow_expected_provider(task: dict, requested_voice: str | None, defau
     provider = normalize_provider(default_provider)
     target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     if str(task.get("kind") or "").strip().lower() == "hot_follow" and target_lang == "my":
-        if str(requested_voice or "").strip() == "mm_male_1":
-            return "edge-tts"
+        requested = str(requested_voice or "").strip()
+        if not requested or requested in {"mm_female_1", "mm_male_1"}:
+            return "azure-speech"
     return provider
 
 
@@ -3177,6 +3181,39 @@ def create_hot_follow_task(
     data["category_key"] = data.get("category_key") or "hot_follow"
     if data.get("auto_start") is None:
         data["auto_start"] = True
+    target_lang = normalize_target_lang(data.get("content_lang") or "my")
+    if target_lang == "my":
+        settings = get_settings()
+        config = dict(data.get("config") or {})
+        requested_voice = (
+            str(data.get("voice_id") or "").strip()
+            or str(config.get("tts_requested_voice") or config.get("hot_follow_tts_requested_voice") or "").strip()
+            or os.getenv("DEFAULT_MM_VOICE_ID", "mm_female_1").strip()
+            or "mm_female_1"
+        )
+        expected_provider = _hot_follow_expected_provider(
+            {
+                "kind": "hot_follow",
+                "target_lang": target_lang,
+                "content_lang": target_lang,
+            },
+            requested_voice,
+            data.get("dub_provider") or config.get("tts_provider") or settings.dub_provider,
+        )
+        resolved_voice, _ = resolve_tts_voice(
+            settings=settings,
+            provider=expected_provider,
+            target_lang=target_lang,
+            requested_voice=requested_voice,
+        )
+        data["voice_id"] = requested_voice
+        data["dub_provider"] = expected_provider
+        if resolved_voice:
+            config["tts_requested_voice"] = requested_voice
+            config["hot_follow_tts_requested_voice"] = requested_voice
+            config["tts_provider"] = expected_provider
+            config["tts_resolved_voice"] = resolved_voice
+            data["config"] = config
     normalized = TaskCreate(**data)
     return create_task(normalized, background_tasks=background_tasks, repo=repo)
 
