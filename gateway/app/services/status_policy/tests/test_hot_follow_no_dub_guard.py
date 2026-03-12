@@ -11,6 +11,7 @@ def _load_no_dub_helper():
         "_hf_load_normalized_source_text",
         "_hf_dub_input_text",
         "_hf_dual_channel_state",
+        "_hf_safe_dual_channel_state",
         "_hf_detect_no_dub_candidate",
     }
     selected = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in keep]

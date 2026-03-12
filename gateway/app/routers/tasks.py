@@ -1780,6 +1780,17 @@ def _hf_load_normalized_source_text(task_id: str, task: dict) -> str:
     return _hf_load_origin_subtitles_text(task)
 
 
+def _hf_safe_normalized_source_text(task_id: str, task: dict) -> str:
+    try:
+        return _hf_load_normalized_source_text(task_id, task) or ""
+    except Exception:
+        logger.warning("HF_HUB_NORMALIZED_TEXT_FAIL task=%s", task_id, exc_info=True)
+        try:
+            return _hf_load_origin_subtitles_text(task) or ""
+        except Exception:
+            return ""
+
+
 def _hf_dub_input_text(task_id: str, task: dict, manual_text: str | None = None) -> str:
     manual_value = str(manual_text or "").strip()
     if manual_value:
@@ -1791,6 +1802,20 @@ def _hf_dub_input_text(task_id: str, task: dict, manual_text: str | None = None)
     if str(normalized_text or "").strip():
         return str(normalized_text)
     return _hf_load_origin_subtitles_text(task)
+
+
+def _hf_safe_dub_input_text(task_id: str, task: dict, manual_text: str | None = None) -> str:
+    try:
+        return _hf_dub_input_text(task_id, task, manual_text) or ""
+    except Exception:
+        logger.warning("HF_HUB_DUB_INPUT_TEXT_FAIL task=%s", task_id, exc_info=True)
+        try:
+            edited = _hf_load_subtitles_text(task_id, task)
+            if str(edited or "").strip():
+                return str(edited)
+        except Exception:
+            pass
+        return ""
 
 
 def _hf_source_subtitle_cover_filter(compose_plan: dict[str, Any] | None, config: dict[str, Any] | None = None) -> str | None:
@@ -1899,6 +1924,30 @@ def _hf_dual_channel_state(task_id: str, task: dict) -> dict[str, Any]:
     }
 
 
+def _hf_safe_dual_channel_state(task_id: str, task: dict) -> dict[str, Any]:
+    try:
+        state = _hf_dual_channel_state(task_id, task) or {}
+    except Exception:
+        logger.warning("HF_HUB_DUAL_CHANNEL_FAIL task=%s", task_id, exc_info=True)
+        state = {}
+    content_mode = str(state.get("content_mode") or "").strip()
+    if content_mode not in {"voice_led", "subtitle_led_candidate", "silent_candidate"}:
+        content_mode = "unknown"
+    speech_confidence = str(state.get("speech_confidence") or "").strip() or "none"
+    if speech_confidence not in {"high", "low", "none"}:
+        speech_confidence = "none"
+    onscreen_text_density = str(state.get("onscreen_text_density") or "").strip() or "none"
+    if onscreen_text_density not in {"high", "low", "none"}:
+        onscreen_text_density = "none"
+    return {
+        "speech_detected": bool(state.get("speech_detected")),
+        "speech_confidence": speech_confidence,
+        "onscreen_text_detected": bool(state.get("onscreen_text_detected")),
+        "onscreen_text_density": onscreen_text_density,
+        "content_mode": content_mode,
+    }
+
+
 def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | None = None) -> dict[str, Any]:
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     origin_text = _hf_load_origin_subtitles_text(task)
@@ -1927,7 +1976,7 @@ def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | Non
         and not _hf_has_usable_dub_text(edited_text)
         and not _hf_has_usable_dub_text(manual_value)
     )
-    channel_state = _hf_dual_channel_state(task_id, task)
+    channel_state = _hf_safe_dual_channel_state(task_id, task)
     if channel_state.get("content_mode") == "subtitle_led_candidate" and empty_transcript:
         return {
             "no_dub": True,
@@ -2722,7 +2771,11 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     dub_status = str(task.get("dub_status") or "").strip().lower()
     dub_running = dub_status in {"queued", "running", "processing"}
     dub_done = dub_status in {"ready", "done", "success", "completed"}
-    no_dub_state = _hf_detect_no_dub_candidate(task_id, task)
+    try:
+        no_dub_state = _hf_detect_no_dub_candidate(task_id, task)
+    except Exception:
+        logger.warning("HF_HUB_NO_DUB_STATE_FAIL task=%s", task_id, exc_info=True)
+        no_dub_state = {"no_dub": False, "no_dub_reason": None, "no_dub_message": None}
     audio_ready_reason = "ready"
     if no_dub_state.get("no_dub"):
         audio_ready_reason = str(no_dub_state.get("no_dub_reason") or "no_dub_candidate")
@@ -2760,14 +2813,32 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
 
 
 def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
-    voice_state = _collect_voice_execution_state(task, settings)
+    try:
+        voice_state = _collect_voice_execution_state(task, settings)
+    except Exception:
+        task_id = str(task.get("task_id") or task.get("id") or "")
+        logger.warning("HF_HUB_VOICE_STATE_FAIL task=%s", task_id, exc_info=True)
+        voice_state = {
+            "target_lang": "mm",
+            "voice_options_by_provider": {},
+            "requested_voice": None,
+            "actual_provider": None,
+            "resolved_voice": None,
+            "expected_provider": None,
+            "expected_resolved_voice": None,
+            "audio_ready": False,
+            "audio_ready_reason": "unknown",
+            "no_dub": False,
+            "no_dub_reason": None,
+            "no_dub_message": None,
+        }
     task_id = str(task.get("task_id") or task.get("id") or "")
-    channel_state = _hf_dual_channel_state(task_id, task) if task_id else {
+    channel_state = _hf_safe_dual_channel_state(task_id, task) if task_id else {
         "speech_detected": False,
         "speech_confidence": "none",
         "onscreen_text_detected": False,
         "onscreen_text_density": "none",
-        "content_mode": "silent_candidate",
+        "content_mode": "unknown",
     }
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
     final_exists = bool(final_key and object_exists(str(final_key)))
@@ -4074,13 +4145,32 @@ def get_hot_follow_workbench_hub(
     scenes_url = _task_endpoint(task_id, "scenes") if scenes_key else None
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
-    normalized_source_text = _hf_load_normalized_source_text(task_id, task)
-    dub_input_text = _hf_dub_input_text(task_id, task)
+    normalized_source_text = _hf_safe_normalized_source_text(task_id, task)
+    dub_input_text = _hf_safe_dub_input_text(task_id, task)
     audio_cfg = _hf_audio_config(task)
-    voice_state = _collect_voice_execution_state(task, get_settings())
+    try:
+        voice_state = _collect_voice_execution_state(task, get_settings())
+    except Exception:
+        logger.warning("HF_WORKBENCH_HUB_VOICE_STATE_FAIL task=%s", task_id, exc_info=True)
+        voice_state = {
+            "requested_voice": None,
+            "actual_provider": None,
+            "resolved_voice": None,
+            "expected_provider": None,
+            "expected_resolved_voice": None,
+            "audio_ready": False,
+            "audio_ready_reason": "unknown",
+            "no_dub": False,
+            "no_dub_reason": None,
+            "no_dub_message": None,
+        }
     target_lang_internal = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
-    text_guard = clean_and_analyze_dub_text(subtitles_text or "", target_lang_internal)
-    audio_warning = str(text_guard.get("warning") or "").strip() or None
+    try:
+        text_guard = clean_and_analyze_dub_text(subtitles_text or "", target_lang_internal)
+    except Exception:
+        logger.warning("HF_WORKBENCH_HUB_TEXT_GUARD_FAIL task=%s", task_id, exc_info=True)
+        text_guard = {}
+    audio_warning = str((text_guard or {}).get("warning") or "").strip() or None
     if not (audio_cfg.get("voiceover_url") or "").strip() and (task.get("mm_audio_key") or task.get("mm_audio_path")):
         dub_state = "failed"
         if not dub_summary:
@@ -4341,7 +4431,41 @@ def get_hot_follow_workbench_hub(
                     item["status"] = "pending"
                     item["state"] = "pending"
                     break
-    payload.update(_collect_hot_follow_workbench_ui(task, get_settings()))
+    try:
+        payload.update(_collect_hot_follow_workbench_ui(task, get_settings()))
+    except Exception:
+        logger.warning("HF_WORKBENCH_HUB_UI_STATE_FAIL task=%s", task_id, exc_info=True)
+        payload.update(
+            {
+                "compose_status": str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never",
+                "final_exists": bool((payload.get("final") or {}).get("exists")),
+                "actual_burn_subtitle_source": payload.get("subtitles", {}).get("actual_burn_subtitle_source"),
+                "speech_detected": False,
+                "speech_confidence": "none",
+                "onscreen_text_detected": False,
+                "onscreen_text_density": "none",
+                "content_mode": "unknown",
+                "recommended_path": None,
+                "ocr_enabled": False,
+                "ocr_fallback_only": True,
+                "ocr_soft_fail": True,
+                "ocr_status": "off",
+                "ocr_candidate": False,
+                "ocr_warning": None,
+                "lipsync_enabled": os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
+                "lipsync_status": str(task.get("lipsync_status") or "off").strip() or "off",
+                "lipsync_warning": str(task.get("lipsync_warning") or "").strip() or None,
+                "compose_video_source": str(task.get("compose_video_source") or "basic").strip() or "basic",
+                "requested_voice": voice_state.get("requested_voice"),
+                "actual_provider": voice_state.get("actual_provider"),
+                "resolved_voice": voice_state.get("resolved_voice"),
+                "audio_ready": bool(voice_state.get("audio_ready")),
+                "audio_ready_reason": voice_state.get("audio_ready_reason") or "unknown",
+                "no_dub": bool(voice_state.get("no_dub")),
+                "no_dub_reason": voice_state.get("no_dub_reason"),
+                "no_dub_message": voice_state.get("no_dub_message"),
+            }
+        )
     return payload
 
 
