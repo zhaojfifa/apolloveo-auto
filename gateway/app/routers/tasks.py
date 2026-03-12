@@ -840,6 +840,49 @@ def _hf_fresh_dub_output_path(task_id: str, workspace: Workspace, task_after: di
     return None
 
 
+def _hf_persist_dub_artifact(
+    *,
+    repo,
+    task_id: str,
+    provider: str,
+    selected_voice_id: str | None,
+    final_voice_id: str | None,
+    config: dict[str, Any],
+    request_token: str,
+    local_audio_path: Path,
+) -> tuple[str, int, float, str | None]:
+    mp3_path = local_audio_path
+    if local_audio_path.suffix.lower() != ".mp3":
+        mp3_path = _ensure_mp3_audio(local_audio_path, Workspace(task_id).mm_audio_mp3_path)
+    output_size, output_duration = assert_local_audio_ok(mp3_path)
+    audio_key = deliver_key(task_id, "audio_mm.mp3")
+    storage = get_storage_service()
+    storage.upload_file(str(mp3_path), audio_key, content_type="audio/mpeg")
+    audio_sha256 = _sha256_file(mp3_path)
+    _policy_upsert(
+        repo,
+        task_id,
+        {
+            "mm_audio_path": audio_key,
+            "mm_audio_key": audio_key,
+            "mm_audio_provider": provider,
+            "mm_audio_voice_id": final_voice_id,
+            "mm_audio_bytes": output_size,
+            "mm_audio_duration_ms": int(output_duration * 1000),
+            "mm_audio_mime": "audio/mpeg",
+            "dub_provider": provider,
+            "last_step": "dubbing",
+            "voice_id": selected_voice_id,
+            "dub_status": "ready",
+            "dub_error": None,
+            "audio_sha256": audio_sha256,
+            "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+            "config": {**config, "tts_completed_token": request_token},
+        },
+    )
+    return audio_key, int(output_size), float(output_duration), audio_sha256
+
+
 @pages_router.head("/v1/tasks/{task_id}/audio_mm")
 def head_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     try:
@@ -5990,15 +6033,20 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             return _mark_hot_follow_dub_failed("output_missing", "fresh dub output is missing")
 
         try:
-            local_size, local_duration = assert_local_audio_ok(audio_path)
+            audio_key, local_size, local_duration, audio_sha256 = _hf_persist_dub_artifact(
+                repo=repo,
+                task_id=task_id,
+                provider=provider,
+                selected_voice_id=selected_voice_id,
+                final_voice_id=final_voice_id,
+                config=config,
+                request_token=request_token,
+                local_audio_path=audio_path,
+            )
         except ValueError:
             return _mark_hot_follow_dub_failed("audio_invalid", "dub output is not probeable audio")
         if local_size < MIN_AUDIO_BYTES or local_duration <= 0.15:
             return _mark_hot_follow_dub_failed("audio_invalid", "dub output is too small or too short")
-        audio_key = deliver_key(task_id, "audio_mm.mp3")
-        storage = get_storage_service()
-        storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
-        audio_sha256 = _sha256_file(audio_path)
         if not object_exists(str(audio_key)):
             return _mark_hot_follow_dub_failed("upload_missing", "uploaded dub artifact is missing")
         try:
@@ -6075,27 +6123,6 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         raise HTTPException(status_code=500, detail=f"Dubbing step failed: {exc}")
 
     # repo.update 鏈繀瀛樺湪锛涚敤 upsert 鏇寸ǔ
-    _policy_upsert(repo, 
-        task_id,
-        {
-            "mm_audio_path": audio_key,
-            "mm_audio_key": audio_key,
-            "mm_audio_provider": provider,
-            "mm_audio_voice_id": final_voice_id,
-            "mm_audio_bytes": local_size,
-            "mm_audio_duration_ms": int(local_duration * 1000),
-            "mm_audio_mime": "audio/mpeg",
-            "dub_provider": provider,
-            "last_step": "dubbing",
-            "voice_id": selected_voice_id,
-            "dub_status": "ready",
-            "dub_error": None,
-            "audio_sha256": audio_sha256,
-            "dub_generated_at": datetime.now(timezone.utc).isoformat(),
-            "config": {**config, "tts_completed_token": request_token},
-        },
-    )
-
     stored = repo.get(task_id)
     detail = _task_to_detail(stored)
     logger.info(
