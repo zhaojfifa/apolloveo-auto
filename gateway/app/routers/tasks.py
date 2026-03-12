@@ -2322,6 +2322,16 @@ def _repo_upsert(repo, task_id: str, patch: dict) -> None:
     _policy_upsert(repo, task_id, patch)
 
 
+def _repo_refresh_task(repo, task_id: str) -> Any:
+    session = getattr(repo, "session", None)
+    if session is not None:
+        try:
+            session.expire_all()
+        except Exception:
+            logger.warning("HF_REPO_REFRESH_FAIL task=%s", task_id)
+    return repo.get(task_id)
+
+
 def _build_hot_follow_voice_options(settings, target_lang: str | None) -> dict[str, list[dict[str, str]]]:
     if normalize_target_lang(target_lang) != "my":
         return {"azure_speech": [], "edge_tts": []}
@@ -5563,7 +5573,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         # 鏍稿績锛歋SOT dubbing
         await run_dub_step_ssot(task_adapter)
 
-        task_after = repo.get(task_id) or {}
+        task_after = _repo_refresh_task(repo, task_id) or {}
         existing_audio_key = task_after.get("mm_audio_key") or task_after.get("mm_audio_path")
         existing_audio_exists = bool(existing_audio_key and object_exists(str(existing_audio_key)))
         existing_audio_size = 0
@@ -5650,7 +5660,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                         "dub_generated_at": datetime.now(timezone.utc).isoformat(),
                     },
                 )
-                stored = repo.get(task_id)
+                stored = _repo_refresh_task(repo, task_id)
                 detail = _task_to_detail(stored)
                 return DubResponse(
                     **detail.dict(exclude={"mm_audio_key"}),
@@ -5679,7 +5689,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "config": {**config, "tts_completed_token": request_token},
                 },
             )
-            stored = repo.get(task_id)
+            stored = _repo_refresh_task(repo, task_id)
             detail = _task_to_detail(stored)
             logger.info(
                 "DUB3_DONE",
@@ -5755,7 +5765,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                         "config": {**config, "tts_completed_token": request_token},
                     },
                 )
-                stored = repo.get(task_id)
+                stored = _repo_refresh_task(repo, task_id)
                 detail = _task_to_detail(stored)
                 return DubResponse(
                     **detail.dict(exclude={"mm_audio_key"}),
@@ -5804,7 +5814,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "audio_sha256": None,
                 },
             )
-            stored = repo.get(task_id)
+            stored = _repo_refresh_task(repo, task_id)
             detail = _task_to_detail(stored)
             return DubResponse(
                 **detail.dict(exclude={"mm_audio_key"}),
@@ -5846,7 +5856,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "audio_sha256": None,
                 },
             )
-            stored = repo.get(task_id)
+            stored = _repo_refresh_task(repo, task_id)
             detail = _task_to_detail(stored)
             return DubResponse(
                 **detail.dict(exclude={"mm_audio_key"}),
@@ -5941,7 +5951,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         },
     )
 
-    stored = repo.get(task_id)
+    stored = _repo_refresh_task(repo, task_id)
     detail = _task_to_detail(stored)
     logger.info(
         "DUB3_DONE",
