@@ -1376,6 +1376,7 @@ def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     voice_exists = bool(voice_key and object_exists(str(voice_key)))
     voice_state = _collect_voice_execution_state(task, get_settings())
+    no_dub_state = _hf_detect_no_dub_candidate(task_id, task)
     compose_status = str(task.get("compose_status") or "").lower()
     compose_last_status = str(task.get("compose_last_status") or compose_status).lower()
     compose_done = compose_last_status in {"done", "ready", "success", "completed"}
@@ -1754,6 +1755,73 @@ def _hf_load_origin_subtitles_text(task: dict) -> str:
     return ""
 
 
+def _hf_no_dub_note_path(task_id: str) -> Path:
+    return task_base_dir(task_id) / "dub" / "no_dub.txt"
+
+
+def _hf_write_no_dub_note(task_id: str, reason: str) -> None:
+    note_path = _hf_no_dub_note_path(task_id)
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+    note_path.write_text(str(reason or "no_speech_detected").strip() + "\n", encoding="utf-8")
+
+
+def _hf_clear_no_dub_note(task_id: str) -> None:
+    note_path = _hf_no_dub_note_path(task_id)
+    try:
+        if note_path.exists():
+            note_path.unlink()
+    except Exception:
+        logger.warning("HF_NO_DUB_NOTE_CLEAR_FAIL task=%s path=%s", task_id, note_path)
+
+
+def _hf_plain_text_signal(text: str | None) -> str:
+    value = str(text or "").strip()
+    if not value:
+        return ""
+    if value in {"NO_SUBTITLES_MARKER", "MM_TXT_MISSING"}:
+        return ""
+    if "NO_SUBTITLES_MARKER" in value or "MM_TXT_MISSING" in value:
+        return ""
+    return value
+
+
+def _hf_has_usable_dub_text(text: str | None) -> bool:
+    return bool(_hf_plain_text_signal(text))
+
+
+def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | None = None) -> dict[str, Any]:
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    origin_text = _hf_load_origin_subtitles_text(task)
+    edited_text = _hf_load_subtitles_text(task_id, task)
+    manual_value = str(manual_text or "").strip()
+    title_hint = " ".join(
+        [
+            str(task.get("title") or ""),
+            str(task.get("source_title") or ""),
+            str(task.get("note") or ""),
+        ]
+    ).lower()
+    silent_hint = any(token in title_hint for token in ("无人声", "asmr", "涂抹音", "无语音", "no voice"))
+    no_subtitles_flag = pipeline_config.get("no_subtitles") == "true"
+    no_dub_flag = pipeline_config.get("no_dub") == "true"
+    no_marker = any(
+        token in " ".join([origin_text, edited_text, manual_value])
+        for token in ("NO_SUBTITLES_MARKER", "MM_TXT_MISSING")
+    )
+    if _hf_has_usable_dub_text(manual_value) or _hf_has_usable_dub_text(edited_text):
+        return {"no_dub": False, "no_dub_reason": None, "no_dub_message": None}
+    empty_transcript = not _hf_has_usable_dub_text(origin_text) and not _hf_has_usable_dub_text(edited_text) and not _hf_has_usable_dub_text(manual_value)
+    if no_subtitles_flag or no_dub_flag or no_marker or silent_hint or empty_transcript:
+        reason = "no_speech_detected" if (silent_hint or no_marker or no_subtitles_flag or no_dub_flag) else "empty_transcript"
+        message = (
+            "当前素材更像无人声 / ASMR 素材，已跳过配音。如需继续，请手工编辑字幕文本后再生成配音。"
+            if reason == "no_speech_detected"
+            else "未检测到可配音语音内容，已跳过配音。如需继续，请手工编辑字幕文本后再生成配音。"
+        )
+        return {"no_dub": True, "no_dub_reason": reason, "no_dub_message": message}
+    return {"no_dub": False, "no_dub_reason": None, "no_dub_message": None}
+
+
 def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
     last_step = str(task.get("last_step") or "").lower()
     task_status = str(task.get("status") or "").lower()
@@ -1776,6 +1844,9 @@ def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
     if step == "audio":
         status = _hf_state_from_status(task.get("dub_status"))
         voice_state = _collect_voice_execution_state(task, get_settings())
+        if voice_state.get("no_dub"):
+            status = "pending"
+            return status, str(voice_state.get("no_dub_message") or "dubbing skipped")
         if status == "pending" and voice_state.get("audio_ready"):
             status = "done"
         if status == "pending" and task_status == "processing" and last_step == "dub":
@@ -2496,6 +2567,7 @@ def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
 
 
 def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
+    task_id = str(task.get("task_id") or task.get("id") or "")
     target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     voice_options_by_provider = _build_hot_follow_voice_options(settings, target_lang)
     config_state = _voice_state_config(task)
@@ -2527,8 +2599,11 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     dub_status = str(task.get("dub_status") or "").strip().lower()
     dub_running = dub_status in {"queued", "running", "processing"}
     dub_done = dub_status in {"ready", "done", "success", "completed"}
+    no_dub_state = _hf_detect_no_dub_candidate(task_id, task)
     audio_ready_reason = "ready"
-    if dub_running:
+    if no_dub_state.get("no_dub"):
+        audio_ready_reason = "no_dub_candidate"
+    elif dub_running:
         audio_ready_reason = "dub_running"
     elif not audio_exists:
         audio_ready_reason = "audio_missing"
@@ -2555,6 +2630,9 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         "expected_resolved_voice": expected_resolved_voice,
         "audio_ready": audio_ready,
         "audio_ready_reason": audio_ready_reason,
+        "no_dub": bool(no_dub_state.get("no_dub")),
+        "no_dub_reason": no_dub_state.get("no_dub_reason"),
+        "no_dub_message": no_dub_state.get("no_dub_message"),
     }
 
 
@@ -2572,6 +2650,9 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
         "lipsync_enabled": lipsync_enabled,
         "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
+        "no_dub": voice_state.get("no_dub"),
+        "no_dub_reason": voice_state.get("no_dub_reason"),
+        "no_dub_message": voice_state.get("no_dub_message"),
     }
 
 
@@ -3916,9 +3997,13 @@ def get_hot_follow_workbench_hub(
             "warning": audio_warning,
             "sha256": task.get("audio_sha256"),
             "audio_ready": bool(voice_state.get("audio_ready")),
+            "audio_ready_reason": voice_state.get("audio_ready_reason"),
             "requested_voice": voice_state.get("requested_voice"),
             "actual_provider": voice_state.get("actual_provider"),
             "resolved_voice": voice_state.get("resolved_voice"),
+            "no_dub": bool(no_dub_state.get("no_dub")),
+            "no_dub_reason": no_dub_state.get("no_dub_reason"),
+            "no_dub_message": no_dub_state.get("no_dub_message"),
         },
         "scenes": {
             "status": scenes_status,
@@ -5432,6 +5517,67 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     config["tts_provider"] = provider
     config["tts_request_token"] = request_token
     config["tts_completed_token"] = None
+
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+
+    def _mark_hot_follow_no_dub(reason: str, message: str) -> DubResponse:
+        pipeline_updates = dict(pipeline_config)
+        pipeline_updates["no_dub"] = "true"
+        pipeline_updates["dub_skip_reason"] = reason
+        _hf_write_no_dub_note(task_id, reason)
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "config": config,
+                "pipeline_config": pipeline_config_to_storage(pipeline_updates),
+                "dub_provider": provider,
+                "voice_id": selected_voice_id,
+                "last_step": "dub",
+                "dub_status": "skipped",
+                "dub_error": None,
+                "mm_audio_key": None,
+                "mm_audio_path": None,
+                "mm_audio_provider": None,
+                "mm_audio_voice_id": None,
+                "audio_sha256": None,
+                "compose_status": "pending",
+                "compose_last_status": "pending",
+                "compose_error": {"reason": "no_dub_candidate", "message": message},
+                "compose_error_reason": "no_dub_candidate",
+                "compose_warning": message,
+                "final_video_key": None,
+                "final_video_path": None,
+                "final_video_sha256": None,
+            },
+        )
+        stored = repo.get(task_id)
+        detail = _task_to_detail(stored)
+        return DubResponse(
+            **detail.dict(exclude={"mm_audio_key"}),
+            resolved_voice_id=final_voice_id,
+            resolved_edge_voice=edge_voice,
+            audio_sha256=None,
+            mm_audio_key=None,
+        )
+
+    no_dub_state = _hf_detect_no_dub_candidate(task_id, task, mm_text_override)
+    if no_dub_state.get("no_dub"):
+        logger.info(
+            "DUB3_SKIP_NO_SPEECH",
+            extra={
+                "task_id": task_id,
+                "reason": no_dub_state.get("no_dub_reason") or "no_speech_detected",
+            },
+        )
+        return _mark_hot_follow_no_dub(
+            str(no_dub_state.get("no_dub_reason") or "no_speech_detected"),
+            str(no_dub_state.get("no_dub_message") or "No spoken speech detected in source video; dubbing is skipped."),
+        )
+
+    _hf_clear_no_dub_note(task_id)
+    pipeline_config.pop("no_dub", None)
+    pipeline_config.pop("dub_skip_reason", None)
     for stale_path in (
         workspace.mm_audio_primary_path,
         workspace.mm_audio_mp3_path,
@@ -5447,6 +5593,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         task_id,
         {
             "config": config,
+            "pipeline_config": pipeline_config_to_storage(pipeline_config),
             "dub_provider": provider,
             "voice_id": selected_voice_id,
             "last_step": "dub",
