@@ -893,6 +893,31 @@ def _hf_resolve_persisted_audio_key(task_after: dict | None) -> str | None:
     return None
 
 
+def _hf_persisted_voiceover_gate(task_id: str, repo, task: dict | None = None) -> dict[str, Any]:
+    current = task or repo.get(task_id) or {}
+    voice_state = _collect_voice_execution_state(current, get_settings())
+    audio_ready = bool(voice_state.get("audio_ready"))
+    reason = str(voice_state.get("audio_ready_reason") or "audio_not_ready")
+    artifact_key = None
+    artifact_size = 0
+    artifact_ready = False
+    try:
+        artifact_key, artifact_size, _ = _resolve_audio_meta(task_id, repo)
+        artifact_ready = True
+    except Exception:
+        artifact_key = _hf_resolve_persisted_audio_key(current if isinstance(current, dict) else None)
+        artifact_size = 0
+        artifact_ready = False
+    return {
+        "audio_ready": audio_ready,
+        "audio_ready_reason": reason,
+        "artifact_key": artifact_key,
+        "artifact_size": int(artifact_size or 0),
+        "artifact_ready": bool(artifact_ready),
+        "compose_allowed": bool(audio_ready and artifact_ready),
+    }
+
+
 @pages_router.head("/v1/tasks/{task_id}/audio_mm")
 def head_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     try:
@@ -5277,7 +5302,14 @@ def compose_task(
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
     final_meta = object_head(str(final_key)) if final_key else None
     final_size, _ = media_meta_from_head(final_meta)
-    if final_key and object_exists(str(final_key)) and final_size >= MIN_VIDEO_BYTES and not req.force:
+    hot_follow_gate = _hf_persisted_voiceover_gate(task_id, repo, task) if str(task.get("kind") or "").strip().lower() == "hot_follow" else None
+    if (
+        final_key
+        and object_exists(str(final_key))
+        and final_size >= MIN_VIDEO_BYTES
+        and not req.force
+        and (hot_follow_gate is None or bool(hot_follow_gate.get("compose_allowed")))
+    ):
         lock.release()
         return {
             "task_id": task_id,
@@ -5286,7 +5318,6 @@ def compose_task(
             "final_key": str(final_key),
             "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
         }
-
     current_for_plan = repo.get(task_id) or task
     current_plan = dict(current_for_plan.get("compose_plan") or {})
     compose_plan = {
@@ -6124,7 +6155,6 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "uploaded_key": audio_key,
             },
         )
-
     except HTTPException as exc:
         _policy_upsert(
             repo,
