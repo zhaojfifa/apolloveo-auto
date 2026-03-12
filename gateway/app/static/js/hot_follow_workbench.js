@@ -72,6 +72,8 @@
   const deliverablesGridEl = document.getElementById("hf_deliverables_grid");
   const subtitlesTextEl = document.getElementById("hf_subtitles_text");
   const subtitlesOriginEl = document.getElementById("hf_subtitles_origin");
+  const subtitlesNormalizedEl = document.getElementById("hf_subtitles_normalized");
+  const dubInputPreviewEl = document.getElementById("hf_dub_input_preview");
   const subtitlesEditedPreviewEl = document.getElementById("hf_subtitles_edited_preview");
   const translationQaCountsEl = document.getElementById("hf_translation_qa_counts");
   const translationQaWarningEl = document.getElementById("hf_translation_qa_warning");
@@ -253,11 +255,15 @@
   function renderSubtitles() {
     const subtitles = (currentHub && currentHub.subtitles) || {};
     const qa = (currentHub && currentHub.translation_qa) || {};
-    const origin = subtitles.origin_text || "";
+    const origin = subtitles.raw_source_text || subtitles.origin_text || "";
+    const normalized = subtitles.normalized_source_text || origin || "";
     const edited = subtitles.edited_text || subtitles.srt_text || "";
+    const dubInput = subtitles.dub_input_text || edited || normalized || origin || "";
     const sourcePlaceholder = t("hot_follow_workbench_source_not_generated", "Source subtitles not generated yet.");
     const targetPlaceholder = t("hot_follow_workbench_target_not_generated", "Target subtitles not generated yet.");
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
+    if (subtitlesNormalizedEl) subtitlesNormalizedEl.textContent = normalized || sourcePlaceholder;
+    if (dubInputPreviewEl) dubInputPreviewEl.textContent = dubInput || targetPlaceholder;
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || targetPlaceholder;
     if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = edited || "";
     const sourceCount = Number.isFinite(Number(qa.source_count)) ? Number(qa.source_count) : 0;
@@ -518,7 +524,7 @@
     const voiceId = ttsVoiceEl ? ttsVoiceEl.value : null;
     const subtitles = (currentHub && currentHub.subtitles) || {};
     const textareaText = subtitlesTextEl ? subtitlesTextEl.value : "";
-    const fallbackText = subtitles.edited_text || subtitles.srt_text || subtitles.origin_text || "";
+    const fallbackText = subtitles.dub_input_text || subtitles.edited_text || subtitles.srt_text || subtitles.normalized_source_text || subtitles.origin_text || "";
     const dubText = (textareaText || "").trim() ? textareaText : fallbackText;
     const payload = {
       provider: provider === "edge_tts" ? "edge-tts" : (provider === "azure_speech" ? "azure-speech" : provider),

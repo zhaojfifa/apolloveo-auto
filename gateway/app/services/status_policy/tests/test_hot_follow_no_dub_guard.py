@@ -8,6 +8,8 @@ def _load_no_dub_helper():
     keep = {
         "_hf_plain_text_signal",
         "_hf_has_usable_dub_text",
+        "_hf_load_normalized_source_text",
+        "_hf_dub_input_text",
         "_hf_detect_no_dub_candidate",
     }
     selected = [node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name in keep]
@@ -17,6 +19,7 @@ def _load_no_dub_helper():
         "parse_pipeline_config": lambda _v: {},
         "_hf_load_origin_subtitles_text": lambda _task: "",
         "_hf_load_subtitles_text": lambda *_args, **_kwargs: "",
+        "task_base_dir": lambda _task_id: Path("."),
     }
     exec(compile(module, "gateway/app/routers/tasks.py", "exec"), namespace)
     return namespace["_hf_detect_no_dub_candidate"]

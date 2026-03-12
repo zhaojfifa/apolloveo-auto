@@ -1755,6 +1755,32 @@ def _hf_load_origin_subtitles_text(task: dict) -> str:
     return ""
 
 
+def _hf_load_normalized_source_text(task_id: str, task: dict) -> str:
+    try:
+        normalized_path = task_base_dir(task_id) / "subtitles" / "origin_normalized.srt"
+        if normalized_path.exists():
+            try:
+                return normalized_path.read_text(encoding="utf-8")
+            except Exception:
+                return normalized_path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        pass
+    return _hf_load_origin_subtitles_text(task)
+
+
+def _hf_dub_input_text(task_id: str, task: dict, manual_text: str | None = None) -> str:
+    manual_value = str(manual_text or "").strip()
+    if manual_value:
+        return manual_value
+    edited_text = _hf_load_subtitles_text(task_id, task)
+    if str(edited_text or "").strip():
+        return str(edited_text)
+    normalized_text = _hf_load_normalized_source_text(task_id, task)
+    if str(normalized_text or "").strip():
+        return str(normalized_text)
+    return _hf_load_origin_subtitles_text(task)
+
+
 def _hf_no_dub_note_path(task_id: str) -> Path:
     return task_base_dir(task_id) / "dub" / "no_dub.txt"
 
@@ -1792,8 +1818,9 @@ def _hf_has_usable_dub_text(text: str | None) -> bool:
 def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | None = None) -> dict[str, Any]:
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     origin_text = _hf_load_origin_subtitles_text(task)
+    normalized_source_text = _hf_load_normalized_source_text(task_id, task)
     edited_text = _hf_load_subtitles_text(task_id, task)
-    manual_value = str(manual_text or "").strip()
+    manual_value = _hf_dub_input_text(task_id, task, manual_text).strip() if manual_text is not None else str(manual_text or "").strip()
     title_hint = " ".join(
         [
             str(task.get("title") or ""),
@@ -1810,7 +1837,12 @@ def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | Non
     )
     if _hf_has_usable_dub_text(manual_value) or _hf_has_usable_dub_text(edited_text):
         return {"no_dub": False, "no_dub_reason": None, "no_dub_message": None}
-    empty_transcript = not _hf_has_usable_dub_text(origin_text) and not _hf_has_usable_dub_text(edited_text) and not _hf_has_usable_dub_text(manual_value)
+    empty_transcript = (
+        not _hf_has_usable_dub_text(origin_text)
+        and not _hf_has_usable_dub_text(normalized_source_text)
+        and not _hf_has_usable_dub_text(edited_text)
+        and not _hf_has_usable_dub_text(manual_value)
+    )
     if no_subtitles_flag or no_dub_flag or no_marker or silent_hint or empty_transcript:
         reason = "no_speech_detected" if (silent_hint or no_marker or no_subtitles_flag or no_dub_flag) else "empty_transcript"
         message = (
@@ -3911,6 +3943,8 @@ def get_hot_follow_workbench_hub(
     scenes_url = _task_endpoint(task_id, "scenes") if scenes_key else None
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
+    normalized_source_text = _hf_load_normalized_source_text(task_id, task)
+    dub_input_text = _hf_dub_input_text(task_id, task)
     audio_cfg = _hf_audio_config(task)
     voice_state = _collect_voice_execution_state(task, get_settings())
     target_lang_internal = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
@@ -3979,8 +4013,12 @@ def get_hot_follow_workbench_hub(
         "pipeline": pipeline,
         "subtitles": {
             "origin_text": origin_text or "",
+            "raw_source_text": origin_text or "",
+            "normalized_source_text": normalized_source_text or origin_text or "",
             "edited_text": subtitles_text or "",
             "srt_text": subtitles_text or "",
+            "dub_input_text": dub_input_text or "",
+            "actual_burn_subtitle_source": "mm.srt" if _task_key(task, "mm_srt_path") else None,
             "status": subtitles_state,
             "error": task.get("subtitles_error"),
             "editable": True,
@@ -4001,6 +4039,7 @@ def get_hot_follow_workbench_hub(
             "requested_voice": voice_state.get("requested_voice"),
             "actual_provider": voice_state.get("actual_provider"),
             "resolved_voice": voice_state.get("resolved_voice"),
+            "dub_input_text": dub_input_text or "",
             "no_dub": bool(no_dub_state.get("no_dub")),
             "no_dub_reason": no_dub_state.get("no_dub_reason"),
             "no_dub_message": no_dub_state.get("no_dub_message"),
@@ -4302,7 +4341,10 @@ def patch_hot_follow_subtitles(
         "subtitles": {
             "srt_text": _hf_load_subtitles_text(task_id, repo.get(task_id) or task),
             "origin_text": _hf_load_origin_subtitles_text(repo.get(task_id) or task),
+            "raw_source_text": _hf_load_origin_subtitles_text(repo.get(task_id) or task),
+            "normalized_source_text": _hf_load_normalized_source_text(task_id, repo.get(task_id) or task),
             "edited_text": _hf_load_subtitles_text(task_id, repo.get(task_id) or task),
+            "dub_input_text": _hf_dub_input_text(task_id, repo.get(task_id) or task),
             "editable": True,
         },
     }
@@ -5479,14 +5521,14 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             final_voice_id,
             provider,
         )
-    mm_text_override = (payload.mm_text or "").strip() or None
+    mm_text_override = _hf_dub_input_text(task_id, task, payload.mm_text).strip() or None
     logger.info(
         "DUB3_TEXT_SOURCE",
         extra={
             "task_id": task_id,
             "step": "dub",
             "stage": "DUB3_TEXT_SOURCE",
-            "text_source": "override" if mm_text_override else "workspace",
+            "text_source": "override" if (payload.mm_text or "").strip() else "subtitle_lane",
             "text_len": len(mm_text_override or ""),
             "dub_provider": provider,
             "voice_id": final_voice_id,
