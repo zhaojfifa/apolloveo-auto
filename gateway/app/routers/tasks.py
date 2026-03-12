@@ -808,6 +808,38 @@ def _resolve_audio_meta(task_id: str, repo) -> tuple[str, int, str]:
     return chosen_key, int(chosen_size), content_type
 
 
+def _hf_fresh_dub_output_path(task_id: str, workspace: Workspace, task_after: dict | None = None) -> Path | None:
+    candidates: list[Path] = []
+    if isinstance(task_after, dict):
+        for field in ("mm_audio_path", "mm_audio_key"):
+            raw = str(task_after.get(field) or "").strip()
+            if raw and not raw.startswith("deliver/") and not raw.startswith("s3://") and not raw.startswith("oss://"):
+                try:
+                    candidates.append(Path(raw))
+                except Exception:
+                    pass
+    candidates.extend(
+        [
+            workspace.mm_audio_mp3_path,
+            workspace.mm_audio_primary_path,
+            workspace.mm_audio_legacy_path,
+            workspace.mm_audio_path,
+        ]
+    )
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            if candidate.exists() and candidate.stat().st_size > 0:
+                return candidate
+        except Exception:
+            continue
+    return None
+
+
 @pages_router.head("/v1/tasks/{task_id}/audio_mm")
 def head_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     try:
@@ -5929,14 +5961,10 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "未检测到可配音语音内容，已跳过配音。",
             )
 
-        audio_path = (
-            workspace.mm_audio_mp3_path
-            if workspace.mm_audio_mp3_path.exists()
-            else workspace.mm_audio_path
-        )
+        audio_path = _hf_fresh_dub_output_path(task_id, workspace, task_after)
         executed = True
         skip_reason = None
-        if not audio_path.exists():
+        if not audio_path or not audio_path.exists():
             executed = False
             skip_reason = "output_missing_after_execute"
         logger.info(
@@ -5947,14 +5975,14 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "reason": skip_reason or "fresh_output_expected",
             },
         )
-        if not audio_path.exists():
+        if not audio_path or not audio_path.exists():
             logger.info(
                 "DUB3_OUTPUT_CHECK",
                 extra={
                     "task_id": task_id,
                     "decision": "executed",
                     "key": existing_audio_key,
-                    "path": str(audio_path),
+                    "path": str(audio_path) if audio_path else None,
                     "exists": existing_audio_exists,
                     "size": existing_audio_size,
                 },
