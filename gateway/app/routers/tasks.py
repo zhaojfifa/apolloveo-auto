@@ -893,29 +893,68 @@ def _hf_resolve_persisted_audio_key(task_after: dict | None) -> str | None:
     return None
 
 
+def _hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
+    artifact_key = _hf_resolve_persisted_audio_key(task)
+    size_bytes = 0
+    content_type = None
+    if artifact_key:
+        try:
+            head = object_head(str(artifact_key))
+            size_bytes, content_type = media_meta_from_head(head)
+        except Exception:
+            size_bytes, content_type = 0, None
+    voiceover_ready = bool(artifact_key and int(size_bytes or 0) >= MIN_AUDIO_BYTES)
+    dub_status = str(task.get("dub_status") or "").strip().lower()
+    deliverable_done = voiceover_ready and dub_status in {"ready", "done", "success", "completed"}
+    voiceover_url = f"/v1/tasks/{task_id}/audio_mm" if task_id and voiceover_ready else None
+    return {
+        "artifact_key": artifact_key,
+        "size_bytes": int(size_bytes or 0),
+        "content_type": content_type,
+        "voiceover_ready": voiceover_ready,
+        "voiceover_url": voiceover_url,
+        "deliverable_audio_done": deliverable_done,
+    }
+
+
 def _hf_persisted_voiceover_gate(task_id: str, repo, task: dict | None = None) -> dict[str, Any]:
     current = task or repo.get(task_id) or {}
     voice_state = _collect_voice_execution_state(current, get_settings())
     audio_ready = bool(voice_state.get("audio_ready"))
     reason = str(voice_state.get("audio_ready_reason") or "audio_not_ready")
-    artifact_key = None
-    artifact_size = 0
-    artifact_ready = False
-    try:
-        artifact_key, artifact_size, _ = _resolve_audio_meta(task_id, repo)
-        artifact_ready = True
-    except Exception:
-        artifact_key = _hf_resolve_persisted_audio_key(current if isinstance(current, dict) else None)
-        artifact_size = 0
-        artifact_ready = False
+    persisted = _hf_persisted_audio_state(task_id, current if isinstance(current, dict) else {})
+    artifact_key = persisted.get("artifact_key")
+    artifact_size = int(persisted.get("size_bytes") or 0)
+    artifact_ready = bool(persisted.get("voiceover_ready"))
     return {
         "audio_ready": audio_ready,
         "audio_ready_reason": reason,
         "artifact_key": artifact_key,
         "artifact_size": int(artifact_size or 0),
         "artifact_ready": bool(artifact_ready),
-        "compose_allowed": bool(audio_ready and artifact_ready),
+        "compose_allowed": bool(artifact_ready and (audio_ready or bool(voice_state.get("dub_current")))),
     }
+
+
+def _hf_log_currentness_diag(task_id: str, task: dict, *, stage: str, compose_allowed: bool | None = None) -> None:
+    voice_state = _collect_voice_execution_state(task, get_settings())
+    persisted = _hf_persisted_audio_state(task_id, task)
+    payload = {
+        "task_id": task_id,
+        "stage": stage,
+        "requested_voice": voice_state.get("requested_voice"),
+        "expected_provider": voice_state.get("expected_provider"),
+        "expected_resolved_voice": voice_state.get("expected_resolved_voice"),
+        "actual_provider": voice_state.get("actual_provider"),
+        "resolved_voice": voice_state.get("resolved_voice"),
+        "voiceover_url_exists": bool(persisted.get("voiceover_url")),
+        "deliverable_audio_done": bool(voice_state.get("deliverable_audio_done")),
+        "audio_ready": bool(voice_state.get("audio_ready")),
+        "audio_ready_reason": voice_state.get("audio_ready_reason"),
+    }
+    if compose_allowed is not None:
+        payload["compose_allowed"] = bool(compose_allowed)
+    logger.info("HF_DUB_CURRENTNESS", extra=payload)
 
 
 @pages_router.head("/v1/tasks/{task_id}/audio_mm")
@@ -1840,10 +1879,8 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
     except Exception:
         audio_fit_max_speed = 1.25
     audio_fit_max_speed = max(1.0, min(1.6, audio_fit_max_speed))
-    voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-    meta = object_head(str(voice_key)) if voice_key else None
-    size, _ = media_meta_from_head(meta)
-    voice_url = f"/v1/tasks/{task_id}/audio_mm" if task_id and size >= MIN_AUDIO_BYTES else None
+    persisted_audio = _hf_persisted_audio_state(task_id, task)
+    voice_url = persisted_audio.get("voiceover_url")
     voice_state = _collect_voice_execution_state(task, settings)
     provider = normalize_provider(voice_state.get("expected_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
     return {
@@ -2861,31 +2898,45 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
             task=task,
         )
     )
-    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-    audio_exists = bool(audio_key and object_exists(str(audio_key)))
+    persisted_audio = _hf_persisted_audio_state(task_id, task)
+    audio_key = persisted_audio.get("artifact_key")
+    audio_exists = bool(persisted_audio.get("voiceover_ready"))
     dub_status = str(task.get("dub_status") or "").strip().lower()
     dub_running = dub_status in {"queued", "running", "processing"}
     dub_done = dub_status in {"ready", "done", "success", "completed"}
     no_dub_state = _hf_detect_no_dub_candidate(task_id, task)
+    provider_matches = normalize_provider(actual_provider) == normalize_provider(expected_provider)
+    voice_matches = bool(expected_resolved_voice and resolved_voice and resolved_voice == expected_resolved_voice)
+    persisted_current = bool(
+        persisted_audio.get("voiceover_ready")
+        and (persisted_audio.get("voiceover_url") or persisted_audio.get("deliverable_audio_done"))
+        and provider_matches
+        and voice_matches
+    )
+    request_token = config_state.get("request_token")
+    completed_token = config_state.get("completed_token")
+    incompatible_pending = bool(request_token and completed_token != request_token and (dub_running or not persisted_current))
     audio_ready_reason = "ready"
     if no_dub_state.get("no_dub"):
         audio_ready_reason = str(no_dub_state.get("content_mode") or "no_dub_candidate")
-    elif dub_running:
-        audio_ready_reason = "dub_running"
     elif not audio_exists:
         audio_ready_reason = "audio_missing"
-    elif not dub_done:
-        audio_ready_reason = "dub_not_done"
     elif not expected_resolved_voice:
         audio_ready_reason = "voice_unresolved"
     elif not resolved_voice:
         audio_ready_reason = "resolved_voice_missing"
-    elif normalize_provider(actual_provider) != normalize_provider(expected_provider):
+    elif not provider_matches:
         audio_ready_reason = "provider_mismatch"
-    elif resolved_voice != expected_resolved_voice:
+    elif not voice_matches:
         audio_ready_reason = "voice_mismatch"
-    elif config_state.get("request_token") and config_state.get("completed_token") != config_state.get("request_token"):
+    elif incompatible_pending:
         audio_ready_reason = "dub_not_current"
+    elif persisted_current:
+        audio_ready_reason = "ready"
+    elif dub_running:
+        audio_ready_reason = "dub_running"
+    elif not dub_done:
+        audio_ready_reason = "dub_not_done"
     audio_ready = audio_ready_reason == "ready"
     return {
         "target_lang": target_lang,
@@ -2897,6 +2948,9 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         "expected_resolved_voice": expected_resolved_voice,
         "audio_ready": audio_ready,
         "audio_ready_reason": audio_ready_reason,
+        "voiceover_url": persisted_audio.get("voiceover_url"),
+        "deliverable_audio_done": bool(persisted_audio.get("deliverable_audio_done")),
+        "dub_current": persisted_current,
         "speech_detected": bool(no_dub_state.get("speech_detected")),
         "speech_confidence": no_dub_state.get("speech_confidence"),
         "onscreen_text_detected": bool(no_dub_state.get("onscreen_text_detected")),
@@ -4629,6 +4683,21 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         raw = str(path).replace("\\", "/")
         return raw.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
+    def _source_subtitle_cover_filter() -> str | None:
+        config = dict(task.get("config") or {})
+        cover_cfg = compose_plan.get("source_subtitle_cover")
+        if not isinstance(cover_cfg, dict):
+            cover_cfg = dict(config.get("source_subtitle_cover") or {})
+        enabled = bool(cover_cfg.get("enabled")) or str(config.get("source_subtitle_cover_enabled") or "").strip().lower() in {"1", "true", "yes"}
+        if not enabled:
+            return None
+        x = str(cover_cfg.get("x", "0"))
+        y = str(cover_cfg.get("y", "ih*0.78"))
+        w = str(cover_cfg.get("w", "iw"))
+        h = str(cover_cfg.get("h", "ih*0.22"))
+        color = str(cover_cfg.get("color", "black@1.0"))
+        return f"drawbox=x={x}:y={y}:w={w}:h={h}:color={color}:t=fill"
+
     def _bgm_filter_expr() -> str:
         base = f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}"
         if compose_policy == "match_video":
@@ -4816,6 +4885,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         if bgm_path and bgm_path.exists():
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
+                cover_filter = _source_subtitle_cover_filter()
+                video_subtitle_input = "[base]" if cover_filter else "[0:v]"
                 subtitle_filter = (
                     f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
                     "charenc=UTF-8:"
@@ -4823,7 +4894,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
                 filter_complex = (
-                    f"[0:v]{subtitle_filter}[v];"
+                    (f"[0:v]{cover_filter}[base];" if cover_filter else "")
+                    + f"{video_subtitle_input}{subtitle_filter}[v];"
                     + (
                         f"[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
                         + (
@@ -4889,6 +4961,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         else:
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
+                cover_filter = _source_subtitle_cover_filter()
+                video_subtitle_input = "[base]" if cover_filter else "[0:v]"
                 subtitle_filter = (
                     f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
                     "charenc=UTF-8:"
@@ -4896,7 +4970,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
                 filter_complex = (
-                    f"[0:v]{subtitle_filter}[v];"
+                    (f"[0:v]{cover_filter}[base];" if cover_filter else "")
+                    + f"{video_subtitle_input}{subtitle_filter}[v];"
                     + (
                         "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
                         + (
@@ -5135,6 +5210,7 @@ def compose_hot_follow_final_video(
     current_for_plan = repo.get(task_id) or task
     current_plan = dict(current_for_plan.get("compose_plan") or {})
     gate = _hf_persisted_voiceover_gate(task_id, repo, current_for_plan)
+    _hf_log_currentness_diag(task_id, current_for_plan, stage="compose_hot_follow_entry", compose_allowed=bool(gate.get("compose_allowed")))
     logger.info(
         "HF_COMPOSE_GATE",
         extra={
@@ -5316,6 +5392,7 @@ def compose_task(
     final_size, _ = media_meta_from_head(final_meta)
     hot_follow_gate = _hf_persisted_voiceover_gate(task_id, repo, task) if str(task.get("kind") or "").strip().lower() == "hot_follow" else None
     if hot_follow_gate:
+        _hf_log_currentness_diag(task_id, task, stage="compose_generic_entry", compose_allowed=bool(hot_follow_gate.get("compose_allowed")))
         logger.info(
             "HF_COMPOSE_GATE",
             extra={
@@ -5976,6 +6053,17 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         target_lang=target_lang,
         requested_voice=selected_voice_id,
     )
+    logger.info(
+        "HF_DUB_ROUTE",
+        extra={
+            "task_id": task_id,
+            "requested_voice": selected_voice_id,
+            "expected_provider": expected_provider,
+            "expected_resolved_voice": expected_resolved_voice,
+            "actual_provider": provider,
+            "resolved_voice": final_voice_id,
+        },
+    )
 
     def _mark_hot_follow_dub_failed(reason: str, message: str) -> DubResponse:
         _policy_upsert(
@@ -6213,6 +6301,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "uploaded_key": audio_key,
             },
         )
+        _hf_log_currentness_diag(task_id, repo.get(task_id) or task_after, stage="dub_persisted")
     except HTTPException as exc:
         _policy_upsert(
             repo,
@@ -6250,6 +6339,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     # repo.update 鏈繀瀛樺湪锛涚敤 upsert 鏇寸ǔ
     stored = repo.get(task_id)
     detail = _task_to_detail(stored)
+    _hf_log_currentness_diag(task_id, stored or {}, stage="dub_done")
     logger.info(
         "DUB3_DONE",
         extra={
