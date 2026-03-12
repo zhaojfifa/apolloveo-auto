@@ -12,6 +12,7 @@
   const bgmFile = document.getElementById("hf-bgm");
   const mixEl = document.getElementById("hf-mix");
   const targetLangEl = document.querySelector('select[name="target_lang"]');
+  const voiceIdEl = document.getElementById("hf-voice-id");
   const publishAccountEl = document.querySelector('select[name="publish_account"]');
   const taskTitleEl = document.getElementById("hf-task-title");
 
@@ -110,6 +111,7 @@
           account_id: publishAccountEl ? publishAccountEl.value : null,
           account_name: publishAccountEl ? publishAccountEl.value : null,
           content_lang: targetLangEl ? targetLangEl.value : "mm",
+          voice_id: voiceIdEl ? voiceIdEl.value : "mm_female_1",
           ui_lang: locale,
           pipeline_config: pipelineConfig,
           auto_start: true,
