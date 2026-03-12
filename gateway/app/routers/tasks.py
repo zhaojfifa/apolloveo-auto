@@ -3071,10 +3071,17 @@ async def _probe_url_metadata(url: str, platform_hint: str | None = None) -> dic
     platform = (platform_hint or "").strip().lower() if platform_hint else "auto"
     if platform in ("", "auto"):
         platform = detect_platform(url) or "auto"
+    logger.info("[hotfollow][probe] source_url=%s", url)
+    logger.info("[hotfollow][probe] platform=%s", platform or "auto")
 
     try:
-        meta = await parse_with_xiongmao(url)
+        meta = await parse_with_xiongmao(url, platform_hint=platform)
     except XiongmaoError as exc:
+        logger.warning(
+            "[hotfollow][probe] provider=xiongmao resolved_url=%s error=%s",
+            url,
+            str(exc),
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     raw = meta.get("raw") if isinstance(meta, dict) else None
