@@ -89,12 +89,30 @@ async def parse_video(
     )
 
     try:
-        parsed = await parse_with_xiongmao(normalized_link)
+        logger.info(
+            "[hotfollow][probe] source_url=%s platform=%s provider=xiongmao resolved_url=%s",
+            link,
+            platform_hint or "auto",
+            normalized_link,
+        )
+        parsed = await parse_with_xiongmao(normalized_link, platform_hint=platform_hint)
     except httpx.HTTPError as exc:  # pragma: no cover - network dependent
-        logger.exception("Parse failed for %s", link)
+        logger.exception(
+            "[hotfollow][probe] error=%s source_url=%s platform=%s provider=xiongmao resolved_url=%s",
+            str(exc),
+            link,
+            platform_hint or "auto",
+            normalized_link,
+        )
         raise HTTPException(status_code=502, detail=f"Parse failed: {exc}") from exc
     except XiongmaoError as exc:
-        logger.exception("Xiongmao provider error for %s", link)
+        logger.exception(
+            "[hotfollow][probe] error=%s source_url=%s platform=%s provider=xiongmao resolved_url=%s",
+            str(exc),
+            link,
+            platform_hint or "auto",
+            normalized_link,
+        )
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - defensive
         logger.exception("Unexpected error during parse for %s", link)

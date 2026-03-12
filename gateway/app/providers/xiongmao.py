@@ -1,6 +1,6 @@
 """Xiongmao short-video parser provider.
 
-This module is responsible for calling the Xiongmao (去水印) API to
+This module is responsible for calling the Xiongmao API to
 resolve download metadata for supported platforms (Douyin/TikTok/XHS).
 The function signatures remain stable so downstream services can call
 ``parse_with_xiongmao`` and receive normalized metadata.
@@ -20,6 +20,15 @@ logger = logging.getLogger(__name__)
 
 class XiongmaoError(Exception):
     """Raised when the Xiongmao provider fails."""
+
+
+def _normalize_platform_hint(value: Optional[str]) -> Optional[str]:
+    raw = str(value or "").strip().lower()
+    if raw in {"", "auto", "none", "unknown"}:
+        return None
+    if raw == "fb":
+        return "facebook"
+    return raw
 
 
 def _extract_download_url(content: Dict[str, Any]) -> Optional[str]:
@@ -65,8 +74,6 @@ def _normalize_content(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def _resolve_settings():
     settings = get_settings()
-    # Baseline compatibility: prefer explicit Xiongmao fields when present,
-    # fall back to the current douyin_* aliases so both env styles work.
     api_base = getattr(settings, "xiongmao_api_base", None) or getattr(
         settings, "douyin_api_base", ""
     )
@@ -80,13 +87,8 @@ def _resolve_settings():
     return api_base, api_key, app_id
 
 
-async def parse_with_xiongmao(link: str) -> Dict[str, Any]:
-    """Call Xiongmao API and normalize the response.
-
-    Supports Douyin/TikTok/Xiaohongshu links handled by the provider. This
-    implementation keeps the baseline request/response behavior while adding
-    gentle validation and logging for easier diagnosis.
-    """
+async def parse_with_xiongmao(link: str, platform_hint: Optional[str] = None) -> Dict[str, Any]:
+    """Call Xiongmao API and normalize the response."""
 
     api_base, api_key, app_id = _resolve_settings()
     if not api_base:
@@ -97,15 +99,30 @@ async def parse_with_xiongmao(link: str) -> Dict[str, Any]:
         raise XiongmaoError("provider error: XIONGMAO_API_KEY is not configured")
 
     url = f"{api_base.rstrip('/')}/waterRemoveDetail/{app_id}"
+    platform_value = _normalize_platform_hint(platform_hint)
     params = {"ak": api_key, "link": link}
-    logger.debug("Requesting Xiongmao parse", extra={"url": url, "link": link})
+    if platform_value:
+        params["platform"] = platform_value
+        params["ptype"] = platform_value
+    logger.info(
+        "[hotfollow][probe] provider=xiongmao source_url=%s platform=%s resolved_url=%s",
+        link,
+        platform_value or "auto",
+        link,
+    )
 
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.get(url, params=params)
             response.raise_for_status()
     except httpx.HTTPError as exc:  # pragma: no cover - network dependent
-        logger.exception("Xiongmao provider HTTP error for link %s", link)
+        logger.exception(
+            "[hotfollow][probe] error=%s provider=xiongmao source_url=%s platform=%s resolved_url=%s",
+            str(exc),
+            link,
+            platform_value or "auto",
+            link,
+        )
         raise XiongmaoError(f"provider error: {exc}") from exc
 
     try:
@@ -117,11 +134,24 @@ async def parse_with_xiongmao(link: str) -> Dict[str, Any]:
         raise XiongmaoError("provider error: unexpected response")
 
     if str(data.get("code")) != "10000":
-        message = data.get("msg") or data.get("message") or "短视频解析失败"
+        message = data.get("msg") or data.get("message") or "视频解析失败"
+        logger.warning(
+            "[hotfollow][probe] error=%s provider=xiongmao source_url=%s platform=%s resolved_url=%s",
+            message,
+            link,
+            platform_value or "auto",
+            link,
+        )
         raise XiongmaoError(f"provider error: {message}")
 
     normalized = _normalize_content(data)
     if not normalized.get("download_url"):
-        raise XiongmaoError("provider error: 短视频解析失败，无下载链接")
+        logger.warning(
+            "[hotfollow][probe] error=missing_download_url provider=xiongmao source_url=%s platform=%s resolved_url=%s",
+            link,
+            platform_value or "auto",
+            link,
+        )
+        raise XiongmaoError("provider error: 视频解析失败，无下载链接")
 
     return normalized
