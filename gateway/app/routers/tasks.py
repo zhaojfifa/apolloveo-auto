@@ -377,6 +377,8 @@ class ComposePlanPatchRequest(BaseModel):
     target_lang: str | None = None
     freeze_tail_enabled: bool | None = None
     freeze_tail_cap_sec: int | None = None
+    source_subtitle_cover_enabled: bool | None = None
+    source_subtitle_cover_mode: str | None = None
 
 
 pages_router = APIRouter()
@@ -1779,6 +1781,21 @@ def _hf_dub_input_text(task_id: str, task: dict, manual_text: str | None = None)
     if str(normalized_text or "").strip():
         return str(normalized_text)
     return _hf_load_origin_subtitles_text(task)
+
+
+def _hf_source_subtitle_cover_filter(compose_plan: dict[str, Any] | None, config: dict[str, Any] | None = None) -> str | None:
+    plan = dict(compose_plan or {})
+    cfg = dict(config or {})
+    enabled = (
+        bool(plan.get("source_subtitle_cover_enabled"))
+        or str(cfg.get("source_subtitle_cover_enabled") or os.getenv("HF_SUBTITLE_COVER_ENABLED", "0")).strip().lower() in {"1", "true", "yes"}
+    )
+    if not enabled:
+        return None
+    mode = str(plan.get("source_subtitle_cover_mode") or cfg.get("source_subtitle_cover_mode") or os.getenv("HF_SUBTITLE_COVER_MODE", "bottom_band")).strip().lower()
+    if mode != "bottom_band":
+        return None
+    return "drawbox=x=0:y=ih*0.78:w=iw:h=ih*0.22:color=black@1.0:t=fill"
 
 
 def _hf_no_dub_note_path(task_id: str) -> Path:
@@ -3921,6 +3938,8 @@ def get_hot_follow_workbench_hub(
         }
     compose_plan.setdefault("freeze_tail_enabled", False)
     compose_plan.setdefault("freeze_tail_cap_sec", 8)
+    compose_plan.setdefault("source_subtitle_cover_enabled", str(os.getenv("HF_SUBTITLE_COVER_ENABLED", "0")).strip().lower() in ("1", "true", "yes"))
+    compose_plan.setdefault("source_subtitle_cover_mode", str(os.getenv("HF_SUBTITLE_COVER_MODE", "bottom_band")).strip() or "bottom_band")
     compose_plan["compose_policy"] = "freeze_tail" if bool(compose_plan.get("freeze_tail_enabled")) else "match_video"
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
@@ -4297,6 +4316,10 @@ def patch_hot_follow_compose_plan(
         plan["freeze_tail_enabled"] = False
     if "freeze_tail_cap_sec" not in plan:
         plan["freeze_tail_cap_sec"] = 8
+    if "source_subtitle_cover_enabled" not in plan:
+        plan["source_subtitle_cover_enabled"] = str(os.getenv("HF_SUBTITLE_COVER_ENABLED", "0")).strip().lower() in {"1", "true", "yes"}
+    if "source_subtitle_cover_mode" not in plan:
+        plan["source_subtitle_cover_mode"] = str(os.getenv("HF_SUBTITLE_COVER_MODE", "bottom_band")).strip() or "bottom_band"
     if "compose_policy" not in plan:
         plan["compose_policy"] = "match_video"
     if payload.overlay_subtitles is not None:
@@ -4307,6 +4330,10 @@ def patch_hot_follow_compose_plan(
         plan["freeze_tail_enabled"] = bool(payload.freeze_tail_enabled)
     if payload.freeze_tail_cap_sec is not None:
         plan["freeze_tail_cap_sec"] = max(1, min(30, int(payload.freeze_tail_cap_sec)))
+    if payload.source_subtitle_cover_enabled is not None:
+        plan["source_subtitle_cover_enabled"] = bool(payload.source_subtitle_cover_enabled)
+    if payload.source_subtitle_cover_mode is not None and str(payload.source_subtitle_cover_mode).strip():
+        plan["source_subtitle_cover_mode"] = str(payload.source_subtitle_cover_mode).strip().lower()
     plan["compose_policy"] = "freeze_tail" if bool(plan.get("freeze_tail_enabled")) else "match_video"
     _policy_upsert(repo, task_id, {"compose_plan": plan})
     return {"task_id": task_id, "compose_plan": plan}
@@ -4473,6 +4500,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         freeze_tail_cap_sec = 8.0
     compose_policy = "freeze_tail" if freeze_tail_enabled else "match_video"
     compose_warning = None
+    source_subtitle_cover_filter = _hf_source_subtitle_cover_filter(compose_plan, config)
     logger.info(
         "COMPOSE_START",
         extra={
@@ -4487,6 +4515,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             "freeze_tail_enabled": freeze_tail_enabled,
             "freeze_tail_cap_sec": freeze_tail_cap_sec,
             "compose_policy": compose_policy,
+            "source_subtitle_cover_enabled": bool(source_subtitle_cover_filter),
+            "source_subtitle_cover_mode": compose_plan.get("source_subtitle_cover_mode"),
         },
     )
 
@@ -4568,6 +4598,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         if bgm_path and bgm_path.exists():
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
+                video_subtitle_input = "[base]" if source_subtitle_cover_filter else "[0:v]"
                 subtitle_filter = (
                     f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
                     "charenc=UTF-8:"
@@ -4575,7 +4606,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
                 filter_complex = (
-                    f"[0:v]{subtitle_filter}[v];"
+                    (f"[0:v]{source_subtitle_cover_filter}[base];" if source_subtitle_cover_filter else "")
+                    + f"{video_subtitle_input}{subtitle_filter}[v];"
                     + (
                         f"[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
                         + (
@@ -4641,6 +4673,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         else:
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
+                video_subtitle_input = "[base]" if source_subtitle_cover_filter else "[0:v]"
                 subtitle_filter = (
                     f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
                     "charenc=UTF-8:"
@@ -4648,7 +4681,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                     "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
                 )
                 filter_complex = (
-                    f"[0:v]{subtitle_filter}[v];"
+                    (f"[0:v]{source_subtitle_cover_filter}[base];" if source_subtitle_cover_filter else "")
+                    + f"{video_subtitle_input}{subtitle_filter}[v];"
                     + (
                         "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
                         + (
