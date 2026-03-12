@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from xml.sax.saxutils import escape
 
 import httpx
+
+
+logger = logging.getLogger(__name__)
 
 
 class AzureSpeechError(RuntimeError):
@@ -27,6 +31,15 @@ def _build_ssml(text: str, voice: str) -> str:
     )
 
 
+def _normalize_region(speech_region: str) -> str:
+    return str(speech_region or "").strip().lower()
+
+
+def _build_endpoint(speech_region: str) -> str:
+    region = _normalize_region(speech_region)
+    return f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
+
+
 async def generate_audio_azure_speech(
     text: str,
     voice: str,
@@ -38,6 +51,7 @@ async def generate_audio_azure_speech(
 ) -> None:
     if not speech_key:
         raise AzureSpeechError("TTS_AZURE_CONFIG_MISSING: missing AZURE_SPEECH_KEY")
+    speech_region = _normalize_region(speech_region)
     if not speech_region:
         raise AzureSpeechError("TTS_AZURE_CONFIG_MISSING: missing AZURE_SPEECH_REGION")
     if not text or not text.strip():
@@ -45,7 +59,7 @@ async def generate_audio_azure_speech(
     if not voice or not voice.strip():
         raise AzureSpeechError("TTS_AZURE_VOICE_MISSING: missing voice")
 
-    endpoint = f"https://{speech_region}.tts.speech.microsoft.com/cognitiveservices/v1"
+    endpoint = _build_endpoint(speech_region)
     headers = {
         "Ocp-Apim-Subscription-Key": speech_key,
         "Content-Type": "application/ssml+xml",
@@ -53,8 +67,30 @@ async def generate_audio_azure_speech(
     }
     ssml = _build_ssml(text.strip(), voice.strip())
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        resp = await client.post(endpoint, content=ssml.encode("utf-8"), headers=headers)
+    timeout = httpx.Timeout(60.0, connect=15.0)
+    logger.info(
+        "AZURE_TTS_CONNECT",
+        extra={
+            "azure_region": speech_region,
+            "azure_endpoint": endpoint,
+            "azure_voice": voice.strip(),
+            "azure_output_format": headers["X-Microsoft-OutputFormat"],
+        },
+    )
+    try:
+        async with httpx.AsyncClient(timeout=timeout, http2=False, follow_redirects=True, trust_env=False) as client:
+            resp = await client.post(endpoint, content=ssml.encode("utf-8"), headers=headers)
+    except httpx.HTTPError as exc:
+        logger.warning(
+            "AZURE_TTS_CONNECT_FAIL",
+            extra={
+                "azure_region": speech_region,
+                "azure_endpoint": endpoint,
+                "azure_voice": voice.strip(),
+                "error": str(exc),
+            },
+        )
+        raise AzureSpeechError(f"TTS_AZURE_CONNECT_FAIL:{exc}") from exc
     if resp.status_code < 200 or resp.status_code >= 300:
         preview = (resp.text or "").strip().replace("\n", " ")[:400]
         raise AzureSpeechError(f"TTS_AZURE_HTTP_{resp.status_code}: {preview}")
