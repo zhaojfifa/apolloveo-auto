@@ -1832,6 +1832,63 @@ def _hf_has_usable_dub_text(text: str | None) -> bool:
     return bool(_hf_plain_text_signal(text))
 
 
+def _hf_dual_channel_state(task_id: str, task: dict) -> dict[str, Any]:
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    origin_text = _hf_load_origin_subtitles_text(task)
+    normalized_source_text = _hf_load_normalized_source_text(task_id, task)
+    edited_text = _hf_load_subtitles_text(task_id, task)
+    title_hint = " ".join(
+        [
+            str(task.get("title") or ""),
+            str(task.get("source_title") or ""),
+            str(task.get("note") or ""),
+            str(task.get("source_url") or ""),
+        ]
+    ).lower()
+    speech_text = _hf_plain_text_signal(normalized_source_text) or _hf_plain_text_signal(origin_text)
+    speech_text_compact = "".join(str(speech_text or "").split())
+    subtitle_meta_hint = any(
+        token in title_hint
+        for token in ("字幕", "caption", "subtitle", "subtitles", "文案", "上字", "双语", "text-led", "text led")
+    )
+    subtitle_stream = pipeline_config.get("subtitle_stream") == "true" or bool(
+        str(pipeline_config.get("subtitle_track_kind") or "").strip()
+    )
+    subtitle_basis = _hf_plain_text_signal(edited_text) or _hf_plain_text_signal(normalized_source_text) or _hf_plain_text_signal(origin_text)
+    subtitle_basis_compact = "".join(str(subtitle_basis or "").split())
+
+    speech_detected = len(speech_text_compact) >= 6
+    if speech_detected:
+        speech_confidence = "high" if len(speech_text_compact) >= 20 else "low"
+    else:
+        speech_confidence = "none"
+
+    onscreen_text_detected = bool(
+        subtitle_stream
+        or subtitle_meta_hint
+        or (not speech_detected and len(subtitle_basis_compact) >= 4)
+    )
+    if not onscreen_text_detected:
+        onscreen_text_density = "none"
+    else:
+        onscreen_text_density = "high" if len(subtitle_basis_compact) >= 20 else "low"
+
+    if speech_detected:
+        content_mode = "voice_led"
+    elif onscreen_text_detected:
+        content_mode = "subtitle_led_candidate"
+    else:
+        content_mode = "silent_candidate"
+
+    return {
+        "speech_detected": speech_detected,
+        "speech_confidence": speech_confidence,
+        "onscreen_text_detected": onscreen_text_detected,
+        "onscreen_text_density": onscreen_text_density,
+        "content_mode": content_mode,
+    }
+
+
 def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | None = None) -> dict[str, Any]:
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     origin_text = _hf_load_origin_subtitles_text(task)
@@ -1860,11 +1917,18 @@ def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | Non
         and not _hf_has_usable_dub_text(edited_text)
         and not _hf_has_usable_dub_text(manual_value)
     )
-    if no_subtitles_flag or no_dub_flag or no_marker or silent_hint or empty_transcript:
-        reason = "no_speech_detected" if (silent_hint or no_marker or no_subtitles_flag or no_dub_flag) else "empty_transcript"
+    channel_state = _hf_dual_channel_state(task_id, task)
+    if channel_state.get("content_mode") == "subtitle_led_candidate" and empty_transcript:
+        return {
+            "no_dub": True,
+            "no_dub_reason": "subtitle_led_candidate",
+            "no_dub_message": "未检测到可靠语音，但疑似存在画面字幕/文字内容。当前版本不会默认自动 OCR，请先检查字幕或手工补充文本后再生成配音。",
+        }
+    if channel_state.get("content_mode") == "silent_candidate" or no_subtitles_flag or no_dub_flag or no_marker or silent_hint or empty_transcript:
+        reason = "no_speech_detected" if (silent_hint or no_marker or no_subtitles_flag or no_dub_flag) else "silent_candidate"
         message = (
             "当前素材更像无人声 / ASMR 素材，已跳过配音。如需继续，请手工编辑字幕文本后再生成配音。"
-            if reason == "no_speech_detected"
+            if reason in {"no_speech_detected", "silent_candidate"}
             else "未检测到可配音语音内容，已跳过配音。如需继续，请手工编辑字幕文本后再生成配音。"
         )
         return {"no_dub": True, "no_dub_reason": reason, "no_dub_message": message}
@@ -2651,7 +2715,7 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     no_dub_state = _hf_detect_no_dub_candidate(task_id, task)
     audio_ready_reason = "ready"
     if no_dub_state.get("no_dub"):
-        audio_ready_reason = "no_dub_candidate"
+        audio_ready_reason = str(no_dub_state.get("no_dub_reason") or "no_dub_candidate")
     elif dub_running:
         audio_ready_reason = "dub_running"
     elif not audio_exists:
@@ -2687,18 +2751,52 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
 
 def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     voice_state = _collect_voice_execution_state(task, settings)
+    task_id = str(task.get("task_id") or task.get("id") or "")
+    channel_state = _hf_dual_channel_state(task_id, task) if task_id else {
+        "speech_detected": False,
+        "speech_confidence": "none",
+        "onscreen_text_detected": False,
+        "onscreen_text_density": "none",
+        "content_mode": "silent_candidate",
+    }
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
     final_exists = bool(final_key and object_exists(str(final_key)))
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
+    ocr_enabled = os.getenv("HF_OCR_ENABLED", "0").strip().lower() in ("1", "true", "yes")
+    ocr_fallback_only = os.getenv("HF_OCR_FALLBACK_ONLY", "1").strip().lower() not in ("0", "false", "no")
+    ocr_soft_fail = os.getenv("HF_OCR_SOFT_FAIL", "1").strip().lower() not in ("0", "false", "no")
+    ocr_candidate = bool(ocr_enabled and channel_state.get("content_mode") == "subtitle_led_candidate")
+    if not ocr_enabled:
+        ocr_status = "off"
+        ocr_warning = "OCR candidate path is disabled by default."
+    elif ocr_candidate:
+        ocr_status = "candidate"
+        ocr_warning = "OCR candidate path is available as a fallback only. Current version does not auto-run OCR by default."
+    else:
+        ocr_status = "not_applicable"
+        ocr_warning = None
+    recommended_path = (
+        "Voice dubbing"
+        if channel_state.get("content_mode") == "voice_led"
+        else ("OCR subtitle translation candidate" if channel_state.get("content_mode") == "subtitle_led_candidate" else "Manual text input required")
+    )
     return {
         **voice_state,
+        **channel_state,
         "compose_status": compose_status,
         "final_exists": final_exists,
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
         "lipsync_enabled": lipsync_enabled,
         "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
+        "ocr_enabled": ocr_enabled,
+        "ocr_fallback_only": ocr_fallback_only,
+        "ocr_soft_fail": ocr_soft_fail,
+        "ocr_status": ocr_status,
+        "ocr_candidate": ocr_candidate,
+        "ocr_warning": ocr_warning,
+        "recommended_path": recommended_path,
         "no_dub": voice_state.get("no_dub"),
         "no_dub_reason": voice_state.get("no_dub_reason"),
         "no_dub_message": voice_state.get("no_dub_message"),

@@ -64,8 +64,14 @@
   const voiceoverAudioEl = document.getElementById("hf_voiceover_audio");
   const actualProviderEl = document.getElementById("hf_actual_provider");
   const resolvedVoiceEl = document.getElementById("hf_resolved_voice");
+  const contentModeValueEl = document.getElementById("hf_content_mode_value");
+  const speechDetectedValueEl = document.getElementById("hf_speech_detected_value");
+  const onscreenTextDetectedValueEl = document.getElementById("hf_onscreen_text_detected_value");
+  const recommendedPathValueEl = document.getElementById("hf_recommended_path_value");
   const noDubWarningEl = document.getElementById("hf_no_dub_warning");
   const noDubReasonEl = document.getElementById("hf_no_dub_reason");
+  const ocrCandidateWarningEl = document.getElementById("hf_ocr_candidate_warning");
+  const ocrCandidateTextEl = document.getElementById("hf_ocr_candidate_text");
   const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
   const scenePackDownloadEl = document.getElementById("hf_scene_pack_download");
   const scenePackHintEl = document.getElementById("hf-scene-pack-hint");
@@ -319,6 +325,10 @@
   function renderVoiceMeta() {
     if (actualProviderEl) actualProviderEl.textContent = (currentHub && currentHub.actual_provider) || "-";
     if (resolvedVoiceEl) resolvedVoiceEl.textContent = (currentHub && currentHub.resolved_voice) || "-";
+    if (contentModeValueEl) contentModeValueEl.textContent = (currentHub && currentHub.content_mode) || "-";
+    if (speechDetectedValueEl) speechDetectedValueEl.textContent = (currentHub && currentHub.speech_detected) ? "yes" : "no";
+    if (onscreenTextDetectedValueEl) onscreenTextDetectedValueEl.textContent = (currentHub && currentHub.onscreen_text_detected) ? "yes" : "no";
+    if (recommendedPathValueEl) recommendedPathValueEl.textContent = (currentHub && currentHub.recommended_path) || "-";
   }
 
   function renderConsistencyPanel() {
@@ -354,6 +364,12 @@
     }
     if (noDubWarningEl) noDubWarningEl.classList.toggle("hidden", !noDub);
     if (noDubReasonEl) noDubReasonEl.textContent = noDubMessage || "当前素材更像无人声 / ASMR 素材。如需继续，请手工编辑字幕文本后再生成配音。";
+    const showOcrCandidate = Boolean(audio.ocr_candidate || audio.content_mode === "subtitle_led_candidate");
+    if (ocrCandidateWarningEl) ocrCandidateWarningEl.classList.toggle("hidden", !showOcrCandidate);
+    if (ocrCandidateTextEl) {
+      ocrCandidateTextEl.textContent = audio.ocr_warning
+        || "No reliable speech detected. This task looks subtitle-led; review subtitles or provide text before dubbing.";
+    }
     const hasManualText = Boolean(subtitlesTextEl && String(subtitlesTextEl.value || "").trim());
     if (rerunAudioBtn) {
       rerunAudioBtn.disabled = Boolean(noDub && !hasManualText);
