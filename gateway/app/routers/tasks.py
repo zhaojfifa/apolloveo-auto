@@ -1692,10 +1692,6 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
     except Exception:
         audio_fit_max_speed = 1.25
     audio_fit_max_speed = max(1.0, min(1.6, audio_fit_max_speed))
-    voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-    meta = object_head(str(voice_key)) if voice_key else None
-    size, _ = media_meta_from_head(meta)
-    voice_url = f"/v1/tasks/{task_id}/audio_mm" if task_id and size >= MIN_AUDIO_BYTES else None
     voice_state = _collect_voice_execution_state(task, settings)
     provider = normalize_provider(voice_state.get("expected_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
     return {
@@ -1704,8 +1700,8 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
-        "voiceover_url": voice_url,
-        "audio_url": voice_url,
+        "voiceover_url": voice_state.get("voiceover_url"),
+        "audio_url": voice_state.get("voiceover_url"),
         "audio_fit_max_speed": audio_fit_max_speed,
     }
 
@@ -2439,6 +2435,41 @@ def _resolve_hot_follow_provider_voice(
     return requested
 
 
+def _hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
+    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
+    exists = False
+    size_bytes = 0
+    if audio_key and object_exists(str(audio_key)):
+        meta = object_head(str(audio_key))
+        size_bytes, _ = media_meta_from_head(meta)
+        exists = int(size_bytes or 0) >= MIN_AUDIO_BYTES
+    return {
+        "audio_key": str(audio_key) if audio_key else None,
+        "exists": bool(exists),
+        "size_bytes": int(size_bytes or 0),
+        "voiceover_url": f"/v1/tasks/{task_id}/audio_mm" if task_id and exists else None,
+        "deliverable_audio_done": bool(exists),
+    }
+
+
+def _hf_audio_matches_expected(
+    *,
+    actual_provider: str | None,
+    expected_provider: str | None,
+    resolved_voice: str | None,
+    expected_resolved_voice: str | None,
+) -> tuple[bool, str]:
+    if not expected_resolved_voice:
+        return False, "voice_unresolved"
+    if not resolved_voice:
+        return False, "resolved_voice_missing"
+    if normalize_provider(actual_provider) != normalize_provider(expected_provider):
+        return False, "provider_mismatch"
+    if str(resolved_voice).strip() != str(expected_resolved_voice).strip():
+        return False, "voice_mismatch"
+    return True, "ready"
+
+
 def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
     warnings: list[dict[str, str | None]] = []
     seen: set[tuple[str, str, str, str]] = set()
@@ -2497,6 +2528,7 @@ def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
 
 def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    task_id = str(task.get("task_id") or task.get("id") or "")
     voice_options_by_provider = _build_hot_follow_voice_options(settings, target_lang)
     config_state = _voice_state_config(task)
     requested_voice = config_state.get("requested_voice") or _resolve_hot_follow_requested_voice(settings, task, config_state.get("provider"))
@@ -2522,29 +2554,35 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
             task=task,
         )
     )
-    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-    audio_exists = bool(audio_key and object_exists(str(audio_key)))
+    persisted_audio = _hf_persisted_audio_state(task_id, task)
+    audio_exists = bool(persisted_audio.get("exists"))
     dub_status = str(task.get("dub_status") or "").strip().lower()
     dub_running = dub_status in {"queued", "running", "processing"}
     dub_done = dub_status in {"ready", "done", "success", "completed"}
+    matches_expected, match_reason = _hf_audio_matches_expected(
+        actual_provider=actual_provider,
+        expected_provider=expected_provider,
+        resolved_voice=resolved_voice,
+        expected_resolved_voice=expected_resolved_voice,
+    )
     audio_ready_reason = "ready"
-    if dub_running:
+    if dub_running and not audio_exists:
         audio_ready_reason = "dub_running"
     elif not audio_exists:
         audio_ready_reason = "audio_missing"
     elif not dub_done:
         audio_ready_reason = "dub_not_done"
-    elif not expected_resolved_voice:
-        audio_ready_reason = "voice_unresolved"
-    elif not resolved_voice:
-        audio_ready_reason = "resolved_voice_missing"
-    elif normalize_provider(actual_provider) != normalize_provider(expected_provider):
-        audio_ready_reason = "provider_mismatch"
-    elif resolved_voice != expected_resolved_voice:
-        audio_ready_reason = "voice_mismatch"
-    elif config_state.get("request_token") and config_state.get("completed_token") != config_state.get("request_token"):
+    elif not matches_expected:
+        audio_ready_reason = match_reason
+    elif (
+        config_state.get("request_token")
+        and config_state.get("completed_token")
+        and config_state.get("completed_token") != config_state.get("request_token")
+        and not audio_exists
+    ):
         audio_ready_reason = "dub_not_current"
     audio_ready = audio_ready_reason == "ready"
+    dub_current = audio_ready and audio_exists and matches_expected
     return {
         "target_lang": target_lang,
         "voice_options_by_provider": voice_options_by_provider,
@@ -2555,6 +2593,10 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         "expected_resolved_voice": expected_resolved_voice,
         "audio_ready": audio_ready,
         "audio_ready_reason": audio_ready_reason,
+        "voiceover_url": persisted_audio.get("voiceover_url") if dub_current else None,
+        "deliverable_audio_done": bool(persisted_audio.get("deliverable_audio_done")),
+        "dub_current": bool(dub_current),
+        "dub_current_reason": audio_ready_reason if not dub_current else "ready",
     }
 
 
@@ -2572,6 +2614,10 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
         "lipsync_enabled": lipsync_enabled,
         "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
+        "voiceover_url": voice_state.get("voiceover_url"),
+        "deliverable_audio_done": bool(voice_state.get("deliverable_audio_done")),
+        "dub_current": bool(voice_state.get("dub_current")),
+        "dub_current_reason": voice_state.get("dub_current_reason"),
     }
 
 
@@ -3916,9 +3962,13 @@ def get_hot_follow_workbench_hub(
             "warning": audio_warning,
             "sha256": task.get("audio_sha256"),
             "audio_ready": bool(voice_state.get("audio_ready")),
+            "audio_ready_reason": voice_state.get("audio_ready_reason"),
             "requested_voice": voice_state.get("requested_voice"),
             "actual_provider": voice_state.get("actual_provider"),
             "resolved_voice": voice_state.get("resolved_voice"),
+            "deliverable_audio_done": bool(voice_state.get("deliverable_audio_done")),
+            "dub_current": bool(voice_state.get("dub_current")),
+            "dub_current_reason": voice_state.get("dub_current_reason"),
         },
         "scenes": {
             "status": scenes_status,
@@ -5520,6 +5570,15 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         if existing_audio_key:
             head = object_head(str(existing_audio_key))
             existing_audio_size, _ = media_meta_from_head(head)
+        persisted_audio = _hf_persisted_audio_state(task_id, task_after)
+        persisted_provider = normalize_provider(task_after.get("mm_audio_provider") or provider)
+        persisted_voice = str(task_after.get("mm_audio_voice_id") or "").strip() or None
+        persisted_matches_expected, persisted_match_reason = _hf_audio_matches_expected(
+            actual_provider=persisted_provider,
+            expected_provider=provider,
+            resolved_voice=persisted_voice,
+            expected_resolved_voice=final_voice_id,
+        )
         pipeline_config = parse_pipeline_config(task_after.get("pipeline_config"))
         no_dub_flag = pipeline_config.get("no_dub") == "true"
         no_dub_note = (task_base_dir(task_id) / "dub" / "no_dub.txt").exists()
@@ -5658,6 +5717,53 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             },
         )
         if not audio_path.exists():
+            if persisted_audio.get("exists") and persisted_matches_expected:
+                audio_key = str(persisted_audio.get("audio_key"))
+                local_size = int(persisted_audio.get("size_bytes") or 0)
+                local_duration_ms = task_after.get("mm_audio_duration_ms")
+                local_duration = float(local_duration_ms or 0) / 1000.0 if local_duration_ms is not None else 0.0
+                audio_sha256 = task_after.get("audio_sha256")
+                logger.info(
+                    "HF_DUB_ARTIFACT",
+                    extra={
+                        "task_id": task_id,
+                        "requested_voice": selected_voice_id,
+                        "resolved_voice": final_voice_id,
+                        "provider": provider,
+                        "fresh_artifact_persisted": True,
+                        "audio_key": audio_key,
+                    },
+                )
+                _policy_upsert(
+                    repo,
+                    task_id,
+                    {
+                        "mm_audio_path": audio_key,
+                        "mm_audio_key": audio_key,
+                        "mm_audio_provider": provider,
+                        "mm_audio_voice_id": final_voice_id,
+                        "mm_audio_bytes": local_size or None,
+                        "mm_audio_duration_ms": int(local_duration * 1000) if local_duration > 0 else local_duration_ms,
+                        "mm_audio_mime": "audio/mpeg",
+                        "dub_provider": provider,
+                        "last_step": "dubbing",
+                        "voice_id": selected_voice_id,
+                        "dub_status": "ready",
+                        "dub_error": None,
+                        "audio_sha256": audio_sha256,
+                        "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+                        "config": {**config, "tts_completed_token": request_token},
+                    },
+                )
+                stored = repo.get(task_id)
+                detail = _task_to_detail(stored)
+                return DubResponse(
+                    **detail.dict(exclude={"mm_audio_key"}),
+                    resolved_voice_id=final_voice_id,
+                    resolved_edge_voice=edge_voice,
+                    audio_sha256=audio_sha256,
+                    mm_audio_key=audio_key,
+                )
             logger.info(
                 "DUB3_OUTPUT_CHECK",
                 extra={
@@ -5669,6 +5775,20 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "size": existing_audio_size,
                 },
             )
+            if existing_audio_key:
+                logger.warning(
+                    "HF_STALE_AUDIO_REJECT",
+                    extra={
+                        "task_id": task_id,
+                        "requested_voice": selected_voice_id,
+                        "resolved_voice": final_voice_id,
+                        "provider": provider,
+                        "persisted_provider": persisted_provider,
+                        "persisted_voice": persisted_voice,
+                        "reason": persisted_match_reason,
+                        "audio_key": existing_audio_key,
+                    },
+                )
             _policy_upsert(
                 repo,
                 task_id,
@@ -5677,6 +5797,11 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "dub_error": "output_missing",
                     "last_step": "dub",
                     "voice_id": selected_voice_id,
+                    "mm_audio_key": None,
+                    "mm_audio_path": None,
+                    "mm_audio_provider": None,
+                    "mm_audio_voice_id": None,
+                    "audio_sha256": None,
                 },
             )
             stored = repo.get(task_id)
@@ -5692,6 +5817,20 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         try:
             local_size, local_duration = assert_local_audio_ok(audio_path)
         except ValueError:
+            if existing_audio_key:
+                logger.warning(
+                    "HF_STALE_AUDIO_REJECT",
+                    extra={
+                        "task_id": task_id,
+                        "requested_voice": selected_voice_id,
+                        "resolved_voice": final_voice_id,
+                        "provider": provider,
+                        "persisted_provider": persisted_provider,
+                        "persisted_voice": persisted_voice,
+                        "reason": persisted_match_reason,
+                        "audio_key": existing_audio_key,
+                    },
+                )
             _policy_upsert(
                 repo,
                 task_id,
@@ -5700,6 +5839,11 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "dub_error": "output_missing",
                     "last_step": "dub",
                     "voice_id": selected_voice_id,
+                    "mm_audio_key": None,
+                    "mm_audio_path": None,
+                    "mm_audio_provider": None,
+                    "mm_audio_voice_id": None,
+                    "audio_sha256": None,
                 },
             )
             stored = repo.get(task_id)
@@ -5735,6 +5879,17 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "output_size": local_size,
                 "duration_sec": local_duration,
                 "uploaded_key": audio_key,
+            },
+        )
+        logger.info(
+            "HF_DUB_ARTIFACT",
+            extra={
+                "task_id": task_id,
+                "requested_voice": selected_voice_id,
+                "resolved_voice": final_voice_id,
+                "provider": provider,
+                "fresh_artifact_persisted": True,
+                "audio_key": audio_key,
             },
         )
 
