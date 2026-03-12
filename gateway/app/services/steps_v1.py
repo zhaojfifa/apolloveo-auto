@@ -714,6 +714,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
     )
     try:
         _update_task(req.task_id, subtitles_status="running", subtitles_error=None)
+        _update_pipeline_config(req.task_id, {"no_subtitles": "false"})
         step_timeout_sec = _env_int("SUBTITLES_STEP_TIMEOUT_SEC", 7200)
         result = await asyncio.wait_for(
             generate_subtitles(
@@ -816,12 +817,15 @@ async def run_subtitles_step(req: SubtitlesRequest):
         return result
 
     except asyncio.TimeoutError:
+        _update_pipeline_config(req.task_id, {"no_subtitles": "false"})
         _update_task(req.task_id, subtitles_status="error", subtitles_error="timeout")
         raise HTTPException(status_code=504, detail="subtitles timeout")
     except asyncio.CancelledError:
+        _update_pipeline_config(req.task_id, {"no_subtitles": "false"})
         _update_task(req.task_id, subtitles_status="error", subtitles_error="cancelled")
         raise
     except HTTPException as exc:
+        _update_pipeline_config(req.task_id, {"no_subtitles": "false"})
         _update_task(
             req.task_id,
             subtitles_status="error",
@@ -840,6 +844,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
         raise
     except Exception as exc:  # pragma: no cover
         logger.exception("Unexpected error in subtitles step for task %s", req.task_id)
+        _update_pipeline_config(req.task_id, {"no_subtitles": "false"})
         _update_task(req.task_id, subtitles_status="error", subtitles_error=str(exc))
         raise HTTPException(status_code=500, detail="internal error") from exc
     finally:

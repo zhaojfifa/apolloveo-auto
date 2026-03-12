@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import time
 import wave
-from math import ceil
+from math import ceil, isfinite
 from pathlib import Path
 
 from fastapi import HTTPException
@@ -61,9 +61,35 @@ def _wav_duration_seconds(wav_path: Path) -> float | None:
         return None
 
 
+def _safe_non_negative_float(value, default: float = 0.0) -> float:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return default
+    if not isfinite(number):
+        return default
+    return max(number, 0.0)
+
+
+def _sanitize_segment_timing(segments: list[dict]) -> list[dict]:
+    sanitized: list[dict] = []
+    for idx, seg in enumerate(segments, start=1):
+        start = _safe_non_negative_float(seg.get("start"), 0.0)
+        end = _safe_non_negative_float(seg.get("end"), start)
+        if end < start:
+            end = start
+        cloned = dict(seg)
+        cloned["index"] = int(seg.get("index") or idx)
+        cloned["start"] = start
+        cloned["end"] = end
+        sanitized.append(cloned)
+    return sanitized
+
+
 def _compute_asr_timeout_sec(audio_sec: float | None) -> int:
     fixed = _env_int("SUBTITLES_ASR_TIMEOUT_SEC", 600)
-    if not audio_sec or audio_sec <= 0:
+    audio_value = _safe_non_negative_float(audio_sec, 0.0)
+    if audio_value <= 0:
         return fixed
 
     min_sec = _env_int("SUBTITLES_ASR_TIMEOUT_MIN_SEC", 600)
@@ -74,7 +100,7 @@ def _compute_asr_timeout_sec(audio_sec: float | None) -> int:
     except ValueError:
         rtf = 3.0
 
-    dynamic = int(ceil(audio_sec * rtf + slack))
+    dynamic = int(ceil(audio_value * rtf + slack))
     return max(min_sec, min(dynamic, max_sec))
 
 
@@ -354,13 +380,13 @@ def _transcribe_with_faster_whisper(
         segments.append(
             {
                 "index": idx,
-                "start": float(seg.start),
-                "end": float(seg.end),
+                "start": _safe_non_negative_float(getattr(seg, "start", None), 0.0),
+                "end": _safe_non_negative_float(getattr(seg, "end", None), 0.0),
                 "origin": text,
             }
         )
     detected_lang = getattr(info, "language", None)
-    return segments, detected_lang
+    return _sanitize_segment_timing(segments), detected_lang
 
 
 def _parse_srt_to_segments(srt_text: str) -> list[dict]:
@@ -377,8 +403,10 @@ def _parse_srt_to_segments(srt_text: str) -> list[dict]:
         start, end = time_line.split("-->")
         start = start.strip()
         end = end.strip()
-        start_sec = _parse_srt_time(start)
-        end_sec = _parse_srt_time(end)
+        start_sec = _safe_non_negative_float(_parse_srt_time(start), 0.0)
+        end_sec = _safe_non_negative_float(_parse_srt_time(end), start_sec)
+        if end_sec < start_sec:
+            end_sec = start_sec
         text_lines = lines[2:] if lines[0].strip().isdigit() else lines[1:]
         segments.append(
             {
@@ -388,7 +416,7 @@ def _parse_srt_to_segments(srt_text: str) -> list[dict]:
                 "origin": "\n".join(text_lines),
             }
         )
-    return segments
+    return _sanitize_segment_timing(segments)
 
 
 def _parse_srt_time(value: str) -> float:
@@ -570,6 +598,8 @@ async def generate_subtitles(
                         log_stage=log_stage,
                     )
                 segments = _parse_srt_to_segments(origin_srt_text)
+
+            segments = _sanitize_segment_timing(segments)
 
             if not segments:
                 return _write_no_subtitles_placeholders(

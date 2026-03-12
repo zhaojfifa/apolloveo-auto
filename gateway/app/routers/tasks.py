@@ -1759,6 +1759,8 @@ def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
     task_status = str(task.get("status") or "").lower()
     if step == "parse":
         status = _hf_state_from_status(task.get("parse_status"))
+        if task.get("parse_error"):
+            status = "failed"
         if status == "pending" and task.get("raw_path"):
             status = "done"
         if status == "pending" and task_status == "processing" and last_step == "parse":
@@ -1767,6 +1769,8 @@ def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
         return status, summary
     if step == "subtitles":
         status = _hf_state_from_status(task.get("subtitles_status"))
+        if task.get("subtitles_error"):
+            status = "failed"
         if status == "pending" and (task.get("origin_srt_path") or task.get("mm_srt_path")):
             status = "done"
         if status == "pending" and task_status == "processing" and last_step == "subtitles":
