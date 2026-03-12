@@ -56,3 +56,39 @@ def test_hot_follow_no_dub_guard_allows_manual_override(monkeypatch):
     )
     assert state["no_dub"] is False
     assert state["manual_override_available"] is True
+
+
+def test_hot_follow_dual_channel_state_marks_subtitle_led_candidate(monkeypatch):
+    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda task: "")
+    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda task_id: "")
+    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda task_id, task: "")
+
+    task = {
+        "task_id": "hf-route-01",
+        "kind": "hot_follow",
+        "title": "字幕版试色",
+        "pipeline_config": {"subtitle_stream": "true"},
+    }
+
+    state = tasks_router._hf_dual_channel_state("hf-route-01", task)
+    assert state["speech_detected"] is False
+    assert state["onscreen_text_detected"] is True
+    assert state["content_mode"] == "subtitle_led_candidate"
+
+
+def test_hot_follow_dual_channel_state_marks_silent_candidate(monkeypatch):
+    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda task: "")
+    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda task_id: "")
+    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda task_id, task: "")
+
+    task = {
+        "task_id": "hf-route-02",
+        "kind": "hot_follow",
+        "title": "无人声涂抹音",
+        "pipeline_config": {},
+    }
+
+    state = tasks_router._hf_dual_channel_state("hf-route-02", task)
+    assert state["speech_detected"] is False
+    assert state["onscreen_text_detected"] is False
+    assert state["content_mode"] == "silent_candidate"

@@ -1820,11 +1820,79 @@ def _hf_has_usable_dub_text(text: str | None) -> bool:
     return True
 
 
+def _hf_plain_text_for_signal(text: str | None) -> str:
+    value = str(text or "")
+    if not value:
+        return ""
+    value = re.sub(r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}", " ", value)
+    value = re.sub(r"(?m)^\s*\d+\s*$", " ", value)
+    value = re.sub(r"<[^>]+>", " ", value)
+    value = re.sub(r"\s+", " ", value)
+    return value.strip()
+
+
 def _hf_no_speech_title_hint(task: dict) -> bool:
     title = str(task.get("title") or task.get("source_title") or "").strip().lower()
     if not title:
         return False
     return any(token in title for token in ("无人声", "asmr", "涂抹音", "无语音", "no voice"))
+
+
+def _hf_subtitle_text_hint(task: dict) -> bool:
+    haystack = " ".join(
+        [
+            str(task.get("title") or ""),
+            str(task.get("source_title") or ""),
+            str(task.get("source_url") or ""),
+            str(task.get("note") or ""),
+        ]
+    ).lower()
+    return any(token in haystack for token in ("字幕", "caption", "subtitles", "screen text", "text-led"))
+
+
+def _hf_dual_channel_state(task_id: str, task: dict) -> dict[str, Any]:
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    origin_text = _hf_load_origin_subtitles_text(task)
+    normalized_source_text = _hf_load_normalized_source_text(task_id)
+    edited_text = _hf_load_subtitles_text(task_id, task)
+    source_signal_text = _hf_plain_text_for_signal(normalized_source_text or origin_text)
+    speech_len = len(source_signal_text)
+    speech_detected = speech_len >= 6 and _hf_has_usable_dub_text(source_signal_text)
+    if speech_detected and speech_len >= 18:
+        speech_confidence = "high"
+    elif speech_detected:
+        speech_confidence = "low"
+    else:
+        speech_confidence = "none"
+    subtitle_stream = pipeline_config.get("subtitle_stream") == "true"
+    subtitle_track_kind = str(pipeline_config.get("subtitle_track_kind") or "").strip()
+    metadata_hint = _hf_subtitle_text_hint(task)
+    onscreen_text_detected = bool(
+        subtitle_stream
+        or subtitle_track_kind
+        or metadata_hint
+        or (not speech_detected and any(_hf_has_usable_dub_text(v) for v in (origin_text, normalized_source_text, edited_text)))
+    )
+    edited_plain = _hf_plain_text_for_signal(edited_text)
+    if subtitle_stream or len(edited_plain) >= 24:
+        onscreen_text_density = "high"
+    elif onscreen_text_detected:
+        onscreen_text_density = "low"
+    else:
+        onscreen_text_density = "none"
+    if speech_detected:
+        content_mode = "voice_led"
+    elif onscreen_text_detected:
+        content_mode = "subtitle_led_candidate"
+    else:
+        content_mode = "silent_candidate"
+    return {
+        "speech_detected": speech_detected,
+        "speech_confidence": speech_confidence,
+        "onscreen_text_detected": onscreen_text_detected,
+        "onscreen_text_density": onscreen_text_density,
+        "content_mode": content_mode,
+    }
 
 
 def _hf_write_no_dub_note(task_id: str, reason: str) -> None:
@@ -1847,6 +1915,7 @@ def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | Non
     origin_text = _hf_load_origin_subtitles_text(task)
     normalized_source_text = _hf_load_normalized_source_text(task_id)
     edited_text = _hf_load_subtitles_text(task_id, task)
+    routing_state = _hf_dual_channel_state(task_id, task)
     manual_override_text = str(manual_text or "").strip()
     origin_has_text = _hf_has_usable_dub_text(origin_text)
     normalized_has_text = _hf_has_usable_dub_text(normalized_source_text)
@@ -1864,6 +1933,12 @@ def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | Non
     reason = None
     if manual_has_text or edited_has_text:
         no_dub = False
+    elif routing_state.get("content_mode") == "subtitle_led_candidate":
+        no_dub = True
+        reason = "subtitle_led_candidate"
+    elif routing_state.get("content_mode") == "silent_candidate" and (all_empty or title_hint):
+        no_dub = True
+        reason = "no_speech_detected" if title_hint else "silent_candidate"
     elif no_subtitles_flag or no_dub_note or no_dub_flag:
         no_dub = True
         reason = str(pipeline_config.get("dub_skip_reason") or "").strip() or "no_speech_detected"
@@ -1872,11 +1947,14 @@ def _hf_detect_no_dub_candidate(task_id: str, task: dict, manual_text: str | Non
         reason = "no_speech_detected" if title_hint else "empty_transcript"
     message = None
     if no_dub:
-        if reason == "empty_transcript":
+        if reason == "subtitle_led_candidate":
+            message = "未检测到可靠语音，但检测到字幕/屏幕文字候选，当前默认不自动配音。"
+        elif reason == "empty_transcript":
             message = "未检测到可配音语音内容，已跳过配音。"
         else:
             message = "当前素材更像无人声 / ASMR 素材，已跳过配音。"
     return {
+        **routing_state,
         "no_dub": no_dub,
         "no_dub_reason": reason,
         "no_dub_message": message,
@@ -2581,6 +2659,17 @@ def _resolve_hot_follow_provider_voice(
 def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
     warnings: list[dict[str, str | None]] = []
     seen: set[tuple[str, str, str, str]] = set()
+    no_dub_state = _hf_detect_no_dub_candidate(str(task.get("task_id") or task.get("id") or ""), task)
+
+    if no_dub_state.get("no_dub"):
+        warnings.append(
+            {
+                "code": str(no_dub_state.get("no_dub_reason") or "no_dub_candidate"),
+                "message": str(no_dub_state.get("no_dub_message") or "dubbing skipped"),
+                "provider": None,
+                "voice_id": str(task.get("voice_id") or "").strip() or None,
+            }
+        )
 
     task_dub_error = str(task.get("dub_error") or "").strip()
     if task_dub_error:
@@ -2670,7 +2759,7 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     no_dub_state = _hf_detect_no_dub_candidate(task_id, task)
     audio_ready_reason = "ready"
     if no_dub_state.get("no_dub"):
-        audio_ready_reason = "no_dub_candidate"
+        audio_ready_reason = str(no_dub_state.get("content_mode") or "no_dub_candidate")
     elif dub_running:
         audio_ready_reason = "dub_running"
     elif not audio_exists:
@@ -2698,6 +2787,11 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         "expected_resolved_voice": expected_resolved_voice,
         "audio_ready": audio_ready,
         "audio_ready_reason": audio_ready_reason,
+        "speech_detected": bool(no_dub_state.get("speech_detected")),
+        "speech_confidence": no_dub_state.get("speech_confidence"),
+        "onscreen_text_detected": bool(no_dub_state.get("onscreen_text_detected")),
+        "onscreen_text_density": no_dub_state.get("onscreen_text_density"),
+        "content_mode": no_dub_state.get("content_mode") or "voice_led",
         "no_dub": bool(no_dub_state.get("no_dub")),
         "no_dub_reason": no_dub_state.get("no_dub_reason"),
         "no_dub_message": no_dub_state.get("no_dub_message"),

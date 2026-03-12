@@ -85,6 +85,11 @@
   const subtitlesRefreshBtn = document.getElementById("hf_subtitles_refresh_btn");
   const subtitlesSaveBtn = document.getElementById("hf_subtitles_save_btn");
   const subtitlesMsgEl = document.getElementById("hf_subtitles_msg");
+  const contentModeEl = document.getElementById("hf_content_mode");
+  const speechDetectedEl = document.getElementById("hf_speech_detected");
+  const onscreenTextDetectedEl = document.getElementById("hf_onscreen_text_detected");
+  const recommendedPathEl = document.getElementById("hf_recommended_path");
+  const contentModeHintEl = document.getElementById("hf_content_mode_hint");
   const sourceVideoEl = document.getElementById("hf_source_video");
   const finalVideoEl = document.getElementById("hf_final_video");
   const sourcePosterEl = document.getElementById("hf_source_poster");
@@ -364,6 +369,29 @@
     }
   }
 
+  function renderContentRouting() {
+    const contentMode = (currentHub && currentHub.content_mode) || "voice_led";
+    const speechDetected = Boolean(currentHub && currentHub.speech_detected);
+    const onscreenTextDetected = Boolean(currentHub && currentHub.onscreen_text_detected);
+    if (contentModeEl) contentModeEl.textContent = contentMode;
+    if (speechDetectedEl) speechDetectedEl.textContent = speechDetected ? "yes" : "no";
+    if (onscreenTextDetectedEl) onscreenTextDetectedEl.textContent = onscreenTextDetected ? "yes" : "no";
+    if (recommendedPathEl) {
+      if (contentMode === "subtitle_led_candidate") recommendedPathEl.textContent = "OCR subtitle translation candidate";
+      else if (contentMode === "silent_candidate") recommendedPathEl.textContent = "Manual text input required";
+      else recommendedPathEl.textContent = "Voice dubbing";
+    }
+    if (contentModeHintEl) {
+      if (contentMode === "subtitle_led_candidate") {
+        contentModeHintEl.textContent = "No reliable speech detected. On-screen subtitle/text candidate detected. Review subtitles or provide text before dubbing.";
+      } else if (contentMode === "silent_candidate") {
+        contentModeHintEl.textContent = "No reliable speech or subtitle text detected. This appears to be B-roll / ASMR / silent content. Manual text input is required.";
+      } else {
+        contentModeHintEl.textContent = "Voice-led content detected. Current Azure dubbing path remains the recommended route.";
+      }
+    }
+  }
+
   function renderConsistencyPanel() {
     if (burnSubtitleSourceEl) burnSubtitleSourceEl.textContent = (currentHub && currentHub.actual_burn_subtitle_source) || "-";
     if (composeStatusValueEl) composeStatusValueEl.textContent = (currentHub && currentHub.compose_status) || (((currentHub && currentHub.compose) || {}).last || {}).status || "-";
@@ -401,6 +429,7 @@
     if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
     renderVoiceMeta();
     renderNoDubState();
+    renderContentRouting();
   }
 
   function renderComposedReadiness() {
