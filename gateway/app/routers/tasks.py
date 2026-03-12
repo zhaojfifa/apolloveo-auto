@@ -2339,15 +2339,15 @@ def _build_hot_follow_voice_options(settings, target_lang: str | None) -> dict[s
     options: dict[str, list[dict[str, str]]] = {"azure_speech": [], "edge_tts": []}
     azure_map = getattr(settings, "azure_tts_voice_map", {}) or {}
     if azure_map.get("mm_female_1"):
-        options["azure_speech"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
+        options["azure_speech"].append({"value": "mm_female_1", "label": "女声"})
     if azure_map.get("mm_male_1"):
-        options["azure_speech"].append({"value": "mm_male_1", "label": "缅语男声（标准）"})
+        options["azure_speech"].append({"value": "mm_male_1", "label": "男声"})
 
     edge_map = getattr(settings, "edge_tts_voice_map", {}) or {}
     if edge_map.get("mm_female_1"):
-        options["edge_tts"].append({"value": "mm_female_1", "label": "缅语女声（标准）"})
+        options["edge_tts"].append({"value": "mm_female_1", "label": "女声"})
     if edge_map.get("mm_male_1"):
-        options["edge_tts"].append({"value": "mm_male_1", "label": "缅语男声（标准）"})
+        options["edge_tts"].append({"value": "mm_male_1", "label": "男声"})
     return options
 
 
@@ -2629,6 +2629,16 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
         "dub_current": bool(voice_state.get("dub_current")),
         "dub_current_reason": voice_state.get("dub_current_reason"),
     }
+
+
+def _hf_audio_display_error(dub_state: str, dub_error: str | None, voice_state: dict[str, Any]) -> str | None:
+    state = str(dub_state or "").strip().lower()
+    reason = str(voice_state.get("dub_current_reason") or voice_state.get("audio_ready_reason") or "").strip().lower()
+    if state in {"running", "processing", "queued"} or reason == "dub_running":
+        return None
+    if state == "failed":
+        return str(dub_error or "").strip() or None
+    return None
 
 
 def _merge_probe_into_pipeline_config(
@@ -3891,10 +3901,16 @@ def get_hot_follow_workbench_hub(
     target_lang_internal = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     text_guard = clean_and_analyze_dub_text(subtitles_text or "", target_lang_internal)
     audio_warning = str(text_guard.get("warning") or "").strip() or None
-    if not (audio_cfg.get("voiceover_url") or "").strip() and (task.get("mm_audio_key") or task.get("mm_audio_path")):
+    if (
+        not (audio_cfg.get("voiceover_url") or "").strip()
+        and (task.get("mm_audio_key") or task.get("mm_audio_path"))
+        and str(dub_state).strip().lower() not in {"running", "processing", "queued"}
+        and str(voice_state.get("dub_current_reason") or "").strip().lower() not in {"dub_running", "dub_not_done"}
+    ):
         dub_state = "failed"
         if not dub_summary:
             dub_summary = "voiceover artifact invalid"
+    audio_error = _hf_audio_display_error(str(dub_state), task.get("dub_error"), voice_state)
     deliverables = _hf_deliverables(task_id, task)
     compose_last_status_raw = str(
         task.get("compose_last_status")
@@ -3924,7 +3940,7 @@ def get_hot_follow_workbench_hub(
     pipeline = [
         {"key": "parse", "label": "Parse", "status": parse_state, "updated_at": task.get("updated_at"), "error": task.get("error_message"), "message": parse_summary},
         {"key": "subtitles", "label": "Subtitles", "status": subtitles_state, "updated_at": task.get("updated_at"), "error": task.get("subtitles_error"), "message": subtitles_summary},
-        {"key": "dub", "label": "Dub", "status": dub_state, "updated_at": task.get("updated_at"), "error": task.get("dub_error"), "message": dub_summary},
+        {"key": "dub", "label": "Dub", "status": dub_state, "updated_at": task.get("updated_at"), "error": audio_error, "message": dub_summary},
         {"key": "pack", "label": "Pack", "status": pack_state, "updated_at": task.get("updated_at"), "error": task.get("pack_error"), "message": pack_summary},
         {"key": "compose", "label": "Compose", "status": compose_state, "updated_at": task.get("updated_at"), "error": task.get("compose_error"), "message": compose_summary},
     ]
@@ -3968,7 +3984,7 @@ def get_hot_follow_workbench_hub(
             "bgm_url": audio_cfg.get("bgm_url"),
             "bgm_mix": audio_cfg.get("bgm_mix"),
             "status": dub_state,
-            "error": task.get("dub_error"),
+            "error": audio_error,
             "warning": audio_warning,
             "sha256": task.get("audio_sha256"),
             "audio_ready": bool(voice_state.get("audio_ready")),

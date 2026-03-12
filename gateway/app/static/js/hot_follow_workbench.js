@@ -154,14 +154,36 @@
     if (summaryEl) summaryEl.textContent = summary || "";
   }
 
+  function getAudioDisplayState() {
+    const audio = (currentHub && currentHub.audio) || {};
+    const media = (currentHub && currentHub.media) || {};
+    const status = String(audio.status || "").trim().toLowerCase();
+    const reason = String(audio.dub_current_reason || audio.audio_ready_reason || "").trim().toLowerCase();
+    const hasVoiceover = Boolean(media.voiceover_url || audio.voiceover_url || audio.audio_url);
+    const deliverableDone = Boolean(audio.deliverable_audio_done);
+    const audioReady = Boolean(audio.audio_ready);
+
+    if (["running", "processing", "queued"].includes(status) || reason === "dub_running") {
+      return { status: "running", message: "Dubbing running..." };
+    }
+    if (status === "failed") {
+      return { status: "failed", message: audio.error ? `Audio error: ${audio.error}` : "Audio failed." };
+    }
+    if (status === "done" && audioReady && deliverableDone && hasVoiceover) {
+      return { status: "done", message: "Current voiceover ready." };
+    }
+    return { status: status || "pending", message: hasVoiceover ? "Voiceover available." : "" };
+  }
+
   function renderPipeline() {
     const parse = getPipelineItem("parse");
     const subtitles = getPipelineItem("subtitles");
     const dub = getPipelineItem("dub");
     const compose = getPipelineItem("compose");
+    const audioDisplay = getAudioDisplayState();
     setStep("parse", parse.status, parse.error || parse.message);
     setStep("subtitles", subtitles.status, subtitles.error || subtitles.message);
-    setStep("audio", dub.status, dub.error || dub.message);
+    setStep("audio", audioDisplay.status || dub.status, audioDisplay.status === "running" ? (audioDisplay.message || dub.message) : (dub.error || audioDisplay.message || dub.message));
     setStep("compose", compose.status, compose.error || compose.message);
     if (statusEl) statusEl.textContent = `${compose.status || dub.status || subtitles.status || parse.status || "pending"}`;
   }
@@ -337,7 +359,7 @@
     if (audioFitCapSliderEl) audioFitCapSliderEl.value = String(Math.max(1.0, Math.min(1.6, cap)));
     if (audioFitCapValueEl) audioFitCapValueEl.textContent = `${Number(audioFitCapSliderEl ? audioFitCapSliderEl.value : cap).toFixed(2)}x`;
     setMediaSrcStable(voiceoverAudioEl, voiceUrl, "audioUrl");
-    if (audioMsgEl) audioMsgEl.textContent = audio.error ? `Audio error: ${audio.error}` : "";
+    if (audioMsgEl) audioMsgEl.textContent = getAudioDisplayState().message;
     renderVoiceMeta();
   }
 
@@ -572,6 +594,7 @@
     const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
     const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
     const composeRunning = ["running", "processing", "queued"].includes(String(composeLast.status || "").toLowerCase());
+    const audioDisplay = getAudioDisplayState();
     const enabled = hasRaw && hasVoiceover && confirmed && !composeSubmitting && !composeRunning;
     if (!composeBtnEl.dataset.defaultText) composeBtnEl.dataset.defaultText = composeBtnEl.textContent || "Compose Final";
     composeBtnEl.disabled = !enabled;
@@ -582,6 +605,7 @@
       : (composeBtnEl.dataset.defaultText || "Compose Final");
     if (composeMsgEl) {
       if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
+      else if (audioDisplay.status === "running") composeMsgEl.textContent = "Compose disabled: dubbing still running.";
       else if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
       else if (!hasRaw) composeMsgEl.textContent = "Compose disabled: missing raw video.";
       else if (!confirmed) composeMsgEl.textContent = t("hot_follow_workbench_compose_disabled_hint", "Compose disabled: check confirmation first");
