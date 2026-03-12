@@ -5134,6 +5134,18 @@ def compose_hot_follow_final_video(
         return _compose_in_progress_response(task_id)
     current_for_plan = repo.get(task_id) or task
     current_plan = dict(current_for_plan.get("compose_plan") or {})
+    gate = _hf_persisted_voiceover_gate(task_id, repo, current_for_plan)
+    logger.info(
+        "HF_COMPOSE_GATE",
+        extra={
+            "task_id": task_id,
+            "compose_allowed": gate.get("compose_allowed"),
+            "audio_ready": gate.get("audio_ready"),
+            "audio_ready_reason": gate.get("audio_ready_reason"),
+            "artifact_key": gate.get("artifact_key"),
+            "artifact_ready": gate.get("artifact_ready"),
+        },
+    )
     compose_plan = {
         "mute": bool(current_plan.get("mute", True)),
         "overlay_subtitles": bool(current_plan.get("overlay_subtitles", True)),
@@ -5303,6 +5315,19 @@ def compose_task(
     final_meta = object_head(str(final_key)) if final_key else None
     final_size, _ = media_meta_from_head(final_meta)
     hot_follow_gate = _hf_persisted_voiceover_gate(task_id, repo, task) if str(task.get("kind") or "").strip().lower() == "hot_follow" else None
+    if hot_follow_gate:
+        logger.info(
+            "HF_COMPOSE_GATE",
+            extra={
+                "task_id": task_id,
+                "compose_allowed": hot_follow_gate.get("compose_allowed"),
+                "audio_ready": hot_follow_gate.get("audio_ready"),
+                "audio_ready_reason": hot_follow_gate.get("audio_ready_reason"),
+                "artifact_key": hot_follow_gate.get("artifact_key"),
+                "artifact_ready": hot_follow_gate.get("artifact_ready"),
+                "route": "generic_compose",
+            },
+        )
     if (
         final_key
         and object_exists(str(final_key))
@@ -5318,6 +5343,16 @@ def compose_task(
             "final_key": str(final_key),
             "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
         }
+    if hot_follow_gate and final_key and object_exists(str(final_key)) and final_size >= MIN_VIDEO_BYTES and not req.force:
+        logger.info(
+            "HF_COMPOSE_GATE_BLOCK",
+            extra={
+                "task_id": task_id,
+                "reason": hot_follow_gate.get("audio_ready_reason"),
+                "artifact_key": hot_follow_gate.get("artifact_key"),
+                "artifact_ready": hot_follow_gate.get("artifact_ready"),
+            },
+        )
     current_for_plan = repo.get(task_id) or task
     current_plan = dict(current_for_plan.get("compose_plan") or {})
     compose_plan = {
@@ -6049,6 +6084,18 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         executed = True
         skip_reason = None
         persisted_audio_key = _hf_resolve_persisted_audio_key(task_after)
+        logger.info(
+            "DUB3_ARTIFACT_DIAG",
+            extra={
+                "task_id": task_id,
+                "fresh_output_path": str(audio_path) if audio_path else None,
+                "fresh_output_exists": bool(audio_path and audio_path.exists()),
+                "persisted_audio_key": persisted_audio_key,
+                "existing_audio_key": existing_audio_key,
+                "existing_audio_exists": existing_audio_exists,
+                "existing_audio_size": existing_audio_size,
+            },
+        )
         if (not audio_path or not audio_path.exists()) and not persisted_audio_key:
             executed = False
             skip_reason = "output_missing_after_execute"
@@ -6142,6 +6189,17 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "path": str(audio_path),
                 "exists": True,
                 "size": local_size,
+            },
+        )
+        logger.info(
+            "DUB3_ARTIFACT_DIAG",
+            extra={
+                "task_id": task_id,
+                "persisted_audio_key": audio_key,
+                "persisted_audio_exists": object_exists(str(audio_key)),
+                "audio_sha256": audio_sha256,
+                "duration_sec": local_duration,
+                "size_bytes": local_size,
             },
         )
         logger.info(
