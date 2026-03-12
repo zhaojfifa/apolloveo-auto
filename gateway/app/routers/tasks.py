@@ -883,6 +883,16 @@ def _hf_persist_dub_artifact(
     return audio_key, int(output_size), float(output_duration), audio_sha256
 
 
+def _hf_resolve_persisted_audio_key(task_after: dict | None) -> str | None:
+    if not isinstance(task_after, dict):
+        return None
+    for field in ("mm_audio_key", "mm_audio_path"):
+        value = str(task_after.get(field) or "").strip()
+        if value and object_exists(value):
+            return value
+    return None
+
+
 @pages_router.head("/v1/tasks/{task_id}/audio_mm")
 def head_audio_mm(task_id: str, repo=Depends(get_task_repository)):
     try:
@@ -6007,7 +6017,8 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         audio_path = _hf_fresh_dub_output_path(task_id, workspace, task_after)
         executed = True
         skip_reason = None
-        if not audio_path or not audio_path.exists():
+        persisted_audio_key = _hf_resolve_persisted_audio_key(task_after)
+        if (not audio_path or not audio_path.exists()) and not persisted_audio_key:
             executed = False
             skip_reason = "output_missing_after_execute"
         logger.info(
@@ -6018,7 +6029,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "reason": skip_reason or "fresh_output_expected",
             },
         )
-        if not audio_path or not audio_path.exists():
+        if (not audio_path or not audio_path.exists()) and not persisted_audio_key:
             logger.info(
                 "DUB3_OUTPUT_CHECK",
                 extra={
@@ -6028,9 +6039,35 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "path": str(audio_path) if audio_path else None,
                     "exists": existing_audio_exists,
                     "size": existing_audio_size,
+                    "persisted_audio_key": persisted_audio_key,
                 },
             )
             return _mark_hot_follow_dub_failed("output_missing", "fresh dub output is missing")
+
+        if persisted_audio_key and (not audio_path or not audio_path.exists()):
+            head = object_head(str(persisted_audio_key))
+            persisted_size, _ = media_meta_from_head(head)
+            logger.info(
+                "DUB3_OUTPUT_CHECK",
+                extra={
+                    "task_id": task_id,
+                    "decision": "executed",
+                    "key": persisted_audio_key,
+                    "path": None,
+                    "exists": True,
+                    "size": persisted_size,
+                    "reason": "persisted_artifact_reused",
+                },
+            )
+            stored = repo.get(task_id) or task_after
+            detail = _task_to_detail(stored)
+            return DubResponse(
+                **detail.dict(exclude={"mm_audio_key"}),
+                resolved_voice_id=final_voice_id,
+                resolved_edge_voice=edge_voice,
+                audio_sha256=stored.get("audio_sha256"),
+                mm_audio_key=persisted_audio_key,
+            )
 
         try:
             audio_key, local_size, local_duration, audio_sha256 = _hf_persist_dub_artifact(
