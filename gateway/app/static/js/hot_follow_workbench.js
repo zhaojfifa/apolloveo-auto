@@ -105,8 +105,10 @@
   const burnSubtitleSourceEl = document.getElementById("hf_burn_subtitle_source");
   const composeStatusValueEl = document.getElementById("hf_compose_status_value");
   const finalExistsValueEl = document.getElementById("hf_final_exists_value");
+  const composeVideoSourceValueEl = document.getElementById("hf_compose_video_source_value");
   const lipsyncStatusValueEl = document.getElementById("hf_lipsync_status_value");
   const lipsyncHintEl = document.getElementById("hf_lipsync_hint");
+  const lipsyncWarningEl = document.getElementById("hf_lipsync_warning");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
@@ -335,12 +337,18 @@
     if (burnSubtitleSourceEl) burnSubtitleSourceEl.textContent = (currentHub && currentHub.actual_burn_subtitle_source) || "-";
     if (composeStatusValueEl) composeStatusValueEl.textContent = (currentHub && currentHub.compose_status) || (((currentHub && currentHub.compose) || {}).last || {}).status || "-";
     if (finalExistsValueEl) finalExistsValueEl.textContent = (currentHub && currentHub.final_exists) ? "yes" : "no";
+    if (composeVideoSourceValueEl) composeVideoSourceValueEl.textContent = (currentHub && currentHub.compose_video_source) || "basic";
     const lipsyncEnabled = Boolean(currentHub && currentHub.lipsync_enabled);
-    if (lipsyncStatusValueEl) lipsyncStatusValueEl.textContent = lipsyncEnabled ? "Enhanced path enabled (soft-fail)" : "Off";
+    if (lipsyncStatusValueEl) lipsyncStatusValueEl.textContent = (currentHub && currentHub.lipsync_status) || (lipsyncEnabled ? "pending" : "off");
     if (lipsyncHintEl) {
       lipsyncHintEl.textContent = lipsyncEnabled
         ? "Enhanced path will run before compose. Stub failures do not block the basic path."
         : "Enhanced path is off by default.";
+    }
+    const lipsyncWarning = (currentHub && currentHub.lipsync_warning) || "";
+    if (lipsyncWarningEl) {
+      lipsyncWarningEl.classList.toggle("hidden", !lipsyncWarning);
+      lipsyncWarningEl.textContent = lipsyncWarning || "-";
     }
   }
 

@@ -211,14 +211,24 @@ def _compose_in_progress_response(task_id: str) -> JSONResponse:
     )
 
 
-def _maybe_run_hot_follow_lipsync_stub(task_id: str, enabled: bool = False) -> str | None:
+def _run_hot_follow_lipsync_stub(task_id: str, enabled: bool = False) -> dict[str, Any]:
     if not enabled:
-        return None
+        return {
+            "enabled": False,
+            "status": "off",
+            "warning": None,
+            "compose_video_source": "basic",
+        }
     soft_fail = os.getenv("HF_LIPSYNC_SOFT_FAIL", "1").strip().lower() not in ("0", "false", "no")
     message = "Lipsync stub enabled, but no provider is wired in v1.9; continuing basic compose."
     if soft_fail:
         logger.warning("HF_LIPSYNC_STUB_SOFT_FAIL task=%s message=%s", task_id, message)
-        return message
+        return {
+            "enabled": True,
+            "status": "fallback_basic",
+            "warning": message,
+            "compose_video_source": "basic",
+        }
     raise HTTPException(
         status_code=409,
         detail={"reason": "lipsync_stub_blocked", "message": message},
@@ -2764,6 +2774,8 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
+    lipsync_status = str(task.get("lipsync_status") or ("off" if not lipsync_enabled else "pending")).strip() or "off"
+    compose_video_source = str(task.get("compose_video_source") or "basic").strip() or "basic"
     ocr_enabled = os.getenv("HF_OCR_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     ocr_fallback_only = os.getenv("HF_OCR_FALLBACK_ONLY", "1").strip().lower() not in ("0", "false", "no")
     ocr_soft_fail = os.getenv("HF_OCR_SOFT_FAIL", "1").strip().lower() not in ("0", "false", "no")
@@ -2789,7 +2801,9 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
         "final_exists": final_exists,
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
         "lipsync_enabled": lipsync_enabled,
-        "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
+        "lipsync_status": lipsync_status,
+        "lipsync_warning": str(task.get("lipsync_warning") or "").strip() or None,
+        "compose_video_source": compose_video_source,
         "ocr_enabled": ocr_enabled,
         "ocr_fallback_only": ocr_fallback_only,
         "ocr_soft_fail": ocr_soft_fail,
@@ -5046,16 +5060,28 @@ def compose_hot_follow_final_video(
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
         )
-        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(
+        lipsync_state = _run_hot_follow_lipsync_stub(
             task_id,
             os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
         )
-        if lipsync_warning:
-            _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "lipsync_status": lipsync_state.get("status"),
+                "lipsync_warning": lipsync_state.get("warning"),
+                "compose_video_source": lipsync_state.get("compose_video_source") or "basic",
+            },
+        )
+        if lipsync_state.get("warning"):
+            _policy_upsert(repo, task_id, {"compose_warning": lipsync_state.get("warning")})
         updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
-        if lipsync_warning:
+        updates["lipsync_status"] = lipsync_state.get("status")
+        updates["lipsync_warning"] = lipsync_state.get("warning")
+        updates["compose_video_source"] = lipsync_state.get("compose_video_source") or "basic"
+        if lipsync_state.get("warning"):
             current_warning = str(updates.get("compose_warning") or "").strip()
-            updates["compose_warning"] = f"{current_warning} {lipsync_warning}".strip() if current_warning else lipsync_warning
+            updates["compose_warning"] = f"{current_warning} {lipsync_state.get('warning')}".strip() if current_warning else lipsync_state.get("warning")
         _policy_upsert(repo, task_id, updates)
         latest = repo.get(task_id) or task
         return {
@@ -5208,16 +5234,28 @@ def compose_task(
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
         )
-        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(
+        lipsync_state = _run_hot_follow_lipsync_stub(
             task_id,
             os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
         )
-        if lipsync_warning:
-            _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "lipsync_status": lipsync_state.get("status"),
+                "lipsync_warning": lipsync_state.get("warning"),
+                "compose_video_source": lipsync_state.get("compose_video_source") or "basic",
+            },
+        )
+        if lipsync_state.get("warning"):
+            _policy_upsert(repo, task_id, {"compose_warning": lipsync_state.get("warning")})
         updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
-        if lipsync_warning:
+        updates["lipsync_status"] = lipsync_state.get("status")
+        updates["lipsync_warning"] = lipsync_state.get("warning")
+        updates["compose_video_source"] = lipsync_state.get("compose_video_source") or "basic"
+        if lipsync_state.get("warning"):
             current_warning = str(updates.get("compose_warning") or "").strip()
-            updates["compose_warning"] = f"{current_warning} {lipsync_warning}".strip() if current_warning else lipsync_warning
+            updates["compose_warning"] = f"{current_warning} {lipsync_state.get('warning')}".strip() if current_warning else lipsync_state.get("warning")
         _policy_upsert(repo, task_id, updates)
         latest = repo.get(task_id) or task
         resolved_key = _task_key(latest, "final_video_key") or _task_key(latest, "final_video_path")
