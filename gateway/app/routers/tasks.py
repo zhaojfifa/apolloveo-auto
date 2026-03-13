@@ -75,6 +75,8 @@ from gateway.app.services.tts_policy import (
     resolve_tts_voice,
 )
 from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
+from gateway.app.steps.subtitles import _parse_srt_to_segments, segments_to_srt
+from gateway.app.providers.gemini_subtitles import GeminiSubtitlesError, translate_segments_with_gemini
 
 
 def _policy_upsert(repo, task_id: str, updates: dict, *, task: dict | None = None, step: str = "router.tasks", force: bool = False):
@@ -361,6 +363,35 @@ class HotFollowAudioConfigRequest(BaseModel):
 
 class HotFollowSubtitlesRequest(BaseModel):
     srt_text: str = ""
+
+
+class HotFollowTranslateRequest(BaseModel):
+    text: str = ""
+    target_lang: str = "my"
+
+
+def _hf_translate_plain_lines(text: str, *, target_lang: str) -> str:
+    lines = str(text or "").splitlines()
+    segments: list[dict[str, Any]] = []
+    mapping: list[int | None] = []
+    for line in lines:
+        content = str(line or "")
+        if content.strip():
+            idx = len(segments) + 1
+            segments.append({"index": idx, "origin": content.strip()})
+            mapping.append(idx)
+        else:
+            mapping.append(None)
+    if not segments:
+        return ""
+    translations = translate_segments_with_gemini(segments=segments, target_lang=target_lang)
+    out: list[str] = []
+    for line, idx in zip(lines, mapping):
+        if idx is None:
+            out.append("")
+        else:
+            out.append(str(translations.get(idx) or line or "").strip())
+    return "\n".join(out)
 
 
 class ComposeTaskRequest(BaseModel):
@@ -4465,6 +4496,40 @@ def patch_hot_follow_subtitles(
             "edited_text": _hf_load_subtitles_text(task_id, repo.get(task_id) or task),
             "editable": True,
         },
+    }
+
+
+@api_router.post("/hot_follow/tasks/{task_id}/translate_subtitles")
+def translate_hot_follow_subtitles(
+    task_id: str,
+    payload: HotFollowTranslateRequest,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    source_text = str(payload.text or "").strip()
+    if not source_text:
+        raise HTTPException(status_code=400, detail="text is empty")
+    target_lang = normalize_target_lang(payload.target_lang or task.get("target_lang") or task.get("content_lang") or "mm")
+    try:
+        if "-->" in source_text:
+            segments = _parse_srt_to_segments(source_text)
+            if not segments:
+                raise HTTPException(status_code=400, detail="invalid srt text")
+            translations = translate_segments_with_gemini(segments=segments, target_lang=target_lang)
+            for seg in segments:
+                idx = int(seg.get("index") or 0)
+                seg["mm"] = str(translations.get(idx) or seg.get("origin") or "").strip()
+            translated_text = segments_to_srt(segments, "mm")
+        else:
+            translated_text = _hf_translate_plain_lines(source_text, target_lang=target_lang)
+    except GeminiSubtitlesError as exc:
+        raise HTTPException(status_code=409, detail={"reason": "translate_failed", "message": str(exc)}) from exc
+    return {
+        "task_id": task_id,
+        "target_lang": public_target_lang(target_lang),
+        "translated_text": translated_text,
     }
 
 

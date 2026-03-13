@@ -101,6 +101,7 @@
   const opsGuideReasonEl = document.getElementById("hf_ops_guide_reason");
   const translationQaCountsEl = document.getElementById("hf_translation_qa_counts");
   const translationQaWarningEl = document.getElementById("hf_translation_qa_warning");
+  const translateMmBtn = document.getElementById("hf_translate_mm_btn");
   const subtitlesRefreshBtn = document.getElementById("hf_subtitles_refresh_btn");
   const subtitlesSaveBtn = document.getElementById("hf_subtitles_save_btn");
   const subtitlesMsgEl = document.getElementById("hf_subtitles_msg");
@@ -335,6 +336,7 @@
       translationQaCountsEl.textContent = `${t("hot_follow_workbench_translation_cues_prefix", "Translation cues")}: ${sourceCount} / ${translatedCount}`;
     }
     if (translationQaWarningEl) translationQaWarningEl.classList.toggle("hidden", !hasMismatch);
+    if (translateMmBtn) translateMmBtn.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
   }
 
   function normalizeEngineKey(value) {
@@ -615,6 +617,16 @@
     return res.json();
   }
 
+  async function translateCurrentSubtitles(text) {
+    const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/translate_subtitles`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text || "", target_lang: "mm" }),
+    });
+    if (!res.ok) throw new Error((await res.text()) || "translate subtitles failed");
+    return res.json();
+  }
+
   async function patchComposePlan(payload) {
     const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/compose_plan`, {
       method: "PATCH",
@@ -885,6 +897,26 @@
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "Refreshed";
       } catch (err) {
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = err.message || "refresh failed";
+      }
+    });
+  }
+  if (translateMmBtn) {
+    translateMmBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        const text = subtitlesTextEl ? String(subtitlesTextEl.value || "").trim() : "";
+        if (!text) throw new Error("请先在当前编辑区输入中文文本。");
+        translateMmBtn.disabled = true;
+        if (subtitlesMsgEl) subtitlesMsgEl.textContent = "正在翻译为缅语...";
+        const data = await translateCurrentSubtitles(text);
+        if (subtitlesTextEl) subtitlesTextEl.value = String(data.translated_text || "");
+        if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = String(data.translated_text || "") || "-";
+        subtitleDirty = true;
+        if (subtitlesMsgEl) subtitlesMsgEl.textContent = "翻译结果已回写当前编辑区，请检查后保存字幕。";
+      } catch (err) {
+        if (subtitlesMsgEl) subtitlesMsgEl.textContent = err.message || "translate failed";
+      } finally {
+        translateMmBtn.disabled = false;
       }
     });
   }
