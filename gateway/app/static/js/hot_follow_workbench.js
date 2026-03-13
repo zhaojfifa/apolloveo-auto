@@ -159,6 +159,8 @@
   let subtitlesChangedSinceDub = false;
   let selectedComposeMode = "voice";
   let selectedCleanupMode = "none";
+  let finalPreviewRetryKey = "";
+  let finalPreviewRetried = false;
 
   function escapeHtml(s) {
     return String(s || "")
@@ -283,6 +285,16 @@
     }
   }
 
+  async function probeFinalUrlOnce(url) {
+    if (!url) return false;
+    try {
+      const res = await fetch(url, { method: "HEAD" });
+      return res.ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
   function shouldPollHub() {
     if (!currentHub) return true;
     const readyGate = (currentHub && currentHub.ready_gate) || {};
@@ -313,13 +325,20 @@
     const finalMeta = (currentHub && currentHub.final) || {};
     const sourceUrl = media.source_video_url || media.raw_url || null;
     const finalAssetVersion = finalMeta.asset_version || null;
+    const finalExists = Boolean((currentHub && currentHub.final_exists) || finalMeta.exists);
+    const retryKey = `${finalExists ? (finalUrl || "") : ""}::${String(finalAssetVersion || "")}`;
+    if (retryKey !== finalPreviewRetryKey) {
+      finalPreviewRetryKey = retryKey;
+      finalPreviewRetried = false;
+    }
+
     setMediaSrcStable(sourceVideoEl, sourceUrl, "sourceUrl");
-    setMediaSrcStable(finalVideoEl, finalUrl, "finalUrl(main)", finalAssetVersion);
-    setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose)", finalAssetVersion);
-    if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
-    setLink(composeFinalLinkEl, finalUrl);
+    setMediaSrcStable(finalVideoEl, finalExists ? finalUrl : null, "finalUrl(main)", finalAssetVersion);
+    setMediaSrcStable(composeFinalVideoEl, finalExists ? finalUrl : null, "finalUrl(compose)", finalAssetVersion);
+    if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !(finalExists && finalUrl));
+    setLink(composeFinalLinkEl, finalExists ? finalUrl : null);
     setLink(sourceLinkEl, sourceUrl);
-    setLink(finalLinkEl, finalUrl);
+    setLink(finalLinkEl, finalExists ? finalUrl : null);
     setTab(activeTab);
   }
 
@@ -921,8 +940,9 @@
     const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
     const composeRunning = ["running", "processing", "queued"].includes(String(composeLast.status || "").toLowerCase());
     const composeDone = ["done", "success", "completed", "ready"].includes(String((currentHub && currentHub.compose_status) || composeLast.status || "").toLowerCase());
+    const finalExists = Boolean(currentHub && currentHub.final_exists);
     const audioDisplay = getAudioDisplayState();
-    const enabled = hasRaw && (hasVoiceover || subtitleOnlyAllowed) && confirmed && !composeSubmitting && !composeRunning;
+    const enabled = hasRaw && (hasVoiceover || subtitleOnlyAllowed) && confirmed && !composeSubmitting && !composeRunning && !(composeDone && finalExists);
     if (!composeBtnEl.dataset.defaultText) composeBtnEl.dataset.defaultText = composeBtnEl.textContent || "Compose Final";
     composeBtnEl.disabled = !enabled;
     composeBtnEl.classList.toggle("opacity-50", !enabled);
@@ -932,6 +952,7 @@
       : (composeBtnEl.dataset.defaultText || "Compose Final");
     if (composeMsgEl) {
       if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
+      else if (composeDone && finalExists) composeMsgEl.textContent = "最终成片已生成，无需重复合成。";
       else if (audioDisplay.status === "running") composeMsgEl.textContent = "Compose disabled: dubbing still running.";
       else if (!hasVoiceover && subtitleOnlyAllowed) composeMsgEl.textContent = "当前任务可直接走字幕版合成。";
       else if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
@@ -959,6 +980,28 @@
 
   if (tabSourceEl) tabSourceEl.addEventListener("click", (e) => { e.preventDefault(); setTab("source"); });
   if (tabFinalEl) tabFinalEl.addEventListener("click", (e) => { e.preventDefault(); setTab("final"); });
+  if (finalVideoEl) {
+    finalVideoEl.addEventListener("error", async () => {
+      const finalUrl = resolveFinalUrl(currentHub || {});
+      const finalExists = Boolean(currentHub && currentHub.final_exists);
+      const retryKey = `${finalUrl || ""}::${String(((currentHub && currentHub.final) || {}).asset_version || "")}`;
+      if (!finalExists || !finalUrl) return;
+      if (retryKey !== finalPreviewRetryKey) {
+        finalPreviewRetryKey = retryKey;
+        finalPreviewRetried = false;
+      }
+      if (finalPreviewRetried) return;
+      finalPreviewRetried = true;
+      if (composeMsgEl) composeMsgEl.textContent = "最终成片加载中，正在重试一次…";
+      const ok = await probeFinalUrlOnce(finalUrl);
+      if (ok) {
+        setMediaSrcStable(finalVideoEl, finalUrl, "finalUrl(retry)", ((currentHub && currentHub.final) || {}).asset_version || null);
+        if (composeFinalVideoEl && activeTab === "final") {
+          setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose-retry)", ((currentHub && currentHub.final) || {}).asset_version || null);
+        }
+      }
+    });
+  }
   if (subtitlesTextEl) subtitlesTextEl.addEventListener("input", () => {
     subtitleDirty = true;
     subtitlesChangedSinceDub = true;
