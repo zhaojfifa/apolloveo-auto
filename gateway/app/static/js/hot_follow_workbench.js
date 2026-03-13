@@ -64,12 +64,16 @@
   const voiceoverAudioEl = document.getElementById("hf_voiceover_audio");
   const actualProviderEl = document.getElementById("hf_actual_provider");
   const resolvedVoiceEl = document.getElementById("hf_resolved_voice");
+  const subtitleReadyEl = document.getElementById("hf_subtitle_ready");
+  const audioReadyEl = document.getElementById("hf_audio_ready");
+  const audioReadyReasonEl = document.getElementById("hf_audio_ready_reason");
   const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
   const scenePackDownloadEl = document.getElementById("hf_scene_pack_download");
   const scenePackHintEl = document.getElementById("hf-scene-pack-hint");
   const deliverablesGridEl = document.getElementById("hf_deliverables_grid");
   const subtitlesTextEl = document.getElementById("hf_subtitles_text");
   const subtitlesOriginEl = document.getElementById("hf_subtitles_origin");
+  const subtitlesNormalizedEl = document.getElementById("hf_subtitles_normalized");
   const subtitlesEditedPreviewEl = document.getElementById("hf_subtitles_edited_preview");
   const translationQaCountsEl = document.getElementById("hf_translation_qa_counts");
   const translationQaWarningEl = document.getElementById("hf_translation_qa_warning");
@@ -96,6 +100,11 @@
   const finalExistsValueEl = document.getElementById("hf_final_exists_value");
   const lipsyncStatusValueEl = document.getElementById("hf_lipsync_status_value");
   const lipsyncHintEl = document.getElementById("hf_lipsync_hint");
+  const contentModeEl = document.getElementById("hf_content_mode");
+  const speechDetectedEl = document.getElementById("hf_speech_detected");
+  const onscreenTextDetectedEl = document.getElementById("hf_onscreen_text_detected");
+  const recommendedPathEl = document.getElementById("hf_recommended_path");
+  const noDubMessageEl = document.getElementById("hf_no_dub_message");
   const previewAudioEl = new Audio();
 
   let currentHub = null;
@@ -274,10 +283,12 @@
     const subtitles = (currentHub && currentHub.subtitles) || {};
     const qa = (currentHub && currentHub.translation_qa) || {};
     const origin = subtitles.origin_text || "";
+    const normalized = subtitles.normalized_source_text || origin || "";
     const edited = subtitles.edited_text || subtitles.srt_text || "";
     const sourcePlaceholder = t("hot_follow_workbench_source_not_generated", "Source subtitles not generated yet.");
     const targetPlaceholder = t("hot_follow_workbench_target_not_generated", "Target subtitles not generated yet.");
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
+    if (subtitlesNormalizedEl) subtitlesNormalizedEl.textContent = normalized || sourcePlaceholder;
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || targetPlaceholder;
     if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = edited || "";
     const sourceCount = Number.isFinite(Number(qa.source_count)) ? Number(qa.source_count) : 0;
@@ -332,6 +343,9 @@
   function renderVoiceMeta() {
     if (actualProviderEl) actualProviderEl.textContent = (currentHub && currentHub.actual_provider) || "-";
     if (resolvedVoiceEl) resolvedVoiceEl.textContent = (currentHub && currentHub.resolved_voice) || "-";
+    if (subtitleReadyEl) subtitleReadyEl.textContent = (currentHub && currentHub.subtitle_ready) ? "yes" : "no";
+    if (audioReadyEl) audioReadyEl.textContent = (currentHub && currentHub.audio_ready) ? "yes" : "no";
+    if (audioReadyReasonEl) audioReadyReasonEl.textContent = (currentHub && currentHub.audio_ready_reason) || "-";
   }
 
   function renderConsistencyPanel() {
@@ -344,6 +358,18 @@
       lipsyncHintEl.textContent = lipsyncEnabled
         ? "Enhanced path will run before compose. Stub failures do not block the basic path."
         : "Enhanced path is off by default.";
+    }
+  }
+
+  function renderRoutingState() {
+    if (contentModeEl) contentModeEl.textContent = (currentHub && currentHub.content_mode) || "-";
+    if (speechDetectedEl) speechDetectedEl.textContent = (currentHub && currentHub.speech_detected) ? "yes" : "no";
+    if (onscreenTextDetectedEl) onscreenTextDetectedEl.textContent = (currentHub && currentHub.onscreen_text_detected) ? "yes" : "no";
+    if (recommendedPathEl) recommendedPathEl.textContent = (currentHub && currentHub.recommended_path) || "-";
+    if (noDubMessageEl) {
+      const msg = (currentHub && currentHub.no_dub_message) || "";
+      noDubMessageEl.textContent = msg || "-";
+      noDubMessageEl.classList.toggle("hidden", !msg);
     }
   }
 
@@ -361,6 +387,7 @@
     setMediaSrcStable(voiceoverAudioEl, voiceUrl, "audioUrl");
     if (audioMsgEl) audioMsgEl.textContent = getAudioDisplayState().message;
     renderVoiceMeta();
+    renderRoutingState();
   }
 
   function renderComposedReadiness() {

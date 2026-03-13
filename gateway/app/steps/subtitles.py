@@ -38,6 +38,75 @@ _SRT_TIME_RE = re.compile(
     r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
 )
 
+_HOT_FOLLOW_DOMAIN_TERM_REPLACEMENTS: dict[str, str] = {
+    "布灵布灵": "bling bling",
+    "雅光": "哑光",
+    "亚光": "哑光",
+    "亮闪": "爆闪",
+    "细钻": "细闪",
+    "沉膜": "成膜",
+    "速干沉膜": "速干成膜",
+    "不粘杯": "不沾杯",
+    "不占杯": "不沾杯",
+    "双头口红": "双头唇釉",
+    "hagard": "haggard",
+    "哈格德": "haggard",
+}
+
+_HOT_FOLLOW_PROTECTED_TERMS: tuple[str, ...] = (
+    "haggard",
+    "bling bling",
+    "matte",
+    "gloss",
+    "lip gloss",
+    "lip glaze",
+    "lip mud",
+    "lip tint",
+    "velvet",
+    "mirror gloss",
+    "shimmer",
+    "glitter",
+    "dual-ended",
+    "double-ended",
+    "cushion",
+    "primer",
+    "setting spray",
+    "spf",
+    "pa+++",
+    "爆闪",
+    "细闪",
+    "珠光",
+    "镜面",
+    "哑光",
+    "丝绒",
+    "水光",
+    "唇釉",
+    "唇蜜",
+    "唇泥",
+    "口红",
+    "染唇",
+    "双头唇釉",
+    "速干成膜",
+    "不沾杯",
+    "显白",
+    "提气色",
+    "薄涂",
+    "厚涂",
+    "叠涂",
+    "氛围感",
+    "千金感",
+    "试色",
+    "上嘴",
+    "持妆",
+    "luggage",
+    "carry on",
+    "spinner",
+    "waterproof",
+    "coupon",
+    "flash sale",
+    "free shipping",
+)
+
 
 def _env_int(name: str, default: int) -> int:
     value = os.getenv(name)
@@ -63,6 +132,7 @@ def _wav_duration_seconds(wav_path: Path) -> float | None:
 
 def _compute_asr_timeout_sec(audio_sec: float | None) -> int:
     fixed = _env_int("SUBTITLES_ASR_TIMEOUT_SEC", 600)
+    audio_sec = _safe_non_negative_float(audio_sec, 0.0)
     if not audio_sec or audio_sec <= 0:
         return fixed
 
@@ -76,6 +146,51 @@ def _compute_asr_timeout_sec(audio_sec: float | None) -> int:
 
     dynamic = int(ceil(audio_sec * rtf + slack))
     return max(min_sec, min(dynamic, max_sec))
+
+
+def _safe_non_negative_float(value: float | int | str | None, default: float = 0.0) -> float:
+    try:
+        parsed = float(value)
+    except Exception:
+        return float(default)
+    if parsed < 0:
+        return float(default)
+    return parsed
+
+
+def _sanitize_segment_timing(segments: list[dict]) -> list[dict]:
+    sanitized: list[dict] = []
+    for seg in segments or []:
+        row = dict(seg or {})
+        start = _safe_non_negative_float(row.get("start"), 0.0)
+        end = _safe_non_negative_float(row.get("end"), start)
+        if end < start:
+            end = start
+        row["start"] = start
+        row["end"] = end
+        sanitized.append(row)
+    return sanitized
+
+
+def _normalize_hot_follow_origin_text(text: str) -> str:
+    normalized = str(text or "")
+    if not normalized.strip():
+        return ""
+    for source, target in _HOT_FOLLOW_DOMAIN_TERM_REPLACEMENTS.items():
+        normalized = normalized.replace(source, target)
+    for term in _HOT_FOLLOW_PROTECTED_TERMS:
+        pattern = re.compile(re.escape(term), re.IGNORECASE)
+        normalized = pattern.sub(term, normalized)
+    return normalized
+
+
+def _normalized_segments(segments: list[dict]) -> list[dict]:
+    normalized: list[dict] = []
+    for seg in segments or []:
+        row = dict(seg or {})
+        row["origin_normalized"] = _normalize_hot_follow_origin_text(str(seg.get("origin") or ""))
+        normalized.append(row)
+    return normalized
 
 
 def _probe_streams(video_path: Path) -> dict:
@@ -354,8 +469,8 @@ def _transcribe_with_faster_whisper(
         segments.append(
             {
                 "index": idx,
-                "start": float(seg.start),
-                "end": float(seg.end),
+                "start": _safe_non_negative_float(getattr(seg, "start", None), 0.0),
+                "end": _safe_non_negative_float(getattr(seg, "end", None), _safe_non_negative_float(getattr(seg, "start", None), 0.0)),
                 "origin": text,
             }
         )
@@ -377,8 +492,10 @@ def _parse_srt_to_segments(srt_text: str) -> list[dict]:
         start, end = time_line.split("-->")
         start = start.strip()
         end = end.strip()
-        start_sec = _parse_srt_time(start)
-        end_sec = _parse_srt_time(end)
+        start_sec = _safe_non_negative_float(_parse_srt_time(start), 0.0)
+        end_sec = _safe_non_negative_float(_parse_srt_time(end), start_sec)
+        if end_sec < start_sec:
+            end_sec = start_sec
         text_lines = lines[2:] if lines[0].strip().isdigit() else lines[1:]
         segments.append(
             {
@@ -395,6 +512,15 @@ def _parse_srt_time(value: str) -> float:
     h, m, rest = value.replace(",", ".").split(":")
     s, ms = rest.split(".")
     return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000.0
+
+
+def _segments_to_normalized_srt(segments: list[dict]) -> str:
+    normalized_segments = []
+    for seg in segments or []:
+        row = dict(seg or {})
+        row["origin"] = str(seg.get("origin_normalized") or seg.get("origin") or "")
+        normalized_segments.append(row)
+    return segments_to_srt(normalized_segments, "origin")
 
 
 async def generate_subtitles(
@@ -579,7 +705,9 @@ async def generate_subtitles(
                     log_stage=log_stage,
                 )
 
+            segments = _sanitize_segment_timing(_normalized_segments(segments))
             origin_text = segments_to_srt(segments, "origin")
+            normalized_origin_text = _segments_to_normalized_srt(segments)
             translations: dict[int, str] = {}
             translation_retry_count = 0
             translate_enabled_local = translate_enabled
@@ -609,7 +737,13 @@ async def generate_subtitles(
                         translations = await asyncio.wait_for(
                             asyncio.to_thread(
                                 translate_segments_with_gemini,
-                                segments=segments,
+                                segments=[
+                                    {
+                                        **seg,
+                                        "origin": str(seg.get("origin_normalized") or seg.get("origin") or ""),
+                                    }
+                                    for seg in segments
+                                ],
                                 target_lang=target_lang,
                                 debug_dir=subs_dir(task_id),
                             ),
@@ -677,7 +811,13 @@ async def generate_subtitles(
                     retry_translations = await asyncio.wait_for(
                         asyncio.to_thread(
                             translate_segments_with_gemini,
-                            segments=missing_segments,
+                            segments=[
+                                {
+                                    **seg,
+                                    "origin": str(seg.get("origin_normalized") or seg.get("origin") or ""),
+                                }
+                                for seg in missing_segments
+                            ],
                             target_lang=target_lang,
                             debug_dir=subs_dir(task_id),
                         ),
@@ -750,14 +890,20 @@ async def generate_subtitles(
 
             origin_srt_path = workspace.write_origin_srt(origin_text)
             mm_srt_path = workspace.write_mm_srt(mm_text)
+            origin_normalized_srt_path = workspace.subtitles_dir / "origin_normalized.srt"
+            origin_normalized_txt_path = workspace.subtitles_dir / "origin_normalized.txt"
             origin_txt_path = origin_srt_path.with_suffix(".txt")
             mm_txt_path = mm_srt_path.with_suffix(".txt")
+            origin_normalized_srt_path.write_text(normalized_origin_text, encoding="utf-8")
+            _write_txt_from_srt(origin_normalized_txt_path, normalized_origin_text)
             _write_txt_from_srt(origin_txt_path, origin_text)
             _write_txt_from_srt(mm_txt_path, mm_text)
             log_stage(
                 "SUB2_WRITE_DONE",
                 origin_srt_path=str(origin_srt_path),
                 origin_srt_size=origin_srt_path.stat().st_size if origin_srt_path.exists() else None,
+                origin_normalized_srt_path=str(origin_normalized_srt_path),
+                origin_normalized_srt_size=origin_normalized_srt_path.stat().st_size if origin_normalized_srt_path.exists() else None,
                 mm_srt_path=str(mm_srt_path),
                 mm_srt_size=mm_srt_path.stat().st_size if mm_srt_path.exists() else None,
                 mm_txt_path=str(mm_txt_path),
@@ -782,10 +928,13 @@ async def generate_subtitles(
             return {
                 "task_id": task_id,
                 "origin_srt": origin_text,
+                "origin_normalized_srt": normalized_origin_text,
                 "mm_srt": mm_text,
                 "mm_txt_path": relative_to_workspace(mm_txt_path),
+                "origin_normalized_srt_path": relative_to_workspace(origin_normalized_srt_path),
                 "segments_json": scenes_payload,
                 "origin_preview": build_preview(origin_text),
+                "origin_normalized_preview": build_preview(normalized_origin_text),
                 "mm_preview": build_preview(mm_text),
                 "stream_probe": probe_result,
                 "clean_video_generated": clean_generated,

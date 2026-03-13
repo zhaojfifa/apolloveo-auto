@@ -1750,6 +1750,134 @@ def _hf_load_origin_subtitles_text(task: dict) -> str:
     return ""
 
 
+def _hf_load_normalized_source_text(task_id: str, task: dict) -> str:
+    normalized_path = task_base_dir(task_id) / "subs" / "origin_normalized.srt"
+    if normalized_path.exists():
+        try:
+            return normalized_path.read_text(encoding="utf-8")
+        except Exception:
+            return normalized_path.read_text(encoding="utf-8", errors="ignore")
+    return _hf_load_origin_subtitles_text(task)
+
+
+def _hf_dub_input_text(task_id: str, task: dict) -> str:
+    edited = _hf_load_subtitles_text(task_id, task)
+    if str(edited or "").strip():
+        return edited
+    normalized = _hf_load_normalized_source_text(task_id, task)
+    if str(normalized or "").strip():
+        return normalized
+    return _hf_load_origin_subtitles_text(task)
+
+
+def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
+    raw_source_text = _hf_load_origin_subtitles_text(task)
+    normalized_source_text = _hf_load_normalized_source_text(task_id, task)
+    edited_text = _hf_load_subtitles_text(task_id, task)
+    srt_text = edited_text or normalized_source_text or raw_source_text
+    actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
+    subtitle_artifact_exists = bool(_task_key(task, "mm_srt_path") and object_exists(str(_task_key(task, "mm_srt_path"))))
+    subtitle_ready = bool(subtitle_artifact_exists or str(edited_text or normalized_source_text or raw_source_text).strip())
+    subtitle_ready_reason = "ready" if subtitle_ready else "subtitle_missing"
+    return {
+        "raw_source_text": raw_source_text or "",
+        "normalized_source_text": normalized_source_text or "",
+        "edited_text": edited_text or "",
+        "srt_text": srt_text or "",
+        "dub_input_text": _hf_dub_input_text(task_id, task) or "",
+        "actual_burn_subtitle_source": actual_burn_subtitle_source,
+        "subtitle_artifact_exists": bool(subtitle_artifact_exists),
+        "subtitle_ready": bool(subtitle_ready),
+        "subtitle_ready_reason": subtitle_ready_reason,
+    }
+
+
+def _hf_dual_channel_state(task_id: str, task: dict, subtitle_lane: dict[str, Any] | None = None) -> dict[str, Any]:
+    lane = subtitle_lane or _hf_subtitle_lane_state(task_id, task)
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    raw_text = str(lane.get("raw_source_text") or "")
+    normalized_text = str(lane.get("normalized_source_text") or "")
+    has_text = bool(normalized_text.strip() or raw_text.strip())
+    no_subtitles = pipeline_config.get("no_subtitles") == "true"
+    title_hint = str(task.get("title") or "").lower()
+    speech_detected = has_text and not no_subtitles
+    speech_confidence = "high" if speech_detected else "none"
+    subtitle_stream = pipeline_config.get("subtitle_stream") == "true"
+    onscreen_text_detected = bool(subtitle_stream or (not speech_detected and has_text))
+    onscreen_text_density = "high" if onscreen_text_detected and len(normalized_text.strip() or raw_text.strip()) >= 20 else ("low" if onscreen_text_detected else "none")
+    if speech_detected:
+        content_mode = "voice_led"
+    elif onscreen_text_detected:
+        content_mode = "subtitle_led"
+    else:
+        content_mode = "silent_candidate"
+    if "asmr" in title_hint or "无人声" in title_hint or "涂抹音" in title_hint:
+        speech_detected = False
+        speech_confidence = "none"
+        content_mode = "silent_candidate" if not onscreen_text_detected else "subtitle_led"
+    recommended_path = (
+        "Voice dubbing"
+        if content_mode == "voice_led"
+        else ("OCR subtitle translation candidate" if content_mode == "subtitle_led" else "Manual text input required")
+    )
+    return {
+        "speech_detected": bool(speech_detected),
+        "speech_confidence": speech_confidence,
+        "onscreen_text_detected": bool(onscreen_text_detected),
+        "onscreen_text_density": onscreen_text_density,
+        "content_mode": content_mode,
+        "recommended_path": recommended_path,
+    }
+
+
+def _hot_follow_operational_defaults() -> dict[str, Any]:
+    return {
+        "raw_source_text": "",
+        "normalized_source_text": "",
+        "dub_input_text": "",
+        "subtitle_ready": False,
+        "subtitle_ready_reason": "unknown",
+        "speech_detected": False,
+        "speech_confidence": "none",
+        "onscreen_text_detected": False,
+        "onscreen_text_density": "none",
+        "content_mode": "unknown",
+        "recommended_path": "Voice dubbing",
+        "no_dub": False,
+        "no_dub_reason": None,
+        "no_dub_message": None,
+        "actual_burn_subtitle_source": None,
+    }
+
+
+def _safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+    try:
+        return _collect_hot_follow_workbench_ui(task, settings)
+    except Exception:
+        logger.exception("HF_WORKBENCH_UI_SAFE_FALLBACK task=%s", task.get("task_id") or task.get("id"))
+        payload = _hot_follow_operational_defaults()
+        payload.update(
+            {
+                "actual_provider": normalize_provider(task.get("dub_provider") or getattr(settings, "dub_provider", None)),
+                "resolved_voice": None,
+                "requested_voice": None,
+                "audio_ready": False,
+                "audio_ready_reason": "unknown",
+                "deliverable_audio_done": False,
+                "dub_current": False,
+                "dub_current_reason": "unknown",
+                "voice_options_by_provider": _build_hot_follow_voice_options(
+                    settings, normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+                ),
+                "compose_status": str(task.get("compose_status") or "never"),
+                "final_exists": False,
+                "lipsync_enabled": False,
+                "lipsync_status": "off",
+            }
+        )
+        return payload
+
+
 def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
     last_step = str(task.get("last_step") or "").lower()
     task_status = str(task.get("status") or "").lower()
@@ -2611,17 +2739,36 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
 
 
 def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+    task_id = str(task.get("task_id") or task.get("id") or "")
+    subtitle_lane = _hf_subtitle_lane_state(task_id, task)
+    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
     voice_state = _collect_voice_execution_state(task, settings)
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
     final_exists = bool(final_key and object_exists(str(final_key)))
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
-    actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
+    no_dub = route_state.get("content_mode") in {"silent_candidate", "subtitle_led"} and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    if route_state.get("content_mode") == "subtitle_led":
+        no_dub_reason = "subtitle_led"
+        no_dub_message = "No reliable speech detected. Review subtitles or provide text before dubbing."
+    elif route_state.get("content_mode") == "silent_candidate":
+        no_dub_reason = "no_speech_detected"
+        no_dub_message = "No spoken speech detected in source video; dubbing is skipped."
+    else:
+        no_dub_reason = None
+        no_dub_message = None
     return {
+        **subtitle_lane,
+        **route_state,
         **voice_state,
+        "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
+        "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),
         "compose_status": compose_status,
         "final_exists": final_exists,
-        "actual_burn_subtitle_source": actual_burn_subtitle_source,
+        "actual_burn_subtitle_source": subtitle_lane.get("actual_burn_subtitle_source"),
+        "no_dub": bool(no_dub),
+        "no_dub_reason": no_dub_reason,
+        "no_dub_message": no_dub_message,
         "lipsync_enabled": lipsync_enabled,
         "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
         "voiceover_url": voice_state.get("voiceover_url"),
@@ -3022,7 +3169,8 @@ async def task_workbench_page(
         "published_at": detail.published_at,
     }
     if spec.kind == "hot_follow":
-        task_json.update(_collect_hot_follow_workbench_ui(task, app_settings))
+        task_json.update(_hot_follow_operational_defaults())
+        task_json.update(_safe_collect_hot_follow_workbench_ui(task, app_settings))
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
     return render_template(
         request=request,
@@ -3903,6 +4051,9 @@ def get_hot_follow_workbench_hub(
     scenes_url = _task_endpoint(task_id, "scenes") if scenes_key else None
     subtitles_text = _hf_load_subtitles_text(task_id, task)
     origin_text = _hf_load_origin_subtitles_text(task)
+    normalized_source_text = _hf_load_normalized_source_text(task_id, task)
+    subtitle_lane = _hf_subtitle_lane_state(task_id, task)
+    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
     audio_cfg = _hf_audio_config(task)
     voice_state = _collect_voice_execution_state(task, get_settings())
     target_lang_internal = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
@@ -3977,10 +4128,15 @@ def get_hot_follow_workbench_hub(
         "pipeline": pipeline,
         "subtitles": {
             "origin_text": origin_text or "",
+            "raw_source_text": subtitle_lane.get("raw_source_text") or origin_text or "",
+            "normalized_source_text": subtitle_lane.get("normalized_source_text") or normalized_source_text or "",
             "edited_text": subtitles_text or "",
             "srt_text": subtitles_text or "",
+            "dub_input_text": subtitle_lane.get("dub_input_text") or "",
             "status": subtitles_state,
             "error": task.get("subtitles_error"),
+            "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
+            "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),
             "editable": True,
             "updated_at": task.get("subtitles_override_updated_at") or task.get("updated_at"),
         },
@@ -4002,6 +4158,11 @@ def get_hot_follow_workbench_hub(
             "deliverable_audio_done": bool(voice_state.get("deliverable_audio_done")),
             "dub_current": bool(voice_state.get("dub_current")),
             "dub_current_reason": voice_state.get("dub_current_reason"),
+            "no_dub": bool(route_state.get("content_mode") in {"silent_candidate", "subtitle_led_candidate"} and not str(subtitle_lane.get("dub_input_text") or "").strip()),
+            "no_dub_reason": (
+                "subtitle_led" if route_state.get("content_mode") == "subtitle_led"
+                else ("no_speech_detected" if route_state.get("content_mode") == "silent_candidate" else None)
+            ),
         },
         "scenes": {
             "status": scenes_status,
@@ -4169,7 +4330,8 @@ def get_hot_follow_workbench_hub(
                     item["status"] = "pending"
                     item["state"] = "pending"
                     break
-    payload.update(_collect_hot_follow_workbench_ui(task, get_settings()))
+    payload.update(_hot_follow_operational_defaults())
+    payload.update(_safe_collect_hot_follow_workbench_ui(task, get_settings()))
     return payload
 
 
@@ -5478,6 +5640,39 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             provider,
         )
     mm_text_override = (payload.mm_text or "").strip() or None
+    subtitle_lane = _hf_subtitle_lane_state(task_id, task)
+    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
+    no_dub_candidate = (
+        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
+        and not mm_text_override
+        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    )
+    if no_dub_candidate:
+        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+        pipeline_config["no_dub"] = "true"
+        pipeline_config["dub_skip_reason"] = (
+            "subtitle_led" if route_state.get("content_mode") == "subtitle_led" else "no_speech_detected"
+        )
+        _policy_upsert(
+            repo,
+            task_id,
+            {
+                "pipeline_config": pipeline_config_to_storage(pipeline_config),
+                "last_step": "dub",
+                "dub_status": "skipped",
+                "dub_error": None,
+                "compose_status": "pending",
+            },
+        )
+        stored = repo.get(task_id) or task
+        detail = _task_to_detail(stored)
+        return DubResponse(
+            **detail.dict(exclude={"mm_audio_key"}),
+            resolved_voice_id=final_voice_id,
+            resolved_edge_voice=None,
+            audio_sha256=None,
+            mm_audio_key=None,
+        )
     logger.info(
         "DUB3_TEXT_SOURCE",
         extra={

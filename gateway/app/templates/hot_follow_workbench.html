@@ -69,10 +69,14 @@
 
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <h3 class="text-base font-semibold mb-3" data-i18n="hot_follow_workbench_subtitle_edit">字幕编辑</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
               <div class="rounded-xl border border-gray-200 p-3">
                 <div class="text-xs text-gray-500 mb-2" data-i18n="hot_follow_workbench_source_label">Original (Source)</div>
                 <pre id="hf_subtitles_origin" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
+              </div>
+              <div class="rounded-xl border border-gray-200 p-3">
+                <div class="text-xs text-gray-500 mb-2">Normalized Source</div>
+                <pre id="hf_subtitles_normalized" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
               </div>
               <div class="rounded-xl border border-gray-200 p-3">
                 <div class="text-xs text-gray-500 mb-2">Burn Subtitle Preview</div>
@@ -165,6 +169,9 @@
                   <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
                     <div><span class="font-semibold">Actual Provider:</span> <span id="hf_actual_provider">-</span></div>
                     <div><span class="font-semibold">Resolved Voice:</span> <span id="hf_resolved_voice">-</span></div>
+                    <div><span class="font-semibold">Subtitle Ready:</span> <span id="hf_subtitle_ready">-</span></div>
+                    <div><span class="font-semibold">Audio Ready:</span> <span id="hf_audio_ready">-</span></div>
+                    <div><span class="font-semibold">Audio Ready Reason:</span> <span id="hf_audio_ready_reason">-</span></div>
                   </div>
                 </div>
               </div>
@@ -219,6 +226,13 @@
           </div>
 
           <div id="hf_scene_pack_card" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
+            <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1 mb-4">
+              <div><span class="font-semibold">Content Mode:</span> <span id="hf_content_mode">-</span></div>
+              <div><span class="font-semibold">Speech Detected:</span> <span id="hf_speech_detected">-</span></div>
+              <div><span class="font-semibold">On-screen Text Detected:</span> <span id="hf_onscreen_text_detected">-</span></div>
+              <div><span class="font-semibold">Recommended Path:</span> <span id="hf_recommended_path">-</span></div>
+              <div id="hf_no_dub_message" class="text-[11px] text-amber-700 hidden">-</div>
+            </div>
             <h3 class="text-base font-semibold mb-3" data-i18n="hot_follow_scene_pack_title">Scene Pack</h3>
             <div class="flex items-center justify-between">
               <span class="text-sm text-gray-600">{{ t("hot.follow.step.scenes") }}</span>
