@@ -117,6 +117,15 @@
   const freezeTailEnabledEl = document.getElementById("hf_freeze_tail_enabled");
   const composeBtnEl = document.getElementById("hf_compose_btn");
   const composeMsgEl = document.getElementById("hf_compose_msg");
+  const composeModesIntroEl = document.getElementById("hf_compose_modes_intro");
+  const composeModesEl = document.getElementById("hf_compose_modes");
+  const composeModesHintEl = document.getElementById("hf_compose_modes_hint");
+  const composeModeSubtitleEl = document.getElementById("hf_mode_subtitle");
+  const composeModeVoiceEl = document.getElementById("hf_mode_voice");
+  const composeModeBgmEl = document.getElementById("hf_mode_bgm");
+  const composeModeSubtitleBadgeEl = document.getElementById("hf_mode_subtitle_badge");
+  const composeModeVoiceBadgeEl = document.getElementById("hf_mode_voice_badge");
+  const composeModeBgmBadgeEl = document.getElementById("hf_mode_bgm_badge");
   const composeFinalBlockEl = document.getElementById("hf_compose_final_block");
   const composeFinalVideoEl = document.getElementById("hf_compose_final_video");
   const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
@@ -139,6 +148,7 @@
   let pollTimer = null;
   let composeSubmitting = false;
   let subtitlesChangedSinceDub = false;
+  let selectedComposeMode = "voice";
 
   function escapeHtml(s) {
     return String(s || "")
@@ -408,6 +418,70 @@
     }
   }
 
+  function getRecommendedComposeMode() {
+    const contentMode = String((currentHub && currentHub.content_mode) || "").trim().toLowerCase();
+    const noDub = Boolean(currentHub && currentHub.no_dub);
+    const subtitleReady = Boolean(currentHub && currentHub.subtitle_ready);
+    if ((contentMode === "silent_candidate" || noDub) && subtitleReady) return "subtitle";
+    if (contentMode === "subtitle_led" && subtitleReady) return "bgm";
+    return "voice";
+  }
+
+  function applyComposeModePreset(mode) {
+    selectedComposeMode = mode || "voice";
+    if (overlaySubtitlesEl) overlaySubtitlesEl.checked = true;
+    if (freezeTailEnabledEl) freezeTailEnabledEl.checked = selectedComposeMode === "voice";
+    if (bgmMixEl) {
+      if (selectedComposeMode === "subtitle") bgmMixEl.value = "0";
+      else if (selectedComposeMode === "bgm") bgmMixEl.value = "0.35";
+      else if (!bgmMixEl.value) bgmMixEl.value = "0.3";
+    }
+    renderComposeModes();
+  }
+
+  function renderComposeModes() {
+    const enabled = isHotFollowOpsGuideV1Enabled();
+    if (composeModesIntroEl) composeModesIntroEl.classList.toggle("hidden", !enabled);
+    if (composeModesEl) composeModesEl.classList.toggle("hidden", !enabled);
+    if (composeModesHintEl) composeModesHintEl.classList.toggle("hidden", !enabled);
+    if (!enabled) return;
+
+    const recommended = getRecommendedComposeMode();
+    const noDub = Boolean(currentHub && currentHub.no_dub);
+    const subtitleReady = Boolean(currentHub && currentHub.subtitle_ready);
+    const audioReady = Boolean(currentHub && currentHub.audio_ready);
+
+    if (composeModeSubtitleBadgeEl) composeModeSubtitleBadgeEl.classList.toggle("hidden", recommended !== "subtitle");
+    if (composeModeVoiceBadgeEl) composeModeVoiceBadgeEl.classList.toggle("hidden", recommended !== "voice");
+    if (composeModeBgmBadgeEl) composeModeBgmBadgeEl.classList.toggle("hidden", recommended !== "bgm");
+
+    const cards = [
+      [composeModeSubtitleEl, "subtitle"],
+      [composeModeVoiceEl, "voice"],
+      [composeModeBgmEl, "bgm"],
+    ];
+    cards.forEach(([el, key]) => {
+      if (!el) return;
+      const active = selectedComposeMode === key;
+      el.classList.toggle("border-gray-900", active);
+      el.classList.toggle("bg-gray-50", active);
+    });
+
+    if (composeModesHintEl) {
+      if (recommended === "subtitle") {
+        composeModesHintEl.textContent = "当前更推荐先走快速字幕版。若后端仍要求音频就绪，先完成字幕保存，字幕-only 合成将在下一阶段放开。";
+      } else if (recommended === "bgm") {
+        composeModesHintEl.textContent = "当前更推荐字幕+BGM版，适合商品展示或试色视频。当前阶段仍沿用既有后端 compose 门控。";
+      } else if (!audioReady && subtitleReady) {
+        composeModesHintEl.textContent = "当前字幕已就绪，但配音尚未就绪。你可以先整理字幕版路线，真正 subtitle-only 合成需等待下一阶段后端放开。";
+      } else if (noDub) {
+        composeModesHintEl.textContent = "当前任务可不做配音，优先整理字幕版出片路径。";
+      } else {
+        composeModesHintEl.textContent = "标准配音版是当前推荐路径。快速字幕版和字幕+BGM版主要用于运营试片和商品展示。";
+      }
+    }
+  }
+
   function renderRoutingState() {
     if (contentModeEl) contentModeEl.textContent = (currentHub && currentHub.content_mode) || "-";
     if (speechDetectedEl) speechDetectedEl.textContent = (currentHub && currentHub.speech_detected) ? "yes" : "no";
@@ -497,6 +571,7 @@
     const composePlan = (currentHub && currentHub.compose_plan) || {};
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
     if (freezeTailEnabledEl) freezeTailEnabledEl.checked = Boolean(composePlan.freeze_tail_enabled);
+    renderComposeModes();
   }
 
   function getSelectedTtsSpeed() {
@@ -794,6 +869,44 @@
         await loadHub();
       } catch (e) {
         if (composeMsgEl) composeMsgEl.textContent = e.message || "save freeze-tail failed";
+      }
+    });
+  }
+  if (composeModeSubtitleEl) {
+    composeModeSubtitleEl.addEventListener("click", async (e) => {
+      e.preventDefault();
+      applyComposeModePreset("subtitle");
+      try {
+        await patchComposePlan({ overlay_subtitles: true, freeze_tail_enabled: false, freeze_tail_cap_sec: 8 });
+        await patchAudioConfig({ bgm_mix: 0 });
+        await loadHub();
+      } catch (err) {
+        if (composeMsgEl) composeMsgEl.textContent = err.message || "save compose mode failed";
+      }
+    });
+  }
+  if (composeModeVoiceEl) {
+    composeModeVoiceEl.addEventListener("click", async (e) => {
+      e.preventDefault();
+      applyComposeModePreset("voice");
+      try {
+        await patchComposePlan({ overlay_subtitles: true, freeze_tail_enabled: true, freeze_tail_cap_sec: 8 });
+        await loadHub();
+      } catch (err) {
+        if (composeMsgEl) composeMsgEl.textContent = err.message || "save compose mode failed";
+      }
+    });
+  }
+  if (composeModeBgmEl) {
+    composeModeBgmEl.addEventListener("click", async (e) => {
+      e.preventDefault();
+      applyComposeModePreset("bgm");
+      try {
+        await patchComposePlan({ overlay_subtitles: true, freeze_tail_enabled: false, freeze_tail_cap_sec: 8 });
+        await patchAudioConfig({ bgm_mix: 0.35 });
+        await loadHub();
+      } catch (err) {
+        if (composeMsgEl) composeMsgEl.textContent = err.message || "save compose mode failed";
       }
     });
   }
