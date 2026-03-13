@@ -89,6 +89,10 @@
   const subtitlesOriginEl = document.getElementById("hf_subtitles_origin");
   const subtitlesNormalizedEl = document.getElementById("hf_subtitles_normalized");
   const subtitlesEditedPreviewEl = document.getElementById("hf_subtitles_edited_preview");
+  const ocrCandidateBlockEl = document.getElementById("hf_ocr_candidate_block");
+  const ocrCandidateHintEl = document.getElementById("hf_ocr_candidate_hint");
+  const ocrCandidateTextEl = document.getElementById("hf_ocr_candidate_text");
+  const ocrFillBtn = document.getElementById("hf_ocr_fill_btn");
   const subtitleChannelIntroEl = document.getElementById("hf_subtitle_channel_intro");
   const subtitlesOriginHintEl = document.getElementById("hf_subtitles_origin_hint");
   const subtitlesEditHintEl = document.getElementById("hf_subtitles_edit_hint");
@@ -126,6 +130,11 @@
   const composeModeSubtitleBadgeEl = document.getElementById("hf_mode_subtitle_badge");
   const composeModeVoiceBadgeEl = document.getElementById("hf_mode_voice_badge");
   const composeModeBgmBadgeEl = document.getElementById("hf_mode_bgm_badge");
+  const cleanupModesEl = document.getElementById("hf_cleanup_modes");
+  const cleanupModesHintEl = document.getElementById("hf_cleanup_modes_hint");
+  const cleanupKeepEl = document.getElementById("hf_cleanup_keep");
+  const cleanupMaskEl = document.getElementById("hf_cleanup_mask");
+  const cleanupCleanEl = document.getElementById("hf_cleanup_clean");
   const composeFinalBlockEl = document.getElementById("hf_compose_final_block");
   const composeFinalVideoEl = document.getElementById("hf_compose_final_video");
   const composeFinalLinkEl = document.getElementById("hf_compose_final_link");
@@ -149,6 +158,7 @@
   let composeSubmitting = false;
   let subtitlesChangedSinceDub = false;
   let selectedComposeMode = "voice";
+  let selectedCleanupMode = "none";
 
   function escapeHtml(s) {
     return String(s || "")
@@ -347,6 +357,33 @@
     }
     if (translationQaWarningEl) translationQaWarningEl.classList.toggle("hidden", !hasMismatch);
     if (translateMmBtn) translateMmBtn.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
+    renderOcrCandidate();
+  }
+
+  function getOcrCandidateText() {
+    const subtitles = (currentHub && currentHub.subtitles) || {};
+    const normalized = String(subtitles.normalized_source_text || "").trim();
+    const raw = String(subtitles.origin_text || "").trim();
+    const onscreen = Boolean(currentHub && currentHub.onscreen_text_detected);
+    const contentMode = String((currentHub && currentHub.content_mode) || "").trim().toLowerCase();
+    if (!isHotFollowOpsGuideV1Enabled()) return "";
+    if (!onscreen && contentMode !== "subtitle_led") return "";
+    return normalized || raw || "";
+  }
+
+  function renderOcrCandidate() {
+    if (!ocrCandidateBlockEl) return;
+    const candidate = getOcrCandidateText();
+    const show = isHotFollowOpsGuideV1Enabled() && (Boolean(candidate) || Boolean(currentHub && currentHub.onscreen_text_detected));
+    ocrCandidateBlockEl.classList.toggle("hidden", !show);
+    if (!show) return;
+    if (ocrCandidateTextEl) ocrCandidateTextEl.textContent = candidate || "当前版本尚未提取到可直接使用的画面文字草稿，可手工补字幕后继续。";
+    if (ocrCandidateHintEl) {
+      ocrCandidateHintEl.textContent = candidate
+        ? "检测到画面文字候选，可填充到当前编辑区作为字幕草稿，请检查后再保存。"
+        : "当前版本未启用完整自动识别，这里只保留候选入口，不会自动覆盖来源层。";
+    }
+    if (ocrFillBtn) ocrFillBtn.disabled = !candidate;
   }
 
   function normalizeEngineKey(value) {
@@ -452,6 +489,11 @@
     renderComposeModes();
   }
 
+  function applyCleanupModePreset(mode) {
+    selectedCleanupMode = mode || "none";
+    renderCleanupModes();
+  }
+
   function renderComposeModes() {
     const enabled = isHotFollowOpsGuideV1Enabled();
     if (composeModesIntroEl) composeModesIntroEl.classList.toggle("hidden", !enabled);
@@ -482,15 +524,49 @@
 
     if (composeModesHintEl) {
       if (recommended === "subtitle") {
-        composeModesHintEl.textContent = "当前更推荐先走快速字幕版。若后端仍要求音频就绪，先完成字幕保存，字幕-only 合成将在下一阶段放开。";
+        composeModesHintEl.textContent = "当前更推荐先走快速字幕版。若字幕已就绪，可直接尝试字幕版合成；若还需解说，再补文案后生成配音。";
       } else if (recommended === "bgm") {
         composeModesHintEl.textContent = "当前更推荐字幕+BGM版，适合商品展示或试色视频。当前阶段仍沿用既有后端 compose 门控。";
       } else if (!audioReady && subtitleReady) {
-        composeModesHintEl.textContent = "当前字幕已就绪，但配音尚未就绪。你可以先整理字幕版路线，真正 subtitle-only 合成需等待下一阶段后端放开。";
+        composeModesHintEl.textContent = "当前字幕已就绪，但配音尚未就绪。若是无人声/弱语音素材，可先尝试字幕版路线；标准口播仍建议先完成配音。";
       } else if (noDub) {
         composeModesHintEl.textContent = "当前任务可不做配音，优先整理字幕版出片路径。";
       } else {
         composeModesHintEl.textContent = "标准配音版是当前推荐路径。快速字幕版和字幕+BGM版主要用于运营试片和商品展示。";
+      }
+    }
+  }
+
+  function renderCleanupModes() {
+    const enabled = isHotFollowOpsGuideV1Enabled();
+    if (cleanupModesEl) cleanupModesEl.classList.toggle("hidden", !enabled);
+    if (cleanupModesHintEl) cleanupModesHintEl.classList.toggle("hidden", !enabled);
+    if (!enabled) return;
+
+    const composePlan = (currentHub && currentHub.compose_plan) || {};
+    if (!selectedCleanupMode || selectedCleanupMode === "none") {
+      selectedCleanupMode = String(composePlan.cleanup_mode || "none").trim() || "none";
+    }
+
+    const cards = [
+      [cleanupKeepEl, "none"],
+      [cleanupMaskEl, "bottom_mask"],
+      [cleanupCleanEl, "safe_band"],
+    ];
+    cards.forEach(([el, key]) => {
+      if (!el) return;
+      const active = selectedCleanupMode === key;
+      el.classList.toggle("border-gray-900", active);
+      el.classList.toggle("bg-gray-50", active);
+    });
+
+    if (cleanupModesHintEl) {
+      if (selectedCleanupMode === "bottom_mask") {
+        cleanupModesHintEl.textContent = "当前将优先使用微遮挡原字幕模式。适合常见底部字幕干扰，失败时仍回退到普通合成。";
+      } else if (selectedCleanupMode === "safe_band") {
+        cleanupModesHintEl.textContent = "当前启用清洁版实验模式，会使用更高的安全带遮挡。适合字幕冲突更明显的画面。";
+      } else {
+        cleanupModesHintEl.textContent = "当前保留原画面，不额外处理原字幕区域。适合标准口播或原字幕干扰较轻的任务。";
       }
     }
   }
@@ -585,6 +661,7 @@
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
     if (freezeTailEnabledEl) freezeTailEnabledEl.checked = Boolean(composePlan.freeze_tail_enabled);
     renderComposeModes();
+    renderCleanupModes();
   }
 
   function getSelectedTtsSpeed() {
@@ -926,6 +1003,42 @@
       }
     });
   }
+  if (cleanupKeepEl) {
+    cleanupKeepEl.addEventListener("click", async (e) => {
+      e.preventDefault();
+      applyCleanupModePreset("none");
+      try {
+        await patchComposePlan({ cleanup_mode: "none" });
+        await loadHub();
+      } catch (err) {
+        if (composeMsgEl) composeMsgEl.textContent = err.message || "save cleanup mode failed";
+      }
+    });
+  }
+  if (cleanupMaskEl) {
+    cleanupMaskEl.addEventListener("click", async (e) => {
+      e.preventDefault();
+      applyCleanupModePreset("bottom_mask");
+      try {
+        await patchComposePlan({ cleanup_mode: "bottom_mask" });
+        await loadHub();
+      } catch (err) {
+        if (composeMsgEl) composeMsgEl.textContent = err.message || "save cleanup mode failed";
+      }
+    });
+  }
+  if (cleanupCleanEl) {
+    cleanupCleanEl.addEventListener("click", async (e) => {
+      e.preventDefault();
+      applyCleanupModePreset("safe_band");
+      try {
+        await patchComposePlan({ cleanup_mode: "safe_band" });
+        await loadHub();
+      } catch (err) {
+        if (composeMsgEl) composeMsgEl.textContent = err.message || "save cleanup mode failed";
+      }
+    });
+  }
   if (confirmVoiceoverEl && composeConfirmEl) {
     confirmVoiceoverEl.addEventListener("change", () => {
       composeConfirmEl.checked = !!confirmVoiceoverEl.checked;
@@ -1047,6 +1160,20 @@
       } finally {
         translateMmBtn.disabled = false;
       }
+    });
+  }
+  if (ocrFillBtn) {
+    ocrFillBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const candidate = getOcrCandidateText();
+      if (!candidate) {
+        if (subtitlesMsgEl) subtitlesMsgEl.textContent = "当前没有可用的候选字幕草稿，请先手工补字幕。";
+        return;
+      }
+      if (subtitlesTextEl) subtitlesTextEl.value = candidate;
+      if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = candidate;
+      subtitleDirty = true;
+      if (subtitlesMsgEl) subtitlesMsgEl.textContent = "候选文本已填充到当前编辑区，请检查后保存字幕。";
     });
   }
   if (subtitlesSaveBtn) {
