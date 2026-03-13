@@ -83,21 +83,29 @@
 
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <h3 class="text-base font-semibold mb-3" data-i18n="hot_follow_workbench_subtitle_edit">字幕编辑</h3>
+            <div id="hf_subtitle_channel_intro" class="hidden mb-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+              先看来源字幕，再看最终烧录字幕预览，最后在当前目标语言字幕编辑区进行修改并保存。
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
               <div class="rounded-xl border border-gray-200 p-3">
-                <div class="text-xs text-gray-500 mb-2" data-i18n="hot_follow_workbench_source_label">Original (Source)</div>
+                <div class="text-xs text-gray-500 mb-2">来源字幕（来源层）</div>
                 <pre id="hf_subtitles_origin" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
+                <div id="hf_subtitles_origin_hint" class="mt-2 text-[11px] text-gray-500">这里显示当前素材提取到的来源字幕或识别文本。</div>
               </div>
               <div class="rounded-xl border border-gray-200 p-3">
-                <div class="text-xs text-gray-500 mb-2">Normalized Source</div>
-                <pre id="hf_subtitles_normalized" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
-              </div>
-              <div class="rounded-xl border border-gray-200 p-3">
-                <div class="text-xs text-gray-500 mb-2">Burn Subtitle Preview</div>
+                <div class="text-xs text-gray-500 mb-2">当前烧录字幕预览</div>
                 <pre id="hf_subtitles_edited_preview" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
+                <div class="mt-2 text-[11px] text-gray-500">最终视频会使用这一版字幕进行烧录。</div>
+              </div>
+              <div class="rounded-xl border border-gray-200 p-3">
+                <div class="text-xs text-gray-500 mb-2">标准化来源文本（辅助层）</div>
+                <pre id="hf_subtitles_normalized" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-gray-50 rounded-lg p-2">-</pre>
+                <div class="mt-2 text-[11px] text-gray-500">用于帮助理解来源文本，不直接等于最终烧录字幕。</div>
               </div>
             </div>
+            <div class="mb-2 text-xs text-gray-500">当前目标语言字幕编辑区</div>
             <textarea id="hf_subtitles_text" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" rows="10" placeholder="在此编辑 SRT 文本" data-i18n-placeholder="hot_follow_workbench_subtitle_placeholder"></textarea>
+            <div id="hf_subtitles_edit_hint" class="mt-2 text-[11px] text-gray-500">这里是当前目标语言字幕编辑区。保存后会更新 mm.srt，并影响后续配音与合成。</div>
             <div id="hf_translation_qa_counts" class="text-xs text-gray-500 mt-2" data-i18n="hot_follow_workbench_translation_cues_default">Translation cues: - / -</div>
             <div id="hf_translation_qa_warning" class="hidden mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
               <span data-i18n="hot_follow_workbench_translation_mismatch">Translation cues mismatch. Please refresh or re-run subtitles.</span>
@@ -136,6 +144,9 @@
                 </div>
                 <div class="text-xs text-gray-500 mt-1" data-hf-step-summary="audio">-</div>
                 <div class="grid grid-cols-1 gap-3 mt-3">
+                  <div id="hf_audio_channel_intro" class="hidden rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+                    这里展示当前音频通道状态。若当前素材适合字幕驱动处理，可不强求先生成配音。
+                  </div>
                   <audio id="hf_voiceover_audio" controls class="w-full"></audio>
                   <label class="flex items-center gap-2 text-xs text-gray-600">
                     <input id="hf_confirm_voiceover" type="checkbox" class="rounded border-gray-300" />
@@ -151,9 +162,10 @@
                     <label class="block text-xs font-semibold text-gray-600 mb-1" data-i18n="hot_follow_workbench_tts_voice">Voice</label>
                     <select id="hf_tts_voice" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></select>
                   </div>
-                  <div class="flex items-center gap-2">
-                    <button id="hf_tts_preview_btn" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_tts_preview">试听</button>
-                    <button id="hf_rerun_audio_btn" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_rerun_audio">Re-Run Audio</button>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <button id="hf_subtitles_save_btn_dup" class="hidden btn-secondary text-xs" type="button">保存字幕</button>
+                    <button id="hf_rerun_audio_btn" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_rerun_audio">基于当前字幕生成配音</button>
+                    <button id="hf_tts_preview_btn" class="btn-secondary text-xs" data-i18n="hot_follow_workbench_tts_preview">试听当前音频</button>
                     <span id="hf_dub_outdated_badge" class="hidden text-[11px] rounded bg-amber-100 text-amber-700 px-2 py-1" data-i18n="hot_follow_workbench_dub_outdated">Dub is out of date</span>
                   </div>
                   <div>
@@ -183,9 +195,12 @@
                   <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
                     <div><span class="font-semibold">Actual Provider:</span> <span id="hf_actual_provider">-</span></div>
                     <div><span class="font-semibold">Resolved Voice:</span> <span id="hf_resolved_voice">-</span></div>
+                    <div><span class="font-semibold">当前音频是否存在：</span> <span id="hf_audio_exists">-</span></div>
+                    <div><span class="font-semibold">当前音频是否匹配当前字幕：</span> <span id="hf_audio_matches_subtitles">-</span></div>
                     <div><span class="font-semibold">Subtitle Ready:</span> <span id="hf_subtitle_ready">-</span></div>
                     <div><span class="font-semibold">Audio Ready:</span> <span id="hf_audio_ready">-</span></div>
                     <div><span class="font-semibold">Audio Ready Reason:</span> <span id="hf_audio_ready_reason">-</span></div>
+                    <div id="hf_audio_no_dub_hint" class="hidden text-[11px] text-amber-700">当前任务可不做配音，可继续走字幕驱动路径。</div>
                   </div>
                 </div>
               </div>

@@ -72,11 +72,15 @@
   const rerunAudioBtn = document.getElementById("hf_rerun_audio_btn");
   const dubOutdatedBadgeEl = document.getElementById("hf_dub_outdated_badge");
   const voiceoverAudioEl = document.getElementById("hf_voiceover_audio");
+  const audioChannelIntroEl = document.getElementById("hf_audio_channel_intro");
   const actualProviderEl = document.getElementById("hf_actual_provider");
   const resolvedVoiceEl = document.getElementById("hf_resolved_voice");
+  const audioExistsEl = document.getElementById("hf_audio_exists");
+  const audioMatchesSubtitlesEl = document.getElementById("hf_audio_matches_subtitles");
   const subtitleReadyEl = document.getElementById("hf_subtitle_ready");
   const audioReadyEl = document.getElementById("hf_audio_ready");
   const audioReadyReasonEl = document.getElementById("hf_audio_ready_reason");
+  const audioNoDubHintEl = document.getElementById("hf_audio_no_dub_hint");
   const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
   const scenePackDownloadEl = document.getElementById("hf_scene_pack_download");
   const scenePackHintEl = document.getElementById("hf-scene-pack-hint");
@@ -85,6 +89,9 @@
   const subtitlesOriginEl = document.getElementById("hf_subtitles_origin");
   const subtitlesNormalizedEl = document.getElementById("hf_subtitles_normalized");
   const subtitlesEditedPreviewEl = document.getElementById("hf_subtitles_edited_preview");
+  const subtitleChannelIntroEl = document.getElementById("hf_subtitle_channel_intro");
+  const subtitlesOriginHintEl = document.getElementById("hf_subtitles_origin_hint");
+  const subtitlesEditHintEl = document.getElementById("hf_subtitles_edit_hint");
   const opsGuideCardEl = document.getElementById("hf_ops_guide_card");
   const opsGuideBadgeEl = document.getElementById("hf_ops_guide_badge");
   const opsGuideTitleEl = document.getElementById("hf_ops_guide_title");
@@ -302,8 +309,21 @@
     const origin = subtitles.origin_text || "";
     const normalized = subtitles.normalized_source_text || origin || "";
     const edited = subtitles.edited_text || subtitles.srt_text || "";
-    const sourcePlaceholder = t("hot_follow_workbench_source_not_generated", "Source subtitles not generated yet.");
+    const sourcePlaceholder = isHotFollowOpsGuideV1Enabled()
+      ? "当前素材未提取到稳定来源字幕，这在无人声/弱语音素材中属于正常情况。"
+      : t("hot_follow_workbench_source_not_generated", "Source subtitles not generated yet.");
     const targetPlaceholder = t("hot_follow_workbench_target_not_generated", "Target subtitles not generated yet.");
+    if (subtitleChannelIntroEl) subtitleChannelIntroEl.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
+    if (subtitlesOriginHintEl) {
+      subtitlesOriginHintEl.textContent = isHotFollowOpsGuideV1Enabled()
+        ? "这里显示来源层文本；为空时不一定代表异常，也可能是当前素材没有稳定语音字幕。"
+        : "这里显示当前素材提取到的来源字幕或识别文本。";
+    }
+    if (subtitlesEditHintEl) {
+      subtitlesEditHintEl.textContent = isHotFollowOpsGuideV1Enabled()
+        ? "这是当前目标语言字幕编辑区。保存后会更新 mm.srt，最终视频会以这一版字幕为准。"
+        : "这里是当前目标语言字幕编辑区。保存后会更新 mm.srt，并影响后续配音与合成。";
+    }
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
     if (subtitlesNormalizedEl) subtitlesNormalizedEl.textContent = normalized || sourcePlaceholder;
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || targetPlaceholder;
@@ -358,11 +378,19 @@
   }
 
   function renderVoiceMeta() {
+    const audio = (currentHub && currentHub.audio) || {};
+    const media = (currentHub && currentHub.media) || {};
+    const hasAudio = Boolean(media.voiceover_url || audio.voiceover_url || audio.audio_url || (currentHub && currentHub.deliverable_audio_done));
+    const noDub = Boolean(currentHub && currentHub.no_dub);
     if (actualProviderEl) actualProviderEl.textContent = (currentHub && currentHub.actual_provider) || "-";
     if (resolvedVoiceEl) resolvedVoiceEl.textContent = (currentHub && currentHub.resolved_voice) || "-";
+    if (audioExistsEl) audioExistsEl.textContent = hasAudio ? "是" : "否";
+    if (audioMatchesSubtitlesEl) audioMatchesSubtitlesEl.textContent = (currentHub && currentHub.dub_current) ? "是" : "否";
     if (subtitleReadyEl) subtitleReadyEl.textContent = (currentHub && currentHub.subtitle_ready) ? "yes" : "no";
     if (audioReadyEl) audioReadyEl.textContent = (currentHub && currentHub.audio_ready) ? "yes" : "no";
     if (audioReadyReasonEl) audioReadyReasonEl.textContent = (currentHub && currentHub.audio_ready_reason) || "-";
+    if (audioChannelIntroEl) audioChannelIntroEl.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
+    if (audioNoDubHintEl) audioNoDubHintEl.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled() || !noDub);
   }
 
   function renderConsistencyPanel() {
