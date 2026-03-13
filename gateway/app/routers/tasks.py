@@ -1909,6 +1909,27 @@ def _safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any
         return payload
 
 
+def _hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
+    if str(task.get("kind") or "").strip().lower() != "hot_follow":
+        return False
+    subtitle_lane = _hf_subtitle_lane_state(task_id, task)
+    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    no_dub = pipeline_config.get("no_dub") == "true"
+    no_dub = no_dub or bool(
+        str(route_state.get("content_mode") or "").strip().lower() == "silent_candidate"
+        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    )
+    return bool(
+        subtitle_lane.get("subtitle_ready")
+        and (str(route_state.get("content_mode") or "").strip().lower() == "silent_candidate" or no_dub)
+        and (
+            not bool(route_state.get("speech_detected"))
+            or str(task.get("dub_skip_reason") or "").strip().lower() == "no_speech_detected"
+        )
+    )
+
+
 def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
     last_step = str(task.get("last_step") or "").lower()
     task_status = str(task.get("status") or "").lower()
@@ -4581,12 +4602,19 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             base += f",atrim=0:{video_duration:.3f}"
         return base + "[bgm];"
 
+    def _bgm_only_filter_expr(input_index: int) -> str:
+        base = f"[{input_index}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}"
+        if compose_policy == "match_video":
+            base += f",atrim=0:{video_duration:.3f}"
+        return base + ",alimiter=limit=0.95[mix]"
+
     def _assert_overlay_cmd(cmd_text: str):
         if overlay_subtitles and "subtitles=" not in cmd_text:
             _compose_fail("compose_failed", "overlay_subtitles enabled but ffmpeg cmd missing subtitles filter", ffmpeg_cmd=cmd_text)
 
     storage = get_storage_service()
     voice_state = _collect_voice_execution_state(task, get_settings())
+    subtitle_only_compose = _hf_allow_subtitle_only_compose(task_id, task)
     video_key = (
         _task_key(task, "mute_video_key")
         or _task_key(task, "mute_video_path")
@@ -4595,9 +4623,9 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
     if not video_key:
         _compose_fail("missing_raw", "missing video source for compose")
-    if not audio_key:
+    if not audio_key and not subtitle_only_compose:
         _compose_fail("missing_voiceover", "missing voiceover audio for compose")
-    if not bool(voice_state.get("audio_ready")):
+    if not bool(voice_state.get("audio_ready")) and not subtitle_only_compose:
         _compose_fail(
             "missing_voiceover",
             f"voiceover audio not ready: {voice_state.get('audio_ready_reason') or 'audio_not_ready'}",
@@ -4611,15 +4639,16 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         )
     except Exception:
         _compose_fail("missing_raw", "video source not ready")
-    try:
-        assert_artifact_ready(
-            kind="audio",
-            key=str(audio_key),
-            exists_fn=object_exists,
-            head_fn=object_head,
-        )
-    except Exception:
-        _compose_fail("missing_voiceover", "voiceover audio invalid")
+    if audio_key and not subtitle_only_compose:
+        try:
+            assert_artifact_ready(
+                kind="audio",
+                key=str(audio_key),
+                exists_fn=object_exists,
+                head_fn=object_head,
+            )
+        except Exception:
+            _compose_fail("missing_voiceover", "voiceover audio invalid")
 
     ffmpeg = shutil.which("ffmpeg")
     if not ffmpeg:
@@ -4684,12 +4713,15 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         final_path = tmp / "final_compose.mp4"
         subtitle_path = tmp / "subs_target.srt"
         storage.download_file(str(video_key), str(video_path))
-        storage.download_file(str(audio_key), str(voice_path))
+        if audio_key and not subtitle_only_compose:
+            storage.download_file(str(audio_key), str(voice_path))
         video_size, video_duration = assert_local_video_ok(video_path)
-        try:
-            _, voice_duration = assert_local_audio_ok(voice_path)
-        except ValueError:
-            _compose_fail("missing_voiceover", "voiceover audio invalid")
+        voice_duration = 0.0
+        if audio_key and not subtitle_only_compose:
+            try:
+                _, voice_duration = assert_local_audio_ok(voice_path)
+            except ValueError:
+                _compose_fail("missing_voiceover", "voiceover audio invalid")
 
         video_input_path = video_path
         hold_sec = 0.0
@@ -4748,7 +4780,105 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             bgm_path = tmp / "bgm_input.mp3"
             storage.download_file(str(bgm_key), str(bgm_path))
 
-        if bgm_path and bgm_path.exists():
+        if subtitle_only_compose:
+            if bgm_path and bgm_path.exists():
+                if overlay_subtitles:
+                    fontsdir = bundled_fonts_dir
+                    subtitle_filter = (
+                        f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
+                        "charenc=UTF-8:"
+                        f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
+                        "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
+                    )
+                    filter_complex = (
+                        f"[0:v]{subtitle_filter}[v];"
+                        + _bgm_only_filter_expr(1)
+                    )
+                    map_video = "[v]"
+                    video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+                else:
+                    filter_complex = _bgm_only_filter_expr(1)
+                    map_video = "0:v:0"
+                    video_codec_args = ["-c:v", "copy"]
+                cmd = [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    str(video_input_path),
+                    "-i",
+                    str(bgm_path),
+                    "-filter_complex",
+                    filter_complex,
+                    "-map",
+                    map_video,
+                    "-map",
+                    "[mix]",
+                    *video_codec_args,
+                    "-c:a",
+                    "aac",
+                    "-shortest",
+                    "-movflags",
+                    "+faststart",
+                    *(["-sn"] if strip_subtitle_streams else []),
+                    str(final_path),
+                ]
+                logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd))
+                ffmpeg_cmd_used = " ".join(cmd)
+                _assert_overlay_cmd(ffmpeg_cmd_used)
+                proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
+                    _compose_fail("compose_failed", "compose ffmpeg failed", ffmpeg_cmd=ffmpeg_cmd_used, stderr_tail=(proc.stderr or "")[-800:])
+            else:
+                if overlay_subtitles:
+                    fontsdir = bundled_fonts_dir
+                    subtitle_filter = (
+                        f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
+                        "charenc=UTF-8:"
+                        f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
+                        "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
+                    )
+                    cmd = [
+                        ffmpeg,
+                        "-y",
+                        "-i",
+                        str(video_input_path),
+                        "-vf",
+                        subtitle_filter,
+                        "-c:v",
+                        "libx264",
+                        "-preset",
+                        "veryfast",
+                        "-crf",
+                        "20",
+                        "-pix_fmt",
+                        "yuv420p",
+                        "-an",
+                        "-movflags",
+                        "+faststart",
+                        *(["-sn"] if strip_subtitle_streams else []),
+                        str(final_path),
+                    ]
+                else:
+                    cmd = [
+                        ffmpeg,
+                        "-y",
+                        "-i",
+                        str(video_input_path),
+                        "-c:v",
+                        "copy",
+                        "-an",
+                        "-movflags",
+                        "+faststart",
+                        *(["-sn"] if strip_subtitle_streams else []),
+                        str(final_path),
+                    ]
+                logger.info("COMPOSE_FFMPEG_CMD task=%s cmd=%s", task_id, " ".join(cmd))
+                ffmpeg_cmd_used = " ".join(cmd)
+                _assert_overlay_cmd(ffmpeg_cmd_used)
+                proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                if proc.returncode != 0 or not final_path.exists() or final_path.stat().st_size == 0:
+                    _compose_fail("compose_failed", "compose ffmpeg failed", ffmpeg_cmd=ffmpeg_cmd_used, stderr_tail=(proc.stderr or "")[-800:])
+        elif bgm_path and bgm_path.exists():
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
                 subtitle_filter = (

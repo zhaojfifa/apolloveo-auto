@@ -427,6 +427,19 @@
     return "voice";
   }
 
+  function canUseSubtitleOnlyCompose() {
+    const contentMode = String((currentHub && currentHub.content_mode) || "").trim().toLowerCase();
+    const noDub = Boolean(currentHub && currentHub.no_dub);
+    const noDubReason = String((currentHub && currentHub.no_dub_reason) || "").trim().toLowerCase();
+    const subtitleReady = Boolean(currentHub && currentHub.subtitle_ready);
+    const speechDetected = Boolean(currentHub && currentHub.speech_detected);
+    return Boolean(
+      subtitleReady
+      && (contentMode === "silent_candidate" || noDub)
+      && (!speechDetected || noDubReason === "no_speech_detected")
+    );
+  }
+
   function applyComposeModePreset(mode) {
     selectedComposeMode = mode || "voice";
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = true;
@@ -760,8 +773,9 @@
     const media = (currentHub && currentHub.media) || {};
     const audio = (currentHub && currentHub.audio) || {};
     const voiceUrl = media.voiceover_url || audio.voiceover_url || null;
+    const subtitleOnlyAllowed = canUseSubtitleOnlyCompose();
     if (composeConfirmEl && !composeConfirmEl.checked) throw new Error("Please confirm before composing.");
-    if (!voiceUrl) throw new Error("No voiceover yet; run Re-Run Audio first.");
+    if (!voiceUrl && !subtitleOnlyAllowed) throw new Error("No voiceover yet; run Re-Run Audio first.");
     composeSubmitting = true;
     updateComposeButtonState();
     const res = await fetch(composeUrl, {
@@ -805,11 +819,12 @@
     const audio = (currentHub && currentHub.audio) || {};
     const hasRaw = Boolean(media.raw_url || media.source_video_url);
     const hasVoiceover = Boolean(media.voiceover_url || audio.voiceover_url);
+    const subtitleOnlyAllowed = canUseSubtitleOnlyCompose();
     const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
     const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
     const composeRunning = ["running", "processing", "queued"].includes(String(composeLast.status || "").toLowerCase());
     const audioDisplay = getAudioDisplayState();
-    const enabled = hasRaw && hasVoiceover && confirmed && !composeSubmitting && !composeRunning;
+    const enabled = hasRaw && (hasVoiceover || subtitleOnlyAllowed) && confirmed && !composeSubmitting && !composeRunning;
     if (!composeBtnEl.dataset.defaultText) composeBtnEl.dataset.defaultText = composeBtnEl.textContent || "Compose Final";
     composeBtnEl.disabled = !enabled;
     composeBtnEl.classList.toggle("opacity-50", !enabled);
@@ -820,6 +835,7 @@
     if (composeMsgEl) {
       if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
       else if (audioDisplay.status === "running") composeMsgEl.textContent = "Compose disabled: dubbing still running.";
+      else if (!hasVoiceover && subtitleOnlyAllowed) composeMsgEl.textContent = "当前任务可直接走字幕版合成。";
       else if (!hasVoiceover) composeMsgEl.textContent = "Compose disabled: run Re-Run Audio first.";
       else if (!hasRaw) composeMsgEl.textContent = "Compose disabled: missing raw video.";
       else if (!confirmed) composeMsgEl.textContent = t("hot_follow_workbench_compose_disabled_hint", "Compose disabled: check confirmation first");
