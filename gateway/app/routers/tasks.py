@@ -370,6 +370,48 @@ class HotFollowTranslateRequest(BaseModel):
     target_lang: str = "my"
 
 
+def _hf_is_srt_text(text: str) -> bool:
+    source = str(text or "").strip()
+    if not source or "-->" not in source:
+        return False
+    try:
+        segments = _parse_srt_to_segments(source)
+    except Exception:
+        return False
+    return bool(segments)
+
+
+def _hf_plain_text_to_single_srt(text: str, *, duration_sec: float | None) -> str:
+    content_lines = [str(line or "").rstrip() for line in str(text or "").splitlines()]
+    content = "\n".join(line for line in content_lines if line.strip()).strip()
+    if not content:
+        return ""
+    try:
+        dur = float(duration_sec) if duration_sec is not None else 0.0
+    except Exception:
+        dur = 0.0
+    if dur <= 0:
+        dur = 8.0
+    dur = max(2.0, min(dur, 60.0))
+    seg = {
+        "index": 1,
+        "start": 0.0,
+        "end": dur,
+        "mm": content,
+        "origin": content,
+    }
+    return segments_to_srt([seg], "mm")
+
+
+def _hf_normalize_subtitles_save_text(task: dict, raw_text: str) -> tuple[str, str]:
+    text = str(raw_text or "").strip()
+    if not text:
+        return "", "empty"
+    if _hf_is_srt_text(text):
+        return text + ("\n" if not text.endswith("\n") else ""), "srt"
+    return _hf_plain_text_to_single_srt(text, duration_sec=task.get("duration_sec")) + "\n", "plain_text_wrapped"
+
+
 def _hf_translate_plain_lines(text: str, *, target_lang: str) -> str:
     lines = str(text or "").splitlines()
     segments: list[dict[str, Any]] = []
@@ -4502,10 +4544,10 @@ def patch_hot_follow_subtitles(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    text = (payload.srt_text or "").strip()
+    text, text_mode = _hf_normalize_subtitles_save_text(task, payload.srt_text or "")
     override_path = _hf_subtitles_override_path(task_id)
     override_path.parent.mkdir(parents=True, exist_ok=True)
-    override_path.write_text(text + ("\n" if text else ""), encoding="utf-8")
+    override_path.write_text(text, encoding="utf-8")
     _policy_upsert(
         repo,
         task_id,
@@ -4513,6 +4555,7 @@ def patch_hot_follow_subtitles(
             "subtitles_status": "ready" if text else task.get("subtitles_status"),
             "last_step": "subtitles" if text else task.get("last_step"),
             "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
+            "subtitles_override_mode": text_mode,
             "error_message": None,
             "error_reason": None,
         },

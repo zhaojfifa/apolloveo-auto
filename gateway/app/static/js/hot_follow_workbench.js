@@ -313,7 +313,6 @@
     const finalMeta = (currentHub && currentHub.final) || {};
     const sourceUrl = media.source_video_url || media.raw_url || null;
     const finalAssetVersion = finalMeta.asset_version || null;
-
     setMediaSrcStable(sourceVideoEl, sourceUrl, "sourceUrl");
     setMediaSrcStable(finalVideoEl, finalUrl, "finalUrl(main)", finalAssetVersion);
     setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose)", finalAssetVersion);
@@ -670,6 +669,26 @@
     return Math.max(1.0, Math.min(1.6, n));
   }
 
+  function isLikelySrtText(text) {
+    const source = String(text || "").trim();
+    return source.includes("-->") && /\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}/.test(source);
+  }
+
+  function analyzeMyanmarDubCandidate(text) {
+    const source = String(text || "");
+    const myanmarMatches = source.match(/[\u1000-\u109F\uAA60-\uAA7F\uA9E0-\uA9FF]/g) || [];
+    const cjkMatches = source.match(/[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]/g) || [];
+    const latinMatches = source.match(/[A-Za-z]/g) || [];
+    const total = myanmarMatches.length + cjkMatches.length + latinMatches.length;
+    const myanmarRatio = total > 0 ? (myanmarMatches.length / total) : 0;
+    return {
+      hasCjk: cjkMatches.length > 0,
+      myanmarRatio,
+      isLikelySrt: isLikelySrtText(source),
+      text: source.trim(),
+    };
+  }
+
   function renderDubOutdatedBadge() {
     if (!dubOutdatedBadgeEl) return;
     dubOutdatedBadgeEl.classList.toggle("hidden", !subtitlesChangedSinceDub);
@@ -882,9 +901,10 @@
     const hub = currentHub || {};
     const finalUrl = resolveFinalUrl(hub || data);
     const finalMeta = (currentHub && currentHub.final) || {};
-    setMediaSrcStable(composeFinalVideoEl, finalUrl, "finalUrl(compose-action)", finalMeta.asset_version || null);
-    if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !finalUrl);
-    setLink(composeFinalLinkEl, finalUrl);
+    const finalExists = Boolean((currentHub && currentHub.final_exists) || finalMeta.exists);
+    setMediaSrcStable(composeFinalVideoEl, finalExists ? finalUrl : null, "finalUrl(compose-action)", finalMeta.asset_version || null);
+    if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !(finalExists && finalUrl));
+    setLink(composeFinalLinkEl, finalExists ? finalUrl : null);
     composeSubmitting = false;
     updateComposeButtonState();
     return data;
@@ -900,6 +920,7 @@
     const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
     const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
     const composeRunning = ["running", "processing", "queued"].includes(String(composeLast.status || "").toLowerCase());
+    const composeDone = ["done", "success", "completed", "ready"].includes(String((currentHub && currentHub.compose_status) || composeLast.status || "").toLowerCase());
     const audioDisplay = getAudioDisplayState();
     const enabled = hasRaw && (hasVoiceover || subtitleOnlyAllowed) && confirmed && !composeSubmitting && !composeRunning;
     if (!composeBtnEl.dataset.defaultText) composeBtnEl.dataset.defaultText = composeBtnEl.textContent || "Compose Final";
@@ -1092,6 +1113,14 @@
     rerunAudioBtn.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
+        const currentText = subtitlesTextEl ? subtitlesTextEl.value : "";
+        const analysis = analyzeMyanmarDubCandidate(currentText);
+        if (analysis.text && !analysis.isLikelySrt && analysis.hasCjk && analysis.myanmarRatio < 0.6) {
+          const warning = "当前文本尚未翻译为缅语，不建议直接生成缅语配音。请先翻译为缅语并保存字幕成品。";
+          if (audioMsgEl) audioMsgEl.textContent = warning;
+          if (subtitlesMsgEl) subtitlesMsgEl.textContent = warning;
+          return;
+        }
         if (audioMsgEl) audioMsgEl.textContent = "Rerunning audio...";
         await patchAudioConfig({
           tts_engine: ttsEngineEl ? ttsEngineEl.value : null,
