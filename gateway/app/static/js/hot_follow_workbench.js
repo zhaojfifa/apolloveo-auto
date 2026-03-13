@@ -1,5 +1,15 @@
 ﻿(function () {
   const root = document.querySelector(".page");
+  function readHotFollowFeatureFlags() {
+    const raw = window.__HF_FEATURES__ || {};
+    return {
+      hotFollowOpsGuideV1: Boolean(raw.hotFollowOpsGuideV1),
+    };
+  }
+  const featureFlags = readHotFollowFeatureFlags();
+  function isHotFollowOpsGuideV1Enabled() {
+    return Boolean(featureFlags.hotFollowOpsGuideV1);
+  }
   function readLocale() {
     const i18n = window.__V185_I18N__ || {};
     if (typeof i18n.readLocale === "function") return i18n.readLocale();

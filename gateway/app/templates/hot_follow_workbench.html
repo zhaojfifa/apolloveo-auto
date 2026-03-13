@@ -261,6 +261,9 @@
   <script src="/static/js/i18n_v185.js" defer></script>
   <script src="/static/js/hot_follow_common.js" defer></script>
   <script>
+    window.__HF_FEATURES__ = Object.assign({
+      hotFollowOpsGuideV1: false,
+    }, window.__HF_FEATURES__ || {});
     window.__TASK_JSON__ = {{ task_json | tojson | safe }};
   </script>
   <script defer src="/static/js/hot_follow_workbench.js?v={{ task.updated_at or task.created_at or 'dev' }}"></script>
