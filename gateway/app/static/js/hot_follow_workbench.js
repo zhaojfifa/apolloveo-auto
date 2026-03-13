@@ -80,6 +80,7 @@
   const subtitleReadyEl = document.getElementById("hf_subtitle_ready");
   const audioReadyEl = document.getElementById("hf_audio_ready");
   const audioReadyReasonEl = document.getElementById("hf_audio_ready_reason");
+  const audioCurrentnessHintEl = document.getElementById("hf_audio_currentness_hint");
   const audioNoDubHintEl = document.getElementById("hf_audio_no_dub_hint");
   const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
   const scenePackDownloadEl = document.getElementById("hf_scene_pack_download");
@@ -449,6 +450,9 @@
     const media = (currentHub && currentHub.media) || {};
     const hasAudio = Boolean(media.voiceover_url || audio.voiceover_url || audio.audio_url || (currentHub && currentHub.deliverable_audio_done));
     const noDub = Boolean(currentHub && currentHub.no_dub);
+    const finalExists = Boolean(currentHub && currentHub.final_exists);
+    const audioStatus = String(audio.status || "").trim().toLowerCase();
+    const showRerunHint = finalExists && !Boolean(currentHub && currentHub.dub_current) && !Boolean(currentHub && currentHub.audio_ready) && !noDub;
     if (actualProviderEl) actualProviderEl.textContent = (currentHub && currentHub.actual_provider) || "-";
     if (resolvedVoiceEl) resolvedVoiceEl.textContent = (currentHub && currentHub.resolved_voice) || "-";
     if (audioExistsEl) audioExistsEl.textContent = hasAudio ? "是" : "否";
@@ -456,6 +460,18 @@
     if (subtitleReadyEl) subtitleReadyEl.textContent = (currentHub && currentHub.subtitle_ready) ? "yes" : "no";
     if (audioReadyEl) audioReadyEl.textContent = (currentHub && currentHub.audio_ready) ? "yes" : "no";
     if (audioReadyReasonEl) audioReadyReasonEl.textContent = (currentHub && currentHub.audio_ready_reason) || "-";
+    if (audioCurrentnessHintEl) {
+      audioCurrentnessHintEl.classList.toggle("hidden", !showRerunHint);
+      if (!showRerunHint) {
+        audioCurrentnessHintEl.textContent = "当前重新配音未更新，最终视频仍为上次版本。";
+      } else if (["running", "processing", "queued"].includes(audioStatus)) {
+        audioCurrentnessHintEl.textContent = "当前重新配音进行中，最终视频仍为上次版本。";
+      } else if (audioStatus === "failed") {
+        audioCurrentnessHintEl.textContent = "当前重新配音失败，最终视频仍为上次版本。";
+      } else {
+        audioCurrentnessHintEl.textContent = "当前重新配音未更新，最终视频仍为上次版本。";
+      }
+    }
     if (audioChannelIntroEl) audioChannelIntroEl.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
     if (audioNoDubHintEl) audioNoDubHintEl.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled() || !noDub);
   }
@@ -700,11 +716,14 @@
     const latinMatches = source.match(/[A-Za-z]/g) || [];
     const total = myanmarMatches.length + cjkMatches.length + latinMatches.length;
     const myanmarRatio = total > 0 ? (myanmarMatches.length / total) : 0;
+    const nonMyanmar = cjkMatches.length + latinMatches.length;
     return {
       hasCjk: cjkMatches.length > 0,
+      hasLatin: latinMatches.length > 0,
       myanmarRatio,
       isLikelySrt: isLikelySrtText(source),
       text: source.trim(),
+      shouldBlockMyanmarTts: source.trim() && myanmarRatio < 0.6 && nonMyanmar >= Math.max(4, myanmarMatches.length),
     };
   }
 
@@ -942,6 +961,7 @@
     const composeDone = ["done", "success", "completed", "ready"].includes(String((currentHub && currentHub.compose_status) || composeLast.status || "").toLowerCase());
     const finalExists = Boolean(currentHub && currentHub.final_exists);
     const audioDisplay = getAudioDisplayState();
+    const hasCurrentFinalFromPreviousRun = finalExists && !Boolean(currentHub && currentHub.dub_current) && !Boolean(currentHub && currentHub.audio_ready) && !Boolean(currentHub && currentHub.no_dub);
     const enabled = hasRaw && (hasVoiceover || subtitleOnlyAllowed) && confirmed && !composeSubmitting && !composeRunning && !(composeDone && finalExists);
     if (!composeBtnEl.dataset.defaultText) composeBtnEl.dataset.defaultText = composeBtnEl.textContent || "Compose Final";
     composeBtnEl.disabled = !enabled;
@@ -952,6 +972,9 @@
       : (composeBtnEl.dataset.defaultText || "Compose Final");
     if (composeMsgEl) {
       if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
+      else if (hasCurrentFinalFromPreviousRun && audioDisplay.status === "running") composeMsgEl.textContent = "当前重新配音进行中，最终视频仍为上次版本。";
+      else if (hasCurrentFinalFromPreviousRun && audioDisplay.status === "failed") composeMsgEl.textContent = "当前重新配音失败，最终视频仍为上次版本。";
+      else if (hasCurrentFinalFromPreviousRun) composeMsgEl.textContent = "当前配音未更新，最终视频仍为上次版本。";
       else if (composeDone && finalExists) composeMsgEl.textContent = "最终成片已生成，无需重复合成。";
       else if (audioDisplay.status === "running") composeMsgEl.textContent = "Compose disabled: dubbing still running.";
       else if (!hasVoiceover && subtitleOnlyAllowed) composeMsgEl.textContent = "当前任务可直接走字幕版合成。";
@@ -1158,8 +1181,8 @@
       try {
         const currentText = subtitlesTextEl ? subtitlesTextEl.value : "";
         const analysis = analyzeMyanmarDubCandidate(currentText);
-        if (analysis.text && !analysis.isLikelySrt && analysis.hasCjk && analysis.myanmarRatio < 0.6) {
-          const warning = "当前文本尚未翻译为缅语，不建议直接生成缅语配音。请先翻译为缅语并保存字幕成品。";
+        if (analysis.text && analysis.shouldBlockMyanmarTts) {
+          const warning = "当前文本尚未翻译为缅语，不建议直接生成缅语配音。请先翻译为缅语并保存字幕成品，或直接走字幕版合成。";
           if (audioMsgEl) audioMsgEl.textContent = warning;
           if (subtitlesMsgEl) subtitlesMsgEl.textContent = warning;
           return;

@@ -100,3 +100,41 @@ def test_stale_female_artifact_is_not_current_for_male_request(monkeypatch):
     assert state["dub_current"] is False
     assert state["voiceover_url"] is None
     assert state["deliverable_audio_done"] is True
+
+
+def test_previous_final_can_coexist_with_failed_current_redub(monkeypatch, tmp_path):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    monkeypatch.setattr(tasks_router, "task_base_dir", lambda _task_id: tmp_path / _task_id)
+    monkeypatch.setattr(tasks_router, "object_exists", lambda key: str(key).endswith(("audio_mm.mp3", "final.mp4")))
+    monkeypatch.setattr(
+        tasks_router,
+        "object_head",
+        lambda key: {"ContentLength": "4096" if str(key).endswith("audio_mm.mp3") else "8192", "Content-Type": "audio/mpeg" if str(key).endswith("audio_mm.mp3") else "video/mp4"},
+    )
+    monkeypatch.setattr(
+        tasks_router,
+        "media_meta_from_head",
+        lambda meta: (int(meta.get("ContentLength") or 0), str(meta.get("Content-Type") or "")),
+    )
+
+    task = {
+        "task_id": "hf-rerun",
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "dub_status": "failed",
+        "compose_status": "done",
+        "final_video_key": "deliver/tasks/hf-rerun/final.mp4",
+        "mm_audio_key": "deliver/tasks/hf-rerun/audio_mm.mp3",
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "my-MM-NilarNeural",
+        "config": {
+            "tts_requested_voice": "mm_male_1",
+            "tts_resolved_voice": "my-MM-ThihaNeural",
+            "tts_provider": "azure-speech",
+        },
+    }
+
+    payload = tasks_router._collect_hot_follow_workbench_ui(task, _settings())
+    assert payload["final_exists"] is True
+    assert payload["audio_ready"] is False
+    assert payload["dub_current"] is False

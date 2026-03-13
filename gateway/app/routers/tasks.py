@@ -412,6 +412,47 @@ def _hf_normalize_subtitles_save_text(task: dict, raw_text: str) -> tuple[str, s
     return _hf_plain_text_to_single_srt(text, duration_sec=task.get("duration_sec")) + "\n", "plain_text_wrapped"
 
 
+def _hf_text_for_script_analysis(text: str) -> str:
+    source = str(text or "")
+    if not source:
+        return ""
+    lines: list[str] = []
+    for raw_line in source.splitlines():
+        line = str(raw_line or "").strip()
+        if not line:
+            continue
+        if "-->" in line:
+            continue
+        if re.fullmatch(r"\d+", line):
+            continue
+        lines.append(line)
+    return "\n".join(lines).strip()
+
+
+def _hf_target_lang_gate(text: str, *, target_lang: str) -> dict[str, Any]:
+    normalized_lang = normalize_target_lang(target_lang or "my")
+    content = _hf_text_for_script_analysis(text)
+    if normalized_lang not in {"my", "mm"} or not content:
+        return {"allow": True, "reason": None, "message": None}
+    myanmar_matches = re.findall(r"[\u1000-\u109F\uAA60-\uAA7F\uA9E0-\uA9FF]", content)
+    cjk_matches = re.findall(r"[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]", content)
+    latin_matches = re.findall(r"[A-Za-z]", content)
+    total = len(myanmar_matches) + len(cjk_matches) + len(latin_matches)
+    if total <= 0:
+        return {"allow": True, "reason": None, "message": None}
+    myanmar_ratio = len(myanmar_matches) / total
+    non_myanmar = len(cjk_matches) + len(latin_matches)
+    mostly_non_myanmar = non_myanmar >= max(4, len(myanmar_matches))
+    if myanmar_ratio < 0.6 and mostly_non_myanmar and non_myanmar > 0:
+        return {
+            "allow": False,
+            "reason": "target_lang_mismatch",
+            "message": "当前文本尚未翻译为缅语，不建议直接生成缅语配音。请先翻译为缅语并保存字幕成品，或直接走字幕版合成。",
+            "myanmar_ratio": myanmar_ratio,
+        }
+    return {"allow": True, "reason": None, "message": None, "myanmar_ratio": myanmar_ratio}
+
+
 def _hf_translate_plain_lines(text: str, *, target_lang: str) -> str:
     lines = str(text or "").splitlines()
     segments: list[dict[str, Any]] = []
@@ -5918,6 +5959,17 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             audio_sha256=None,
             mm_audio_key=None,
         )
+    dub_input_text = mm_text_override or str(subtitle_lane.get("dub_input_text") or "").strip()
+    target_lang_gate = _hf_target_lang_gate(dub_input_text, target_lang=target_lang)
+    if not target_lang_gate.get("allow", True):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "reason": target_lang_gate.get("reason") or "target_lang_mismatch",
+                "message": target_lang_gate.get("message"),
+                "target_lang": target_lang,
+            },
+        )
     logger.info(
         "DUB3_TEXT_SOURCE",
         extra={
@@ -5925,7 +5977,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "step": "dub",
             "stage": "DUB3_TEXT_SOURCE",
             "text_source": "override" if mm_text_override else "workspace",
-            "text_len": len(mm_text_override or ""),
+            "text_len": len(dub_input_text or ""),
             "dub_provider": provider,
             "voice_id": final_voice_id,
             "tts_speed": req_tts_speed,
