@@ -408,6 +408,7 @@ class ComposePlanPatchRequest(BaseModel):
     target_lang: str | None = None
     freeze_tail_enabled: bool | None = None
     freeze_tail_cap_sec: int | None = None
+    cleanup_mode: str | None = None
 
 
 pages_router = APIRouter()
@@ -4470,6 +4471,8 @@ def patch_hot_follow_compose_plan(
         plan["freeze_tail_enabled"] = False
     if "freeze_tail_cap_sec" not in plan:
         plan["freeze_tail_cap_sec"] = 8
+    if "cleanup_mode" not in plan:
+        plan["cleanup_mode"] = "none"
     if "compose_policy" not in plan:
         plan["compose_policy"] = "match_video"
     if payload.overlay_subtitles is not None:
@@ -4480,6 +4483,11 @@ def patch_hot_follow_compose_plan(
         plan["freeze_tail_enabled"] = bool(payload.freeze_tail_enabled)
     if payload.freeze_tail_cap_sec is not None:
         plan["freeze_tail_cap_sec"] = max(1, min(30, int(payload.freeze_tail_cap_sec)))
+    if payload.cleanup_mode is not None:
+        cleanup_mode = str(payload.cleanup_mode or "").strip().lower()
+        if cleanup_mode not in {"none", "bottom_mask", "safe_band"}:
+            raise HTTPException(status_code=400, detail="invalid cleanup_mode")
+        plan["cleanup_mode"] = cleanup_mode
     plan["compose_policy"] = "freeze_tail" if bool(plan.get("freeze_tail_enabled")) else "match_video"
     _policy_upsert(repo, task_id, {"compose_plan": plan})
     return {"task_id": task_id, "compose_plan": plan}
@@ -4612,6 +4620,24 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         if overlay_subtitles and "subtitles=" not in cmd_text:
             _compose_fail("compose_failed", "overlay_subtitles enabled but ffmpeg cmd missing subtitles filter", ffmpeg_cmd=cmd_text)
 
+    def _source_subtitle_cover_filter(cleanup_mode: str) -> str:
+        mode = str(cleanup_mode or "").strip().lower()
+        if mode == "bottom_mask":
+            return "drawbox=x=0:y=ih*0.80:w=iw:h=ih*0.20:color=black@0.92:t=fill"
+        if mode == "safe_band":
+            return "drawbox=x=0:y=ih*0.74:w=iw:h=ih*0.26:color=black@0.96:t=fill"
+        return ""
+
+    def _compose_subtitle_vf(subtitle_path_obj: Path, fontsdir: Path, cleanup_mode: str) -> str:
+        subtitle_filter = (
+            f"subtitles='{_escape_subtitles_path(subtitle_path_obj)}':"
+            "charenc=UTF-8:"
+            f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
+            "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
+        )
+        cover_filter = _source_subtitle_cover_filter(cleanup_mode)
+        return f"{cover_filter},{subtitle_filter}" if cover_filter else subtitle_filter
+
     storage = get_storage_service()
     voice_state = _collect_voice_execution_state(task, get_settings())
     subtitle_only_compose = _hf_allow_subtitle_only_compose(task_id, task)
@@ -4677,6 +4703,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     compose_plan = dict(task.get("compose_plan") or {})
     overlay_subtitles = bool(compose_plan.get("overlay_subtitles"))
     strip_subtitle_streams = bool(compose_plan.get("strip_subtitle_streams", True))
+    cleanup_mode = str(compose_plan.get("cleanup_mode") or "none").strip().lower()
     target_lang = str(compose_plan.get("target_lang") or task.get("target_lang") or task.get("content_lang") or "mm")
     freeze_tail_enabled = bool(compose_plan.get("freeze_tail_enabled", False))
     try:
@@ -4784,12 +4811,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             if bgm_path and bgm_path.exists():
                 if overlay_subtitles:
                     fontsdir = bundled_fonts_dir
-                    subtitle_filter = (
-                        f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
-                        "charenc=UTF-8:"
-                        f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
-                        "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
-                    )
+                    subtitle_filter = _compose_subtitle_vf(subtitle_path, fontsdir, cleanup_mode)
                     filter_complex = (
                         f"[0:v]{subtitle_filter}[v];"
                         + _bgm_only_filter_expr(1)
@@ -4831,12 +4853,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             else:
                 if overlay_subtitles:
                     fontsdir = bundled_fonts_dir
-                    subtitle_filter = (
-                        f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
-                        "charenc=UTF-8:"
-                        f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
-                        "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
-                    )
+                    subtitle_filter = _compose_subtitle_vf(subtitle_path, fontsdir, cleanup_mode)
                     cmd = [
                         ffmpeg,
                         "-y",
@@ -4881,12 +4898,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         elif bgm_path and bgm_path.exists():
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
-                subtitle_filter = (
-                    f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
-                    "charenc=UTF-8:"
-                    f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
-                    "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
-                )
+                subtitle_filter = _compose_subtitle_vf(subtitle_path, fontsdir, cleanup_mode)
                 filter_complex = (
                     f"[0:v]{subtitle_filter}[v];"
                     + (
@@ -4954,12 +4966,7 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
         else:
             if overlay_subtitles:
                 fontsdir = bundled_fonts_dir
-                subtitle_filter = (
-                    f"subtitles='{_escape_subtitles_path(subtitle_path)}':"
-                    "charenc=UTF-8:"
-                    f"fontsdir='{_escape_subtitles_path(Path(fontsdir))}':"
-                    "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
-                )
+                subtitle_filter = _compose_subtitle_vf(subtitle_path, fontsdir, cleanup_mode)
                 filter_complex = (
                     f"[0:v]{subtitle_filter}[v];"
                     + (
