@@ -81,6 +81,11 @@ def _resolve_final_url(task_id: str, task: Dict[str, Any], state: Dict[str, Any]
 
 
 def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    # Operational policy for Hot Follow v1.9:
+    # 1. execution state = runtime step result
+    # 2. artifact truth = actual current generated outputs
+    # 3. operational readiness = operator-facing readiness derived from artifacts
+    # 4. legacy/status summary fields are compatibility-only, not the source of truth
     state: Dict[str, Any] = dict(base_state or {})
     task_id = str(state.get("task_id") or task.get("task_id") or task.get("id") or "")
 
@@ -144,6 +149,7 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         state["deliverables"] = patched
 
     audio = _as_dict(state.get("audio"))
+    subtitles = _as_dict(state.get("subtitles"))
     audio_status = str(
         audio.get("status")
         or task.get("dub_status")
@@ -163,7 +169,18 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         audio_ready = bool(audio_done and voiceover_exists and tts_voice_valid)
     else:
         audio_ready = bool(audio_ready_hint)
-    compose_ready = bool(final_exists and audio_ready)
+    subtitle_ready_hint = subtitles.get("subtitle_ready")
+    subtitle_artifact_exists = bool(
+        subtitles.get("edited_text")
+        or subtitles.get("srt_text")
+        or task.get("mm_srt_path")
+        or task.get("origin_srt_path")
+    )
+    subtitle_ready = bool(subtitle_artifact_exists) if subtitle_ready_hint is None else bool(subtitle_ready_hint)
+    subtitle_ready_reason = str(subtitles.get("subtitle_ready_reason") or ("ready" if subtitle_ready else "subtitle_missing"))
+    no_dub = bool(audio.get("no_dub"))
+    no_dub_reason = str(audio.get("no_dub_reason") or "").strip() or None
+    compose_ready = bool(final_exists and (audio_ready or no_dub))
 
     compose = dict(_as_dict(state.get("compose")))
     last = dict(_as_dict(compose.get("last")))
@@ -199,14 +216,18 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
     blocking: list[str] = []
     if not compose_ready:
         blocking.append("compose_not_done")
-        if not audio_done:
+        if not subtitle_ready:
+            blocking.append("subtitle_not_ready")
+        if not audio_done and not no_dub:
             blocking.append("audio_not_done")
-        if not voiceover_exists:
+        if not voiceover_exists and not no_dub:
             blocking.append("voiceover_missing")
-        if not tts_voice_valid:
+        if not tts_voice_valid and not no_dub:
             blocking.append("tts_voice_invalid")
-        if final_exists and not audio_ready:
+        if final_exists and not audio_ready and not no_dub:
             blocking.append("audio_not_ready")
+        if no_dub and no_dub_reason:
+            blocking.append(no_dub_reason)
     else:
         blocking = [b for b in blocking if b != "compose_not_done"]
 
@@ -222,9 +243,13 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
                 break
     state["ready_gate"] = {
         "final_exists": final_exists,
+        "subtitle_ready": subtitle_ready,
+        "subtitle_ready_reason": subtitle_ready_reason,
         "audio_ready": audio_ready,
+        "audio_ready_reason": str(audio.get("audio_ready_reason") or ("ready" if audio_ready else "audio_not_ready")),
         "compose_ready": compose_ready,
         "publish_ready": compose_ready,
+        "compose_reason": "ready" if compose_ready else (no_dub_reason or "compose_not_done"),
         "blocking": blocking,
     }
     return state
