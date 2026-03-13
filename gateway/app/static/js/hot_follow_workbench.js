@@ -85,6 +85,13 @@
   const subtitlesOriginEl = document.getElementById("hf_subtitles_origin");
   const subtitlesNormalizedEl = document.getElementById("hf_subtitles_normalized");
   const subtitlesEditedPreviewEl = document.getElementById("hf_subtitles_edited_preview");
+  const opsGuideCardEl = document.getElementById("hf_ops_guide_card");
+  const opsGuideBadgeEl = document.getElementById("hf_ops_guide_badge");
+  const opsGuideTitleEl = document.getElementById("hf_ops_guide_title");
+  const opsGuideDescEl = document.getElementById("hf_ops_guide_desc");
+  const opsGuideModeEl = document.getElementById("hf_ops_guide_mode");
+  const opsGuidePathEl = document.getElementById("hf_ops_guide_path");
+  const opsGuideReasonEl = document.getElementById("hf_ops_guide_reason");
   const translationQaCountsEl = document.getElementById("hf_translation_qa_counts");
   const translationQaWarningEl = document.getElementById("hf_translation_qa_warning");
   const subtitlesRefreshBtn = document.getElementById("hf_subtitles_refresh_btn");
@@ -383,6 +390,60 @@
     }
   }
 
+  function buildOpsGuideModel() {
+    const contentMode = String((currentHub && currentHub.content_mode) || "").trim().toLowerCase();
+    const speechDetected = Boolean(currentHub && currentHub.speech_detected);
+    const noDub = Boolean(currentHub && currentHub.no_dub);
+    const noDubReason = String((currentHub && currentHub.no_dub_reason) || "").trim().toLowerCase();
+    const noDubMessage = String((currentHub && currentHub.no_dub_message) || "").trim();
+    const recommendedPath = String((currentHub && currentHub.recommended_path) || "").trim() || "请检查当前任务路径";
+
+    if (contentMode === "voice_led" && speechDetected && !noDub) {
+      return {
+        badge: "标准口播",
+        title: "当前素材适合走标准配音路径",
+        desc: "建议先检查字幕，再生成配音，最后合成成片。若需要微调效果，优先先改字幕，再重生成配音。",
+        mode: "标准口播 / 语音驱动",
+        path: recommendedPath || "检查字幕 → 生成配音 → 合成",
+        reason: "已检测到稳定语音内容，适合标准配音出片。",
+      };
+    }
+
+    if (noDub && (contentMode === "silent_candidate" || noDubReason === "no_speech_detected")) {
+      return {
+        badge: "字幕驱动",
+        title: "当前素材更适合字幕驱动处理",
+        desc: "这类素材常见于无人声、ASMR 或弱语音内容。优先建议编辑字幕后直接合成字幕版，或先输入解说文案再生成配音。",
+        mode: "无人声 / ASMR / 弱语音",
+        path: "优先编辑字幕 → 直接合成字幕版，或补文案后再生成配音",
+        reason: noDubMessage || "当前素材未检测到稳定语音内容，不建议反复重试配音。",
+      };
+    }
+
+    return {
+      badge: "先补文本",
+      title: "来源文本暂时不足，建议先补字幕",
+      desc: "当前来源字幕或文本信息不足，先检查并补齐当前字幕编辑区内容，再决定是否生成配音，会更稳定。",
+      mode: "来源文本不足",
+      path: "先补文本 / 校对字幕 → 再决定是否配音",
+      reason: noDubMessage || recommendedPath || "当前更适合先补文本，再进入配音或合成步骤。",
+    };
+  }
+
+  function renderOpsGuide() {
+    if (!opsGuideCardEl) return;
+    const enabled = isHotFollowOpsGuideV1Enabled();
+    opsGuideCardEl.classList.toggle("hidden", !enabled);
+    if (!enabled) return;
+    const model = buildOpsGuideModel();
+    if (opsGuideBadgeEl) opsGuideBadgeEl.textContent = model.badge;
+    if (opsGuideTitleEl) opsGuideTitleEl.textContent = model.title;
+    if (opsGuideDescEl) opsGuideDescEl.textContent = model.desc;
+    if (opsGuideModeEl) opsGuideModeEl.textContent = model.mode;
+    if (opsGuidePathEl) opsGuidePathEl.textContent = model.path;
+    if (opsGuideReasonEl) opsGuideReasonEl.textContent = model.reason;
+  }
+
   function renderAudio() {
     const audio = (currentHub && currentHub.audio) || {};
     const media = (currentHub && currentHub.media) || {};
@@ -398,6 +459,7 @@
     if (audioMsgEl) audioMsgEl.textContent = getAudioDisplayState().message;
     renderVoiceMeta();
     renderRoutingState();
+    renderOpsGuide();
   }
 
   function renderComposedReadiness() {
