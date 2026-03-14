@@ -112,6 +112,8 @@
   const assistedInputBlockEl = document.getElementById("hf_assisted_input_block");
   const assistedInputHintEl = document.getElementById("hf_assisted_input_hint");
   const assistedInputTextEl = document.getElementById("hf_assisted_input_text");
+  const assistedFillSourceBtn = document.getElementById("hf_assisted_fill_source_btn");
+  const assistedFillNormalizedBtn = document.getElementById("hf_assisted_fill_normalized_btn");
   const assistedTranslateBtn = document.getElementById("hf_assisted_translate_btn");
   const assistedInputMsgEl = document.getElementById("hf_assisted_input_msg");
   const ocrCandidateBlockEl = document.getElementById("hf_ocr_candidate_block");
@@ -490,6 +492,19 @@
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = nextText || "-";
     subtitleDirty = true;
     if (subtitlesMsgEl) subtitlesMsgEl.textContent = successMessage || "翻译结果已回写当前编辑区，请检查后保存字幕。";
+  }
+
+  function fillAssistedInputFromText(text, successMessage) {
+    const value = String(text || "").trim();
+    if (!value) {
+      if (assistedInputMsgEl) assistedInputMsgEl.textContent = "当前没有可用的来源文字，请先检查来源层内容。";
+      return false;
+    }
+    if (assistedInputTextEl) assistedInputTextEl.value = value;
+    assistedInputDirty = true;
+    persistAssistedInputDraft(value);
+    if (assistedInputMsgEl) assistedInputMsgEl.textContent = successMessage || "已填充到辅助输入区。";
+    return true;
   }
 
   function normalizeEngineKey(value) {
@@ -1423,6 +1438,20 @@
       } finally {
         assistedTranslateBtn.disabled = false;
       }
+    });
+  }
+  if (assistedFillSourceBtn) {
+    assistedFillSourceBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const text = subtitlesOriginEl ? String(subtitlesOriginEl.textContent || "").trim() : "";
+      fillAssistedInputFromText(text, "来源字幕已填充到辅助输入区，可继续翻译写入目标字幕区。");
+    });
+  }
+  if (assistedFillNormalizedBtn) {
+    assistedFillNormalizedBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      const text = subtitlesNormalizedEl ? String(subtitlesNormalizedEl.textContent || "").trim() : "";
+      fillAssistedInputFromText(text, "标准化来源文本已填充到辅助输入区，可继续翻译写入目标字幕区。");
     });
   }
   if (ocrFillBtn) {
