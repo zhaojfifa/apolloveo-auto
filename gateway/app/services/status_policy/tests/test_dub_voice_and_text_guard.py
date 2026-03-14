@@ -131,3 +131,31 @@ def test_hot_follow_final_exists_but_audio_not_ready_stays_blocked():
     assert state.get("compose_status") != "done"
     assert gate.get("compose_ready") is False
     assert "audio_not_ready" in (gate.get("blocking") or [])
+
+
+def test_hot_follow_ready_gate_ignores_no_dub_when_audio_artifact_is_ready():
+    state = compute_hot_follow_state(
+        {"task_id": "hf-a9", "compose_status": "pending"},
+        {
+            "task_id": "hf-a9",
+            "final": {"exists": False},
+            "audio": {
+                "status": "done",
+                "tts_voice": "my-MM-NilarNeural",
+                "voiceover_url": "/v1/tasks/hf-a9/audio_mm",
+                "audio_ready": True,
+                "no_dub": True,
+                "no_dub_reason": "no_speech_detected",
+            },
+            "subtitles": {
+                "subtitle_artifact_exists": True,
+                "actual_burn_subtitle_source": "mm.srt",
+                "edited_text": "",
+                "srt_text": "",
+            },
+        },
+    )
+    gate = state.get("ready_gate") or {}
+    assert gate.get("subtitle_ready") is True
+    assert gate.get("compose_reason") == "compose_not_done"
+    assert "no_speech_detected" not in (gate.get("blocking") or [])

@@ -171,7 +171,9 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         audio_ready = bool(audio_ready_hint)
     subtitle_ready_hint = subtitles.get("subtitle_ready")
     subtitle_artifact_exists = bool(
-        subtitles.get("edited_text")
+        subtitles.get("subtitle_artifact_exists")
+        or subtitles.get("actual_burn_subtitle_source")
+        or subtitles.get("edited_text")
         or subtitles.get("srt_text")
         or task.get("mm_srt_path")
         or task.get("origin_srt_path")
@@ -180,6 +182,9 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
     subtitle_ready_reason = str(subtitles.get("subtitle_ready_reason") or ("ready" if subtitle_ready else "subtitle_missing"))
     no_dub = bool(audio.get("no_dub"))
     no_dub_reason = str(audio.get("no_dub_reason") or "").strip() or None
+    if voiceover_exists or audio_ready:
+        no_dub = False
+        no_dub_reason = None
     compose_ready = bool(final_exists and (audio_ready or no_dub))
 
     compose = dict(_as_dict(state.get("compose")))
@@ -249,7 +254,7 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         "audio_ready_reason": str(audio.get("audio_ready_reason") or ("ready" if audio_ready else "audio_not_ready")),
         "compose_ready": compose_ready,
         "publish_ready": compose_ready,
-        "compose_reason": "ready" if compose_ready else (no_dub_reason or "compose_not_done"),
+        "compose_reason": "ready" if compose_ready else (no_dub_reason if no_dub else "compose_not_done"),
         "blocking": blocking,
     }
     return state

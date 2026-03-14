@@ -335,6 +335,45 @@ def test_screen_text_candidate_summary_prefers_normalized_text_for_subtitle_led(
     assert candidate["screen_text_candidate_mode"] == "subtitle_led"
 
 
+def test_collect_hot_follow_workbench_ui_does_not_keep_no_dub_when_audio_is_current(monkeypatch):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: True)
+    monkeypatch.setattr(tasks_router, "object_head", lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"})
+    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (4096, "audio/mpeg"))
+    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
+
+    task = {
+        "task_id": "hf-a9-ui",
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "title": "silent candidate but current dub exists",
+        "dub_status": "done",
+        "voice_id": "mm_female_1",
+        "dub_provider": "azure-speech",
+        "mm_audio_key": "deliver/tasks/hf-a9-ui/audio_mm.mp3",
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "my-MM-NilarNeural",
+        "mm_srt_path": "deliver/tasks/hf-a9-ui/mm.srt",
+        "config": {
+            "tts_requested_voice": "mm_female_1",
+            "tts_resolved_voice": "my-MM-NilarNeural",
+            "tts_provider": "azure-speech",
+        },
+        "pipeline_config": {"no_dub": "true"},
+    }
+
+    payload = tasks_router._collect_hot_follow_workbench_ui(task, _settings())
+
+    assert payload["audio_ready"] is True
+    assert payload["dub_current"] is True
+    assert payload["subtitle_artifact_exists"] is True
+    assert payload["actual_burn_subtitle_source"] == "mm.srt"
+    assert payload["no_dub"] is False
+    assert payload["no_dub_reason"] is None
+
+
 def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch, tmp_path):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
     monkeypatch.setattr(tasks_router, "_hf_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})

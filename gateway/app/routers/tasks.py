@@ -2976,6 +2976,8 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     no_dub = route_state.get("content_mode") in {"silent_candidate", "subtitle_led"} and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
+        no_dub = False
     if route_state.get("content_mode") == "subtitle_led":
         no_dub_reason = "subtitle_led"
         no_dub_message = "No reliable speech detected. Review subtitles or provide text before dubbing."
@@ -2983,6 +2985,9 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
         no_dub_reason = "no_speech_detected"
         no_dub_message = "No spoken speech detected in source video; dubbing is skipped."
     else:
+        no_dub_reason = None
+        no_dub_message = None
+    if not no_dub:
         no_dub_reason = None
         no_dub_message = None
     return {
