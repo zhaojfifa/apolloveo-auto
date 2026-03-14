@@ -138,3 +138,64 @@ def test_previous_final_can_coexist_with_failed_current_redub(monkeypatch, tmp_p
     assert payload["final_exists"] is True
     assert payload["audio_ready"] is False
     assert payload["dub_current"] is False
+
+
+def test_rerun_presentation_reports_last_final_and_current_failure():
+    task = {
+        "task_id": "hf-rerun-presentation",
+        "updated_at": "2026-03-14T10:00:00+00:00",
+    }
+    voice_state = {
+        "audio_ready": False,
+        "audio_ready_reason": "dub_not_done",
+        "dub_current": False,
+        "dub_current_reason": "dub_not_done",
+        "requested_voice": "mm_male_1",
+        "resolved_voice": "my-MM-ThihaNeural",
+        "actual_provider": "azure-speech",
+    }
+    final_info = {
+        "exists": True,
+        "url": "/v1/tasks/hf-rerun-presentation/final",
+        "asset_version": "etag-123",
+        "updated_at": "2026-03-14T09:55:00+00:00",
+    }
+
+    presentation = tasks_router._hf_rerun_presentation_state(task, voice_state, final_info, "failed")
+
+    assert presentation["last_successful_output"]["final_exists"] is True
+    assert presentation["last_successful_output"]["final_url"] == "/v1/tasks/hf-rerun-presentation/final"
+    assert presentation["current_attempt"]["dub_status"] == "failed"
+    assert presentation["current_attempt"]["audio_ready"] is False
+    assert presentation["current_attempt"]["dub_current"] is False
+    assert presentation["current_attempt"]["requested_voice"] == "mm_male_1"
+
+
+def test_rerun_presentation_reports_current_success_without_regressing_baseline():
+    task = {
+        "task_id": "hf-success-presentation",
+        "updated_at": "2026-03-14T10:00:00+00:00",
+    }
+    voice_state = {
+        "audio_ready": True,
+        "audio_ready_reason": "ready",
+        "dub_current": True,
+        "dub_current_reason": "ready",
+        "requested_voice": "mm_female_1",
+        "resolved_voice": "my-MM-NilarNeural",
+        "actual_provider": "azure-speech",
+    }
+    final_info = {
+        "exists": True,
+        "url": "/v1/tasks/hf-success-presentation/final",
+        "asset_version": "etag-456",
+        "updated_at": "2026-03-14T09:58:00+00:00",
+    }
+
+    presentation = tasks_router._hf_rerun_presentation_state(task, voice_state, final_info, "done")
+
+    assert presentation["last_successful_output"]["final_exists"] is True
+    assert presentation["current_attempt"]["dub_status"] == "done"
+    assert presentation["current_attempt"]["audio_ready"] is True
+    assert presentation["current_attempt"]["dub_current"] is True
+    assert presentation["current_attempt"]["resolved_voice"] == "my-MM-NilarNeural"

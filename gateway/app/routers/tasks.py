@@ -2914,6 +2914,38 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     }
 
 
+def _hf_rerun_presentation_state(
+    task: dict,
+    voice_state: dict[str, Any] | None,
+    final_info: dict[str, Any] | None,
+    dub_status: str | None,
+) -> dict[str, Any]:
+    voice = voice_state or {}
+    final_payload = final_info or {}
+    final_exists = bool(final_payload.get("exists"))
+    final_url = str(final_payload.get("url") or "").strip() or None
+    final_asset_version = str(final_payload.get("asset_version") or "").strip() or None
+    final_updated_at = final_payload.get("updated_at") or task.get("final_updated_at") or task.get("updated_at")
+    return {
+        "last_successful_output": {
+            "final_exists": final_exists,
+            "final_url": final_url,
+            "final_asset_version": final_asset_version,
+            "final_updated_at": final_updated_at,
+        },
+        "current_attempt": {
+            "dub_status": str(dub_status or "").strip().lower() or "never",
+            "audio_ready": bool(voice.get("audio_ready")),
+            "audio_ready_reason": str(voice.get("audio_ready_reason") or "").strip() or "unknown",
+            "dub_current": bool(voice.get("dub_current")),
+            "dub_current_reason": str(voice.get("dub_current_reason") or "").strip() or "unknown",
+            "requested_voice": str(voice.get("requested_voice") or "").strip() or None,
+            "resolved_voice": str(voice.get("resolved_voice") or "").strip() or None,
+            "actual_provider": str(voice.get("actual_provider") or "").strip() or None,
+        },
+    }
+
+
 def _hf_audio_display_error(dub_state: str, dub_error: str | None, voice_state: dict[str, Any]) -> str | None:
     state = str(dub_state or "").strip().lower()
     reason = str(voice_state.get("dub_current_reason") or voice_state.get("audio_ready_reason") or "").strip().lower()
@@ -4333,6 +4365,7 @@ def get_hot_follow_workbench_hub(
             "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
         },
     }
+    payload["presentation"] = _hf_rerun_presentation_state(task, voice_state, final_info, dub_state)
     final_url = _resolve_hub_final_url(task_id, payload)
     if final_url:
         payload["media"]["final_url"] = final_url
