@@ -214,6 +214,13 @@ def _compose_in_progress_response(task_id: str) -> JSONResponse:
     )
 
 
+def _hf_compose_revision_snapshot(task: dict) -> dict[str, str | None]:
+    return {
+        "subtitle_updated_at": str(task.get("subtitles_override_updated_at") or task.get("updated_at") or "").strip() or None,
+        "audio_sha256": str(task.get("audio_sha256") or "").strip() or None,
+    }
+
+
 def _maybe_run_hot_follow_lipsync_stub(task_id: str, enabled: bool = False) -> str | None:
     if not enabled:
         return None
@@ -486,6 +493,15 @@ class ComposeTaskRequest(BaseModel):
     overlay_subtitles: bool | None = None
     freeze_tail_enabled: bool | None = None
     force: bool = False
+
+
+class HotFollowComposeRequest(BaseModel):
+    bgm_mix: float | None = None
+    overlay_subtitles: bool | None = None
+    freeze_tail_enabled: bool | None = None
+    force: bool = False
+    expected_subtitle_updated_at: str | None = None
+    expected_audio_sha256: str | None = None
 
 
 class ComposePlanPatchRequest(BaseModel):
@@ -5586,11 +5602,27 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
 @api_router.post("/hot_follow/tasks/{task_id}/compose")
 def compose_hot_follow_final_video(
     task_id: str,
+    payload: HotFollowComposeRequest | None = None,
     repo=Depends(get_task_repository),
 ):
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    req = payload or HotFollowComposeRequest()
+    revision = _hf_compose_revision_snapshot(task)
+    expected_subtitle_updated_at = str(req.expected_subtitle_updated_at or "").strip() or None
+    expected_audio_sha256 = str(req.expected_audio_sha256 or "").strip() or None
+    subtitle_mismatch = bool(expected_subtitle_updated_at and expected_subtitle_updated_at != revision.get("subtitle_updated_at"))
+    audio_mismatch = bool(expected_audio_sha256 and expected_audio_sha256 != revision.get("audio_sha256"))
+    if subtitle_mismatch or audio_mismatch:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "reason": "compose_revision_mismatch",
+                "message": "Current subtitles or audio changed; refresh workbench state before composing again.",
+                "current_revision": revision,
+            },
+        )
     lock = _task_compose_lock(task_id)
     if not lock.acquire(blocking=False):
         current = repo.get(task_id) or task
@@ -5618,6 +5650,19 @@ def compose_hot_follow_final_video(
         "compose_policy": "freeze_tail" if bool(current_plan.get("freeze_tail_enabled", False)) else "match_video",
     }
     try:
+        if req.bgm_mix is not None:
+            mix = max(0.0, min(1.0, float(req.bgm_mix)))
+            config = dict(current_for_plan.get("config") or {})
+            bgm = dict(config.get("bgm") or {})
+            bgm["mix_ratio"] = mix
+            config["bgm"] = bgm
+            _policy_upsert(repo, task_id, {"config": config})
+            current_for_plan = repo.get(task_id) or current_for_plan
+        if req.overlay_subtitles is not None:
+            compose_plan["overlay_subtitles"] = bool(req.overlay_subtitles)
+        if req.freeze_tail_enabled is not None:
+            compose_plan["freeze_tail_enabled"] = bool(req.freeze_tail_enabled)
+            compose_plan["compose_policy"] = "freeze_tail" if bool(compose_plan.get("freeze_tail_enabled")) else "match_video"
         _policy_upsert(
             repo,
             task_id,

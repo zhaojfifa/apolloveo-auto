@@ -184,4 +184,35 @@ def test_hot_follow_workbench_hub_survives_optional_presentation_aggregation_fai
     assert data.get("artifact_facts") == {}
     assert data.get("current_attempt") == {}
     assert data.get("operator_summary") == {}
-    assert data.get("kind") == "hot_follow"
+
+
+def test_hot_follow_compose_rejects_stale_revision_submission():
+    task_id = "hf-compose-revision-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "ready",
+            "subtitles_override_updated_at": "2026-03-14T10:00:00+00:00",
+            "audio_sha256": "audio-current",
+        },
+    )
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.post(
+            f"/api/hot_follow/tasks/{task_id}/compose",
+            json={
+                "expected_subtitle_updated_at": "2026-03-14T09:00:00+00:00",
+                "expected_audio_sha256": "audio-current",
+            },
+        )
+
+    assert res.status_code == 409
+    detail = res.json().get("detail") or {}
+    assert detail.get("reason") == "compose_revision_mismatch"

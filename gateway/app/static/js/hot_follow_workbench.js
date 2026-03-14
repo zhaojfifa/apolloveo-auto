@@ -58,7 +58,7 @@
   if (!taskId) return;
 
   const hubUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/workbench_hub`;
-  const composeUrl = `/api/tasks/${encodeURIComponent(taskId)}/compose`;
+  const composeUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/compose`;
   const assistedInputStorageKey = `hf_assisted_input:${taskId}`;
   const statusEl = document.getElementById("hf-status");
   const eventsEl = document.getElementById("hf-events");
@@ -198,6 +198,7 @@
   let finalPreviewRetried = false;
   let assistedInputDirty = false;
   let assistedInputHydrated = false;
+  let composeSubmissionRevision = "";
 
   function readAssistedInputDraft() {
     try {
@@ -929,6 +930,32 @@
     refreshLocale(deliverablesGridEl);
   }
 
+  function getComposeRevisionSnapshot() {
+    const subtitles = (currentHub && currentHub.subtitles) || {};
+    const audio = (currentHub && currentHub.audio) || {};
+    return {
+      subtitle_updated_at: String(subtitles.updated_at || "").trim() || null,
+      audio_sha256: String(audio.sha256 || "").trim() || null,
+    };
+  }
+
+  async function tryHandleUncertainComposeResponse(res) {
+    let bodyText = "";
+    try { bodyText = await res.text(); } catch (_) { bodyText = ""; }
+    await loadHub().catch(() => {});
+    const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
+    const composeRunning = ["running", "processing", "queued"].includes(String(composeLast.status || "").toLowerCase());
+    const composeDone = ["done", "success", "completed", "ready"].includes(String((currentHub && currentHub.compose_status) || composeLast.status || "").toLowerCase());
+    const finalMeta = (currentHub && currentHub.final) || {};
+    const finalExists = Boolean((currentHub && currentHub.final_exists) || finalMeta.exists);
+    if (composeRunning || composeDone || finalExists) {
+      if (composeMsgEl) composeMsgEl.textContent = composeRunning ? "合成请求已发出，正在继续轮询状态…" : "合成结果已更新，正在刷新状态…";
+      return { uncertain: true, in_progress: composeRunning, final_exists: finalExists };
+    }
+    const fallback = String(bodyText || "").trim();
+    throw new Error(fallback || "compose request failed");
+  }
+
   function renderEvents() {
     if (!eventsEl) return;
     const events = (currentHub && currentHub.events) || [];
@@ -1064,42 +1091,70 @@
     const subtitleOnlyAllowed = canUseSubtitleOnlyCompose();
     if (composeConfirmEl && !composeConfirmEl.checked) throw new Error("Please confirm before composing.");
     if (!voiceUrl && !subtitleOnlyAllowed) throw new Error("No voiceover yet; run Re-Run Audio first.");
+    if (composeSubmitting) return { in_progress: true };
     composeSubmitting = true;
+    const revision = getComposeRevisionSnapshot();
+    composeSubmissionRevision = JSON.stringify(revision);
     updateComposeButtonState();
-    const res = await fetch(composeUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        bgm_mix: Number(bgmMixEl ? (bgmMixEl.value || "0.3") : "0.3"),
-        overlay_subtitles: overlaySubtitlesEl ? !!overlaySubtitlesEl.checked : false,
-        force: false,
-      }),
-    });
-    if (res.status === 409) {
-      let payload = null;
-      try { payload = await res.json(); } catch (_) { payload = null; }
-      const inProgress = payload && payload.error === "compose_in_progress";
-      if (inProgress) {
-        if (composeMsgEl) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
-        await loadHub();
-        updateComposeButtonState();
-        return { in_progress: true, retry_after_ms: payload.retry_after_ms || 1500 };
+    try {
+      const res = await fetch(composeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bgm_mix: Number(bgmMixEl ? (bgmMixEl.value || "0.3") : "0.3"),
+          overlay_subtitles: overlaySubtitlesEl ? !!overlaySubtitlesEl.checked : false,
+          freeze_tail_enabled: freezeTailEnabledEl ? !!freezeTailEnabledEl.checked : false,
+          force: false,
+          expected_subtitle_updated_at: revision.subtitle_updated_at,
+          expected_audio_sha256: revision.audio_sha256,
+        }),
+      });
+      const contentType = String(res.headers.get("content-type") || "").toLowerCase();
+      if (res.status === 409) {
+        let payload = null;
+        if (contentType.includes("application/json")) {
+          try { payload = await res.json(); } catch (_) { payload = null; }
+        } else {
+          return await tryHandleUncertainComposeResponse(res);
+        }
+        const inProgress = payload && payload.error === "compose_in_progress";
+        const revisionMismatch = payload && ((payload.reason || (payload.detail && payload.detail.reason)) === "compose_revision_mismatch");
+        if (inProgress) {
+          if (composeMsgEl) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
+          await loadHub();
+          updateComposeButtonState();
+          return { in_progress: true, retry_after_ms: payload.retry_after_ms || 1500 };
+        }
+        if (revisionMismatch) {
+          await loadHub();
+          throw new Error((payload && (payload.message || (payload.detail && payload.detail.message))) || "当前字幕或音频已更新，请刷新后重新合成。");
+        }
+        throw new Error((payload && (payload.message || payload.detail)) || "compose conflict");
       }
-      throw new Error((payload && (payload.message || payload.detail)) || "compose conflict");
+      if (!res.ok) {
+        if (!contentType.includes("application/json")) return await tryHandleUncertainComposeResponse(res);
+        throw new Error((await res.text()) || "compose failed");
+      }
+      let data = null;
+      if (contentType.includes("application/json")) {
+        data = await res.json();
+      } else {
+        return await tryHandleUncertainComposeResponse(res);
+      }
+      await loadHub();
+      const hub = currentHub || {};
+      const finalUrl = resolveFinalUrl(hub || data);
+      const finalMeta = (currentHub && currentHub.final) || {};
+      const finalExists = Boolean((currentHub && currentHub.final_exists) || finalMeta.exists);
+      setMediaSrcStable(composeFinalVideoEl, finalExists ? finalUrl : null, "finalUrl(compose-action)", finalMeta.asset_version || null);
+      if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !(finalExists && finalUrl));
+      setLink(composeFinalLinkEl, finalExists ? finalUrl : null);
+      return data;
+    } finally {
+      composeSubmitting = false;
+      composeSubmissionRevision = "";
+      updateComposeButtonState();
     }
-    if (!res.ok) throw new Error((await res.text()) || "compose failed");
-    const data = await res.json();
-    await loadHub();
-    const hub = currentHub || {};
-    const finalUrl = resolveFinalUrl(hub || data);
-    const finalMeta = (currentHub && currentHub.final) || {};
-    const finalExists = Boolean((currentHub && currentHub.final_exists) || finalMeta.exists);
-    setMediaSrcStable(composeFinalVideoEl, finalExists ? finalUrl : null, "finalUrl(compose-action)", finalMeta.asset_version || null);
-    if (composeFinalBlockEl) composeFinalBlockEl.classList.toggle("hidden", !(finalExists && finalUrl));
-    setLink(composeFinalLinkEl, finalExists ? finalUrl : null);
-    composeSubmitting = false;
-    updateComposeButtonState();
-    return data;
   }
 
   function updateComposeButtonState() {
