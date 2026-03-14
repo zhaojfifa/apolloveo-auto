@@ -374,6 +374,78 @@ def test_collect_hot_follow_workbench_ui_does_not_keep_no_dub_when_audio_is_curr
     assert payload["no_dub_reason"] is None
 
 
+def test_sync_saved_target_subtitle_artifact_writes_canonical_mm_srt(monkeypatch, tmp_path):
+    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (0, None))
+
+    class _Workspace:
+        def __init__(self, task_id):
+            base = tmp_path / task_id
+            base.mkdir(parents=True, exist_ok=True)
+            self.mm_srt_path = base / "mm.srt"
+
+    uploaded = []
+
+    def _fake_upload(task, local_path, artifact_name, task_id=None, **_kwargs):
+        uploaded.append((artifact_name, Path(local_path).read_text(encoding="utf-8")))
+        return f"deliver/tasks/{task_id}/{artifact_name}"
+
+    monkeypatch.setattr(tasks_router, "Workspace", _Workspace)
+    monkeypatch.setattr(tasks_router, "upload_task_artifact", _fake_upload)
+
+    task = {"task_id": "hf-sync", "kind": "hot_follow"}
+    key = tasks_router._hf_sync_saved_target_subtitle_artifact(
+        "hf-sync",
+        task,
+        "1\n00:00:00,000 --> 00:00:02,000\nမင်္ဂလာပါ\n",
+    )
+
+    assert key == "deliver/tasks/hf-sync/mm.srt"
+    assert task["mm_srt_path"] == "deliver/tasks/hf-sync/mm.srt"
+    assert uploaded[0][0] == "mm.srt"
+    assert "မင်္ဂလာပါ" in uploaded[0][1]
+    assert uploaded[1][0] == "mm.txt"
+    assert "မင်္ဂလာပါ" in uploaded[1][1]
+
+
+def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeypatch, tmp_path):
+    class _Repo:
+        def __init__(self):
+            self.task = {"task_id": "hf-save", "kind": "hot_follow", "subtitles_status": "pending"}
+
+        def get(self, task_id):
+            assert task_id == "hf-save"
+            return dict(self.task)
+
+    repo = _Repo()
+
+    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (0, None))
+
+    class _Workspace:
+        def __init__(self, task_id):
+            base = tmp_path / task_id
+            base.mkdir(parents=True, exist_ok=True)
+            self.mm_srt_path = base / "mm.srt"
+
+    monkeypatch.setattr(tasks_router, "Workspace", _Workspace)
+    monkeypatch.setattr(tasks_router, "_hf_subtitles_override_path", lambda task_id: tmp_path / task_id / "override.srt")
+    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda _task_id, task: Path(tmp_path / "hf-save" / "override.srt").read_text(encoding="utf-8"))
+    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(tasks_router, "_policy_upsert", lambda _repo, _task_id, updates, **_kwargs: repo.task.update(updates))
+    monkeypatch.setattr(tasks_router, "upload_task_artifact", lambda _task, _local_path, artifact_name, task_id=None, **_kwargs: f"deliver/tasks/{task_id}/{artifact_name}")
+
+    payload = tasks_router.HotFollowSubtitlesRequest(
+        srt_text="1\n00:00:00,000 --> 00:00:02,000\nမင်္ဂလာပါ\n"
+    )
+    result = tasks_router.patch_hot_follow_subtitles("hf-save", payload, repo=repo)
+
+    assert repo.task["mm_srt_path"] == "deliver/tasks/hf-save/mm.srt"
+    assert result["subtitles"]["srt_text"].strip().endswith("မင်္ဂလာပါ")
+
+
 def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch, tmp_path):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
     monkeypatch.setattr(tasks_router, "_hf_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})

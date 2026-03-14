@@ -57,6 +57,7 @@ from gateway.app.steps.dubbing import run_dub_step as run_dub_step_ssot
 
 # Legacy v1 pipeline steps (parse/subtitles/pack). Dubbing 淇濈暀 v1 鍚嶇О浣嗗繀椤绘樉寮忓埆鍚嶏紝閬垮厤瑕嗙洊 SSOT
 from ..services.steps_v1 import (
+    _srt_to_txt,
     compute_subtitles_params,
     run_pack_step as run_pack_step_v1,
     run_parse_step as run_parse_step_v1,
@@ -1824,6 +1825,31 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
 
 def _hf_subtitles_override_path(task_id: str) -> Path:
     return task_base_dir(task_id) / "subtitles" / "subtitles_override.srt"
+
+
+def _hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text: str | None = None) -> str | None:
+    text = str(saved_text if saved_text is not None else _hf_load_subtitles_text(task_id, task) or "").strip()
+    current_key = _task_key(task, "mm_srt_path")
+    if current_key and object_exists(str(current_key)):
+        head = object_head(str(current_key))
+        size, _ = media_meta_from_head(head)
+        if int(size or 0) > 0:
+            return str(current_key)
+    if not text:
+        return str(current_key) if current_key else None
+
+    workspace = Workspace(task_id)
+    workspace.mm_srt_path.parent.mkdir(parents=True, exist_ok=True)
+    workspace.mm_srt_path.write_text(text, encoding="utf-8")
+    synced_key = upload_task_artifact(task, workspace.mm_srt_path, "mm.srt", task_id=task_id)
+    mm_txt_text = _srt_to_txt(text).strip()
+    if mm_txt_text:
+        mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
+        mm_txt_path.write_text(mm_txt_text + "\n", encoding="utf-8")
+        upload_task_artifact(task, mm_txt_path, "mm.txt", task_id=task_id)
+    if synced_key and isinstance(task, dict):
+        task["mm_srt_path"] = synced_key
+    return str(synced_key) if synced_key else (str(current_key) if current_key else None)
 
 
 def _hf_load_subtitles_text(task_id: str, task: dict) -> str:
@@ -4874,12 +4900,14 @@ def patch_hot_follow_subtitles(
     override_path = _hf_subtitles_override_path(task_id)
     override_path.parent.mkdir(parents=True, exist_ok=True)
     override_path.write_text(text, encoding="utf-8")
+    synced_mm_key = _hf_sync_saved_target_subtitle_artifact(task_id, task, text)
     _policy_upsert(
         repo,
         task_id,
         {
             "subtitles_status": "ready" if text else task.get("subtitles_status"),
             "last_step": "subtitles" if text else task.get("last_step"),
+            "mm_srt_path": synced_mm_key or task.get("mm_srt_path"),
             "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
             "subtitles_override_mode": text_mode,
             "error_message": None,
@@ -4948,8 +4976,11 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
 
     def _resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> str | None:
         lang_norm = _normalize_target_lang(lang)
+        synced_mm_key = _hf_sync_saved_target_subtitle_artifact(task_code, task_obj)
         candidates: list[str] = []
         if lang_norm == "mm":
+            if synced_mm_key:
+                candidates.append(str(synced_mm_key))
             mm_path = _task_key(task_obj, "mm_srt_path")
             if mm_path:
                 candidates.append(str(mm_path))
@@ -4959,6 +4990,8 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
             if lang_path:
                 candidates.append(str(lang_path))
             candidates.append(deliver_key(task_code, f"{lang_norm}.srt"))
+            if synced_mm_key:
+                candidates.append(str(synced_mm_key))
             mm_path = _task_key(task_obj, "mm_srt_path")
             if mm_path:
                 candidates.append(str(mm_path))
