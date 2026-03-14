@@ -59,6 +59,7 @@
 
   const hubUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/workbench_hub`;
   const composeUrl = `/api/tasks/${encodeURIComponent(taskId)}/compose`;
+  const assistedInputStorageKey = `hf_assisted_input:${taskId}`;
   const statusEl = document.getElementById("hf-status");
   const eventsEl = document.getElementById("hf-events");
   const audioMsgEl = document.getElementById("hf_audio_msg") || document.getElementById("hf-audio-msg");
@@ -194,6 +195,32 @@
   let finalPreviewRetryKey = "";
   let finalPreviewRetried = false;
   let assistedInputDirty = false;
+  let assistedInputHydrated = false;
+
+  function readAssistedInputDraft() {
+    try {
+      return String(window.localStorage.getItem(assistedInputStorageKey) || "");
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function persistAssistedInputDraft(text) {
+    try {
+      const value = String(text || "");
+      if (value.trim()) window.localStorage.setItem(assistedInputStorageKey, value);
+      else window.localStorage.removeItem(assistedInputStorageKey);
+    } catch (_) {
+      // Assisted input is an optional UI helper; local storage failure should not break the page.
+    }
+  }
+
+  function hydrateAssistedInputDraft() {
+    if (!assistedInputTextEl || assistedInputHydrated) return;
+    const draft = readAssistedInputDraft();
+    if (draft && !String(assistedInputTextEl.value || "").trim()) assistedInputTextEl.value = draft;
+    assistedInputHydrated = true;
+  }
 
   function escapeHtml(s) {
     return String(s || "")
@@ -411,6 +438,7 @@
         assistedInputHintEl.textContent = "这里用于暂存原文手工输入、OCR 候选或商品文案。翻译后再写入下方目标语言字幕编辑区。";
       }
     }
+    hydrateAssistedInputDraft();
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
     if (subtitlesNormalizedEl) subtitlesNormalizedEl.textContent = normalized || sourcePlaceholder;
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || targetPlaceholder;
@@ -1375,6 +1403,7 @@
   if (assistedInputTextEl) {
     assistedInputTextEl.addEventListener("input", () => {
       assistedInputDirty = true;
+      persistAssistedInputDraft(assistedInputTextEl.value || "");
       if (assistedInputMsgEl) assistedInputMsgEl.textContent = "";
     });
   }
@@ -1406,6 +1435,7 @@
       }
       if (assistedInputTextEl) assistedInputTextEl.value = candidate;
       assistedInputDirty = true;
+      persistAssistedInputDraft(candidate);
       if (assistedInputMsgEl) assistedInputMsgEl.textContent = "候选文本已填充到辅助输入区，可继续翻译写入目标字幕区。";
     });
   }
@@ -1445,6 +1475,7 @@
     });
   });
 
+  hydrateAssistedInputDraft();
   loadHub().then(() => setTab("source")).catch((e) => {
     if (statusEl) statusEl.textContent = e.message || "hub load failed";
   });
