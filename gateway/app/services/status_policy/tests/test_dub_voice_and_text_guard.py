@@ -1,10 +1,24 @@
 from pathlib import Path
 import sys
 from types import SimpleNamespace
+import types
+
+from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[5]))
+try:
+    import pydantic_settings as _pydantic_settings  # noqa: F401
+except Exception:
+    shim = types.ModuleType("pydantic_settings")
+
+    class _BaseSettings(BaseModel):
+        model_config = {"extra": "ignore"}
+
+    shim.BaseSettings = _BaseSettings
+    sys.modules["pydantic_settings"] = shim
 
 from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
+from gateway.app.services.steps_v1 import _resolve_mm_txt_text
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 from gateway.app.services.tts_policy import normalize_target_lang, resolve_tts_voice
 
@@ -159,3 +173,27 @@ def test_hot_follow_ready_gate_ignores_no_dub_when_audio_artifact_is_ready():
     assert gate.get("subtitle_ready") is True
     assert gate.get("compose_reason") == "compose_not_done"
     assert "no_speech_detected" not in (gate.get("blocking") or [])
+
+
+def test_resolve_mm_txt_text_prefers_target_subtitle_artifact_over_edited_text():
+    resolved, used_fallback, fallback_source = _resolve_mm_txt_text(
+        mm_txt_text="no subtitles",
+        override_text=None,
+        edited_text="旧的编辑区草稿",
+        mm_srt_text="1\n00:00:00,000 --> 00:00:02,000\nမင်္ဂလာပါ\n",
+    )
+    assert resolved == "မင်္ဂလာပါ"
+    assert used_fallback is True
+    assert fallback_source == "mm_srt"
+
+
+def test_resolve_mm_txt_text_uses_manual_target_override_before_marker():
+    resolved, used_fallback, fallback_source = _resolve_mm_txt_text(
+        mm_txt_text="no subtitles",
+        override_text="မင်္ဂလာပါ",
+        edited_text=None,
+        mm_srt_text="",
+    )
+    assert resolved == "မင်္ဂလာပါ"
+    assert used_fallback is True
+    assert fallback_source == "override"

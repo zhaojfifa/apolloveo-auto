@@ -493,14 +493,14 @@ def _pick_mm_text_fallback(
     override = str(override_text or "").strip()
     if override:
         return override, "override"
-    edited = str(edited_text or "").strip()
-    if edited:
-        return edited, "edited_text"
     srt_text = str(mm_srt_text or "").strip()
     if srt_text:
         txt = _srt_to_txt(srt_text).strip()
         if txt:
             return txt, "mm_srt"
+    edited = str(edited_text or "").strip()
+    if edited:
+        return edited, "edited_text"
     return None, None
 
 
@@ -968,8 +968,6 @@ async def run_dub_step(req: DubRequest):
             mm_txt_text = mm_txt_path.read_text(encoding="utf-8")
         except Exception:
             mm_txt_text = ""
-    if mm_txt_text.strip().lower() == "no subtitles":
-        _fail_dub(req, "NO_SUBTITLES_MARKER", provider)
     mm_srt_text = ""
     if workspace.mm_srt_path.exists():
         try:
@@ -999,6 +997,8 @@ async def run_dub_step(req: DubRequest):
             },
         )
     mm_txt_text = mm_txt_resolved
+    if str(mm_txt_text or "").strip().lower() == "no subtitles":
+        _fail_dub(req, "NO_SUBTITLES_MARKER", provider)
     if not mm_txt_text.strip():
         if not mm_txt_exists:
             _fail_dub(req, "MM_TXT_MISSING", provider)
