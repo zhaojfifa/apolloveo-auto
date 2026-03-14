@@ -1950,6 +1950,82 @@ def _hf_dual_channel_state(task_id: str, task: dict, subtitle_lane: dict[str, An
     }
 
 
+def _hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None = None) -> dict[str, Any]:
+    route = route_state or {}
+    content_mode = str(route.get("content_mode") or "").strip().lower()
+    speech_detected = bool(route.get("speech_detected"))
+    title_hint = str(task.get("title") or "").strip().lower()
+    has_bgm_hint = any(token in title_hint for token in ("bgm", "音乐", "配乐", "商品", "展示"))
+
+    if content_mode == "silent_candidate":
+        return {
+            "source_audio_lane": "silent_candidate",
+            "source_audio_lane_reason": "未检测到稳定人声，建议优先字幕驱动。",
+            "speech_presence": "none",
+            "bgm_presence": "possible" if has_bgm_hint else "unknown",
+            "audio_mix_mode": "silent_or_fx",
+        }
+    if content_mode == "subtitle_led":
+        return {
+            "source_audio_lane": "music_or_text_led",
+            "source_audio_lane_reason": "画面文字线索更强，当前素材更像字幕或画面驱动。",
+            "speech_presence": "low",
+            "bgm_presence": "possible",
+            "audio_mix_mode": "text_led",
+        }
+    if speech_detected and has_bgm_hint:
+        return {
+            "source_audio_lane": "mixed_audio",
+            "source_audio_lane_reason": "检测到人声，同时素材特征显示可能带明显配乐。",
+            "speech_presence": "high",
+            "bgm_presence": "possible",
+            "audio_mix_mode": "speech_plus_bgm",
+        }
+    if speech_detected:
+        return {
+            "source_audio_lane": "speech_primary",
+            "source_audio_lane_reason": "检测到稳定人声，适合标准配音替换路径。",
+            "speech_presence": "high",
+            "bgm_presence": "low",
+            "audio_mix_mode": "speech_primary",
+        }
+    return {
+        "source_audio_lane": "unknown",
+        "source_audio_lane_reason": "当前音频结构信息不足，建议先检查来源字幕和原视频。",
+        "speech_presence": "unknown",
+        "bgm_presence": "unknown",
+        "audio_mix_mode": "unknown",
+    }
+
+
+def _hf_screen_text_candidate_summary(
+    subtitle_lane: dict[str, Any] | None = None,
+    route_state: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    lane = subtitle_lane or {}
+    route = route_state or {}
+    normalized = str(lane.get("normalized_source_text") or "").strip()
+    raw = str(lane.get("raw_source_text") or "").strip()
+    content_mode = str(route.get("content_mode") or "").strip().lower()
+    onscreen = bool(route.get("onscreen_text_detected"))
+    density = str(route.get("onscreen_text_density") or "").strip().lower() or "none"
+
+    candidate_text = normalized or raw
+    if not candidate_text or (not onscreen and content_mode != "subtitle_led"):
+        return {
+            "screen_text_candidate": "",
+            "screen_text_candidate_source": None,
+            "screen_text_candidate_confidence": "none",
+            "screen_text_candidate_mode": "unavailable",
+        }
+    return {
+        "screen_text_candidate": candidate_text,
+        "screen_text_candidate_source": "normalized_source" if normalized else "source_text",
+        "screen_text_candidate_confidence": density if density in {"high", "low"} else "low",
+        "screen_text_candidate_mode": "subtitle_led" if content_mode == "subtitle_led" else "assisted_candidate",
+    }
+
+
 def _hot_follow_operational_defaults() -> dict[str, Any]:
     return {
         "raw_source_text": "",
@@ -1963,6 +2039,15 @@ def _hot_follow_operational_defaults() -> dict[str, Any]:
         "onscreen_text_density": "none",
         "content_mode": "unknown",
         "recommended_path": "Voice dubbing",
+        "source_audio_lane": "unknown",
+        "source_audio_lane_reason": "当前音频结构信息不足。",
+        "speech_presence": "unknown",
+        "bgm_presence": "unknown",
+        "audio_mix_mode": "unknown",
+        "screen_text_candidate": "",
+        "screen_text_candidate_source": None,
+        "screen_text_candidate_confidence": "none",
+        "screen_text_candidate_mode": "unavailable",
         "no_dub": False,
         "no_dub_reason": None,
         "no_dub_message": None,
@@ -2883,6 +2968,8 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     task_id = str(task.get("task_id") or task.get("id") or "")
     subtitle_lane = _hf_subtitle_lane_state(task_id, task)
     route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
+    audio_lane = _hf_source_audio_lane_summary(task, route_state)
+    screen_text_candidate = _hf_screen_text_candidate_summary(subtitle_lane, route_state)
     voice_state = _collect_voice_execution_state(task, settings)
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
     final_exists = bool(final_key and object_exists(str(final_key)))
@@ -2901,6 +2988,8 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     return {
         **subtitle_lane,
         **route_state,
+        **audio_lane,
+        **screen_text_candidate,
         **voice_state,
         "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
         "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),

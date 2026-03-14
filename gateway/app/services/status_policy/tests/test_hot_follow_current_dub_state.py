@@ -300,6 +300,41 @@ def test_artifact_facts_and_operator_summary_preserve_voice_led_success_baseline
     assert operator_summary["show_previous_final_as_primary"] is False
 
 
+def test_source_audio_lane_summary_distinguishes_voice_led_and_silent_candidates():
+    voice_led = tasks_router._hf_source_audio_lane_summary(
+        {"title": "standard talking head"},
+        {"content_mode": "voice_led", "speech_detected": True},
+    )
+    silent = tasks_router._hf_source_audio_lane_summary(
+        {"title": "ASMR product showcase"},
+        {"content_mode": "silent_candidate", "speech_detected": False},
+    )
+
+    assert voice_led["source_audio_lane"] == "speech_primary"
+    assert voice_led["speech_presence"] == "high"
+    assert silent["source_audio_lane"] == "silent_candidate"
+    assert silent["audio_mix_mode"] == "silent_or_fx"
+
+
+def test_screen_text_candidate_summary_prefers_normalized_text_for_subtitle_led():
+    candidate = tasks_router._hf_screen_text_candidate_summary(
+        {
+            "normalized_source_text": "候选字幕",
+            "raw_source_text": "原始文本",
+        },
+        {
+            "onscreen_text_detected": True,
+            "onscreen_text_density": "high",
+            "content_mode": "subtitle_led",
+        },
+    )
+
+    assert candidate["screen_text_candidate"] == "候选字幕"
+    assert candidate["screen_text_candidate_source"] == "normalized_source"
+    assert candidate["screen_text_candidate_confidence"] == "high"
+    assert candidate["screen_text_candidate_mode"] == "subtitle_led"
+
+
 def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch, tmp_path):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
     monkeypatch.setattr(tasks_router, "_hf_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})

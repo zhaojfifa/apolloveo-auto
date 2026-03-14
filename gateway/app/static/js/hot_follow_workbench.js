@@ -108,9 +108,17 @@
   const subtitlesOriginEl = document.getElementById("hf_subtitles_origin");
   const subtitlesNormalizedEl = document.getElementById("hf_subtitles_normalized");
   const subtitlesEditedPreviewEl = document.getElementById("hf_subtitles_edited_preview");
+  const assistedInputBlockEl = document.getElementById("hf_assisted_input_block");
+  const assistedInputHintEl = document.getElementById("hf_assisted_input_hint");
+  const assistedInputTextEl = document.getElementById("hf_assisted_input_text");
+  const assistedTranslateBtn = document.getElementById("hf_assisted_translate_btn");
+  const assistedInputMsgEl = document.getElementById("hf_assisted_input_msg");
   const ocrCandidateBlockEl = document.getElementById("hf_ocr_candidate_block");
   const ocrCandidateHintEl = document.getElementById("hf_ocr_candidate_hint");
   const ocrCandidateTextEl = document.getElementById("hf_ocr_candidate_text");
+  const ocrCandidateSourceEl = document.getElementById("hf_ocr_candidate_source");
+  const ocrCandidateConfidenceEl = document.getElementById("hf_ocr_candidate_confidence");
+  const ocrCandidateModeEl = document.getElementById("hf_ocr_candidate_mode");
   const ocrFillBtn = document.getElementById("hf_ocr_fill_btn");
   const subtitleChannelIntroEl = document.getElementById("hf_subtitle_channel_intro");
   const subtitlesOriginHintEl = document.getElementById("hf_subtitles_origin_hint");
@@ -163,6 +171,11 @@
   const lipsyncStatusValueEl = document.getElementById("hf_lipsync_status_value");
   const lipsyncHintEl = document.getElementById("hf_lipsync_hint");
   const contentModeEl = document.getElementById("hf_content_mode");
+  const sourceAudioLaneEl = document.getElementById("hf_source_audio_lane");
+  const speechPresenceEl = document.getElementById("hf_speech_presence");
+  const bgmPresenceEl = document.getElementById("hf_bgm_presence");
+  const audioMixModeEl = document.getElementById("hf_audio_mix_mode");
+  const sourceAudioLaneReasonEl = document.getElementById("hf_source_audio_lane_reason");
   const speechDetectedEl = document.getElementById("hf_speech_detected");
   const onscreenTextDetectedEl = document.getElementById("hf_onscreen_text_detected");
   const recommendedPathEl = document.getElementById("hf_recommended_path");
@@ -180,6 +193,7 @@
   let selectedCleanupMode = "none";
   let finalPreviewRetryKey = "";
   let finalPreviewRetried = false;
+  let assistedInputDirty = false;
 
   function escapeHtml(s) {
     return String(s || "")
@@ -367,6 +381,9 @@
     const origin = subtitles.origin_text || "";
     const normalized = subtitles.normalized_source_text || origin || "";
     const edited = subtitles.edited_text || subtitles.srt_text || "";
+    const sourceAudioLane = String((currentHub && currentHub.source_audio_lane) || "").trim().toLowerCase();
+    const candidateMode = String((currentHub && currentHub.screen_text_candidate_mode) || "").trim().toLowerCase();
+    const candidateConfidence = String((currentHub && currentHub.screen_text_candidate_confidence) || "").trim().toLowerCase();
     const sourcePlaceholder = isHotFollowOpsGuideV1Enabled()
       ? "当前素材未提取到稳定来源字幕，这在无人声/弱语音素材中属于正常情况。"
       : t("hot_follow_workbench_source_not_generated", "Source subtitles not generated yet.");
@@ -381,6 +398,18 @@
       subtitlesEditHintEl.textContent = isHotFollowOpsGuideV1Enabled()
         ? "这是当前目标语言字幕编辑区。保存后会更新 mm.srt，最终视频会以这一版字幕为准。"
         : "这里是当前目标语言字幕编辑区。保存后会更新 mm.srt，并影响后续配音与合成。";
+    }
+    if (assistedInputBlockEl) assistedInputBlockEl.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
+    if (assistedInputHintEl) {
+      if (!isHotFollowOpsGuideV1Enabled()) {
+        assistedInputHintEl.textContent = "这里用于暂存辅助输入。";
+      } else if (candidateMode === "subtitle_led" || candidateConfidence === "high") {
+        assistedInputHintEl.textContent = "当前画面文字候选较明确。建议先在这里整理原文，再翻译写入目标语言字幕区。";
+      } else if (sourceAudioLane === "silent_candidate" || sourceAudioLane === "music_or_text_led") {
+        assistedInputHintEl.textContent = "当前素材更偏字幕/画面驱动。这里适合暂存原文、商品文案或 OCR 候选，再翻译写入目标字幕区。";
+      } else {
+        assistedInputHintEl.textContent = "这里用于暂存原文手工输入、OCR 候选或商品文案。翻译后再写入下方目标语言字幕编辑区。";
+      }
     }
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
     if (subtitlesNormalizedEl) subtitlesNormalizedEl.textContent = normalized || sourcePlaceholder;
@@ -398,29 +427,41 @@
   }
 
   function getOcrCandidateText() {
-    const subtitles = (currentHub && currentHub.subtitles) || {};
-    const normalized = String(subtitles.normalized_source_text || "").trim();
-    const raw = String(subtitles.origin_text || "").trim();
-    const onscreen = Boolean(currentHub && currentHub.onscreen_text_detected);
-    const contentMode = String((currentHub && currentHub.content_mode) || "").trim().toLowerCase();
     if (!isHotFollowOpsGuideV1Enabled()) return "";
-    if (!onscreen && contentMode !== "subtitle_led") return "";
-    return normalized || raw || "";
+    return String((currentHub && currentHub.screen_text_candidate) || "").trim();
   }
 
   function renderOcrCandidate() {
     if (!ocrCandidateBlockEl) return;
     const candidate = getOcrCandidateText();
+    const candidateSource = String((currentHub && currentHub.screen_text_candidate_source) || "").trim() || "-";
+    const candidateConfidence = String((currentHub && currentHub.screen_text_candidate_confidence) || "").trim() || "none";
+    const candidateMode = String((currentHub && currentHub.screen_text_candidate_mode) || "").trim() || "unavailable";
     const show = isHotFollowOpsGuideV1Enabled() && (Boolean(candidate) || Boolean(currentHub && currentHub.onscreen_text_detected));
     ocrCandidateBlockEl.classList.toggle("hidden", !show);
     if (!show) return;
     if (ocrCandidateTextEl) ocrCandidateTextEl.textContent = candidate || "当前版本尚未提取到可直接使用的画面文字草稿，可手工补字幕后继续。";
+    if (ocrCandidateSourceEl) ocrCandidateSourceEl.textContent = candidateSource;
+    if (ocrCandidateConfidenceEl) ocrCandidateConfidenceEl.textContent = candidateConfidence;
+    if (ocrCandidateModeEl) ocrCandidateModeEl.textContent = candidateMode;
     if (ocrCandidateHintEl) {
-      ocrCandidateHintEl.textContent = candidate
-        ? "检测到画面文字候选，可填充到当前编辑区作为字幕草稿，请检查后再保存。"
-        : "当前版本未启用完整自动识别，这里只保留候选入口，不会自动覆盖来源层。";
+      if (!candidate) {
+        ocrCandidateHintEl.textContent = "当前版本未启用完整自动识别，这里只保留候选入口，不会自动覆盖来源层。";
+      } else if (candidateMode === "subtitle_led" && candidateConfidence === "high") {
+        ocrCandidateHintEl.textContent = "当前画面文字候选较强，建议先填充到辅助输入区，再翻译写入目标语言字幕区。";
+      } else {
+        ocrCandidateHintEl.textContent = "检测到画面文字候选，可先填充到辅助输入区，再翻译写入目标语言字幕区。";
+      }
     }
     if (ocrFillBtn) ocrFillBtn.disabled = !candidate;
+  }
+
+  function applyTranslatedTextToTargetEditor(text, successMessage) {
+    const nextText = String(text || "");
+    if (subtitlesTextEl) subtitlesTextEl.value = nextText;
+    if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = nextText || "-";
+    subtitleDirty = true;
+    if (subtitlesMsgEl) subtitlesMsgEl.textContent = successMessage || "翻译结果已回写当前编辑区，请检查后保存字幕。";
   }
 
   function normalizeEngineKey(value) {
@@ -538,10 +579,12 @@
 
   function getRecommendedComposeMode() {
     const contentMode = String((currentHub && currentHub.content_mode) || "").trim().toLowerCase();
+    const sourceAudioLane = String((currentHub && currentHub.source_audio_lane) || "").trim().toLowerCase();
     const noDub = Boolean(currentHub && currentHub.no_dub);
     const subtitleReady = Boolean(currentHub && currentHub.subtitle_ready);
     if ((contentMode === "silent_candidate" || noDub) && subtitleReady) return "subtitle";
-    if (contentMode === "subtitle_led" && subtitleReady) return "bgm";
+    if ((contentMode === "subtitle_led" || sourceAudioLane === "music_or_text_led") && subtitleReady) return "bgm";
+    if (sourceAudioLane === "mixed_audio" && subtitleReady) return "voice";
     return "voice";
   }
 
@@ -583,6 +626,7 @@
     if (!enabled) return;
 
     const recommended = getRecommendedComposeMode();
+    const sourceAudioLane = String((currentHub && currentHub.source_audio_lane) || "").trim().toLowerCase();
     const noDub = Boolean(currentHub && currentHub.no_dub);
     const subtitleReady = Boolean(currentHub && currentHub.subtitle_ready);
     const audioReady = Boolean(currentHub && currentHub.audio_ready);
@@ -607,9 +651,13 @@
       if (recommended === "subtitle") {
         composeModesHintEl.textContent = "当前更推荐先走快速字幕版。若字幕已就绪，可直接尝试字幕版合成；若还需解说，再补文案后生成配音。";
       } else if (recommended === "bgm") {
-        composeModesHintEl.textContent = "当前更推荐字幕+BGM版，适合商品展示或试色视频。当前阶段仍沿用既有后端 compose 门控。";
+        composeModesHintEl.textContent = sourceAudioLane === "music_or_text_led"
+          ? "当前素材更偏画面文字或音乐驱动，优先推荐字幕+BGM版。当前阶段仍沿用既有后端 compose 门控。"
+          : "当前更推荐字幕+BGM版，适合商品展示或试色视频。当前阶段仍沿用既有后端 compose 门控。";
       } else if (!audioReady && subtitleReady) {
         composeModesHintEl.textContent = "当前字幕已就绪，但配音尚未就绪。若是无人声/弱语音素材，可先尝试字幕版路线；标准口播仍建议先完成配音。";
+      } else if (sourceAudioLane === "mixed_audio") {
+        composeModesHintEl.textContent = "当前素材像人声+配乐混合音轨。标准配音版仍是主路径，但建议同时关注背景音乐和字幕节奏。";
       } else if (noDub) {
         composeModesHintEl.textContent = "当前任务可不做配音，优先整理字幕版出片路径。";
       } else {
@@ -654,9 +702,14 @@
 
   function renderRoutingState() {
     if (contentModeEl) contentModeEl.textContent = (currentHub && currentHub.content_mode) || "-";
+    if (sourceAudioLaneEl) sourceAudioLaneEl.textContent = (currentHub && currentHub.source_audio_lane) || "-";
+    if (speechPresenceEl) speechPresenceEl.textContent = (currentHub && currentHub.speech_presence) || "-";
+    if (bgmPresenceEl) bgmPresenceEl.textContent = (currentHub && currentHub.bgm_presence) || "-";
+    if (audioMixModeEl) audioMixModeEl.textContent = (currentHub && currentHub.audio_mix_mode) || "-";
     if (speechDetectedEl) speechDetectedEl.textContent = (currentHub && currentHub.speech_detected) ? "yes" : "no";
     if (onscreenTextDetectedEl) onscreenTextDetectedEl.textContent = (currentHub && currentHub.onscreen_text_detected) ? "yes" : "no";
     if (recommendedPathEl) recommendedPathEl.textContent = (currentHub && currentHub.recommended_path) || "-";
+    if (sourceAudioLaneReasonEl) sourceAudioLaneReasonEl.textContent = (currentHub && currentHub.source_audio_lane_reason) || "-";
     if (noDubMessageEl) {
       const msg = (currentHub && currentHub.no_dub_message) || "";
       noDubMessageEl.textContent = msg || "-";
@@ -666,6 +719,9 @@
 
   function buildOpsGuideModel() {
     const contentMode = String((currentHub && currentHub.content_mode) || "").trim().toLowerCase();
+    const sourceAudioLane = String((currentHub && currentHub.source_audio_lane) || "").trim().toLowerCase();
+    const sourceAudioLaneReason = String((currentHub && currentHub.source_audio_lane_reason) || "").trim();
+    const candidateMode = String((currentHub && currentHub.screen_text_candidate_mode) || "").trim().toLowerCase();
     const speechDetected = Boolean(currentHub && currentHub.speech_detected);
     const noDub = Boolean(currentHub && currentHub.no_dub);
     const noDubReason = String((currentHub && currentHub.no_dub_reason) || "").trim().toLowerCase();
@@ -673,13 +729,16 @@
     const recommendedPath = String((currentHub && currentHub.recommended_path) || "").trim() || "请检查当前任务路径";
 
     if (contentMode === "voice_led" && speechDetected && !noDub) {
+      const mixedDesc = sourceAudioLane === "mixed_audio"
+        ? "当前素材检测到人声，同时可能带明显配乐。建议先检查字幕与配音节奏，再决定是否需要保留或减弱原背景音乐。"
+        : "建议先检查字幕，再生成配音，最后合成成片。若需要微调效果，优先先改字幕，再重生成配音。";
       return {
         badge: "标准口播",
         title: "当前素材适合走标准配音路径",
-        desc: "建议先检查字幕，再生成配音，最后合成成片。若需要微调效果，优先先改字幕，再重生成配音。",
+        desc: mixedDesc,
         mode: "标准口播 / 语音驱动",
         path: recommendedPath || "检查字幕 → 生成配音 → 合成",
-        reason: "已检测到稳定语音内容，适合标准配音出片。",
+        reason: sourceAudioLaneReason || "已检测到稳定语音内容，适合标准配音出片。",
       };
     }
 
@@ -687,20 +746,24 @@
       return {
         badge: "字幕驱动",
         title: "当前素材更适合字幕驱动处理",
-        desc: "这类素材常见于无人声、ASMR 或弱语音内容。优先建议编辑字幕后直接合成字幕版，或先输入解说文案再生成配音。",
+        desc: candidateMode === "subtitle_led"
+          ? "当前素材更像画面文字驱动内容。优先建议整理候选文字、翻译并保存字幕，再直接合成字幕版。"
+          : "这类素材常见于无人声、ASMR 或弱语音内容。优先建议编辑字幕后直接合成字幕版，或先输入解说文案再生成配音。",
         mode: "无人声 / ASMR / 弱语音",
         path: "优先编辑字幕 → 直接合成字幕版，或补文案后再生成配音",
-        reason: noDubMessage || "当前素材未检测到稳定语音内容，不建议反复重试配音。",
+        reason: sourceAudioLaneReason || noDubMessage || "当前素材未检测到稳定语音内容，不建议反复重试配音。",
       };
     }
 
     return {
       badge: "先补文本",
       title: "来源文本暂时不足，建议先补字幕",
-      desc: "当前来源字幕或文本信息不足，先检查并补齐当前字幕编辑区内容，再决定是否生成配音，会更稳定。",
+      desc: candidateMode === "subtitle_led"
+        ? "当前更适合先整理画面文字候选或原文辅助输入，再翻译写入目标字幕区。"
+        : "当前来源字幕或文本信息不足，先检查并补齐当前字幕编辑区内容，再决定是否生成配音，会更稳定。",
       mode: "来源文本不足",
       path: "先补文本 / 校对字幕 → 再决定是否配音",
-      reason: noDubMessage || recommendedPath || "当前更适合先补文本，再进入配音或合成步骤。",
+      reason: sourceAudioLaneReason || noDubMessage || recommendedPath || "当前更适合先补文本，再进入配音或合成步骤。",
     };
   }
 
@@ -1289,19 +1352,47 @@
     translateMmBtn.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
-        const text = subtitlesTextEl ? String(subtitlesTextEl.value || "").trim() : "";
-        if (!text) throw new Error("请先在当前编辑区输入中文文本。");
+        const assistedText = assistedInputTextEl ? String(assistedInputTextEl.value || "").trim() : "";
+        const targetText = subtitlesTextEl ? String(subtitlesTextEl.value || "").trim() : "";
+        const text = assistedText || targetText;
+        if (!text) throw new Error("请先在辅助输入区或当前编辑区输入中文文本。");
         translateMmBtn.disabled = true;
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = "正在翻译为缅语...";
         const data = await translateCurrentSubtitles(text);
-        if (subtitlesTextEl) subtitlesTextEl.value = String(data.translated_text || "");
-        if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = String(data.translated_text || "") || "-";
-        subtitleDirty = true;
-        if (subtitlesMsgEl) subtitlesMsgEl.textContent = "翻译结果已回写当前编辑区，请检查后保存字幕。";
+        applyTranslatedTextToTargetEditor(
+          String(data.translated_text || ""),
+          assistedText
+            ? "辅助输入已翻译并写入目标字幕区，请检查后保存字幕。"
+            : "翻译结果已回写当前编辑区，请检查后保存字幕。",
+        );
       } catch (err) {
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = err.message || "translate failed";
       } finally {
         translateMmBtn.disabled = false;
+      }
+    });
+  }
+  if (assistedInputTextEl) {
+    assistedInputTextEl.addEventListener("input", () => {
+      assistedInputDirty = true;
+      if (assistedInputMsgEl) assistedInputMsgEl.textContent = "";
+    });
+  }
+  if (assistedTranslateBtn) {
+    assistedTranslateBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      try {
+        const text = assistedInputTextEl ? String(assistedInputTextEl.value || "").trim() : "";
+        if (!text) throw new Error("请先在辅助输入区填写原文或候选文本。");
+        assistedTranslateBtn.disabled = true;
+        if (assistedInputMsgEl) assistedInputMsgEl.textContent = "正在翻译并写入目标字幕区...";
+        const data = await translateCurrentSubtitles(text);
+        applyTranslatedTextToTargetEditor(String(data.translated_text || ""), "辅助输入已翻译并写入目标字幕区，请检查后保存字幕。");
+        if (assistedInputMsgEl) assistedInputMsgEl.textContent = "辅助输入翻译完成。";
+      } catch (err) {
+        if (assistedInputMsgEl) assistedInputMsgEl.textContent = err.message || "translate failed";
+      } finally {
+        assistedTranslateBtn.disabled = false;
       }
     });
   }
@@ -1310,13 +1401,12 @@
       e.preventDefault();
       const candidate = getOcrCandidateText();
       if (!candidate) {
-        if (subtitlesMsgEl) subtitlesMsgEl.textContent = "当前没有可用的候选字幕草稿，请先手工补字幕。";
+        if (assistedInputMsgEl) assistedInputMsgEl.textContent = "当前没有可用的候选文字草稿，请先手工补辅助输入。";
         return;
       }
-      if (subtitlesTextEl) subtitlesTextEl.value = candidate;
-      if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = candidate;
-      subtitleDirty = true;
-      if (subtitlesMsgEl) subtitlesMsgEl.textContent = "候选文本已填充到当前编辑区，请检查后保存字幕。";
+      if (assistedInputTextEl) assistedInputTextEl.value = candidate;
+      assistedInputDirty = true;
+      if (assistedInputMsgEl) assistedInputMsgEl.textContent = "候选文本已填充到辅助输入区，可继续翻译写入目标字幕区。";
     });
   }
   if (subtitlesSaveBtn) {

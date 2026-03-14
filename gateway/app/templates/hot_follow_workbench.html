@@ -107,11 +107,23 @@
               <div class="flex items-center justify-between gap-3">
                 <div>
                   <div class="text-sm font-semibold text-amber-900">简单字幕识别候选</div>
-                  <div id="hf_ocr_candidate_hint" class="mt-1 text-[11px] text-amber-800">检测到画面文字线索时，可将候选文本填充到当前编辑区后再人工检查。</div>
+                  <div id="hf_ocr_candidate_hint" class="mt-1 text-[11px] text-amber-800">检测到画面文字线索时，可先放入辅助输入区，再翻译写入当前目标字幕区。</div>
+                  <div class="mt-1 text-[11px] text-amber-700">
+                    来源：<span id="hf_ocr_candidate_source">-</span> · 置信度：<span id="hf_ocr_candidate_confidence">-</span> · 模式：<span id="hf_ocr_candidate_mode">-</span>
+                  </div>
                 </div>
-                <button id="hf_ocr_fill_btn" class="btn-secondary text-xs" type="button">填充到当前编辑区</button>
+                <button id="hf_ocr_fill_btn" class="btn-secondary text-xs" type="button">填充到辅助输入区</button>
               </div>
               <pre id="hf_ocr_candidate_text" class="mt-3 text-xs whitespace-pre-wrap max-h-40 overflow-auto bg-white rounded-lg p-3 border border-amber-200">-</pre>
+            </div>
+            <div id="hf_assisted_input_block" class="hidden mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
+              <div class="text-sm font-semibold text-sky-900">辅助输入（原文 / 候选）</div>
+              <div id="hf_assisted_input_hint" class="mt-1 text-[11px] text-sky-800">这里用于暂存原文手工输入或画面文字候选。翻译后再写入下方目标语言字幕编辑区。</div>
+              <textarea id="hf_assisted_input_text" class="mt-3 w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm" rows="6" placeholder="在此粘贴原文、商品文案或候选文字，不会直接覆盖目标语言字幕"></textarea>
+              <div class="flex flex-wrap items-center gap-3 mt-3">
+                <button id="hf_assisted_translate_btn" class="btn-secondary text-xs" type="button">翻译并写入目标字幕区</button>
+                <span id="hf_assisted_input_msg" class="text-xs text-sky-700"></span>
+              </div>
             </div>
             <div class="mb-2 text-xs text-gray-500">当前目标语言字幕编辑区</div>
             <textarea id="hf_subtitles_text" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" rows="10" placeholder="在此编辑 SRT 文本" data-i18n-placeholder="hot_follow_workbench_subtitle_placeholder"></textarea>
@@ -341,9 +353,14 @@
           <div id="hf_scene_pack_card" class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1 mb-4">
               <div><span class="font-semibold">Content Mode:</span> <span id="hf_content_mode">-</span></div>
+              <div><span class="font-semibold">Source Audio Lane:</span> <span id="hf_source_audio_lane">-</span></div>
+              <div><span class="font-semibold">Speech Presence:</span> <span id="hf_speech_presence">-</span></div>
+              <div><span class="font-semibold">BGM Presence:</span> <span id="hf_bgm_presence">-</span></div>
+              <div><span class="font-semibold">Audio Mix Mode:</span> <span id="hf_audio_mix_mode">-</span></div>
               <div><span class="font-semibold">Speech Detected:</span> <span id="hf_speech_detected">-</span></div>
               <div><span class="font-semibold">On-screen Text Detected:</span> <span id="hf_onscreen_text_detected">-</span></div>
               <div><span class="font-semibold">Recommended Path:</span> <span id="hf_recommended_path">-</span></div>
+              <div id="hf_source_audio_lane_reason" class="text-[11px] text-gray-600">-</div>
               <div id="hf_no_dub_message" class="text-[11px] text-amber-700 hidden">-</div>
             </div>
             <h3 class="text-base font-semibold mb-3" data-i18n="hot_follow_scene_pack_title">Scene Pack</h3>
