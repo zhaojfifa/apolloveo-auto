@@ -1867,7 +1867,11 @@ def _hf_load_origin_subtitles_text(task: dict) -> str:
 
 
 def _hf_load_normalized_source_text(task_id: str, task: dict) -> str:
-    normalized_path = task_base_dir(task_id) / "subs" / "origin_normalized.srt"
+    try:
+        normalized_path = task_base_dir(task_id) / "subs" / "origin_normalized.srt"
+    except Exception:
+        logger.warning("HF_NORMALIZED_SOURCE_FALLBACK task=%s", task_id)
+        return _hf_load_origin_subtitles_text(task)
     if normalized_path.exists():
         try:
             return normalized_path.read_text(encoding="utf-8")
@@ -3040,6 +3044,47 @@ def _hf_operator_summary(
         "show_previous_final_as_primary": show_previous_final_as_primary,
         "recommended_next_action": recommended_next_action,
     }
+
+
+def _hf_safe_presentation_aggregates(
+    task_id: str,
+    task: dict,
+    *,
+    final_info: dict[str, Any] | None,
+    persisted_audio: dict[str, Any] | None,
+    subtitle_lane: dict[str, Any] | None,
+    scene_pack: dict[str, Any] | None,
+    voice_state: dict[str, Any],
+    dub_status: str,
+    compose_status: str,
+    composed_reason: str,
+    no_dub: bool,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    try:
+        artifact_facts = _hf_artifact_facts(
+            task_id,
+            task,
+            final_info=final_info,
+            persisted_audio=persisted_audio,
+            subtitle_lane=subtitle_lane,
+            scene_pack=scene_pack,
+        )
+        current_attempt = _hf_current_attempt_summary(
+            voice_state=voice_state,
+            subtitle_lane=subtitle_lane or {},
+            dub_status=dub_status,
+            compose_status=compose_status,
+            composed_reason=composed_reason,
+        )
+        operator_summary = _hf_operator_summary(
+            artifact_facts=artifact_facts,
+            current_attempt=current_attempt,
+            no_dub=no_dub,
+        )
+        return artifact_facts, current_attempt, operator_summary
+    except Exception:
+        logger.exception("HF_PRESENTATION_AGGREGATES_SAFE_FALLBACK task=%s", task_id)
+        return {}, {}, {}
 
 
 def _hf_audio_display_error(dub_state: str, dub_error: str | None, voice_state: dict[str, Any]) -> str | None:
@@ -4462,24 +4507,17 @@ def get_hot_follow_workbench_hub(
             "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
         },
     }
-    artifact_facts = _hf_artifact_facts(
+    artifact_facts, current_attempt, operator_summary = _hf_safe_presentation_aggregates(
         task_id,
         task,
         final_info=final_info,
         persisted_audio=persisted_audio,
         subtitle_lane=subtitle_lane,
         scene_pack=scene_pack,
-    )
-    current_attempt = _hf_current_attempt_summary(
         voice_state=voice_state,
-        subtitle_lane=subtitle_lane,
         dub_status=str(dub_state),
-        compose_status=compose_status,
+        compose_status=compose_state,
         composed_reason=composed_reason,
-    )
-    operator_summary = _hf_operator_summary(
-        artifact_facts=artifact_facts,
-        current_attempt=current_attempt,
         no_dub=bool(payload.get("no_dub")),
     )
     payload["artifact_facts"] = artifact_facts

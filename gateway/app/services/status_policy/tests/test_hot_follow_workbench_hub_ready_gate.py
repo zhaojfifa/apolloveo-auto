@@ -149,3 +149,39 @@ def test_hot_follow_workbench_compose_view_is_done_when_final_ready(monkeypatch)
         {},
     )
     assert final_row.get("status") == "done"
+
+
+def test_hot_follow_workbench_hub_survives_optional_presentation_aggregation_failure(monkeypatch):
+    task_id = "hf-workbench-presentation-safe-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "pending",
+            "target_lang": "mm",
+            "title": "safe fallback",
+        },
+    )
+
+    monkeypatch.setattr(tasks_router, "_hf_artifact_facts", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    assert data.get("artifact_facts") == {}
+    assert data.get("current_attempt") == {}
+    assert data.get("operator_summary") == {}
+    assert data.get("kind") == "hot_follow"
