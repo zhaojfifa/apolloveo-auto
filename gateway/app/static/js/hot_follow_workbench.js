@@ -85,11 +85,21 @@
   const lastFinalExistsEl = document.getElementById("hf_last_final_exists");
   const lastFinalUpdatedAtEl = document.getElementById("hf_last_final_updated_at");
   const lastFinalAssetVersionEl = document.getElementById("hf_last_final_asset_version");
+  const artifactAudioExistsEl = document.getElementById("hf_artifact_audio_exists");
+  const artifactSubtitleExistsEl = document.getElementById("hf_artifact_subtitle_exists");
+  const artifactPackExistsEl = document.getElementById("hf_artifact_pack_exists");
   const currentAttemptDubStatusEl = document.getElementById("hf_current_attempt_dub_status");
   const currentAttemptAudioReadyEl = document.getElementById("hf_current_attempt_audio_ready");
   const currentAttemptAudioReasonEl = document.getElementById("hf_current_attempt_audio_reason");
   const currentAttemptDubCurrentEl = document.getElementById("hf_current_attempt_dub_current");
   const currentAttemptDubReasonEl = document.getElementById("hf_current_attempt_dub_reason");
+  const currentAttemptComposeStatusEl = document.getElementById("hf_current_attempt_compose_status");
+  const currentAttemptComposeReasonEl = document.getElementById("hf_current_attempt_compose_reason");
+  const currentAttemptSubtitleSourceEl = document.getElementById("hf_current_attempt_subtitle_source");
+  const operatorLastSuccessfulEl = document.getElementById("hf_operator_last_successful");
+  const operatorCurrentFailedEl = document.getElementById("hf_operator_current_failed");
+  const operatorShowPreviousFinalEl = document.getElementById("hf_operator_show_previous_final");
+  const operatorNextActionEl = document.getElementById("hf_operator_next_action");
   const confirmVoiceoverEl = document.getElementById("hf_confirm_voiceover");
   const scenePackDownloadEl = document.getElementById("hf_scene_pack_download");
   const scenePackHintEl = document.getElementById("hf-scene-pack-hint");
@@ -456,12 +466,20 @@
   function renderVoiceMeta() {
     const audio = (currentHub && currentHub.audio) || {};
     const media = (currentHub && currentHub.media) || {};
+    const artifactFacts = (currentHub && currentHub.artifact_facts) || {};
+    const operatorSummary = (currentHub && currentHub.operator_summary) || {};
     const presentation = (currentHub && currentHub.presentation) || {};
     const lastSuccessfulOutput = presentation.last_successful_output || {};
     const currentAttempt = presentation.current_attempt || {};
-    const hasAudio = Boolean(media.voiceover_url || audio.voiceover_url || audio.audio_url || (currentHub && currentHub.deliverable_audio_done));
+    const hasAudio = Boolean(
+      artifactFacts.audio_exists
+      || media.voiceover_url
+      || audio.voiceover_url
+      || audio.audio_url
+      || (currentHub && currentHub.deliverable_audio_done)
+    );
     const noDub = Boolean(currentHub && currentHub.no_dub);
-    const finalExists = Boolean(currentHub && currentHub.final_exists);
+    const finalExists = Boolean(artifactFacts.final_exists || (currentHub && currentHub.final_exists));
     const audioStatus = String(audio.status || "").trim().toLowerCase();
     const showRerunHint = finalExists && !Boolean(currentHub && currentHub.dub_current) && !Boolean(currentHub && currentHub.audio_ready) && !noDub;
     if (actualProviderEl) actualProviderEl.textContent = (currentHub && currentHub.actual_provider) || "-";
@@ -471,14 +489,24 @@
     if (subtitleReadyEl) subtitleReadyEl.textContent = (currentHub && currentHub.subtitle_ready) ? "yes" : "no";
     if (audioReadyEl) audioReadyEl.textContent = (currentHub && currentHub.audio_ready) ? "yes" : "no";
     if (audioReadyReasonEl) audioReadyReasonEl.textContent = (currentHub && currentHub.audio_ready_reason) || "-";
-    if (lastFinalExistsEl) lastFinalExistsEl.textContent = lastSuccessfulOutput.final_exists ? "yes" : "no";
-    if (lastFinalUpdatedAtEl) lastFinalUpdatedAtEl.textContent = lastSuccessfulOutput.final_updated_at || "-";
-    if (lastFinalAssetVersionEl) lastFinalAssetVersionEl.textContent = lastSuccessfulOutput.final_asset_version || "-";
+    if (lastFinalExistsEl) lastFinalExistsEl.textContent = artifactFacts.final_exists ? "yes" : (lastSuccessfulOutput.final_exists ? "yes" : "no");
+    if (lastFinalUpdatedAtEl) lastFinalUpdatedAtEl.textContent = artifactFacts.final_updated_at || lastSuccessfulOutput.final_updated_at || "-";
+    if (lastFinalAssetVersionEl) lastFinalAssetVersionEl.textContent = artifactFacts.final_asset_version || lastSuccessfulOutput.final_asset_version || "-";
+    if (artifactAudioExistsEl) artifactAudioExistsEl.textContent = artifactFacts.audio_exists ? "yes" : "no";
+    if (artifactSubtitleExistsEl) artifactSubtitleExistsEl.textContent = artifactFacts.subtitle_exists ? "yes" : "no";
+    if (artifactPackExistsEl) artifactPackExistsEl.textContent = artifactFacts.pack_exists ? "yes" : "no";
     if (currentAttemptDubStatusEl) currentAttemptDubStatusEl.textContent = currentAttempt.dub_status || audioStatus || "-";
     if (currentAttemptAudioReadyEl) currentAttemptAudioReadyEl.textContent = currentAttempt.audio_ready ? "yes" : "no";
     if (currentAttemptAudioReasonEl) currentAttemptAudioReasonEl.textContent = currentAttempt.audio_ready_reason || "-";
     if (currentAttemptDubCurrentEl) currentAttemptDubCurrentEl.textContent = currentAttempt.dub_current ? "yes" : "no";
     if (currentAttemptDubReasonEl) currentAttemptDubReasonEl.textContent = currentAttempt.dub_current_reason || "-";
+    if (currentAttemptComposeStatusEl) currentAttemptComposeStatusEl.textContent = currentAttempt.compose_status || "-";
+    if (currentAttemptComposeReasonEl) currentAttemptComposeReasonEl.textContent = currentAttempt.compose_reason || "-";
+    if (currentAttemptSubtitleSourceEl) currentAttemptSubtitleSourceEl.textContent = currentAttempt.current_subtitle_source || "-";
+    if (operatorLastSuccessfulEl) operatorLastSuccessfulEl.textContent = operatorSummary.last_successful_output_available ? "yes" : "no";
+    if (operatorCurrentFailedEl) operatorCurrentFailedEl.textContent = operatorSummary.current_attempt_failed ? "yes" : "no";
+    if (operatorShowPreviousFinalEl) operatorShowPreviousFinalEl.textContent = operatorSummary.show_previous_final_as_primary ? "yes" : "no";
+    if (operatorNextActionEl) operatorNextActionEl.textContent = operatorSummary.recommended_next_action || "-";
     if (audioCurrentnessHintEl) {
       audioCurrentnessHintEl.classList.toggle("hidden", !showRerunHint);
       if (!showRerunHint) {
@@ -912,6 +940,7 @@
       voice_id: voiceId || null,
       mm_text: dubText || "",
       tts_speed: getSelectedTtsSpeed(),
+      force: true,
     };
     const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/dub`, {
       method: "POST",

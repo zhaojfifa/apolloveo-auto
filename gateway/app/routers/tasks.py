@@ -315,6 +315,7 @@ class DubProviderRequest(BaseModel):
     voice_id: str | None = None
     mm_text: str | None = None
     tts_speed: float | None = None
+    force: bool = False
 
 
 class EditedTextRequest(BaseModel):
@@ -2946,6 +2947,101 @@ def _hf_rerun_presentation_state(
     }
 
 
+def _hf_artifact_facts(
+    task_id: str,
+    task: dict,
+    *,
+    final_info: dict[str, Any] | None,
+    persisted_audio: dict[str, Any] | None,
+    subtitle_lane: dict[str, Any] | None,
+    scene_pack: dict[str, Any] | None,
+) -> dict[str, Any]:
+    final_payload = final_info or {}
+    audio_payload = persisted_audio or {}
+    subtitle_payload = subtitle_lane or {}
+    pack_payload = scene_pack or {}
+    subtitle_url = _deliverable_url(task_id, task, "mm_srt")
+    pack_url = _deliverable_url(task_id, task, "pack_zip") or pack_payload.get("download_url")
+    return {
+        "final_exists": bool(final_payload.get("exists")),
+        "final_url": str(final_payload.get("url") or "").strip() or None,
+        "final_updated_at": final_payload.get("updated_at") or task.get("final_updated_at") or task.get("updated_at"),
+        "final_asset_version": str(final_payload.get("asset_version") or "").strip() or None,
+        "audio_exists": bool(audio_payload.get("exists")),
+        "audio_url": str(audio_payload.get("voiceover_url") or "").strip() or None,
+        "subtitle_exists": bool(subtitle_payload.get("subtitle_artifact_exists")),
+        "subtitle_url": str(subtitle_url or "").strip() or None,
+        "pack_exists": bool(pack_url),
+        "pack_url": str(pack_url or "").strip() or None,
+    }
+
+
+def _hf_current_attempt_summary(
+    *,
+    voice_state: dict[str, Any],
+    subtitle_lane: dict[str, Any],
+    dub_status: str,
+    compose_status: str,
+    composed_reason: str,
+) -> dict[str, Any]:
+    compose_status_norm = str(compose_status or "").strip().lower() or "never"
+    compose_reason_norm = str(composed_reason or "").strip().lower() or "unknown"
+    requires_recompose = bool(
+        voice_state.get("audio_ready")
+        and voice_state.get("dub_current")
+        and compose_reason_norm != "ready"
+    )
+    return {
+        "dub_status": str(dub_status or "").strip().lower() or "never",
+        "audio_ready": bool(voice_state.get("audio_ready")),
+        "audio_ready_reason": str(voice_state.get("audio_ready_reason") or "").strip() or "unknown",
+        "dub_current": bool(voice_state.get("dub_current")),
+        "dub_current_reason": str(voice_state.get("dub_current_reason") or "").strip() or "unknown",
+        "requested_voice": str(voice_state.get("requested_voice") or "").strip() or None,
+        "resolved_voice": str(voice_state.get("resolved_voice") or "").strip() or None,
+        "actual_provider": str(voice_state.get("actual_provider") or "").strip() or None,
+        "compose_status": compose_status_norm,
+        "compose_reason": compose_reason_norm,
+        "requires_recompose": requires_recompose,
+        "current_subtitle_source": str(subtitle_lane.get("actual_burn_subtitle_source") or "").strip() or None,
+    }
+
+
+def _hf_operator_summary(
+    *,
+    artifact_facts: dict[str, Any],
+    current_attempt: dict[str, Any],
+    no_dub: bool,
+) -> dict[str, Any]:
+    last_successful_output_available = bool(artifact_facts.get("final_exists"))
+    dub_status = str(current_attempt.get("dub_status") or "").strip().lower()
+    compose_status = str(current_attempt.get("compose_status") or "").strip().lower()
+    current_attempt_failed = dub_status in {"failed", "error"} or compose_status in {"failed", "error"}
+    show_previous_final_as_primary = bool(
+        last_successful_output_available
+        and not bool(current_attempt.get("audio_ready"))
+        and not no_dub
+    )
+    if no_dub:
+        recommended_next_action = "当前素材适合字幕驱动路径，可先保存字幕并直接合成字幕版。"
+    elif current_attempt.get("requires_recompose"):
+        recommended_next_action = "当前配音已更新，建议重新合成最终视频以生成最新版本。"
+    elif show_previous_final_as_primary and current_attempt_failed:
+        recommended_next_action = "当前重配音失败，但上一次成片仍可查看；请先修复当前配音后再重新合成。"
+    elif show_previous_final_as_primary:
+        recommended_next_action = "当前重配音未完成，上一次成片仍可查看；如需更新版本，请在当前配音完成后重新合成。"
+    elif last_successful_output_available:
+        recommended_next_action = "当前已有可用成片，可按需继续校对字幕、配音或重新合成。"
+    else:
+        recommended_next_action = "当前尚无可用成片，请先确保字幕和配音链路完成后再合成。"
+    return {
+        "last_successful_output_available": last_successful_output_available,
+        "current_attempt_failed": current_attempt_failed,
+        "show_previous_final_as_primary": show_previous_final_as_primary,
+        "recommended_next_action": recommended_next_action,
+    }
+
+
 def _hf_audio_display_error(dub_state: str, dub_error: str | None, voice_state: dict[str, Any]) -> str | None:
     state = str(dub_state or "").strip().lower()
     reason = str(voice_state.get("dub_current_reason") or voice_state.get("audio_ready_reason") or "").strip().lower()
@@ -4224,6 +4320,7 @@ def get_hot_follow_workbench_hub(
     route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
     audio_cfg = _hf_audio_config(task)
     voice_state = _collect_voice_execution_state(task, get_settings())
+    persisted_audio = _hf_persisted_audio_state(task_id, task)
     target_lang_internal = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     text_guard = clean_and_analyze_dub_text(subtitles_text or "", target_lang_internal)
     audio_warning = str(text_guard.get("warning") or "").strip() or None
@@ -4365,6 +4462,29 @@ def get_hot_follow_workbench_hub(
             "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
         },
     }
+    artifact_facts = _hf_artifact_facts(
+        task_id,
+        task,
+        final_info=final_info,
+        persisted_audio=persisted_audio,
+        subtitle_lane=subtitle_lane,
+        scene_pack=scene_pack,
+    )
+    current_attempt = _hf_current_attempt_summary(
+        voice_state=voice_state,
+        subtitle_lane=subtitle_lane,
+        dub_status=str(dub_state),
+        compose_status=compose_status,
+        composed_reason=composed_reason,
+    )
+    operator_summary = _hf_operator_summary(
+        artifact_facts=artifact_facts,
+        current_attempt=current_attempt,
+        no_dub=bool(payload.get("no_dub")),
+    )
+    payload["artifact_facts"] = artifact_facts
+    payload["current_attempt"] = current_attempt
+    payload["operator_summary"] = operator_summary
     payload["presentation"] = _hf_rerun_presentation_state(task, voice_state, final_info, dub_state)
     final_url = _resolve_hub_final_url(task_id, payload)
     if final_url:
@@ -6026,7 +6146,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         )
     audio_present = audio_present or workspace.mm_audio_exists()
     voice_changed = bool(req_voice_id and req_voice_id != prev_voice_id)
-    force_dub = bool(audio_present and voice_changed)
+    force_dub = bool(payload.force or (audio_present and voice_changed))
 
     edge_voice = None
     if provider == "edge-tts":

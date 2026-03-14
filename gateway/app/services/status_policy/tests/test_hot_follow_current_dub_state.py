@@ -1,8 +1,10 @@
+import asyncio
 from pathlib import Path
 import sys
 import types
 from types import SimpleNamespace
 
+import pytest
 from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[5]))
@@ -31,6 +33,8 @@ def _settings():
             "mm_male_1": "my-MM-ThihaNeural",
         },
         dub_provider="azure-speech",
+        azure_speech_key="test-key",
+        azure_speech_region="eastasia",
     )
 
 
@@ -109,7 +113,10 @@ def test_previous_final_can_coexist_with_failed_current_redub(monkeypatch, tmp_p
     monkeypatch.setattr(
         tasks_router,
         "object_head",
-        lambda key: {"ContentLength": "4096" if str(key).endswith("audio_mm.mp3") else "8192", "Content-Type": "audio/mpeg" if str(key).endswith("audio_mm.mp3") else "video/mp4"},
+        lambda key: {
+            "ContentLength": "4096" if str(key).endswith("audio_mm.mp3") else "8192",
+            "Content-Type": "audio/mpeg" if str(key).endswith("audio_mm.mp3") else "video/mp4",
+        },
     )
     monkeypatch.setattr(
         tasks_router,
@@ -199,3 +206,165 @@ def test_rerun_presentation_reports_current_success_without_regressing_baseline(
     assert presentation["current_attempt"]["audio_ready"] is True
     assert presentation["current_attempt"]["dub_current"] is True
     assert presentation["current_attempt"]["resolved_voice"] == "my-MM-NilarNeural"
+
+
+def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
+    artifact_facts = tasks_router._hf_artifact_facts(
+        "hf-rerun-presentation",
+        {},
+        final_info={
+            "exists": True,
+            "url": "/v1/tasks/hf-rerun-presentation/final",
+            "asset_version": "etag-123",
+            "updated_at": "2026-03-14T09:55:00+00:00",
+        },
+        persisted_audio={"exists": False, "voiceover_url": None},
+        subtitle_lane={"subtitle_artifact_exists": True},
+        scene_pack={"download_url": "/v1/tasks/hf-rerun-presentation/pack"},
+    )
+    current_attempt = tasks_router._hf_current_attempt_summary(
+        voice_state={
+            "audio_ready": False,
+            "audio_ready_reason": "dub_not_done",
+            "dub_current": False,
+            "dub_current_reason": "dub_not_done",
+            "requested_voice": "mm_male_1",
+            "resolved_voice": "my-MM-ThihaNeural",
+            "actual_provider": "azure-speech",
+        },
+        subtitle_lane={"actual_burn_subtitle_source": "mm.srt"},
+        dub_status="failed",
+        compose_status="pending",
+        composed_reason="audio_not_ready",
+    )
+    operator_summary = tasks_router._hf_operator_summary(
+        artifact_facts=artifact_facts,
+        current_attempt=current_attempt,
+        no_dub=False,
+    )
+
+    assert artifact_facts["final_exists"] is True
+    assert artifact_facts["final_url"] == "/v1/tasks/hf-rerun-presentation/final"
+    assert artifact_facts["audio_exists"] is False
+    assert artifact_facts["subtitle_exists"] is True
+    assert artifact_facts["pack_exists"] is True
+    assert current_attempt["dub_status"] == "failed"
+    assert current_attempt["compose_status"] == "pending"
+    assert current_attempt["current_subtitle_source"] == "mm.srt"
+    assert operator_summary["last_successful_output_available"] is True
+    assert operator_summary["current_attempt_failed"] is True
+    assert operator_summary["show_previous_final_as_primary"] is True
+
+
+def test_artifact_facts_and_operator_summary_preserve_voice_led_success_baseline():
+    artifact_facts = tasks_router._hf_artifact_facts(
+        "hf-success-presentation",
+        {},
+        final_info={
+            "exists": True,
+            "url": "/v1/tasks/hf-success-presentation/final",
+            "asset_version": "etag-456",
+            "updated_at": "2026-03-14T09:58:00+00:00",
+        },
+        persisted_audio={"exists": True, "voiceover_url": "/v1/tasks/hf-success-presentation/audio_mm"},
+        subtitle_lane={"subtitle_artifact_exists": True},
+        scene_pack=None,
+    )
+    current_attempt = tasks_router._hf_current_attempt_summary(
+        voice_state={
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "requested_voice": "mm_female_1",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+        },
+        subtitle_lane={"actual_burn_subtitle_source": "mm.srt"},
+        dub_status="done",
+        compose_status="done",
+        composed_reason="ready",
+    )
+    operator_summary = tasks_router._hf_operator_summary(
+        artifact_facts=artifact_facts,
+        current_attempt=current_attempt,
+        no_dub=False,
+    )
+
+    assert artifact_facts["audio_exists"] is True
+    assert artifact_facts["audio_url"] == "/v1/tasks/hf-success-presentation/audio_mm"
+    assert current_attempt["requires_recompose"] is False
+    assert current_attempt["compose_reason"] == "ready"
+    assert operator_summary["last_successful_output_available"] is True
+    assert operator_summary["current_attempt_failed"] is False
+    assert operator_summary["show_previous_final_as_primary"] is False
+
+
+def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch, tmp_path):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    monkeypatch.setattr(tasks_router, "_hf_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})
+    monkeypatch.setattr(tasks_router, "_hf_dual_channel_state", lambda *_args, **_kwargs: {"content_mode": "voice_led"})
+
+    class _Workspace:
+        def __init__(self, task_id):
+            base = tmp_path / task_id
+            base.mkdir(parents=True, exist_ok=True)
+            self.base_dir = base
+            self.mm_audio_primary_path = base / "audio_primary.wav"
+            self.mm_audio_mp3_path = base / "audio.mp3"
+            self.mm_audio_legacy_path = base / "audio_legacy.wav"
+            self.mm_audio_path = base / "audio.wav"
+
+        def mm_audio_exists(self):
+            return False
+
+    monkeypatch.setattr(tasks_router, "Workspace", _Workspace)
+
+    def _fake_upsert(repo, task_id, updates, **_kwargs):
+        assert task_id == repo.task["task_id"]
+        repo.task.update(updates)
+        return repo.task
+
+    monkeypatch.setattr(tasks_router, "_policy_upsert", _fake_upsert)
+
+    captured = {}
+
+    async def _fake_run_dub_step_ssot(task_adapter):
+        captured["force_dub"] = bool(getattr(task_adapter, "force_dub", False))
+        raise RuntimeError("stop_after_force_capture")
+
+    monkeypatch.setattr(tasks_router, "run_dub_step_ssot", _fake_run_dub_step_ssot)
+
+    class _Repo:
+        def __init__(self):
+            self.task = {
+                "task_id": "hf-force",
+                "kind": "hot_follow",
+                "target_lang": "mm",
+                "voice_id": "mm_female_1",
+                "dub_provider": "azure-speech",
+                "mm_audio_key": "deliver/tasks/hf-force/audio_mm.mp3",
+                "config": {
+                    "tts_requested_voice": "mm_female_1",
+                    "tts_resolved_voice": "my-MM-NilarNeural",
+                    "tts_provider": "azure-speech",
+                },
+            }
+            self.session = SimpleNamespace(expire_all=lambda: None)
+
+        def get(self, _task_id):
+            return self.task
+
+    repo = _Repo()
+    payload = tasks_router.DubProviderRequest(
+        provider="azure-speech",
+        voice_id="mm_female_1",
+        mm_text="မင်္ဂလာပါ",
+        force=True,
+    )
+
+    with pytest.raises(tasks_router.HTTPException) as exc:
+        asyncio.run(tasks_router._run_dub_job("hf-force", payload, repo))
+
+    assert exc.value.status_code == 500
+    assert captured["force_dub"] is True
