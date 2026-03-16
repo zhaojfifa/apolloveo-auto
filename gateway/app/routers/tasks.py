@@ -221,81 +221,11 @@ def _hf_compose_revision_snapshot(task: dict) -> dict[str, str | None]:
     }
 
 
-def _hf_lipsync_feature_enabled() -> bool:
-    return os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
-
-
-def _hf_lipsync_provider() -> str | None:
-    provider = str(os.getenv("HF_LIPSYNC_PROVIDER", "") or "").strip().lower()
-    return provider or None
-
-
-def _hf_lipsync_state(
-    task: dict,
-    route_state: dict[str, Any] | None = None,
-    voice_state: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    route = route_state or {}
-    voice = voice_state or {}
-    enabled = _hf_lipsync_feature_enabled()
-    provider = _hf_lipsync_provider()
-    content_mode = str(route.get("content_mode") or "").strip().lower()
-    audio_ready = bool(voice.get("audio_ready"))
-    dub_current = bool(voice.get("dub_current"))
-
+def _maybe_run_hot_follow_lipsync_stub(task_id: str, enabled: bool = False) -> str | None:
     if not enabled:
-        return {
-            "lipsync_enabled": False,
-            "lipsync_provider": None,
-            "lipsync_status": "off",
-            "lipsync_mode": "disabled",
-            "lipsync_reason": "feature_disabled",
-            "lipsync_operator_hint": "Enhanced path is off by default.",
-        }
-    if not provider:
-        return {
-            "lipsync_enabled": True,
-            "lipsync_provider": None,
-            "lipsync_status": "unavailable",
-            "lipsync_mode": "design_only",
-            "lipsync_reason": "provider_unconfigured",
-            "lipsync_operator_hint": "Lipsync enhancement is enabled in principle, but no provider is configured; baseline compose stays unchanged.",
-        }
-    if content_mode != "voice_led":
-        return {
-            "lipsync_enabled": True,
-            "lipsync_provider": provider,
-            "lipsync_status": "unsupported",
-            "lipsync_mode": "optional_precompose",
-            "lipsync_reason": "content_mode_not_voice_led",
-            "lipsync_operator_hint": "Current material is not voice-led. Keep baseline Hot Follow flow and skip lipsync.",
-        }
-    if not audio_ready or not dub_current:
-        return {
-            "lipsync_enabled": True,
-            "lipsync_provider": provider,
-            "lipsync_status": "awaiting_audio",
-            "lipsync_mode": "optional_precompose",
-            "lipsync_reason": "audio_not_ready",
-            "lipsync_operator_hint": "Lipsync is optional and only becomes relevant after current dubbing is ready.",
-        }
-    return {
-        "lipsync_enabled": True,
-        "lipsync_provider": provider,
-        "lipsync_status": "ready_optional",
-        "lipsync_mode": "optional_precompose",
-        "lipsync_reason": "ready",
-        "lipsync_operator_hint": "Optional lipsync enhancement can run before compose, but baseline final delivery remains available without it.",
-    }
-
-
-def _maybe_run_hot_follow_lipsync_stub(task_id: str, lipsync_state: dict[str, Any] | None = None) -> str | None:
-    state = lipsync_state or {}
-    if str(state.get("lipsync_status") or "").strip().lower() != "ready_optional":
         return None
     soft_fail = os.getenv("HF_LIPSYNC_SOFT_FAIL", "1").strip().lower() not in ("0", "false", "no")
-    provider = str(state.get("lipsync_provider") or "").strip() or "stub"
-    message = f"Lipsync enhancement path requested ({provider}), but no provider is wired in v1.9; continuing basic compose."
+    message = "Lipsync stub enabled, but no provider is wired in v1.9; continuing basic compose."
     if soft_fail:
         logger.warning("HF_LIPSYNC_STUB_SOFT_FAIL task=%s message=%s", task_id, message)
         return message
@@ -438,12 +368,6 @@ class HotFollowAudioConfigRequest(BaseModel):
     tts_voice: str | None = None
     bgm_mix: float | None = None
     audio_fit_max_speed: float | None = None
-
-
-class HotFollowAssistedInputRequest(BaseModel):
-    text: str = ""
-    input_kind: str | None = None
-    source: str | None = None
 
 
 class HotFollowSubtitlesRequest(BaseModel):
@@ -1919,99 +1843,6 @@ def _hf_subtitles_override_path(task_id: str) -> Path:
     return task_base_dir(task_id) / "subtitles" / "subtitles_override.srt"
 
 
-def _hf_assisted_input_path(task_id: str) -> Path:
-    return task_base_dir(task_id) / "subtitles" / "assisted_input.json"
-
-
-def _hf_normalize_assisted_input_kind(value: str | None) -> str:
-    raw = str(value or "").strip().lower().replace("-", "_")
-    if raw in {
-        "manual_source",
-        "source_draft",
-        "screen_text_candidate",
-        "normalized_source",
-        "raw_source",
-    }:
-        return raw
-    return "manual_source"
-
-
-def _hf_normalize_assisted_input_source(value: str | None) -> str | None:
-    raw = str(value or "").strip().lower().replace("-", "_")
-    if raw in {
-        "manual_source",
-        "source_draft",
-        "screen_text_candidate",
-        "normalized_source",
-        "raw_source",
-        "operator",
-    }:
-        return raw
-    return None
-
-
-def _hf_load_assisted_input_state(task_id: str) -> dict[str, Any]:
-    path = _hf_assisted_input_path(task_id)
-    if not path.exists():
-        return {
-            "text": "",
-            "input_kind": "manual_source",
-            "source": None,
-            "updated_at": None,
-            "persisted": False,
-        }
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        logger.warning("HF_ASSISTED_INPUT_LOAD_FAIL task=%s", task_id)
-        return {
-            "text": "",
-            "input_kind": "manual_source",
-            "source": None,
-            "updated_at": None,
-            "persisted": False,
-        }
-    text = str(payload.get("text") or "")
-    return {
-        "text": text,
-        "input_kind": _hf_normalize_assisted_input_kind(payload.get("input_kind")),
-        "source": _hf_normalize_assisted_input_source(payload.get("source")),
-        "updated_at": str(payload.get("updated_at") or "").strip() or None,
-        "persisted": bool(text.strip()),
-    }
-
-
-def _hf_write_assisted_input_state(
-    task_id: str,
-    *,
-    text: str,
-    input_kind: str | None = None,
-    source: str | None = None,
-) -> dict[str, Any]:
-    normalized_text = str(text or "").strip()
-    path = _hf_assisted_input_path(task_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if not normalized_text:
-        if path.exists():
-            path.unlink()
-        return {
-            "text": "",
-            "input_kind": _hf_normalize_assisted_input_kind(input_kind),
-            "source": _hf_normalize_assisted_input_source(source),
-            "updated_at": None,
-            "persisted": False,
-        }
-    payload = {
-        "text": normalized_text,
-        "input_kind": _hf_normalize_assisted_input_kind(input_kind),
-        "source": _hf_normalize_assisted_input_source(source),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
-    payload["persisted"] = True
-    return payload
-
-
 def _hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text: str | None = None) -> str | None:
     text = str(saved_text if saved_text is not None else _hf_load_subtitles_text(task_id, task) or "").strip()
     current_key = _task_key(task, "mm_srt_path")
@@ -2161,396 +1992,68 @@ def _hf_dual_channel_state(task_id: str, task: dict, subtitle_lane: dict[str, An
     }
 
 
-def _audio_probe_cache_path(task_id: str) -> Path:
-    return task_base_dir(task_id) / "source_audio_probe.json"
-
-
-def _detect_source_audio_profile(raw_file: Path) -> dict[str, Any]:
-    base = {
-        "status": "unknown",
-        "reason": None,
-        "has_audio": None,
-        "audio_stream_count": 0,
-        "max_channels": 0,
-        "audio_codecs": [],
-        "duration_seconds": None,
-    }
-    if not raw_file.exists():
-        base["reason"] = "raw_missing"
-        return base
-
-    ffprobe = shutil.which("ffprobe")
-    if not ffprobe:
-        base["reason"] = "ffprobe_missing"
-        return base
-
-    cmd = [
-        ffprobe,
-        "-v",
-        "error",
-        "-print_format",
-        "json",
-        "-show_streams",
-        "-show_format",
-        str(raw_file),
-    ]
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if proc.returncode != 0:
-        base["reason"] = "ffprobe_failed"
-        return base
-
-    try:
-        payload = json.loads(proc.stdout or "{}")
-    except json.JSONDecodeError:
-        base["reason"] = "ffprobe_bad_json"
-        return base
-
-    streams = payload.get("streams", []) or []
-    audio_streams = [s for s in streams if s.get("codec_type") == "audio"]
-    durations: list[float] = []
-    for value in [payload.get("format", {}).get("duration"), *[s.get("duration") for s in audio_streams]]:
-        try:
-            if value is not None and str(value).strip():
-                durations.append(float(value))
-        except (TypeError, ValueError):
-            continue
-    max_channels = 0
-    for stream in audio_streams:
-        try:
-            max_channels = max(max_channels, int(stream.get("channels") or 0))
-        except (TypeError, ValueError):
-            continue
-    codecs = sorted(
-        {
-            str(stream.get("codec_name") or "").strip().lower()
-            for stream in audio_streams
-            if str(stream.get("codec_name") or "").strip()
-        }
-    )
-    return {
-        "status": "ok" if audio_streams else "no_audio",
-        "reason": "ready" if audio_streams else "audio_stream_missing",
-        "has_audio": bool(audio_streams),
-        "audio_stream_count": len(audio_streams),
-        "max_channels": max_channels,
-        "audio_codecs": codecs,
-        "duration_seconds": round(max(durations), 3) if durations else None,
-    }
-
-
-def _get_source_audio_profile(task_id: str) -> dict[str, Any]:
-    try:
-        cache_path = _audio_probe_cache_path(task_id)
-        if cache_path.exists():
-            try:
-                return json.loads(cache_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-    except Exception:
-        cache_path = None
-
-    try:
-        raw_file = raw_path(task_id)
-    except Exception:
-        return {
-            "status": "unknown",
-            "reason": "workspace_unavailable",
-            "has_audio": None,
-            "audio_stream_count": 0,
-            "max_channels": 0,
-            "audio_codecs": [],
-            "duration_seconds": None,
-        }
-
-    result = _detect_source_audio_profile(raw_file)
-    if cache_path is not None:
-        try:
-            cache_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception:
-            pass
-    return result
-
-
-def _hf_source_audio_lane_summary(
-    task: dict,
-    route_state: dict[str, Any] | None = None,
-    *,
-    task_id: str | None = None,
-    audio_profile: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+def _hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None = None) -> dict[str, Any]:
     route = route_state or {}
     content_mode = str(route.get("content_mode") or "").strip().lower()
     speech_detected = bool(route.get("speech_detected"))
     title_hint = str(task.get("title") or "").strip().lower()
     has_bgm_hint = any(token in title_hint for token in ("bgm", "音乐", "配乐", "商品", "展示"))
-    profile = audio_profile or (_get_source_audio_profile(task_id) if task_id else {})
-    profile_status = str(profile.get("status") or "").strip().lower()
-    has_audio = profile.get("has_audio")
-    if has_audio is None and profile_status == "no_audio":
-        has_audio = False
-    has_audio = bool(has_audio) if has_audio is not None else None
-    try:
-        audio_stream_count = int(profile.get("audio_stream_count") or 0)
-    except (TypeError, ValueError):
-        audio_stream_count = 0
-    try:
-        max_channels = int(profile.get("max_channels") or 0)
-    except (TypeError, ValueError):
-        max_channels = 0
-    has_multi_stream = audio_stream_count > 1
-    has_multichannel = max_channels >= 2
-
-    if has_audio is False:
-        return {
-            "source_audio_lane": "silent_candidate",
-            "source_audio_lane_reason": "ffprobe 未发现可用音频流，当前更适合字幕驱动或手工文案路径。",
-            "speech_presence": "none",
-            "bgm_presence": "none",
-            "audio_mix_mode": "no_audio",
-        }
 
     if content_mode == "silent_candidate":
         return {
             "source_audio_lane": "silent_candidate",
-            "source_audio_lane_reason": (
-                "未检测到稳定人声，音频更像氛围音或配乐底。"
-                if has_audio
-                else "未检测到稳定人声，建议优先字幕驱动。"
-            ),
+            "source_audio_lane_reason": "未检测到稳定人声，建议优先字幕驱动。",
             "speech_presence": "none",
-            "bgm_presence": "possible" if (has_bgm_hint or has_multichannel or has_audio) else "unknown",
-            "audio_mix_mode": "fx_or_bgm" if has_audio else "silent_or_fx",
+            "bgm_presence": "possible" if has_bgm_hint else "unknown",
+            "audio_mix_mode": "silent_or_fx",
         }
     if content_mode == "subtitle_led":
         return {
             "source_audio_lane": "music_or_text_led",
-            "source_audio_lane_reason": (
-                "画面文字线索更强，同时存在原始音频底，当前素材更像字幕/画面驱动。"
-                if has_audio
-                else "画面文字线索更强，当前素材更像字幕或画面驱动。"
-            ),
+            "source_audio_lane_reason": "画面文字线索更强，当前素材更像字幕或画面驱动。",
             "speech_presence": "low",
-            "bgm_presence": "high" if has_bgm_hint else ("possible" if (has_multichannel or has_audio) else "unknown"),
-            "audio_mix_mode": "text_led_with_audio_bed" if has_audio else "text_led",
+            "bgm_presence": "possible",
+            "audio_mix_mode": "text_led",
         }
-    if speech_detected and (has_bgm_hint or has_multi_stream):
+    if speech_detected and has_bgm_hint:
         return {
             "source_audio_lane": "mixed_audio",
-            "source_audio_lane_reason": (
-                "检测到人声，同时 ffprobe 显示多音频流，建议按人声+氛围音混合素材处理。"
-                if has_multi_stream
-                else "检测到人声，同时素材特征显示可能带明显配乐。"
-            ),
+            "source_audio_lane_reason": "检测到人声，同时素材特征显示可能带明显配乐。",
             "speech_presence": "high",
-            "bgm_presence": "high" if has_multi_stream else "possible",
+            "bgm_presence": "possible",
             "audio_mix_mode": "speech_plus_bgm",
         }
     if speech_detected:
         return {
             "source_audio_lane": "speech_primary",
-            "source_audio_lane_reason": (
-                "检测到稳定人声，存在原始音频底，适合标准配音替换路径。"
-                if has_multichannel
-                else "检测到稳定人声，适合标准配音替换路径。"
-            ),
+            "source_audio_lane_reason": "检测到稳定人声，适合标准配音替换路径。",
             "speech_presence": "high",
-            "bgm_presence": "possible" if has_multichannel else "low",
+            "bgm_presence": "low",
             "audio_mix_mode": "speech_primary",
         }
     return {
         "source_audio_lane": "unknown",
-        "source_audio_lane_reason": (
-            "当前音频结构信息不足，建议先检查来源字幕和原视频。"
-            if profile_status != "unknown"
-            else "当前无法稳定识别音频结构，建议先检查原视频音轨。"
-        ),
+        "source_audio_lane_reason": "当前音频结构信息不足，建议先检查来源字幕和原视频。",
         "speech_presence": "unknown",
         "bgm_presence": "unknown",
         "audio_mix_mode": "unknown",
     }
 
 
-def _screen_text_probe_cache_path(task_id: str) -> Path:
-    return task_base_dir(task_id) / "screen_text_candidate.json"
-
-
-def _normalize_screen_text_candidate_text(value: str | None) -> str:
-    raw = str(value or "")
-    lines: list[str] = []
-    seen: set[str] = set()
-    for line in raw.splitlines():
-        compact = " ".join(str(line or "").strip().split())
-        if not compact:
-            continue
-        if len(compact) < 2 and not re.search(r"[\u4e00-\u9fff]", compact):
-            continue
-        if compact in seen:
-            continue
-        seen.add(compact)
-        lines.append(compact)
-    text = "\n".join(lines).strip()
-    return text[:800]
-
-
-def _run_tesseract_stdout(image_path: Path) -> tuple[str | None, str]:
-    tesseract = shutil.which("tesseract")
-    if not tesseract:
-        return None, "tesseract_missing"
-
-    attempts = [
-        ("chi_sim+eng", "tesseract"),
-        ("chi_sim", "tesseract"),
-        ("eng", "tesseract"),
-    ]
-    for language, source in attempts:
-        cmd = [
-            tesseract,
-            str(image_path),
-            "stdout",
-            "--psm",
-            "6",
-            "-l",
-            language,
-        ]
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        if proc.returncode != 0:
-            continue
-        text = _normalize_screen_text_candidate_text(proc.stdout)
-        if text:
-            return text, f"{source}:{language}"
-    return None, "tesseract_no_text"
-
-
-def _detect_screen_text_candidate(raw_file: Path, *, duration_seconds: float | None = None) -> dict[str, Any]:
-    base = {
-        "text": "",
-        "source": None,
-        "confidence": "none",
-        "mode": "unavailable",
-        "reason": None,
-        "frames_sampled": 0,
-    }
-    if not raw_file.exists():
-        base["reason"] = "raw_missing"
-        return base
-
-    ffmpeg = shutil.which("ffmpeg")
-    if not ffmpeg:
-        base["reason"] = "ffmpeg_missing"
-        return base
-    if not shutil.which("tesseract"):
-        base["reason"] = "tesseract_missing"
-        return base
-
-    try:
-        duration = float(duration_seconds or 0.0)
-    except (TypeError, ValueError):
-        duration = 0.0
-    if duration > 3:
-        timestamps = sorted({max(0.4, round(duration * 0.2, 2)), max(0.8, round(duration * 0.55, 2))})
-    else:
-        timestamps = [0.6]
-
-    collected_lines: list[str] = []
-    unique_lines: set[str] = set()
-    best_source = None
-    with tempfile.TemporaryDirectory(prefix="hf-screen-text-") as tmp_dir:
-        tmp_root = Path(tmp_dir)
-        for index, timestamp in enumerate(timestamps):
-            frame_path = tmp_root / f"frame_{index}.png"
-            cmd = [
-                ffmpeg,
-                "-y",
-                "-ss",
-                f"{timestamp:.2f}",
-                "-i",
-                str(raw_file),
-                "-frames:v",
-                "1",
-                "-vf",
-                "scale=iw*2:-1,format=gray",
-                str(frame_path),
-            ]
-            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            if proc.returncode != 0 or not frame_path.exists() or frame_path.stat().st_size == 0:
-                continue
-            text, source = _run_tesseract_stdout(frame_path)
-            if not text:
-                continue
-            best_source = source
-            for line in text.splitlines():
-                compact = line.strip()
-                if not compact or compact in unique_lines:
-                    continue
-                unique_lines.add(compact)
-                collected_lines.append(compact)
-
-    candidate_text = "\n".join(collected_lines).strip()
-    if not candidate_text:
-        base["reason"] = "ocr_unavailable"
-        return base
-
-    confidence = "high" if len(collected_lines) >= 2 or len(candidate_text) >= 24 else "low"
-    return {
-        "text": candidate_text,
-        "source": best_source or "tesseract",
-        "confidence": confidence,
-        "mode": "ocr_candidate",
-        "reason": "ready",
-        "frames_sampled": len(timestamps),
-    }
-
-
-def _get_screen_text_candidate_probe(task_id: str) -> dict[str, Any]:
-    try:
-        cache_path = _screen_text_probe_cache_path(task_id)
-        if cache_path.exists():
-            try:
-                return json.loads(cache_path.read_text(encoding="utf-8"))
-            except Exception:
-                pass
-    except Exception:
-        cache_path = None
-
-    try:
-        raw_file = raw_path(task_id)
-    except Exception:
-        return {
-            "text": "",
-            "source": None,
-            "confidence": "none",
-            "mode": "unavailable",
-            "reason": "workspace_unavailable",
-            "frames_sampled": 0,
-        }
-
-    duration_seconds = None
-    try:
-        duration_seconds = float((_get_source_audio_profile(task_id) or {}).get("duration_seconds") or 0.0)
-    except (TypeError, ValueError):
-        duration_seconds = None
-    result = _detect_screen_text_candidate(raw_file, duration_seconds=duration_seconds)
-    if cache_path is not None:
-        try:
-            cache_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-        except Exception:
-            pass
-    return result
-
-
 def _hf_screen_text_candidate_summary(
     subtitle_lane: dict[str, Any] | None = None,
     route_state: dict[str, Any] | None = None,
-    *,
-    task_id: str | None = None,
-    screen_probe: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    lane = subtitle_lane or {}
     route = route_state or {}
+    normalized = str(lane.get("normalized_source_text") or "").strip()
+    raw = str(lane.get("raw_source_text") or "").strip()
     content_mode = str(route.get("content_mode") or "").strip().lower()
     onscreen = bool(route.get("onscreen_text_detected"))
-    probe = screen_probe or (_get_screen_text_candidate_probe(task_id) if task_id else {})
-    candidate_text = _normalize_screen_text_candidate_text(probe.get("text"))
-    if not candidate_text or (not onscreen and content_mode != "subtitle_led" and str(probe.get("mode") or "") != "ocr_candidate"):
+    density = str(route.get("onscreen_text_density") or "").strip().lower() or "none"
+
+    candidate_text = normalized or raw
+    if not candidate_text or (not onscreen and content_mode != "subtitle_led"):
         return {
             "screen_text_candidate": "",
             "screen_text_candidate_source": None,
@@ -2559,9 +2062,9 @@ def _hf_screen_text_candidate_summary(
         }
     return {
         "screen_text_candidate": candidate_text,
-        "screen_text_candidate_source": str(probe.get("source") or "screen_text_probe"),
-        "screen_text_candidate_confidence": str(probe.get("confidence") or "low") if str(probe.get("confidence") or "").strip() in {"high", "low"} else "low",
-        "screen_text_candidate_mode": str(probe.get("mode") or "ocr_candidate"),
+        "screen_text_candidate_source": "normalized_source" if normalized else "source_text",
+        "screen_text_candidate_confidence": density if density in {"high", "low"} else "low",
+        "screen_text_candidate_mode": "subtitle_led" if content_mode == "subtitle_led" else "assisted_candidate",
     }
 
 
@@ -2587,19 +2090,6 @@ def _hot_follow_operational_defaults() -> dict[str, Any]:
         "screen_text_candidate_source": None,
         "screen_text_candidate_confidence": "none",
         "screen_text_candidate_mode": "unavailable",
-        "assisted_input": {
-            "text": "",
-            "input_kind": "manual_source",
-            "source": None,
-            "updated_at": None,
-            "persisted": False,
-        },
-        "lipsync_enabled": False,
-        "lipsync_provider": None,
-        "lipsync_status": "off",
-        "lipsync_mode": "disabled",
-        "lipsync_reason": "feature_disabled",
-        "lipsync_operator_hint": "Enhanced path is off by default.",
         "no_dub": False,
         "no_dub_reason": None,
         "no_dub_message": None,
@@ -2628,6 +2118,8 @@ def _safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any
                 ),
                 "compose_status": str(task.get("compose_status") or "never"),
                 "final_exists": False,
+                "lipsync_enabled": False,
+                "lipsync_status": "off",
             }
         )
         return payload
@@ -3518,13 +3010,13 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     task_id = str(task.get("task_id") or task.get("id") or "")
     subtitle_lane = _hf_subtitle_lane_state(task_id, task)
     route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
-    audio_lane = _hf_source_audio_lane_summary(task, route_state, task_id=task_id)
-    screen_text_candidate = _hf_screen_text_candidate_summary(subtitle_lane, route_state, task_id=task_id)
+    audio_lane = _hf_source_audio_lane_summary(task, route_state)
+    screen_text_candidate = _hf_screen_text_candidate_summary(subtitle_lane, route_state)
     voice_state = _collect_voice_execution_state(task, settings)
-    lipsync_state = _hf_lipsync_state(task, route_state, voice_state)
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
     final_exists = bool(final_key and object_exists(str(final_key)))
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
+    lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     no_dub = route_state.get("content_mode") in {"silent_candidate", "subtitle_led"} and not str(subtitle_lane.get("dub_input_text") or "").strip()
     if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
         no_dub = False
@@ -3554,7 +3046,8 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
         "no_dub": bool(no_dub),
         "no_dub_reason": no_dub_reason,
         "no_dub_message": no_dub_message,
-        **lipsync_state,
+        "lipsync_enabled": lipsync_enabled,
+        "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
         "voiceover_url": voice_state.get("voiceover_url"),
         "deliverable_audio_done": bool(voice_state.get("deliverable_audio_done")),
         "dub_current": bool(voice_state.get("dub_current")),
@@ -5005,7 +4498,6 @@ def get_hot_follow_workbench_hub(
     origin_text = _hf_load_origin_subtitles_text(task)
     normalized_source_text = _hf_load_normalized_source_text(task_id, task)
     subtitle_lane = _hf_subtitle_lane_state(task_id, task)
-    assisted_input = _hf_load_assisted_input_state(task_id)
     route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
     audio_cfg = _hf_audio_config(task)
     voice_state = _collect_voice_execution_state(task, get_settings())
@@ -5094,7 +4586,6 @@ def get_hot_follow_workbench_hub(
             "editable": True,
             "updated_at": task.get("subtitles_override_updated_at") or task.get("updated_at"),
         },
-        "assisted_input": assisted_input,
         "audio": {
             "tts_engine": audio_cfg.get("tts_engine"),
             "tts_voice": audio_cfg.get("tts_voice"),
@@ -5447,27 +4938,6 @@ def patch_hot_follow_subtitles(
             "edited_text": _hf_load_subtitles_text(task_id, repo.get(task_id) or task),
             "editable": True,
         },
-    }
-
-
-@api_router.patch("/hot_follow/tasks/{task_id}/assisted_input")
-def patch_hot_follow_assisted_input(
-    task_id: str,
-    payload: HotFollowAssistedInputRequest,
-    repo=Depends(get_task_repository),
-):
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    assisted_input = _hf_write_assisted_input_state(
-        task_id,
-        text=payload.text or "",
-        input_kind=payload.input_kind,
-        source=payload.source,
-    )
-    return {
-        "task_id": task_id,
-        "assisted_input": assisted_input,
     }
 
 
@@ -6211,14 +5681,9 @@ def compose_hot_follow_final_video(
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
         )
-        latest_for_lipsync = repo.get(task_id) or task
         lipsync_warning = _maybe_run_hot_follow_lipsync_stub(
             task_id,
-            _hf_lipsync_state(
-                latest_for_lipsync,
-                _hf_dual_channel_state(task_id, latest_for_lipsync, _hf_subtitle_lane_state(task_id, latest_for_lipsync)),
-                _collect_voice_execution_state(latest_for_lipsync, get_settings()),
-            ),
+            os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
         )
         if lipsync_warning:
             _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
@@ -6378,14 +5843,9 @@ def compose_task(
                 "scene_outputs": current_for_plan.get("scene_outputs") or [],
             },
         )
-        latest_for_lipsync = repo.get(task_id) or task
         lipsync_warning = _maybe_run_hot_follow_lipsync_stub(
             task_id,
-            _hf_lipsync_state(
-                latest_for_lipsync,
-                _hf_dual_channel_state(task_id, latest_for_lipsync, _hf_subtitle_lane_state(task_id, latest_for_lipsync)),
-                _collect_voice_execution_state(latest_for_lipsync, get_settings()),
-            ),
+            os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
         )
         if lipsync_warning:
             _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})

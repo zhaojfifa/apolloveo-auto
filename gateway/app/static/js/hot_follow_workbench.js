@@ -59,7 +59,6 @@
 
   const hubUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/workbench_hub`;
   const composeUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/compose`;
-  const assistedInputUrl = `/api/hot_follow/tasks/${encodeURIComponent(taskId)}/assisted_input`;
   const assistedInputStorageKey = `hf_assisted_input:${taskId}`;
   const statusEl = document.getElementById("hf-status");
   const eventsEl = document.getElementById("hf-events");
@@ -113,12 +112,8 @@
   const assistedInputBlockEl = document.getElementById("hf_assisted_input_block");
   const assistedInputHintEl = document.getElementById("hf_assisted_input_hint");
   const assistedInputTextEl = document.getElementById("hf_assisted_input_text");
-  const assistedInputSourceEl = document.getElementById("hf_assisted_input_source");
-  const assistedInputKindEl = document.getElementById("hf_assisted_input_kind");
-  const assistedInputUpdatedAtEl = document.getElementById("hf_assisted_input_updated_at");
   const assistedFillSourceBtn = document.getElementById("hf_assisted_fill_source_btn");
   const assistedFillNormalizedBtn = document.getElementById("hf_assisted_fill_normalized_btn");
-  const assistedSaveBtn = document.getElementById("hf_assisted_save_btn");
   const assistedTranslateBtn = document.getElementById("hf_assisted_translate_btn");
   const assistedInputMsgEl = document.getElementById("hf_assisted_input_msg");
   const ocrCandidateBlockEl = document.getElementById("hf_ocr_candidate_block");
@@ -177,8 +172,6 @@
   const composeStatusValueEl = document.getElementById("hf_compose_status_value");
   const finalExistsValueEl = document.getElementById("hf_final_exists_value");
   const lipsyncStatusValueEl = document.getElementById("hf_lipsync_status_value");
-  const lipsyncModeValueEl = document.getElementById("hf_lipsync_mode_value");
-  const lipsyncProviderValueEl = document.getElementById("hf_lipsync_provider_value");
   const lipsyncHintEl = document.getElementById("hf_lipsync_hint");
   const contentModeEl = document.getElementById("hf_content_mode");
   const sourceAudioLaneEl = document.getElementById("hf_source_audio_lane");
@@ -206,8 +199,6 @@
   let assistedInputDirty = false;
   let assistedInputHydrated = false;
   let composeSubmissionRevision = "";
-  let assistedInputKind = "manual_source";
-  let assistedInputSource = null;
 
   function readAssistedInputDraft() {
     try {
@@ -232,18 +223,6 @@
     const draft = readAssistedInputDraft();
     if (draft && !String(assistedInputTextEl.value || "").trim()) assistedInputTextEl.value = draft;
     assistedInputHydrated = true;
-  }
-
-  function toDisplayValue(value, fallback) {
-    const text = String(value || "").trim();
-    return text || fallback || "-";
-  }
-
-  function renderAssistedInputMeta(state) {
-    const payload = state || {};
-    if (assistedInputSourceEl) assistedInputSourceEl.textContent = toDisplayValue(payload.source, "-");
-    if (assistedInputKindEl) assistedInputKindEl.textContent = toDisplayValue(payload.input_kind, "manual_source");
-    if (assistedInputUpdatedAtEl) assistedInputUpdatedAtEl.textContent = toDisplayValue(payload.updated_at, "-");
   }
 
   function escapeHtml(s) {
@@ -462,14 +441,6 @@
         assistedInputHintEl.textContent = "这里用于暂存原文手工输入、OCR 候选或商品文案。翻译后再写入下方目标语言字幕编辑区。";
       }
     }
-    const assistedInput = (currentHub && currentHub.assisted_input) || {};
-    if (assistedInputTextEl && !assistedInputDirty) {
-      const persistedText = String(assistedInput.text || "").trim();
-      assistedInputTextEl.value = persistedText || readAssistedInputDraft();
-    }
-    assistedInputKind = String(assistedInput.input_kind || assistedInputKind || "manual_source").trim() || "manual_source";
-    assistedInputSource = String(assistedInput.source || assistedInputSource || "").trim() || null;
-    renderAssistedInputMeta(assistedInput);
     hydrateAssistedInputDraft();
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
     if (subtitlesNormalizedEl) subtitlesNormalizedEl.textContent = normalized || sourcePlaceholder;
@@ -506,11 +477,11 @@
     if (ocrCandidateModeEl) ocrCandidateModeEl.textContent = candidateMode;
     if (ocrCandidateHintEl) {
       if (!candidate) {
-        ocrCandidateHintEl.textContent = "当前 OCR probe 不可用或未提取到稳定文字，这里只保留候选入口，不会自动覆盖来源层或目标字幕。";
-      } else if (candidateMode === "ocr_candidate" && candidateConfidence === "high") {
-        ocrCandidateHintEl.textContent = "当前 OCR 候选较强，建议先填充到辅助输入区，再整理翻译写入目标语言字幕区。";
+        ocrCandidateHintEl.textContent = "当前版本未启用完整自动识别，这里只保留候选入口，不会自动覆盖来源层。";
+      } else if (candidateMode === "subtitle_led" && candidateConfidence === "high") {
+        ocrCandidateHintEl.textContent = "当前画面文字候选较强，建议先填充到辅助输入区，再翻译写入目标语言字幕区。";
       } else {
-        ocrCandidateHintEl.textContent = "检测到 OCR 候选文本，可先填充到辅助输入区，再翻译写入目标语言字幕区。";
+        ocrCandidateHintEl.textContent = "检测到画面文字候选，可先填充到辅助输入区，再翻译写入目标语言字幕区。";
       }
     }
     if (ocrFillBtn) ocrFillBtn.disabled = !candidate;
@@ -524,7 +495,7 @@
     if (subtitlesMsgEl) subtitlesMsgEl.textContent = successMessage || "翻译结果已回写当前编辑区，请检查后保存字幕。";
   }
 
-  function fillAssistedInputFromText(text, successMessage, source, inputKind) {
+  function fillAssistedInputFromText(text, successMessage) {
     const value = String(text || "").trim();
     if (!value) {
       if (assistedInputMsgEl) assistedInputMsgEl.textContent = "当前没有可用的来源文字，请先检查来源层内容。";
@@ -532,10 +503,7 @@
     }
     if (assistedInputTextEl) assistedInputTextEl.value = value;
     assistedInputDirty = true;
-    assistedInputSource = String(source || "").trim() || "operator";
-    assistedInputKind = String(inputKind || "").trim() || "manual_source";
     persistAssistedInputDraft(value);
-    renderAssistedInputMeta({ source: assistedInputSource, input_kind: assistedInputKind, updated_at: null });
     if (assistedInputMsgEl) assistedInputMsgEl.textContent = successMessage || "已填充到辅助输入区。";
     return true;
   }
@@ -644,14 +612,12 @@
     if (burnSubtitleSourceEl) burnSubtitleSourceEl.textContent = (currentHub && currentHub.actual_burn_subtitle_source) || "-";
     if (composeStatusValueEl) composeStatusValueEl.textContent = (currentHub && currentHub.compose_status) || (((currentHub && currentHub.compose) || {}).last || {}).status || "-";
     if (finalExistsValueEl) finalExistsValueEl.textContent = (currentHub && currentHub.final_exists) ? "yes" : "no";
-    const lipsyncStatus = String((currentHub && currentHub.lipsync_status) || "").trim() || "off";
-    const lipsyncMode = String((currentHub && currentHub.lipsync_mode) || "").trim() || "disabled";
-    const lipsyncProvider = String((currentHub && currentHub.lipsync_provider) || "").trim() || "-";
-    if (lipsyncStatusValueEl) lipsyncStatusValueEl.textContent = lipsyncStatus;
-    if (lipsyncModeValueEl) lipsyncModeValueEl.textContent = lipsyncMode;
-    if (lipsyncProviderValueEl) lipsyncProviderValueEl.textContent = lipsyncProvider;
+    const lipsyncEnabled = Boolean(currentHub && currentHub.lipsync_enabled);
+    if (lipsyncStatusValueEl) lipsyncStatusValueEl.textContent = lipsyncEnabled ? "Enhanced path enabled (soft-fail)" : "Off";
     if (lipsyncHintEl) {
-      lipsyncHintEl.textContent = String((currentHub && currentHub.lipsync_operator_hint) || "").trim() || "Enhanced path is off by default.";
+      lipsyncHintEl.textContent = lipsyncEnabled
+        ? "Enhanced path will run before compose. Stub failures do not block the basic path."
+        : "Enhanced path is off by default.";
     }
   }
 
@@ -660,7 +626,7 @@
     const sourceAudioLane = String((currentHub && currentHub.source_audio_lane) || "").trim().toLowerCase();
     const noDub = Boolean(currentHub && currentHub.no_dub);
     const subtitleReady = Boolean(currentHub && currentHub.subtitle_ready);
-    if ((contentMode === "silent_candidate" || sourceAudioLane === "silent_candidate" || noDub) && subtitleReady) return "subtitle";
+    if ((contentMode === "silent_candidate" || noDub) && subtitleReady) return "subtitle";
     if ((contentMode === "subtitle_led" || sourceAudioLane === "music_or_text_led") && subtitleReady) return "bgm";
     if (sourceAudioLane === "mixed_audio" && subtitleReady) return "voice";
     return "voice";
@@ -806,7 +772,7 @@
     const noDubMessage = String((currentHub && currentHub.no_dub_message) || "").trim();
     const recommendedPath = String((currentHub && currentHub.recommended_path) || "").trim() || "请检查当前任务路径";
 
-    if (contentMode === "voice_led" && speechDetected && !noDub && sourceAudioLane !== "silent_candidate") {
+    if (contentMode === "voice_led" && speechDetected && !noDub) {
       const mixedDesc = sourceAudioLane === "mixed_audio"
         ? "当前素材检测到人声，同时可能带明显配乐。建议先检查字幕与配音节奏，再决定是否需要保留或减弱原背景音乐。"
         : "建议先检查字幕，再生成配音，最后合成成片。若需要微调效果，优先先改字幕，再重生成配音。";
@@ -820,7 +786,7 @@
       };
     }
 
-    if (sourceAudioLane === "silent_candidate" || (noDub && (contentMode === "silent_candidate" || noDubReason === "no_speech_detected"))) {
+    if (noDub && (contentMode === "silent_candidate" || noDubReason === "no_speech_detected")) {
       return {
         badge: "字幕驱动",
         title: "当前素材更适合字幕驱动处理",
@@ -1070,16 +1036,6 @@
       body: JSON.stringify(payload || {}),
     });
     if (!res.ok) throw new Error((await res.text()) || "save compose plan failed");
-    return res.json();
-  }
-
-  async function patchAssistedInput(payload) {
-    const res = await fetch(assistedInputUrl, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload || {}),
-    });
-    if (!res.ok) throw new Error((await res.text()) || "save assisted input failed");
     return res.json();
   }
 
@@ -1517,37 +1473,8 @@
   if (assistedInputTextEl) {
     assistedInputTextEl.addEventListener("input", () => {
       assistedInputDirty = true;
-      assistedInputKind = assistedInputKind || "manual_source";
-      assistedInputSource = assistedInputSource || "operator";
       persistAssistedInputDraft(assistedInputTextEl.value || "");
-      renderAssistedInputMeta({ source: assistedInputSource, input_kind: assistedInputKind, updated_at: null });
       if (assistedInputMsgEl) assistedInputMsgEl.textContent = "";
-    });
-  }
-  if (assistedSaveBtn) {
-    assistedSaveBtn.addEventListener("click", async (e) => {
-      e.preventDefault();
-      try {
-        assistedSaveBtn.disabled = true;
-        if (assistedInputMsgEl) assistedInputMsgEl.textContent = "正在保存辅助输入...";
-        const text = assistedInputTextEl ? String(assistedInputTextEl.value || "") : "";
-        const data = await patchAssistedInput({
-          text,
-          source: assistedInputSource || "operator",
-          input_kind: assistedInputKind || "manual_source",
-        });
-        assistedInputDirty = false;
-        persistAssistedInputDraft(((data && data.assisted_input) || {}).text || text);
-        renderAssistedInputMeta((data && data.assisted_input) || {});
-        await loadHub();
-        if (assistedInputMsgEl) assistedInputMsgEl.textContent = text.trim()
-          ? "辅助输入已保存；它不会自动覆盖目标语言字幕。"
-          : "辅助输入已清空。";
-      } catch (err) {
-        if (assistedInputMsgEl) assistedInputMsgEl.textContent = err.message || "save assisted input failed";
-      } finally {
-        assistedSaveBtn.disabled = false;
-      }
     });
   }
   if (assistedTranslateBtn) {
@@ -1572,14 +1499,14 @@
     assistedFillSourceBtn.addEventListener("click", (e) => {
       e.preventDefault();
       const text = subtitlesOriginEl ? String(subtitlesOriginEl.textContent || "").trim() : "";
-      fillAssistedInputFromText(text, "来源字幕已填充到辅助输入区，可继续翻译写入目标字幕区。", "raw_source", "manual_source");
+      fillAssistedInputFromText(text, "来源字幕已填充到辅助输入区，可继续翻译写入目标字幕区。");
     });
   }
   if (assistedFillNormalizedBtn) {
     assistedFillNormalizedBtn.addEventListener("click", (e) => {
       e.preventDefault();
       const text = subtitlesNormalizedEl ? String(subtitlesNormalizedEl.textContent || "").trim() : "";
-      fillAssistedInputFromText(text, "标准化来源文本已填充到辅助输入区，可继续翻译写入目标字幕区。", "normalized_source", "source_draft");
+      fillAssistedInputFromText(text, "标准化来源文本已填充到辅助输入区，可继续翻译写入目标字幕区。");
     });
   }
   if (ocrFillBtn) {
@@ -1592,10 +1519,7 @@
       }
       if (assistedInputTextEl) assistedInputTextEl.value = candidate;
       assistedInputDirty = true;
-      assistedInputSource = "screen_text_candidate";
-      assistedInputKind = "screen_text_candidate";
       persistAssistedInputDraft(candidate);
-      renderAssistedInputMeta({ source: assistedInputSource, input_kind: assistedInputKind, updated_at: null });
       if (assistedInputMsgEl) assistedInputMsgEl.textContent = "候选文本已填充到辅助输入区，可继续翻译写入目标字幕区。";
     });
   }

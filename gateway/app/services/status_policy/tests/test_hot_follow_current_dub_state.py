@@ -1,5 +1,4 @@
 import asyncio
-import json
 from pathlib import Path
 import sys
 import types
@@ -209,50 +208,6 @@ def test_rerun_presentation_reports_current_success_without_regressing_baseline(
     assert presentation["current_attempt"]["resolved_voice"] == "my-MM-NilarNeural"
 
 
-def test_hot_follow_lipsync_state_defaults_off(monkeypatch):
-    monkeypatch.delenv("HF_LIPSYNC_ENABLED", raising=False)
-    monkeypatch.delenv("HF_LIPSYNC_PROVIDER", raising=False)
-
-    state = tasks_router._hf_lipsync_state(
-        {"task_id": "hf-lipsync-off", "kind": "hot_follow"},
-        {"content_mode": "voice_led"},
-        {"audio_ready": True, "dub_current": True},
-    )
-
-    assert state["lipsync_status"] == "off"
-    assert state["lipsync_mode"] == "disabled"
-    assert state["lipsync_provider"] is None
-
-
-def test_hot_follow_lipsync_state_is_unavailable_without_provider(monkeypatch):
-    monkeypatch.setenv("HF_LIPSYNC_ENABLED", "1")
-    monkeypatch.delenv("HF_LIPSYNC_PROVIDER", raising=False)
-
-    state = tasks_router._hf_lipsync_state(
-        {"task_id": "hf-lipsync-unavailable", "kind": "hot_follow"},
-        {"content_mode": "voice_led"},
-        {"audio_ready": True, "dub_current": True},
-    )
-
-    assert state["lipsync_status"] == "unavailable"
-    assert state["lipsync_reason"] == "provider_unconfigured"
-
-
-def test_hot_follow_lipsync_state_ready_optional_when_voice_and_audio_ready(monkeypatch):
-    monkeypatch.setenv("HF_LIPSYNC_ENABLED", "1")
-    monkeypatch.setenv("HF_LIPSYNC_PROVIDER", "syncmock")
-
-    state = tasks_router._hf_lipsync_state(
-        {"task_id": "hf-lipsync-ready", "kind": "hot_follow"},
-        {"content_mode": "voice_led"},
-        {"audio_ready": True, "dub_current": True},
-    )
-
-    assert state["lipsync_status"] == "ready_optional"
-    assert state["lipsync_mode"] == "optional_precompose"
-    assert state["lipsync_provider"] == "syncmock"
-
-
 def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
     artifact_facts = tasks_router._hf_artifact_facts(
         "hf-rerun-presentation",
@@ -361,80 +316,23 @@ def test_source_audio_lane_summary_distinguishes_voice_led_and_silent_candidates
     assert silent["audio_mix_mode"] == "silent_or_fx"
 
 
-def test_source_audio_lane_summary_uses_no_audio_probe_when_ffprobe_finds_no_audio():
-    lane = tasks_router._hf_source_audio_lane_summary(
-        {"title": "standard talking head"},
-        {"content_mode": "voice_led", "speech_detected": True},
-        audio_profile={"status": "no_audio", "has_audio": False, "audio_stream_count": 0, "max_channels": 0},
-    )
-
-    assert lane["source_audio_lane"] == "silent_candidate"
-    assert lane["speech_presence"] == "none"
-    assert lane["bgm_presence"] == "none"
-    assert lane["audio_mix_mode"] == "no_audio"
-
-
-def test_source_audio_lane_summary_marks_mixed_audio_for_multistream_voice_source():
-    lane = tasks_router._hf_source_audio_lane_summary(
-        {"title": "product launch voiceover"},
-        {"content_mode": "voice_led", "speech_detected": True},
-        audio_profile={"status": "ok", "has_audio": True, "audio_stream_count": 2, "max_channels": 2},
-    )
-
-    assert lane["source_audio_lane"] == "mixed_audio"
-    assert lane["speech_presence"] == "high"
-    assert lane["bgm_presence"] == "high"
-    assert lane["audio_mix_mode"] == "speech_plus_bgm"
-
-
-def test_screen_text_candidate_summary_prefers_ocr_probe_candidate():
+def test_screen_text_candidate_summary_prefers_normalized_text_for_subtitle_led():
     candidate = tasks_router._hf_screen_text_candidate_summary(
         {
-            "normalized_source_text": "不会自动变成 OCR 候选",
+            "normalized_source_text": "候选字幕",
             "raw_source_text": "原始文本",
         },
         {
             "onscreen_text_detected": True,
             "onscreen_text_density": "high",
             "content_mode": "subtitle_led",
-        },
-        screen_probe={
-            "text": "候选字幕",
-            "source": "tesseract:chi_sim+eng",
-            "confidence": "high",
-            "mode": "ocr_candidate",
         },
     )
 
     assert candidate["screen_text_candidate"] == "候选字幕"
-    assert candidate["screen_text_candidate_source"] == "tesseract:chi_sim+eng"
+    assert candidate["screen_text_candidate_source"] == "normalized_source"
     assert candidate["screen_text_candidate_confidence"] == "high"
-    assert candidate["screen_text_candidate_mode"] == "ocr_candidate"
-
-
-def test_screen_text_candidate_summary_degrades_safely_when_probe_unavailable():
-    candidate = tasks_router._hf_screen_text_candidate_summary(
-        {
-            "normalized_source_text": "已有来源文本",
-            "raw_source_text": "原始文本",
-        },
-        {
-            "onscreen_text_detected": True,
-            "onscreen_text_density": "high",
-            "content_mode": "subtitle_led",
-        },
-        screen_probe={
-            "text": "",
-            "source": None,
-            "confidence": "none",
-            "mode": "unavailable",
-        },
-    )
-
-    assert candidate["screen_text_candidate"] == ""
-    assert candidate["screen_text_candidate_source"] is None
-    assert candidate["screen_text_candidate_confidence"] == "none"
-    assert candidate["screen_text_candidate_mode"] == "unavailable"
+    assert candidate["screen_text_candidate_mode"] == "subtitle_led"
 
 
 def test_collect_hot_follow_workbench_ui_does_not_keep_no_dub_when_audio_is_current(monkeypatch):
@@ -474,101 +372,6 @@ def test_collect_hot_follow_workbench_ui_does_not_keep_no_dub_when_audio_is_curr
     assert payload["actual_burn_subtitle_source"] == "mm.srt"
     assert payload["no_dub"] is False
     assert payload["no_dub_reason"] is None
-
-
-def test_collect_hot_follow_workbench_ui_prefers_audio_probe_for_audio_lane(monkeypatch):
-    monkeypatch.setattr(tasks_router, "get_settings", _settings)
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "spoken source text")
-    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "spoken source text")
-    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
-    monkeypatch.setattr(
-        tasks_router,
-        "_get_source_audio_profile",
-        lambda _task_id: {"status": "no_audio", "has_audio": False, "audio_stream_count": 0, "max_channels": 0},
-    )
-
-    payload = tasks_router._collect_hot_follow_workbench_ui(
-        {"task_id": "hf-audio-probe", "kind": "hot_follow", "target_lang": "mm", "title": "standard talking head"},
-        _settings(),
-    )
-
-    assert payload["content_mode"] == "voice_led"
-    assert payload["source_audio_lane"] == "silent_candidate"
-    assert payload["audio_mix_mode"] == "no_audio"
-
-
-def test_collect_hot_follow_workbench_ui_keeps_ocr_candidate_outside_dub_input(monkeypatch):
-    monkeypatch.setattr(tasks_router, "get_settings", _settings)
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "")
-    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
-    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
-    monkeypatch.setattr(
-        tasks_router,
-        "_get_screen_text_candidate_probe",
-        lambda _task_id: {
-            "text": "屏幕候选文案",
-            "source": "tesseract:chi_sim+eng",
-            "confidence": "high",
-            "mode": "ocr_candidate",
-        },
-    )
-    monkeypatch.setattr(tasks_router, "_get_source_audio_profile", lambda _task_id: {"status": "unknown"})
-    monkeypatch.setattr(tasks_router, "_hf_load_assisted_input_state", lambda _task_id: {
-        "text": "",
-        "input_kind": "manual_source",
-        "source": None,
-        "updated_at": None,
-        "persisted": False,
-    })
-
-    payload = tasks_router._collect_hot_follow_workbench_ui(
-        {"task_id": "hf-ocr-candidate", "kind": "hot_follow", "target_lang": "mm", "title": "subtitle led teaser"},
-        _settings(),
-    )
-
-    assert payload["screen_text_candidate"] == "屏幕候选文案"
-    assert payload["screen_text_candidate_mode"] == "ocr_candidate"
-    assert payload["dub_input_text"] == ""
-
-
-def test_collect_hot_follow_workbench_ui_reports_lipsync_unavailable_without_affecting_baseline(monkeypatch):
-    monkeypatch.setenv("HF_LIPSYNC_ENABLED", "1")
-    monkeypatch.delenv("HF_LIPSYNC_PROVIDER", raising=False)
-    monkeypatch.setattr(tasks_router, "get_settings", _settings)
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "spoken source text")
-    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "spoken source text")
-    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
-    monkeypatch.setattr(tasks_router, "_get_source_audio_profile", lambda _task_id: {"status": "unknown"})
-    monkeypatch.setattr(tasks_router, "_get_screen_text_candidate_probe", lambda _task_id: {"text": "", "mode": "unavailable"})
-
-    payload = tasks_router._collect_hot_follow_workbench_ui(
-        {"task_id": "hf-lipsync-ui", "kind": "hot_follow", "target_lang": "mm", "title": "standard talking head"},
-        _settings(),
-    )
-
-    assert payload["content_mode"] == "voice_led"
-    assert payload["lipsync_status"] == "unavailable"
-    assert payload["lipsync_mode"] == "design_only"
-    assert payload["audio_ready"] is False
-
-
-def test_lipsync_stub_only_warns_when_ready_optional(monkeypatch):
-    monkeypatch.setenv("HF_LIPSYNC_SOFT_FAIL", "1")
-
-    no_warning = tasks_router._maybe_run_hot_follow_lipsync_stub(
-        "hf-lipsync-noop",
-        {"lipsync_status": "unavailable", "lipsync_provider": None},
-    )
-    warning = tasks_router._maybe_run_hot_follow_lipsync_stub(
-        "hf-lipsync-ready",
-        {"lipsync_status": "ready_optional", "lipsync_provider": "syncmock"},
-    )
-
-    assert no_warning is None
-    assert "syncmock" in str(warning)
 
 
 def test_sync_saved_target_subtitle_artifact_writes_canonical_mm_srt(monkeypatch, tmp_path):
@@ -641,72 +444,6 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
 
     assert repo.task["mm_srt_path"] == "deliver/tasks/hf-save/mm.srt"
     assert result["subtitles"]["srt_text"].strip().endswith("မင်္ဂလာပါ")
-
-
-def test_patch_hot_follow_assisted_input_persists_outside_target_subtitles(monkeypatch, tmp_path):
-    class _Repo:
-        def __init__(self):
-            self.task = {"task_id": "hf-assisted", "kind": "hot_follow"}
-
-        def get(self, task_id):
-            assert task_id == "hf-assisted"
-            return dict(self.task)
-
-    repo = _Repo()
-    assisted_path = tmp_path / "hf-assisted" / "assisted_input.json"
-    monkeypatch.setattr(tasks_router, "_hf_assisted_input_path", lambda _task_id: assisted_path)
-
-    result = tasks_router.patch_hot_follow_assisted_input(
-        "hf-assisted",
-        tasks_router.HotFollowAssistedInputRequest(
-            text="manual source draft",
-            input_kind="source_draft",
-            source="operator",
-        ),
-        repo=repo,
-    )
-
-    saved = json.loads(assisted_path.read_text(encoding="utf-8"))
-    assert saved["text"] == "manual source draft"
-    assert saved["input_kind"] == "source_draft"
-    assert saved["source"] == "operator"
-    assert repo.task.get("mm_srt_path") is None
-    assert result["assisted_input"]["persisted"] is True
-    assert result["assisted_input"]["text"] == "manual source draft"
-
-
-def test_assisted_input_does_not_override_target_subtitle_dub_input(monkeypatch, tmp_path):
-    assisted_path = tmp_path / "hf-lane" / "assisted_input.json"
-    assisted_path.parent.mkdir(parents=True, exist_ok=True)
-    assisted_path.write_text(
-        json.dumps(
-            {
-                "text": "manual chinese candidate",
-                "input_kind": "manual_source",
-                "source": "operator",
-                "updated_at": "2026-03-16T00:00:00+00:00",
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(tasks_router, "_hf_assisted_input_path", lambda _task_id: assisted_path)
-    monkeypatch.setattr(
-        tasks_router,
-        "_hf_load_subtitles_text",
-        lambda _task_id, _task: "1\n00:00:00,000 --> 00:00:01,000\nMyanmar target subtitle",
-    )
-    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "normalized source text")
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "raw source text")
-
-    task = {"task_id": "hf-lane", "kind": "hot_follow"}
-    subtitle_lane = tasks_router._hf_subtitle_lane_state("hf-lane", task)
-    assisted = tasks_router._hf_load_assisted_input_state("hf-lane")
-
-    assert assisted["text"] == "manual chinese candidate"
-    assert subtitle_lane["edited_text"].endswith("Myanmar target subtitle")
-    assert subtitle_lane["dub_input_text"].endswith("Myanmar target subtitle")
-    assert subtitle_lane["dub_input_text"] != assisted["text"]
 
 
 def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch, tmp_path):
