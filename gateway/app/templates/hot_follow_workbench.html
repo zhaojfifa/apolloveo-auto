@@ -119,12 +119,16 @@
             <div id="hf_assisted_input_block" class="hidden mb-3 rounded-xl border border-sky-200 bg-sky-50 p-3">
               <div class="text-sm font-semibold text-sky-900">辅助输入（原文 / 候选）</div>
               <div id="hf_assisted_input_hint" class="mt-1 text-[11px] text-sky-800">这里用于暂存原文手工输入或画面文字候选。翻译后再写入下方目标语言字幕编辑区。</div>
+              <div class="mt-2 text-[11px] text-sky-700">
+                来源：<span id="hf_assisted_input_source">-</span> · 类型：<span id="hf_assisted_input_kind">-</span> · 已保存：<span id="hf_assisted_input_updated_at">-</span>
+              </div>
               <div class="flex flex-wrap items-center gap-2 mt-3">
                 <button id="hf_assisted_fill_source_btn" class="btn-secondary text-xs" type="button">从来源字幕填充</button>
                 <button id="hf_assisted_fill_normalized_btn" class="btn-secondary text-xs" type="button">从标准化来源填充</button>
               </div>
               <textarea id="hf_assisted_input_text" class="mt-3 w-full rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm" rows="6" placeholder="在此粘贴原文、商品文案或候选文字，不会直接覆盖目标语言字幕"></textarea>
               <div class="flex flex-wrap items-center gap-3 mt-3">
+                <button id="hf_assisted_save_btn" class="btn-secondary text-xs" type="button">保存辅助输入</button>
                 <button id="hf_assisted_translate_btn" class="btn-secondary text-xs" type="button">翻译并写入目标字幕区</button>
                 <span id="hf_assisted_input_msg" class="text-xs text-sky-700"></span>
               </div>
@@ -333,6 +337,8 @@
                   </div>
                   <div class="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1">
                     <div><span class="font-semibold">Lipsync / Alignment:</span> <span id="hf_lipsync_status_value">-</span></div>
+                    <div><span class="font-semibold">Lipsync Mode:</span> <span id="hf_lipsync_mode_value">-</span></div>
+                    <div><span class="font-semibold">Lipsync Provider:</span> <span id="hf_lipsync_provider_value">-</span></div>
                     <div id="hf_lipsync_hint" class="text-[11px] text-gray-500">Enhanced path is off by default.</div>
                   </div>
                   <div id="hf_compose_final_block" class="hidden rounded-xl border border-gray-200 p-3">
