@@ -1024,12 +1024,18 @@
     const pipeline = (currentHub && currentHub.pipeline) || [];
     const stepMap = {};
     pipeline.forEach(s => { if (s && s.key) stepMap[s.key] = s; });
+    // "audio" dot maps to pipeline key "dub" (backend uses "dub", UI uses "audio")
+    const keyToPipelineKey = { audio: "dub" };
+    const noDub = Boolean(currentHub && (currentHub.no_dub || (currentHub.audio && currentHub.audio.no_dub)));
     const keys = ["parse", "subtitles", "audio", "compose", "publish"];
     keys.forEach(key => {
       const dot = document.querySelector(`[data-pipe-dot="${key}"]`);
       if (!dot) return;
-      const step = stepMap[key] || {};
-      const status = String(step.status || "").toLowerCase();
+      const pipelineKey = keyToPipelineKey[key] || key;
+      const step = stepMap[pipelineKey] || {};
+      // For the audio/dub step: when no_dub is true, treat as done (skipped/not needed)
+      let status = String(step.status || "").toLowerCase();
+      if (key === "audio" && !status && noDub) status = "done";
       dot.className = "w-6 h-6 rounded-full text-center text-xs leading-6 font-bold ";
       if (status === "done" || status === "ready" || status === "success") {
         dot.className += "bg-green-100 text-green-700";

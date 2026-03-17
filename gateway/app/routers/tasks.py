@@ -4660,7 +4660,7 @@ def get_hot_follow_workbench_hub(
         dub_status=str(dub_state),
         compose_status=compose_state,
         composed_reason=composed_reason,
-        no_dub=bool(payload.get("no_dub")),
+        no_dub=bool((payload.get("audio") or {}).get("no_dub")),
     )
     payload["artifact_facts"] = artifact_facts
     payload["current_attempt"] = current_attempt
@@ -5227,7 +5227,11 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
                 _compose_fail("subtitles_missing", "overlay_subtitles enabled but target subtitle key is missing")
             storage.download_file(str(subtitle_key), str(subtitle_path))
             if not subtitle_path.exists() or subtitle_path.stat().st_size == 0:
-                _compose_fail("subtitles_missing", "overlay_subtitles enabled but subtitle file is empty")
+                if subtitle_only_compose:
+                    # No-speech task with empty subtitle: skip overlay, compose succeeds without burned-in text
+                    overlay_subtitles = False
+                else:
+                    _compose_fail("subtitles_missing", "overlay_subtitles enabled but subtitle file is empty")
 
         bgm_path = None
         if bgm_key:
@@ -5660,12 +5664,6 @@ def compose_hot_follow_final_video(
             },
         )
         return _compose_in_progress_response(task_id)
-    # --- Phase 0.1: Set DB-level lock (300s TTL) ---
-    _policy_upsert(
-        repo,
-        task_id,
-        {"compose_lock_until": (datetime.now(timezone.utc) + timedelta(seconds=300)).isoformat()},
-    )
     current_for_plan = repo.get(task_id) or task
     current_plan = dict(current_for_plan.get("compose_plan") or {})
     compose_plan = {
@@ -5679,6 +5677,12 @@ def compose_hot_follow_final_video(
         "compose_policy": "freeze_tail" if bool(current_plan.get("freeze_tail_enabled", False)) else "match_video",
     }
     try:
+        # --- Phase 0.1: Set DB-level lock (300s TTL) inside try to prevent unhandled 500 ---
+        _policy_upsert(
+            repo,
+            task_id,
+            {"compose_lock_until": (datetime.now(timezone.utc) + timedelta(seconds=300)).isoformat()},
+        )
         if req.bgm_mix is not None:
             mix = max(0.0, min(1.0, float(req.bgm_mix)))
             config = dict(current_for_plan.get("config") or {})
