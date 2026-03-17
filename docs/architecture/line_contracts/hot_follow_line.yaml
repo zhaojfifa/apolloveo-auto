@@ -1,0 +1,127 @@
+# Hot Follow Line Contract
+# RFC-0001 Production Line Contract — v1.9.0
+# Generated: 2026-03-17
+
+line_id: hot_follow_line
+line_name: "Hot Follow Line"
+line_version: "1.9.0"
+status: active
+
+# ─── Business contract ────────────────────────────────────────────────────────
+
+target_result_type: final_video
+task_kind: hot_follow
+
+# ─── Deliverable profile ──────────────────────────────────────────────────────
+
+deliverables:
+  primary:
+    kind: final_video
+    filename: hot_follow_final.mp4
+    publishable: true
+    pack_required: optional
+  secondary:
+    - kind: subtitle
+      filename: mm.srt
+    - kind: audio
+      filename: voiceover.wav
+    - kind: pack
+      filename: scene_pack.zip
+      required: false
+
+# ─── SOP profile (骨架路径) ───────────────────────────────────────────────────
+
+sop_profile_ref: docs/sop/hot_follow_v1.md
+
+# SOP steps (ordered):
+sop_steps:
+  - id: parse
+    name: "视频解析"
+    description: "下载并解析源视频，提取元数据"
+    retry_allowed: true
+  - id: subtitles
+    name: "字幕提取"
+    description: "ASR 识别 + 目标语言翻译，生成 mm.srt"
+    retry_allowed: true
+  - id: dub
+    name: "配音生成"
+    description: "基于字幕调用 TTS 生成目标语言配音"
+    retry_allowed: true
+    skip_condition: no_dub
+  - id: compose
+    name: "成片合成"
+    description: "合并视频、字幕、配音，生成最终成片"
+    retry_allowed: true
+    requires: [subtitles, dub]
+  - id: publish
+    name: "交付发布"
+    description: "上传交付物至分发中心"
+    confirmation_required: true
+
+# ─── Skills bundle ────────────────────────────────────────────────────────────
+
+skills_bundle_ref: docs/skills/
+skills:
+  - content          # 内容模式识别（voice_led / silent_candidate / subtitle_led）
+  - language         # 目标语言检测与翻译门控
+  - tts              # TTS provider 路由（Azure Speech / Edge-TTS / Lovo）
+  - compliance       # 合规过滤
+  - media-compose    # 合成参数选择（overlay_subtitles, freeze_tail, cleanup_mode）
+
+# ─── Worker profile ───────────────────────────────────────────────────────────
+
+worker_profile:
+  execution_mode: hybrid          # local FFmpeg + remote TTS/ASR
+  default_tts_provider: azure_speech
+  fallback_tts_provider: edge_tts
+  default_asr_provider: gemini
+  ffmpeg_required: true
+
+# ─── Asset sink profile ───────────────────────────────────────────────────────
+
+asset_sink:
+  auto_sink_enabled: true
+  sink_granularity:
+    - final_video
+    - subtitle
+    - audio
+    - pack
+  fingerprint_async: true
+  tag_extraction_async: true
+  promote_policy: manual          # promotion to canonical asset requires ops review
+
+# ─── Confirmation policy ──────────────────────────────────────────────────────
+
+confirmation_policy:
+  before_execute: false
+  before_result_accept: false     # workbench review is implicit
+  before_publish: true
+  before_retry: false
+
+# ─── Status policy reference ──────────────────────────────────────────────────
+
+status_policy_ref: gateway/app/services/status_policy/hot_follow_state.py
+
+# ─── Content routing summary ──────────────────────────────────────────────────
+# (from _hf_dual_channel_state implementation)
+
+content_modes:
+  voice_led:
+    description: "标准口播：有稳定人声，走配音+合成路径"
+    no_dub: false
+    recommended_compose_mode: voice
+  silent_candidate:
+    description: "无人声/ASMR：无稳定人声，优先字幕版合成"
+    no_dub: true
+    recommended_compose_mode: subtitle
+  subtitle_led:
+    description: "画面文字/BGM驱动：弱人声，字幕+BGM版合成"
+    no_dub: true
+    recommended_compose_mode: bgm
+
+# ─── Migration notes ──────────────────────────────────────────────────────────
+
+migration:
+  phase: A           # RFC-0001 Phase A — line registry defined, impl unchanged
+  next_phase: B      # Phase B — router split, bridge existing flow to contract
+  impl_location: gateway/app/routers/tasks.py  # to be extracted in Phase B

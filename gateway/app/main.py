@@ -26,6 +26,7 @@ from gateway.app.ports.storage_provider import get_storage_service, set_storage_
 from gateway.app.routers import admin_publish, admin_tools as admin_tools_router, publish as publish_router, tasks as tasks_router
 from gateway.app.routers import hot_follow_ui as hot_follow_ui_router
 from gateway.app.routers.api_tools import router as tools_api_router
+import gateway.app.lines.hot_follow as _line_reg_hot_follow  # noqa: F401 — registers HOT_FOLLOW_LINE
 from gateway.app.routes.auth import router as auth_router
 from gateway.app.routes.v17_pack import router as v17_pack_router
 from gateway.app.web.templates import render_template

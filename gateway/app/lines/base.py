@@ -1,0 +1,93 @@
+"""Production Line base contract and registry.
+
+RFC-0001: Production Line Contract
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import ClassVar
+
+
+@dataclass(frozen=True)
+class ProductionLine:
+    """Immutable contract for a single ApolloVeo production line.
+
+    Each line targets exactly one primary result (``target_result_type``) and
+    maps 1:1 to a ``task.kind`` value in the database.  All references are
+    relative paths from the repository root so they can be resolved by tooling
+    without coupling to the runtime environment.
+    """
+
+    # --- Identity ---
+    line_id: str
+    """Stable identifier, e.g. "hot_follow_line".  Must be unique in the registry."""
+
+    line_name: str
+    """Human-readable name."""
+
+    line_version: str
+    """Semantic version of this line contract, e.g. "1.9.0"."""
+
+    # --- Business contract ---
+    target_result_type: str
+    """Primary deliverable type.  Always "final_video" for v1.9/2.0 lines."""
+
+    task_kind: str
+    """Value of ``task.kind`` that this line handles, e.g. "hot_follow"."""
+
+    # --- References (relative to repo root) ---
+    sop_profile_ref: str
+    """Path to the SOP profile document for this line."""
+
+    skills_bundle_ref: str
+    """Path to the Skills bundle directory for this line."""
+
+    # --- Deliverable policy ---
+    deliverable_kinds: tuple[str, ...] = (
+        "final_video",
+        "subtitle",
+        "audio",
+        "pack",
+    )
+    """Ordered list of deliverable kinds produced by this line."""
+
+    # --- Sink / confirmation policy ---
+    auto_sink_enabled: bool = True
+    """Whether results are automatically sunk to the asset store."""
+
+    confirmation_before_publish: bool = True
+    """Whether a human confirmation gate is required before publish."""
+
+
+class LineRegistry:
+    """Class-level registry mapping line_id → ProductionLine.
+
+    Lines self-register at module import time by calling
+    ``LineRegistry.register(line)``.  The registry is process-global and
+    intentionally simple — no persistence, no concurrency concerns.
+    """
+
+    _lines: ClassVar[dict[str, ProductionLine]] = {}
+    _by_kind: ClassVar[dict[str, ProductionLine]] = {}
+
+    @classmethod
+    def register(cls, line: ProductionLine) -> ProductionLine:
+        """Register *line* and return it (supports one-liner module-level assignment)."""
+        cls._lines[line.line_id] = line
+        cls._by_kind[line.task_kind] = line
+        return line
+
+    @classmethod
+    def get(cls, line_id: str) -> ProductionLine | None:
+        """Look up a line by its stable ``line_id``."""
+        return cls._lines.get(line_id)
+
+    @classmethod
+    def for_kind(cls, task_kind: str) -> ProductionLine | None:
+        """Look up a line by the ``task.kind`` field value."""
+        return cls._by_kind.get(task_kind)
+
+    @classmethod
+    def all(cls) -> list[ProductionLine]:
+        """Return all registered lines in registration order."""
+        return list(cls._lines.values())
