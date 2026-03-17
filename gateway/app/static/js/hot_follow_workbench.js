@@ -54,6 +54,27 @@
     return finalUrl;
   }
   applyLocale(readLocale());
+
+  // Phase 1.6: Sidebar Tab switching
+  (function initSidebarTabs() {
+    const tabBtns = document.querySelectorAll(".hf-sidebar-tab");
+    const tabPanels = document.querySelectorAll(".hf-tab-panel");
+    tabBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const target = btn.dataset.tab;
+        tabBtns.forEach(b => {
+          b.classList.toggle("border-gray-900", b.dataset.tab === target);
+          b.classList.toggle("text-gray-900", b.dataset.tab === target);
+          b.classList.toggle("border-transparent", b.dataset.tab !== target);
+          b.classList.toggle("text-gray-500", b.dataset.tab !== target);
+        });
+        tabPanels.forEach(p => {
+          p.classList.toggle("hidden", p.dataset.tabPanel !== target);
+        });
+      });
+    });
+  })();
+
   const taskId = root ? root.getAttribute("data-task-id") : null;
   if (!taskId) return;
 
@@ -445,6 +466,12 @@
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
     if (subtitlesNormalizedEl) subtitlesNormalizedEl.textContent = normalized || sourcePlaceholder;
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || targetPlaceholder;
+    // Phase 0.7: collapse three-column preview when all empty
+    const _previewGrid = subtitlesOriginEl && subtitlesOriginEl.closest(".grid");
+    if (_previewGrid) {
+      const _hasContent = Boolean(origin.trim() || normalized.trim() || edited.trim());
+      _previewGrid.style.display = _hasContent ? "" : "none";
+    }
     if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = edited || "";
     const sourceCount = Number.isFinite(Number(qa.source_count)) ? Number(qa.source_count) : 0;
     const translatedCount = Number.isFinite(Number(qa.translated_count)) ? Number(qa.translated_count) : 0;
@@ -850,6 +877,91 @@
     if (freezeTailEnabledEl) freezeTailEnabledEl.checked = Boolean(composePlan.freeze_tail_enabled);
     renderComposeModes();
     renderCleanupModes();
+    // Phase 0.5: update ops guide card
+    _updateOpsGuideCard(readyGate);
+    // Phase 0.6: update compose quick bar
+    _updateComposeQuickBar(readyGate);
+  }
+
+  function _updateOpsGuideCard(readyGate) {
+    const card = document.getElementById("hf_ops_guide_card");
+    if (!card || !isHotFollowOpsGuideV1Enabled()) return;
+    const opsSummary = (currentHub && currentHub.operator_summary) || {};
+    const nextAction = String(opsSummary.recommended_next_action || "").trim();
+    const pipeline = (currentHub && currentHub.pipeline) || [];
+    const parseStep = pipeline.find(s => s && s.key === "parse") || {};
+    const subtitlesStep = pipeline.find(s => s && s.key === "subtitles") || {};
+    const subReady = Boolean(readyGate.subtitle_ready);
+    const audioReady = Boolean(readyGate.audio_ready);
+    const composeReady = Boolean(readyGate.compose_ready);
+    let title, desc, mode, path, badge;
+    if (composeReady) {
+      title = "已就绪"; desc = "成片已生成，可前往交付中心下载或发布。";
+      mode = "compose_done"; path = "前往交付中心"; badge = "已完成";
+    } else if (subReady && audioReady) {
+      title = "可以合成"; desc = "字幕和配音均已就绪，点击下方合成按钮生成最终视频。";
+      mode = "ready_to_compose"; path = "合成最终视频"; badge = "待合成";
+    } else if (subReady && !audioReady) {
+      title = "请生成配音"; desc = "字幕已就绪，请选择配音音色后点击生成配音。";
+      mode = "dub_needed"; path = "生成配音 → 合成"; badge = "待配音";
+    } else if (String(subtitlesStep.status || "").toLowerCase() === "done") {
+      title = "请编辑字幕"; desc = "原始字幕已提取，请编辑目标语言字幕并保存。";
+      mode = "edit_subtitles"; path = "编辑字幕 → 配音 → 合成"; badge = "待编辑";
+    } else if (String(parseStep.status || "").toLowerCase() === "done") {
+      title = "等待字幕生成"; desc = "解析完成，字幕正在生成中，请稍候。";
+      mode = "subtitles_pending"; path = "等待字幕 → 编辑 → 配音"; badge = "处理中";
+    } else {
+      title = "等待解析"; desc = "视频正在解析中，请稍候。";
+      mode = "parsing"; path = "解析 → 字幕 → 配音 → 合成"; badge = "处理中";
+    }
+    if (nextAction) desc = nextAction;
+    card.classList.remove("hidden");
+    const badgeEl = document.getElementById("hf_ops_guide_badge");
+    const titleEl = document.getElementById("hf_ops_guide_title");
+    const descEl = document.getElementById("hf_ops_guide_desc");
+    const modeEl = document.getElementById("hf_ops_guide_mode");
+    const pathEl = document.getElementById("hf_ops_guide_path");
+    const reasonEl = document.getElementById("hf_ops_guide_reason");
+    if (badgeEl) badgeEl.textContent = badge;
+    if (titleEl) titleEl.textContent = title;
+    if (descEl) descEl.textContent = desc;
+    if (modeEl) modeEl.textContent = mode;
+    if (pathEl) pathEl.textContent = path;
+    if (reasonEl) reasonEl.textContent = String(readyGate.compose_reason || "-");
+  }
+
+  function _updateComposeQuickBar(readyGate) {
+    const bar = document.getElementById("hf_compose_quick_bar");
+    if (!bar) return;
+    const subReady = Boolean(readyGate.subtitle_ready);
+    const audioReady = Boolean(readyGate.audio_ready);
+    const noDub = Boolean((currentHub && currentHub.audio || {}).no_dub);
+    const composeReady = Boolean(readyGate.compose_ready);
+    bar.classList.remove("hidden");
+    const subIcon = document.getElementById("hf_cq_subtitle_icon");
+    const audioIcon = document.getElementById("hf_cq_audio_icon");
+    const statusText = document.getElementById("hf_cq_status_text");
+    const composeBtn = document.getElementById("hf_compose_quick_btn");
+    if (subIcon) {
+      subIcon.textContent = subReady ? "\u2713" : "-";
+      subIcon.className = "w-5 h-5 rounded-full text-center text-xs leading-5 " + (subReady ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500");
+    }
+    if (audioIcon) {
+      const ok = audioReady || noDub;
+      audioIcon.textContent = ok ? "\u2713" : "-";
+      audioIcon.className = "w-5 h-5 rounded-full text-center text-xs leading-5 " + (ok ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500");
+    }
+    if (statusText) {
+      if (composeReady) statusText.textContent = "已合成完成";
+      else if (subReady && (audioReady || noDub)) statusText.textContent = "可以合成";
+      else if (subReady) statusText.textContent = "等待配音就绪...";
+      else statusText.textContent = "等待字幕就绪...";
+    }
+    if (composeBtn) {
+      const canCompose = subReady && (audioReady || noDub) && !composeReady;
+      composeBtn.disabled = !canCompose;
+      if (composeReady) composeBtn.textContent = "已合成";
+    }
   }
 
   function getSelectedTtsSpeed() {
@@ -886,6 +998,34 @@
     dubOutdatedBadgeEl.classList.toggle("hidden", !subtitlesChangedSinceDub);
   }
 
+  // Phase 1.7: Horizontal pipeline bar
+  function _renderPipelineBar() {
+    const pipeline = (currentHub && currentHub.pipeline) || [];
+    const stepMap = {};
+    pipeline.forEach(s => { if (s && s.key) stepMap[s.key] = s; });
+    const keys = ["parse", "subtitles", "audio", "compose", "publish"];
+    keys.forEach(key => {
+      const dot = document.querySelector(`[data-pipe-dot="${key}"]`);
+      if (!dot) return;
+      const step = stepMap[key] || {};
+      const status = String(step.status || "").toLowerCase();
+      dot.className = "w-6 h-6 rounded-full text-center text-xs leading-6 font-bold ";
+      if (status === "done" || status === "ready" || status === "success") {
+        dot.className += "bg-green-100 text-green-700";
+        dot.textContent = "\u2713";
+      } else if (status === "running" || status === "processing") {
+        dot.className += "bg-blue-100 text-blue-700 animate-pulse";
+        dot.textContent = "\u25CF";
+      } else if (status === "failed" || status === "error") {
+        dot.className += "bg-red-100 text-red-700";
+        dot.textContent = "\u2717";
+      } else {
+        dot.className += "bg-gray-200 text-gray-400";
+        dot.textContent = keys.indexOf(key) + 1;
+      }
+    });
+  }
+
   function renderScenePack() {
     const scene = (currentHub && currentHub.scenes) || {};
     const status = scene.status || t("hot_follow_scene_status_pending", "Pending");
@@ -907,26 +1047,45 @@
       refreshLocale(deliverablesGridEl);
       return;
     }
-    deliverablesGridEl.innerHTML = list.map((d) => {
-      const label = escapeHtml(d.label || d.title || d.kind || "-");
-      const key = escapeHtml(d.key || "-");
-      const status = escapeHtml(d.status || d.state || "pending");
-      const sha = d.sha256 ? `<div class="text-[10px] text-gray-400 mt-1 truncate">sha256: ${escapeHtml(d.sha256)}</div>` : "";
-      const hasUrl = Boolean(d.url);
-      const href = hasUrl ? d.url : "#";
-      const btnClass = hasUrl ? "btn-secondary" : "btn-secondary opacity-50 pointer-events-none";
-      return `
-        <div class="rounded-lg border border-gray-200 p-3">
-          <div class="flex items-center justify-between gap-3">
-            <div class="text-sm font-semibold">${label}</div>
-            <div class="text-xs rounded-full bg-gray-100 px-2 py-1">${status}</div>
-          </div>
-          <div class="text-xs text-gray-500 mt-1 truncate">${key}</div>
-          ${sha}
-          <a class="${btnClass} mt-2 inline-block text-xs" href="${href}" target="_blank" rel="noopener">${hasUrl ? "Download" : "Pending"}</a>
+    // Phase 1.8: Separate final from rest; show ready items first
+    const finalItem = list.find(d => String(d.kind || "").toLowerCase() === "final");
+    const readyItems = list.filter(d => String(d.kind || "").toLowerCase() !== "final" && String(d.status || d.state || "").toLowerCase() !== "pending");
+    const pendingItems = list.filter(d => String(d.kind || "").toLowerCase() !== "final" && String(d.status || d.state || "").toLowerCase() === "pending");
+    let html = "";
+    // Final item — full width highlight
+    if (finalItem) {
+      const status = escapeHtml(finalItem.status || finalItem.state || "pending");
+      const hasUrl = Boolean(finalItem.url);
+      const isDone = ["done", "ready", "success"].includes(status.toLowerCase());
+      html += `<div class="col-span-full rounded-xl border ${isDone ? "border-green-200 bg-green-50" : "border-gray-200"} p-4">
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-base font-bold">${escapeHtml(finalItem.label || "Final Video")}</div>
+          <div class="text-xs rounded-full ${isDone ? "bg-green-100 text-green-700" : "bg-gray-100"} px-2 py-1">${status}</div>
         </div>
-      `;
-    }).join("");
+        ${hasUrl ? `<a class="btn-primary mt-3 inline-block text-sm" href="${finalItem.url}" target="_blank" rel="noopener">Download</a>` : '<span class="text-sm text-gray-500 mt-2 inline-block">Pending</span>'}
+      </div>`;
+    }
+    // Ready items
+    readyItems.forEach(d => {
+      const label = escapeHtml(d.label || d.title || d.kind || "-");
+      const status = escapeHtml(d.status || d.state || "pending");
+      const hasUrl = Boolean(d.url);
+      const btnClass = hasUrl ? "btn-secondary" : "btn-secondary opacity-50 pointer-events-none";
+      html += `<div class="rounded-lg border border-gray-200 p-3">
+        <div class="flex items-center justify-between gap-3">
+          <div class="text-sm font-semibold">${label}</div>
+          <div class="text-xs rounded-full bg-gray-100 px-2 py-1">${status}</div>
+        </div>
+        <a class="${btnClass} mt-2 inline-block text-xs" href="${hasUrl ? d.url : "#"}" target="_blank" rel="noopener">${hasUrl ? "Download" : "Pending"}</a>
+      </div>`;
+    });
+    // Pending items — collapsed summary
+    if (pendingItems.length > 0) {
+      html += `<div class="col-span-full rounded-lg border border-dashed border-gray-200 p-3 text-xs text-gray-500">
+        其余 ${pendingItems.length} 项产物等待生成 (${pendingItems.map(d => escapeHtml(d.label || d.kind || "")).join(", ")})
+      </div>`;
+    }
+    deliverablesGridEl.innerHTML = html;
     refreshLocale(deliverablesGridEl);
   }
 
@@ -972,6 +1131,7 @@
     const composeLastStatus = String(composeLast.status || "").toLowerCase();
     if (!["running", "processing", "queued"].includes(composeLastStatus)) composeSubmitting = false;
     renderPipeline();
+    _renderPipelineBar();
     renderMedia(finalUrl);
     renderSubtitles();
     renderAudio();
@@ -1558,6 +1718,26 @@
       }
     });
   });
+
+  // Phase 0.6: compose quick bar button binding
+  const _cqBtn = document.getElementById("hf_compose_quick_btn");
+  if (_cqBtn) {
+    _cqBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      _cqBtn.disabled = true;
+      _cqBtn.textContent = "合成中...";
+      try {
+        await composeFinal();
+        await loadHub();
+      } catch (err) {
+        if (composeMsgEl) composeMsgEl.textContent = err.message || "compose failed";
+      } finally {
+        _cqBtn.disabled = false;
+        _cqBtn.textContent = "合成最终视频";
+        updateComposeButtonState();
+      }
+    });
+  }
 
   hydrateAssistedInputDraft();
   loadHub().then(() => setTab("source")).catch((e) => {
