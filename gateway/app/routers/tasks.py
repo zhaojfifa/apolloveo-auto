@@ -5747,45 +5747,57 @@ def compose_hot_follow_final_video(
         }
     except HTTPException as exc:
         detail = exc.detail if isinstance(exc.detail, dict) else {"reason": "compose_failed", "message": str(exc.detail)}
-        _policy_upsert(
-            repo,
-            task_id,
-            {
-                "compose_status": "failed",
-                "compose_error": detail,
-                "compose_error_reason": detail.get("reason"),
-                "compose_last_status": "failed",
-                "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-                "compose_last_error": detail.get("message") or str(exc.detail),
-                "status": "failed",
-                "last_step": "compose",
-                "final_video_key": None,
-                "final_video_path": None,
-            },
-        )
+        try:
+            _policy_upsert(
+                repo,
+                task_id,
+                {
+                    "compose_status": "failed",
+                    "compose_error": detail,
+                    "compose_error_reason": detail.get("reason"),
+                    "compose_last_status": "failed",
+                    "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
+                    "compose_last_error": detail.get("message") or str(exc.detail),
+                    "status": "failed",
+                    "last_step": "compose",
+                    "final_video_key": None,
+                    "final_video_path": None,
+                },
+            )
+        except Exception:
+            logger.exception("COMPOSE_STATUS_UPDATE_FAILED task=%s (in HTTPException handler)", task_id)
         raise
     except Exception as exc:
         detail = {"reason": "compose_failed", "message": str(exc)}
-        _policy_upsert(
-            repo,
-            task_id,
-            {
-                "compose_status": "failed",
-                "compose_error": detail,
-                "compose_error_reason": detail.get("reason"),
-                "compose_last_status": "failed",
-                "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-                "compose_last_error": detail.get("message"),
-                "status": "failed",
-                "last_step": "compose",
-                "final_video_key": None,
-                "final_video_path": None,
-            },
-        )
+        try:
+            _policy_upsert(
+                repo,
+                task_id,
+                {
+                    "compose_status": "failed",
+                    "compose_error": detail,
+                    "compose_error_reason": detail.get("reason"),
+                    "compose_last_status": "failed",
+                    "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
+                    "compose_last_error": detail.get("message"),
+                    "status": "failed",
+                    "last_step": "compose",
+                    "final_video_key": None,
+                    "final_video_path": None,
+                },
+            )
+        except Exception:
+            logger.exception("COMPOSE_STATUS_UPDATE_FAILED task=%s (in Exception handler)", task_id)
         raise HTTPException(status_code=409, detail=detail) from exc
     finally:
-        _policy_upsert(repo, task_id, {"compose_lock_until": None})
-        lock.release()
+        try:
+            _policy_upsert(repo, task_id, {"compose_lock_until": None})
+        except Exception:
+            logger.exception("COMPOSE_LOCK_CLEAR_FAILED task=%s", task_id)
+        try:
+            lock.release()
+        except Exception:
+            logger.exception("COMPOSE_LOCK_RELEASE_FAILED task=%s", task_id)
 
 
 @api_router.post("/tasks/{task_id}/compose")
