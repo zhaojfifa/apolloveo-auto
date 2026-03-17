@@ -1035,7 +1035,7 @@
       const step = stepMap[pipelineKey] || {};
       // For the audio/dub step: when no_dub is true, treat as done (skipped/not needed)
       let status = String(step.status || "").toLowerCase();
-      if (key === "audio" && !status && noDub) status = "done";
+      if (key === "audio" && noDub && !["done", "running", "failed", "error"].includes(status)) status = "done";
       dot.className = "w-6 h-6 rounded-full text-center text-xs leading-6 font-bold ";
       if (status === "done" || status === "ready" || status === "success") {
         dot.className += "bg-green-100 text-green-700";

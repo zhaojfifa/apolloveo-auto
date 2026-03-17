@@ -1954,7 +1954,7 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
     }
 
 
-def _hf_dual_channel_state(task_id: str, task: dict, subtitle_lane: dict[str, Any] | None = None) -> dict[str, Any]:
+def _hf_dual_channel_state(task_id: str, task: dict, subtitle_lane: dict[str, Any] | None = None, *, subtitles_step_done: bool = True) -> dict[str, Any]:
     lane = subtitle_lane or _hf_subtitle_lane_state(task_id, task)
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     raw_text = str(lane.get("raw_source_text") or "")
@@ -1967,8 +1967,16 @@ def _hf_dual_channel_state(task_id: str, task: dict, subtitle_lane: dict[str, An
     subtitle_stream = pipeline_config.get("subtitle_stream") == "true"
     onscreen_text_detected = bool(subtitle_stream or (not speech_detected and has_text))
     onscreen_text_density = "high" if onscreen_text_detected and len(normalized_text.strip() or raw_text.strip()) >= 20 else ("low" if onscreen_text_detected else "none")
+    # When subtitle extraction is still running and no text has been found yet,
+    # do NOT conclude "silent_candidate" — speech detection is indeterminate.
+    # Default to "voice_led" (standard dubbing path) until subtitles step completes.
+    subtitle_still_pending = not subtitles_step_done and not has_text and not no_subtitles
     if speech_detected:
         content_mode = "voice_led"
+    elif subtitle_still_pending:
+        content_mode = "voice_led"
+        speech_detected = True
+        speech_confidence = "pending"
     elif onscreen_text_detected:
         content_mode = "subtitle_led"
     else:
@@ -3011,7 +3019,9 @@ def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
 def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     task_id = str(task.get("task_id") or task.get("id") or "")
     subtitle_lane = _hf_subtitle_lane_state(task_id, task)
-    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
+    _sub_status_b, _ = _hf_pipeline_state(task, "subtitles")
+    _sub_done_b = _sub_status_b in ("done", "ready", "success", "completed", "failed", "error")
+    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane, subtitles_step_done=_sub_done_b)
     audio_lane = _hf_source_audio_lane_summary(task, route_state)
     screen_text_candidate = _hf_screen_text_candidate_summary(subtitle_lane, route_state)
     voice_state = _collect_voice_execution_state(task, settings)
@@ -4504,7 +4514,8 @@ def get_hot_follow_workbench_hub(
     origin_text = _hf_load_origin_subtitles_text(task)
     normalized_source_text = _hf_load_normalized_source_text(task_id, task)
     subtitle_lane = _hf_subtitle_lane_state(task_id, task)
-    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
+    _sub_step_done = str(subtitles_state).strip().lower() in ("done", "ready", "success", "completed", "failed", "error")
+    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane, subtitles_step_done=_sub_step_done)
     audio_cfg = _hf_audio_config(task)
     voice_state = _collect_voice_execution_state(task, get_settings())
     persisted_audio = _hf_persisted_audio_state(task_id, task)
