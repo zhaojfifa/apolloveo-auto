@@ -125,6 +125,10 @@ def ensure_task_extra_columns(engine) -> None:
         )
     if "pipeline_config" not in columns:
         alter_statements.append("ALTER TABLE tasks ADD COLUMN pipeline_config TEXT")
+    if "compose_lock_until" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN compose_lock_until DATETIME")
+    if "subtitles_content_hash" not in columns:
+        alter_statements.append("ALTER TABLE tasks ADD COLUMN subtitles_content_hash VARCHAR(64)")
 
     if not alter_statements:
         return
