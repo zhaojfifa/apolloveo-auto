@@ -713,17 +713,37 @@ async def run_subtitles_step(req: SubtitlesRequest):
     )
     try:
         _update_task(req.task_id, subtitles_status="running", subtitles_error=None)
-        step_timeout_sec = _env_int("SUBTITLES_STEP_TIMEOUT_SEC", 7200)
-        result = await asyncio.wait_for(
-            generate_subtitles(
-                task_id=req.task_id,
-                target_lang=req.target_lang,
-                force=req.force,
-                translate_enabled=req.translate,
-                use_ffmpeg_extract=True,
-            ),
-            timeout=step_timeout_sec,
-        )
+        # Fast-path: skip Whisper when pipeline already recorded no_subtitles from a
+        # previous run AND the caller did not explicitly force re-extraction.
+        if not req.force:
+            try:
+                _fast_repo = get_task_repository()
+                _fast_task = _fast_repo.get(req.task_id) or {}
+                _fast_pc = parse_pipeline_config(_fast_task.get("pipeline_config"))
+                if _fast_pc.get("no_subtitles") == "true":
+                    from gateway.app.core.workspace import Workspace as _WS
+                    from gateway.app.steps.subtitles import _write_no_subtitles_placeholders as _wnsp
+                    _ws = _WS(req.task_id)
+                    result = _wnsp(workspace=_ws, task_id=req.task_id, reason="cached_no_subtitles", log_stage=lambda *a, **k: None)
+                    # fall through to normal result handling below
+                else:
+                    result = None
+            except Exception:
+                result = None
+        else:
+            result = None
+        if result is None:
+            step_timeout_sec = _env_int("SUBTITLES_STEP_TIMEOUT_SEC", 7200)
+            result = await asyncio.wait_for(
+                generate_subtitles(
+                    task_id=req.task_id,
+                    target_lang=req.target_lang,
+                    force=req.force,
+                    translate_enabled=req.translate,
+                    use_ffmpeg_extract=True,
+                ),
+                timeout=step_timeout_sec,
+            )
         probe = result.get("stream_probe") if isinstance(result, dict) else None
         clean_generated = bool(result.get("clean_video_generated")) if isinstance(result, dict) else False
         no_subtitles_flag = bool(result.get("no_subtitles")) if isinstance(result, dict) else False

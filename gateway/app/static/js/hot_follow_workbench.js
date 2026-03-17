@@ -451,6 +451,12 @@
         : "这里是当前目标语言字幕编辑区。保存后会更新 mm.srt，并影响后续配音与合成。";
     }
     if (assistedInputBlockEl) assistedInputBlockEl.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
+    // Auto-expand the assisted input block for no-speech tasks that need manual input
+    const _noDubForInput = Boolean(currentHub && currentHub.no_dub) || Boolean(currentHub && currentHub.audio && currentHub.audio.no_dub);
+    const _subReadyForInput = Boolean(currentHub && currentHub.subtitle_ready);
+    if (isHotFollowOpsGuideV1Enabled() && _noDubForInput && !_subReadyForInput && assistedInputBlockEl) {
+      assistedInputBlockEl.classList.remove("hidden");
+    }
     if (assistedInputHintEl) {
       if (!isHotFollowOpsGuideV1Enabled()) {
         assistedInputHintEl.textContent = "这里用于暂存辅助输入。";
@@ -894,6 +900,9 @@
     const subReady = Boolean(readyGate.subtitle_ready);
     const audioReady = Boolean(readyGate.audio_ready);
     const composeReady = Boolean(readyGate.compose_ready);
+    const noDub = Boolean((currentHub && currentHub.no_dub) || (currentHub && currentHub.audio && currentHub.audio.no_dub));
+    const noDubReason = String((currentHub && currentHub.no_dub_reason) || (currentHub && currentHub.audio && currentHub.audio.no_dub_reason) || "").trim();
+    const subtitleRunning = String(subtitlesStep.status || "").toLowerCase() === "running";
     let title, desc, mode, path, badge;
     if (composeReady) {
       title = "已就绪"; desc = "成片已生成，可前往交付中心下载或发布。";
@@ -901,6 +910,17 @@
     } else if (subReady && audioReady) {
       title = "可以合成"; desc = "字幕和配音均已就绪，点击下方合成按钮生成最终视频。";
       mode = "ready_to_compose"; path = "合成最终视频"; badge = "待合成";
+    } else if (subReady && noDub) {
+      title = "可以合成（字幕版）"; desc = "字幕已就绪，当前素材适合直接字幕版合成，无需配音。点击合成按钮生成最终视频。";
+      mode = "ready_subtitle_only"; path = "合成字幕版"; badge = "待合成";
+    } else if (!subReady && noDub) {
+      if (subtitleRunning) {
+        title = "等待字幕检测"; desc = "正在自动检测字幕，当前素材可能无可提取语音。也可直接在下方字幕编辑区手工输入缅语文字，保存后即可合成。";
+        mode = "subtitle_running_no_speech"; path = "等待检测 / 手工输入字幕 → 合成"; badge = "检测中";
+      } else {
+        title = "请手工输入字幕"; desc = "当前素材未检测到可提取字幕，请在下方字幕编辑区手工输入缅语文字并保存，然后合成字幕版。";
+        mode = "manual_subtitle_needed"; path = "手工输入字幕 → 保存 → 合成"; badge = "待输入";
+      }
     } else if (subReady && !audioReady) {
       title = "请生成配音"; desc = "字幕已就绪，请选择配音音色后点击生成配音。";
       mode = "dub_needed"; path = "生成配音 → 合成"; badge = "待配音";
@@ -955,6 +975,7 @@
       if (composeReady) statusText.textContent = "已合成完成";
       else if (subReady && (audioReady || noDub)) statusText.textContent = "可以合成";
       else if (subReady) statusText.textContent = "等待配音就绪...";
+      else if (noDub) statusText.textContent = "等待字幕（可手工输入）...";
       else statusText.textContent = "等待字幕就绪...";
     }
     if (composeBtn) {

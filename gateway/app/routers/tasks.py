@@ -3154,6 +3154,7 @@ def _hf_operator_summary(
     artifact_facts: dict[str, Any],
     current_attempt: dict[str, Any],
     no_dub: bool,
+    subtitle_ready: bool = False,
 ) -> dict[str, Any]:
     last_successful_output_available = bool(artifact_facts.get("final_exists"))
     dub_status = str(current_attempt.get("dub_status") or "").strip().lower()
@@ -3164,7 +3165,9 @@ def _hf_operator_summary(
         and not bool(current_attempt.get("audio_ready"))
         and not no_dub
     )
-    if no_dub:
+    if no_dub and not subtitle_ready:
+        recommended_next_action = "当前素材无可提取字幕，正在等待自动检测完成；也可直接在下方字幕编辑区手工输入缅语文字，保存后即可合成字幕版。"
+    elif no_dub:
         recommended_next_action = "当前素材适合字幕驱动路径，可先保存字幕并直接合成字幕版。"
     elif current_attempt.get("requires_recompose"):
         recommended_next_action = "当前配音已更新，建议重新合成最终视频以生成最新版本。"
@@ -3218,6 +3221,7 @@ def _hf_safe_presentation_aggregates(
             artifact_facts=artifact_facts,
             current_attempt=current_attempt,
             no_dub=no_dub,
+            subtitle_ready=bool((subtitle_lane or {}).get("subtitle_ready")),
         )
         return artifact_facts, current_attempt, operator_summary
     except Exception:

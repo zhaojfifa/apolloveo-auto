@@ -231,7 +231,9 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
             blocking.append("tts_voice_invalid")
         if final_exists and not audio_ready and not no_dub:
             blocking.append("audio_not_ready")
-        if no_dub and no_dub_reason:
+        # Only surface no_dub_reason as a blocker when subtitle is also not ready;
+        # once subtitles are ready the no_speech signal is informational only.
+        if no_dub and no_dub_reason and not subtitle_ready:
             blocking.append(no_dub_reason)
     else:
         blocking = [b for b in blocking if b != "compose_not_done"]
@@ -246,6 +248,15 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
                 item["status"] = "done" if compose_ready else "pending"
                 item["state"] = "done" if compose_ready else "pending"
                 break
+    # compose_reason: if no_dub but subtitle is already ready, use compose_not_done
+    # so the compose button is enabled; only use no_dub_reason while subtitle is missing.
+    _compose_reason: str
+    if compose_ready:
+        _compose_reason = "ready"
+    elif no_dub and not subtitle_ready and no_dub_reason:
+        _compose_reason = no_dub_reason
+    else:
+        _compose_reason = "compose_not_done"
     state["ready_gate"] = {
         "final_exists": final_exists,
         "subtitle_ready": subtitle_ready,
@@ -254,7 +265,7 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         "audio_ready_reason": str(audio.get("audio_ready_reason") or ("ready" if audio_ready else "audio_not_ready")),
         "compose_ready": compose_ready,
         "publish_ready": compose_ready,
-        "compose_reason": "ready" if compose_ready else (no_dub_reason if no_dub else "compose_not_done"),
+        "compose_reason": _compose_reason,
         "blocking": blocking,
     }
     return state
