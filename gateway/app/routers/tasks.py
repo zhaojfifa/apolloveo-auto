@@ -5638,11 +5638,11 @@ def compose_hot_follow_final_video(
     _compose_lock_until = task.get("compose_lock_until")
     if _compose_lock_until:
         try:
-            from datetime import datetime, timezone
-            _lock_dt = datetime.fromisoformat(str(_compose_lock_until)) if isinstance(_compose_lock_until, str) else _compose_lock_until
+            from datetime import datetime as _dt_cls, timezone as _tz
+            _lock_dt = _dt_cls.fromisoformat(str(_compose_lock_until)) if isinstance(_compose_lock_until, str) else _compose_lock_until
             if _lock_dt.tzinfo is None:
-                _lock_dt = _lock_dt.replace(tzinfo=timezone.utc)
-            if _lock_dt > datetime.now(timezone.utc):
+                _lock_dt = _lock_dt.replace(tzinfo=_tz.utc)
+            if _lock_dt > _dt_cls.now(_tz.utc):
                 return _compose_in_progress_response(task_id)
         except Exception:
             pass  # malformed lock value — ignore and proceed
