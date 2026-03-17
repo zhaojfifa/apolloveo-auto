@@ -87,6 +87,12 @@ class Task(Base):
     pack_provider = Column(String(64), nullable=True)
     face_swap_provider = Column(String(64), nullable=True)
 
+    # === 6. Compose Lock (Phase 0.1 — DB-level advisory lock) ===
+    compose_lock_until = Column(DateTime, nullable=True)
+
+    # === 7. Subtitle Version Tracking (Phase 0.2) ===
+    subtitles_content_hash = Column(String(64), nullable=True)
+
     created_at = Column(DateTime, nullable=False, default=dt.datetime.utcnow)
     updated_at = Column(
         DateTime,

@@ -13,7 +13,7 @@ import tempfile
 import time
 import threading
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 from uuid import uuid4
@@ -1973,7 +1973,9 @@ def _hf_dual_channel_state(task_id: str, task: dict, subtitle_lane: dict[str, An
         content_mode = "subtitle_led"
     else:
         content_mode = "silent_candidate"
-    if "asmr" in title_hint or "无人声" in title_hint or "涂抹音" in title_hint:
+    _silent_kw_raw = getattr(get_settings(), "hot_follow_silent_keywords", "") or "asmr,无人声,涂抹音"
+    _silent_keywords = [k.strip().lower() for k in _silent_kw_raw.split(",") if k.strip()]
+    if any(kw in title_hint for kw in _silent_keywords):
         speech_detected = False
         speech_confidence = "none"
         content_mode = "silent_candidate" if not onscreen_text_detected else "subtitle_led"
@@ -4913,6 +4915,8 @@ def patch_hot_follow_subtitles(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     text, text_mode = _hf_normalize_subtitles_save_text(task, payload.srt_text or "")
+    # Phase 0.2: compute content hash for revision consistency
+    _subtitle_content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16] if text else None
     override_path = _hf_subtitles_override_path(task_id)
     override_path.parent.mkdir(parents=True, exist_ok=True)
     override_path.write_text(text, encoding="utf-8")
@@ -4926,6 +4930,7 @@ def patch_hot_follow_subtitles(
             "mm_srt_path": synced_mm_key or task.get("mm_srt_path"),
             "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
             "subtitles_override_mode": text_mode,
+            "subtitles_content_hash": _subtitle_content_hash,
             "error_message": None,
             "error_reason": None,
         },
@@ -5609,6 +5614,20 @@ def compose_hot_follow_final_video(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     req = payload or HotFollowComposeRequest()
+
+    # --- Phase 0.1: DB-level advisory lock (survives process restart) ---
+    _compose_lock_until = task.get("compose_lock_until")
+    if _compose_lock_until:
+        try:
+            from datetime import datetime, timezone
+            _lock_dt = datetime.fromisoformat(str(_compose_lock_until)) if isinstance(_compose_lock_until, str) else _compose_lock_until
+            if _lock_dt.tzinfo is None:
+                _lock_dt = _lock_dt.replace(tzinfo=timezone.utc)
+            if _lock_dt > datetime.now(timezone.utc):
+                return _compose_in_progress_response(task_id)
+        except Exception:
+            pass  # malformed lock value — ignore and proceed
+
     revision = _hf_compose_revision_snapshot(task)
     expected_subtitle_updated_at = str(req.expected_subtitle_updated_at or "").strip() or None
     expected_audio_sha256 = str(req.expected_audio_sha256 or "").strip() or None
@@ -5637,6 +5656,12 @@ def compose_hot_follow_final_video(
             },
         )
         return _compose_in_progress_response(task_id)
+    # --- Phase 0.1: Set DB-level lock (300s TTL) ---
+    _policy_upsert(
+        repo,
+        task_id,
+        {"compose_lock_until": (datetime.now(timezone.utc) + timedelta(seconds=300)).isoformat()},
+    )
     current_for_plan = repo.get(task_id) or task
     current_plan = dict(current_for_plan.get("compose_plan") or {})
     compose_plan = {
@@ -5740,6 +5765,7 @@ def compose_hot_follow_final_video(
         )
         raise HTTPException(status_code=409, detail=detail) from exc
     finally:
+        _policy_upsert(repo, task_id, {"compose_lock_until": None})
         lock.release()
 
 
@@ -5803,6 +5829,7 @@ def compose_task(
     final_meta = object_head(str(final_key)) if final_key else None
     final_size, _ = media_meta_from_head(final_meta)
     if final_key and object_exists(str(final_key)) and final_size >= MIN_VIDEO_BYTES and not req.force:
+        _policy_upsert(repo, task_id, {"compose_lock_until": None})
         lock.release()
         return {
             "task_id": task_id,
@@ -5903,6 +5930,7 @@ def compose_task(
         )
         raise HTTPException(status_code=409, detail=detail) from exc
     finally:
+        _policy_upsert(repo, task_id, {"compose_lock_until": None})
         lock.release()
 
 

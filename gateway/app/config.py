@@ -103,6 +103,12 @@ class Settings(BaseSettings):
     )
     apollo_avatar_live_timeout_sec: int = Field(300, env="APOLLO_AVATAR_LIVE_TIMEOUT_SEC")
     demo_asset_base_url: str = Field("", env="DEMO_ASSET_BASE_URL")
+
+    # Hot Follow — silent content detection keywords (Phase 0.3)
+    hot_follow_silent_keywords: str = Field(
+        "asmr,无人声,涂抹音,no voice,silent",
+        env="HOT_FOLLOW_SILENT_KEYWORDS",
+    )
 # === Storage Configuration (PR-0B) ===
     STORAGE_BACKEND: str = "local"  # 选项: "local", "s3"
     
