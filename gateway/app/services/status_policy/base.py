@@ -17,9 +17,10 @@ class StatusPolicy:
         step: str,
         updates: Dict[str, Any],
         force: bool = False,
+        kind: str | None = None,
     ) -> Dict[str, Any]:
         del step
         del force
-        kind = getattr(self, "kind", None)
-        return coerce_final_status(kind, task, updates or {})
+        resolved_kind = kind or getattr(self, "kind", None)
+        return coerce_final_status(resolved_kind, task, updates or {})
 

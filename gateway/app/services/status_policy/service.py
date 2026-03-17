@@ -16,7 +16,7 @@ def policy_upsert(
     force: bool = False,
 ) -> dict:
     cur = (repo.get(task_id) or task or {})
-    policy = get_status_policy(cur)
+    policy, _kind = get_status_policy(cur)
 
     filtered = policy.reconcile_after_step(
         cur,

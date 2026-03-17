@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Tuple
 
 from .base import StatusPolicy
 from .apollo_avatar import ApolloAvatarStatusPolicy
@@ -14,18 +14,19 @@ _POLICIES: Dict[str, StatusPolicy] = {
 }
 
 
-def get_policy(kind: str | None) -> StatusPolicy:
+def get_policy(kind: str | None) -> Tuple[StatusPolicy, str]:
+    """Return (policy, normalized_kind) without mutating the singleton."""
     k = (kind or "").strip().lower()
     if k == "apollo-avatar":
         k = "apollo_avatar"
     policy = _POLICIES.get(k, _DEFAULT)
-    setattr(policy, "kind", k)
-    return policy
+    return policy, k
 
 
-def get_status_policy(task: dict | None) -> StatusPolicy:
+def get_status_policy(task: dict | None) -> Tuple[StatusPolicy, str]:
+    """Return (policy, kind) for a task dict."""
     if not task:
-        return _DEFAULT
+        return _DEFAULT, ""
     kind = (
         (task.get("kind") if isinstance(task, dict) else None)
         or (task.get("task_kind") if isinstance(task, dict) else None)

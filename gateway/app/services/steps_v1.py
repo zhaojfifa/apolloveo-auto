@@ -32,7 +32,6 @@ from gateway.app.services.artifact_storage import upload_task_artifact, get_down
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.services.status_policy.registry import get_status_policy
 from gateway.app.services.status_policy.service import policy_upsert
-from gateway.app.services.status_policy.registry import get_status_policy
 from gateway.app.services.dubbing import DubbingError, synthesize_voice
 from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
 from gateway.app.services.parse import detect_platform, parse_video
@@ -1780,7 +1779,7 @@ async def run_post_generate_pipeline(
     )
 
     # Status policy hook (no-op by default; apollo_avatar prevents READY regression when publish bundle exists)
-    _policy = get_status_policy(task)
+    _policy, _policy_kind = get_status_policy(task)
 
     def _update(fields: dict) -> None:
         nonlocal task
@@ -2161,7 +2160,7 @@ def _update_task(task_id: str, **fields) -> None:
         sorted(list(fields.keys())),
     )
     current = repo.get(task_id) or {}
-    policy = get_status_policy(current)
+    policy, _kind = get_status_policy(current)
     updates = policy.reconcile_after_step(
         current,
         step="steps_v1._update_task",
@@ -2181,8 +2180,8 @@ def _update_pipeline_config(task_id: str, updates: dict[str, str]) -> None:
             return
         current = parse_pipeline_config(task.pipeline_config)
         current.update(updates)
-        task.pipeline_config = pipeline_config_to_storage(current)
-        db.commit()
+        repo = get_task_repository()
+        policy_upsert(repo, task_id, None, {"pipeline_config": pipeline_config_to_storage(current)}, step="pipeline_config")
     finally:
         db.close()
 

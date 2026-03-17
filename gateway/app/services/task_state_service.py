@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Any
 
-from gateway.app.db import SessionLocal
-from gateway.app.models import Task
 from gateway.app.services.status_policy.service import policy_upsert
 
 
@@ -12,12 +9,10 @@ class TaskStateService:
     def __init__(
         self,
         *,
-        repo: Any | None = None,
-        session: Any | None = None,
+        repo: Any,
         step: str = "services.task_state",
     ) -> None:
         self._repo = repo
-        self._session = session
         self._step = step
 
     def set_pack_key(self, task_id: str, pack_key: str) -> None:
@@ -42,22 +37,4 @@ class TaskStateService:
     def update_fields(self, task_id: str, fields: dict) -> None:
         if not fields:
             return
-        if self._repo is not None:
-            policy_upsert(self._repo, task_id, None, fields, step=self._step)
-            return
-
-        db = self._session or SessionLocal()
-        close_db = self._session is None
-        try:
-            task = db.query(Task).filter(Task.id == task_id).first()
-            if not task:
-                return
-            for key, value in fields.items():
-                if hasattr(task, key):
-                    setattr(task, key, value)
-            if hasattr(task, "updated_at"):
-                task.updated_at = datetime.utcnow()
-            db.commit()
-        finally:
-            if close_db:
-                db.close()
+        policy_upsert(self._repo, task_id, None, fields, step=self._step)

@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from gateway.app.config import get_settings
 from gateway.app.db import SessionLocal, engine
+from gateway.app.db import get_task_repository as _get_task_repo
 from gateway.app.core.workspace import (
     Workspace,
     get_task_workspace,
@@ -237,7 +238,7 @@ async def run_pipeline_for_task(task_id: str, db: Session):
         pack_req = schemas.PackRequest(task_id=task.id)
         ok, pack_res = await _run_step("pack", pack_handler(pack_req))
         if not ok:
-            TaskStateService(session=db, step="steps.pipeline_v1").update_fields(
+            TaskStateService(repo=_get_task_repo(db), step="steps.pipeline_v1").update_fields(
                 task_id,
                 {
                     "status": "error",
@@ -256,11 +257,11 @@ async def run_pipeline_for_task(task_id: str, db: Session):
                 or pack_res.get("pack_path")
             )
         if pack_key:
-            TaskStateService(session=db, step="steps.pipeline_v1").set_pack_key(
+            TaskStateService(repo=_get_task_repo(db), step="steps.pipeline_v1").set_pack_key(
                 task_id, str(pack_key)
             )
 
-        TaskStateService(session=db, step="steps.pipeline_v1").update_fields(
+        TaskStateService(repo=_get_task_repo(db), step="steps.pipeline_v1").update_fields(
             task_id,
             {
                 "status": "ready",

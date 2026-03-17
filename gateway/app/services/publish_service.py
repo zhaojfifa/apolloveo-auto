@@ -15,6 +15,7 @@ from gateway.app.core.workspace import (
     relative_to_workspace,
     workspace_root,
 )
+from gateway.app.services.status_policy.service import policy_upsert
 
 PUBLISH_PROVIDER_DEFAULT = os.getenv("PUBLISH_PROVIDER", "local")
 
@@ -121,13 +122,13 @@ def publish_task_pack(
             download_url = f"{R2_PUBLIC_BASE_URL.rstrip('/')}/{key}"
         else:
             download_url = ""
-        if db is not None and isinstance(task, models.Task):
-            task.publish_provider = "r2"
-            task.publish_key = key
-            task.publish_url = download_url
-            task.publish_status = "ready"
-            task.published_at = published_at
-            db.commit()
+        _publish_upsert(task_id, task_repo=task_repo, db=db, updates={
+            "publish_provider": "r2",
+            "publish_key": key,
+            "publish_url": download_url,
+            "publish_status": "ready",
+            "published_at": published_at,
+        })
         return {
             "provider": "r2",
             "publish_key": key,
@@ -136,19 +137,33 @@ def publish_task_pack(
         }
 
     publish_key, rel = _local_publish_copy(task_id, zip_path)
-    if db is not None and isinstance(task, models.Task):
-        task.publish_provider = "local"
-        task.publish_key = publish_key
-        task.publish_url = ""
-        task.publish_status = "ready"
-        task.published_at = published_at
-        db.commit()
+    _publish_upsert(task_id, task_repo=task_repo, db=db, updates={
+        "publish_provider": "local",
+        "publish_key": publish_key,
+        "publish_url": "",
+        "publish_status": "ready",
+        "published_at": published_at,
+    })
     return {
         "provider": "local",
         "publish_key": publish_key,
         "download_url": rel,
         "published_at": published_at,
     }
+
+
+def _publish_upsert(task_id: str, *, task_repo=None, db=None, updates: dict) -> None:
+    """Write publish state through policy_upsert when possible, fallback to repo/db."""
+    if task_repo is not None:
+        policy_upsert(task_repo, task_id, None, updates, step="publish")
+        return
+    if db is not None:
+        task = db.query(models.Task).filter(models.Task.id == task_id).first()
+        if task:
+            for k, v in updates.items():
+                if hasattr(task, k):
+                    setattr(task, k, v)
+            db.commit()
 
 
 def resolve_download_url(task: models.Task) -> str:
