@@ -645,6 +645,19 @@
     if (burnSubtitleSourceEl) burnSubtitleSourceEl.textContent = (currentHub && currentHub.actual_burn_subtitle_source) || "-";
     if (composeStatusValueEl) composeStatusValueEl.textContent = (currentHub && currentHub.compose_status) || (((currentHub && currentHub.compose) || {}).last || {}).status || "-";
     if (finalExistsValueEl) finalExistsValueEl.textContent = (currentHub && currentHub.final_exists) ? "yes" : "no";
+    // Dub text source hint (Phase 1.3 ops iteration)
+    const dubSourceEl = document.getElementById("hf_dub_text_source_value");
+    if (dubSourceEl) {
+      const contentMode = String((currentHub && currentHub.content_mode) || "").trim().toLowerCase();
+      const noDub = Boolean((currentHub && currentHub.audio || {}).no_dub);
+      if (noDub || contentMode === "silent_candidate") {
+        dubSourceEl.textContent = "当前无需配音（静默 / ASMR 模式），仅合成字幕版";
+      } else if (contentMode === "subtitle_led") {
+        dubSourceEl.textContent = "画面文字识别（OCR），可在配音 tab 手动编辑";
+      } else {
+        dubSourceEl.textContent = "语音识别字幕（ASR 提取），可在配音 tab 手动编辑。BGM 不参与配音文字生成。";
+      }
+    }
     const lipsyncEnabled = Boolean(currentHub && currentHub.lipsync_enabled);
     if (lipsyncStatusValueEl) lipsyncStatusValueEl.textContent = lipsyncEnabled ? "Enhanced path enabled (soft-fail)" : "Off";
     if (lipsyncHintEl) {
@@ -1766,6 +1779,22 @@
   if (_cqBtn) {
     _cqBtn.addEventListener("click", async (e) => {
       e.preventDefault();
+      // Always switch to compose tab first so user sees the full compose panel
+      const composeTabBtn = document.querySelector('.hf-sidebar-tab[data-tab="compose"]');
+      if (composeTabBtn) composeTabBtn.click();
+      // Check confirmation — if not checked, guide user instead of silent failure
+      if (composeConfirmEl && !composeConfirmEl.checked) {
+        const confirmRow = composeConfirmEl.closest("label");
+        if (confirmRow) {
+          confirmRow.classList.add("bg-amber-50", "ring-2", "ring-amber-400", "rounded-lg", "px-2", "py-1");
+          confirmRow.scrollIntoView({ behavior: "smooth", block: "center" });
+          setTimeout(() => confirmRow.classList.remove("bg-amber-50", "ring-2", "ring-amber-400", "rounded-lg", "px-2", "py-1"), 3000);
+        }
+        const cqStatus = document.getElementById("hf_cq_status_text");
+        if (cqStatus) cqStatus.textContent = "请先在合成面板确认就绪";
+        if (composeMsgEl) composeMsgEl.textContent = "请勾选确认后再合成";
+        return;
+      }
       _cqBtn.disabled = true;
       _cqBtn.textContent = "合成中...";
       try {
@@ -1773,6 +1802,8 @@
         await loadHub();
       } catch (err) {
         if (composeMsgEl) composeMsgEl.textContent = err.message || "compose failed";
+        const cqStatus = document.getElementById("hf_cq_status_text");
+        if (cqStatus) cqStatus.textContent = err.message || "合成失败";
       } finally {
         _cqBtn.disabled = false;
         _cqBtn.textContent = "合成最终视频";
