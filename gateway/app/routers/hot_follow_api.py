@@ -1,4 +1,8 @@
-"""Hot Follow API router — extracted from tasks.py (Phase 1.2 Router Split)."""
+"""Hot Follow API router — extracted from tasks.py (Phase 1.2 Router Split).
+
+Phase 1.3 Port Merge: all shared helpers now imported from services/,
+breaking the circular dependency with tasks.py.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +15,6 @@ import shutil
 import subprocess
 import tempfile
 import time
-import threading
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
@@ -61,50 +64,63 @@ from ..core.workspace import (
     task_base_dir,
 )
 
-# Shared functions from tasks.py (these stay in tasks.py)
-from gateway.app.routers.tasks import (
-    _policy_upsert,
-    _task_compose_lock,
-    _compose_in_progress_response,
-    _task_value,
-    _task_key,
-    _task_to_detail,
-    _task_endpoint,
-    _publish_hub_payload,
-    _backfill_compose_done_if_final_ready,
-    _compute_composed_state,
-    _scene_pack_info,
-    _upload_task_bgm_impl,
-    _collect_voice_execution_state,
-    _hot_follow_expected_provider,
-    _build_hot_follow_voice_options,
-    _hf_persisted_audio_state,
-    _hf_audio_matches_expected,
-    _resolve_hot_follow_requested_voice,
-    _voice_state_config,
-    _resolve_hot_follow_provider_voice,
-    _sha256_file,
-    _probe_url_metadata,
-    _update_pipeline_probe,
-    _scenes_status_from_ssot,
-    _deliverable_url,
-    _resolve_hub_final_url,
-    _build_workbench_debug_payload,
-    _count_srt_cues,
-    _build_translation_qa_summary,
-    _compose_error_parts,
-    _resolve_audio_fit_max_speed,
-    _compute_audio_fit_speeds,
-    _build_atempo_chain,
-    create_task,
-    run_task_pipeline,
-    rerun_dub,
-    DubProviderRequest,
-    PublishBackfillRequest,
+# ── Phase 1.3: shared helpers from service modules (NO more tasks.py imports) ─
+from gateway.app.core.constants import (
     COMPOSE_RETRY_AFTER_MS,
-    api_key_header,
+    DubProviderRequest,
     OP_HEADER_KEY,
+    PublishBackfillRequest,
+    api_key_header,
 )
+from gateway.app.services.compose_helpers import (
+    build_atempo_chain as _build_atempo_chain,
+    compose_in_progress_response as _compose_in_progress_response,
+    compute_audio_fit_speeds as _compute_audio_fit_speeds,
+    resolve_audio_fit_max_speed as _resolve_audio_fit_max_speed,
+    task_compose_lock as _task_compose_lock,
+)
+from gateway.app.services.media_helpers import (
+    probe_url_metadata as _probe_url_metadata,
+    sha256_file as _sha256_file,
+    update_pipeline_probe as _update_pipeline_probe,
+    upload_task_bgm_impl as _upload_task_bgm_impl,
+)
+from gateway.app.services.task_view_helpers import (
+    backfill_compose_done_if_final_ready as _backfill_compose_done_if_final_ready,
+    build_translation_qa_summary as _build_translation_qa_summary,
+    build_workbench_debug_payload as _build_workbench_debug_payload,
+    compose_error_parts as _compose_error_parts,
+    compute_composed_state as _compute_composed_state,
+    count_srt_cues as _count_srt_cues,
+    deliverable_url as _deliverable_url,
+    publish_hub_payload as _publish_hub_payload,
+    resolve_hub_final_url as _resolve_hub_final_url,
+    scene_pack_info as _scene_pack_info,
+    scenes_status_from_ssot as _scenes_status_from_ssot,
+    task_endpoint as _task_endpoint,
+    task_key as _task_key,
+    task_to_detail as _task_to_detail,
+    task_value as _task_value,
+)
+from gateway.app.services.voice_state import (
+    build_hot_follow_voice_options as _build_hot_follow_voice_options,
+    collect_voice_execution_state as _collect_voice_execution_state,
+    hf_audio_matches_expected as _hf_audio_matches_expected,
+    hf_persisted_audio_state as _hf_persisted_audio_state,
+    hot_follow_expected_provider as _hot_follow_expected_provider,
+    resolve_hot_follow_provider_voice as _resolve_hot_follow_provider_voice,
+    resolve_hot_follow_requested_voice as _resolve_hot_follow_requested_voice,
+    voice_state_config as _voice_state_config,
+)
+
+
+def _policy_upsert(repo, task_id, updates, *, task=None, step="router.hf_api", force=False):
+    """Thin wrapper matching the old tasks.py signature."""
+    return policy_upsert(repo, task_id, task, updates, step=step, force=force)
+
+
+# Endpoint functions that remain in tasks.py — imported lazily where needed.
+# create_task, run_task_pipeline, rerun_dub are called via lazy import below.
 
 
 logger = logging.getLogger(__name__)
@@ -1845,6 +1861,7 @@ def create_hot_follow_task(
             config["tts_resolved_voice"] = resolved_voice
             data["config"] = config
     normalized = TaskCreate(**data)
+    from gateway.app.routers.tasks import create_task  # noqa: PLC0415 — endpoint, not movable
     return create_task(normalized, background_tasks=background_tasks, repo=repo)
 
 
@@ -2610,6 +2627,7 @@ async def rerun_hot_follow_dub(
                 voice_id=payload.voice_id,
                 mm_text=edited,
             )
+    from gateway.app.routers.tasks import rerun_dub  # noqa: PLC0415 — endpoint, not movable
     return await rerun_dub(
         task_id=task_id,
         payload=payload,
@@ -2661,6 +2679,7 @@ def run_hot_follow_pipeline(
     background_tasks: BackgroundTasks,
     repo=Depends(get_task_repository),
 ):
+    from gateway.app.routers.tasks import run_task_pipeline  # noqa: PLC0415 — endpoint, not movable
     return run_task_pipeline(task_id, background_tasks=background_tasks, repo=repo)
 
 

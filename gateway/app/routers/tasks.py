@@ -187,123 +187,84 @@ from ..core.workspace import (
 
 logger = logging.getLogger(__name__)
 
-OP_HEADER_KEY = "X-OP-KEY"
-COMPOSE_RETRY_AFTER_MS = 1500
-_COMPOSE_LOCKS_GUARD = threading.Lock()
-_COMPOSE_LOCKS: dict[str, threading.Lock] = {}
+# ── Phase 1.3 Port Merge: import from service modules ─────────────────────────
+from gateway.app.core.constants import (  # noqa: E402
+    COMPOSE_RETRY_AFTER_MS,
+    DubProviderRequest,
+    OP_HEADER_KEY,
+    PublishBackfillRequest,
+    api_key_header,
+)
+from gateway.app.services.compose_helpers import (  # noqa: E402
+    build_atempo_chain as _build_atempo_chain,
+    compose_in_progress_response as _compose_in_progress_response,
+    compute_audio_fit_speeds as _compute_audio_fit_speeds,
+    resolve_audio_fit_max_speed as _resolve_audio_fit_max_speed,
+    task_compose_lock as _task_compose_lock,
+)
+from gateway.app.services.media_helpers import (  # noqa: E402
+    merge_probe_into_pipeline_config as _merge_probe_into_pipeline_config,
+    probe_url_metadata as _probe_url_metadata,
+    save_upload_to_paths as _save_upload_to_paths,
+    sha256_file as _sha256_file,
+    update_pipeline_probe as _update_pipeline_probe,
+    upload_task_bgm_impl as _upload_task_bgm_impl,
+)
+from gateway.app.services.task_view_helpers import (  # noqa: E402
+    _build_copy_bundle,
+    _get_op_access_key,
+    _op_sign,
+    _publish_sop_markdown,
+    backfill_compose_done_if_final_ready as _backfill_compose_done_if_final_ready,
+    build_translation_qa_summary as _build_translation_qa_summary,
+    build_workbench_debug_payload as _build_workbench_debug_payload,
+    coerce_datetime as _coerce_datetime,
+    compose_error_parts as _compose_error_parts,
+    compute_composed_state as _compute_composed_state,
+    count_srt_cues as _count_srt_cues,
+    deliverable_url as _deliverable_url,
+    derive_status,
+    download_code as _download_code,
+    extract_first_http_url as _extract_first_http_url,
+    model_allowed_fields as _model_allowed_fields,
+    normalize_selected_tool_ids as _normalize_selected_tool_ids,
+    op_gate_enabled as _op_gate_enabled,
+    publish_hub_payload as _publish_hub_payload,
+    resolve_download_urls as _resolve_download_urls,
+    resolve_hub_final_url as _resolve_hub_final_url,
+    scene_pack_info as _scene_pack_info,
+    scenes_status_from_ssot as _scenes_status_from_ssot,
+    signed_op_url as _signed_op_url,
+    task_endpoint as _task_endpoint,
+    task_key as _task_key,
+    task_to_detail as _task_to_detail,
+    task_value as _task_value,
+)
+from gateway.app.services.voice_state import (  # noqa: E402
+    build_hot_follow_voice_options as _build_hot_follow_voice_options,
+    collect_voice_execution_state as _collect_voice_execution_state,
+    hf_audio_matches_expected as _hf_audio_matches_expected,
+    hf_persisted_audio_state as _hf_persisted_audio_state,
+    hot_follow_expected_provider as _hot_follow_expected_provider,
+    resolve_hot_follow_provider_voice as _resolve_hot_follow_provider_voice,
+    resolve_hot_follow_requested_voice as _resolve_hot_follow_requested_voice,
+    voice_state_config as _voice_state_config,
+)
 
 
-def _task_compose_lock(task_id: str) -> threading.Lock:
-    with _COMPOSE_LOCKS_GUARD:
-        lock = _COMPOSE_LOCKS.get(task_id)
-        if lock is None:
-            lock = threading.Lock()
-            _COMPOSE_LOCKS[task_id] = lock
-        return lock
+# _task_compose_lock: moved to services/compose_helpers.py (Phase 1.3)
+# _compose_in_progress_response: moved to services/compose_helpers.py (Phase 1.3)
 
 
-def _compose_in_progress_response(task_id: str) -> JSONResponse:
-    return JSONResponse(
-        status_code=409,
-        content={
-            "error": "compose_in_progress",
-            "status": "running",
-            "retry_after_ms": COMPOSE_RETRY_AFTER_MS,
-            "task_id": task_id,
-        },
-    )
+# _build_atempo_chain, _resolve_audio_fit_max_speed, _compute_audio_fit_speeds:
+# moved to services/compose_helpers.py (Phase 1.3)
 
 
-def _build_atempo_chain(speed: float) -> str:
-    try:
-        value = float(speed)
-    except Exception:
-        value = 1.0
-    value = max(0.5, min(100.0, value))
-    factors: list[float] = []
-    while value > 2.0:
-        factors.append(2.0)
-        value /= 2.0
-    while value < 0.5:
-        factors.append(0.5)
-        value /= 0.5
-    factors.append(value)
-    parts: list[str] = []
-    for factor in factors:
-        if abs(factor - 2.0) < 1e-9:
-            parts.append("atempo=2.0")
-        elif abs(factor - 0.5) < 1e-9:
-            parts.append("atempo=0.5")
-        else:
-            parts.append(f"atempo={factor:.6f}")
-    return ",".join(parts)
+# _count_srt_cues, _build_translation_qa_summary, _build_workbench_debug_payload:
+# moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _resolve_audio_fit_max_speed(pipeline_config: dict | None) -> tuple[float, str]:
-    cfg = pipeline_config or {}
-    raw = cfg.get("audio_fit_max_speed")
-    source = "default"
-    if raw in (None, "", "null"):
-        speed = 1.25
-    else:
-        source = "operator"
-        try:
-            speed = float(raw)
-        except Exception:
-            speed = 1.25
-    speed = max(1.0, min(2.0, speed))
-    return speed, source
-
-
-def _compute_audio_fit_speeds(source_duration_sec: float, dubbed_duration_sec: float, max_speed: float) -> tuple[float, float]:
-    try:
-        source = float(source_duration_sec)
-    except Exception:
-        source = 0.0
-    try:
-        dubbed = float(dubbed_duration_sec)
-    except Exception:
-        dubbed = 0.0
-    safe_source = max(source, 1e-6)
-    need_speed = max(1.0, dubbed / safe_source)
-    applied_speed = min(max(1.0, float(max_speed or 1.25)), need_speed)
-    return need_speed, applied_speed
-
-
-def _count_srt_cues(srt_text: str | None) -> int:
-    text = str(srt_text or "")
-    if not text.strip():
-        return 0
-    return len(re.findall(r"(?m)^\s*\d+\s*\r?\n\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}", text))
-
-
-def _build_translation_qa_summary(origin_srt_text: str | None, translated_srt_text: str | None) -> dict:
-    source_count = _count_srt_cues(origin_srt_text)
-    translated_count = _count_srt_cues(translated_srt_text)
-    return {
-        "source_count": source_count,
-        "translated_count": translated_count,
-        "has_mismatch": source_count != translated_count,
-    }
-
-
-def _build_workbench_debug_payload(show_debug: bool, scene_outputs: list[dict] | None, compose_last: dict | None) -> dict:
-    if not show_debug:
-        return {}
-    compose = compose_last or {}
-    return {
-        "scene_outputs": list(scene_outputs or []),
-        "compose_last_ffmpeg_cmd": compose.get("ffmpeg_cmd"),
-    }
-
-
-class DubProviderRequest(BaseModel):
-    provider: str | None = None
-    voice_id: str | None = None
-    mm_text: str | None = None
-    tts_speed: float | None = None
-    force: bool = False
-
+# DubProviderRequest, PublishBackfillRequest: moved to core/constants.py (Phase 1.3)
 
 class EditedTextRequest(BaseModel):
     text: str
@@ -336,11 +297,7 @@ class PublishTaskRequest(BaseModel):
     notes: str | None = None
 
 
-class PublishBackfillRequest(BaseModel):
-    publish_url: str | None = None
-    note: str | None = None
-    status: str | None = None
-
+# PublishBackfillRequest: moved to core/constants.py (Phase 1.3)
 
 class ComposeTaskRequest(BaseModel):
     voiceover_url: str | None = None
@@ -353,48 +310,14 @@ class ComposeTaskRequest(BaseModel):
 
 pages_router = APIRouter()
 api_router = APIRouter(prefix="/api", tags=["tasks"])
-api_key_header = APIKeyHeader(name=OP_HEADER_KEY, auto_error=False)
+# api_key_header: now imported from core/constants.py (Phase 1.3)
 
 
 @pages_router.get("/favicon.ico", include_in_schema=False)
 def favicon_noop():
     return Response(status_code=204)
-def _coerce_datetime(value) -> datetime:
-    # Pydantic TaskDetail.created_at expects datetime, so guarantee it.
-    if isinstance(value, datetime):
-        return value
 
-    if isinstance(value, (int, float)):
-        return datetime.fromtimestamp(value, tz=timezone.utc)
-
-    if isinstance(value, str):
-        s = value.strip()
-        if not s:
-            return datetime.now(timezone.utc)
-
-        # unix seconds in string
-        if s.isdigit():
-            return datetime.fromtimestamp(int(s), tz=timezone.utc)
-
-        # ISO with Z
-        if s.endswith("Z"):
-            s = s[:-1] + "+00:00"
-
-        # Try ISO formats
-        try:
-            dt = datetime.fromisoformat(s)
-            # If naive, assume UTC
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-        except Exception:
-            pass
-
-        # Common fallback: "YYYY-MM-DD HH:MM:SS"
-        try:
-            return datetime.strptime(s, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
-        except Exception:
-            return datetime.now(timezone.utc)
-
-    return datetime.now(timezone.utc)
+# _coerce_datetime: moved to services/task_view_helpers.py (Phase 1.3)
 
 
 def _infer_platform_from_url(url: str) -> Optional[str]:
@@ -1155,36 +1078,14 @@ def task_status(task_id: str, repo=Depends(get_task_repository)):
 
 
 
-def _task_endpoint(task_id: str, kind: str) -> Optional[str]:
-    safe_id = str(task_id)
-    if kind == "raw":
-        return f"/v1/tasks/{safe_id}/raw"
-    if kind == "origin":
-        return f"/v1/tasks/{safe_id}/subs_origin"
-    if kind == "mm":
-        return f"/v1/tasks/{safe_id}/subs_mm"
-    if kind == "mm_txt":
-        return f"/v1/tasks/{safe_id}/mm_txt"
-    if kind == "audio":
-        return f"/v1/tasks/{safe_id}/audio_mm"
-    if kind == "pack":
-        return f"/v1/tasks/{safe_id}/pack"
-    if kind == "scenes":
-        return f"/v1/tasks/{safe_id}/scenes"
-    if kind == "final":
-        return f"/v1/tasks/{safe_id}/final"
-    if kind == "publish_bundle":
-        return f"/v1/tasks/{safe_id}/publish_bundle"
-    return None
+
+# _task_endpoint: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _get_op_access_key() -> Optional[str]:
-    key = (os.getenv("OP_ACCESS_KEY") or "").strip()
-    return key or None
+# _get_op_access_key: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _op_gate_enabled() -> bool:
-    return bool(_get_op_access_key())
+# _op_gate_enabled: moved to services/task_view_helpers.py (Phase 1.3)
 
 
 def _op_key_valid(request: Request) -> bool:
@@ -1208,12 +1109,7 @@ def _require_op_key(request: Request) -> None:
         raise HTTPException(status_code=401, detail="OP key required")
 
 
-def _op_sign(task_id: str, kind: str, exp: int) -> str:
-    secret = _get_op_access_key()
-    if not secret:
-        return ""
-    msg = f"{task_id}:{kind}:{exp}".encode("utf-8")
-    return hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+# _op_sign: moved to services/task_view_helpers.py (Phase 1.3)
 
 
 def _op_verify(task_id: str, kind: str, exp: int, sig: str) -> bool:
@@ -1226,446 +1122,58 @@ def _op_verify(task_id: str, kind: str, exp: int, sig: str) -> bool:
     return hmac.compare_digest(expected, sig)
 
 
-def _download_code(task_id: str) -> str:
-    return str(task_id).upper()[:6]
+# _download_code: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _signed_op_url(task_id: str, kind: str) -> str:
-    exp = int(time.time()) + 86400
-    sig = _op_sign(task_id, kind, exp)
-    base = f"/op/dl/{task_id}?kind={kind}&exp={exp}"
-    return f"{base}&sig={sig}" if sig else base
+# _signed_op_url: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _read_mm_txt_from_task(task: dict) -> str:
-    mm_key = _task_key(task, "mm_srt_path")
-    if not mm_key:
-        return ""
-    txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
-    if not object_exists(txt_key):
-        return ""
-    data = get_object_bytes(txt_key)
-    if not data:
-        return ""
-    try:
-        return data.decode("utf-8").strip()
-    except UnicodeDecodeError:
-        return data.decode(errors="ignore").strip()
+# _read_mm_txt_from_task: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _publish_sop_markdown() -> str:
-    return (
-        "# Publish SOP\n"
-        "1) Download the edit bundle (pack.zip).\n"
-        "2) Import into CapCut and finish edits.\n"
-        "3) Copy caption and hashtags from Copy Bundle.\n"
-        "4) Publish manually (publish bundle in v2.0).\n"
-    )
+# _publish_sop_markdown: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _build_copy_bundle(task: dict) -> dict[str, str]:
-    caption = _read_mm_txt_from_task(task) or (task.get("title") or "")
-    return {
-        "caption": caption.strip(),
-        "hashtags": "",
-        "comment_cta": "",
-        "link_text": task.get("publish_url") or "",
-        "publish_time_suggestion": "",
-    }
+# _build_copy_bundle: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
-    if kind == "final_mp4":
-        key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
-        return _signed_op_url(task_id, "final_mp4") if key and object_exists(str(key)) else None
-    if kind == "pack_zip":
-        pack_type = _task_value(task, "pack_type")
-        pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
-        if pack_type == "capcut_v18" and pack_key and object_exists(str(pack_key)):
-            return _signed_op_url(task_id, "pack")
-        if pack_key and object_exists(str(pack_key)):
-            return _signed_op_url(task_id, "pack")
-        return None
-    if kind == "scenes_zip":
-        scenes_key = _task_value(task, "scenes_pack_key") or _task_value(task, "scenes_key")
-        scenes_path = _task_value(task, "scenes_path")
-        scenes_status = str(_task_value(task, "scenes_pack_status") or _task_value(task, "scenes_status") or "").lower()
-        if scenes_key and object_exists(str(scenes_key)):
-            return _signed_op_url(task_id, "scenes")
-        if scenes_path and scenes_status == "ready":
-            return _signed_op_url(task_id, "scenes")
-        return None
-    if kind == "origin_srt":
-        key = _task_key(task, "origin_srt_path")
-        return _signed_op_url(task_id, "origin_srt") if key and object_exists(key) else None
-    if kind == "mm_srt":
-        key = _task_key(task, "mm_srt_path")
-        return _signed_op_url(task_id, "mm_srt") if key and object_exists(key) else None
-    if kind == "mm_txt":
-        mm_key = _task_key(task, "mm_srt_path")
-        if not mm_key:
-            return None
-        txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
-        return _signed_op_url(task_id, "mm_txt") if object_exists(txt_key) else None
-    if kind == "mm_audio":
-        key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-        return _signed_op_url(task_id, "mm_audio") if key and object_exists(key) else None
-    if kind == "edit_bundle_zip":
-        return _signed_op_url(task_id, "publish_bundle")
-    return None
+# _deliverable_url: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _compose_error_parts(task: dict) -> tuple[str | None, str | None]:
-    reason_field = task.get("compose_error_reason")
-    raw = task.get("compose_error")
-    if not reason_field and not raw:
-        return (None, None)
-    if isinstance(raw, dict):
-        reason = raw.get("reason")
-        message = raw.get("message")
-        resolved_reason = str(reason) if reason else (str(reason_field) if reason_field else None)
-        resolved_message = str(message) if message else None
-        return (resolved_reason, resolved_message)
-    text = str(raw).strip() if raw is not None else ""
-    if not text:
-        return (None, None)
-    return (str(reason_field) if reason_field else "compose_failed", text)
+# _compose_error_parts: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
-    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
-    final_meta = object_head(str(final_key)) if final_key and object_exists(str(final_key)) else None
-    final_size, final_ctype = media_meta_from_head(final_meta)
-    final_asset_version = (
-        task.get("final_asset_version")
-        or (final_meta.get("etag") if isinstance(final_meta, dict) else None)
-        or task.get("final_video_sha256")
-        or None
-    )
-    final_exists = bool(final_key and object_exists(str(final_key)) and int(final_size or 0) > 0)
-    raw_key = _task_key(task, "raw_path")
-    raw_exists = bool(raw_key and object_exists(str(raw_key)))
-    voice_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-    voice_exists = bool(voice_key and object_exists(str(voice_key)))
-    voice_state = _collect_voice_execution_state(task, get_settings())
-    compose_status = str(task.get("compose_status") or "").lower()
-    compose_last_status = str(task.get("compose_last_status") or compose_status).lower()
-    compose_done = compose_last_status in {"done", "ready", "success", "completed"}
-    compose_error_reason, compose_error_message = _compose_error_parts(task)
-
-    composed_ready = bool(
-        final_exists
-        and compose_done
-        and compose_error_reason is None
-        and bool(voice_state.get("audio_ready"))
-    )
-    if composed_ready:
-        composed_reason = "ready"
-    elif not raw_exists:
-        composed_reason = "missing_raw"
-    elif not voice_exists:
-        composed_reason = "missing_voiceover"
-    elif not voice_state.get("audio_ready"):
-        composed_reason = str(voice_state.get("audio_ready_reason") or "audio_not_ready")
-    elif compose_status in {"running", "processing", "queued"}:
-        composed_reason = "compose_in_progress"
-    elif compose_error_reason in {"subtitles_missing", "font_missing"}:
-        composed_reason = compose_error_reason
-    elif compose_error_reason or compose_status in {"failed", "error"}:
-        composed_reason = "compose_failed"
-    else:
-        composed_reason = "final_missing"
-
-    final_info = {
-        "exists": final_exists,
-        "key": str(final_key) if final_key else None,
-        "size_bytes": int(final_size) if final_size is not None else None,
-        "duration_ms": int(task.get("final_duration_ms")) if task.get("final_duration_ms") is not None else None,
-        "asset_version": str(final_asset_version) if final_asset_version else None,
-        "updated_at": task.get("final_updated_at") or task.get("updated_at"),
-        "content_type": task.get("final_mime") or final_ctype or "video/mp4",
-        "url": _task_endpoint(task_id, "final") if final_exists and int(final_size or 0) >= MIN_VIDEO_BYTES else None,
-    }
-    return {
-        "composed_ready": composed_ready,
-        "composed_reason": composed_reason,
-        "final": final_info,
-        "compose_error_reason": compose_error_reason,
-        "compose_error_message": compose_error_message,
-        "raw_exists": raw_exists,
-        "voice_exists": voice_exists,
-        "audio_ready": bool(voice_state.get("audio_ready")),
-        "audio_ready_reason": voice_state.get("audio_ready_reason"),
-    }
+# _compute_composed_state: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _scene_pack_info(task: dict, task_id: str) -> dict[str, Any]:
-    key = (
-        _task_key(task, "scenes_key")
-        or _task_key(task, "scenes_pack_key")
-        or f"deliver/scenes/{task_id}/scenes.zip"
-    )
-    scenes_key_ready = bool(_task_key(task, "scenes_key"))
-    exists = bool(key and object_exists(str(key)))
-    if scenes_key_ready:
-        exists = True
-    meta = object_head(str(key)) if exists else None
-    size_bytes, _ = media_meta_from_head(meta)
-    status_raw = str(task.get("scenes_pack_last_status") or task.get("scenes_pack_status") or task.get("scenes_status") or "").lower()
-    if status_raw in {"ready", "done", "success", "completed"}:
-        status = "done"
-    elif status_raw in {"running", "processing", "queued"}:
-        status = "running"
-    elif status_raw in {"failed", "error"}:
-        status = "failed"
-    else:
-        status = "pending"
-    if scenes_key_ready:
-        status = "done"
-    elif exists and status != "running":
-        status = "done"
-    return {
-        "exists": exists,
-        "key": str(key) if key else None,
-        "url": _task_endpoint(task_id, "scenes") if exists else None,
-        "size_bytes": int(size_bytes) if size_bytes is not None else None,
-        "asset_version": (meta.get("etag") if isinstance(meta, dict) else None) or task.get("scenes_pack_asset_version"),
-        "status": status,
-        "started_at": task.get("scenes_pack_last_started_at"),
-        "finished_at": task.get("scenes_pack_last_finished_at"),
-        "error": task.get("scenes_pack_error") or task.get("scenes_error"),
-        "error_reason": task.get("scenes_pack_error_reason"),
-    }
+# _scene_pack_info: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _compose_done_like(status: Any) -> bool:
-    return str(status or "").strip().lower() in {"done", "ready", "success", "completed"}
+# _compose_done_like: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _deliverables_final_url(deliverables: Any) -> str | None:
-    if isinstance(deliverables, dict):
-        final_item = deliverables.get("final_mp4")
-        if isinstance(final_item, dict):
-            url = final_item.get("url")
-            if url:
-                return str(url)
-    if isinstance(deliverables, list):
-        for item in deliverables:
-            if not isinstance(item, dict):
-                continue
-            kind = str(item.get("kind") or "").strip().lower()
-            key = str(item.get("key") or "").strip().lower()
-            label = str(item.get("label") or item.get("title") or "").strip().lower()
-            if kind == "final" or key.endswith("final.mp4") or "final video" in label or label == "final.mp4":
-                url = item.get("url")
-                if url:
-                    return str(url)
-    return None
+# _deliverables_final_url: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _resolve_hub_final_url(task_id: str, hub: dict[str, Any] | None = None) -> str | None:
-    payload = hub or {}
-    media = payload.get("media") if isinstance(payload.get("media"), dict) else {}
-    extra = payload.get("extra") if isinstance(payload.get("extra"), dict) else {}
-    url = (
-        _deliverables_final_url(payload.get("deliverables"))
-        or media.get("final_url")
-        or media.get("final_video_url")
-        or payload.get("final_url")
-        or payload.get("final_video_url")
-        or extra.get("final_video_url")
-        or None
-    )
-    if url:
-        return str(url)
-    final_info = payload.get("final") if isinstance(payload.get("final"), dict) else {}
-    final_exists_hint = bool(final_info.get("exists"))
-    compose_like_done = _compose_done_like(payload.get("compose_status")) or _compose_done_like(payload.get("compose_last_status"))
-    if final_exists_hint or compose_like_done:
-        return _task_endpoint(task_id, "final")
-    return None
+# _resolve_hub_final_url: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _backfill_compose_done_if_final_ready(repo, task_id: str, task: dict, composed_ready: bool) -> bool:
-    if not composed_ready:
-        return False
-    compose_status = str(task.get("compose_status") or "").strip().lower()
-    compose_last_status = str(task.get("compose_last_status") or "").strip().lower()
-    pipeline_compose_status = ""
-    pipeline = task.get("pipeline")
-    if isinstance(pipeline, dict):
-        compose_node = pipeline.get("compose")
-        if isinstance(compose_node, dict):
-            pipeline_compose_status = str(compose_node.get("status") or "").strip().lower()
-    if _compose_done_like(compose_status) and _compose_done_like(compose_last_status or compose_status) and (
-        not pipeline_compose_status or _compose_done_like(pipeline_compose_status)
-    ):
-        return False
-    now = datetime.now(timezone.utc).isoformat()
-    updates: dict[str, Any] = {
-        "compose_status": "done",
-        "compose_last_status": "done",
-        "compose_error": None,
-        "compose_error_reason": None,
-        "compose_last_error": None,
-        "compose_last_finished_at": now,
-        "updated_at": now,
-    }
-    if not task.get("compose_last_started_at"):
-        updates["compose_last_started_at"] = now
-    task_status = str(task.get("status") or "").strip().lower()
-    if task_status in {"", "pending", "processing", "running", "queued", "failed", "error"}:
-        updates["status"] = "ready"
-    if isinstance(pipeline, dict):
-        patched_pipeline = dict(pipeline)
-        compose_node = patched_pipeline.get("compose")
-        compose_dict = dict(compose_node) if isinstance(compose_node, dict) else {}
-        compose_dict["status"] = "done"
-        compose_dict["state"] = "done"
-        compose_dict["updated_at"] = now
-        patched_pipeline["compose"] = compose_dict
-        updates["pipeline"] = patched_pipeline
-    _policy_upsert(repo, task_id, updates)
-    logger.info("hot_follow_compose_backfill_done", extra={"task_id": task_id})
-    return True
+# _backfill_compose_done_if_final_ready: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _publish_hub_payload(task: dict) -> dict[str, object]:
-    task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
-    composed = _compute_composed_state(task, task_id)
-    scene_pack = _scene_pack_info(task, task_id)
-
-    deliverables = {}
-    for key, label in (
-        ("final_mp4", "final.mp4"),
-        ("pack_zip", "pack.zip"),
-        ("scenes_zip", "scenes.zip"),
-        ("origin_srt", "origin.srt"),
-        ("mm_srt", "mm.srt"),
-        ("mm_txt", "mm.txt"),
-        ("mm_audio", "mm_audio"),
-        ("edit_bundle_zip", "scenes_bundle.zip"),
-    ):
-        url = _deliverable_url(task_id, task, key)
-        if url:
-            item = {"label": label, "url": url}
-            if key == "edit_bundle_zip":
-                item["artifact"] = "scenes_bundle"
-                item["description"] = "Scenes package for re-editing / advanced workflow"
-            deliverables[key] = item
-    scene_pack_pending_reason = None
-    if not bool(scene_pack.get("exists")):
-        if scene_pack.get("status") == "running":
-            scene_pack_pending_reason = "scenes.running"
-        elif scene_pack.get("status") == "failed":
-            scene_pack_pending_reason = "scenes.failed"
-        else:
-            scene_pack_pending_reason = "scenes.not_ready"
-    short_code = _download_code(task_id)
-    short_url = f"/d/{short_code}"
-    final_payload_probe = {
-        "deliverables": deliverables,
-        "media": {"final_video_url": (composed.get("final") or {}).get("url"), "final_url": (composed.get("final") or {}).get("url")},
-        "final": composed.get("final") or {"exists": False},
-        "compose_status": task.get("compose_status"),
-        "compose_last_status": task.get("compose_last_status"),
-    }
-    final_preview_url = _resolve_hub_final_url(task_id, final_payload_probe)
-    composed_ready = bool(final_preview_url or (composed.get("final") or {}).get("exists"))
-    composed_reason = "ready" if composed_ready else "not_ready"
-    if final_preview_url:
-        final_item = dict(deliverables.get("final_mp4") or {"label": "final.mp4"})
-        final_item["url"] = final_preview_url
-        deliverables["final_mp4"] = final_item
-
-    return {
-        "task_id": task_id,
-        "gate_enabled": _op_gate_enabled(),
-        "media": {
-            "final_video_url": final_preview_url,
-            "final_url": final_preview_url,
-        },
-        "final_url": final_preview_url,
-        "final_video_url": final_preview_url,
-        "deliverables": deliverables,
-        "composed_ready": composed_ready,
-        "composed_reason": composed_reason,
-        "final": composed.get("final") or {"exists": False},
-        "scene_pack": scene_pack,
-        "scene_pack_pending_reason": scene_pack_pending_reason,
-        "scene_pack_action_url": f"/tasks/{task_id}",
-        "copy_bundle": _build_copy_bundle(task),
-        "download_code": short_code,
-        "mobile": {
-            "qr_target": short_url,
-            "short_link": short_url,
-            "short_url": short_url,
-            "qr_url": short_url,
-        },
-        "sop_markdown": _publish_sop_markdown(),
-        "archive": {
-            "publish_provider": task.get("publish_provider") or "-",
-            "publish_key": task.get("publish_key") or "-",
-            "publish_status": task.get("publish_status") or "-",
-            "publish_url": task.get("publish_url") or "-",
-            "published_at": task.get("published_at") or "-",
-        },
-    }
+# _publish_hub_payload: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _task_value(task: dict, field: str) -> Optional[str]:
-    if isinstance(task, dict):
-        value = task.get(field)
-        if value is None:
-            deliverables = task.get("deliverables")
-            if isinstance(deliverables, dict):
-                value = deliverables.get(field)
-        return value
-    return getattr(task, field, None)
+# _task_value: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _task_key(task: dict, field: str) -> Optional[str]:
-    value = _task_value(task, field)
-    return str(value) if value else None
+# _task_key: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _scenes_status_from_ssot(task: dict) -> str:
-    if _task_key(task, "scenes_key"):
-        return "done"
-    if _task_value(task, "scenes_error"):
-        return "failed"
-    started_at = _task_value(task, "scenes_started_at")
-    finished_at = _task_value(task, "scenes_finished_at")
-    if started_at and not finished_at:
-        return "running"
-    events = task.get("events") if isinstance(task, dict) else None
-    if isinstance(events, list):
-        for ev in reversed(events):
-            if not isinstance(ev, dict):
-                continue
-            if str(ev.get("channel") or "").lower() != "scenes":
-                continue
-            code = str(ev.get("code") or "").upper()
-            if code in {"SCENES_RUN_DONE"}:
-                return "done"
-            if code in {"SCENES_RUN_FAIL", "SCENES_RUN_FAILED"}:
-                return "failed"
-            if code in {"SCENES_ENQUEUE", "SCENES_RUN_START"}:
-                return "running"
-            break
-    return "pending"
+# _scenes_status_from_ssot: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def derive_status(task: dict) -> str:
-    pack_key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
-    if pack_key:
-        try:
-            if object_exists(str(pack_key)):
-                return "ready"
-        except Exception:
-            pass
-        return "ready"
-    return task.get("status") or "processing"
+# derive_status: moved to services/task_view_helpers.py (Phase 1.3)
 
 
 def _require_storage_key(task: dict, field: str, not_found: str) -> str:
@@ -1806,163 +1314,20 @@ def _get_subtitle_detection(task_id: str) -> dict[str, Any]:
     return result
 
 
-def _resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
-    task_id = str(task.get("task_id") or task.get("id"))
-    raw_url = _task_endpoint(task_id, "raw") if task.get("raw_path") else None
-    origin_url = (
-        _task_endpoint(task_id, "origin")
-        if task.get("origin_srt_path")
-        else None
-    )
-    mm_url = (
-        _task_endpoint(task_id, "mm")
-        if task.get("mm_srt_path")
-        else None
-    )
-    audio_url = (
-        _task_endpoint(task_id, "audio")
-        if task.get("mm_audio_key") or task.get("mm_audio_path")
-        else None
-    )
-    mm_txt_url = _task_endpoint(task_id, "mm_txt") if mm_url else None
-    pack_key = task.get("pack_key")
-    pack_type = task.get("pack_type")
-    pack_url = None
-    if pack_type == "capcut_v18" and pack_key:
-        pack_url = _task_endpoint(task_id, "pack")
-    elif task.get("pack_path"):
-        pack_url = _task_endpoint(task_id, "pack")
-    scenes_url = _task_endpoint(task_id, "scenes") if _task_value(task, "scenes_key") else None
+# _resolve_download_urls: moved to services/task_view_helpers.py (Phase 1.3)
 
-    return {
-        "raw_path": raw_url,
-        "origin_srt_path": origin_url,
-        "mm_srt_path": mm_url,
-        "mm_audio_path": audio_url,
-        "mm_txt_path": mm_txt_url,
-        "pack_path": pack_url,
-        "scenes_path": scenes_url,
-    }
-
-def _model_allowed_fields(model_cls) -> set[str]:
-    # pydantic v2: model_fields; v1: __fields__
-    if hasattr(model_cls, "model_fields"):
-        return set(model_cls.model_fields.keys())
-    if hasattr(model_cls, "__fields__"):
-        return set(model_cls.__fields__.keys())
-    return set()
+# _model_allowed_fields: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _normalize_selected_tool_ids(value: Any) -> Optional[list[str]]:
-    if value is None:
-        return None
-    if isinstance(value, list):
-        return [str(v) for v in value if str(v).strip()]
-    if isinstance(value, str):
-        text = value.strip()
-        if not text:
-            return None
-        try:
-            decoded = json.loads(text)
-        except Exception:
-            decoded = None
-        if isinstance(decoded, list):
-            return [str(v) for v in decoded if str(v).strip()]
-        return [v.strip() for v in text.split(",") if v.strip()]
-    return None
+# _normalize_selected_tool_ids: moved to services/task_view_helpers.py (Phase 1.3)
 
-def _task_to_detail(task: dict) -> TaskDetail:
-    paths = _resolve_download_urls(task)
-    status = derive_status(task)
-    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-
-    payload = {
-        "task_id": str(task.get("task_id") or task.get("id")),
-        "title": task.get("title"),
-        "kind": task.get("kind"),
-        "source_url": str(task.get("source_url")) if task.get("source_url") else None,
-        "source_link_url": _extract_first_http_url(task.get("source_url")),
-        "platform": task.get("platform"),
-        "account_id": task.get("account_id"),
-        "account_name": task.get("account_name"),
-        "video_type": task.get("video_type"),
-        "template": task.get("template"),
-        "category_key": task.get("category_key") or "beauty",
-        "content_lang": task.get("content_lang") or "my",
-        "ui_lang": task.get("ui_lang") or "en",
-        "style_preset": task.get("style_preset"),
-        "face_swap_enabled": bool(task.get("face_swap_enabled")),
-        "status": status,
-        "last_step": task.get("last_step"),
-        "duration_sec": task.get("duration_sec"),
-        "thumb_url": task.get("thumb_url"),
-
-        "raw_path": paths.get("raw_path"),
-        "origin_srt_path": paths.get("origin_srt_path"),
-        "mm_srt_path": paths.get("mm_srt_path"),
-        "mm_audio_path": paths.get("mm_audio_path"),
-        "mm_audio_key": task.get("mm_audio_key"),
-        "pack_path": paths.get("pack_path"),
-        "scenes_path": paths.get("scenes_path"),
-        "scenes_status": _scenes_status_from_ssot(task),
-        "scenes_key": task.get("scenes_key"),
-        "scenes_error": task.get("scenes_error"),
-        "scenes_started_at": task.get("scenes_started_at"),
-        "scenes_finished_at": task.get("scenes_finished_at"),
-        "scenes_elapsed_ms": task.get("scenes_elapsed_ms"),
-        "scenes_attempt": task.get("scenes_attempt"),
-        "scenes_run_id": task.get("scenes_run_id"),
-        "scenes_error_message": task.get("scenes_error_message"),
-        "subtitles_status": task.get("subtitles_status"),
-        "subtitles_key": task.get("subtitles_key"),
-        "subtitles_error": task.get("subtitles_error"),
-
-        "created_at": _coerce_datetime(task.get("created_at") or task.get("created") or task.get("createdAt")),
-        "updated_at": _coerce_datetime(task.get("updated_at") or task.get("updatedAt")),
-        "error_message": task.get("error_message"),
-        "error_reason": task.get("error_reason"),
-
-        # 涓嬮潰杩欎簺瀛楁濡傛灉 TaskDetail 娌″畾涔夛紝浼氳杩囨护鎺夛紝涓嶅啀瑙﹀彂 500
-        "parse_provider": task.get("parse_provider"),
-        "subtitles_provider": task.get("subtitles_provider"),
-        "dub_provider": task.get("dub_provider"),
-        "pack_provider": task.get("pack_provider"),
-        "face_swap_provider": task.get("face_swap_provider"),
-        "publish_status": task.get("publish_status"),
-        "publish_provider": task.get("publish_provider"),
-        "publish_key": task.get("publish_key"),
-        "publish_url": task.get("publish_url"),
-        "published_at": task.get("published_at"),
-        "priority": task.get("priority"),
-        "assignee": task.get("assignee"),
-        "ops_notes": task.get("ops_notes"),
-        "selected_tool_ids": _normalize_selected_tool_ids(task.get("selected_tool_ids")),
-        "pipeline_config": pipeline_config,
-        "no_dub": pipeline_config.get("no_dub") == "true",
-        "dub_skip_reason": pipeline_config.get("dub_skip_reason"),
-        "subtitle_track_kind": pipeline_config.get("subtitle_track_kind"),
-    }
-
-    allowed = _model_allowed_fields(TaskDetail)
-    payload = {k: v for k, v in payload.items() if k in allowed}
-    return TaskDetail(**payload)
+# _task_to_detail: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _extract_first_http_url(text: str | None) -> str | None:
-    if not text:
-        return None
-    match = re.search(r"https?://\S+", text)
-    return match.group(0) if match else None
+# _extract_first_http_url: moved to services/task_view_helpers.py (Phase 1.3)
 
 
-def _sha256_file(path: Path) -> str | None:
-    if not path.exists():
-        return None
-    hasher = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(8192), b""):
-            hasher.update(chunk)
-    return hasher.hexdigest()
+# _sha256_file: moved to services/media_helpers.py (Phase 1.3)
 
 
 def _repo_upsert(repo, task_id: str, patch: dict) -> None:
@@ -1979,259 +1344,34 @@ def _repo_refresh_task(repo, task_id: str) -> Any:
     return repo.get(task_id)
 
 
-def _build_hot_follow_voice_options(settings, target_lang: str | None) -> dict[str, list[dict[str, str]]]:
-    if normalize_target_lang(target_lang) != "my":
-        return {"azure_speech": [], "edge_tts": []}
-
-    options: dict[str, list[dict[str, str]]] = {"azure_speech": [], "edge_tts": []}
-    azure_map = getattr(settings, "azure_tts_voice_map", {}) or {}
-    if azure_map.get("mm_female_1"):
-        options["azure_speech"].append({"value": "mm_female_1", "label": "女声"})
-    if azure_map.get("mm_male_1"):
-        options["azure_speech"].append({"value": "mm_male_1", "label": "男声"})
-
-    edge_map = getattr(settings, "edge_tts_voice_map", {}) or {}
-    if edge_map.get("mm_female_1"):
-        options["edge_tts"].append({"value": "mm_female_1", "label": "女声"})
-    if edge_map.get("mm_male_1"):
-        options["edge_tts"].append({"value": "mm_male_1", "label": "男声"})
-    return options
+# _build_hot_follow_voice_options: moved to services/voice_state.py (Phase 1.3)
 
 
-def _resolve_hot_follow_requested_voice(
-    settings,
-    task: dict,
-    provider: str | None,
-) -> str | None:
-    config = dict(task.get("config") or {})
-    requested = str(
-        config.get("tts_requested_voice")
-        or config.get("hot_follow_tts_requested_voice")
-        or ""
-    ).strip() or None
-    if requested:
-        return requested
-
-    provider_norm = normalize_provider(provider)
-    reverse_edge = {
-        str(v).strip(): str(k).strip()
-        for k, v in ((getattr(settings, "edge_tts_voice_map", {}) or {}).items())
-        if str(k).strip() and str(v).strip()
-    }
-    reverse_azure = {
-        str(v).strip(): str(k).strip()
-        for k, v in ((getattr(settings, "azure_tts_voice_map", {}) or {}).items())
-        if str(k).strip() and str(v).strip()
-    }
-    reverse_lovo = {}
-    if getattr(settings, "lovo_speaker_mm_female_1", None):
-        reverse_lovo[str(getattr(settings, "lovo_speaker_mm_female_1")).strip()] = "mm_female_1"
-    if getattr(settings, "lovo_speaker_mm_male_1", None):
-        reverse_lovo[str(getattr(settings, "lovo_speaker_mm_male_1")).strip()] = "mm_male_1"
-
-    for candidate in (task.get("voice_id"), task.get("mm_audio_voice_id")):
-        voice = str(candidate or "").strip() or None
-        if not voice:
-            continue
-        if voice in {"mm_female_1", "mm_male_1", "mm_female_2"}:
-            return voice
-        if provider_norm == "edge-tts" and voice in reverse_edge:
-            return reverse_edge[voice]
-        if provider_norm == "azure-speech" and voice in reverse_azure:
-            return reverse_azure[voice]
-        if provider_norm == "lovo" and voice in reverse_lovo:
-            return reverse_lovo[voice]
-    return None
+# _resolve_hot_follow_requested_voice: moved to services/voice_state.py (Phase 1.3)
 
 
-def _hot_follow_expected_provider(task: dict, requested_voice: str | None, default_provider: str | None) -> str:
-    provider = normalize_provider(default_provider)
-    target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
-    if str(task.get("kind") or "").strip().lower() == "hot_follow" and target_lang == "my":
-        requested = str(requested_voice or "").strip()
-        if not requested or requested in {"mm_female_1", "mm_male_1"}:
-            return "azure-speech"
-    return provider
+# _hot_follow_expected_provider: moved to services/voice_state.py (Phase 1.3)
 
 
-def _voice_state_config(task: dict) -> dict[str, Any]:
-    config = dict(task.get("config") or {})
-    return {
-        "requested_voice": str(config.get("tts_requested_voice") or config.get("hot_follow_tts_requested_voice") or "").strip() or None,
-        "resolved_voice": str(config.get("tts_resolved_voice") or "").strip() or None,
-        "provider": normalize_provider(config.get("tts_provider") or task.get("dub_provider") or get_settings().dub_provider),
-        "request_token": str(config.get("tts_request_token") or "").strip() or None,
-        "completed_token": str(config.get("tts_completed_token") or "").strip() or None,
-    }
+# _voice_state_config: moved to services/voice_state.py (Phase 1.3)
 
 
-def _resolve_hot_follow_provider_voice(
-    settings,
-    provider: str | None,
-    requested_voice: str | None,
-    *,
-    task: dict | None = None,
-) -> str | None:
-    if isinstance(task, dict):
-        actual_voice = str(task.get("mm_audio_voice_id") or "").strip() or None
-        if actual_voice:
-            return actual_voice
-    requested = str(requested_voice or "").strip() or None
-    if not requested:
-        return None
-    provider_norm = normalize_provider(provider)
-    if provider_norm == "edge-tts":
-        return (getattr(settings, "edge_tts_voice_map", {}) or {}).get(requested, requested)
-    if provider_norm == "azure-speech":
-        return (getattr(settings, "azure_tts_voice_map", {}) or {}).get(requested, requested)
-    if provider_norm == "lovo":
-        if requested == "mm_female_1":
-            return getattr(settings, "lovo_speaker_mm_female_1", None) or requested
-        if requested == "mm_male_1":
-            return getattr(settings, "lovo_speaker_mm_male_1", None) or requested
-    return requested
+# _resolve_hot_follow_provider_voice: moved to services/voice_state.py (Phase 1.3)
 
 
-def _hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
-    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-    exists = False
-    size_bytes = 0
-    if audio_key and object_exists(str(audio_key)):
-        meta = object_head(str(audio_key))
-        size_bytes, _ = media_meta_from_head(meta)
-        exists = int(size_bytes or 0) >= MIN_AUDIO_BYTES
-    return {
-        "audio_key": str(audio_key) if audio_key else None,
-        "exists": bool(exists),
-        "size_bytes": int(size_bytes or 0),
-        "voiceover_url": f"/v1/tasks/{task_id}/audio_mm" if task_id and exists else None,
-        "deliverable_audio_done": bool(exists),
-    }
+# _hf_persisted_audio_state: moved to services/voice_state.py (Phase 1.3)
 
 
-def _hf_audio_matches_expected(
-    *,
-    actual_provider: str | None,
-    expected_provider: str | None,
-    resolved_voice: str | None,
-    expected_resolved_voice: str | None,
-) -> tuple[bool, str]:
-    if not expected_resolved_voice:
-        return False, "voice_unresolved"
-    if not resolved_voice:
-        return False, "resolved_voice_missing"
-    if normalize_provider(actual_provider) != normalize_provider(expected_provider):
-        return False, "provider_mismatch"
-    if str(resolved_voice).strip() != str(expected_resolved_voice).strip():
-        return False, "voice_mismatch"
-    return True, "ready"
+# _hf_audio_matches_expected: moved to services/voice_state.py (Phase 1.3)
 
 
-def _collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
-    target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
-    task_id = str(task.get("task_id") or task.get("id") or "")
-    voice_options_by_provider = _build_hot_follow_voice_options(settings, target_lang)
-    config_state = _voice_state_config(task)
-    requested_voice = config_state.get("requested_voice") or _resolve_hot_follow_requested_voice(settings, task, config_state.get("provider"))
-    expected_provider = _hot_follow_expected_provider(
-        task,
-        requested_voice,
-        config_state.get("provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None),
-    )
-    actual_provider = normalize_provider(task.get("mm_audio_provider") or expected_provider)
-    expected_resolved_voice, _ = resolve_tts_voice(
-        settings=settings,
-        provider=expected_provider,
-        target_lang=target_lang,
-        requested_voice=requested_voice,
-    )
-    resolved_voice = (
-        str(task.get("mm_audio_voice_id") or "").strip()
-        or str(config_state.get("resolved_voice") or "").strip()
-        or _resolve_hot_follow_provider_voice(
-            settings,
-            actual_provider,
-            requested_voice,
-            task=task,
-        )
-    )
-    persisted_audio = _hf_persisted_audio_state(task_id, task)
-    audio_exists = bool(persisted_audio.get("exists"))
-    dub_status = str(task.get("dub_status") or "").strip().lower()
-    dub_running = dub_status in {"queued", "running", "processing"}
-    dub_done = dub_status in {"ready", "done", "success", "completed"}
-    matches_expected, match_reason = _hf_audio_matches_expected(
-        actual_provider=actual_provider,
-        expected_provider=expected_provider,
-        resolved_voice=resolved_voice,
-        expected_resolved_voice=expected_resolved_voice,
-    )
-    audio_ready_reason = "ready"
-    if dub_running and not audio_exists:
-        audio_ready_reason = "dub_running"
-    elif not audio_exists:
-        audio_ready_reason = "audio_missing"
-    elif not dub_done:
-        audio_ready_reason = "dub_not_done"
-    elif not matches_expected:
-        audio_ready_reason = match_reason
-    elif (
-        config_state.get("request_token")
-        and config_state.get("completed_token")
-        and config_state.get("completed_token") != config_state.get("request_token")
-        and not audio_exists
-    ):
-        audio_ready_reason = "dub_not_current"
-    audio_ready = audio_ready_reason == "ready"
-    dub_current = audio_ready and audio_exists and matches_expected
-    return {
-        "target_lang": target_lang,
-        "voice_options_by_provider": voice_options_by_provider,
-        "requested_voice": requested_voice,
-        "actual_provider": actual_provider,
-        "resolved_voice": resolved_voice,
-        "expected_provider": expected_provider,
-        "expected_resolved_voice": expected_resolved_voice,
-        "audio_ready": audio_ready,
-        "audio_ready_reason": audio_ready_reason,
-        "voiceover_url": persisted_audio.get("voiceover_url") if dub_current else None,
-        "deliverable_audio_done": bool(persisted_audio.get("deliverable_audio_done")),
-        "dub_current": bool(dub_current),
-        "dub_current_reason": audio_ready_reason if not dub_current else "ready",
-    }
+# _collect_voice_execution_state: moved to services/voice_state.py (Phase 1.3)
 
 
-def _merge_probe_into_pipeline_config(
-    pipeline_config: dict[str, str], probe: dict[str, Any] | None
-) -> dict[str, str]:
-    if not probe:
-        return pipeline_config
-    kind = probe.get("subtitle_track_kind")
-    if isinstance(kind, str) and kind:
-        pipeline_config["subtitle_track_kind"] = kind
-    has_sub = probe.get("has_subtitle_stream")
-    if has_sub is True:
-        pipeline_config["subtitle_stream"] = "true"
-    elif has_sub is False:
-        pipeline_config["subtitle_stream"] = "false"
-    subtitle_codecs = probe.get("subtitle_codecs") or []
-    if isinstance(subtitle_codecs, list) and subtitle_codecs:
-        pipeline_config["subtitle_codecs"] = ",".join(
-            [str(v) for v in subtitle_codecs if str(v).strip()]
-        )
-    return pipeline_config
+# _merge_probe_into_pipeline_config: moved to services/media_helpers.py (Phase 1.3)
 
 
-def _update_pipeline_probe(repo, task_id: str, probe: dict[str, Any] | None) -> None:
-    if not probe:
-        return
-    task = repo.get(task_id)
-    if not task:
-        return
-    current = parse_pipeline_config(task.get("pipeline_config"))
-    updated = _merge_probe_into_pipeline_config(current, probe)
-    if updated != current:
-        _policy_upsert(repo, task_id, {"pipeline_config": pipeline_config_to_storage(updated)})
+# _update_pipeline_probe: moved to services/media_helpers.py (Phase 1.3)
 
 
 def _should_autostart(task: dict) -> bool:
@@ -2694,48 +1834,7 @@ def resolve_download_code(code: str, repo=Depends(get_task_repository)):
     raise HTTPException(status_code=404, detail="Code not found")
 
 
-async def _probe_url_metadata(url: str, platform_hint: str | None = None) -> dict[str, Any]:
-    url = _extract_first_http_url(url) or url
-    if not url:
-        raise HTTPException(status_code=400, detail="url is required")
-
-    platform = (platform_hint or "").strip().lower() if platform_hint else "auto"
-    if platform in ("", "auto"):
-        platform = detect_platform(url) or "auto"
-    logger.info("[hotfollow][probe] source_url=%s", url)
-    logger.info("[hotfollow][probe] platform=%s", platform or "auto")
-
-    try:
-        meta = await parse_with_xiongmao(url, platform_hint=platform)
-    except XiongmaoError as exc:
-        logger.warning(
-            "[hotfollow][probe] provider=xiongmao resolved_url=%s error=%s",
-            url,
-            str(exc),
-        )
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    raw = meta.get("raw") if isinstance(meta, dict) else None
-    duration_sec = None
-    if isinstance(raw, dict):
-        for key in ("duration_sec", "duration", "durationSec"):
-            if raw.get(key):
-                try:
-                    duration_sec = int(float(raw.get(key)))
-                    break
-                except Exception:
-                    pass
-
-    return {
-        "platform": platform or meta.get("platform"),
-        "url": url,
-        "title": meta.get("title") if isinstance(meta, dict) else None,
-        "cover": meta.get("cover") if isinstance(meta, dict) else None,
-        "duration_sec": duration_sec,
-        "source_id": raw.get("source_id") if isinstance(raw, dict) else None,
-        "raw": raw,
-        "raw_downloaded": False,
-    }
+# _probe_url_metadata: moved to services/media_helpers.py (Phase 1.3)
 
 
 @api_router.post("/tasks/probe")
@@ -2808,33 +1907,7 @@ def create_task(
     return _task_to_detail(stored_task)
 
 
-def _save_upload_to_paths(
-    *,
-    upload: UploadFile,
-    inputs_path: Path,
-    raw_path_target: Path,
-    max_bytes: int,
-) -> int:
-    inputs_path.parent.mkdir(parents=True, exist_ok=True)
-    raw_path_target.parent.mkdir(parents=True, exist_ok=True)
-    total = 0
-    with inputs_path.open("wb") as out:
-        while True:
-            chunk = upload.file.read(1024 * 1024)
-            if not chunk:
-                break
-            total += len(chunk)
-            if total > max_bytes:
-                out.close()
-                try:
-                    inputs_path.unlink(missing_ok=True)
-                except Exception:
-                    pass
-                raise HTTPException(status_code=413, detail="upload too large")
-            out.write(chunk)
-    if inputs_path != raw_path_target:
-        shutil.copyfile(inputs_path, raw_path_target)
-    return total
+# _save_upload_to_paths: moved to services/media_helpers.py (Phase 1.3)
 
 
 @api_router.post("/tasks/local_upload")
@@ -2950,65 +2023,7 @@ def create_task_local_upload(
     return {"ok": True, "task_id": task_id, "redirect": f"/tasks/{task_id}"}
 
 
-def _upload_task_bgm_impl(
-    task_id: str,
-    *,
-    bgm_file: UploadFile,
-    original_pct: int | None,
-    bgm_pct: int | None,
-    mix_ratio: float | None,
-    strategy: str | None,
-    repo,
-) -> dict[str, Any]:
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    if not bgm_file or not bgm_file.filename:
-        raise HTTPException(status_code=400, detail="bgm_file is required")
-
-    ext = Path(bgm_file.filename).suffix.lower()
-    if ext not in {".mp3", ".wav"}:
-        raise HTTPException(status_code=400, detail="unsupported file type")
-
-    max_mb = int(os.getenv("MAX_BGM_UPLOAD_MB", "50"))
-    max_bytes = max_mb * 1024 * 1024
-
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmp_path = Path(tmpdir) / f"user_bgm{ext}"
-        _save_upload_to_paths(
-            upload=bgm_file,
-            inputs_path=tmp_path,
-            raw_path_target=tmp_path,
-            max_bytes=max_bytes,
-        )
-        artifact_name = f"bgm/user_bgm{ext}"
-        bgm_key = upload_task_artifact(task, tmp_path, artifact_name, task_id=task_id)
-
-    ratio = mix_ratio
-    if ratio is None:
-        if bgm_pct is not None and original_pct is not None:
-            total = max(bgm_pct + original_pct, 0)
-            ratio = (bgm_pct / total) if total > 0 else 0.5
-        else:
-            ratio = 0.8
-    ratio = max(0.0, min(float(ratio), 1.0))
-
-    config = dict(task.get("config") or {})
-    config["bgm"] = {
-        "strategy": strategy or "replace",
-        "bgm_key": bgm_key,
-        "mix_ratio": ratio,
-    }
-    _policy_upsert(repo, task_id, {"config": config})
-
-    bgm_url = get_download_url(str(bgm_key)) if bgm_key else None
-    return {
-        "task_id": task_id,
-        "bgm_key": bgm_key,
-        "bgm_url": bgm_url,
-        "mix_ratio": ratio,
-        "strategy": config["bgm"]["strategy"],
-    }
+# _upload_task_bgm_impl: moved to services/media_helpers.py (Phase 1.3)
 
 @api_router.post("/tasks/{task_id}/bgm")
 def upload_task_bgm(
