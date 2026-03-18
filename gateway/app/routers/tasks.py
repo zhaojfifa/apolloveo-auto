@@ -3291,6 +3291,7 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     payload["stale"] = stale
     payload["stale_reason"] = "running_but_not_updated" if stale else None
     payload["stale_for_seconds"] = stale_for
+    from gateway.app.routers.hot_follow_api import _hf_task_status_shape  # noqa: PLC0415
     shape = _hf_task_status_shape(t)
 
     logger.info(
@@ -3399,6 +3400,11 @@ def compose_task(
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
     final_meta = object_head(str(final_key)) if final_key else None
     final_size, _ = media_meta_from_head(final_meta)
+    from gateway.app.routers.hot_follow_api import (  # noqa: PLC0415
+        _maybe_run_hot_follow_lipsync_stub,
+        _hf_compose_final_video,
+        get_hot_follow_workbench_hub,
+    )
     if final_key and object_exists(str(final_key)) and final_size >= MIN_VIDEO_BYTES and not req.force:
         _policy_upsert(repo, task_id, {"compose_lock_until": None})
         lock.release()
@@ -3783,6 +3789,11 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             provider,
         )
     mm_text_override = (payload.mm_text or "").strip() or None
+    from gateway.app.routers.hot_follow_api import (  # noqa: PLC0415 — lazy import breaks circular dep
+        _hf_subtitle_lane_state,
+        _hf_dual_channel_state,
+        _hf_target_lang_gate,
+    )
     subtitle_lane = _hf_subtitle_lane_state(task_id, task)
     route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
     no_dub_candidate = (
