@@ -392,6 +392,9 @@
                     <span data-i18n="hot_follow_workbench_freeze_tail_toggle">Hold last frame to match audio (freeze tail)</span>
                   </label>
                   <div class="text-[11px] text-gray-500" data-i18n="hot_follow_workbench_freeze_tail_cap_hint">Freeze tail cap: 8s; if exceeded fallback to match video.</div>
+                  <div id="hf_compose_plan_warning" class="hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+                    <span class="font-semibold">⚠ 实际策略降级：</span><span id="hf_compose_plan_warning_text"></span>
+                  </div>
                   <label class="flex items-center gap-2 text-xs text-gray-600">
                     <input id="hf_compose_confirm" type="checkbox" class="rounded border-gray-300" />
                     <span data-i18n="hot_follow_workbench_compose_confirm">I confirm voiceover and mix settings are ready.</span>

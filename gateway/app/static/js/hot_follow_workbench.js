@@ -881,12 +881,27 @@
     const composePlan = (currentHub && currentHub.compose_plan) || {};
     if (overlaySubtitlesEl) overlaySubtitlesEl.checked = Boolean(composePlan.overlay_subtitles);
     if (freezeTailEnabledEl) freezeTailEnabledEl.checked = Boolean(composePlan.freeze_tail_enabled);
+    _renderComposeOptionWarning();
     renderComposeModes();
     renderCleanupModes();
     // Phase 0.5: update ops guide card
     _updateOpsGuideCard(readyGate);
     // Phase 0.6: update compose quick bar
     _updateComposeQuickBar(readyGate);
+  }
+
+  function _renderComposeOptionWarning() {
+    const warningEl = document.getElementById("hf_compose_plan_warning");
+    const warningTextEl = document.getElementById("hf_compose_plan_warning_text");
+    if (!warningEl || !warningTextEl) return;
+    const warning = String((currentHub && currentHub.compose && currentHub.compose.warning) || "").trim();
+    if (warning) {
+      warningTextEl.textContent = warning;
+      warningEl.classList.remove("hidden");
+    } else {
+      warningTextEl.textContent = "";
+      warningEl.classList.add("hidden");
+    }
   }
 
   function _updateOpsGuideCard(readyGate) {

@@ -4346,18 +4346,12 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
 def _run_dub_background(task_id: str, payload: DubProviderRequest, repo: ITaskRepository) -> None:
     try:
         asyncio.run(_run_dub_job(task_id, payload, repo))
-    except Exception:
-        logger.exception("DUB3_FAIL", extra={"task_id": task_id, "step": "dub", "phase": "exception"})
     except Exception as exc:
-        _policy_upsert(repo, task_id, {"subtitles_status": "error", "subtitles_error": str(exc)})
-        logger.exception(
-            "SUB2_FAIL",
-            extra={
-                "task_id": task_id,
-                "step": "subtitles",
-                "phase": "exception",
-            },
-        )
+        try:
+            _policy_upsert(repo, task_id, {"dub_status": "failed", "dub_error": str(exc)})
+        except Exception:
+            logger.exception("DUB3_FAIL_STATUS_UPDATE_FAILED", extra={"task_id": task_id})
+        logger.exception("DUB3_FAIL", extra={"task_id": task_id, "step": "dub", "phase": "exception"})
 
 
 @api_router.post("/tasks/{task_id}/scenes")
