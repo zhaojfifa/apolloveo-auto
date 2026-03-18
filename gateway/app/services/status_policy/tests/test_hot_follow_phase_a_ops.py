@@ -18,6 +18,7 @@ except Exception:
     sys.modules["pydantic_settings"] = shim
 
 from gateway.app.routers import tasks as tasks_router
+from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.steps import subtitles as subtitles_step
 
 
@@ -44,36 +45,36 @@ def test_hot_follow_translation_normalizes_beauty_terms():
 
 
 def test_dual_channel_uses_voice_led_when_text_exists(monkeypatch):
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "Hello brand matte lip glaze")
-    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "Hello brand matte lip glaze")
-    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "Hello brand matte lip glaze")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "Hello brand matte lip glaze")
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
     task = {
         "task_id": "hf-a2",
         "kind": "hot_follow",
         "platform": "douyin",
         "pipeline_config": "",
     }
-    subtitle_lane = tasks_router._hf_subtitle_lane_state("hf-a2", task)
-    route = tasks_router._hf_dual_channel_state("hf-a2", task, subtitle_lane)
+    subtitle_lane = hf_router._hf_subtitle_lane_state("hf-a2", task)
+    route = hf_router._hf_dual_channel_state("hf-a2", task, subtitle_lane)
     assert route["speech_detected"] is True
     assert route["content_mode"] == "voice_led"
     assert route["recommended_path"] == "Voice dubbing"
 
 
 def test_dual_channel_uses_silent_candidate_for_asmr_title(monkeypatch):
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "")
-    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
-    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
     task = {
         "task_id": "hf-a2-silent",
         "kind": "hot_follow",
         "title": "无人声涂抹音 asmr",
         "pipeline_config": "",
     }
-    subtitle_lane = tasks_router._hf_subtitle_lane_state("hf-a2-silent", task)
-    route = tasks_router._hf_dual_channel_state("hf-a2-silent", task, subtitle_lane)
+    subtitle_lane = hf_router._hf_subtitle_lane_state("hf-a2-silent", task)
+    route = hf_router._hf_dual_channel_state("hf-a2-silent", task, subtitle_lane)
     assert route["speech_detected"] is False
     assert route["content_mode"] == "silent_candidate"
 
@@ -106,9 +107,9 @@ def test_artifact_first_audio_ready_keeps_current_matching_audio(monkeypatch):
 
 
 def test_safe_workbench_ui_returns_defaults_on_builder_error(monkeypatch):
-    monkeypatch.setattr(tasks_router, "_collect_hot_follow_workbench_ui", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(hf_router, "_collect_hot_follow_workbench_ui", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
     task = {"task_id": "hf-a4", "kind": "hot_follow", "target_lang": "mm"}
-    payload = tasks_router._safe_collect_hot_follow_workbench_ui(task, _settings())
+    payload = hf_router._safe_collect_hot_follow_workbench_ui(task, _settings())
     assert payload["content_mode"] == "unknown"
     assert payload["lipsync_status"] == "off"
     assert payload["audio_ready"] is False

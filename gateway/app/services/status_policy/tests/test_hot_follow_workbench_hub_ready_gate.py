@@ -20,6 +20,7 @@ except Exception:
 
 from gateway.app.deps import get_task_repository
 from gateway.app.routers import tasks as tasks_router
+from gateway.app.routers import hot_follow_api as hf_router
 
 
 class _Repo:
@@ -63,14 +64,15 @@ def test_hot_follow_workbench_ready_gate_backfills_compose_when_final_exists(mon
             "voice_exists": True,
         }
 
-    monkeypatch.setattr(tasks_router, "_compute_composed_state", _fake_composed)
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
-    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_compute_composed_state", _fake_composed)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
 
     app = FastAPI()
     app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
     app.dependency_overrides[get_task_repository] = lambda: repo
 
     with TestClient(app) as client:
@@ -118,14 +120,15 @@ def test_hot_follow_workbench_compose_view_is_done_when_final_ready(monkeypatch)
             "voice_exists": True,
         }
 
-    monkeypatch.setattr(tasks_router, "_compute_composed_state", _fake_composed)
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
-    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_compute_composed_state", _fake_composed)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
 
     app = FastAPI()
     app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
     app.dependency_overrides[get_task_repository] = lambda: repo
 
     with TestClient(app) as client:
@@ -166,14 +169,15 @@ def test_hot_follow_workbench_hub_survives_optional_presentation_aggregation_fai
         },
     )
 
-    monkeypatch.setattr(tasks_router, "_hf_artifact_facts", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
-    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_artifact_facts", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
 
     app = FastAPI()
     app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
     app.dependency_overrides[get_task_repository] = lambda: repo
 
     with TestClient(app) as client:
@@ -202,6 +206,7 @@ def test_hot_follow_compose_rejects_stale_revision_submission():
 
     app = FastAPI()
     app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
     app.dependency_overrides[get_task_repository] = lambda: repo
 
     with TestClient(app) as client:

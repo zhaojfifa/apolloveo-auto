@@ -16,13 +16,14 @@ except Exception:
     shim.BaseSettings = _BaseSettings
     sys.modules["pydantic_settings"] = shim
 
-from gateway.app.routers import tasks as tasks_router
+from gateway.app.routers import tasks as tasks_router  # noqa: F401
+from gateway.app.routers import hot_follow_api as hf_router
 
 
 def test_plain_text_is_wrapped_to_single_srt():
     task = {"duration_sec": 12}
     source = "第一行中文\n第二行中文"
-    text, mode = tasks_router._hf_normalize_subtitles_save_text(task, source)
+    text, mode = hf_router._hf_normalize_subtitles_save_text(task, source)
     assert mode == "plain_text_wrapped"
     assert "-->" in text
     assert "第一行中文" in text
@@ -32,13 +33,13 @@ def test_plain_text_is_wrapped_to_single_srt():
 def test_valid_srt_is_preserved():
     task = {"duration_sec": 12}
     source = "1\n00:00:00,000 --> 00:00:03,000\n缅文字幕\n"
-    text, mode = tasks_router._hf_normalize_subtitles_save_text(task, source)
+    text, mode = hf_router._hf_normalize_subtitles_save_text(task, source)
     assert mode == "srt"
     assert text.strip() == source.strip()
 
 
 def test_target_lang_gate_blocks_non_myanmar_text_for_burmese_tts():
-    result = tasks_router._hf_target_lang_gate(
+    result = hf_router._hf_target_lang_gate(
         "1\n00:00:00,000 --> 00:00:03,000\nHello lipstick matte finish\n",
         target_lang="my",
     )

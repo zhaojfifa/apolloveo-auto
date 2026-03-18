@@ -10,6 +10,7 @@ pytest.importorskip("pydantic_settings")
 
 from gateway.app.deps import get_task_repository
 from gateway.app.routers import tasks as tasks_router
+from gateway.app.routers import hot_follow_api as hf_router
 
 
 class _Repo:
@@ -53,10 +54,11 @@ def test_hot_follow_publish_hub_includes_final_preview_url_and_ready(monkeypatch
             "voice_exists": True,
         }
 
-    monkeypatch.setattr(tasks_router, "_compute_composed_state", _fake_composed)
+    monkeypatch.setattr(hf_router, "_compute_composed_state", _fake_composed)
 
     app = FastAPI()
     app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
     app.dependency_overrides[get_task_repository] = lambda: repo
 
     with TestClient(app) as client:

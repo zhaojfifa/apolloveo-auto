@@ -16,15 +16,16 @@ except Exception:
     shim.BaseSettings = _BaseSettings
     sys.modules["pydantic_settings"] = shim
 
-from gateway.app.routers import tasks as tasks_router
+from gateway.app.routers import tasks as tasks_router  # noqa: F401
+from gateway.app.routers import hot_follow_api as hf_router
 
 
 def test_allow_subtitle_only_compose_for_silent_hot_follow(monkeypatch):
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: True)
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "")
-    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
     monkeypatch.setattr(
-        tasks_router,
+        hf_router,
         "_hf_load_subtitles_text",
         lambda _task_id, _task: "1\n00:00:00,000 --> 00:00:02,000\n字幕版测试\n",
     )
@@ -36,15 +37,15 @@ def test_allow_subtitle_only_compose_for_silent_hot_follow(monkeypatch):
         "mm_srt_path": "deliver/tasks/hf_silent/mm.srt",
         "dub_skip_reason": "no_speech_detected",
     }
-    assert tasks_router._hf_allow_subtitle_only_compose("hf_silent", task) is True
+    assert hf_router._hf_allow_subtitle_only_compose("hf_silent", task) is True
 
 
 def test_do_not_allow_subtitle_only_compose_for_voice_led_hot_follow(monkeypatch):
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: True)
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "标准口播测试")
-    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "标准口播测试")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "标准口播测试")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "标准口播测试")
     monkeypatch.setattr(
-        tasks_router,
+        hf_router,
         "_hf_load_subtitles_text",
         lambda _task_id, _task: "1\n00:00:00,000 --> 00:00:02,000\n标准口播测试\n",
     )
@@ -55,4 +56,4 @@ def test_do_not_allow_subtitle_only_compose_for_voice_led_hot_follow(monkeypatch
         "pipeline_config": {},
         "mm_srt_path": "deliver/tasks/hf_voice/mm.srt",
     }
-    assert tasks_router._hf_allow_subtitle_only_compose("hf_voice", task) is False
+    assert hf_router._hf_allow_subtitle_only_compose("hf_voice", task) is False

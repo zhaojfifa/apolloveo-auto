@@ -25,6 +25,7 @@ from gateway.app import models
 from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
 from gateway.app.routers import admin_publish, admin_tools as admin_tools_router, publish as publish_router, tasks as tasks_router
 from gateway.app.routers import hot_follow_ui as hot_follow_ui_router
+from gateway.app.routers.hot_follow_api import hot_follow_api_router
 from gateway.app.routers.api_tools import router as tools_api_router
 import gateway.app.lines.hot_follow as _line_reg_hot_follow  # noqa: F401 — registers HOT_FOLLOW_LINE
 from gateway.app.routes.auth import router as auth_router
@@ -152,6 +153,7 @@ async def auth_middleware(request: Request, call_next):
 
 app.include_router(tasks_router.pages_router)
 app.include_router(tasks_router.api_router)
+app.include_router(hot_follow_api_router)
 app.include_router(auth_router)
 app.include_router(tools_api_router)
 app.include_router(v1_actions.router, prefix="/v1")

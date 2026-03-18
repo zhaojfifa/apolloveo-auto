@@ -20,6 +20,7 @@ except Exception:
     sys.modules["pydantic_settings"] = shim
 
 from gateway.app.routers import tasks as tasks_router
+from gateway.app.routers import hot_follow_api as hf_router
 
 
 def _settings():
@@ -123,6 +124,23 @@ def test_previous_final_can_coexist_with_failed_current_redub(monkeypatch, tmp_p
         "media_meta_from_head",
         lambda meta: (int(meta.get("ContentLength") or 0), str(meta.get("Content-Type") or "")),
     )
+    # Also patch on hf_router since _collect_hot_follow_workbench_ui lives there
+    monkeypatch.setattr(hf_router, "get_settings", _settings)
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: tmp_path / _task_id)
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key).endswith(("audio_mm.mp3", "final.mp4")))
+    monkeypatch.setattr(
+        hf_router,
+        "object_head",
+        lambda key: {
+            "ContentLength": "4096" if str(key).endswith("audio_mm.mp3") else "8192",
+            "Content-Type": "audio/mpeg" if str(key).endswith("audio_mm.mp3") else "video/mp4",
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "media_meta_from_head",
+        lambda meta: (int(meta.get("ContentLength") or 0), str(meta.get("Content-Type") or "")),
+    )
 
     task = {
         "task_id": "hf-rerun",
@@ -141,7 +159,7 @@ def test_previous_final_can_coexist_with_failed_current_redub(monkeypatch, tmp_p
         },
     }
 
-    payload = tasks_router._collect_hot_follow_workbench_ui(task, _settings())
+    payload = hf_router._collect_hot_follow_workbench_ui(task, _settings())
     assert payload["final_exists"] is True
     assert payload["audio_ready"] is False
     assert payload["dub_current"] is False
@@ -168,7 +186,7 @@ def test_rerun_presentation_reports_last_final_and_current_failure():
         "updated_at": "2026-03-14T09:55:00+00:00",
     }
 
-    presentation = tasks_router._hf_rerun_presentation_state(task, voice_state, final_info, "failed")
+    presentation = hf_router._hf_rerun_presentation_state(task, voice_state, final_info, "failed")
 
     assert presentation["last_successful_output"]["final_exists"] is True
     assert presentation["last_successful_output"]["final_url"] == "/v1/tasks/hf-rerun-presentation/final"
@@ -199,7 +217,7 @@ def test_rerun_presentation_reports_current_success_without_regressing_baseline(
         "updated_at": "2026-03-14T09:58:00+00:00",
     }
 
-    presentation = tasks_router._hf_rerun_presentation_state(task, voice_state, final_info, "done")
+    presentation = hf_router._hf_rerun_presentation_state(task, voice_state, final_info, "done")
 
     assert presentation["last_successful_output"]["final_exists"] is True
     assert presentation["current_attempt"]["dub_status"] == "done"
@@ -209,7 +227,7 @@ def test_rerun_presentation_reports_current_success_without_regressing_baseline(
 
 
 def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
-    artifact_facts = tasks_router._hf_artifact_facts(
+    artifact_facts = hf_router._hf_artifact_facts(
         "hf-rerun-presentation",
         {},
         final_info={
@@ -222,7 +240,7 @@ def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
         subtitle_lane={"subtitle_artifact_exists": True},
         scene_pack={"download_url": "/v1/tasks/hf-rerun-presentation/pack"},
     )
-    current_attempt = tasks_router._hf_current_attempt_summary(
+    current_attempt = hf_router._hf_current_attempt_summary(
         voice_state={
             "audio_ready": False,
             "audio_ready_reason": "dub_not_done",
@@ -237,7 +255,7 @@ def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
         compose_status="pending",
         composed_reason="audio_not_ready",
     )
-    operator_summary = tasks_router._hf_operator_summary(
+    operator_summary = hf_router._hf_operator_summary(
         artifact_facts=artifact_facts,
         current_attempt=current_attempt,
         no_dub=False,
@@ -257,7 +275,7 @@ def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
 
 
 def test_artifact_facts_and_operator_summary_preserve_voice_led_success_baseline():
-    artifact_facts = tasks_router._hf_artifact_facts(
+    artifact_facts = hf_router._hf_artifact_facts(
         "hf-success-presentation",
         {},
         final_info={
@@ -270,7 +288,7 @@ def test_artifact_facts_and_operator_summary_preserve_voice_led_success_baseline
         subtitle_lane={"subtitle_artifact_exists": True},
         scene_pack=None,
     )
-    current_attempt = tasks_router._hf_current_attempt_summary(
+    current_attempt = hf_router._hf_current_attempt_summary(
         voice_state={
             "audio_ready": True,
             "audio_ready_reason": "ready",
@@ -285,7 +303,7 @@ def test_artifact_facts_and_operator_summary_preserve_voice_led_success_baseline
         compose_status="done",
         composed_reason="ready",
     )
-    operator_summary = tasks_router._hf_operator_summary(
+    operator_summary = hf_router._hf_operator_summary(
         artifact_facts=artifact_facts,
         current_attempt=current_attempt,
         no_dub=False,
@@ -301,11 +319,11 @@ def test_artifact_facts_and_operator_summary_preserve_voice_led_success_baseline
 
 
 def test_source_audio_lane_summary_distinguishes_voice_led_and_silent_candidates():
-    voice_led = tasks_router._hf_source_audio_lane_summary(
+    voice_led = hf_router._hf_source_audio_lane_summary(
         {"title": "standard talking head"},
         {"content_mode": "voice_led", "speech_detected": True},
     )
-    silent = tasks_router._hf_source_audio_lane_summary(
+    silent = hf_router._hf_source_audio_lane_summary(
         {"title": "ASMR product showcase"},
         {"content_mode": "silent_candidate", "speech_detected": False},
     )
@@ -317,7 +335,7 @@ def test_source_audio_lane_summary_distinguishes_voice_led_and_silent_candidates
 
 
 def test_screen_text_candidate_summary_prefers_normalized_text_for_subtitle_led():
-    candidate = tasks_router._hf_screen_text_candidate_summary(
+    candidate = hf_router._hf_screen_text_candidate_summary(
         {
             "normalized_source_text": "候选字幕",
             "raw_source_text": "原始文本",
@@ -336,13 +354,13 @@ def test_screen_text_candidate_summary_prefers_normalized_text_for_subtitle_led(
 
 
 def test_collect_hot_follow_workbench_ui_does_not_keep_no_dub_when_audio_is_current(monkeypatch):
-    monkeypatch.setattr(tasks_router, "get_settings", _settings)
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: True)
-    monkeypatch.setattr(tasks_router, "object_head", lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"})
-    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (4096, "audio/mpeg"))
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "")
-    monkeypatch.setattr(tasks_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
-    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(hf_router, "get_settings", _settings)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"})
+    monkeypatch.setattr(hf_router, "media_meta_from_head", lambda _meta: (4096, "audio/mpeg"))
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
 
     task = {
         "task_id": "hf-a9-ui",
@@ -364,7 +382,7 @@ def test_collect_hot_follow_workbench_ui_does_not_keep_no_dub_when_audio_is_curr
         "pipeline_config": {"no_dub": "true"},
     }
 
-    payload = tasks_router._collect_hot_follow_workbench_ui(task, _settings())
+    payload = hf_router._collect_hot_follow_workbench_ui(task, _settings())
 
     assert payload["audio_ready"] is True
     assert payload["dub_current"] is True
@@ -375,9 +393,9 @@ def test_collect_hot_follow_workbench_ui_does_not_keep_no_dub_when_audio_is_curr
 
 
 def test_sync_saved_target_subtitle_artifact_writes_canonical_mm_srt(monkeypatch, tmp_path):
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
-    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (0, None))
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "media_meta_from_head", lambda _meta: (0, None))
 
     class _Workspace:
         def __init__(self, task_id):
@@ -391,11 +409,11 @@ def test_sync_saved_target_subtitle_artifact_writes_canonical_mm_srt(monkeypatch
         uploaded.append((artifact_name, Path(local_path).read_text(encoding="utf-8")))
         return f"deliver/tasks/{task_id}/{artifact_name}"
 
-    monkeypatch.setattr(tasks_router, "Workspace", _Workspace)
-    monkeypatch.setattr(tasks_router, "upload_task_artifact", _fake_upload)
+    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "upload_task_artifact", _fake_upload)
 
     task = {"task_id": "hf-sync", "kind": "hot_follow"}
-    key = tasks_router._hf_sync_saved_target_subtitle_artifact(
+    key = hf_router._hf_sync_saved_target_subtitle_artifact(
         "hf-sync",
         task,
         "1\n00:00:00,000 --> 00:00:02,000\nမင်္ဂလာပါ\n",
@@ -420,9 +438,9 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
 
     repo = _Repo()
 
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
-    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (0, None))
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "media_meta_from_head", lambda _meta: (0, None))
 
     class _Workspace:
         def __init__(self, task_id):
@@ -430,17 +448,17 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
             base.mkdir(parents=True, exist_ok=True)
             self.mm_srt_path = base / "mm.srt"
 
-    monkeypatch.setattr(tasks_router, "Workspace", _Workspace)
-    monkeypatch.setattr(tasks_router, "_hf_subtitles_override_path", lambda task_id: tmp_path / task_id / "override.srt")
-    monkeypatch.setattr(tasks_router, "_hf_load_subtitles_text", lambda _task_id, task: Path(tmp_path / "hf-save" / "override.srt").read_text(encoding="utf-8"))
-    monkeypatch.setattr(tasks_router, "_hf_load_origin_subtitles_text", lambda _task: "")
-    monkeypatch.setattr(tasks_router, "_policy_upsert", lambda _repo, _task_id, updates, **_kwargs: repo.task.update(updates))
-    monkeypatch.setattr(tasks_router, "upload_task_artifact", lambda _task, _local_path, artifact_name, task_id=None, **_kwargs: f"deliver/tasks/{task_id}/{artifact_name}")
+    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda task_id: tmp_path / task_id / "override.srt")
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda _task_id, task: Path(tmp_path / "hf-save" / "override.srt").read_text(encoding="utf-8"))
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(hf_router, "_policy_upsert", lambda _repo, _task_id, updates, **_kwargs: repo.task.update(updates))
+    monkeypatch.setattr(hf_router, "upload_task_artifact", lambda _task, _local_path, artifact_name, task_id=None, **_kwargs: f"deliver/tasks/{task_id}/{artifact_name}")
 
-    payload = tasks_router.HotFollowSubtitlesRequest(
+    payload = hf_router.HotFollowSubtitlesRequest(
         srt_text="1\n00:00:00,000 --> 00:00:02,000\nမင်္ဂလာပါ\n"
     )
-    result = tasks_router.patch_hot_follow_subtitles("hf-save", payload, repo=repo)
+    result = hf_router.patch_hot_follow_subtitles("hf-save", payload, repo=repo)
 
     assert repo.task["mm_srt_path"] == "deliver/tasks/hf-save/mm.srt"
     assert result["subtitles"]["srt_text"].strip().endswith("မင်္ဂလာပါ")
