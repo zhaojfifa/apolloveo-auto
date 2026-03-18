@@ -1,6 +1,24 @@
+"""Hot Follow state inference (v2.0 — Declarative Ready Gate).
+
+Refactored in TASK-2.3: the L3/L4 readiness logic that was previously
+hardcoded as 120 lines of if/else is now delegated to the declarative
+``evaluate_ready_gate()`` engine with ``HOT_FOLLOW_GATE_SPEC``.
+
+The function signature and output format of ``compute_hot_follow_state()``
+are **identical** to pre-refactor — callers require zero changes.
+"""
+
 from __future__ import annotations
 
 from typing import Any, Dict
+
+from gateway.app.services.ready_gate import evaluate_ready_gate
+from gateway.app.services.ready_gate.hot_follow_rules import HOT_FOLLOW_GATE_SPEC
+
+
+# ---------------------------------------------------------------------------
+# Helpers (unchanged from pre-refactor)
+# ---------------------------------------------------------------------------
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:
@@ -80,18 +98,18 @@ def _resolve_final_url(task_id: str, task: Dict[str, Any], state: Dict[str, Any]
     return None, evidence
 
 
-def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    # Operational policy for Hot Follow v1.9:
-    # 1. execution state = runtime step result
-    # 2. artifact truth = actual current generated outputs
-    # 3. operational readiness = operator-facing readiness derived from artifacts
-    # 4. legacy/status summary fields are compatibility-only, not the source of truth
-    state: Dict[str, Any] = dict(base_state or {})
-    task_id = str(state.get("task_id") or task.get("task_id") or task.get("id") or "")
+# ---------------------------------------------------------------------------
+# Phase ①: Artifact resolution (side effects on state dict)
+# ---------------------------------------------------------------------------
 
-    state.setdefault("task_id", task_id)
-    state.setdefault("kind", task.get("kind", "hot_follow"))
 
+def _resolve_artifacts(task_id: str, task: Dict[str, Any], state: Dict[str, Any]) -> None:
+    """Resolve final video existence and patch state with URLs/deliverables.
+
+    This is pure side-effect code — it writes to *state* so that downstream
+    consumers (workbench hub response) get correct URLs.  Unchanged from
+    pre-refactor lines 95-149.
+    """
     final = _pick_final(task, state)
     final_url, final_evidence = _resolve_final_url(task_id, task, state, final)
     final_exists = bool(final.get("exists") or final_evidence)
@@ -148,45 +166,20 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
             )
         state["deliverables"] = patched
 
-    audio = _as_dict(state.get("audio"))
-    subtitles = _as_dict(state.get("subtitles"))
-    audio_status = str(
-        audio.get("status")
-        or task.get("dub_status")
-        or ""
-    ).strip().lower()
-    audio_done = audio_status in {"done", "ready", "success", "completed"}
-    voiceover_exists = bool(
-        audio.get("voiceover_url")
-        or _as_dict(state.get("media")).get("voiceover_url")
-        or task.get("mm_audio_key")
-        or task.get("mm_audio_path")
-    )
-    tts_voice = str(audio.get("tts_voice") or task.get("voice_id") or "").strip()
-    tts_voice_valid = bool(tts_voice and tts_voice not in {"-", "none", "null"})
-    audio_ready_hint = audio.get("audio_ready")
-    if audio_ready_hint is None:
-        audio_ready = bool(audio_done and voiceover_exists and tts_voice_valid)
-    else:
-        audio_ready = bool(audio_ready_hint)
-    subtitle_ready_hint = subtitles.get("subtitle_ready")
-    subtitle_artifact_exists = bool(
-        subtitles.get("subtitle_artifact_exists")
-        or subtitles.get("actual_burn_subtitle_source")
-        or subtitles.get("edited_text")
-        or subtitles.get("srt_text")
-        or task.get("mm_srt_path")
-        or task.get("origin_srt_path")
-    )
-    subtitle_ready = bool(subtitle_artifact_exists) if subtitle_ready_hint is None else bool(subtitle_ready_hint)
-    subtitle_ready_reason = str(subtitles.get("subtitle_ready_reason") or ("ready" if subtitle_ready else "subtitle_missing"))
-    no_dub = bool(audio.get("no_dub"))
-    no_dub_reason = str(audio.get("no_dub_reason") or "").strip() or None
-    if voiceover_exists or audio_ready:
-        no_dub = False
-        no_dub_reason = None
-    compose_ready = bool(final_exists and (audio_ready or no_dub))
 
+# ---------------------------------------------------------------------------
+# Phase ③: Gate side-effect application
+# ---------------------------------------------------------------------------
+
+
+def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any]) -> None:
+    """Apply compose/pipeline/deliverables mutations based on gate result.
+
+    Unchanged from pre-refactor lines 190-250.
+    """
+    compose_ready = gate_result["compose_ready"]
+
+    # Compose status
     compose = dict(_as_dict(state.get("compose")))
     last = dict(_as_dict(compose.get("last")))
     if compose_ready:
@@ -199,6 +192,7 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         compose["last"] = last
     state["compose"] = compose
 
+    # Pipeline status
     pipeline = list(_as_list(state.get("pipeline")))
     if compose_ready and pipeline:
         for step in pipeline:
@@ -218,28 +212,7 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
                 step["state"] = "pending"
     state["pipeline"] = pipeline
 
-    blocking: list[str] = []
-    if not compose_ready:
-        blocking.append("compose_not_done")
-        if not subtitle_ready:
-            blocking.append("subtitle_not_ready")
-        if not audio_done and not no_dub:
-            blocking.append("audio_not_done")
-        if not voiceover_exists and not no_dub:
-            blocking.append("voiceover_missing")
-        if not tts_voice_valid and not no_dub:
-            blocking.append("tts_voice_invalid")
-        if final_exists and not audio_ready and not no_dub:
-            blocking.append("audio_not_ready")
-        # Only surface no_dub_reason as a blocker when subtitle is also not ready;
-        # once subtitles are ready the no_speech signal is informational only.
-        if no_dub and no_dub_reason and not subtitle_ready:
-            blocking.append(no_dub_reason)
-    else:
-        blocking = [b for b in blocking if b != "compose_not_done"]
-
-    state["composed_ready"] = compose_ready
-    state["composed_reason"] = "ready" if compose_ready else "not_ready"
+    # Deliverables status
     if isinstance(state.get("deliverables"), list):
         for item in state.get("deliverables") or []:
             if not isinstance(item, dict):
@@ -248,24 +221,41 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
                 item["status"] = "done" if compose_ready else "pending"
                 item["state"] = "done" if compose_ready else "pending"
                 break
-    # compose_reason: if no_dub but subtitle is already ready, use compose_not_done
-    # so the compose button is enabled; only use no_dub_reason while subtitle is missing.
-    _compose_reason: str
-    if compose_ready:
-        _compose_reason = "ready"
-    elif no_dub and not subtitle_ready and no_dub_reason:
-        _compose_reason = no_dub_reason
-    else:
-        _compose_reason = "compose_not_done"
-    state["ready_gate"] = {
-        "final_exists": final_exists,
-        "subtitle_ready": subtitle_ready,
-        "subtitle_ready_reason": subtitle_ready_reason,
-        "audio_ready": audio_ready,
-        "audio_ready_reason": str(audio.get("audio_ready_reason") or ("ready" if audio_ready else "audio_not_ready")),
-        "compose_ready": compose_ready,
-        "publish_ready": compose_ready,
-        "compose_reason": _compose_reason,
-        "blocking": blocking,
-    }
+
+
+# ---------------------------------------------------------------------------
+# Public API (signature unchanged)
+# ---------------------------------------------------------------------------
+
+
+def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    """Compute the operational readiness state for a Hot Follow task.
+
+    Operational policy for Hot Follow v1.9/2.0:
+      1. execution state = runtime step result
+      2. artifact truth = actual current generated outputs
+      3. operational readiness = operator-facing readiness derived from artifacts
+      4. legacy/status summary fields are compatibility-only, not the source of truth
+
+    Returns *state* with ``ready_gate`` dict (9 fields) and side-effect
+    mutations on compose/pipeline/deliverables status.
+    """
+    state: Dict[str, Any] = dict(base_state or {})
+    task_id = str(state.get("task_id") or task.get("task_id") or task.get("id") or "")
+
+    state.setdefault("task_id", task_id)
+    state.setdefault("kind", task.get("kind", "hot_follow"))
+
+    # ① Artifact resolution (side effects on state)
+    _resolve_artifacts(task_id, task, state)
+
+    # ② Declarative ready-gate evaluation (pure function)
+    gate_result = evaluate_ready_gate(HOT_FOLLOW_GATE_SPEC, task, state)
+
+    # ③ Side-effect application (compose status, pipeline, deliverables)
+    _apply_gate_side_effects(state, gate_result)
+
+    state["composed_ready"] = gate_result["compose_ready"]
+    state["composed_reason"] = "ready" if gate_result["compose_ready"] else "not_ready"
+    state["ready_gate"] = gate_result
     return state
