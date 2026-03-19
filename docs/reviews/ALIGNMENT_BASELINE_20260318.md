@@ -556,7 +556,7 @@ RFC-0003 定义的控制协议：`create_line_job → confirm_execution → conf
 > - `_drafts/E.1` — Hot Follow 当前现状与 abs
 > - `docs/reviews/review_20260317.md` — 上轮代码评审报告
 > - `docs/architecture/v1.9/STATUS_AND_DELIVERABLES_SPEC.md` — 状态与交付物规范
-> - `docs/contracts/HOT_FOLLOW_API_CONTRACT_v1.md` — HF API 契约
+> - `docs/archive/contracts/HOT_FOLLOW_API_CONTRACT_v1.md` — HF API 契约（historical）
 > - `gateway/app/lines/base.py` + `hot_follow.py` — LineRegistry 实现
 > - `gateway/app/routers/hot_follow_api.py` — 2715 行完整结构分析
 > - `gateway/app/routers/tasks.py` — 4612 行完整结构分析

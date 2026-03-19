@@ -84,4 +84,4 @@ business regression cases to rerun:
 
 - no PR merges without business regression
 - document validation must be updated when boundary semantics change
-- `VeoSop05_启动进度文档.md` or successor progress log must be appended
+- `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md` or successor progress log must be appended

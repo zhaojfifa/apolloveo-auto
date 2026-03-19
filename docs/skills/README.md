@@ -1,8 +1,19 @@
-# Skills Catalog
+# Skills Docs
 
-本目录为工程的“技能/规范基线”单一入口（SSOT）。  
-旧目录 `docs/archive/legacy_skill/` 已冻结（legacy），不再新增内容；历史内容逐步迁移到此处。
+本目录保存 skills 相关规范与历史方向资料。
 
-## UI
-- UI i18n locale switching baseline (tasks/board/wizard)
-  - ui/UI_I18N_LOCALE_BASELINE.md
+当前状态：
+
+- skills runtime 尚未开始实现
+- 本目录不是已落地 runtime 的证明
+- 当前只保留规范、目录说明与历史基线
+
+legacy 目录已归档到：
+
+- `docs/archive/legacy_skill/`
+
+当前可读内容：
+
+- `ui/UI_I18N_LOCALE_BASELINE.md`
+- `skill-onboarding-baseline.md`
+- `media-compose-subtitle-burnin.md`

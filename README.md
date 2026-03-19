@@ -1,20 +1,26 @@
-﻿# apolloveo-auto
+# ApolloVeo Auto
 
-This repo is the clean baseline for ApolloVeo V1.9+ evolution, oriented for **collaboration** and **2.0 pluginization**.
+ApolloVeo 当前是一个以成片交付为目标的 AI 内容生产工厂代码库。
 
-## Three scenarios (v1.9 baseline)
-1. **Mainline**: parse → subtitles/translation → dubbing → pack (CapCut/YouCut deliverables)
-2. **Avatar**: image-driven avatar pipeline + publish hub
-3. **Hot Follow**: trend discovery → selection → enter production pipeline
+当前阶段不是平台扩张期，而是 post-review、post-VeoSop05 的基座收口与 Hot Follow cleanup 阶段。
 
-## Repo map
-- gateway/ : backend service (single entrypoint: gateway/main.py → gateway/app/main.py)
-- docs/ : baseline, runbooks, architecture, skills (team knowledge)
-- ops/ : checks + scripts
-- assets/ : accumulated reusable assets (B-roll / avatar / hot-follow)
+## Start Here
 
-## Quick commands
-- Core import smoke test:
-  - powershell -ExecutionPolicy Bypass -File ops/checks/check_import_app.ps1
+1. `docs/README.md`
+2. `PROJECT_RULES.md`
+3. `ENGINEERING_STATUS.md`
+4. `CHANGELOG_STAGE.md`
 
-> Rules: docs + skills are first-class. Any workflow/policy change must be reflected in docs.
+## Current Reality
+
+- Hot Follow 是当前主线
+- business validation 是 mandatory merge gate
+- `_drafts/` 仅作为历史评审与 RFC source material，不是日常 source-of-truth
+
+## Repo Map
+
+- `gateway/` runtime code
+- `docs/` current documentation system
+- `_drafts/` historical review source material
+- `ops/` scripts and checks
+- `assets/` reusable assets

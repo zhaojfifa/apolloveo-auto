@@ -1,15 +1,32 @@
-﻿# Baseline History
+# Baseline History
 
-SCN-001 Mainline Baseline in apolloveo-auto is migrated from the proven v1.85 mainline implementation in the legacy repo.
-Going forward, we refer to it ONLY as:
-- SCN-001 Mainline Baseline (v1.9)
+## Purpose
 
-Legacy labels (v1.8/v1.85) are deprecated naming and must not be used in new docs/issues/PRs.
+记录 baseline 的重置与迁移，不把历史锚点误当当前执行入口。
 
-## v1.9-ops-stable-20260207-01
-- Date: 2026-02-07 21:26:19
-- Source: migrated from shortvideo-v1-capcut (D:\Users\zhaojfifa\video_workspace\shortvideo-v1-capcut)
-- New repo SHA (current): 80dfbb283271f1e7aa4a2ffdd553bfda2c3b39fd
-- Notes:
-  - See: docs/baseline/REVIEW_v1.9_BASELINE.md
-  - See: docs/reviews/v1.9/REVIEW_REPORT_v1.9.md
+## History
+
+### v1.9 Review Era
+
+- baseline authority 主要来自 v1.9 review 与 `_drafts/`
+- 当前已降级为历史参考
+- see:
+  - `docs/archive/v1.9/REVIEW_v1.9_BASELINE.md`
+  - `docs/reviews/v1.9/`
+
+### VeoSop05 Runtime Closure Era
+
+- `TASK-1.3`、`TASK-2.0`、`TASK-2.3`、verification baseline、PR-5、PR-6 收口结果进入 current reality
+- business validation 被提升为 mandatory merge gate
+- Hot Follow 成为当前唯一完成一轮真实业务验证的主线
+
+### Docs Refoundation Reset
+
+- `docs/` 已按 baseline / execution / reviews / contracts / architecture / runbooks / skills / archive 重组
+- `_drafts/` 保留为历史 source material
+- 当前 baseline authority 转移到 `docs/baseline/` 与 `docs/execution/`
+
+## Read Next
+
+- `PROJECT_BASELINE_INDEX.md`
+- `docs/README.md`
