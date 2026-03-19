@@ -47,18 +47,20 @@
 
 ## Current Source-Of-Truth Reading Order
 
-1. `docs/baseline/PROJECT_BASELINE_INDEX.md`
-2. `docs/baseline/PRODUCT_BASELINE.md`
-3. `docs/baseline/ARCHITECTURE_BASELINE.md`
-4. `docs/baseline/EXECUTION_BASELINE.md`
-5. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
-6. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
-7. `docs/runbooks/VERIFICATION_BASELINE.md`
-8. `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
-9. `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
-10. `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
-11. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
-12. `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`
+1. `ENGINEERING_RULES.md`
+2. `CURRENT_ENGINEERING_FOCUS.md`
+3. `docs/baseline/PROJECT_BASELINE_INDEX.md`
+4. `docs/baseline/PRODUCT_BASELINE.md`
+5. `docs/baseline/ARCHITECTURE_BASELINE.md`
+6. `docs/baseline/EXECUTION_BASELINE.md`
+7. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
+8. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
+9. `docs/runbooks/VERIFICATION_BASELINE.md`
+10. `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+11. `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
+12. `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
+13. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
+14. `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`
 
 ## Important Review References
 
