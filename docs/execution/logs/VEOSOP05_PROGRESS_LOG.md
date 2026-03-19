@@ -172,3 +172,25 @@
 - 不启动 Skills implementation
 - 不扩第二条产线
 - 不做平台层扩张
+
+## PR-A1 Thin tasks.py Further Without Behavior Change
+
+日期：2026-03-19
+
+本节点完成：
+
+- 将 `tasks.py` 中的 Hot Follow workbench `task_json` enrich 迁出到窄职责 presenter
+- 将 `tasks.py` 中的 task detail stale/status-shape payload 组装迁出到窄职责 presenter
+
+本次收口说明：
+
+- `tasks.py` 继续只保留 request parsing、entry、dispatch 与 response/log mapping
+- 迁出的逻辑属于 line-/presentation-specific assembly，不涉及 runtime policy 变更
+- 未引入新的 router-to-router coupling，也未让 bridge 文件承担新的状态治理职责
+
+本节点明确不做：
+
+- 不改 compose policy
+- 不改 gate binding
+- 不改 Skills runtime
+- 不扩第二条产线
