@@ -431,7 +431,7 @@
     const qa = (currentHub && currentHub.translation_qa) || {};
     const origin = subtitles.origin_text || "";
     const normalized = subtitles.normalized_source_text || origin || "";
-    const edited = subtitles.edited_text || subtitles.srt_text || "";
+    const primarySrt = subtitles.primary_editable_text || subtitles.srt_text || subtitles.edited_text || "";
     const sourceAudioLane = String((currentHub && currentHub.source_audio_lane) || "").trim().toLowerCase();
     const candidateMode = String((currentHub && currentHub.screen_text_candidate_mode) || "").trim().toLowerCase();
     const candidateConfidence = String((currentHub && currentHub.screen_text_candidate_confidence) || "").trim().toLowerCase();
@@ -447,8 +447,8 @@
     }
     if (subtitlesEditHintEl) {
       subtitlesEditHintEl.textContent = isHotFollowOpsGuideV1Enabled()
-        ? "这是当前目标语言字幕编辑区。保存后会更新 mm.srt，最终视频会以这一版字幕为准。"
-        : "这里是当前目标语言字幕编辑区。保存后会更新 mm.srt，并影响后续配音与合成。";
+        ? "这是当前目标语言 SRT 主编辑区。保存后会更新 mm.srt；辅助输入和 OCR 候选都只是辅助，不会自动覆盖这里。"
+        : "这里是当前目标语言 SRT 主编辑区。保存后会更新 mm.srt，并影响后续配音与合成。";
     }
     if (assistedInputBlockEl) assistedInputBlockEl.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
     // Auto-expand the assisted input block for no-speech tasks that need manual input
@@ -471,14 +471,14 @@
     hydrateAssistedInputDraft();
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
     if (subtitlesNormalizedEl) subtitlesNormalizedEl.textContent = normalized || sourcePlaceholder;
-    if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = edited || targetPlaceholder;
+    if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = primarySrt || targetPlaceholder;
     // Phase 0.7: collapse three-column preview when all empty
     const _previewGrid = subtitlesOriginEl && subtitlesOriginEl.closest(".grid");
     if (_previewGrid) {
-      const _hasContent = Boolean(origin.trim() || normalized.trim() || edited.trim());
+      const _hasContent = Boolean(origin.trim() || normalized.trim() || primarySrt.trim());
       _previewGrid.style.display = _hasContent ? "" : "none";
     }
-    if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = edited || "";
+    if (subtitlesTextEl && !subtitleDirty) subtitlesTextEl.value = primarySrt || "";
     const sourceCount = Number.isFinite(Number(qa.source_count)) ? Number(qa.source_count) : 0;
     const translatedCount = Number.isFinite(Number(qa.translated_count)) ? Number(qa.translated_count) : 0;
     const hasMismatch = Boolean(qa.has_mismatch) || (sourceCount > 0 && sourceCount !== translatedCount);
@@ -648,10 +648,17 @@
     // Dub text source hint (Phase 1.3 ops iteration)
     const dubSourceEl = document.getElementById("hf_dub_text_source_value");
     if (dubSourceEl) {
+      const subtitles = (currentHub && currentHub.subtitles) || {};
+      const primaryFormat = String(subtitles.primary_editable_format || "srt").trim().toLowerCase();
+      const dubInputFormat = String(subtitles.dub_input_format || "").trim().toLowerCase();
       const contentMode = String((currentHub && currentHub.content_mode) || "").trim().toLowerCase();
       const noDub = Boolean((currentHub && currentHub.audio || {}).no_dub);
       if (noDub || contentMode === "silent_candidate") {
         dubSourceEl.textContent = "当前无需配音（静默 / ASMR 模式），仅合成字幕版";
+      } else if (primaryFormat === "srt") {
+        dubSourceEl.textContent = dubInputFormat === "srt"
+          ? "优先使用当前已保存的目标语言 SRT；只有目标字幕缺失时才回退到来源层。"
+          : "当前目标语言字幕仍会作为主对象保存；配音输入存在兼容回退，请先检查并保存 SRT。";
       } else if (contentMode === "subtitle_led") {
         dubSourceEl.textContent = "画面文字识别（OCR），可在配音 tab 手动编辑";
       } else {

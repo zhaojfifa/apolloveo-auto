@@ -38,6 +38,11 @@ class _Repo:
         return cur
 
 
+def _patch_workbench_storage_dependencies(monkeypatch):
+    monkeypatch.setattr(hf_router, "_scene_pack_info", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(hf_router, "_deliverable_url", lambda *_args, **_kwargs: None)
+
+
 def test_hot_follow_workbench_ready_gate_backfills_compose_when_final_exists(monkeypatch):
     task_id = "hf-workbench-ready-gate-01"
     repo = _Repo()
@@ -65,6 +70,7 @@ def test_hot_follow_workbench_ready_gate_backfills_compose_when_final_exists(mon
         }
 
     monkeypatch.setattr(hf_router, "_compute_composed_state", _fake_composed)
+    _patch_workbench_storage_dependencies(monkeypatch)
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
     monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
@@ -121,6 +127,7 @@ def test_hot_follow_workbench_compose_view_is_done_when_final_ready(monkeypatch)
         }
 
     monkeypatch.setattr(hf_router, "_compute_composed_state", _fake_composed)
+    _patch_workbench_storage_dependencies(monkeypatch)
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
     monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
@@ -154,6 +161,91 @@ def test_hot_follow_workbench_compose_view_is_done_when_final_ready(monkeypatch)
     assert final_row.get("status") == "done"
 
 
+def test_hot_follow_workbench_parse_uses_raw_artifacts_over_failed_legacy_status(monkeypatch):
+    task_id = "hf-workbench-parse-facts-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "parse_status": "failed",
+            "raw_path": f"deliver/tasks/{task_id}/raw/raw.mp4",
+            "deliverables": [
+                {"kind": "raw_video", "status": "done", "state": "done", "url": f"/v1/tasks/{task_id}/raw"},
+            ],
+        },
+    )
+
+    monkeypatch.setattr(hf_router, "_compute_composed_state", lambda *_args, **_kwargs: {"composed_ready": False, "composed_reason": "not_ready", "final": {"exists": False}, "compose_error_reason": None, "compose_error_message": None})
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key).endswith("raw.mp4"))
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    parse_step = next(
+        (x for x in (data.get("pipeline") or []) if str(x.get("key") or "").lower() == "parse"),
+        {},
+    )
+    assert parse_step.get("status") == "done"
+    assert parse_step.get("message") == "raw=ready"
+    assert ((data.get("pipeline_legacy") or {}).get("parse") or {}).get("status") == "done"
+
+
+def test_hot_follow_workbench_subtitles_keep_srt_as_primary_editable_object(monkeypatch):
+    task_id = "hf-workbench-subtitles-srt-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "mm_srt_path": f"deliver/tasks/{task_id}/subs/mm.srt",
+        },
+    )
+    mm_srt = "1\n00:00:00,000 --> 00:00:02,000\n缅文字幕\n"
+    origin_srt = "1\n00:00:00,000 --> 00:00:02,000\n原始字幕\n"
+
+    monkeypatch.setattr(hf_router, "_compute_composed_state", lambda *_args, **_kwargs: {"composed_ready": False, "composed_reason": "not_ready", "final": {"exists": False}, "compose_error_reason": None, "compose_error_message": None})
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: mm_srt)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: origin_srt)
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: origin_srt)
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    subtitles = data.get("subtitles") or {}
+    assert subtitles.get("primary_editable_format") == "srt"
+    assert subtitles.get("primary_editable_text") == mm_srt
+    assert subtitles.get("srt_text") == mm_srt
+    assert subtitles.get("edited_text") == mm_srt
+    assert subtitles.get("dub_input_text") == mm_srt
+    assert subtitles.get("dub_input_format") == "srt"
+
+
 def test_hot_follow_workbench_hub_survives_optional_presentation_aggregation_failure(monkeypatch):
     task_id = "hf-workbench-presentation-safe-01"
     repo = _Repo()
@@ -170,6 +262,7 @@ def test_hot_follow_workbench_hub_survives_optional_presentation_aggregation_fai
     )
 
     monkeypatch.setattr(hf_router, "_hf_artifact_facts", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    _patch_workbench_storage_dependencies(monkeypatch)
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
     monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
@@ -190,7 +283,7 @@ def test_hot_follow_workbench_hub_survives_optional_presentation_aggregation_fai
     assert data.get("operator_summary") == {}
 
 
-def test_hot_follow_compose_rejects_stale_revision_submission():
+def test_hot_follow_compose_rejects_stale_revision_submission(monkeypatch):
     task_id = "hf-compose-revision-01"
     repo = _Repo()
     repo.upsert(
@@ -203,6 +296,8 @@ def test_hot_follow_compose_rejects_stale_revision_submission():
             "audio_sha256": "audio-current",
         },
     )
+
+    monkeypatch.setattr(hf_router, "get_storage_service", lambda: object())
 
     app = FastAPI()
     app.include_router(tasks_router.api_router)

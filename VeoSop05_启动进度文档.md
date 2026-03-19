@@ -94,3 +94,29 @@
 - 不继续改 compose 主链
 - 不启动 Skills MVP
 - 不扩第二条产线
+
+## PR-5 Parse Status + Subtitle SRT-First Consistency Fix
+
+日期：2026-03-19
+
+本节点修复：
+
+- parse 实际已成功但 UI 仍显示 failed 的一致性问题
+- Hot Follow 工作台中目标语言字幕编辑对象的 SRT-first 语义不够明确的问题
+
+本次收口的边界：
+
+- parse 状态改为优先由 raw artifact / fact 推导
+  - `raw_video done`
+  - `raw_url`
+  - `source_video.url`
+  - `raw=ready`
+- 目标语言字幕编辑区明确为 `mm.srt` 对应的 SRT 主对象
+- 辅助输入 / OCR 候选 / 标准化来源文本明确降级为 helper-only 语义，不再与主 SRT 对象混淆
+
+本节点明确不做：
+
+- 不改 translation generation
+- 不改 dubbing logic
+- 不改 compose runtime policy
+- 不扩大 router 重构范围

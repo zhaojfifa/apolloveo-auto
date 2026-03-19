@@ -1,0 +1,12 @@
+from pathlib import Path
+
+
+def test_hot_follow_workbench_template_keeps_srt_first_semantics():
+    template = Path("gateway/app/templates/hot_follow_workbench.html").read_text(encoding="utf-8")
+    script = Path("gateway/app/static/js/hot_follow_workbench.js").read_text(encoding="utf-8-sig")
+
+    assert "当前目标语言 SRT 预览（主对象）" in template
+    assert "当前目标语言字幕编辑区（SRT 主对象）" in template
+    assert "辅助输入（原文 / 候选，helper only）" in template
+    assert "primary_editable_text" in script
+    assert "primary_editable_format" in script

@@ -315,6 +315,77 @@ def _hf_state_from_status(value: Any) -> str:
     return "pending"
 
 
+def _hf_done_like(value: Any) -> bool:
+    return str(value or "").strip().lower() in {"done", "ready", "success", "completed"}
+
+
+def _hf_parse_artifact_ready(task: dict) -> bool:
+    if not isinstance(task, dict):
+        return False
+
+    if task.get("raw_url"):
+        return True
+
+    raw_key = _task_key(task, "raw_path") or _task_key(task, "raw_key")
+    if raw_key:
+        return True
+
+    source_video = task.get("source_video")
+    if isinstance(source_video, dict) and source_video.get("url"):
+        return True
+
+    media = task.get("media")
+    if isinstance(media, dict) and (media.get("raw_url") or media.get("source_video_url")):
+        return True
+
+    deliverables = task.get("deliverables")
+    if isinstance(deliverables, dict):
+        raw_deliverable = deliverables.get("raw_video") or deliverables.get("raw") or deliverables.get("source_video")
+        if isinstance(raw_deliverable, dict) and (
+            _hf_done_like(raw_deliverable.get("status") or raw_deliverable.get("state"))
+            or raw_deliverable.get("url")
+            or raw_deliverable.get("key")
+        ):
+            return True
+    elif isinstance(deliverables, list):
+        for item in deliverables:
+            if not isinstance(item, dict):
+                continue
+            kind = str(item.get("kind") or "").strip().lower()
+            if kind not in {"raw_video", "raw", "source_video"}:
+                continue
+            if _hf_done_like(item.get("status") or item.get("state")) or item.get("url") or item.get("key"):
+                return True
+
+    pipeline = task.get("pipeline")
+    parse_row = None
+    if isinstance(pipeline, dict):
+        parse_row = pipeline.get("parse")
+    elif isinstance(pipeline, list):
+        parse_row = next(
+            (
+                item
+                for item in pipeline
+                if isinstance(item, dict) and str(item.get("key") or "").strip().lower() == "parse"
+            ),
+            None,
+        )
+    if isinstance(parse_row, dict):
+        message = str(parse_row.get("message") or parse_row.get("summary") or "").strip().lower()
+        if "raw=ready" in message:
+            return True
+
+    pipeline_legacy = task.get("pipeline_legacy")
+    if isinstance(pipeline_legacy, dict):
+        parse_legacy = pipeline_legacy.get("parse")
+        if isinstance(parse_legacy, dict):
+            message = str(parse_legacy.get("message") or parse_legacy.get("summary") or "").strip().lower()
+            if "raw=ready" in message:
+                return True
+
+    return False
+
+
 def _hf_engine_public(provider: str | None) -> str:
     p = str(provider or "").strip().lower()
     if p in {"edge", "edge-tts", "edge_tts"}:
@@ -467,6 +538,7 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
     normalized_source_text = _hf_load_normalized_source_text(task_id, task)
     edited_text = _hf_load_subtitles_text(task_id, task)
     srt_text = edited_text or normalized_source_text or raw_source_text
+    dub_input_text = _hf_dub_input_text(task_id, task) or ""
     actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
     subtitle_artifact_exists = bool(_task_key(task, "mm_srt_path") and object_exists(str(_task_key(task, "mm_srt_path"))))
     subtitle_ready = bool(subtitle_artifact_exists or str(edited_text or normalized_source_text or raw_source_text).strip())
@@ -476,7 +548,10 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "normalized_source_text": normalized_source_text or "",
         "edited_text": edited_text or "",
         "srt_text": srt_text or "",
-        "dub_input_text": _hf_dub_input_text(task_id, task) or "",
+        "primary_editable_text": srt_text or "",
+        "primary_editable_format": "srt",
+        "dub_input_text": dub_input_text,
+        "dub_input_format": "srt" if _hf_is_srt_text(dub_input_text) else "plain_text",
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
         "subtitle_artifact_exists": bool(subtitle_artifact_exists),
         "subtitle_ready": bool(subtitle_ready),
@@ -692,11 +767,12 @@ def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
     task_status = str(task.get("status") or "").lower()
     if step == "parse":
         status = _hf_state_from_status(task.get("parse_status"))
-        if status == "pending" and task.get("raw_path"):
+        raw_ready = _hf_parse_artifact_ready(task)
+        if raw_ready:
             status = "done"
-        if status == "pending" and task_status == "processing" and last_step == "parse":
+        elif status == "pending" and task_status == "processing" and last_step == "parse":
             status = "running"
-        summary = "raw=ready" if task.get("raw_path") else "raw=none"
+        summary = "raw=ready" if raw_ready else "raw=none"
         return status, summary
     if step == "subtitles":
         status = _hf_state_from_status(task.get("subtitles_status"))
@@ -782,7 +858,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             "Raw Video",
             raw_key,
             _task_endpoint(task_id, "raw") if raw_key and object_exists(raw_key) else None,
-            _hf_deliverable_state(task, raw_key, "parse_status"),
+            "done" if _hf_parse_artifact_ready(task) else _hf_deliverable_state(task, raw_key, "parse_status"),
         ),
         _entry(
             "origin_subtitle",
@@ -1458,7 +1534,10 @@ def get_hot_follow_workbench_hub(
             "normalized_source_text": subtitle_lane.get("normalized_source_text") or normalized_source_text or "",
             "edited_text": subtitles_text or "",
             "srt_text": subtitles_text or "",
+            "primary_editable_text": subtitle_lane.get("primary_editable_text") or subtitles_text or "",
+            "primary_editable_format": subtitle_lane.get("primary_editable_format") or "srt",
             "dub_input_text": subtitle_lane.get("dub_input_text") or "",
+            "dub_input_format": subtitle_lane.get("dub_input_format") or "plain_text",
             "status": subtitles_state,
             "error": task.get("subtitles_error"),
             "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
