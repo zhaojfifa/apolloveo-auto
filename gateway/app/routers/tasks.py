@@ -250,6 +250,17 @@ from gateway.app.services.voice_state import (  # noqa: E402
     resolve_hot_follow_requested_voice as _resolve_hot_follow_requested_voice,
     voice_state_config as _voice_state_config,
 )
+from gateway.app.services.hot_follow_runtime_bridge import (  # noqa: E402
+    get_hot_follow_workbench_hub as _get_hot_follow_workbench_hub,
+    hf_compose_final_video as _hf_compose_final_video,
+    hf_dual_channel_state as _hf_dual_channel_state,
+    hf_subtitle_lane_state as _hf_subtitle_lane_state,
+    hf_target_lang_gate as _hf_target_lang_gate,
+    hf_task_status_shape as _hf_task_status_shape,
+    hot_follow_operational_defaults as _hot_follow_operational_defaults,
+    maybe_run_hot_follow_lipsync_stub as _maybe_run_hot_follow_lipsync_stub,
+    safe_collect_hot_follow_workbench_ui as _safe_collect_hot_follow_workbench_ui,
+)
 
 
 # _task_compose_lock: moved to services/compose_helpers.py (Phase 1.3)
@@ -1722,10 +1733,6 @@ async def task_workbench_page(
         "published_at": detail.published_at,
     }
     if spec.kind == "hot_follow":
-        from gateway.app.routers.hot_follow_api import (
-            _hot_follow_operational_defaults,
-            _safe_collect_hot_follow_workbench_ui,
-        )
         task_json.update(_hot_follow_operational_defaults())
         task_json.update(_safe_collect_hot_follow_workbench_ui(task, app_settings))
     task_view = {"source_url_open": _extract_first_http_url(task.get("source_url"))}
@@ -2306,7 +2313,6 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
     payload["stale"] = stale
     payload["stale_reason"] = "running_but_not_updated" if stale else None
     payload["stale_for_seconds"] = stale_for
-    from gateway.app.routers.hot_follow_api import _hf_task_status_shape  # noqa: PLC0415
     shape = _hf_task_status_shape(t)
 
     logger.info(
@@ -2415,11 +2421,6 @@ def compose_task(
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
     final_meta = object_head(str(final_key)) if final_key else None
     final_size, _ = media_meta_from_head(final_meta)
-    from gateway.app.routers.hot_follow_api import (  # noqa: PLC0415
-        _maybe_run_hot_follow_lipsync_stub,
-        _hf_compose_final_video,
-        get_hot_follow_workbench_hub,
-    )
     if final_key and object_exists(str(final_key)) and final_size >= MIN_VIDEO_BYTES and not req.force:
         _policy_upsert(repo, task_id, {"compose_lock_until": None})
         lock.release()
@@ -2428,7 +2429,7 @@ def compose_task(
             "final_url": _task_endpoint(task_id, "final"),
             "final_video_url": _task_endpoint(task_id, "final"),
             "final_key": str(final_key),
-            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
+            "hub": _get_hot_follow_workbench_hub(task_id, repo=repo),
         }
 
     current_for_plan = repo.get(task_id) or task
@@ -2480,7 +2481,7 @@ def compose_task(
             "final_url": _task_endpoint(task_id, "final"),
             "final_video_url": _task_endpoint(task_id, "final"),
             "final_key": str(resolved_key or ""),
-            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
+            "hub": _get_hot_follow_workbench_hub(task_id, repo=repo),
             "compose_status": latest.get("compose_status"),
         }
     except HTTPException as exc:
@@ -2804,11 +2805,6 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             provider,
         )
     mm_text_override = (payload.mm_text or "").strip() or None
-    from gateway.app.routers.hot_follow_api import (  # noqa: PLC0415 — lazy import breaks circular dep
-        _hf_subtitle_lane_state,
-        _hf_dual_channel_state,
-        _hf_target_lang_gate,
-    )
     subtitle_lane = _hf_subtitle_lane_state(task_id, task)
     route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
     no_dub_candidate = (

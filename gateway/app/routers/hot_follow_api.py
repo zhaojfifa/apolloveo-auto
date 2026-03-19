@@ -112,6 +112,11 @@ from gateway.app.services.voice_state import (
     resolve_hot_follow_requested_voice as _resolve_hot_follow_requested_voice,
     voice_state_config as _voice_state_config,
 )
+from gateway.app.services.task_router_actions import (
+    create_task_entry as _create_task_entry,
+    rerun_dub_entry as _rerun_dub_entry,
+    run_task_pipeline_entry as _run_task_pipeline_entry,
+)
 
 
 def _policy_upsert(repo, task_id, updates, *, task=None, step="router.hf_api", force=False):
@@ -119,8 +124,8 @@ def _policy_upsert(repo, task_id, updates, *, task=None, step="router.hf_api", f
     return policy_upsert(repo, task_id, task, updates, step=step, force=force)
 
 
-# Endpoint functions that remain in tasks.py — imported lazily where needed.
-# create_task, run_task_pipeline, rerun_dub are called via lazy import below.
+# Endpoint functions that remain in tasks.py are reached via
+# gateway.app.services.task_router_actions, not direct router imports.
 
 
 logger = logging.getLogger(__name__)
@@ -1286,8 +1291,7 @@ def create_hot_follow_task(
             config["tts_resolved_voice"] = resolved_voice
             data["config"] = config
     normalized = TaskCreate(**data)
-    from gateway.app.routers.tasks import create_task  # noqa: PLC0415 — endpoint, not movable
-    return create_task(normalized, background_tasks=background_tasks, repo=repo)
+    return _create_task_entry(normalized, background_tasks, repo)
 
 
 @hot_follow_api_router.post("/hot_follow/tasks/{task_id}/bgm")
@@ -2052,13 +2056,7 @@ async def rerun_hot_follow_dub(
                 voice_id=payload.voice_id,
                 mm_text=edited,
             )
-    from gateway.app.routers.tasks import rerun_dub  # noqa: PLC0415 — endpoint, not movable
-    return await rerun_dub(
-        task_id=task_id,
-        payload=payload,
-        background_tasks=background_tasks,
-        repo=repo,
-    )
+    return await _rerun_dub_entry(task_id, payload, background_tasks, repo)
 
 
 @hot_follow_api_router.post("/hot_follow/tasks/{task_id}/probe")
@@ -2104,8 +2102,7 @@ def run_hot_follow_pipeline(
     background_tasks: BackgroundTasks,
     repo=Depends(get_task_repository),
 ):
-    from gateway.app.routers.tasks import run_task_pipeline  # noqa: PLC0415 — endpoint, not movable
-    return run_task_pipeline(task_id, background_tasks=background_tasks, repo=repo)
+    return _run_task_pipeline_entry(task_id, background_tasks, repo)
 
 
 @hot_follow_api_router.put("/hot_follow/tasks/{task_id}/publish_backfill")
@@ -2156,4 +2153,3 @@ def build_hot_follow_scene_pack(
         result["deprecated_endpoint"] = "/api/hot_follow/tasks/{task_id}/scene_pack"
         result["use_endpoint"] = "/api/tasks/{task_id}/scenes"
     return result
-
