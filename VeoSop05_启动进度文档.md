@@ -57,3 +57,40 @@
 
 - gate binding / line-aware status policy 仍留给 PR-4
 - `_hf_allow_subtitle_only_compose` / `_resolve_target_srt_key` 仍是 Hot Follow 兼容 helper，后续可继续从 router 退出
+
+## PR-4 Gate Binding + Verification Baseline
+
+日期：2026-03-19
+
+本节点完成：
+
+- 将 `hot_follow_line -> ready_gate_ref -> HOT_FOLLOW_GATE_SPEC` 的最小 runtime 绑定落到代码
+- 为 status policy 增加 `get_status_runtime_binding(task)` 作为最小 line-aware 装配入口
+- 让 `compute_hot_follow_state()` 通过 runtime binding 消费 gate spec，而不是继续直接 import 规则源
+- 冻结系统 `python3` 与 `./venv/bin/python` 的最小验证职责边界
+
+本次新增或更新的最小绑定点：
+
+- `gateway/app/lines/base.py`
+  - 增加 `ready_gate_ref` / `status_policy_ref`
+- `gateway/app/lines/hot_follow.py`
+  - 明确声明 Hot Follow line 的 `ready_gate_ref` / `status_policy_ref`
+- `gateway/app/services/ready_gate/registry.py`
+  - 负责 `LineRegistry.for_kind(task.kind) -> ready_gate spec`
+- `gateway/app/services/status_policy/registry.py`
+  - 提供 `get_status_runtime_binding(task)`
+- `gateway/app/services/status_policy/hot_follow_state.py`
+  - 改为消费 runtime 绑定出来的 `ready_gate_spec`
+
+本节点验证冻结：
+
+- 系统 `python3` 当前为 `Python 3.9.6`
+- `./venv/bin/python` 当前为 `Python 3.11.15`
+- 最低纯单测与推荐 3.10+ 回归命令已写入 `docs/runbooks/VERIFICATION_BASELINE.md`
+
+本节点明确不做：
+
+- 不扩大 router / bridge 职责
+- 不继续改 compose 主链
+- 不启动 Skills MVP
+- 不扩第二条产线

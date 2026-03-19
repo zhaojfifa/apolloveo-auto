@@ -2,7 +2,7 @@
 
 Refactored in TASK-2.3: the L3/L4 readiness logic that was previously
 hardcoded as 120 lines of if/else is now delegated to the declarative
-``evaluate_ready_gate()`` engine with ``HOT_FOLLOW_GATE_SPEC``.
+``evaluate_ready_gate()`` engine with a line-bound ready-gate spec.
 
 The function signature and output format of ``compute_hot_follow_state()``
 are **identical** to pre-refactor — callers require zero changes.
@@ -13,7 +13,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from gateway.app.services.ready_gate import evaluate_ready_gate
-from gateway.app.services.ready_gate.hot_follow_rules import HOT_FOLLOW_GATE_SPEC
+from gateway.app.services.status_policy.registry import get_status_runtime_binding
 
 
 # ---------------------------------------------------------------------------
@@ -249,8 +249,16 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
     # ① Artifact resolution (side effects on state)
     _resolve_artifacts(task_id, task, state)
 
+    runtime_task = dict(task)
+    runtime_task.setdefault("kind", state.get("kind"))
+    binding = get_status_runtime_binding(runtime_task)
+    if binding.ready_gate_spec is None:
+        raise RuntimeError(
+            f"ready gate spec is not bound for task kind={binding.kind or state.get('kind')!r}"
+        )
+
     # ② Declarative ready-gate evaluation (pure function)
-    gate_result = evaluate_ready_gate(HOT_FOLLOW_GATE_SPEC, task, state)
+    gate_result = evaluate_ready_gate(binding.ready_gate_spec, task, state)
 
     # ③ Side-effect application (compose status, pipeline, deliverables)
     _apply_gate_side_effects(state, gate_result)

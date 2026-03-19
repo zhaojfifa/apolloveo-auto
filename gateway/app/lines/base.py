@@ -42,6 +42,12 @@ class ProductionLine:
     skills_bundle_ref: str
     """Path to the Skills bundle directory for this line."""
 
+    ready_gate_ref: str = ""
+    """Path to the ready-gate spec source for this line."""
+
+    status_policy_ref: str = ""
+    """Path to the status policy entrypoint for this line."""
+
     # --- Deliverable policy ---
     deliverable_kinds: tuple[str, ...] = (
         "final_video",

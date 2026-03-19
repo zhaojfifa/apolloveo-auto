@@ -16,6 +16,11 @@ from .engine import (
     Signal,
     evaluate_ready_gate,
 )
+from .registry import (
+    get_ready_gate_spec,
+    get_ready_gate_spec_for_line,
+    get_ready_gate_spec_for_task,
+)
 
 __all__ = [
     "BlockingRule",
@@ -24,4 +29,7 @@ __all__ = [
     "ReadyGateSpec",
     "Signal",
     "evaluate_ready_gate",
+    "get_ready_gate_spec",
+    "get_ready_gate_spec_for_line",
+    "get_ready_gate_spec_for_task",
 ]

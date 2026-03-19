@@ -15,6 +15,8 @@ HOT_FOLLOW_LINE: ProductionLine = LineRegistry.register(
         task_kind="hot_follow",
         sop_profile_ref="docs/sop/hot_follow_v1.md",
         skills_bundle_ref="docs/skills/",
+        ready_gate_ref="gateway/app/services/ready_gate/hot_follow_rules.py",
+        status_policy_ref="gateway/app/services/status_policy/hot_follow_state.py",
         deliverable_kinds=(
             "final_video",
             "subtitle",

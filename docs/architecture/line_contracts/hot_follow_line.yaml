@@ -100,6 +100,7 @@ confirmation_policy:
 
 # ─── Status policy reference ──────────────────────────────────────────────────
 
+ready_gate_ref: gateway/app/services/ready_gate/hot_follow_rules.py
 status_policy_ref: gateway/app/services/status_policy/hot_follow_state.py
 
 # ─── Content routing summary ──────────────────────────────────────────────────
