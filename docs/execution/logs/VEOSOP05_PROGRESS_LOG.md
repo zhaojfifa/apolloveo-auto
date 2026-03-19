@@ -217,3 +217,26 @@
 - 不改 compose 主链语义
 - 不改 gate binding 结构
 - 不扩第二条产线
+
+## Skills MVP Entry Review
+
+日期：2026-03-19
+
+本节点完成：
+
+- 完成 Skills MVP entry review 文档冻结
+- 将第一 Skills hook 定义为 Hot Follow workbench / operator guidance layer 中的 read-only advisory hook
+- 冻结 advisory hook 的输入、输出、非目标与 merge gate
+
+本次对齐结论：
+
+- 未启动任何 Skills runtime implementation
+- 第一 hook 只允许读取现有 `ready_gate`、`artifact_facts`、`current_attempt`、`operator_summary`、deliverable facts 等只读事实
+- 第一 hook 只允许输出 non-blocking advisory，不得写状态、改真相、触发 compose / publish
+- 后续任何 Skills implementation 仍必须受 business regression、verification baseline 与当前 execution rules 约束
+
+本节点明确不做：
+
+- 不改 runtime logic
+- 不改 gate / compose / publish ownership
+- 不启动第二条产线或 OpenClaw 相关工作
