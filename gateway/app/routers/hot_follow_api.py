@@ -117,6 +117,7 @@ from gateway.app.services.task_router_actions import (
     rerun_dub_entry as _rerun_dub_entry,
     run_task_pipeline_entry as _run_task_pipeline_entry,
 )
+from gateway.app.services.compose_service import CompositionService, HotFollowComposeRequestContract
 
 
 def _policy_upsert(repo, task_id, updates, *, task=None, step="router.hf_api", force=False):
@@ -1867,171 +1868,31 @@ def compose_hot_follow_final_video(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     req = payload or HotFollowComposeRequest()
-
-    # --- Phase 0.1: DB-level advisory lock (survives process restart) ---
-    _compose_lock_until = task.get("compose_lock_until")
-    if _compose_lock_until:
-        try:
-            from datetime import datetime as _dt_cls, timezone as _tz
-            _lock_dt = _dt_cls.fromisoformat(str(_compose_lock_until)) if isinstance(_compose_lock_until, str) else _compose_lock_until
-            if _lock_dt.tzinfo is None:
-                _lock_dt = _lock_dt.replace(tzinfo=_tz.utc)
-            if _lock_dt > _dt_cls.now(_tz.utc):
-                return _compose_in_progress_response(task_id)
-        except Exception:
-            pass  # malformed lock value — ignore and proceed
-
-    revision = _hf_compose_revision_snapshot(task)
-    expected_subtitle_updated_at = str(req.expected_subtitle_updated_at or "").strip() or None
-    expected_audio_sha256 = str(req.expected_audio_sha256 or "").strip() or None
-    subtitle_mismatch = bool(expected_subtitle_updated_at and expected_subtitle_updated_at != revision.get("subtitle_updated_at"))
-    audio_mismatch = bool(expected_audio_sha256 and expected_audio_sha256 != revision.get("audio_sha256"))
-    if subtitle_mismatch or audio_mismatch:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "reason": "compose_revision_mismatch",
-                "message": "Current subtitles or audio changed; refresh workbench state before composing again.",
-                "current_revision": revision,
-            },
-        )
-    lock = _task_compose_lock(task_id)
-    if not lock.acquire(blocking=False):
-        current = repo.get(task_id) or task
-        _policy_upsert(
-            repo,
-            task_id,
-            {
-                "compose_status": "running",
-                "compose_last_status": "running",
-                "compose_last_started_at": current.get("compose_last_started_at") or datetime.now(timezone.utc).isoformat(),
-                "compose_last_finished_at": None,
-            },
-        )
-        return _compose_in_progress_response(task_id)
-    current_for_plan = repo.get(task_id) or task
-    current_plan = dict(current_for_plan.get("compose_plan") or {})
-    compose_plan = {
-        "mute": bool(current_plan.get("mute", True)),
-        "overlay_subtitles": bool(current_plan.get("overlay_subtitles", True)),
-        "strip_subtitle_streams": bool(current_plan.get("strip_subtitle_streams", True)),
-        "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
-        "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
-        "freeze_tail_enabled": bool(current_plan.get("freeze_tail_enabled", False)),
-        "freeze_tail_cap_sec": int(current_plan.get("freeze_tail_cap_sec") or 8),
-        "compose_policy": "freeze_tail" if bool(current_plan.get("freeze_tail_enabled", False)) else "match_video",
-    }
-    try:
-        # --- Phase 0.1: Set DB-level lock (300s TTL) inside try to prevent unhandled 500 ---
-        _policy_upsert(
-            repo,
-            task_id,
-            {"compose_lock_until": (datetime.now(timezone.utc) + timedelta(seconds=300)).isoformat()},
-        )
-        if req.bgm_mix is not None:
-            mix = max(0.0, min(1.0, float(req.bgm_mix)))
-            config = dict(current_for_plan.get("config") or {})
-            bgm = dict(config.get("bgm") or {})
-            bgm["mix_ratio"] = mix
-            config["bgm"] = bgm
-            _policy_upsert(repo, task_id, {"config": config})
-            current_for_plan = repo.get(task_id) or current_for_plan
-        if req.overlay_subtitles is not None:
-            compose_plan["overlay_subtitles"] = bool(req.overlay_subtitles)
-        if req.freeze_tail_enabled is not None:
-            compose_plan["freeze_tail_enabled"] = bool(req.freeze_tail_enabled)
-            compose_plan["compose_policy"] = "freeze_tail" if bool(compose_plan.get("freeze_tail_enabled")) else "match_video"
-        _policy_upsert(
-            repo,
-            task_id,
-            {
-                "status": "processing",
-                "last_step": "compose",
-                "compose_status": "running",
-                "compose_error": None,
-                "compose_error_reason": None,
-                "compose_last_status": "running",
-                "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
-                "compose_last_finished_at": None,
-                "compose_last_error": None,
-                "compose_warning": None,
-                "compose_plan": compose_plan,
-                "scene_outputs": current_for_plan.get("scene_outputs") or [],
-            },
-        )
-        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(
-            task_id,
-            os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
-        )
-        if lipsync_warning:
-            _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
-        updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
-        if lipsync_warning:
-            current_warning = str(updates.get("compose_warning") or "").strip()
-            updates["compose_warning"] = f"{current_warning} {lipsync_warning}".strip() if current_warning else lipsync_warning
-        _policy_upsert(repo, task_id, updates)
-        latest = repo.get(task_id) or task
-        return {
-            "ok": True,
-            "task_id": task_id,
-            "final_url": _task_endpoint(task_id, "final"),
-            "final_video_url": _task_endpoint(task_id, "final"),
-            "hub": get_hot_follow_workbench_hub(task_id, repo=repo),
-            "compose_status": latest.get("compose_status"),
-        }
-    except HTTPException as exc:
-        detail = exc.detail if isinstance(exc.detail, dict) else {"reason": "compose_failed", "message": str(exc.detail)}
-        try:
-            _policy_upsert(
-                repo,
-                task_id,
-                {
-                    "compose_status": "failed",
-                    "compose_error": detail,
-                    "compose_error_reason": detail.get("reason"),
-                    "compose_last_status": "failed",
-                    "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-                    "compose_last_error": detail.get("message") or str(exc.detail),
-                    "status": "failed",
-                    "last_step": "compose",
-                    "final_video_key": None,
-                    "final_video_path": None,
-                },
-            )
-        except Exception:
-            logger.exception("COMPOSE_STATUS_UPDATE_FAILED task=%s (in HTTPException handler)", task_id)
-        raise
-    except Exception as exc:
-        detail = {"reason": "compose_failed", "message": str(exc)}
-        try:
-            _policy_upsert(
-                repo,
-                task_id,
-                {
-                    "compose_status": "failed",
-                    "compose_error": detail,
-                    "compose_error_reason": detail.get("reason"),
-                    "compose_last_status": "failed",
-                    "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-                    "compose_last_error": detail.get("message"),
-                    "status": "failed",
-                    "last_step": "compose",
-                    "final_video_key": None,
-                    "final_video_path": None,
-                },
-            )
-        except Exception:
-            logger.exception("COMPOSE_STATUS_UPDATE_FAILED task=%s (in Exception handler)", task_id)
-        raise HTTPException(status_code=409, detail=detail) from exc
-    finally:
-        try:
-            _policy_upsert(repo, task_id, {"compose_lock_until": None})
-        except Exception:
-            logger.exception("COMPOSE_LOCK_CLEAR_FAILED task=%s", task_id)
-        try:
-            lock.release()
-        except Exception:
-            logger.exception("COMPOSE_LOCK_RELEASE_FAILED task=%s", task_id)
+    svc = CompositionService(storage=get_storage_service(), settings=get_settings())
+    result = svc.run_hot_follow_compose(
+        task_id,
+        task,
+        HotFollowComposeRequestContract(
+            bgm_mix=req.bgm_mix,
+            overlay_subtitles=req.overlay_subtitles,
+            freeze_tail_enabled=req.freeze_tail_enabled,
+            force=req.force,
+            expected_subtitle_updated_at=req.expected_subtitle_updated_at,
+            expected_audio_sha256=req.expected_audio_sha256,
+        ),
+        repo=repo,
+        policy_upsert=_policy_upsert,
+        hub_loader=lambda current_task_id, current_repo: get_hot_follow_workbench_hub(current_task_id, repo=current_repo),
+        subtitle_resolver=_resolve_target_srt_key,
+        subtitle_only_check=_hf_allow_subtitle_only_compose,
+        revision_snapshot=_hf_compose_revision_snapshot,
+        lipsync_runner=_maybe_run_hot_follow_lipsync_stub,
+    )
+    if result.status_code != 200:
+        return JSONResponse(status_code=result.status_code, content=result.body)
+    body = dict(result.body)
+    body.setdefault("ok", True)
+    return body
 
 
 

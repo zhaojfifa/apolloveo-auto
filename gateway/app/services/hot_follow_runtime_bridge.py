@@ -73,3 +73,15 @@ def hf_target_lang_gate(text: str, *, target_lang: str) -> dict[str, Any]:
     from gateway.app.routers.hot_follow_api import _hf_target_lang_gate
 
     return _hf_target_lang_gate(text, target_lang=target_lang)
+
+
+def hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
+    from gateway.app.routers.hot_follow_api import _hf_allow_subtitle_only_compose
+
+    return _hf_allow_subtitle_only_compose(task_id, task)
+
+
+def resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> str | None:
+    from gateway.app.routers.hot_follow_api import _resolve_target_srt_key
+
+    return _resolve_target_srt_key(task_obj, task_code, lang)

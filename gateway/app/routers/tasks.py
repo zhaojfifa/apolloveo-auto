@@ -252,15 +252,17 @@ from gateway.app.services.voice_state import (  # noqa: E402
 )
 from gateway.app.services.hot_follow_runtime_bridge import (  # noqa: E402
     get_hot_follow_workbench_hub as _get_hot_follow_workbench_hub,
-    hf_compose_final_video as _hf_compose_final_video,
+    hf_allow_subtitle_only_compose as _hf_allow_subtitle_only_compose,
     hf_dual_channel_state as _hf_dual_channel_state,
     hf_subtitle_lane_state as _hf_subtitle_lane_state,
     hf_target_lang_gate as _hf_target_lang_gate,
     hf_task_status_shape as _hf_task_status_shape,
     hot_follow_operational_defaults as _hot_follow_operational_defaults,
     maybe_run_hot_follow_lipsync_stub as _maybe_run_hot_follow_lipsync_stub,
+    resolve_target_srt_key as _resolve_target_srt_key,
     safe_collect_hot_follow_workbench_ui as _safe_collect_hot_follow_workbench_ui,
 )
+from gateway.app.services.compose_service import CompositionService, HotFollowComposeRequestContract  # noqa: E402
 
 
 # _task_compose_lock: moved to services/compose_helpers.py (Phase 1.3)
@@ -2373,158 +2375,26 @@ def compose_task(
         raise HTTPException(status_code=404, detail="Task not found")
 
     req = payload or ComposeTaskRequest()
-    lock = _task_compose_lock(task_id)
-    if not lock.acquire(blocking=False):
-        current = repo.get(task_id) or task
-        _policy_upsert(
-            repo,
-            task_id,
-            {
-                "compose_status": "running",
-                "compose_last_status": "running",
-                "compose_last_started_at": current.get("compose_last_started_at") or datetime.now(timezone.utc).isoformat(),
-                "compose_last_finished_at": None,
-            },
-        )
-        return _compose_in_progress_response(task_id)
-    if req.bgm_mix is not None:
-        mix = max(0.0, min(1.0, float(req.bgm_mix)))
-        config = dict(task.get("config") or {})
-        bgm = dict(config.get("bgm") or {})
-        bgm["mix_ratio"] = mix
-        config["bgm"] = bgm
-        _policy_upsert(repo, task_id, {"config": config})
-        task = repo.get(task_id) or task
-    if req.overlay_subtitles is not None:
-        plan = dict(task.get("compose_plan") or {})
-        if "target_lang" not in plan:
-            plan["target_lang"] = task.get("target_lang") or task.get("content_lang") or "mm"
-        plan["overlay_subtitles"] = bool(req.overlay_subtitles)
-        if "freeze_tail_enabled" not in plan:
-            plan["freeze_tail_enabled"] = False
-        if "freeze_tail_cap_sec" not in plan:
-            plan["freeze_tail_cap_sec"] = 8
-        plan["compose_policy"] = "freeze_tail" if bool(plan.get("freeze_tail_enabled")) else "match_video"
-        _policy_upsert(repo, task_id, {"compose_plan": plan})
-        task = repo.get(task_id) or task
-    if req.freeze_tail_enabled is not None:
-        plan = dict(task.get("compose_plan") or {})
-        if "target_lang" not in plan:
-            plan["target_lang"] = task.get("target_lang") or task.get("content_lang") or "mm"
-        plan["freeze_tail_enabled"] = bool(req.freeze_tail_enabled)
-        if "freeze_tail_cap_sec" not in plan:
-            plan["freeze_tail_cap_sec"] = 8
-        plan["compose_policy"] = "freeze_tail" if bool(plan.get("freeze_tail_enabled")) else "match_video"
-        _policy_upsert(repo, task_id, {"compose_plan": plan})
-        task = repo.get(task_id) or task
-
-    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path") or deliver_key(task_id, "final.mp4")
-    final_meta = object_head(str(final_key)) if final_key else None
-    final_size, _ = media_meta_from_head(final_meta)
-    if final_key and object_exists(str(final_key)) and final_size >= MIN_VIDEO_BYTES and not req.force:
-        _policy_upsert(repo, task_id, {"compose_lock_until": None})
-        lock.release()
-        return {
-            "task_id": task_id,
-            "final_url": _task_endpoint(task_id, "final"),
-            "final_video_url": _task_endpoint(task_id, "final"),
-            "final_key": str(final_key),
-            "hub": _get_hot_follow_workbench_hub(task_id, repo=repo),
-        }
-
-    current_for_plan = repo.get(task_id) or task
-    current_plan = dict(current_for_plan.get("compose_plan") or {})
-    compose_plan = {
-        "mute": bool(current_plan.get("mute", True)),
-        "overlay_subtitles": bool(current_plan.get("overlay_subtitles", True)),
-        "strip_subtitle_streams": bool(current_plan.get("strip_subtitle_streams", True)),
-        "cleanup_mode": str(current_plan.get("cleanup_mode") or "none"),
-        "target_lang": str(current_plan.get("target_lang") or current_for_plan.get("target_lang") or current_for_plan.get("content_lang") or "mm"),
-        "freeze_tail_enabled": bool(current_plan.get("freeze_tail_enabled", False)),
-        "freeze_tail_cap_sec": int(current_plan.get("freeze_tail_cap_sec") or 8),
-        "compose_policy": "freeze_tail" if bool(current_plan.get("freeze_tail_enabled", False)) else "match_video",
-    }
-    try:
-        _policy_upsert(
-            repo,
-            task_id,
-            {
-                "status": "processing",
-                "last_step": "compose",
-                "compose_status": "running",
-                "compose_error": None,
-                "compose_error_reason": None,
-                "compose_last_status": "running",
-                "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
-                "compose_last_finished_at": None,
-                "compose_last_error": None,
-                "compose_warning": None,
-                "compose_plan": compose_plan,
-                "scene_outputs": current_for_plan.get("scene_outputs") or [],
-            },
-        )
-        lipsync_warning = _maybe_run_hot_follow_lipsync_stub(
-            task_id,
-            os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes"),
-        )
-        if lipsync_warning:
-            _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
-        updates = _hf_compose_final_video(task_id, repo.get(task_id) or task)
-        if lipsync_warning:
-            current_warning = str(updates.get("compose_warning") or "").strip()
-            updates["compose_warning"] = f"{current_warning} {lipsync_warning}".strip() if current_warning else lipsync_warning
-        _policy_upsert(repo, task_id, updates)
-        latest = repo.get(task_id) or task
-        resolved_key = _task_key(latest, "final_video_key") or _task_key(latest, "final_video_path")
-        return {
-            "task_id": task_id,
-            "final_url": _task_endpoint(task_id, "final"),
-            "final_video_url": _task_endpoint(task_id, "final"),
-            "final_key": str(resolved_key or ""),
-            "hub": _get_hot_follow_workbench_hub(task_id, repo=repo),
-            "compose_status": latest.get("compose_status"),
-        }
-    except HTTPException as exc:
-        detail = exc.detail if isinstance(exc.detail, dict) else {"reason": "compose_failed", "message": str(exc.detail)}
-        _policy_upsert(
-            repo,
-            task_id,
-            {
-                "compose_status": "failed",
-                "compose_error": detail,
-                "compose_error_reason": detail.get("reason"),
-                "compose_last_status": "failed",
-                "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-                "compose_last_error": detail.get("message") or str(exc.detail),
-                "status": "failed",
-                "last_step": "compose",
-                "final_video_key": None,
-                "final_video_path": None,
-            },
-        )
-        raise
-    except Exception as exc:
-        detail = {"reason": "compose_failed", "message": str(exc)}
-        _policy_upsert(
-            repo,
-            task_id,
-            {
-                "compose_status": "failed",
-                "compose_error": detail,
-                "compose_error_reason": detail.get("reason"),
-                "compose_last_status": "failed",
-                "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-                "compose_last_error": detail.get("message"),
-                "status": "failed",
-                "last_step": "compose",
-                "final_video_key": None,
-                "final_video_path": None,
-            },
-        )
-        raise HTTPException(status_code=409, detail=detail) from exc
-    finally:
-        _policy_upsert(repo, task_id, {"compose_lock_until": None})
-        lock.release()
+    svc = CompositionService(storage=get_storage_service(), settings=get_settings())
+    result = svc.run_hot_follow_compose(
+        task_id,
+        task,
+        HotFollowComposeRequestContract(
+            bgm_mix=req.bgm_mix,
+            overlay_subtitles=req.overlay_subtitles,
+            freeze_tail_enabled=req.freeze_tail_enabled,
+            force=req.force,
+        ),
+        repo=repo,
+        policy_upsert=_policy_upsert,
+        hub_loader=lambda current_task_id, current_repo: _get_hot_follow_workbench_hub(current_task_id, repo=current_repo),
+        subtitle_resolver=_resolve_target_srt_key,
+        subtitle_only_check=_hf_allow_subtitle_only_compose,
+        lipsync_runner=_maybe_run_hot_follow_lipsync_stub,
+    )
+    if result.status_code != 200:
+        return JSONResponse(status_code=result.status_code, content=result.body)
+    return result.body
 
 
 @api_router.post("/tasks/{task_id}/run")
