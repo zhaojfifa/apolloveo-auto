@@ -156,9 +156,9 @@
 
 本节点完成：
 
-- 冻结 `docs/VEOSOP05_STAGE_CLOSURE.md`
+- 冻结 `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
 - 冻结 `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
-- 冻结 `docs/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
+- 冻结 `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
 
 本次执行对齐结论：
 

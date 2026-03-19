@@ -136,11 +136,11 @@ SOP 页面最低必备翻译 key（Hot Follow）：
 git checkout VeoScenes01
 mkdir -p docs/skill
 # 写入上面的 UI_I18N_LOCALE_BASELINE.md
-git add docs/skill/UI_I18N_LOCALE_BASELINE.md
+git add docs/skills/ui/UI_I18N_LOCALE_BASELINE.md
 git commit -m "docs(skill): add UI i18n locale switching baseline (tasks/board/wizard)"
 git push
 
-# 2) 可选：加一个 docs/skill/README.md 索引（如果你们已经有 skill 索引就更新它）
+# 2) 可选：更新 docs/skills/README.md 索引（如果你们已经有 skill 索引就更新它）
 
 
 Rule: All new pages must follow Tasks locale mode (readLocale() + applyLocale()).
