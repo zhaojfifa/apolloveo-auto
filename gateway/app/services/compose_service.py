@@ -666,6 +666,10 @@ class CompositionService:
             result_path = self._apply_freeze_tail(task_id, inputs.ffmpeg, video_path, tmp, hold_sec)
             if result_path:
                 video_input_path = result_path
+                try:
+                    _, video_duration = assert_local_video_ok(result_path)
+                except ValueError:
+                    video_duration = video_duration + hold_sec
                 compose_policy = "freeze_tail"
             else:
                 compose_policy = "match_video"
@@ -781,14 +785,26 @@ class CompositionService:
     def _bgm_filter_expr(self, bgm_mix: float, compose_policy: str, video_duration: float) -> str:
         base = f"[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}"
         if compose_policy == "match_video":
-            base += f",atrim=0:{video_duration:.3f}"
+            base += f",apad,atrim=0:{video_duration:.3f}"
         return base + "[bgm];"
 
     def _bgm_only_filter_expr(self, input_index: int, bgm_mix: float, compose_policy: str, video_duration: float) -> str:
         base = f"[{input_index}:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}"
         if compose_policy == "match_video":
-            base += f",atrim=0:{video_duration:.3f}"
+            base += f",apad,atrim=0:{video_duration:.3f}"
         return base + ",alimiter=limit=0.95[mix]"
+
+    def _voice_filter_expr(self, ws: _WorkspaceFiles) -> str:
+        base = "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
+        if ws.compose_policy != "match_video":
+            return base
+        if ws.voice_duration > ws.video_duration:
+            return (
+                base
+                + f",atrim=0:{ws.video_duration:.3f}"
+                + f",afade=t=out:st={max(ws.video_duration - 0.35, 0.0):.3f}:d=0.35"
+            )
+        return base + f",apad,atrim=0:{ws.video_duration:.3f}"
 
     @staticmethod
     def _assert_overlay_cmd(cmd_text: str, overlay_subtitles: bool) -> None:
@@ -830,7 +846,6 @@ class CompositionService:
             "-map", "[mix]",
             *video_codec_args,
             "-c:a", "aac",
-            "-shortest",
             "-movflags", "+faststart",
             *(["-sn"] if inputs.strip_subtitle_streams else []),
             str(ws.final_path),
@@ -865,20 +880,12 @@ class CompositionService:
 
     def _compose_voice_bgm(self, ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
         """Branch: voice + BGM compose."""
-        voice_trim_expr = (
-            f",atrim=0:{ws.video_duration:.3f},afade=t=out:st={max(ws.video_duration - 0.35, 0.0):.3f}:d=0.35"
-            if ws.compose_policy == "match_video" and ws.voice_duration > ws.video_duration
-            else ""
-        )
+        voice_filter = self._voice_filter_expr(ws)
         if ws.overlay_subtitles:
             subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode)
             filter_complex = (
                 f"[0:v]{subtitle_filter}[v];"
-                + (
-                    f"[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
-                    + voice_trim_expr
-                    + "[voice];"
-                )
+                + (voice_filter + "[voice];")
                 + self._bgm_filter_expr(inputs.bgm_mix, ws.compose_policy, ws.video_duration)
                 + "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
             )
@@ -886,11 +893,7 @@ class CompositionService:
             video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
         else:
             filter_complex = (
-                (
-                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
-                    + voice_trim_expr
-                    + "[voice];"
-                )
+                (voice_filter + "[voice];")
                 + self._bgm_filter_expr(inputs.bgm_mix, ws.compose_policy, ws.video_duration)
                 + "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
             )
@@ -906,7 +909,6 @@ class CompositionService:
             "-map", "[mix]",
             *video_codec_args,
             "-c:a", "aac",
-            "-shortest",
             "-movflags", "+faststart",
             *(["-sn"] if inputs.strip_subtitle_streams else []),
             str(ws.final_path),
@@ -915,29 +917,17 @@ class CompositionService:
 
     def _compose_voice_only(self, ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
         """Branch: voice without BGM.  Includes CRF23 fallback retry."""
-        voice_trim_expr = (
-            f",atrim=0:{ws.video_duration:.3f},afade=t=out:st={max(ws.video_duration - 0.35, 0.0):.3f}:d=0.35"
-            if ws.compose_policy == "match_video" and ws.voice_duration > ws.video_duration
-            else ""
-        )
+        voice_filter = self._voice_filter_expr(ws)
         if ws.overlay_subtitles:
             subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode)
             filter_complex = (
                 f"[0:v]{subtitle_filter}[v];"
-                + (
-                    "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
-                    + voice_trim_expr
-                    + ",alimiter=limit=0.95[mix]"
-                )
+                + (voice_filter + ",alimiter=limit=0.95[mix]")
             )
             map_video = "[v]"
             video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
         else:
-            filter_complex = (
-                "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
-                + voice_trim_expr
-                + ",alimiter=limit=0.95[mix]"
-            )
+            filter_complex = voice_filter + ",alimiter=limit=0.95[mix]"
             map_video = "0:v:0"
             video_codec_args = ["-c:v", "copy"]
 
@@ -950,7 +940,6 @@ class CompositionService:
             "-map", "[mix]",
             *video_codec_args,
             "-c:a", "aac",
-            "-shortest",
             "-movflags", "+faststart",
             *(["-sn"] if inputs.strip_subtitle_streams else []),
             str(ws.final_path),
@@ -971,7 +960,6 @@ class CompositionService:
                 "-map", "[mix]",
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
                 "-c:a", "aac",
-                "-shortest",
                 "-movflags", "+faststart",
                 *(["-sn"] if inputs.strip_subtitle_streams else []),
                 str(ws.final_path),

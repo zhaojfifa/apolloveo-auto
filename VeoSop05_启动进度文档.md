@@ -120,3 +120,32 @@
 - 不改 dubbing logic
 - 不改 compose runtime policy
 - 不扩大 router 重构范围
+
+## PR-6 Compose Duration Must Be Video-Master
+
+日期：2026-03-19
+
+本节点修复：
+
+- Hot Follow formal compose path 在短音频场景下被 `-shortest` 截断，导致最终时长错误跟随音频的问题
+- compose plan 声明为 `match_video` / `freeze_tail` 时，runtime ffmpeg 行为与视频主时长不一致的问题
+
+本次收口的 runtime 边界：
+
+- `gateway/app/services/compose_service.py`
+  - formal compose path 不再依赖 `-shortest` 决定输出时长
+  - `match_video` 下，短音频通过 `apad + atrim` 补齐到视频时长
+  - `match_video` 下，长音频通过 `atrim + afade` 裁到视频时长
+  - freeze-tail 成功后，compose 主时长改为冻结后的视频时长，而不是原始视频时长
+
+本节点对 `freeze_tail` 的真实状态说明：
+
+- 当前为部分实现
+- 当音频长于视频且所需 hold 时长未超过 cap 时，会先做 `tpad` 冻尾再进入 compose
+- 本节点不引入更复杂的高级 policy 框架，只保证 formal path 始终是 video-master
+
+本节点明确后置：
+
+- 不扩 compose policy family
+- 不改 router / workbench / parse 逻辑
+- 不启动 Skills 或第二条产线
