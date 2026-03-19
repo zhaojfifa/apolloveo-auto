@@ -256,16 +256,16 @@ from gateway.app.services.voice_state import (  # noqa: E402
     voice_state_config as _voice_state_config,
 )
 from gateway.app.services.hot_follow_runtime_bridge import (  # noqa: E402
-    get_hot_follow_workbench_hub as _get_hot_follow_workbench_hub,
-    hf_allow_subtitle_only_compose as _hf_allow_subtitle_only_compose,
-    hf_dual_channel_state as _hf_dual_channel_state,
-    hf_subtitle_lane_state as _hf_subtitle_lane_state,
-    hf_target_lang_gate as _hf_target_lang_gate,
-    hf_task_status_shape as _hf_task_status_shape,
-    hot_follow_operational_defaults as _hot_follow_operational_defaults,
-    maybe_run_hot_follow_lipsync_stub as _maybe_run_hot_follow_lipsync_stub,
-    resolve_target_srt_key as _resolve_target_srt_key,
-    safe_collect_hot_follow_workbench_ui as _safe_collect_hot_follow_workbench_ui,
+    compat_allow_subtitle_only_compose as _compat_allow_subtitle_only_compose,
+    compat_collect_hot_follow_workbench_ui as _compat_collect_hot_follow_workbench_ui,
+    compat_get_hot_follow_workbench_hub as _compat_get_hot_follow_workbench_hub,
+    compat_hot_follow_dual_channel_state as _compat_hot_follow_dual_channel_state,
+    compat_hot_follow_operational_defaults as _compat_hot_follow_operational_defaults,
+    compat_hot_follow_subtitle_lane_state as _compat_hot_follow_subtitle_lane_state,
+    compat_hot_follow_target_lang_gate as _compat_hot_follow_target_lang_gate,
+    compat_hot_follow_task_status_shape as _compat_hot_follow_task_status_shape,
+    compat_maybe_run_hot_follow_lipsync_stub as _compat_maybe_run_hot_follow_lipsync_stub,
+    compat_resolve_target_srt_key as _compat_resolve_target_srt_key,
 )
 from gateway.app.services.compose_service import CompositionService, HotFollowComposeRequestContract  # noqa: E402
 
@@ -1715,8 +1715,8 @@ async def task_workbench_page(
         paths,
         workbench_kind=spec.kind,
         settings=app_settings,
-        hot_follow_operational_defaults=_hot_follow_operational_defaults,
-        hot_follow_ui_collector=_safe_collect_hot_follow_workbench_ui,
+        hot_follow_operational_defaults=_compat_hot_follow_operational_defaults,
+        hot_follow_ui_collector=_compat_collect_hot_follow_workbench_ui,
     )
     task_view = _build_task_workbench_view(
         task,
@@ -2250,7 +2250,7 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
         task_id,
         t,
         detail,
-        task_status_shape=_hf_task_status_shape,
+        task_status_shape=_compat_hot_follow_task_status_shape,
     )
 
     logger.info(
@@ -2311,10 +2311,10 @@ def compose_task(
         ),
         repo=repo,
         policy_upsert=_policy_upsert,
-        hub_loader=lambda current_task_id, current_repo: _get_hot_follow_workbench_hub(current_task_id, repo=current_repo),
-        subtitle_resolver=_resolve_target_srt_key,
-        subtitle_only_check=_hf_allow_subtitle_only_compose,
-        lipsync_runner=_maybe_run_hot_follow_lipsync_stub,
+        hub_loader=lambda current_task_id, current_repo: _compat_get_hot_follow_workbench_hub(current_task_id, repo=current_repo),
+        subtitle_resolver=_compat_resolve_target_srt_key,
+        subtitle_only_check=_compat_allow_subtitle_only_compose,
+        lipsync_runner=_compat_maybe_run_hot_follow_lipsync_stub,
     )
     if result.status_code != 200:
         return JSONResponse(status_code=result.status_code, content=result.body)
@@ -2599,8 +2599,8 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             provider,
         )
     mm_text_override = (payload.mm_text or "").strip() or None
-    subtitle_lane = _hf_subtitle_lane_state(task_id, task)
-    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
+    subtitle_lane = _compat_hot_follow_subtitle_lane_state(task_id, task)
+    route_state = _compat_hot_follow_dual_channel_state(task_id, task, subtitle_lane)
     no_dub_candidate = (
         route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
         and not mm_text_override
@@ -2633,7 +2633,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             mm_audio_key=None,
         )
     dub_input_text = mm_text_override or str(subtitle_lane.get("dub_input_text") or "").strip()
-    target_lang_gate = _hf_target_lang_gate(dub_input_text, target_lang=target_lang)
+    target_lang_gate = _compat_hot_follow_target_lang_gate(dub_input_text, target_lang=target_lang)
     if not target_lang_gate.get("allow", True):
         raise HTTPException(
             status_code=422,

@@ -714,6 +714,12 @@ def _hot_follow_operational_defaults() -> dict[str, Any]:
 
 
 def _safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+    """Compatibility-safe wrapper around the formal workbench UI builder.
+
+    Keep this narrow while legacy callers still depend on a router-local helper.
+    New presentation logic should prefer service/presenter paths instead of
+    extending this fallback wrapper.
+    """
     try:
         return _collect_hot_follow_workbench_ui(task, settings)
     except Exception:
@@ -742,6 +748,11 @@ def _safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any
 
 
 def _hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
+    """Compatibility helper for subtitle-only compose fallback decisions.
+
+    This remains router-local for behavior stability, but it is not the primary
+    compose ownership point and must not absorb broader compose policy.
+    """
     if str(task.get("kind") or "").strip().lower() != "hot_follow":
         return False
     subtitle_lane = _hf_subtitle_lane_state(task_id, task)
@@ -933,6 +944,7 @@ def _hf_shape_from_events(task: dict) -> dict[str, str]:
 
 
 def _hf_task_status_shape(task: dict) -> dict[str, str]:
+    """Compatibility presentation helper for legacy status-shape payloads."""
     shape = _hf_shape_from_events(task)
     step = shape.get("step") or ""
     phase = shape.get("phase") or ""
@@ -1279,7 +1291,7 @@ def _normalize_compose_target_lang(value: str | None) -> str:
 
 
 def _resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> str | None:
-    """Resolve the subtitle storage key for the given target language."""
+    """Compatibility subtitle resolver for remaining router-driven compose calls."""
     lang_norm = _normalize_compose_target_lang(lang)
     synced_mm_key = _hf_sync_saved_target_subtitle_artifact(task_code, task_obj)
     candidates: list[str] = []

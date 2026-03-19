@@ -194,3 +194,26 @@
 - 不改 gate binding
 - 不改 Skills runtime
 - 不扩第二条产线
+
+## PR-A2 Isolate Compatibility-Only Helpers Before Skills Entry
+
+日期：2026-03-19
+
+本节点完成：
+
+- 将 `gateway/app/services/hot_follow_runtime_bridge.py` 明确收口为 compatibility-only bridge
+- 为 bridge 导出补充显式 `compat_*` 命名，避免兼容 helper 继续看起来像正式 runtime owner
+- 让 `gateway/app/routers/tasks.py` 改为显式消费 compatibility bridge 名称，而不是继续直接依赖模糊命名的 Hot Follow helper
+
+本次收口说明：
+
+- primary runtime / contract path 仍然是 `CompositionService`、status policy、line-aware gate binding 与正式 presenter/service 路径
+- bridge 仍保留旧名称 alias，只为行为稳定，不作为新增业务逻辑入口
+- `hot_follow_api.py` 中保留的 `_hf_*` / `_safe_*` helper 仍属于过渡残留，但已补充 compatibility 角色说明
+
+本节点明确不做：
+
+- 不实现 Skills MVP
+- 不改 compose 主链语义
+- 不改 gate binding 结构
+- 不扩第二条产线
