@@ -149,3 +149,26 @@
 - 不扩 compose policy family
 - 不改 router / workbench / parse 逻辑
 - 不启动 Skills 或第二条产线
+
+## PR-7 Stage Closure Docs + Business Regression Freeze
+
+日期：2026-03-19
+
+本节点完成：
+
+- 冻结 `docs/VEOSOP05_STAGE_CLOSURE.md`
+- 冻结 `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
+- 冻结 `docs/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
+
+本次执行对齐结论：
+
+- `VeoSop05` 阶段收口说明已固化
+- Hot Follow business validation 已升级为 mandatory merge gate，而不是可选补充验证
+- 下一步工作仍严格限制在 Hot Follow cleanup 内
+
+本节点明确不做：
+
+- 不改任何 runtime logic
+- 不启动 Skills implementation
+- 不扩第二条产线
+- 不做平台层扩张
