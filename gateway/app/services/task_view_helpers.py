@@ -386,7 +386,7 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     current_audio_sha256 = str(task.get("audio_sha256") or "").strip() or None
     composed_audio_sha256 = str(task.get("final_source_audio_sha256") or "").strip() or None
     current_subtitle_updated_at = str(
-        task.get("subtitles_override_updated_at") or task.get("updated_at") or ""
+        task.get("subtitles_override_updated_at") or ""
     ).strip() or None
     composed_subtitle_updated_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
     final_updated_at = task.get("final_updated_at") or task.get("updated_at")
@@ -431,6 +431,10 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         default=None,
     )
     if final_exists and compose_done and compose_refresh_evidence_at is not None:
+        if latest_input_updated_at is not None and compose_refresh_evidence_at >= latest_input_updated_at:
+            audio_changed_since_final = False
+            subtitle_changed_since_final = False
+
         # Clear staleness per-input: only override when the input's own
         # timestamp is known AND compose finished after it.  When an input
         # timestamp is missing we cannot conclude compose incorporated that

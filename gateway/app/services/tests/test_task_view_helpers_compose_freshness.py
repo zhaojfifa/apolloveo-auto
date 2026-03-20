@@ -30,6 +30,7 @@ def test_compute_composed_state_marks_final_stale_when_audio_sha_changes(monkeyp
         "compose_last_status": "done",
         "audio_sha256": "audio-current",
         "final_source_audio_sha256": "audio-old",
+        "dub_generated_at": "2026-03-20T10:02:00+00:00",
         "subtitles_override_updated_at": "2026-03-20T10:00:00+00:00",
         "final_source_subtitle_updated_at": "2026-03-20T10:00:00+00:00",
         "final_updated_at": "2026-03-20T10:01:00+00:00",
@@ -279,3 +280,28 @@ def test_compose_fresh_with_empty_string_timestamps(monkeypatch):
     assert composed["final_fresh"] is True
     assert composed["final_stale_reason"] is None
     assert composed["composed_ready"] is True
+
+
+def test_compose_fresh_when_latest_compose_is_newer_than_latest_inputs_even_if_snapshot_fingerprints_lag(monkeypatch):
+    _setup_monkeypatches(monkeypatch)
+    task = {
+        "task_id": "hf-latest-compose-wins",
+        "final_video_key": "deliver/tasks/hf-latest-compose-wins/final.mp4",
+        "compose_status": "done",
+        "compose_last_status": "done",
+        "audio_sha256": "sha-current",
+        "final_source_audio_sha256": "sha-old",
+        "dub_generated_at": "2026-03-21T08:00:00+00:00",
+        "subtitles_override_updated_at": "2026-03-21T08:30:00+00:00",
+        "final_source_subtitle_updated_at": "2026-03-21T07:00:00+00:00",
+        "compose_last_finished_at": "2026-03-21T09:00:00+00:00",
+        "final_updated_at": "2026-03-21T09:00:00+00:00",
+    }
+
+    composed = task_view_helpers.compute_composed_state(task, "hf-latest-compose-wins")
+
+    assert composed["final"]["exists"] is True
+    assert composed["final_fresh"] is True
+    assert composed["final_stale_reason"] is None
+    assert composed["composed_ready"] is True
+    assert composed["composed_reason"] == "ready"
