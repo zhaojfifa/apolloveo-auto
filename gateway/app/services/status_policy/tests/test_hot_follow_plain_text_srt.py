@@ -20,20 +20,22 @@ from gateway.app.routers import tasks as tasks_router  # noqa: F401
 from gateway.app.routers import hot_follow_api as hf_router
 
 
-def test_plain_text_is_wrapped_to_single_srt():
+def test_plain_text_is_wrapped_to_single_srt(monkeypatch):
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
     task = {"duration_sec": 12}
     source = "第一行中文\n第二行中文"
-    text, mode = hf_router._hf_normalize_subtitles_save_text(task, source)
+    text, mode = hf_router._hf_normalize_subtitles_save_text("hf-plain", task, source)
     assert mode == "plain_text_wrapped"
     assert "-->" in text
     assert "第一行中文" in text
     assert "第二行中文" in text
 
 
-def test_valid_srt_is_preserved():
+def test_valid_srt_is_preserved(monkeypatch):
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
     task = {"duration_sec": 12}
     source = "1\n00:00:00,000 --> 00:00:03,000\n缅文字幕\n"
-    text, mode = hf_router._hf_normalize_subtitles_save_text(task, source)
+    text, mode = hf_router._hf_normalize_subtitles_save_text("hf-srt", task, source)
     assert mode == "srt"
     assert text.strip() == source.strip()
 

@@ -33,6 +33,10 @@ from gateway.app.services.status_policy.service import policy_upsert
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, public_target_lang, resolve_tts_voice
 from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
+from gateway.app.services.hot_follow_subtitles import (
+    is_srt_text as _service_is_srt_text,
+    normalize_target_subtitles_for_save,
+)
 from gateway.app.steps.subtitles import _parse_srt_to_segments, segments_to_srt
 from gateway.app.providers.gemini_subtitles import GeminiSubtitlesError, translate_segments_with_gemini
 from gateway.app.services.artifact_storage import (
@@ -196,46 +200,16 @@ def _maybe_run_hot_follow_lipsync_stub(task_id: str, enabled: bool = False) -> s
 
 
 def _hf_is_srt_text(text: str) -> bool:
-    source = str(text or "").strip()
-    if not source or "-->" not in source:
-        return False
-    try:
-        segments = _parse_srt_to_segments(source)
-    except Exception:
-        return False
-    return bool(segments)
+    return _service_is_srt_text(text)
 
 
-
-def _hf_plain_text_to_single_srt(text: str, *, duration_sec: float | None) -> str:
-    content_lines = [str(line or "").rstrip() for line in str(text or "").splitlines()]
-    content = "\n".join(line for line in content_lines if line.strip()).strip()
-    if not content:
-        return ""
-    try:
-        dur = float(duration_sec) if duration_sec is not None else 0.0
-    except Exception:
-        dur = 0.0
-    if dur <= 0:
-        dur = 8.0
-    dur = max(2.0, min(dur, 60.0))
-    seg = {
-        "index": 1,
-        "start": 0.0,
-        "end": dur,
-        "mm": content,
-        "origin": content,
-    }
-    return segments_to_srt([seg], "mm")
-
-
-def _hf_normalize_subtitles_save_text(task: dict, raw_text: str) -> tuple[str, str]:
-    text = str(raw_text or "").strip()
-    if not text:
-        return "", "empty"
-    if _hf_is_srt_text(text):
-        return text + ("\n" if not text.endswith("\n") else ""), "srt"
-    return _hf_plain_text_to_single_srt(text, duration_sec=task.get("duration_sec")) + "\n", "plain_text_wrapped"
+def _hf_normalize_subtitles_save_text(task_id: str, task: dict, raw_text: str) -> tuple[str, str]:
+    current_target_srt = _hf_load_subtitles_text(task_id, task)
+    return normalize_target_subtitles_for_save(
+        raw_text,
+        duration_sec=task.get("duration_sec"),
+        current_target_srt=current_target_srt,
+    )
 
 
 def _hf_text_for_script_analysis(text: str) -> str:
@@ -447,7 +421,7 @@ def _hf_subtitles_override_path(task_id: str) -> Path:
 def _hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text: str | None = None) -> str | None:
     text = str(saved_text if saved_text is not None else _hf_load_subtitles_text(task_id, task) or "").strip()
     current_key = _task_key(task, "mm_srt_path")
-    if current_key and object_exists(str(current_key)):
+    if saved_text is None and current_key and object_exists(str(current_key)):
         head = object_head(str(current_key))
         size, _ = media_meta_from_head(head)
         if int(size or 0) > 0:
@@ -1883,7 +1857,7 @@ def patch_hot_follow_subtitles(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    text, text_mode = _hf_normalize_subtitles_save_text(task, payload.srt_text or "")
+    text, text_mode = _hf_normalize_subtitles_save_text(task_id, task, payload.srt_text or "")
     # Phase 0.2: compute content hash for revision consistency
     _subtitle_content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16] if text else None
     override_path = _hf_subtitles_override_path(task_id)
