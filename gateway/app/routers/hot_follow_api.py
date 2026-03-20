@@ -726,6 +726,38 @@ def _safe_collect_hot_follow_workbench_ui(
         return payload
 
 
+def _merge_workbench_ui_overlay(
+    payload: dict[str, Any],
+    overlay: dict[str, Any] | None,
+) -> dict[str, Any]:
+    merged = dict(payload or {})
+    ui = dict(overlay or {})
+    blocked_keys = {
+        "compose_status",
+        "final_exists",
+        "final_url",
+        "final_video_url",
+        "final",
+        "composed_ready",
+        "composed_reason",
+        "final_fresh",
+        "final_stale_reason",
+        "current_attempt",
+        "artifact_facts",
+        "historical_final",
+        "ready_gate",
+        "pipeline",
+        "deliverables",
+        "compose",
+        "media",
+    }
+    for key, value in ui.items():
+        if key in blocked_keys:
+            continue
+        merged[key] = value
+    return merged
+
+
 def _hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
     """Compatibility helper for subtitle-only compose fallback decisions.
 
@@ -1676,18 +1708,45 @@ def get_hot_follow_workbench_hub(
     }
     payload = compute_hot_follow_state(task, payload)
     if _backfill_compose_done_if_final_ready(repo, task_id, task, bool(payload.get("composed_ready"))):
-        latest = repo.get(task_id) or task
-        payload = compute_hot_follow_state(latest, payload)
-        task = latest
+        task = repo.get(task_id) or task
+        payload = compute_hot_follow_state(task, payload)
+
+    composed = _compute_composed_state(task, task_id)
+    payload["composed_ready"] = bool(composed.get("composed_ready"))
+    payload["composed_reason"] = str(composed.get("composed_reason") or "final_missing")
+    payload["final_fresh"] = bool(composed.get("final_fresh"))
+    payload["final_stale_reason"] = composed.get("final_stale_reason")
+    payload["final"] = dict(composed.get("final") or {})
+    payload = compute_hot_follow_state(task, payload)
+    payload["historical_final"] = dict(payload.get("final") or {})
+
+    artifact_facts, current_attempt, operator_summary = _hf_safe_presentation_aggregates(
+        task_id,
+        task,
+        final_info=payload.get("final"),
+        persisted_audio=persisted_audio,
+        subtitle_lane=subtitle_lane,
+        scene_pack=scene_pack,
+        voice_state=voice_state,
+        dub_status=str(dub_state),
+        compose_status=str(payload.get("compose_status") or compose_state),
+        composed_reason=str(payload.get("composed_reason") or "final_missing"),
+        no_dub=bool((payload.get("audio") or {}).get("no_dub")),
+    )
+    payload["artifact_facts"] = artifact_facts
+    payload["current_attempt"] = current_attempt
+    payload["operator_summary"] = operator_summary
+    payload["presentation"] = _hf_rerun_presentation_state(task, voice_state, payload.get("final"), dub_state)
 
     # UI consistency guard: once final is ready, compose-facing fields must all read done.
     final_url = str(
-        payload.get("final_url")
+        (payload.get("final") or {}).get("url")
+        or payload.get("final_url")
         or (payload.get("media", {}) or {}).get("final_url")
         or ""
     ).strip()
     final_exists = bool((payload.get("final") or {}).get("exists"))
-    composed_ready = bool((payload.get("ready_gate") or {}).get("compose_ready"))
+    composed_ready = bool(payload.get("composed_ready"))
     if composed_ready:
         pipeline = payload.get("pipeline")
         if isinstance(pipeline, list):
@@ -1725,12 +1784,15 @@ def get_hot_follow_workbench_hub(
                     break
 
         media = payload.get("media")
-        if isinstance(media, dict) and final_url:
-            media["final_url"] = final_url
-            media["final_video_url"] = final_url
+        if isinstance(media, dict):
+            media["final_url"] = final_url or None
+            media["final_video_url"] = final_url or None
 
         payload["composed_ready"] = True
         payload["composed_reason"] = "ready"
+        payload["final_url"] = final_url or None
+        payload["final_video_url"] = final_url or None
+        payload["final_exists"] = final_exists
     else:
         pipeline = payload.get("pipeline")
         if isinstance(pipeline, list):
@@ -1782,8 +1844,12 @@ def get_hot_follow_workbench_hub(
         payload["media"]["final_video_url"] = None
         payload["final_url"] = None
         payload["final_video_url"] = None
+        payload["final_exists"] = False
     payload.update(_hot_follow_operational_defaults())
-    payload.update(_safe_collect_hot_follow_workbench_ui(task, get_settings(), composed=composed))
+    payload = _merge_workbench_ui_overlay(
+        payload,
+        _safe_collect_hot_follow_workbench_ui(task, get_settings(), composed=composed),
+    )
     return payload
 
 

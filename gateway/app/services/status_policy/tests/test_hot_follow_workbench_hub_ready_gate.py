@@ -303,6 +303,102 @@ def test_hot_follow_workbench_promotes_fresh_final_after_successful_recompose(mo
     assert str(saved.get("compose_last_status") or "").lower() == "done"
 
 
+def test_hot_follow_workbench_recomputes_composed_after_state_normalization(monkeypatch):
+    task_id = "hf-workbench-recompose-recompute-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "pending",
+            "compose_last_status": "done",
+            "compose_last_started_at": "2026-03-21T10:00:00+00:00",
+            "compose_last_finished_at": "2026-03-21T10:01:00+00:00",
+            "final_video_key": f"deliver/tasks/{task_id}/final.mp4",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
+            "dub_status": "done",
+            "audio_sha256": "audio-new",
+            "final_source_audio_sha256": "audio-new",
+            "subtitles_override_updated_at": "2026-03-21T09:59:00+00:00",
+            "final_source_subtitle_updated_at": "2026-03-21T09:59:00+00:00",
+        },
+    )
+
+    composed_calls = {"count": 0}
+
+    def _sequenced_composed(_task, _task_id):
+        composed_calls["count"] += 1
+        if composed_calls["count"] == 1:
+            return {
+                "composed_ready": False,
+                "composed_reason": "final_stale_after_dub",
+                "final_fresh": False,
+                "final_stale_reason": "final_stale_after_dub",
+                "final": {"exists": True, "url": f"/v1/tasks/{task_id}/final", "size_bytes": 8192},
+                "compose_error_reason": None,
+                "compose_error_message": None,
+                "raw_exists": True,
+                "voice_exists": True,
+            }
+        return {
+            "composed_ready": True,
+            "composed_reason": "ready",
+            "final_fresh": True,
+            "final_stale_reason": None,
+            "final": {"exists": True, "url": f"/v1/tasks/{task_id}/final", "size_bytes": 8192},
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": True,
+        }
+
+    monkeypatch.setattr(hf_router, "_compute_composed_state", _sequenced_composed)
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "requested_voice": "mm_female_1",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "deliverable_audio_done": True,
+            "voiceover_url": f"/v1/tasks/{task_id}/audio_mm",
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: {"ContentLength": "8192", "Content-Type": "video/mp4"})
+    monkeypatch.setattr(hf_router, "media_meta_from_head", lambda _meta: (8192, "video/mp4"))
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    assert composed_calls["count"] >= 2
+    assert data.get("composed_ready") is True
+    assert data.get("final_fresh") is True
+    assert data.get("ready_gate", {}).get("compose_ready") is True
+    assert str(data.get("compose_status") or "").lower() == "done"
+    assert (data.get("current_attempt") or {}).get("requires_recompose") is False
+    assert data.get("final_exists") is True
+    assert (data.get("final") or {}).get("exists") is True
+    assert (data.get("artifact_facts") or {}).get("final_exists") is True
+
+
 def test_hot_follow_workbench_marks_old_final_stale_after_redub(monkeypatch):
     task_id = "hf-workbench-stale-final-01"
     repo = _Repo()
