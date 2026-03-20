@@ -441,6 +441,8 @@ class CompositionService:
                 policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
 
             updates = compose_runner(task_id, repo.get(task_id) or current_for_plan)
+            updates.setdefault("final_source_subtitle_updated_at", revision.get("subtitle_updated_at"))
+            updates.setdefault("final_source_audio_sha256", revision.get("audio_sha256"))
             if lipsync_warning:
                 current_warning = str(updates.get("compose_warning") or "").strip()
                 updates["compose_warning"] = (

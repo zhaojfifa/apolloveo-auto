@@ -1577,6 +1577,8 @@ def get_hot_follow_workbench_hub(
         "scene_outputs": scene_outputs,
         "composed_ready": composed_ready,
         "composed_reason": composed_reason,
+        "final_fresh": bool(composed.get("final_fresh")),
+        "final_stale_reason": composed.get("final_stale_reason"),
         "final": final_info,
         "compose": {
             "last": compose_last,
@@ -1614,7 +1616,7 @@ def get_hot_follow_workbench_hub(
     final_exists = bool((payload.get("final") or {}).get("exists"))
     composed_ready = bool(composed_ready)
     payload["composed_ready"] = composed_ready
-    payload["composed_reason"] = "ready" if composed_ready else "not_ready"
+    payload["composed_reason"] = "ready" if composed_ready else str(composed_reason or "not_ready")
     if isinstance(payload.get("deliverables"), list):
         for item in payload["deliverables"]:
             if not isinstance(item, dict):
@@ -1738,6 +1740,8 @@ def get_hot_follow_workbench_hub(
                     item["status"] = "pending"
                     item["state"] = "pending"
                     break
+        payload["composed_ready"] = False
+        payload["composed_reason"] = str(payload.get("composed_reason") or composed_reason or "not_ready")
     payload.update(_hot_follow_operational_defaults())
     payload.update(_safe_collect_hot_follow_workbench_ui(task, get_settings()))
     return payload

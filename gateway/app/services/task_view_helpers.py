@@ -383,15 +383,47 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     ).lower()
     compose_done = compose_last_status in {"done", "ready", "success", "completed"}
     compose_error_reason, compose_error_message = compose_error_parts(task)
+    current_audio_sha256 = str(task.get("audio_sha256") or "").strip() or None
+    composed_audio_sha256 = str(task.get("final_source_audio_sha256") or "").strip() or None
+    current_subtitle_updated_at = str(
+        task.get("subtitles_override_updated_at") or task.get("updated_at") or ""
+    ).strip() or None
+    composed_subtitle_updated_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
+    final_updated_at = task.get("final_updated_at") or task.get("updated_at")
+    audio_changed_since_final = False
+    subtitle_changed_since_final = False
+    if final_exists:
+        if composed_audio_sha256 and current_audio_sha256:
+            audio_changed_since_final = composed_audio_sha256 != current_audio_sha256
+        elif current_audio_sha256 and task.get("dub_generated_at") and final_updated_at:
+            audio_changed_since_final = coerce_datetime(task.get("dub_generated_at")) > coerce_datetime(final_updated_at)
 
-    composed_ready = bool(
+        if composed_subtitle_updated_at and current_subtitle_updated_at:
+            subtitle_changed_since_final = composed_subtitle_updated_at != current_subtitle_updated_at
+        elif task.get("subtitles_override_updated_at") and final_updated_at:
+            subtitle_changed_since_final = coerce_datetime(task.get("subtitles_override_updated_at")) > coerce_datetime(final_updated_at)
+
+    final_stale_reason = None
+    if audio_changed_since_final:
+        final_stale_reason = "final_stale_after_dub"
+    elif subtitle_changed_since_final:
+        final_stale_reason = "final_stale_after_subtitles"
+
+    final_fresh = bool(
         final_exists
         and compose_done
         and compose_error_reason is None
+        and final_stale_reason is None
+    )
+
+    composed_ready = bool(
+        final_fresh
         and bool(voice_state.get("audio_ready"))
     )
     if composed_ready:
         composed_reason = "ready"
+    elif final_stale_reason:
+        composed_reason = final_stale_reason
     elif not raw_exists:
         composed_reason = "missing_raw"
     elif not voice_exists:
@@ -426,6 +458,8 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     return {
         "composed_ready": composed_ready,
         "composed_reason": composed_reason,
+        "final_fresh": final_fresh,
+        "final_stale_reason": final_stale_reason,
         "final": final_info,
         "compose_error_reason": compose_error_reason,
         "compose_error_message": compose_error_message,

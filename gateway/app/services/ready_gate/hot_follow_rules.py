@@ -49,6 +49,14 @@ def _extract_final_exists(task: dict, state: dict) -> bool:
     return False
 
 
+def _extract_final_fresh(task: dict, state: dict) -> bool:
+    """Current final is fresh relative to current compose inputs."""
+    hint = state.get("final_fresh")
+    if hint is not None:
+        return bool(hint)
+    return _extract_final_exists(task, state)
+
+
 def _extract_audio_done(task: dict, state: dict) -> bool:
     """audio_status in {"done","ready","success","completed"}."""
     audio = _d(state.get("audio"))
@@ -159,6 +167,7 @@ HOT_FOLLOW_GATE_SPEC = ReadyGateSpec(
     # ── Signals ───────────────────────────────────────────────────────────
     signals=(
         Signal("final_exists",             _extract_final_exists),
+        Signal("final_fresh",              _extract_final_fresh),
         Signal("audio_done",               _extract_audio_done),
         Signal("voiceover_exists",         _extract_voiceover_exists),
         Signal("tts_voice_valid",          _extract_tts_voice_valid),
@@ -192,7 +201,7 @@ HOT_FOLLOW_GATE_SPEC = ReadyGateSpec(
     # ── Gates ─────────────────────────────────────────────────────────────
     # compose_ready = final_exists AND (audio_ready OR no_dub)
     gates=(
-        GateRule("compose_ready",  requires=("final_exists",), unless=("audio_ready", "no_dub")),
+        GateRule("compose_ready",  requires=("final_fresh",), unless=("audio_ready", "no_dub")),
         GateRule("publish_ready",  requires=("compose_ready",), unless=()),
     ),
 
