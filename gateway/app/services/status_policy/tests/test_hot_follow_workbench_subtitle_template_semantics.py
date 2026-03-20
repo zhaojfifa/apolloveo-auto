@@ -25,3 +25,5 @@ def test_hot_follow_workbench_template_keeps_source_link_and_recompose_controls(
     assert "copyTextToClipboard" in script
     assert "requires_recompose" in script
     assert "重新合成最终视频" in script
+    assert "上一版成功输出" in script
+    assert "currentAttempt.compose_status" in script

@@ -687,7 +687,12 @@ def _hot_follow_operational_defaults() -> dict[str, Any]:
     }
 
 
-def _safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+def _safe_collect_hot_follow_workbench_ui(
+    task: dict,
+    settings,
+    *,
+    composed: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Compatibility-safe wrapper around the formal workbench UI builder.
 
     Keep this narrow while legacy callers still depend on a router-local helper.
@@ -695,7 +700,7 @@ def _safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any
     extending this fallback wrapper.
     """
     try:
-        return _collect_hot_follow_workbench_ui(task, settings)
+        return _collect_hot_follow_workbench_ui(task, settings, composed=composed)
     except Exception:
         logger.exception("HF_WORKBENCH_UI_SAFE_FALLBACK task=%s", task.get("task_id") or task.get("id"))
         payload = _hot_follow_operational_defaults()
@@ -747,7 +752,12 @@ def _hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
     )
 
 
-def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
+def _hf_pipeline_state(
+    task: dict,
+    step: str,
+    *,
+    composed: dict[str, Any] | None = None,
+) -> tuple[str, str]:
     last_step = str(task.get("last_step") or "").lower()
     task_status = str(task.get("status") or "").lower()
     if step == "parse":
@@ -791,9 +801,11 @@ def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
         return status, summary
     if step == "compose":
         status = _hf_state_from_status(task.get("compose_status"))
-        final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
-        if status == "pending" and final_key and object_exists(str(final_key)):
+        composed_state = composed or {}
+        if bool(composed_state.get("composed_ready")) or bool(composed_state.get("final_fresh")):
             status = "done"
+        elif status not in {"running", "processing", "queued", "failed", "error"}:
+            status = "pending"
         if status == "pending" and task_status == "processing" and last_step in {"compose", "final"}:
             status = "running"
         summary = "final video merge"
@@ -1023,7 +1035,12 @@ def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
     return warnings
 
 
-def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+def _collect_hot_follow_workbench_ui(
+    task: dict,
+    settings,
+    *,
+    composed: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     task_id = str(task.get("task_id") or task.get("id") or "")
     subtitle_lane = _hf_subtitle_lane_state(task_id, task)
     _sub_status_b, _ = _hf_pipeline_state(task, "subtitles")
@@ -1032,9 +1049,13 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     audio_lane = _hf_source_audio_lane_summary(task, route_state)
     screen_text_candidate = _hf_screen_text_candidate_summary(subtitle_lane, route_state)
     voice_state = _collect_voice_execution_state(task, settings)
-    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
-    final_exists = bool(final_key and object_exists(str(final_key)))
-    compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
+    composed_state = composed or {}
+    final_exists = bool(composed_state.get("composed_ready"))
+    compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip().lower() or "pending"
+    if bool(composed_state.get("composed_ready")) or bool(composed_state.get("final_fresh")):
+        compose_status = "done"
+    elif compose_status not in {"running", "processing", "queued", "failed", "error"}:
+        compose_status = "pending"
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     no_dub = route_state.get("content_mode") in {"silent_candidate", "subtitle_led"} and not str(subtitle_lane.get("dub_input_text") or "").strip()
     if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
@@ -1424,7 +1445,7 @@ def get_hot_follow_workbench_hub(
     subtitles_state, subtitles_summary = _hf_pipeline_state(task, "subtitles")
     dub_state, dub_summary = _hf_pipeline_state(task, "audio")
     pack_state, pack_summary = _hf_pipeline_state(task, "pack")
-    compose_state, compose_summary = _hf_pipeline_state(task, "compose")
+    compose_state, compose_summary = _hf_pipeline_state(task, "compose", composed=composed)
 
     raw_key = _task_key(task, "raw_path")
     raw_url = _task_endpoint(task_id, "raw") if raw_key and object_exists(raw_key) else None
@@ -1743,7 +1764,7 @@ def get_hot_follow_workbench_hub(
         payload["composed_ready"] = False
         payload["composed_reason"] = str(payload.get("composed_reason") or composed_reason or "not_ready")
     payload.update(_hot_follow_operational_defaults())
-    payload.update(_safe_collect_hot_follow_workbench_ui(task, get_settings()))
+    payload.update(_safe_collect_hot_follow_workbench_ui(task, get_settings(), composed=composed))
     return payload
 
 

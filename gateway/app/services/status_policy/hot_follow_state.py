@@ -182,12 +182,25 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
     # Compose status
     compose = dict(_as_dict(state.get("compose")))
     last = dict(_as_dict(compose.get("last")))
+    current_status = str(
+        last.get("status") or state.get("compose_status") or ""
+    ).strip().lower()
     if compose_ready:
         last["status"] = "done"
         last["error"] = None
         state["compose_status"] = "done"
-    elif last:
-        last["status"] = "pending"
+    elif current_status in {"running", "processing", "queued"}:
+        if last:
+            last["status"] = "running"
+        state["compose_status"] = "running"
+    elif current_status in {"failed", "error"}:
+        if last:
+            last["status"] = "failed"
+        state["compose_status"] = "failed"
+    else:
+        if last:
+            last["status"] = "pending"
+        state["compose_status"] = "pending"
     if last:
         compose["last"] = last
     state["compose"] = compose
@@ -264,6 +277,11 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
     _apply_gate_side_effects(state, gate_result)
 
     state["composed_ready"] = gate_result["compose_ready"]
-    state["composed_reason"] = "ready" if gate_result["compose_ready"] else "not_ready"
+    prior_reason = str(state.get("composed_reason") or "").strip()
+    state["composed_reason"] = (
+        "ready"
+        if gate_result["compose_ready"]
+        else (prior_reason or str(gate_result.get("compose_reason") or "not_ready"))
+    )
     state["ready_gate"] = gate_result
     return state

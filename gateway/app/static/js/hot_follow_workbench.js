@@ -687,7 +687,10 @@
 
   function renderConsistencyPanel() {
     if (burnSubtitleSourceEl) burnSubtitleSourceEl.textContent = (currentHub && currentHub.actual_burn_subtitle_source) || "-";
-    if (composeStatusValueEl) composeStatusValueEl.textContent = (currentHub && currentHub.compose_status) || (((currentHub && currentHub.compose) || {}).last || {}).status || "-";
+    if (composeStatusValueEl) {
+      const currentAttempt = ((currentHub && currentHub.current_attempt) || {});
+      composeStatusValueEl.textContent = currentAttempt.compose_status || (currentHub && currentHub.compose_status) || (((currentHub && currentHub.compose) || {}).last || {}).status || "-";
+    }
     if (finalExistsValueEl) finalExistsValueEl.textContent = (currentHub && currentHub.final_exists) ? "yes" : "no";
     // Dub text source hint (Phase 1.3 ops iteration)
     const dubSourceEl = document.getElementById("hf_dub_text_source_value");
@@ -1263,12 +1266,17 @@
       const status = escapeHtml(finalItem.status || finalItem.state || "pending");
       const hasUrl = Boolean(finalItem.url);
       const isDone = ["done", "ready", "success"].includes(status.toLowerCase());
+      const subtitle = !isDone && hasUrl
+        ? '<div class="mt-2 text-xs text-amber-700">当前最终成片待重新合成；这里保留的是上一版成功输出。</div>'
+        : "";
+      const actionLabel = isDone ? "Download" : "查看上一版";
       html += `<div class="col-span-full rounded-xl border ${isDone ? "border-green-200 bg-green-50" : "border-gray-200"} p-4">
         <div class="flex items-center justify-between gap-3">
           <div class="text-base font-bold">${escapeHtml(finalItem.label || "Final Video")}</div>
           <div class="text-xs rounded-full ${isDone ? "bg-green-100 text-green-700" : "bg-gray-100"} px-2 py-1">${status}</div>
         </div>
-        ${hasUrl ? `<a class="btn-primary mt-3 inline-block text-sm" href="${finalItem.url}" target="_blank" rel="noopener">Download</a>` : '<span class="text-sm text-gray-500 mt-2 inline-block">Pending</span>'}
+        ${subtitle}
+        ${hasUrl ? `<a class="btn-primary mt-3 inline-block text-sm" href="${finalItem.url}" target="_blank" rel="noopener">${actionLabel}</a>` : '<span class="text-sm text-gray-500 mt-2 inline-block">Pending</span>'}
       </div>`;
     }
     // Ready items

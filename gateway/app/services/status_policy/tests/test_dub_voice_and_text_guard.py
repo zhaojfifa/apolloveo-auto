@@ -147,6 +147,35 @@ def test_hot_follow_final_exists_but_audio_not_ready_stays_blocked():
     assert "audio_not_ready" in (gate.get("blocking") or [])
 
 
+def test_hot_follow_stale_final_keeps_current_compose_pending():
+    state = compute_hot_follow_state(
+        {"task_id": "hf-stale", "compose_status": "done"},
+        {
+            "task_id": "hf-stale",
+            "final": {"exists": True, "url": "/v1/tasks/hf-stale/final"},
+            "compose": {"last": {"status": "done"}},
+            "audio": {
+                "status": "done",
+                "tts_voice": "my-MM-NilarNeural",
+                "voiceover_url": "/v1/tasks/hf-stale/audio_mm",
+                "audio_ready": True,
+            },
+            "pipeline": [{"key": "compose", "status": "done", "state": "done", "message": ""}],
+            "deliverables": [{"kind": "final", "status": "done", "state": "done", "url": "/v1/tasks/hf-stale/final"}],
+            "final_fresh": False,
+        },
+    )
+    gate = state.get("ready_gate") or {}
+    compose_step = next((x for x in (state.get("pipeline") or []) if x.get("key") == "compose"), {})
+    final_row = next((x for x in (state.get("deliverables") or []) if x.get("kind") == "final"), {})
+    assert state.get("compose_status") == "pending"
+    assert (state.get("compose") or {}).get("last", {}).get("status") == "pending"
+    assert gate.get("compose_ready") is False
+    assert "compose_not_done" in (gate.get("blocking") or [])
+    assert compose_step.get("status") == "pending"
+    assert final_row.get("status") == "pending"
+
+
 def test_hot_follow_ready_gate_ignores_no_dub_when_audio_artifact_is_ready():
     state = compute_hot_follow_state(
         {"task_id": "hf-a9", "compose_status": "pending"},
