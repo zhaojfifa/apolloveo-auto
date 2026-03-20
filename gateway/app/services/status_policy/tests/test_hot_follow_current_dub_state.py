@@ -353,6 +353,33 @@ def test_screen_text_candidate_summary_prefers_normalized_text_for_subtitle_led(
     assert candidate["screen_text_candidate_mode"] == "subtitle_led"
 
 
+def test_operator_summary_prefers_recompose_when_current_dub_is_ready_but_final_is_stale():
+    current_attempt = hf_router._hf_current_attempt_summary(
+        voice_state={
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "requested_voice": "mm_female_1",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+        },
+        subtitle_lane={"actual_burn_subtitle_source": "mm.srt"},
+        dub_status="done",
+        compose_status="done",
+        composed_reason="final_stale_after_dub",
+    )
+
+    operator_summary = hf_router._hf_operator_summary(
+        artifact_facts={"final_exists": True},
+        current_attempt=current_attempt,
+        no_dub=False,
+    )
+
+    assert current_attempt["requires_recompose"] is True
+    assert operator_summary["recommended_next_action"] == "当前配音已更新，建议重新合成最终视频以生成最新版本。"
+
+
 def test_collect_hot_follow_workbench_ui_does_not_keep_no_dub_when_audio_is_current(monkeypatch):
     monkeypatch.setattr(hf_router, "get_settings", _settings)
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)

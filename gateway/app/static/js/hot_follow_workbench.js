@@ -194,6 +194,10 @@
   const finalExistsValueEl = document.getElementById("hf_final_exists_value");
   const lipsyncStatusValueEl = document.getElementById("hf_lipsync_status_value");
   const lipsyncHintEl = document.getElementById("hf_lipsync_hint");
+  const sourceUrlTextEl = document.getElementById("hf_source_url_text");
+  const sourceUrlOpenEl = document.getElementById("hf_source_url_open");
+  const sourceUrlCopyBtn = document.getElementById("hf_source_url_copy");
+  const sourceUrlMsgEl = document.getElementById("hf_source_url_msg");
   const contentModeEl = document.getElementById("hf_content_mode");
   const sourceAudioLaneEl = document.getElementById("hf_source_audio_lane");
   const speechPresenceEl = document.getElementById("hf_speech_presence");
@@ -348,6 +352,30 @@
     }
   }
 
+  function extractFirstHttpUrl(text) {
+    const match = String(text || "").match(/https?:\/\/\S+/i);
+    return match ? match[0] : "";
+  }
+
+  async function copyTextToClipboard(text) {
+    const value = String(text || "");
+    if (!value) return false;
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+      await navigator.clipboard.writeText(value);
+      return true;
+    }
+    const textarea = document.createElement("textarea");
+    textarea.value = value;
+    textarea.setAttribute("readonly", "readonly");
+    textarea.style.position = "absolute";
+    textarea.style.left = "-9999px";
+    document.body.appendChild(textarea);
+    textarea.select();
+    const success = document.execCommand("copy");
+    document.body.removeChild(textarea);
+    return Boolean(success);
+  }
+
   function setMediaSrcStable(el, url, label, assetVersion) {
     if (!el) return;
     const base = normalizeUrl(url);
@@ -488,6 +516,19 @@
     if (translationQaWarningEl) translationQaWarningEl.classList.toggle("hidden", !hasMismatch);
     if (translateMmBtn) translateMmBtn.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
     renderOcrCandidate();
+  }
+
+  function renderSourceLinkCard() {
+    const input = (currentHub && currentHub.input) || {};
+    const rawText = String(input.source_url || "").trim();
+    const openUrl = extractFirstHttpUrl(rawText) || rawText;
+    if (sourceUrlTextEl) {
+      sourceUrlTextEl.textContent = rawText || "-";
+      sourceUrlTextEl.title = rawText || "";
+    }
+    setLink(sourceUrlOpenEl, openUrl || null);
+    if (sourceUrlCopyBtn) sourceUrlCopyBtn.disabled = !rawText;
+    if (sourceUrlMsgEl && !rawText) sourceUrlMsgEl.textContent = "";
   }
 
   function getOcrCandidateText() {
@@ -935,11 +976,15 @@
     const subReady = Boolean(readyGate.subtitle_ready);
     const audioReady = Boolean(readyGate.audio_ready);
     const composeReady = Boolean(readyGate.compose_ready);
+    const requiresRecompose = Boolean(((currentHub && currentHub.current_attempt) || {}).requires_recompose);
     const noDub = Boolean((currentHub && currentHub.no_dub) || (currentHub && currentHub.audio && currentHub.audio.no_dub));
     const noDubReason = String((currentHub && currentHub.no_dub_reason) || (currentHub && currentHub.audio && currentHub.audio.no_dub_reason) || "").trim();
     const subtitleRunning = String(subtitlesStep.status || "").toLowerCase() === "running";
     let title, desc, mode, path, badge;
-    if (composeReady) {
+    if (requiresRecompose) {
+      title = "请重新合成"; desc = "当前字幕或配音已更新，请重新合成最终视频以生成最新版本。";
+      mode = "recompose_needed"; path = "重新合成最终视频"; badge = "待重合成";
+    } else if (composeReady) {
       title = "已就绪"; desc = "成片已生成，可前往交付中心下载或发布。";
       mode = "compose_done"; path = "前往交付中心"; badge = "已完成";
     } else if (subReady && audioReady) {
@@ -992,6 +1037,7 @@
     const audioReady = Boolean(readyGate.audio_ready);
     const noDub = Boolean((currentHub && currentHub.audio || {}).no_dub);
     const composeReady = Boolean(readyGate.compose_ready);
+    const requiresRecompose = Boolean(((currentHub && currentHub.current_attempt) || {}).requires_recompose);
     bar.classList.remove("hidden");
     const subIcon = document.getElementById("hf_cq_subtitle_icon");
     const audioIcon = document.getElementById("hf_cq_audio_icon");
@@ -1007,16 +1053,19 @@
       audioIcon.className = "w-5 h-5 rounded-full text-center text-xs leading-5 " + (ok ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-500");
     }
     if (statusText) {
-      if (composeReady) statusText.textContent = "已合成完成";
+      if (requiresRecompose) statusText.textContent = "配音已更新，可重新合成";
+      else if (composeReady) statusText.textContent = "已合成完成";
       else if (subReady && (audioReady || noDub)) statusText.textContent = "可以合成";
       else if (subReady) statusText.textContent = "等待配音就绪...";
       else if (noDub) statusText.textContent = "等待字幕（可手工输入）...";
       else statusText.textContent = "等待字幕就绪...";
     }
     if (composeBtn) {
-      const canCompose = subReady && (audioReady || noDub) && !composeReady;
+      const canCompose = subReady && (audioReady || noDub) && (!composeReady || requiresRecompose);
       composeBtn.disabled = !canCompose;
-      if (composeReady) composeBtn.textContent = "已合成";
+      if (requiresRecompose) composeBtn.textContent = "重新合成";
+      else if (composeReady) composeBtn.textContent = "已合成";
+      else composeBtn.textContent = "合成最终视频";
     }
   }
 
@@ -1195,6 +1244,7 @@
     renderPipeline();
     _renderPipelineBar();
     renderMedia(finalUrl);
+    renderSourceLinkCard();
     renderSubtitles();
     renderAudio();
     renderComposedReadiness();
@@ -1391,18 +1441,21 @@
     const composeRunning = ["running", "processing", "queued"].includes(String(composeLast.status || "").toLowerCase());
     const composeDone = ["done", "success", "completed", "ready"].includes(String((currentHub && currentHub.compose_status) || composeLast.status || "").toLowerCase());
     const finalExists = Boolean(currentHub && currentHub.final_exists);
+    const requiresRecompose = Boolean(((currentHub && currentHub.current_attempt) || {}).requires_recompose);
     const audioDisplay = getAudioDisplayState();
     const hasCurrentFinalFromPreviousRun = finalExists && !Boolean(currentHub && currentHub.dub_current) && !Boolean(currentHub && currentHub.audio_ready) && !Boolean(currentHub && currentHub.no_dub);
-    const enabled = hasRaw && (hasVoiceover || subtitleOnlyAllowed) && confirmed && !composeSubmitting && !composeRunning && !(composeDone && finalExists);
+    const enabled = hasRaw && (hasVoiceover || subtitleOnlyAllowed) && confirmed && !composeSubmitting && !composeRunning && !(composeDone && finalExists && !requiresRecompose);
     if (!composeBtnEl.dataset.defaultText) composeBtnEl.dataset.defaultText = composeBtnEl.textContent || "Compose Final";
+    if (!composeBtnEl.dataset.recomposeText) composeBtnEl.dataset.recomposeText = "重新合成最终视频";
     composeBtnEl.disabled = !enabled;
     composeBtnEl.classList.toggle("opacity-50", !enabled);
     composeBtnEl.classList.toggle("pointer-events-none", !enabled);
     composeBtnEl.textContent = composeRunning || composeSubmitting
       ? t("hot_follow_compose_running", "合成中…")
-      : (composeBtnEl.dataset.defaultText || "Compose Final");
+      : (requiresRecompose ? (composeBtnEl.dataset.recomposeText || "重新合成最终视频") : (composeBtnEl.dataset.defaultText || "Compose Final"));
     if (composeMsgEl) {
       if (composeRunning || composeSubmitting) composeMsgEl.textContent = t("hot_follow_compose_running", "合成中…");
+      else if (requiresRecompose) composeMsgEl.textContent = "当前配音已更新，建议重新合成最终视频以生成最新版本。";
       else if (hasCurrentFinalFromPreviousRun && audioDisplay.status === "running") composeMsgEl.textContent = "当前重新配音进行中，最终视频仍为上次版本。";
       else if (hasCurrentFinalFromPreviousRun && audioDisplay.status === "failed") composeMsgEl.textContent = "当前重新配音失败，最终视频仍为上次版本。";
       else if (hasCurrentFinalFromPreviousRun) composeMsgEl.textContent = "当前配音未更新，最终视频仍为上次版本。";
@@ -1743,6 +1796,24 @@
       assistedInputDirty = true;
       persistAssistedInputDraft(candidate);
       if (assistedInputMsgEl) assistedInputMsgEl.textContent = "候选文本已填充到辅助输入区，可继续翻译写入目标字幕区。";
+    });
+  }
+  if (sourceUrlCopyBtn) {
+    sourceUrlCopyBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const input = (currentHub && currentHub.input) || {};
+      const rawText = String(input.source_url || "").trim();
+      const copyValue = extractFirstHttpUrl(rawText) || rawText;
+      if (!copyValue) {
+        if (sourceUrlMsgEl) sourceUrlMsgEl.textContent = "当前没有可复制的来源链接";
+        return;
+      }
+      try {
+        await copyTextToClipboard(copyValue);
+        if (sourceUrlMsgEl) sourceUrlMsgEl.textContent = "来源链接已复制";
+      } catch (_) {
+        if (sourceUrlMsgEl) sourceUrlMsgEl.textContent = "复制失败，请手动选择完整链接";
+      }
     });
   }
   if (subtitlesSaveBtn) {
