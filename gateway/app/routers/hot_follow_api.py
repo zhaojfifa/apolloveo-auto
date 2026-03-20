@@ -953,6 +953,10 @@ def _hf_pipeline_state(
         composed_state = composed or {}
         if bool(composed_state.get("composed_ready")) or bool(composed_state.get("final_fresh")):
             status = "done"
+        elif status in {"done", "ready", "success", "completed"}:
+            # Compose execution succeeded — preserve the step status even when
+            # the final is stale relative to newer inputs.
+            status = "done"
         elif status not in {"running", "processing", "queued", "failed", "error"}:
             status = "pending"
         if status == "pending" and task_status == "processing" and last_step in {"compose", "final"}:

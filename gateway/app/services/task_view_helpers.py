@@ -404,12 +404,16 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         elif task.get("subtitles_override_updated_at") and final_updated_at:
             subtitle_changed_since_final = coerce_datetime(task.get("subtitles_override_updated_at")) > coerce_datetime(final_updated_at)
 
+    # Guard: coerce_datetime(None) returns datetime.now() which breaks
+    # the comparison.  Only coerce when the raw value is truthy.
+    _raw_dub_at = task.get("dub_generated_at") or None
+    _raw_sub_at = task.get("subtitles_override_updated_at") or None
     latest_input_updated_at = max(
         (
             dt
             for dt in (
-                coerce_datetime(task.get("dub_generated_at")),
-                coerce_datetime(task.get("subtitles_override_updated_at")),
+                coerce_datetime(_raw_dub_at) if _raw_dub_at else None,
+                coerce_datetime(_raw_sub_at) if _raw_sub_at else None,
             )
             if dt is not None
         ),
@@ -419,22 +423,26 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         (
             dt
             for dt in (
-                coerce_datetime(compose_finished_at),
-                coerce_datetime(final_updated_at),
+                coerce_datetime(compose_finished_at) if compose_finished_at else None,
+                coerce_datetime(final_updated_at) if final_updated_at else None,
             )
             if dt is not None
         ),
         default=None,
     )
-    if (
-        final_exists
-        and compose_done
-        and compose_refresh_evidence_at is not None
-        and latest_input_updated_at is not None
-        and compose_refresh_evidence_at >= latest_input_updated_at
-    ):
-        audio_changed_since_final = False
-        subtitle_changed_since_final = False
+    if final_exists and compose_done and compose_refresh_evidence_at is not None:
+        # Clear staleness per-input: only override when the input's own
+        # timestamp is known AND compose finished after it.  When an input
+        # timestamp is missing we cannot conclude compose incorporated that
+        # input — SHA comparison (if available) remains the sole evidence.
+        if _raw_dub_at:
+            _dub_dt = coerce_datetime(_raw_dub_at)
+            if _dub_dt is not None and compose_refresh_evidence_at >= _dub_dt:
+                audio_changed_since_final = False
+        if _raw_sub_at:
+            _sub_dt = coerce_datetime(_raw_sub_at)
+            if _sub_dt is not None and compose_refresh_evidence_at >= _sub_dt:
+                subtitle_changed_since_final = False
 
     final_stale_reason = None
     if audio_changed_since_final:
