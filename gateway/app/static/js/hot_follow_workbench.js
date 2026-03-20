@@ -562,7 +562,10 @@
   }
 
   function applyTranslatedTextToTargetEditor(text, successMessage) {
-    const nextText = String(text || "");
+    const currentPrimary = subtitlesTextEl && String(subtitlesTextEl.value || "").trim()
+      ? String(subtitlesTextEl.value || "")
+      : String((((currentHub && currentHub.subtitles) || {}).primary_editable_text) || "");
+    const nextText = mergeTranslatedSrtIntoPrimary(currentPrimary, String(text || ""));
     if (subtitlesTextEl) subtitlesTextEl.value = nextText;
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = nextText || "-";
     subtitleDirty = true;
@@ -1078,6 +1081,98 @@
   function isLikelySrtText(text) {
     const source = String(text || "").trim();
     return source.includes("-->") && /\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}/.test(source);
+  }
+
+  function parseSrtTimestamp(raw) {
+    const match = String(raw || "").trim().match(/^(\d{2}):(\d{2}):(\d{2})[,.](\d{3})$/);
+    if (!match) return null;
+    return (
+      Number(match[1]) * 3600
+      + Number(match[2]) * 60
+      + Number(match[3])
+      + Number(match[4]) / 1000
+    );
+  }
+
+  function formatSrtTimestamp(value) {
+    const totalMs = Math.max(0, Math.round(Number(value || 0) * 1000));
+    const hours = Math.floor(totalMs / 3600000);
+    const minutes = Math.floor((totalMs % 3600000) / 60000);
+    const seconds = Math.floor((totalMs % 60000) / 1000);
+    const millis = totalMs % 1000;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")},${String(millis).padStart(3, "0")}`;
+  }
+
+  function parseSrtSegments(text) {
+    return String(text || "")
+      .trim()
+      .split(/\r?\n\s*\r?\n/)
+      .map((block) => String(block || "").split(/\r?\n/))
+      .map((lines) => {
+        const timeLine = lines.find((line) => line.includes("-->"));
+        if (!timeLine) return null;
+        const parts = timeLine.split("-->");
+        if (parts.length !== 2) return null;
+        const start = parseSrtTimestamp(parts[0]);
+        const end = parseSrtTimestamp(parts[1]);
+        if (start === null || end === null) return null;
+        const timeIndex = lines.indexOf(timeLine);
+        const textBody = lines.slice(timeIndex + 1).join("\n").trim();
+        if (!textBody) return null;
+        return { start, end, text: textBody };
+      })
+      .filter(Boolean);
+  }
+
+  function serializeSrtSegments(segments) {
+    return (segments || [])
+      .map((segment, index) => ([
+        String(index + 1),
+        `${formatSrtTimestamp(segment.start)} --> ${formatSrtTimestamp(segment.end)}`,
+        String(segment.text || "").trim(),
+      ].join("\n")))
+      .join("\n\n");
+  }
+
+  function srtSegmentsMatch(baseSegment, overlaySegment) {
+    const baseStart = Number(baseSegment.start || 0);
+    const baseEnd = Number(baseSegment.end || baseStart);
+    const overlayStart = Number(overlaySegment.start || 0);
+    const overlayEnd = Number(overlaySegment.end || overlayStart);
+    if (Math.abs(baseStart - overlayStart) <= 0.12 && Math.abs(baseEnd - overlayEnd) <= 0.18) return true;
+    const overlap = Math.max(0, Math.min(baseEnd, overlayEnd) - Math.max(baseStart, overlayStart));
+    const shorter = Math.min(Math.max(0, baseEnd - baseStart), Math.max(0, overlayEnd - overlayStart));
+    return shorter > 0 && overlap >= shorter * 0.7;
+  }
+
+  function mergeTranslatedSrtIntoPrimary(baseText, overlayText) {
+    if (!isLikelySrtText(overlayText)) return String(overlayText || "");
+    const overlaySegments = parseSrtSegments(overlayText);
+    if (!overlaySegments.length) return String(overlayText || "");
+    if (!isLikelySrtText(baseText)) return serializeSrtSegments(overlaySegments);
+
+    const baseSegments = parseSrtSegments(baseText);
+    const usedOverlay = new Set();
+    const merged = [];
+
+    baseSegments.forEach((baseSegment) => {
+      const replacementIndex = overlaySegments.findIndex(
+        (overlaySegment, idx) => !usedOverlay.has(idx) && srtSegmentsMatch(baseSegment, overlaySegment),
+      );
+      if (replacementIndex === -1) {
+        merged.push({ ...baseSegment });
+        return;
+      }
+      usedOverlay.add(replacementIndex);
+      merged.push({ ...overlaySegments[replacementIndex] });
+    });
+
+    overlaySegments.forEach((overlaySegment, idx) => {
+      if (!usedOverlay.has(idx)) merged.push({ ...overlaySegment });
+    });
+
+    merged.sort((a, b) => (Number(a.start || 0) - Number(b.start || 0)) || (Number(a.end || 0) - Number(b.end || 0)));
+    return serializeSrtSegments(merged);
   }
 
   function analyzeMyanmarDubCandidate(text) {

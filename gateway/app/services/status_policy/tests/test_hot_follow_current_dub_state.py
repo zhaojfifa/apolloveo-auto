@@ -477,6 +477,11 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
 
     monkeypatch.setattr(hf_router, "Workspace", _Workspace)
     monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda task_id: tmp_path / task_id / "override.srt")
+    (tmp_path / "hf-save").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "hf-save" / "override.srt").write_text(
+        "1\n00:00:00,000 --> 00:00:01,000\nexisting\n",
+        encoding="utf-8",
+    )
     monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda _task_id, task: Path(tmp_path / "hf-save" / "override.srt").read_text(encoding="utf-8"))
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
     monkeypatch.setattr(hf_router, "_policy_upsert", lambda _repo, _task_id, updates, **_kwargs: repo.task.update(updates))
@@ -493,8 +498,8 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
 
 def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch, tmp_path):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
-    monkeypatch.setattr(tasks_router, "_hf_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})
-    monkeypatch.setattr(tasks_router, "_hf_dual_channel_state", lambda *_args, **_kwargs: {"content_mode": "voice_led"})
+    monkeypatch.setattr(tasks_router, "_compat_hot_follow_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})
+    monkeypatch.setattr(tasks_router, "_compat_hot_follow_dual_channel_state", lambda *_args, **_kwargs: {"content_mode": "voice_led"})
 
     class _Workspace:
         def __init__(self, task_id):

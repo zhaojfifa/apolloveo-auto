@@ -10,6 +10,8 @@ def test_hot_follow_workbench_template_keeps_srt_first_semantics():
     assert "辅助输入（原文 / 候选，helper only）" in template
     assert "primary_editable_text" in script
     assert "primary_editable_format" in script
+    assert "mergeTranslatedSrtIntoPrimary" in script
+    assert "parseSrtSegments" in script
 
 
 def test_hot_follow_workbench_template_keeps_source_link_and_recompose_controls():
