@@ -758,6 +758,123 @@ def _merge_workbench_ui_overlay(
     return merged
 
 
+def _reconcile_workbench_current_final(
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    final_url = str(
+        (payload.get("final") or {}).get("url")
+        or payload.get("final_url")
+        or (payload.get("media", {}) or {}).get("final_url")
+        or ""
+    ).strip() or None
+    composed_ready = bool(payload.get("composed_ready"))
+    historical_final = dict(payload.get("historical_final") or {})
+
+    if composed_ready:
+        pipeline = payload.get("pipeline")
+        if isinstance(pipeline, list):
+            for step in pipeline:
+                if not isinstance(step, dict):
+                    continue
+                if str(step.get("key") or "").strip().lower() == "compose":
+                    step["status"] = "done"
+                    step["state"] = "done"
+                    step["error"] = None
+                    step["message"] = step.get("message") or "final video merge"
+
+        pipeline_legacy = payload.get("pipeline_legacy")
+        if isinstance(pipeline_legacy, dict):
+            compose_legacy = pipeline_legacy.get("compose")
+            if isinstance(compose_legacy, dict):
+                compose_legacy["status"] = "done"
+
+        compose = payload.get("compose")
+        if isinstance(compose, dict):
+            last = compose.get("last")
+            if isinstance(last, dict):
+                last["status"] = "done"
+
+        deliverables = payload.get("deliverables")
+        if isinstance(deliverables, list):
+            for item in deliverables:
+                if not isinstance(item, dict):
+                    continue
+                if str(item.get("kind") or "").strip().lower() == "final":
+                    item["status"] = "done"
+                    item["state"] = "done"
+                    item["historical"] = False
+                    if final_url:
+                        item["url"] = final_url
+                    break
+
+        media = payload.get("media")
+        if isinstance(media, dict):
+            media["final_url"] = final_url or None
+            media["final_video_url"] = final_url or None
+
+        final_payload = dict(payload.get("final") or {})
+        final_payload["exists"] = True
+        if final_url:
+            final_payload["url"] = final_url
+        final_payload.pop("stale_reason", None)
+        final_payload.pop("historical_available", None)
+        payload["final"] = final_payload
+        payload["composed_ready"] = True
+        payload["composed_reason"] = "ready"
+        payload["final_url"] = final_url or None
+        payload["final_video_url"] = final_url or None
+        payload["final_exists"] = True
+        payload["compose_status"] = "done"
+        return payload
+
+    pipeline = payload.get("pipeline")
+    if isinstance(pipeline, list):
+        for step in pipeline:
+            if not isinstance(step, dict):
+                continue
+            if str(step.get("key") or "").strip().lower() == "compose":
+                step["status"] = "pending"
+                step["state"] = "pending"
+
+    pipeline_legacy = payload.get("pipeline_legacy")
+    if isinstance(pipeline_legacy, dict):
+        compose_legacy = pipeline_legacy.get("compose")
+        if isinstance(compose_legacy, dict):
+            compose_legacy["status"] = "pending"
+
+    deliverables = payload.get("deliverables")
+    if isinstance(deliverables, list):
+        for item in deliverables:
+            if not isinstance(item, dict):
+                continue
+            if str(item.get("kind") or "").strip().lower() == "final":
+                item["status"] = "pending"
+                item["state"] = "pending"
+                item["historical"] = bool(final_url)
+                break
+    payload["composed_ready"] = False
+    payload["composed_reason"] = str(payload.get("composed_reason") or "not_ready")
+    payload["compose_status"] = "pending"
+    payload["final"] = {
+        "exists": False,
+        "key": None,
+        "size_bytes": None,
+        "duration_ms": None,
+        "asset_version": None,
+        "updated_at": None,
+        "content_type": "video/mp4",
+        "url": None,
+        "stale_reason": payload.get("final_stale_reason"),
+        "historical_available": bool(historical_final.get("exists")),
+    }
+    payload["media"]["final_url"] = None
+    payload["media"]["final_video_url"] = None
+    payload["final_url"] = None
+    payload["final_video_url"] = None
+    payload["final_exists"] = False
+    return payload
+
+
 def _hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
     """Compatibility helper for subtitle-only compose fallback decisions.
 
@@ -1643,23 +1760,6 @@ def get_hot_follow_workbench_hub(
             "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
         },
     }
-    artifact_facts, current_attempt, operator_summary = _hf_safe_presentation_aggregates(
-        task_id,
-        task,
-        final_info=final_info,
-        persisted_audio=persisted_audio,
-        subtitle_lane=subtitle_lane,
-        scene_pack=scene_pack,
-        voice_state=voice_state,
-        dub_status=str(dub_state),
-        compose_status=compose_state,
-        composed_reason=composed_reason,
-        no_dub=bool((payload.get("audio") or {}).get("no_dub")),
-    )
-    payload["artifact_facts"] = artifact_facts
-    payload["current_attempt"] = current_attempt
-    payload["operator_summary"] = operator_summary
-    payload["presentation"] = _hf_rerun_presentation_state(task, voice_state, final_info, dub_state)
     payload["historical_final"] = dict(final_info or {})
     final_url = _resolve_hub_final_url(task_id, payload)
     if final_url:
@@ -1719,11 +1819,11 @@ def get_hot_follow_workbench_hub(
     payload["final"] = dict(composed.get("final") or {})
     payload = compute_hot_follow_state(task, payload)
     payload["historical_final"] = dict(payload.get("final") or {})
-
+    payload = _reconcile_workbench_current_final(payload)
     artifact_facts, current_attempt, operator_summary = _hf_safe_presentation_aggregates(
         task_id,
         task,
-        final_info=payload.get("final"),
+        final_info=payload.get("historical_final") or payload.get("final"),
         persisted_audio=persisted_audio,
         subtitle_lane=subtitle_lane,
         scene_pack=scene_pack,
@@ -1736,109 +1836,12 @@ def get_hot_follow_workbench_hub(
     payload["artifact_facts"] = artifact_facts
     payload["current_attempt"] = current_attempt
     payload["operator_summary"] = operator_summary
-    payload["presentation"] = _hf_rerun_presentation_state(task, voice_state, payload.get("final"), dub_state)
-
-    # UI consistency guard: once final is ready, compose-facing fields must all read done.
-    final_url = str(
-        (payload.get("final") or {}).get("url")
-        or payload.get("final_url")
-        or (payload.get("media", {}) or {}).get("final_url")
-        or ""
-    ).strip()
-    final_exists = bool((payload.get("final") or {}).get("exists"))
-    composed_ready = bool(payload.get("composed_ready"))
-    if composed_ready:
-        pipeline = payload.get("pipeline")
-        if isinstance(pipeline, list):
-            for step in pipeline:
-                if not isinstance(step, dict):
-                    continue
-                if str(step.get("key") or "").strip().lower() == "compose":
-                    step["status"] = "done"
-                    step["state"] = "done"
-                    step["error"] = None
-                    step["message"] = step.get("message") or "final video merge"
-
-        pipeline_legacy = payload.get("pipeline_legacy")
-        if isinstance(pipeline_legacy, dict):
-            compose_legacy = pipeline_legacy.get("compose")
-            if isinstance(compose_legacy, dict):
-                compose_legacy["status"] = "done"
-
-        compose = payload.get("compose")
-        if isinstance(compose, dict):
-            last = compose.get("last")
-            if isinstance(last, dict):
-                last["status"] = "done"
-
-        deliverables = payload.get("deliverables")
-        if isinstance(deliverables, list):
-            for item in deliverables:
-                if not isinstance(item, dict):
-                    continue
-                if str(item.get("kind") or "").strip().lower() == "final":
-                    item["status"] = "done"
-                    item["state"] = "done"
-                    if final_url:
-                        item["url"] = final_url
-                    break
-
-        media = payload.get("media")
-        if isinstance(media, dict):
-            media["final_url"] = final_url or None
-            media["final_video_url"] = final_url or None
-
-        payload["composed_ready"] = True
-        payload["composed_reason"] = "ready"
-        payload["final_url"] = final_url or None
-        payload["final_video_url"] = final_url or None
-        payload["final_exists"] = final_exists
-    else:
-        pipeline = payload.get("pipeline")
-        if isinstance(pipeline, list):
-            for step in pipeline:
-                if not isinstance(step, dict):
-                    continue
-                if str(step.get("key") or "").strip().lower() == "compose":
-                    step["status"] = "pending"
-                    step["state"] = "pending"
-
-        pipeline_legacy = payload.get("pipeline_legacy")
-        if isinstance(pipeline_legacy, dict):
-            compose_legacy = pipeline_legacy.get("compose")
-            if isinstance(compose_legacy, dict):
-                compose_legacy["status"] = "pending"
-
-        deliverables = payload.get("deliverables")
-        if isinstance(deliverables, list):
-            for item in deliverables:
-                if not isinstance(item, dict):
-                    continue
-                if str(item.get("kind") or "").strip().lower() == "final":
-                    item["status"] = "pending"
-                    item["state"] = "pending"
-                    item["historical"] = bool(final_url)
-                    break
-        payload["composed_ready"] = False
-        payload["composed_reason"] = str(payload.get("composed_reason") or composed_reason or "not_ready")
-        historical_final = dict(payload.get("historical_final") or {})
-        payload["final"] = {
-            "exists": False,
-            "key": None,
-            "size_bytes": None,
-            "duration_ms": None,
-            "asset_version": None,
-            "updated_at": None,
-            "content_type": "video/mp4",
-            "url": None,
-            "stale_reason": payload.get("final_stale_reason"),
-            "historical_available": bool(historical_final.get("exists")),
-        }
-        payload["media"]["final_url"] = None
-        payload["media"]["final_video_url"] = None
-        payload["final_url"] = None
-        payload["final_video_url"] = None
-        payload["final_exists"] = False
+    payload["presentation"] = _hf_rerun_presentation_state(
+        task,
+        voice_state,
+        payload.get("historical_final") or payload.get("final"),
+        dub_state,
+    )
     payload.update(_hot_follow_operational_defaults())
     payload = _merge_workbench_ui_overlay(
         payload,

@@ -262,3 +262,26 @@
 - 不改 compose / gate / publish 结构
 - 不做 broad TTS provider redesign
 - 不启动 Skills 或第二条产线
+
+## PR-B2 Current Final Reconciliation After Compose Success
+
+日期：2026-03-21
+
+本节点完成：
+
+- 修复 compose 成功后，Hot Follow workbench hub 仍将 current-final 投影保留为 stale/pending 的问题
+- 让 current-final 与 artifact/history layer 在“当前 compose 已成功”场景下重新对齐
+- 收紧 workbench overlay / compatibility 末端，避免 stale projection 覆盖 compose 成功态
+
+本次结论：
+
+- `compose.last.status = done` 且最新 final artifact 已存在时，hub 会基于最新 compose/final 时间证据重新晋升 current-final
+- `final_stale_after_dub` 不再在“当前音频/字幕/config 已重新 compose 成功”的场景下继续卡住
+- `artifact_facts.final_exists` / `historical_final.exists` 与 current-fresh layer 继续区分，但在当前 compose 成功时会重新对齐到 success
+
+本节点明确不做：
+
+- 不改 compose policy
+- 不改 gate/status 架构
+- 不启动 Skills runtime
+- 不扩第二条产线

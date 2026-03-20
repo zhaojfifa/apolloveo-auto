@@ -390,6 +390,7 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     ).strip() or None
     composed_subtitle_updated_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
     final_updated_at = task.get("final_updated_at") or task.get("updated_at")
+    compose_finished_at = task.get("compose_last_finished_at") or final_updated_at
     audio_changed_since_final = False
     subtitle_changed_since_final = False
     if final_exists:
@@ -402,6 +403,38 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
             subtitle_changed_since_final = composed_subtitle_updated_at != current_subtitle_updated_at
         elif task.get("subtitles_override_updated_at") and final_updated_at:
             subtitle_changed_since_final = coerce_datetime(task.get("subtitles_override_updated_at")) > coerce_datetime(final_updated_at)
+
+    latest_input_updated_at = max(
+        (
+            dt
+            for dt in (
+                coerce_datetime(task.get("dub_generated_at")),
+                coerce_datetime(task.get("subtitles_override_updated_at")),
+            )
+            if dt is not None
+        ),
+        default=None,
+    )
+    compose_refresh_evidence_at = max(
+        (
+            dt
+            for dt in (
+                coerce_datetime(compose_finished_at),
+                coerce_datetime(final_updated_at),
+            )
+            if dt is not None
+        ),
+        default=None,
+    )
+    if (
+        final_exists
+        and compose_done
+        and compose_refresh_evidence_at is not None
+        and latest_input_updated_at is not None
+        and compose_refresh_evidence_at >= latest_input_updated_at
+    ):
+        audio_changed_since_final = False
+        subtitle_changed_since_final = False
 
     final_stale_reason = None
     if audio_changed_since_final:

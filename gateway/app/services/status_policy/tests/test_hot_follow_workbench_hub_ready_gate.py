@@ -22,6 +22,7 @@ from gateway.app.deps import get_task_repository
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.services import task_view_helpers
+from gateway.app.services import voice_state as voice_state_service
 
 
 class _Repo:
@@ -47,6 +48,13 @@ def _patch_workbench_storage_dependencies(monkeypatch):
         "_hf_persisted_audio_state",
         lambda *_args, **_kwargs: {"exists": False, "voiceover_url": None},
     )
+    monkeypatch.setattr(task_view_helpers, "object_exists", lambda _key: True)
+    monkeypatch.setattr(
+        task_view_helpers,
+        "object_head",
+        lambda _key: {"ContentLength": "8192", "Content-Type": "video/mp4"},
+    )
+    monkeypatch.setattr(task_view_helpers, "media_meta_from_head", lambda _meta: (8192, "video/mp4"))
 
 
 def test_hot_follow_workbench_ready_gate_backfills_compose_when_final_exists(monkeypatch):
@@ -81,6 +89,51 @@ def test_hot_follow_workbench_ready_gate_backfills_compose_when_final_exists(mon
     monkeypatch.setattr(
         hf_router,
         "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "requested_voice": "mm_female_1",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "deliverable_audio_done": True,
+            "voiceover_url": f"/v1/tasks/{task_id}/audio_mm",
+        },
+    )
+    monkeypatch.setattr(
+        voice_state_service,
+        "collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "requested_voice": "mm_female_1",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "deliverable_audio_done": True,
+            "voiceover_url": f"/v1/tasks/{task_id}/audio_mm",
+        },
+    )
+    monkeypatch.setattr(
+        voice_state_service,
+        "collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "requested_voice": "mm_female_1",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "deliverable_audio_done": True,
+            "voiceover_url": f"/v1/tasks/{task_id}/audio_mm",
+        },
+    )
+    monkeypatch.setattr(
+        voice_state_service,
+        "collect_voice_execution_state",
         lambda *_args, **_kwargs: {
             "audio_ready": True,
             "audio_ready_reason": "ready",
@@ -370,6 +423,21 @@ def test_hot_follow_workbench_recomputes_composed_after_state_normalization(monk
             "voiceover_url": f"/v1/tasks/{task_id}/audio_mm",
         },
     )
+    monkeypatch.setattr(
+        voice_state_service,
+        "collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "requested_voice": "mm_female_1",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "deliverable_audio_done": True,
+            "voiceover_url": f"/v1/tasks/{task_id}/audio_mm",
+        },
+    )
     _patch_workbench_storage_dependencies(monkeypatch)
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
     monkeypatch.setattr(hf_router, "object_head", lambda _key: {"ContentLength": "8192", "Content-Type": "video/mp4"})
@@ -393,10 +461,103 @@ def test_hot_follow_workbench_recomputes_composed_after_state_normalization(monk
     assert data.get("final_fresh") is True
     assert data.get("ready_gate", {}).get("compose_ready") is True
     assert str(data.get("compose_status") or "").lower() == "done"
+    compose_step = next(
+        (x for x in (data.get("pipeline") or []) if str(x.get("key") or "").strip().lower() == "compose"),
+        {},
+    )
+    assert compose_step.get("status") == "done"
     assert (data.get("current_attempt") or {}).get("requires_recompose") is False
+    assert (data.get("current_attempt") or {}).get("compose_status") == "done"
     assert data.get("final_exists") is True
     assert (data.get("final") or {}).get("exists") is True
+    assert str(data.get("final_url") or "").endswith(f"/v1/tasks/{task_id}/final")
+    assert str(data.get("final_video_url") or "").endswith(f"/v1/tasks/{task_id}/final")
     assert (data.get("artifact_facts") or {}).get("final_exists") is True
+
+
+def test_hot_follow_workbench_overlay_cannot_rewrite_successful_current_final_to_stale(monkeypatch):
+    task_id = "hf-workbench-overlay-success-01"
+    repo = _Repo()
+    ready_voice_state = {
+        "audio_ready": True,
+        "audio_ready_reason": "ready",
+        "dub_current": True,
+        "dub_current_reason": "ready",
+        "requested_voice": "mm_female_1",
+        "resolved_voice": "my-MM-NilarNeural",
+        "actual_provider": "azure-speech",
+        "deliverable_audio_done": True,
+        "voiceover_url": f"/v1/tasks/{task_id}/audio_mm",
+    }
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "pending",
+            "compose_last_status": "done",
+            "compose_last_finished_at": "2026-03-21T10:01:00+00:00",
+            "final_video_key": f"deliver/tasks/{task_id}/final.mp4",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
+            "dub_status": "done",
+            "audio_sha256": "audio-new",
+            "final_source_audio_sha256": "audio-new",
+            "subtitles_override_updated_at": "2026-03-21T09:59:00+00:00",
+            "final_source_subtitle_updated_at": "2026-03-21T09:59:00+00:00",
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_safe_collect_hot_follow_workbench_ui",
+        lambda *_args, **_kwargs: {
+            "compose_status": "pending",
+            "final_exists": False,
+            "final_url": None,
+            "final_video_url": None,
+            "composed_ready": False,
+            "composed_reason": "final_stale_after_dub",
+            "final_fresh": False,
+            "final_stale_reason": "final_stale_after_dub",
+            "current_attempt": {"compose_status": "pending", "requires_recompose": True},
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: dict(ready_voice_state),
+    )
+    monkeypatch.setattr(
+        voice_state_service,
+        "collect_voice_execution_state",
+        lambda *_args, **_kwargs: dict(ready_voice_state),
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: {"ContentLength": "8192", "Content-Type": "video/mp4"})
+    monkeypatch.setattr(hf_router, "media_meta_from_head", lambda _meta: (8192, "video/mp4"))
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    assert str(data.get("compose_status") or "").lower() == "done"
+    assert data.get("composed_ready") is True
+    assert data.get("final_fresh") is True
+    assert (data.get("final") or {}).get("exists") is True
+    assert str(data.get("final_url") or "").endswith(f"/v1/tasks/{task_id}/final")
+    assert str(data.get("final_video_url") or "").endswith(f"/v1/tasks/{task_id}/final")
+    assert (data.get("current_attempt") or {}).get("requires_recompose") is False
 
 
 def test_hot_follow_workbench_marks_old_final_stale_after_redub(monkeypatch):
