@@ -479,6 +479,7 @@ def test_hot_follow_workbench_marks_old_final_stale_after_redub(monkeypatch):
     assert str(data.get("compose_status") or "").lower() == "pending"
     assert (data.get("current_attempt") or {}).get("compose_status") == "pending"
     assert (data.get("current_attempt") or {}).get("requires_recompose") is True
+    assert (((data.get("compose") or {}).get("last") or {}).get("status")) == "done"
     assert (data.get("operator_summary") or {}).get("recommended_next_action") == "当前配音已更新，建议重新合成最终视频以生成最新版本。"
     assert data.get("final_exists") is False
     assert (data.get("final") or {}).get("exists") is False

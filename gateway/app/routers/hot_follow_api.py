@@ -1809,12 +1809,6 @@ def get_hot_follow_workbench_hub(
             if isinstance(compose_legacy, dict):
                 compose_legacy["status"] = "pending"
 
-        compose = payload.get("compose")
-        if isinstance(compose, dict):
-            last = compose.get("last")
-            if isinstance(last, dict):
-                last["status"] = "pending"
-
         deliverables = payload.get("deliverables")
         if isinstance(deliverables, list):
             for item in deliverables:

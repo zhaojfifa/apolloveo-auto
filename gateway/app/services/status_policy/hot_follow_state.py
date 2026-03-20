@@ -198,8 +198,6 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
             last["status"] = "failed"
         state["compose_status"] = "failed"
     else:
-        if last:
-            last["status"] = "pending"
         state["compose_status"] = "pending"
     if last:
         compose["last"] = last

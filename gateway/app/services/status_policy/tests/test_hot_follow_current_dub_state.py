@@ -566,6 +566,112 @@ def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch,
     assert captured["force_dub"] is True
 
 
+def test_hot_follow_rerun_success_marks_current_compose_pending_but_keeps_last_compose_done(monkeypatch, tmp_path):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    monkeypatch.setattr(tasks_router, "_compat_hot_follow_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})
+    monkeypatch.setattr(tasks_router, "_compat_hot_follow_dual_channel_state", lambda *_args, **_kwargs: {"content_mode": "voice_led"})
+    monkeypatch.setattr(tasks_router, "task_base_dir", lambda _task_id: tmp_path / _task_id)
+    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (0, None))
+    monkeypatch.setattr(tasks_router, "assert_local_audio_ok", lambda _path: (4096, 2.4))
+    monkeypatch.setattr(tasks_router, "_sha256_file", lambda _path: "audio-new-sha")
+    monkeypatch.setattr(tasks_router, "_repo_refresh_task", lambda repo, _task_id: repo.task)
+    monkeypatch.setattr(tasks_router, "DubResponse", lambda **kwargs: kwargs)
+    monkeypatch.setattr(
+        tasks_router,
+        "_task_to_detail",
+        lambda stored: SimpleNamespace(
+            dict=lambda exclude=None: {
+                "task_id": stored["task_id"],
+                "category_key": "hot_follow",
+                "content_lang": "mm",
+                "ui_lang": "zh",
+                "face_swap_enabled": False,
+                "status": stored.get("status", "processing"),
+                "created_at": stored.get("created_at", "2026-03-21T00:00:00+00:00"),
+            }
+        ),
+    )
+
+    class _Workspace:
+        def __init__(self, task_id):
+            base = tmp_path / task_id
+            base.mkdir(parents=True, exist_ok=True)
+            self.base_dir = base
+            self.mm_audio_primary_path = base / "audio_primary.wav"
+            self.mm_audio_mp3_path = base / "audio.mp3"
+            self.mm_audio_legacy_path = base / "audio_legacy.wav"
+            self.mm_audio_path = base / "audio.wav"
+
+        def mm_audio_exists(self):
+            return False
+
+    monkeypatch.setattr(tasks_router, "Workspace", _Workspace)
+
+    def _fake_upsert(repo, task_id, updates, **_kwargs):
+        assert task_id == repo.task["task_id"]
+        repo.task.update(updates)
+        return repo.task
+
+    monkeypatch.setattr(tasks_router, "_policy_upsert", _fake_upsert)
+
+    class _Storage:
+        def upload_file(self, _src, dest, content_type=None):
+            return dest
+
+    monkeypatch.setattr(tasks_router, "get_storage_service", lambda: _Storage())
+
+    async def _fake_run_dub_step_ssot(task_adapter):
+        workspace = _Workspace(task_adapter.task_id)
+        workspace.mm_audio_mp3_path.write_bytes(b"fresh-audio")
+
+    monkeypatch.setattr(tasks_router, "run_dub_step_ssot", _fake_run_dub_step_ssot)
+
+    class _Repo:
+        def __init__(self):
+            self.task = {
+                "task_id": "hf-rerun-success",
+                "kind": "hot_follow",
+                "target_lang": "mm",
+                "voice_id": "mm_female_1",
+                "dub_provider": "azure-speech",
+                "compose_status": "done",
+                "compose_last_status": "done",
+                "compose_last_started_at": "2026-03-20T10:00:00+00:00",
+                "compose_last_finished_at": "2026-03-20T10:00:10+00:00",
+                "final_video_key": "deliver/tasks/hf-rerun-success/final.mp4",
+                "config": {
+                    "tts_requested_voice": "mm_female_1",
+                    "tts_resolved_voice": "my-MM-NilarNeural",
+                    "tts_provider": "azure-speech",
+                },
+                "created_at": "2026-03-20T09:00:00+00:00",
+            }
+            self.session = SimpleNamespace(expire_all=lambda: None)
+
+        def get(self, _task_id):
+            return self.task
+
+    repo = _Repo()
+    payload = tasks_router.DubProviderRequest(
+        provider="azure-speech",
+        voice_id="mm_female_1",
+        mm_text="မင်္ဂလာပါ",
+        force=True,
+    )
+
+    result = asyncio.run(tasks_router._run_dub_job("hf-rerun-success", payload, repo))
+
+    assert repo.task["dub_status"] == "ready"
+    assert repo.task["audio_sha256"] == "audio-new-sha"
+    assert repo.task["compose_status"] == "pending"
+    assert repo.task["compose_last_status"] == "done"
+    assert repo.task["compose_error"] is None
+    assert repo.task["compose_error_reason"] is None
+    assert result["audio_sha256"] == "audio-new-sha"
+
+
 def test_hot_follow_azure_auth_failure_keeps_audio_missing_and_surfaces_actionable_error(monkeypatch, tmp_path):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
     monkeypatch.setattr(tasks_router, "_compat_hot_follow_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})
