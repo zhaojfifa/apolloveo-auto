@@ -282,7 +282,11 @@ def test_hot_follow_workbench_marks_old_final_stale_after_redub(monkeypatch):
     assert (data.get("current_attempt") or {}).get("requires_recompose") is True
     assert (data.get("operator_summary") or {}).get("recommended_next_action") == "当前配音已更新，建议重新合成最终视频以生成最新版本。"
     assert data.get("final_exists") is False
-    assert (data.get("final") or {}).get("exists") is True
+    assert (data.get("final") or {}).get("exists") is False
+    assert (data.get("historical_final") or {}).get("exists") is True
+    assert data.get("final_url") is None
+    assert ((data.get("media") or {}).get("final_url")) is None
+    assert (data.get("artifact_facts") or {}).get("final_exists") is True
     compose_step = next(
         (x for x in (data.get("pipeline") or []) if str(x.get("key") or "").strip().lower() == "compose"),
         {},
@@ -293,6 +297,7 @@ def test_hot_follow_workbench_marks_old_final_stale_after_redub(monkeypatch):
         {},
     )
     assert final_row.get("status") == "pending"
+    assert final_row.get("historical") is True
     assert str(final_row.get("url") or "").endswith(f"/v1/tasks/{task_id}/final")
 
 

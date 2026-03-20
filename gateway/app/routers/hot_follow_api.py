@@ -1628,6 +1628,7 @@ def get_hot_follow_workbench_hub(
     payload["current_attempt"] = current_attempt
     payload["operator_summary"] = operator_summary
     payload["presentation"] = _hf_rerun_presentation_state(task, voice_state, final_info, dub_state)
+    payload["historical_final"] = dict(final_info or {})
     final_url = _resolve_hub_final_url(task_id, payload)
     if final_url:
         payload["media"]["final_url"] = final_url
@@ -1760,9 +1761,27 @@ def get_hot_follow_workbench_hub(
                 if str(item.get("kind") or "").strip().lower() == "final":
                     item["status"] = "pending"
                     item["state"] = "pending"
+                    item["historical"] = bool(final_url)
                     break
         payload["composed_ready"] = False
         payload["composed_reason"] = str(payload.get("composed_reason") or composed_reason or "not_ready")
+        historical_final = dict(payload.get("historical_final") or {})
+        payload["final"] = {
+            "exists": False,
+            "key": None,
+            "size_bytes": None,
+            "duration_ms": None,
+            "asset_version": None,
+            "updated_at": None,
+            "content_type": "video/mp4",
+            "url": None,
+            "stale_reason": payload.get("final_stale_reason"),
+            "historical_available": bool(historical_final.get("exists")),
+        }
+        payload["media"]["final_url"] = None
+        payload["media"]["final_video_url"] = None
+        payload["final_url"] = None
+        payload["final_video_url"] = None
     payload.update(_hot_follow_operational_defaults())
     payload.update(_safe_collect_hot_follow_workbench_ui(task, get_settings(), composed=composed))
     return payload

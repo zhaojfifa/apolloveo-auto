@@ -91,6 +91,33 @@ def compose_subtitle_vf(subtitle_path_obj: Path, fontsdir: Path, cleanup_mode: s
     return f"{cover_filter},{subtitle_filter}" if cover_filter else subtitle_filter
 
 
+def _current_final_is_fresh(
+    task: dict,
+    *,
+    revision: dict[str, str | None],
+    final_exists: bool,
+    final_size: int,
+) -> bool:
+    if not final_exists or final_size < MIN_VIDEO_BYTES:
+        return False
+    compose_last_status = str(
+        task.get("compose_last_status") or task.get("compose_status") or ""
+    ).strip().lower()
+    if compose_last_status not in {"done", "ready", "success", "completed"}:
+        return False
+
+    current_audio_sha = str(revision.get("audio_sha256") or "").strip() or None
+    current_subtitle_updated_at = str(revision.get("subtitle_updated_at") or "").strip() or None
+    composed_audio_sha = str(task.get("final_source_audio_sha256") or "").strip() or None
+    composed_subtitle_updated_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
+
+    if composed_audio_sha and current_audio_sha and composed_audio_sha != current_audio_sha:
+        return False
+    if composed_subtitle_updated_at and current_subtitle_updated_at and composed_subtitle_updated_at != current_subtitle_updated_at:
+        return False
+    return True
+
+
 # ---------------------------------------------------------------------------
 # Internal dataclasses
 # ---------------------------------------------------------------------------
@@ -397,7 +424,14 @@ class CompositionService:
             )
             final_meta = object_head_fn(str(final_key)) if final_key else None
             final_size, _ = media_meta_from_head_fn(final_meta)
-            if final_key and object_exists_fn(str(final_key)) and final_size >= MIN_VIDEO_BYTES and not request.force:
+            final_exists = bool(final_key and object_exists_fn(str(final_key)))
+            current_final_fresh = _current_final_is_fresh(
+                current_for_plan,
+                revision=revision,
+                final_exists=final_exists,
+                final_size=final_size,
+            )
+            if current_final_fresh and not request.force:
                 policy_upsert(repo, task_id, {"compose_lock_until": None})
                 return HotFollowComposeResponseContract(
                     status_code=200,

@@ -143,3 +143,56 @@ def test_service_direct_compose_entry_persists_revision_snapshot_for_freshness(m
     assert result.status_code == 200
     assert repo.task["final_source_audio_sha256"] == "audio-new"
     assert repo.task["final_source_subtitle_updated_at"] == "2026-03-20T10:00:00+00:00"
+
+
+def test_service_direct_compose_entry_starts_recompose_when_existing_final_is_stale():
+    repo = _Repo(
+        {
+            "task_id": "hf-compose-stale-recompose",
+            "kind": "hot_follow",
+            "content_lang": "mm",
+            "target_lang": "mm",
+            "config": {},
+            "compose_plan": {"overlay_subtitles": True},
+            "scene_outputs": [],
+            "final_video_key": "deliver/tasks/hf-compose-stale-recompose/final.mp4",
+            "compose_status": "done",
+            "compose_last_status": "done",
+            "audio_sha256": "audio-new",
+            "final_source_audio_sha256": "audio-old",
+            "subtitles_override_updated_at": "2026-03-20T10:00:00+00:00",
+            "final_source_subtitle_updated_at": "2026-03-20T10:00:00+00:00",
+        }
+    )
+    svc = CompositionService(storage=object(), settings=object())
+    seen = {"compose_called": False}
+
+    result = svc.run_hot_follow_compose(
+        "hf-compose-stale-recompose",
+        repo.get("hf-compose-stale-recompose"),
+        HotFollowComposeRequestContract(),
+        repo=repo,
+        policy_upsert=_policy_upsert,
+        hub_loader=lambda task_id, _repo: {"task_id": task_id},
+        subtitle_resolver=lambda *_args, **_kwargs: None,
+        subtitle_only_check=lambda *_args, **_kwargs: False,
+        revision_snapshot=lambda _task: {
+            "subtitle_updated_at": "2026-03-20T10:00:00+00:00",
+            "audio_sha256": "audio-new",
+        },
+        object_exists_fn=lambda _key: True,
+        object_head_fn=lambda _key: {"ContentLength": str(8192)},
+        media_meta_from_head_fn=lambda _head: (8192, "video/mp4"),
+        compose_runner=lambda _task_id, _task: seen.update({"compose_called": True}) or {
+            "final_video_key": "deliver/tasks/hf-compose-stale-recompose/final.mp4",
+            "final_video_path": "deliver/tasks/hf-compose-stale-recompose/final.mp4",
+            "compose_status": "done",
+            "compose_last_status": "done",
+        },
+    )
+
+    assert result.status_code == 200
+    assert seen["compose_called"] is True
+    assert repo.task["compose_status"] == "done"
+    assert repo.task["compose_last_status"] == "done"
+    assert repo.task["compose_last_started_at"] is not None

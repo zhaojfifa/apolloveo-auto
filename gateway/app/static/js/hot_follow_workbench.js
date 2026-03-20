@@ -36,6 +36,9 @@
 
   function pickFinalVideoUrl(task) {
     if (typeof window.__HF_PICK_FINAL_URL__ === "function") return window.__HF_PICK_FINAL_URL__(task);
+    const finalMeta = (task && task.final) || {};
+    const currentFinalExists = Boolean((task && task.final_exists) || finalMeta.exists);
+    if (!currentFinalExists) return null;
     const media = (task && task.media) || {};
     let url = media.final_video_url || media.final_url || (task && task.final_video_url) || (task && task.final_url) || null;
     if (!url) {
