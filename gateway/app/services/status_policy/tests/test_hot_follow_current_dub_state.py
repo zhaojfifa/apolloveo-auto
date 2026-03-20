@@ -568,7 +568,8 @@ def test_hot_follow_azure_auth_failure_keeps_audio_missing_and_surfaces_actionab
         raise RuntimeError(
             "TTS_AZURE_HTTP_401: Azure Speech returned 401 Unauthorized; "
             "check AZURE_SPEECH_KEY and AZURE_SPEECH_REGION for an active matching key-region pair "
-            "(region=eastasia)"
+            "and restart the app if env was changed after startup "
+            "(region=eastasia endpoint=https://eastasia.tts.speech.microsoft.com/cognitiveservices/v1)"
         )
 
     monkeypatch.setattr(tasks_router, "run_dub_step_ssot", _fake_run_dub_step_ssot)
@@ -607,6 +608,7 @@ def test_hot_follow_azure_auth_failure_keeps_audio_missing_and_surfaces_actionab
     assert exc.value.status_code == 500
     assert "TTS_AZURE_HTTP_401" in repo.task["dub_error"]
     assert "AZURE_SPEECH_KEY" in repo.task["dub_error"]
+    assert "restart the app if env was changed after startup" in repo.task["dub_error"]
 
     state = tasks_router._collect_voice_execution_state(repo.task, _settings())
 

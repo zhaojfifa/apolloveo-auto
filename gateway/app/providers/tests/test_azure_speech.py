@@ -61,6 +61,8 @@ def test_generate_audio_azure_speech_strips_auth_values_and_uses_expected_endpoi
     assert out_path.read_bytes() == b"fake-mp3-bytes"
     assert captured["url"] == "https://eastasia.tts.speech.microsoft.com/cognitiveservices/v1"
     assert captured["headers"]["Ocp-Apim-Subscription-Key"] == "test-key"
+    assert captured["headers"]["Ocp-Apim-Subscription-Region"] == "eastasia"
+    assert captured["headers"]["User-Agent"] == "ApolloVeo-HotFollow/azure-speech"
 
 
 def test_generate_audio_azure_speech_401_error_is_actionable(monkeypatch, tmp_path):
@@ -88,3 +90,5 @@ def test_generate_audio_azure_speech_401_error_is_actionable(monkeypatch, tmp_pa
     assert "AZURE_SPEECH_KEY" in message
     assert "AZURE_SPEECH_REGION" in message
     assert "region=eastasia" in message
+    assert "endpoint=https://eastasia.tts.speech.microsoft.com/cognitiveservices/v1" in message
+    assert "restart the app if env was changed after startup" in message

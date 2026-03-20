@@ -41,4 +41,11 @@ If dubbing fails with `TTS_AZURE_HTTP_401`, treat it as an Azure auth/config iss
 
 - verify `AZURE_SPEECH_KEY` is the active Speech resource key
 - verify `AZURE_SPEECH_REGION` matches that same Speech resource
+- verify the runtime is calling the regional speech endpoint shown in the error text
 - if env was just changed, restart the app so cached settings reload before retrying dub
+
+Current runtime also sends:
+
+- `Ocp-Apim-Subscription-Key`
+- `Ocp-Apim-Subscription-Region`
+- `User-Agent: ApolloVeo-HotFollow/azure-speech`

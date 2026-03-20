@@ -240,3 +240,25 @@
 - 不改 runtime logic
 - 不改 gate / compose / publish ownership
 - 不启动第二条产线或 OpenClaw 相关工作
+
+## PR-B1 Azure TTS 401 Failure Path
+
+日期：2026-03-20
+
+本节点完成：
+
+- 收口 Azure Speech TTS auth request header，显式发送 subscription key、subscription region 与固定 user-agent
+- 将 `TTS_AZURE_HTTP_401` 的报错改为包含 region、endpoint 与 app restart 提示
+- 保持 Hot Follow dub 成功路径与其他 provider 行为不变
+
+本次结论：
+
+- voice mapping 本身不是本次故障根因
+- 401 failure path 的重点是 Azure auth/config 诊断要更明确
+- operator 仍必须提供有效的 `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` 匹配对
+
+本节点明确不做：
+
+- 不改 compose / gate / publish 结构
+- 不做 broad TTS provider redesign
+- 不启动 Skills 或第二条产线

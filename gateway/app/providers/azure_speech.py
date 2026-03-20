@@ -9,6 +9,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+_AZURE_TTS_USER_AGENT = "ApolloVeo-HotFollow/azure-speech"
+
 
 class AzureSpeechError(RuntimeError):
     """Raised when Azure Speech TTS fails."""
@@ -50,6 +52,16 @@ def _build_endpoint(speech_region: str) -> str:
     return f"https://{region}.tts.speech.microsoft.com/cognitiveservices/v1"
 
 
+def _build_headers(*, speech_key: str, speech_region: str, output_format: str) -> dict[str, str]:
+    return {
+        "Ocp-Apim-Subscription-Key": speech_key,
+        "Ocp-Apim-Subscription-Region": speech_region,
+        "Content-Type": "application/ssml+xml",
+        "X-Microsoft-OutputFormat": output_format or "audio-24khz-48kbitrate-mono-mp3",
+        "User-Agent": _AZURE_TTS_USER_AGENT,
+    }
+
+
 async def generate_audio_azure_speech(
     text: str,
     voice: str,
@@ -69,11 +81,11 @@ async def generate_audio_azure_speech(
         raise AzureSpeechError("TTS_AZURE_VOICE_MISSING: missing voice")
 
     endpoint = _build_endpoint(speech_region)
-    headers = {
-        "Ocp-Apim-Subscription-Key": speech_key,
-        "Content-Type": "application/ssml+xml",
-        "X-Microsoft-OutputFormat": output_format or "audio-24khz-48kbitrate-mono-mp3",
-    }
+    headers = _build_headers(
+        speech_key=speech_key,
+        speech_region=speech_region,
+        output_format=output_format,
+    )
     ssml = _build_ssml(text.strip(), voice.strip())
 
     timeout = httpx.Timeout(60.0, connect=15.0)
@@ -106,7 +118,8 @@ async def generate_audio_azure_speech(
             message = (
                 "TTS_AZURE_HTTP_401: Azure Speech returned 401 Unauthorized; "
                 "check AZURE_SPEECH_KEY and AZURE_SPEECH_REGION for an active matching key-region pair "
-                f"(region={speech_region})"
+                "and restart the app if env was changed after startup "
+                f"(region={speech_region} endpoint={endpoint})"
             )
             if preview:
                 message = f"{message}; provider_message={preview}"
