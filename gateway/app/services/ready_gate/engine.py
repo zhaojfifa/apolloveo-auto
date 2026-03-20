@@ -155,8 +155,15 @@ def evaluate_ready_gate(
 
     # ── Post-process: compose_reason ──────────────────────────────────────
     compose_ready = gates.get("compose_ready", False)
+    stale_reason = str(
+        state.get("final_stale_reason")
+        or state.get("composed_reason")
+        or ""
+    ).strip()
     if compose_ready:
         compose_reason = "ready"
+    elif stale_reason in {"final_stale_after_dub", "final_stale_after_subtitles"}:
+        compose_reason = stale_reason
     elif (
         signals.get("no_dub", False)
         and not signals.get("subtitle_ready", False)

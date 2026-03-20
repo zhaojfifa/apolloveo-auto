@@ -385,6 +385,10 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     compose_error_reason, compose_error_message = compose_error_parts(task)
     current_audio_sha256 = str(task.get("audio_sha256") or "").strip() or None
     composed_audio_sha256 = str(task.get("final_source_audio_sha256") or "").strip() or None
+    current_dub_generated_at = str(task.get("dub_generated_at") or "").strip() or None
+    composed_dub_generated_at = str(task.get("final_source_dub_generated_at") or "").strip() or None
+    current_subtitle_content_hash = str(task.get("subtitles_content_hash") or "").strip() or None
+    composed_subtitle_content_hash = str(task.get("final_source_subtitles_content_hash") or "").strip() or None
     current_subtitle_updated_at = str(
         task.get("subtitles_override_updated_at") or ""
     ).strip() or None
@@ -393,20 +397,29 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     compose_finished_at = task.get("compose_last_finished_at") or final_updated_at
     audio_changed_since_final = False
     subtitle_changed_since_final = False
+    audio_mismatch_from_snapshot = False
+    subtitle_hash_mismatch_from_snapshot = False
     if final_exists:
         if composed_audio_sha256 and current_audio_sha256:
-            audio_changed_since_final = composed_audio_sha256 != current_audio_sha256
+            audio_mismatch_from_snapshot = composed_audio_sha256 != current_audio_sha256
+            audio_changed_since_final = audio_mismatch_from_snapshot
+        elif composed_dub_generated_at and current_dub_generated_at:
+            audio_mismatch_from_snapshot = composed_dub_generated_at != current_dub_generated_at
+            audio_changed_since_final = audio_mismatch_from_snapshot
         elif current_audio_sha256 and task.get("dub_generated_at") and final_updated_at:
             audio_changed_since_final = coerce_datetime(task.get("dub_generated_at")) > coerce_datetime(final_updated_at)
 
-        if composed_subtitle_updated_at and current_subtitle_updated_at:
+        if composed_subtitle_content_hash and current_subtitle_content_hash:
+            subtitle_hash_mismatch_from_snapshot = composed_subtitle_content_hash != current_subtitle_content_hash
+            subtitle_changed_since_final = subtitle_hash_mismatch_from_snapshot
+        elif composed_subtitle_updated_at and current_subtitle_updated_at:
             subtitle_changed_since_final = composed_subtitle_updated_at != current_subtitle_updated_at
         elif task.get("subtitles_override_updated_at") and final_updated_at:
             subtitle_changed_since_final = coerce_datetime(task.get("subtitles_override_updated_at")) > coerce_datetime(final_updated_at)
 
     # Guard: coerce_datetime(None) returns datetime.now() which breaks
     # the comparison.  Only coerce when the raw value is truthy.
-    _raw_dub_at = task.get("dub_generated_at") or None
+    _raw_dub_at = current_dub_generated_at
     _raw_sub_at = task.get("subtitles_override_updated_at") or None
     latest_input_updated_at = max(
         (
@@ -433,7 +446,8 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     if final_exists and compose_done and compose_refresh_evidence_at is not None:
         if latest_input_updated_at is not None and compose_refresh_evidence_at >= latest_input_updated_at:
             audio_changed_since_final = False
-            subtitle_changed_since_final = False
+            if not subtitle_hash_mismatch_from_snapshot:
+                subtitle_changed_since_final = False
 
         # Clear staleness per-input: only override when the input's own
         # timestamp is known AND compose finished after it.  When an input
@@ -441,11 +455,18 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         # input — SHA comparison (if available) remains the sole evidence.
         if _raw_dub_at:
             _dub_dt = coerce_datetime(_raw_dub_at)
-            if _dub_dt is not None and compose_refresh_evidence_at >= _dub_dt:
+            if (
+                _dub_dt is not None
+                and compose_refresh_evidence_at >= _dub_dt
+            ):
                 audio_changed_since_final = False
         if _raw_sub_at:
             _sub_dt = coerce_datetime(_raw_sub_at)
-            if _sub_dt is not None and compose_refresh_evidence_at >= _sub_dt:
+            if (
+                not subtitle_hash_mismatch_from_snapshot
+                and _sub_dt is not None
+                and compose_refresh_evidence_at >= _sub_dt
+            ):
                 subtitle_changed_since_final = False
 
     final_stale_reason = None

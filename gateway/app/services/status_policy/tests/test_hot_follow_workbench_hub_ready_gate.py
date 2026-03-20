@@ -624,6 +624,7 @@ def test_hot_follow_workbench_promotes_current_final_when_latest_compose_is_newe
         data = res.json()
 
     assert data.get("ready_gate", {}).get("compose_ready") is True
+    assert data.get("ready_gate", {}).get("compose_reason") == "ready"
     assert data.get("composed_ready") is True
     assert data.get("composed_reason") == "ready"
     assert str(data.get("compose_status") or "").lower() == "done"
@@ -634,6 +635,24 @@ def test_hot_follow_workbench_promotes_current_final_when_latest_compose_is_newe
     assert str(data.get("final_video_url") or "").endswith(f"/v1/tasks/{task_id}/final")
     assert (data.get("current_attempt") or {}).get("compose_status") == "done"
     assert (data.get("current_attempt") or {}).get("requires_recompose") is False
+
+
+def test_hot_follow_compose_revision_snapshot_uses_explicit_revision_fields_only():
+    snapshot = hf_router._hf_compose_revision_snapshot(
+        {
+            "updated_at": "2026-03-21T11:00:00+00:00",
+            "audio_sha256": "audio-new",
+            "dub_generated_at": "2026-03-21T10:05:00+00:00",
+            "subtitles_content_hash": "sub-hash-current",
+        }
+    )
+
+    assert snapshot == {
+        "subtitle_updated_at": None,
+        "subtitle_content_hash": "sub-hash-current",
+        "audio_sha256": "audio-new",
+        "dub_generated_at": "2026-03-21T10:05:00+00:00",
+    }
 
 
 def test_hot_follow_workbench_marks_old_final_stale_after_redub(monkeypatch):
@@ -711,6 +730,7 @@ def test_hot_follow_workbench_marks_old_final_stale_after_redub(monkeypatch):
         data = res.json()
 
     assert data.get("ready_gate", {}).get("compose_ready") is False
+    assert data.get("ready_gate", {}).get("compose_reason") == "final_stale_after_dub"
     assert data.get("composed_ready") is False
     assert data.get("composed_reason") == "final_stale_after_dub"
     assert str(data.get("compose_status") or "").lower() == "pending"

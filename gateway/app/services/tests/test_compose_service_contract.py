@@ -128,7 +128,9 @@ def test_service_direct_compose_entry_persists_revision_snapshot_for_freshness(m
         subtitle_only_check=lambda *_args, **_kwargs: False,
         revision_snapshot=lambda _task: {
             "subtitle_updated_at": "2026-03-20T10:00:00+00:00",
+            "subtitle_content_hash": "sub-hash-new",
             "audio_sha256": "audio-new",
+            "dub_generated_at": "2026-03-20T10:05:00+00:00",
         },
         object_exists_fn=lambda _key: False,
         object_head_fn=lambda _key: None,
@@ -143,6 +145,8 @@ def test_service_direct_compose_entry_persists_revision_snapshot_for_freshness(m
     assert result.status_code == 200
     assert repo.task["final_source_audio_sha256"] == "audio-new"
     assert repo.task["final_source_subtitle_updated_at"] == "2026-03-20T10:00:00+00:00"
+    assert repo.task["final_source_subtitles_content_hash"] == "sub-hash-new"
+    assert repo.task["final_source_dub_generated_at"] == "2026-03-20T10:05:00+00:00"
 
 
 def test_service_direct_compose_entry_overwrites_stale_revision_snapshot_on_success():
@@ -174,7 +178,9 @@ def test_service_direct_compose_entry_overwrites_stale_revision_snapshot_on_succ
         subtitle_only_check=lambda *_args, **_kwargs: False,
         revision_snapshot=lambda _task: {
             "subtitle_updated_at": "2026-03-21T10:00:00+00:00",
+            "subtitle_content_hash": "sub-hash-newer",
             "audio_sha256": "audio-new",
+            "dub_generated_at": "2026-03-21T10:05:00+00:00",
         },
         object_exists_fn=lambda _key: False,
         object_head_fn=lambda _key: None,
@@ -190,6 +196,8 @@ def test_service_direct_compose_entry_overwrites_stale_revision_snapshot_on_succ
     assert result.status_code == 200
     assert repo.task["final_source_audio_sha256"] == "audio-new"
     assert repo.task["final_source_subtitle_updated_at"] == "2026-03-21T10:00:00+00:00"
+    assert repo.task["final_source_subtitles_content_hash"] == "sub-hash-newer"
+    assert repo.task["final_source_dub_generated_at"] == "2026-03-21T10:05:00+00:00"
 
 
 def test_service_direct_compose_entry_starts_recompose_when_existing_final_is_stale():
@@ -225,11 +233,13 @@ def test_service_direct_compose_entry_starts_recompose_when_existing_final_is_st
         subtitle_only_check=lambda *_args, **_kwargs: False,
         revision_snapshot=lambda _task: {
             "subtitle_updated_at": "2026-03-20T10:00:00+00:00",
+            "subtitle_content_hash": "sub-hash-current",
             "audio_sha256": "audio-new",
+            "dub_generated_at": "2026-03-20T10:05:00+00:00",
         },
         object_exists_fn=lambda _key: True,
-        object_head_fn=lambda _key: {"ContentLength": str(8192)},
-        media_meta_from_head_fn=lambda _head: (8192, "video/mp4"),
+        object_head_fn=lambda _key: {"ContentLength": str(16384)},
+        media_meta_from_head_fn=lambda _head: (16384, "video/mp4"),
         compose_runner=lambda _task_id, _task: seen.update({"compose_called": True}) or {
             "final_video_key": "deliver/tasks/hf-compose-stale-recompose/final.mp4",
             "final_video_path": "deliver/tasks/hf-compose-stale-recompose/final.mp4",
@@ -243,3 +253,55 @@ def test_service_direct_compose_entry_starts_recompose_when_existing_final_is_st
     assert repo.task["compose_status"] == "done"
     assert repo.task["compose_last_status"] == "done"
     assert repo.task["compose_last_started_at"] is not None
+
+
+def test_service_direct_compose_entry_reuses_existing_final_when_revision_snapshot_matches(monkeypatch):
+    repo = _Repo(
+        {
+            "task_id": "hf-compose-current-final",
+            "kind": "hot_follow",
+            "content_lang": "mm",
+            "target_lang": "mm",
+            "config": {},
+            "compose_plan": {"overlay_subtitles": True},
+            "scene_outputs": [],
+            "final_video_key": "deliver/tasks/hf-compose-current-final/final.mp4",
+            "compose_status": "done",
+            "compose_last_status": "done",
+            "audio_sha256": "audio-new",
+            "dub_generated_at": "2026-03-21T10:05:00+00:00",
+            "subtitles_override_updated_at": "2026-03-21T10:00:00+00:00",
+            "subtitles_content_hash": "sub-hash-current",
+            "final_source_audio_sha256": "audio-new",
+            "final_source_dub_generated_at": "2026-03-21T10:05:00+00:00",
+            "final_source_subtitle_updated_at": "2026-03-21T09:00:00+00:00",
+            "final_source_subtitles_content_hash": "sub-hash-current",
+        }
+    )
+    svc = CompositionService(storage=object(), settings=object())
+    seen = {"compose_called": False}
+
+    result = svc.run_hot_follow_compose(
+        "hf-compose-current-final",
+        repo.get("hf-compose-current-final"),
+        HotFollowComposeRequestContract(),
+        repo=repo,
+        policy_upsert=_policy_upsert,
+        hub_loader=lambda task_id, _repo: {"task_id": task_id},
+        subtitle_resolver=lambda *_args, **_kwargs: None,
+        subtitle_only_check=lambda *_args, **_kwargs: False,
+        revision_snapshot=lambda _task: {
+            "subtitle_updated_at": "2026-03-21T10:00:00+00:00",
+            "subtitle_content_hash": "sub-hash-current",
+            "audio_sha256": "audio-new",
+            "dub_generated_at": "2026-03-21T10:05:00+00:00",
+        },
+        object_exists_fn=lambda _key: True,
+        object_head_fn=lambda _key: {"ContentLength": str(16384)},
+        media_meta_from_head_fn=lambda _head: (16384, "video/mp4"),
+        compose_runner=lambda *_args, **_kwargs: seen.update({"compose_called": True}) or {},
+    )
+
+    assert result.status_code == 200
+    assert seen["compose_called"] is False
+    assert result.body["final_key"] == "deliver/tasks/hf-compose-current-final/final.mp4"

@@ -107,13 +107,30 @@ def _current_final_is_fresh(
         return False
 
     current_audio_sha = str(revision.get("audio_sha256") or "").strip() or None
+    current_dub_generated_at = str(revision.get("dub_generated_at") or "").strip() or None
     current_subtitle_updated_at = str(revision.get("subtitle_updated_at") or "").strip() or None
+    current_subtitle_content_hash = str(revision.get("subtitle_content_hash") or "").strip() or None
     composed_audio_sha = str(task.get("final_source_audio_sha256") or "").strip() or None
+    composed_dub_generated_at = str(task.get("final_source_dub_generated_at") or "").strip() or None
     composed_subtitle_updated_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
+    composed_subtitle_content_hash = str(task.get("final_source_subtitles_content_hash") or "").strip() or None
 
     if composed_audio_sha and current_audio_sha and composed_audio_sha != current_audio_sha:
         return False
-    if composed_subtitle_updated_at and current_subtitle_updated_at and composed_subtitle_updated_at != current_subtitle_updated_at:
+    if (
+        composed_dub_generated_at
+        and current_dub_generated_at
+        and composed_dub_generated_at != current_dub_generated_at
+    ):
+        return False
+    if composed_subtitle_content_hash and current_subtitle_content_hash:
+        if composed_subtitle_content_hash != current_subtitle_content_hash:
+            return False
+    elif (
+        composed_subtitle_updated_at
+        and current_subtitle_updated_at
+        and composed_subtitle_updated_at != current_subtitle_updated_at
+    ):
         return False
     return True
 
@@ -476,7 +493,9 @@ class CompositionService:
 
             updates = compose_runner(task_id, repo.get(task_id) or current_for_plan)
             updates["final_source_subtitle_updated_at"] = revision.get("subtitle_updated_at")
+            updates["final_source_subtitles_content_hash"] = revision.get("subtitle_content_hash")
             updates["final_source_audio_sha256"] = revision.get("audio_sha256")
+            updates["final_source_dub_generated_at"] = revision.get("dub_generated_at")
             if lipsync_warning:
                 current_warning = str(updates.get("compose_warning") or "").strip()
                 updates["compose_warning"] = (

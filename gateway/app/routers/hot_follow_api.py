@@ -179,8 +179,10 @@ class ComposePlanPatchRequest(BaseModel):
 
 def _hf_compose_revision_snapshot(task: dict) -> dict[str, str | None]:
     return {
-        "subtitle_updated_at": str(task.get("subtitles_override_updated_at") or task.get("updated_at") or "").strip() or None,
+        "subtitle_updated_at": str(task.get("subtitles_override_updated_at") or "").strip() or None,
+        "subtitle_content_hash": str(task.get("subtitles_content_hash") or "").strip() or None,
         "audio_sha256": str(task.get("audio_sha256") or "").strip() or None,
+        "dub_generated_at": str(task.get("dub_generated_at") or "").strip() or None,
     }
 
 
