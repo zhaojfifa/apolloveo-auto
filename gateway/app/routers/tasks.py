@@ -2538,9 +2538,9 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     if provider == "lovo" and not getattr(settings, "lovo_api_key", None):
         raise HTTPException(status_code=400, detail="LOVO_API_KEY is not configured")
     if provider == "azure-speech":
-        if (not getattr(settings, "azure_speech_key", None)) or (
-            not getattr(settings, "azure_speech_region", None)
-        ):
+        azure_speech_key = str(getattr(settings, "azure_speech_key", "") or "").strip()
+        azure_speech_region = str(getattr(settings, "azure_speech_region", "") or "").strip()
+        if (not azure_speech_key) or (not azure_speech_region):
             raise HTTPException(
                 status_code=400,
                 detail="AZURE_SPEECH_KEY and AZURE_SPEECH_REGION are required for azure-speech",

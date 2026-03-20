@@ -532,3 +532,85 @@ def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch,
 
     assert exc.value.status_code == 500
     assert captured["force_dub"] is True
+
+
+def test_hot_follow_azure_auth_failure_keeps_audio_missing_and_surfaces_actionable_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    monkeypatch.setattr(tasks_router, "_compat_hot_follow_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})
+    monkeypatch.setattr(tasks_router, "_compat_hot_follow_dual_channel_state", lambda *_args, **_kwargs: {"content_mode": "voice_led"})
+    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (0, None))
+
+    class _Workspace:
+        def __init__(self, task_id):
+            base = tmp_path / task_id
+            base.mkdir(parents=True, exist_ok=True)
+            self.base_dir = base
+            self.mm_audio_primary_path = base / "audio_primary.wav"
+            self.mm_audio_mp3_path = base / "audio.mp3"
+            self.mm_audio_legacy_path = base / "audio_legacy.wav"
+            self.mm_audio_path = base / "audio.wav"
+
+        def mm_audio_exists(self):
+            return False
+
+    monkeypatch.setattr(tasks_router, "Workspace", _Workspace)
+
+    def _fake_upsert(repo, task_id, updates, **_kwargs):
+        assert task_id == repo.task["task_id"]
+        repo.task.update(updates)
+        return repo.task
+
+    monkeypatch.setattr(tasks_router, "_policy_upsert", _fake_upsert)
+
+    async def _fake_run_dub_step_ssot(_task_adapter):
+        raise RuntimeError(
+            "TTS_AZURE_HTTP_401: Azure Speech returned 401 Unauthorized; "
+            "check AZURE_SPEECH_KEY and AZURE_SPEECH_REGION for an active matching key-region pair "
+            "(region=eastasia)"
+        )
+
+    monkeypatch.setattr(tasks_router, "run_dub_step_ssot", _fake_run_dub_step_ssot)
+
+    class _Repo:
+        def __init__(self):
+            self.task = {
+                "task_id": "hf-auth-fail",
+                "kind": "hot_follow",
+                "target_lang": "mm",
+                "subtitles_status": "ready",
+                "voice_id": "mm_female_1",
+                "dub_provider": "azure-speech",
+                "config": {
+                    "tts_requested_voice": "mm_female_1",
+                    "tts_resolved_voice": "my-MM-NilarNeural",
+                    "tts_provider": "azure-speech",
+                },
+            }
+            self.session = SimpleNamespace(expire_all=lambda: None)
+
+        def get(self, _task_id):
+            return dict(self.task)
+
+    repo = _Repo()
+    payload = tasks_router.DubProviderRequest(
+        provider="azure-speech",
+        voice_id="mm_female_1",
+        mm_text="မင်္ဂလာပါ",
+        force=True,
+    )
+
+    with pytest.raises(tasks_router.HTTPException) as exc:
+        asyncio.run(tasks_router._run_dub_job("hf-auth-fail", payload, repo))
+
+    assert exc.value.status_code == 500
+    assert "TTS_AZURE_HTTP_401" in repo.task["dub_error"]
+    assert "AZURE_SPEECH_KEY" in repo.task["dub_error"]
+
+    state = tasks_router._collect_voice_execution_state(repo.task, _settings())
+
+    assert state["audio_ready"] is False
+    assert state["audio_ready_reason"] == "audio_missing"
+    assert state["resolved_voice"] == "my-MM-NilarNeural"
+    assert state["actual_provider"] == "azure-speech"

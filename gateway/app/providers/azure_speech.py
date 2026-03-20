@@ -14,6 +14,16 @@ class AzureSpeechError(RuntimeError):
     """Raised when Azure Speech TTS fails."""
 
 
+def resolve_azure_speech_auth(*, speech_key: str | None, speech_region: str | None) -> tuple[str, str]:
+    key = str(speech_key or "").strip()
+    if not key:
+        raise AzureSpeechError("TTS_AZURE_CONFIG_MISSING: missing AZURE_SPEECH_KEY")
+    region = _normalize_region(speech_region)
+    if not region:
+        raise AzureSpeechError("TTS_AZURE_CONFIG_MISSING: missing AZURE_SPEECH_REGION")
+    return key, region
+
+
 def _voice_locale(voice: str) -> str:
     # Voice format is typically like: my-MM-NilarNeural
     parts = (voice or "").split("-")
@@ -49,11 +59,10 @@ async def generate_audio_azure_speech(
     speech_region: str,
     output_format: str = "audio-24khz-48kbitrate-mono-mp3",
 ) -> None:
-    if not speech_key:
-        raise AzureSpeechError("TTS_AZURE_CONFIG_MISSING: missing AZURE_SPEECH_KEY")
-    speech_region = _normalize_region(speech_region)
-    if not speech_region:
-        raise AzureSpeechError("TTS_AZURE_CONFIG_MISSING: missing AZURE_SPEECH_REGION")
+    speech_key, speech_region = resolve_azure_speech_auth(
+        speech_key=speech_key,
+        speech_region=speech_region,
+    )
     if not text or not text.strip():
         raise AzureSpeechError("TTS_EMPTY_TEXT: empty text")
     if not voice or not voice.strip():
@@ -93,6 +102,15 @@ async def generate_audio_azure_speech(
         raise AzureSpeechError(f"TTS_AZURE_CONNECT_FAIL:{exc}") from exc
     if resp.status_code < 200 or resp.status_code >= 300:
         preview = (resp.text or "").strip().replace("\n", " ")[:400]
+        if resp.status_code == 401:
+            message = (
+                "TTS_AZURE_HTTP_401: Azure Speech returned 401 Unauthorized; "
+                "check AZURE_SPEECH_KEY and AZURE_SPEECH_REGION for an active matching key-region pair "
+                f"(region={speech_region})"
+            )
+            if preview:
+                message = f"{message}; provider_message={preview}"
+            raise AzureSpeechError(message)
         raise AzureSpeechError(f"TTS_AZURE_HTTP_{resp.status_code}: {preview}")
     if not resp.content:
         raise AzureSpeechError("TTS_EMPTY_AUDIO: azure-speech returned empty payload")

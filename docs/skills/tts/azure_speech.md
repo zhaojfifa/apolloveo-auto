@@ -30,7 +30,15 @@ If provider is `edge-tts` and synthesis fails with handshake/403 errors, the ser
 Run:
 
 ```bash
-python scripts/selftest_azure_tts.py
+PYTHONPATH=. ./venv/bin/python scripts/selftest_azure_tts.py
 ```
 
 Success writes `/tmp/azure_tts.mp3` and exits `0`.
+
+## 401 auth failures
+
+If dubbing fails with `TTS_AZURE_HTTP_401`, treat it as an Azure auth/config issue first:
+
+- verify `AZURE_SPEECH_KEY` is the active Speech resource key
+- verify `AZURE_SPEECH_REGION` matches that same Speech resource
+- if env was just changed, restart the app so cached settings reload before retrying dub

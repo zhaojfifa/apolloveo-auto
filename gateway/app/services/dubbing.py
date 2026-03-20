@@ -17,7 +17,11 @@ from typing import Any
 
 from gateway.app.config import get_settings
 from gateway.app.core.workspace import Workspace
-from gateway.app.providers.azure_speech import AzureSpeechError, generate_audio_azure_speech
+from gateway.app.providers.azure_speech import (
+    AzureSpeechError,
+    generate_audio_azure_speech,
+    resolve_azure_speech_auth,
+)
 from gateway.app.providers.edge_tts import EdgeTTSError, generate_audio_edge_tts
 from gateway.app.providers import lovo_tts
 from gateway.app.services.media_validation import assert_local_audio_ok, file_size_bytes, probe_duration_seconds
@@ -157,6 +161,10 @@ async def _synthesize_from_text(
     async def _run_azure_speech() -> dict:
         voice = _map_azure_voice_id(voice_id, settings)
         output_path = ws.mm_audio_mp3_path
+        speech_key, speech_region = resolve_azure_speech_auth(
+            speech_key=getattr(settings, "azure_speech_key", ""),
+            speech_region=getattr(settings, "azure_speech_region", ""),
+        )
         logger.info(
             "DUB3_TTS_START",
             extra={
@@ -166,7 +174,8 @@ async def _synthesize_from_text(
                 "dub_provider": "azure-speech",
                 "voice_id": voice_id,
                 "resolved_voice": voice,
-                "azure_region": settings.azure_speech_region,
+                "azure_region": speech_region,
+                "azure_key_configured": True,
                 "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
                 "output_path": str(output_path),
                 "text_len": len(text),
@@ -179,8 +188,8 @@ async def _synthesize_from_text(
                     text,
                     voice,
                     str(output_path),
-                    speech_key=settings.azure_speech_key,
-                    speech_region=settings.azure_speech_region,
+                    speech_key=speech_key,
+                    speech_region=speech_region,
                     output_format=settings.azure_tts_output_format,
                 ),
                 timeout=tts_timeout_sec,
@@ -195,7 +204,8 @@ async def _synthesize_from_text(
                     "dub_provider": "azure-speech",
                     "voice_id": voice_id,
                     "resolved_voice": voice,
-                    "azure_region": settings.azure_speech_region,
+                    "azure_region": speech_region,
+                    "azure_key_configured": True,
                     "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
                     "error": str(exc),
                 },
@@ -211,7 +221,8 @@ async def _synthesize_from_text(
                     "dub_provider": "azure-speech",
                     "voice_id": voice_id,
                     "resolved_voice": voice,
-                    "azure_region": settings.azure_speech_region,
+                    "azure_region": speech_region,
+                    "azure_key_configured": True,
                     "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
                     "error": "timeout",
                 },
@@ -227,7 +238,8 @@ async def _synthesize_from_text(
                     "dub_provider": "azure-speech",
                     "voice_id": voice_id,
                     "resolved_voice": voice,
-                    "azure_region": settings.azure_speech_region,
+                    "azure_region": speech_region,
+                    "azure_key_configured": True,
                     "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
                     "error": str(exc),
                 },
@@ -248,7 +260,8 @@ async def _synthesize_from_text(
                 "dub_provider": "azure-speech",
                 "voice_id": voice_id,
                 "resolved_voice": voice,
-                "azure_region": settings.azure_speech_region,
+                "azure_region": speech_region,
+                "azure_key_configured": True,
                 "elapsed_ms": int((time.perf_counter() - start_time) * 1000),
                 "output_path": str(output_path),
                 "output_size": output_path.stat().st_size if output_path.exists() else None,
