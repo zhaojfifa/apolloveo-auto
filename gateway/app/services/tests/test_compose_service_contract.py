@@ -145,6 +145,53 @@ def test_service_direct_compose_entry_persists_revision_snapshot_for_freshness(m
     assert repo.task["final_source_subtitle_updated_at"] == "2026-03-20T10:00:00+00:00"
 
 
+def test_service_direct_compose_entry_overwrites_stale_revision_snapshot_on_success():
+    repo = _Repo(
+        {
+            "task_id": "hf-compose-revision-overwrite",
+            "kind": "hot_follow",
+            "content_lang": "mm",
+            "target_lang": "mm",
+            "config": {},
+            "compose_plan": {"overlay_subtitles": True},
+            "scene_outputs": [],
+            "audio_sha256": "audio-new",
+            "subtitles_override_updated_at": "2026-03-21T10:00:00+00:00",
+            "final_source_audio_sha256": "audio-old",
+            "final_source_subtitle_updated_at": "2026-03-20T10:00:00+00:00",
+        }
+    )
+    svc = CompositionService(storage=object(), settings=object())
+
+    result = svc.run_hot_follow_compose(
+        "hf-compose-revision-overwrite",
+        repo.get("hf-compose-revision-overwrite"),
+        HotFollowComposeRequestContract(),
+        repo=repo,
+        policy_upsert=_policy_upsert,
+        hub_loader=lambda task_id, _repo: {"task_id": task_id},
+        subtitle_resolver=lambda *_args, **_kwargs: None,
+        subtitle_only_check=lambda *_args, **_kwargs: False,
+        revision_snapshot=lambda _task: {
+            "subtitle_updated_at": "2026-03-21T10:00:00+00:00",
+            "audio_sha256": "audio-new",
+        },
+        object_exists_fn=lambda _key: False,
+        object_head_fn=lambda _key: None,
+        media_meta_from_head_fn=lambda _head: (0, None),
+        compose_runner=lambda _task_id, _task: {
+            "final_video_key": "deliver/tasks/hf-compose-revision-overwrite/final.mp4",
+            "final_video_path": "deliver/tasks/hf-compose-revision-overwrite/final.mp4",
+            "compose_status": "done",
+            "compose_last_status": "done",
+        },
+    )
+
+    assert result.status_code == 200
+    assert repo.task["final_source_audio_sha256"] == "audio-new"
+    assert repo.task["final_source_subtitle_updated_at"] == "2026-03-21T10:00:00+00:00"
+
+
 def test_service_direct_compose_entry_starts_recompose_when_existing_final_is_stale():
     repo = _Repo(
         {
