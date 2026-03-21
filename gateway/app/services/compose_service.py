@@ -46,6 +46,47 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 
+def _current_final_is_fresh(
+    task: dict,
+    *,
+    revision: dict[str, str | None],
+    final_exists: bool,
+    final_size: int,
+) -> bool:
+    """Return True only if the existing final incorporates the current subtitle + audio.
+
+    When True the compose service may safely skip re-running FFmpeg.
+    When False compose must run regardless of whether a file physically exists.
+    """
+    if not final_exists or final_size < MIN_VIDEO_BYTES:
+        return False
+    compose_last_status = str(
+        task.get("compose_last_status") or task.get("compose_status") or ""
+    ).strip().lower()
+    if compose_last_status not in {"done", "ready", "success", "completed"}:
+        return False
+
+    current_audio_sha = str(revision.get("audio_sha256") or "").strip() or None
+    current_sub_hash = str(revision.get("subtitle_content_hash") or "").strip() or None
+    current_sub_at = str(revision.get("subtitle_updated_at") or "").strip() or None
+    composed_audio_sha = str(task.get("final_source_audio_sha256") or "").strip() or None
+    composed_sub_hash = str(task.get("final_source_subtitles_content_hash") or "").strip() or None
+    composed_sub_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
+
+    # No compose snapshot → cannot confirm what was baked into the final → recompose.
+    if not composed_audio_sha and not composed_sub_hash:
+        return False
+
+    if composed_audio_sha and current_audio_sha and composed_audio_sha != current_audio_sha:
+        return False
+    if composed_sub_hash and current_sub_hash:
+        if composed_sub_hash != current_sub_hash:
+            return False
+    elif composed_sub_at and current_sub_at and composed_sub_at != current_sub_at:
+        return False
+    return True
+
+
 def compose_fail(
     reason: str,
     message: str,
@@ -397,18 +438,28 @@ class CompositionService:
             )
             final_meta = object_head_fn(str(final_key)) if final_key else None
             final_size, _ = media_meta_from_head_fn(final_meta)
-            if final_key and object_exists_fn(str(final_key)) and final_size >= MIN_VIDEO_BYTES and not request.force:
-                policy_upsert(repo, task_id, {"compose_lock_until": None})
-                return HotFollowComposeResponseContract(
-                    status_code=200,
-                    body={
-                        "task_id": task_id,
-                        "final_url": task_endpoint(task_id, "final"),
-                        "final_video_url": task_endpoint(task_id, "final"),
-                        "final_key": str(final_key),
-                        "hub": hub_loader(task_id, repo),
-                    },
-                )
+            final_physically_exists = bool(
+                final_key and object_exists_fn(str(final_key)) and final_size >= MIN_VIDEO_BYTES
+            )
+            if final_physically_exists and not request.force:
+                revision_for_freshness = revision_snapshot(current_for_plan)
+                if _current_final_is_fresh(
+                    current_for_plan,
+                    revision=revision_for_freshness,
+                    final_exists=True,
+                    final_size=final_size,
+                ):
+                    policy_upsert(repo, task_id, {"compose_lock_until": None})
+                    return HotFollowComposeResponseContract(
+                        status_code=200,
+                        body={
+                            "task_id": task_id,
+                            "final_url": task_endpoint(task_id, "final"),
+                            "final_video_url": task_endpoint(task_id, "final"),
+                            "final_key": str(final_key),
+                            "hub": hub_loader(task_id, repo),
+                        },
+                    )
 
             compose_plan = self._build_compose_plan(current_for_plan)
             policy_upsert(
@@ -1111,15 +1162,23 @@ class CompositionService:
             },
         )
 
+        compose_finished_at = datetime.now(timezone.utc).isoformat()
         return {
             "final_video_key": final_key,
             "final_video_path": final_key,
             "final_video_sha256": sha256_file(final_path),
-            "final_asset_version": str(final_etag or sha256_file(final_path) or datetime.now(timezone.utc).isoformat()),
-            "final_updated_at": datetime.now(timezone.utc).isoformat(),
+            "final_asset_version": str(final_etag or sha256_file(final_path) or compose_finished_at),
+            "final_updated_at": compose_finished_at,
             "final_mime": "video/mp4",
             "final_duration_ms": int(final_duration * 1000),
             "final_video_bytes": int(uploaded_size),
+            # Compose snapshot: record which inputs were baked into this final.
+            # Used by _current_final_is_fresh() and compute_final_staleness() to
+            # detect when subtitle or audio changed after the last compose ran.
+            "final_source_audio_sha256": str(task.get("audio_sha256") or "").strip() or None,
+            "final_source_dub_generated_at": str(task.get("dub_generated_at") or "").strip() or None,
+            "final_source_subtitles_content_hash": str(task.get("subtitles_content_hash") or "").strip() or None,
+            "final_source_subtitle_updated_at": str(task.get("subtitles_override_updated_at") or "").strip() or None,
             "compose_provider": "ffmpeg",
             "compose_version": int(task.get("compose_version") or 0) + 1,
             "compose_status": "done",
@@ -1127,7 +1186,7 @@ class CompositionService:
             "compose_error_reason": None,
             "compose_last_status": "done",
             "compose_last_started_at": compose_started_at,
-            "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
+            "compose_last_finished_at": compose_finished_at,
             "compose_last_ffmpeg_cmd": ffmpeg_cmd_used,
             "compose_last_error": None,
             "compose_policy": compose_policy,

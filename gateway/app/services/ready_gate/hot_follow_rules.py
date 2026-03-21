@@ -37,7 +37,7 @@ def _d(v: Any) -> Dict[str, Any]:
 
 
 def _extract_final_exists(task: dict, state: dict) -> bool:
-    """Check if final video exists (mirrors _pick_final + _resolve_final_url evidence)."""
+    """Check if a final video file physically exists (any version, fresh or stale)."""
     # The final_exists signal is computed by _resolve_artifacts() before
     # the engine runs, and stored in state["final"]["exists"].
     final = _d(state.get("final"))
@@ -46,6 +46,24 @@ def _extract_final_exists(task: dict, state: dict) -> bool:
     # Also check evidence from URL resolution
     if state.get("final_url") or state.get("final_video_url"):
         return True
+    return False
+
+
+def _extract_final_fresh(task: dict, state: dict) -> bool:
+    """Final video is fresh — it incorporates the current subtitle and audio revision.
+
+    A stale final (composed before the latest subtitle save or re-dub) is NOT
+    fresh and must not be counted as a valid compose output for the gate.
+    """
+    final = _d(state.get("final"))
+    # Explicit stale_reason on the state or on final_info → not fresh.
+    if state.get("final_stale_reason") or final.get("stale_reason"):
+        return False
+    # fresh flag set by compute_composed_state().
+    fresh_hint = final.get("fresh")
+    if fresh_hint is not None:
+        return bool(fresh_hint)
+    # No freshness metadata available — treat as not fresh so compose runs.
     return False
 
 
@@ -159,6 +177,7 @@ HOT_FOLLOW_GATE_SPEC = ReadyGateSpec(
     # ── Signals ───────────────────────────────────────────────────────────
     signals=(
         Signal("final_exists",             _extract_final_exists),
+        Signal("final_fresh",              _extract_final_fresh),
         Signal("audio_done",               _extract_audio_done),
         Signal("voiceover_exists",         _extract_voiceover_exists),
         Signal("tts_voice_valid",          _extract_tts_voice_valid),
@@ -190,9 +209,10 @@ HOT_FOLLOW_GATE_SPEC = ReadyGateSpec(
     ),
 
     # ── Gates ─────────────────────────────────────────────────────────────
-    # compose_ready = final_exists AND (audio_ready OR no_dub)
+    # compose_ready = final_exists AND final_fresh AND (audio_ready OR no_dub)
+    # final_fresh = False when subtitle or audio changed after the last compose.
     gates=(
-        GateRule("compose_ready",  requires=("final_exists",), unless=("audio_ready", "no_dub")),
+        GateRule("compose_ready",  requires=("final_exists", "final_fresh"), unless=("audio_ready", "no_dub")),
         GateRule("publish_ready",  requires=("compose_ready",), unless=()),
     ),
 
@@ -200,14 +220,16 @@ HOT_FOLLOW_GATE_SPEC = ReadyGateSpec(
     blocking=(
         # Always emit when gate is false
         BlockingRule("compose_not_done",   when_missing="__always__"),
+        # Final is stale (composed before current subtitle/audio)
+        BlockingRule("final_stale",        when_missing="final_fresh",        extra_requires=("final_exists",)),
         # Subtitle not ready
         BlockingRule("subtitle_not_ready", when_missing="subtitle_ready"),
         # Audio steps — skipped if no_dub
-        BlockingRule("audio_not_done",     when_missing="audio_done",       unless_signal="no_dub"),
-        BlockingRule("voiceover_missing",  when_missing="voiceover_exists",  unless_signal="no_dub"),
-        BlockingRule("tts_voice_invalid",  when_missing="tts_voice_valid",   unless_signal="no_dub"),
+        BlockingRule("audio_not_done",     when_missing="audio_done",         unless_signal="no_dub"),
+        BlockingRule("voiceover_missing",  when_missing="voiceover_exists",   unless_signal="no_dub"),
+        BlockingRule("tts_voice_invalid",  when_missing="tts_voice_valid",    unless_signal="no_dub"),
         # audio_not_ready only when final exists (original L232-233)
-        BlockingRule("audio_not_ready",    when_missing="audio_ready",       unless_signal="no_dub",
+        BlockingRule("audio_not_ready",    when_missing="audio_ready",        unless_signal="no_dub",
                      extra_requires=("final_exists",)),
         # Dynamic no_dub_reason: only when no_dub=True AND subtitle not ready (original L236-237)
         BlockingRule("",                   when_missing="subtitle_ready",

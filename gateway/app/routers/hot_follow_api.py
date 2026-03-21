@@ -175,7 +175,8 @@ class ComposePlanPatchRequest(BaseModel):
 
 def _hf_compose_revision_snapshot(task: dict) -> dict[str, str | None]:
     return {
-        "subtitle_updated_at": str(task.get("subtitles_override_updated_at") or task.get("updated_at") or "").strip() or None,
+        "subtitle_updated_at": str(task.get("subtitles_override_updated_at") or "").strip() or None,
+        "subtitle_content_hash": str(task.get("subtitles_content_hash") or "").strip() or None,
         "audio_sha256": str(task.get("audio_sha256") or "").strip() or None,
     }
 
@@ -1168,13 +1169,17 @@ def _hf_current_attempt_summary(
     dub_status: str,
     compose_status: str,
     composed_reason: str,
+    final_stale_reason: str | None = None,
 ) -> dict[str, Any]:
     compose_status_norm = str(compose_status or "").strip().lower() or "never"
     compose_reason_norm = str(composed_reason or "").strip().lower() or "unknown"
+    # requires_recompose is True when audio is ready AND the current final is stale.
+    # Using final_stale_reason as the authoritative staleness signal prevents the
+    # self-defeating loop where composed_ready=True forces compose_reason="ready"
+    # which forces requires_recompose=False regardless of actual freshness.
     requires_recompose = bool(
         voice_state.get("audio_ready")
-        and voice_state.get("dub_current")
-        and compose_reason_norm != "ready"
+        and (final_stale_reason or compose_reason_norm != "ready")
     )
     return {
         "dub_status": str(dub_status or "").strip().lower() or "never",
@@ -1187,6 +1192,7 @@ def _hf_current_attempt_summary(
         "actual_provider": str(voice_state.get("actual_provider") or "").strip() or None,
         "compose_status": compose_status_norm,
         "compose_reason": compose_reason_norm,
+        "final_stale_reason": final_stale_reason or None,
         "requires_recompose": requires_recompose,
         "current_subtitle_source": str(subtitle_lane.get("actual_burn_subtitle_source") or "").strip() or None,
     }
@@ -1242,6 +1248,7 @@ def _hf_safe_presentation_aggregates(
     dub_status: str,
     compose_status: str,
     composed_reason: str,
+    final_stale_reason: str | None = None,
     no_dub: bool,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     try:
@@ -1259,6 +1266,7 @@ def _hf_safe_presentation_aggregates(
             dub_status=dub_status,
             compose_status=compose_status,
             composed_reason=composed_reason,
+            final_stale_reason=final_stale_reason,
         )
         operator_summary = _hf_operator_summary(
             artifact_facts=artifact_facts,
@@ -1614,6 +1622,10 @@ def get_hot_follow_workbench_hub(
             "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
         },
     }
+    final_stale_reason = composed.get("final_stale_reason") or None
+    # Propagate into payload so compute_hot_follow_state / ready-gate engine
+    # can read it via state["final_stale_reason"] in _extract_final_fresh().
+    payload["final_stale_reason"] = final_stale_reason
     artifact_facts, current_attempt, operator_summary = _hf_safe_presentation_aggregates(
         task_id,
         task,
@@ -1625,6 +1637,7 @@ def get_hot_follow_workbench_hub(
         dub_status=str(dub_state),
         compose_status=compose_state,
         composed_reason=composed_reason,
+        final_stale_reason=final_stale_reason,
         no_dub=bool((payload.get("audio") or {}).get("no_dub")),
     )
     payload["artifact_facts"] = artifact_facts

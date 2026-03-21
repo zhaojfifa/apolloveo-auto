@@ -349,6 +349,76 @@ def deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
 # Composed-state aggregation
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _coerce_dt(value: Any) -> datetime | None:
+    """Parse an ISO timestamp string or datetime into a UTC-aware datetime."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        try:
+            dt = datetime.fromisoformat(str(value))
+        except (ValueError, TypeError):
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def compute_final_staleness(task: dict, final_exists: bool, compose_done: bool) -> str | None:
+    """Return a stale-reason string if the final video predates current inputs, else None.
+
+    Staleness is detected via snapshot fields written by compose (preferred) and
+    falls back to timestamp comparison when snapshots are absent (legacy tasks).
+
+    Returns one of: ``None``, ``"final_stale_after_dub"``,
+    ``"final_stale_after_subtitles"``.
+    """
+    if not final_exists or not compose_done:
+        return None
+
+    # ── audio staleness ────────────────────────────────────────────────────
+    audio_stale = False
+    current_audio_sha = str(task.get("audio_sha256") or "").strip() or None
+    composed_audio_sha = str(task.get("final_source_audio_sha256") or "").strip() or None
+    current_dub_at = str(task.get("dub_generated_at") or "").strip() or None
+    composed_dub_at = str(task.get("final_source_dub_generated_at") or "").strip() or None
+    compose_finished_at = str(task.get("compose_last_finished_at") or task.get("final_updated_at") or "").strip() or None
+
+    if composed_audio_sha and current_audio_sha:
+        audio_stale = composed_audio_sha != current_audio_sha
+    elif composed_dub_at and current_dub_at:
+        audio_stale = composed_dub_at != current_dub_at
+    elif current_dub_at and compose_finished_at:
+        _dub_dt = _coerce_dt(current_dub_at)
+        _compose_dt = _coerce_dt(compose_finished_at)
+        if _dub_dt is not None and _compose_dt is not None:
+            audio_stale = _dub_dt > _compose_dt
+
+    # ── subtitle staleness ─────────────────────────────────────────────────
+    subtitle_stale = False
+    current_sub_hash = str(task.get("subtitles_content_hash") or "").strip() or None
+    composed_sub_hash = str(task.get("final_source_subtitles_content_hash") or "").strip() or None
+    current_sub_at = str(task.get("subtitles_override_updated_at") or "").strip() or None
+    composed_sub_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
+
+    if composed_sub_hash and current_sub_hash:
+        subtitle_stale = composed_sub_hash != current_sub_hash
+    elif composed_sub_at and current_sub_at:
+        subtitle_stale = composed_sub_at != current_sub_at
+    elif current_sub_at and compose_finished_at:
+        _sub_dt = _coerce_dt(current_sub_at)
+        _compose_dt = _coerce_dt(compose_finished_at)
+        if _sub_dt is not None and _compose_dt is not None:
+            subtitle_stale = _sub_dt > _compose_dt
+
+    if audio_stale:
+        return "final_stale_after_dub"
+    if subtitle_stale:
+        return "final_stale_after_subtitles"
+    return None
+
+
 def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     from gateway.app.services.voice_state import collect_voice_execution_state
 
@@ -384,14 +454,18 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     compose_done = compose_last_status in {"done", "ready", "success", "completed"}
     compose_error_reason, compose_error_message = compose_error_parts(task)
 
+    final_stale_reason = compute_final_staleness(task, final_exists, compose_done)
+    final_fresh = final_exists and compose_done and final_stale_reason is None
+
     composed_ready = bool(
-        final_exists
-        and compose_done
+        final_fresh
         and compose_error_reason is None
         and bool(voice_state.get("audio_ready"))
     )
     if composed_ready:
         composed_reason = "ready"
+    elif final_stale_reason:
+        composed_reason = final_stale_reason
     elif not raw_exists:
         composed_reason = "missing_raw"
     elif not voice_exists:
@@ -411,22 +485,26 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
 
     final_info = {
         "exists": final_exists,
+        "fresh": final_fresh,
+        "stale_reason": final_stale_reason,
         "key": str(final_key) if final_key else None,
         "size_bytes": int(final_size) if final_size is not None else None,
         "duration_ms": int(task.get("final_duration_ms"))
         if task.get("final_duration_ms") is not None
         else None,
         "asset_version": str(final_asset_version) if final_asset_version else None,
-        "updated_at": task.get("final_updated_at") or task.get("updated_at"),
+        "updated_at": task.get("final_updated_at"),
         "content_type": task.get("final_mime") or final_ctype or "video/mp4",
         "url": task_endpoint(task_id, "final")
-        if final_exists and int(final_size or 0) >= MIN_VIDEO_BYTES
+        if final_fresh and int(final_size or 0) >= MIN_VIDEO_BYTES
         else None,
     }
     return {
         "composed_ready": composed_ready,
         "composed_reason": composed_reason,
         "final": final_info,
+        "final_stale_reason": final_stale_reason,
+        "final_fresh": final_fresh,
         "compose_error_reason": compose_error_reason,
         "compose_error_message": compose_error_message,
         "raw_exists": raw_exists,
