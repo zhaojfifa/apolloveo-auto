@@ -8,7 +8,7 @@ from fastapi import HTTPException
 
 from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.services import compose_service as compose_module
-from gateway.app.services.compose_service import CompositionService, _ComposeInputs
+from gateway.app.services.compose_service import CompositionService, _ComposeInputs, _WorkspaceFiles
 
 
 def _hash16(text: str) -> str:
@@ -50,6 +50,10 @@ class _FakeStorage:
             path.write_text(self.subtitle_text, encoding="utf-8")
             return
         raise AssertionError(f"unexpected key {key}")
+
+    def upload_file(self, file_path: str, key: str, content_type: str | None = None) -> str:
+        _ = (file_path, content_type)
+        return key
 
 
 def test_sync_saved_target_subtitle_reuploads_when_existing_mm_srt_differs(monkeypatch, tmp_path):
@@ -125,3 +129,59 @@ def test_prepare_workspace_rejects_mismatched_downloaded_subtitle_payload(monkey
 
     assert exc.value.detail["reason"] == "subtitle_revision_mismatch"
     assert "expected" in exc.value.detail["message"]
+
+
+def test_upload_and_verify_uses_workspace_subtitle_snapshot_without_nameerror(monkeypatch, tmp_path):
+    svc = CompositionService(storage=_FakeStorage("unused"), settings=object())
+    final_path = tmp_path / "final.mp4"
+    final_path.write_bytes(b"0" * 12000)
+    task = {
+        "audio_sha256": "AUDIO_SHA",
+        "dub_generated_at": "2026-03-21T11:12:00+00:00",
+        "subtitles_override_updated_at": "2026-03-21T11:13:00+00:00",
+    }
+    ws = _WorkspaceFiles(
+        task_id="hf-bind-upload",
+        tmp=tmp_path,
+        video_input_path=tmp_path / "video.mp4",
+        voice_path=tmp_path / "voice.mp3",
+        final_path=final_path,
+        subtitle_path=tmp_path / "subs_target.srt",
+        bgm_path=None,
+        fontsdir=tmp_path,
+        ffmpeg="ffmpeg",
+        video_duration=8.0,
+        voice_duration=8.0,
+        compose_policy="match_video",
+        subtitle_key="deliver/tasks/hf-bind-upload/mm.srt",
+        subtitle_object_etag="etag-sub",
+        subtitle_content_hash="HASH_LATEST",
+        subtitle_sha256="sha256-sub",
+        compose_warning=None,
+        ffmpeg_cmd_used="ffmpeg -i ...",
+        overlay_subtitles=True,
+    )
+
+    monkeypatch.setattr(compose_module, "object_exists", lambda _key: True)
+    monkeypatch.setattr(compose_module, "object_head", lambda _key: {"content_length": 12000, "etag": "etag-final"})
+    monkeypatch.setattr(compose_module, "media_meta_from_head", lambda _head: (12000, None))
+
+    updates = svc._upload_and_verify(
+        "hf-bind-upload",
+        task,
+        final_path,
+        ws=ws,
+        final_size=12000,
+        final_duration=8.0,
+        compose_started_at="2026-03-21T11:14:00+00:00",
+        compose_policy=ws.compose_policy,
+        freeze_tail_cap_sec=8.0,
+        compose_warning=None,
+        ffmpeg_cmd_used=ws.ffmpeg_cmd_used,
+    )
+
+    assert updates["compose_status"] == "done"
+    assert updates["final_source_subtitles_content_hash"] == "HASH_LATEST"
+    assert updates["final_source_subtitle_storage_key"] == "deliver/tasks/hf-bind-upload/mm.srt"
+    assert updates["final_source_subtitle_storage_etag"] == "etag-sub"
+    assert updates["final_source_subtitle_sha256"] == "sha256-sub"
