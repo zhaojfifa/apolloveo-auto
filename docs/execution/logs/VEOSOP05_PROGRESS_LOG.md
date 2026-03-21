@@ -263,3 +263,26 @@
 - 不改 runtime logic
 - 不改 tests
 - 不扩第二条产线
+
+## PR-S0 Cleanup — Clean Advisory Entry Surface
+
+日期：2026-03-21
+
+本节点完成：
+
+- 将 Hot Follow workbench/operator-guidance 的 advisory-adjacent 只读聚合从 `hot_follow_api.py` 迁到窄职责 presenter
+- 保持 `workbench_hub` 的 payload shape 与现有 truth-source ownership 不变
+- 为后续 Skills MVP v0 advisory hook 预留更清晰的只读接入面
+
+本次收口说明：
+
+- router 继续保留 route ownership、request/response façade 与 payload 挂接
+- `artifact_facts`、`current_attempt`、`operator_summary` 这组只读 presentation aggregates 不再直接由 router 定义
+- 未引入 Skills logic、bundle loader、compose/publish/gate redesign
+
+本节点明确不做：
+
+- 不实现 Skills advisory
+- 不改 product behavior
+- 不改 compose / publish / ready gate 语义
+- 不扩第二条产线或 OpenClaw 范围
