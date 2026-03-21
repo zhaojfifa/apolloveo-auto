@@ -17,3 +17,4 @@ legacy 目录已归档到：
 - `ui/UI_I18N_LOCALE_BASELINE.md`
 - `skill-onboarding-baseline.md`
 - `media-compose-subtitle-burnin.md`
+- `skills/state_schema_four_layer_template.md`
