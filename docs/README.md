@@ -53,14 +53,17 @@
 4. `docs/baseline/PRODUCT_BASELINE.md`
 5. `docs/baseline/ARCHITECTURE_BASELINE.md`
 6. `docs/baseline/EXECUTION_BASELINE.md`
-7. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
-8. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
-9. `docs/runbooks/VERIFICATION_BASELINE.md`
-10. `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
-11. `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
-12. `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
-13. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
-14. `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`
+7. `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
+8. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
+9. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
+10. `docs/runbooks/VERIFICATION_BASELINE.md`
+11. `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+12. `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
+13. `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
+14. `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
+15. `docs/execution/SKILLS_MVP_ENTRY_REVIEW.md`
+16. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
+17. `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`
 
 ## Important Review References
 
@@ -68,6 +71,8 @@
 
 - `docs/reviews/ALIGNMENT_BASELINE_20260318.md`
   - 重要架构对齐文件，保留在 `reviews/`
+- `docs/reviews/ALIGNMENT_EXECUTION_REVIEW_20260321.md`
+  - 面向执行边界的后续对齐 review
 - `docs/reviews/REVIEW_AFTER_VEOSOP04_WITH_DEMINING_PRIORITY.md`
 - `docs/reviews/TASK_1_3_PORT_MERGE_PLAN.md`
 - `docs/reviews/TASK_2_0_COMPOSE_SURGERY.md`

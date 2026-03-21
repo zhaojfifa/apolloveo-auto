@@ -9,7 +9,10 @@
 - 当前阶段是 post-VeoSop05 的 Hot Follow cleanup continuation
 - business validation 已升级为 mandatory merge gate
 - 当前 source-of-truth 来自：
+  - `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
   - `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
+  - `docs/execution/SKILLS_MVP_ENTRY_REVIEW.md`
+  - `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
   - `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
   - `docs/runbooks/VERIFICATION_BASELINE.md`
 
@@ -35,6 +38,9 @@
 
 ## Read Next
 
+- `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
+- `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
+- `docs/execution/SKILLS_MVP_ENTRY_REVIEW.md`
 - `docs/execution/FROZEN_EXECUTION_PLAN_AFTER_VEOSOP04.md`
 - `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
 - `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`

@@ -22,7 +22,7 @@
 
 因此，本阶段只定义最窄的 Skills MVP entry boundary，不启动执行。
 
-## 2. Proposed First Hook
+## 2. First Hook Location
 
 第一个 Skills hook 应放在 Hot Follow workbench / operator guidance layer。
 
@@ -47,7 +47,7 @@
 - publish path 内
 - router entry 或 bridge compatibility 层内
 
-## 3. Input Contract for the First Hook
+## 3. Inputs
 
 Skills MVP v0 第一 hook 允许读取以下输入：
 
@@ -69,6 +69,11 @@ Skills MVP v0 第一 hook 允许读取以下输入：
   - `artifact_facts`
   - `current_attempt`
   - `operator_summary`
+- four-layer state contract 已暴露的只读事实
+  - object/source facts
+  - attempt facts
+  - derived freshness / ready gate facts
+  - presentation-safe aggregates
 - availability facts
   - subtitle/audio/final existence与url级事实
 
@@ -78,7 +83,7 @@ Skills MVP v0 第一 hook 允许读取以下输入：
 - 不允许把 legacy status 当成高于 artifact facts 的新真相
 - 不允许额外读取未冻结的 provider 内部状态作为决策主依据
 
-## 4. Output Contract for the First Hook
+## 4. Outputs
 
 Skills MVP v0 第一 hook 允许输出一个只读 advisory block，建议格式为结构化 dict：
 
@@ -103,11 +108,12 @@ Skills MVP v0 第一 hook 允许输出一个只读 advisory block，建议格式
 - advisory 不能覆盖 `ready_gate`、`pipeline`、`deliverables`、`artifact_facts`
 - advisory 不是新的 status / compose / publish contract
 
-## 5. Non-Goals
+## 5. Explicit Non-Goals
 
 Skills MVP v0 明确不做：
 
 - 不写 repo state
+- 不写 deliverables
 - 不 override status truth
 - 不触发 compose
 - 不触发 publish
@@ -117,12 +123,13 @@ Skills MVP v0 明确不做：
 - 不实现 multi-line Skills runtime
 - 不实现 Skills marketplace / provider expansion
 
-## 6. Merge Gate for Skills MVP Implementation
+## 6. Merge Gate
 
 任何 Skills MVP implementation PR 在合并前必须满足：
 
 - 入口位置仍然保持在 read-only advisory layer
 - 不改变 runtime ownership
+- `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md` 仍是输入模板基线
 - contract 文档同步更新：
   - `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
   - 相关 execution / runbook 文档
@@ -137,19 +144,3 @@ Skills MVP v0 明确不做：
   - it fixes / adds
   - it does not do
   - follow-up remains
-
-## 7. Open Risks
-
-若 scope 扩大，当前仍存在以下风险：
-
-- advisory 逻辑可能重新侵入 workbench truth derivation
-- compatibility helpers 可能再次变成实际 runtime owner
-- `hot_follow_api.py` 仍有 presentation residue，若直接加 Skills 容易继续膨胀 router
-- 若让 advisory 开始写状态或触发动作，会破坏当前 contract-first boundary
-- 若在未完成业务回归 gate 的情况下推进，会重复 PR-5 / PR-6 之前那类“测试过了但业务语义错了”的问题
-
-## Read Next
-
-1. `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
-2. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
-3. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`

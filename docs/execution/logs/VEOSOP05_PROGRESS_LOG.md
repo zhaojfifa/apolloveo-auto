@@ -240,3 +240,26 @@
 - 不改 runtime logic
 - 不改 gate / compose / publish ownership
 - 不启动第二条产线或 OpenClaw 相关工作
+
+## PR-S0 Docs Freeze — State Schema + Skills Entry Contract
+
+日期：2026-03-21
+
+本节点完成：
+
+- 将四层 state schema 正式提升为 contract 级输入模板
+- 冻结 Skills MVP entry review 的最小边界
+- 冻结 Skills MVP v0 advisory contract 的调用边界、输入、输出与失败回退行为
+
+本次冻结结论：
+
+- 四层 schema 的正式位置现在是 `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
+- Skills MVP v0 第一 hook 仍限制为 Hot Follow workbench / operator guidance layer 的 read-only advisory hook
+- 当前仅冻结 schema 与 contract，不代表 Skills runtime implementation 已开始
+
+本节点明确不做：
+
+- 不启动 Skills runtime
+- 不改 runtime logic
+- 不改 tests
+- 不扩第二条产线

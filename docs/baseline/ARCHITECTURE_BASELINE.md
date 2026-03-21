@@ -10,6 +10,7 @@
 - Hot Follow compose 主链已收口到 service contract 背后
 - router direct coupling 已清零
 - deliverables-first / status-derived 的方向已进入实际修复与展示逻辑
+- 四层 state schema 已在 Hot Follow 上形成第一条真实 reference implementation，但正式模板仍以 contract 文档为准
 
 ## Partial Reality
 
@@ -33,6 +34,7 @@
 
 ## Read Next
 
+- `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
 - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
 - `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
 - `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
