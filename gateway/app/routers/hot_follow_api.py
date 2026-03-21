@@ -2094,6 +2094,8 @@ async def rerun_hot_follow_dub(
                 provider=payload.provider,
                 voice_id=payload.voice_id,
                 mm_text=edited,
+                tts_speed=payload.tts_speed,
+                force=payload.force,
             )
     return await _rerun_dub_entry(task_id, payload, background_tasks, repo)
 
