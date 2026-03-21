@@ -1266,19 +1266,23 @@
     let html = "";
     // Final item — full width highlight
     if (finalItem) {
-      const status = escapeHtml(finalItem.status || finalItem.state || "pending");
+      const rawStatus = String(finalItem.status || finalItem.state || "pending").toLowerCase();
       const hasUrl = Boolean(finalItem.url);
-      const isDone = ["done", "ready", "success"].includes(status.toLowerCase());
-      const subtitle = !isDone && hasUrl
-        ? '<div class="mt-2 text-xs text-amber-700">当前最终成片待重新合成；这里保留的是上一版成功输出。</div>'
+      const isDone = ["done", "ready", "success"].includes(rawStatus);
+      // Stale: has a previous successful output but current inputs have changed
+      const isStale = !isDone && hasUrl;
+      const badgeLabel = isDone ? "当前有效输出" : (isStale ? "待重新合成" : "pending");
+      const badgeCls = isDone ? "bg-green-100 text-green-700" : (isStale ? "bg-amber-100 text-amber-700" : "bg-gray-100 text-gray-500");
+      const staleNote = isStale
+        ? '<div class="mt-2 text-xs text-amber-700">当前字幕或配音已更新；下方链接为上一版成功输出，重新合成后将更新为当前有效输出。</div>'
         : "";
       const actionLabel = isDone ? "Download" : "查看上一版";
-      html += `<div class="col-span-full rounded-xl border ${isDone ? "border-green-200 bg-green-50" : "border-gray-200"} p-4">
+      html += `<div class="col-span-full rounded-xl border ${isDone ? "border-green-200 bg-green-50" : (isStale ? "border-amber-200" : "border-gray-200")} p-4">
         <div class="flex items-center justify-between gap-3">
           <div class="text-base font-bold">${escapeHtml(finalItem.label || "Final Video")}</div>
-          <div class="text-xs rounded-full ${isDone ? "bg-green-100 text-green-700" : "bg-gray-100"} px-2 py-1">${status}</div>
+          <div class="text-xs rounded-full ${badgeCls} px-2 py-1">${escapeHtml(badgeLabel)}</div>
         </div>
-        ${subtitle}
+        ${staleNote}
         ${hasUrl ? `<a class="btn-primary mt-3 inline-block text-sm" href="${finalItem.url}" target="_blank" rel="noopener">${actionLabel}</a>` : '<span class="text-sm text-gray-500 mt-2 inline-block">Pending</span>'}
       </div>`;
     }
@@ -1442,14 +1446,12 @@
   async function rerunAudio() {
     const provider = ttsEngineEl ? ttsEngineEl.value : null;
     const voiceId = ttsVoiceEl ? ttsVoiceEl.value : null;
-    const subtitles = (currentHub && currentHub.subtitles) || {};
-    const textareaText = subtitlesTextEl ? subtitlesTextEl.value : "";
-    const fallbackText = subtitles.edited_text || subtitles.srt_text || subtitles.origin_text || "";
-    const dubText = (textareaText || "").trim() ? textareaText : fallbackText;
+    // Re-dub must only use the last saved official subtitle.
+    // Send empty mm_text so the backend loads from the saved mm_srt_path.
     const payload = {
       provider: provider === "edge_tts" ? "edge-tts" : (provider === "azure_speech" ? "azure-speech" : provider),
       voice_id: voiceId || null,
-      mm_text: dubText || "",
+      mm_text: "",
       tts_speed: getSelectedTtsSpeed(),
       force: true,
     };
