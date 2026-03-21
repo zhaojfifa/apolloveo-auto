@@ -13,5 +13,6 @@
 特别说明：
 
 - `ALIGNMENT_BASELINE_20260318.md` 是重要架构对齐文件
+- `ALIGNMENT_EXECUTION_REVIEW_20260321.md` 是面向执行边界的后续对齐 review
 - `_drafts/` 是更早的 source material
 - review 结论应沉淀到 `docs/baseline/` 与 `docs/execution/`
