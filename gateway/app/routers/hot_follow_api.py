@@ -118,6 +118,9 @@ from gateway.app.services.task_router_actions import (
     run_task_pipeline_entry as _run_task_pipeline_entry,
 )
 from gateway.app.services.compose_service import CompositionService, HotFollowComposeRequestContract
+from gateway.app.services.hot_follow_skills_advisory import (
+    maybe_build_hot_follow_advisory as _maybe_build_hot_follow_advisory,
+)
 from gateway.app.services.hot_follow_workbench_presenter import (
     build_hot_follow_artifact_facts as _build_hot_follow_artifact_facts,
     build_hot_follow_current_attempt_summary as _build_hot_follow_current_attempt_summary,
@@ -1777,6 +1780,9 @@ def get_hot_follow_workbench_hub(
                     item["historical"] = bool((payload.get("historical_final") or {}).get("exists"))
                     item["url"] = None
                     break
+    advisory = _maybe_build_hot_follow_advisory(task, payload)
+    if advisory is not None:
+        payload["advisory"] = advisory
     payload.update(_hot_follow_operational_defaults())
     payload.update(_safe_collect_hot_follow_workbench_ui(task, get_settings()))
     return payload

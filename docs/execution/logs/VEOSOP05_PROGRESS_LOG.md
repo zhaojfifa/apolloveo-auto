@@ -286,3 +286,27 @@
 - 不改 product behavior
 - 不改 compose / publish / ready gate 语义
 - 不扩第二条产线或 OpenClaw 范围
+
+## PR-S1 Skills MVP Skeleton
+
+日期：2026-03-21
+
+本节点完成：
+
+- 为 Hot Follow 增加最小 Skills bundle metadata resolution path
+- 增加 read-only advisory hook 的最小 skeleton interface
+- 将 no-op-safe advisory call path 挂到 Hot Follow workbench / operator guidance surface
+
+本次收口说明：
+
+- 仅支持 Hot Follow advisory skeleton
+- bundle resolution 仍为显式映射，不是 generalized plugin platform
+- advisory 默认 no-op，不改变当前业务可见行为
+- advisory 不拥有 repo write、deliverable write、compose/publish ownership 或 truth-source ownership
+
+本节点明确不做：
+
+- 不实现真实 advisory intelligence
+- 不实现第二条产线 skills
+- 不改 compose / publish / ready gate / status policy 主链
+- 不做 OpenClaw 或平台化扩张
