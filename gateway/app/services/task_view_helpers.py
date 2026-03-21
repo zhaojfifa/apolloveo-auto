@@ -483,10 +483,8 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     else:
         composed_reason = "final_missing"
 
-    final_info = {
+    historical_final_info = {
         "exists": final_exists,
-        "fresh": final_fresh,
-        "stale_reason": final_stale_reason,
         "key": str(final_key) if final_key else None,
         "size_bytes": int(final_size) if final_size is not None else None,
         "duration_ms": int(task.get("final_duration_ms"))
@@ -496,6 +494,22 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         "updated_at": task.get("final_updated_at"),
         "content_type": task.get("final_mime") or final_ctype or "video/mp4",
         "url": task_endpoint(task_id, "final")
+        if final_exists and int(final_size or 0) >= MIN_VIDEO_BYTES
+        else None,
+    }
+    final_info = {
+        "exists": final_fresh,
+        "fresh": final_fresh,
+        "stale_reason": final_stale_reason,
+        "key": str(final_key) if (final_fresh and final_key) else None,
+        "size_bytes": int(final_size) if final_size is not None else None,
+        "duration_ms": int(task.get("final_duration_ms"))
+        if task.get("final_duration_ms") is not None
+        else None,
+        "asset_version": str(final_asset_version) if (final_fresh and final_asset_version) else None,
+        "updated_at": task.get("final_updated_at") if final_fresh else None,
+        "content_type": task.get("final_mime") or final_ctype or "video/mp4",
+        "url": task_endpoint(task_id, "final")
         if final_fresh and int(final_size or 0) >= MIN_VIDEO_BYTES
         else None,
     }
@@ -503,6 +517,7 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         "composed_ready": composed_ready,
         "composed_reason": composed_reason,
         "final": final_info,
+        "historical_final": historical_final_info,
         "final_stale_reason": final_stale_reason,
         "final_fresh": final_fresh,
         "compose_error_reason": compose_error_reason,
@@ -617,11 +632,7 @@ def resolve_hub_final_url(
     final_info = (
         payload.get("final") if isinstance(payload.get("final"), dict) else {}
     )
-    final_exists_hint = bool(final_info.get("exists"))
-    compose_like_done = _compose_done_like(
-        payload.get("compose_status")
-    ) or _compose_done_like(payload.get("compose_last_status"))
-    if final_exists_hint or compose_like_done:
+    if bool(final_info.get("exists")):
         return task_endpoint(task_id, "final")
     return None
 
@@ -750,7 +761,6 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
 
     deliverables = {}
     for key, label in (
-        ("final_mp4", "final.mp4"),
         ("pack_zip", "pack.zip"),
         ("scenes_zip", "scenes.zip"),
         ("origin_srt", "origin.srt"),
@@ -789,10 +799,8 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
         "compose_last_status": task.get("compose_last_status"),
     }
     final_preview_url = resolve_hub_final_url(task_id, final_payload_probe)
-    composed_ready = bool(
-        final_preview_url or (composed.get("final") or {}).get("exists")
-    )
-    composed_reason = "ready" if composed_ready else "not_ready"
+    composed_ready = bool(composed.get("composed_ready"))
+    composed_reason = str(composed.get("composed_reason") or ("ready" if composed_ready else "not_ready"))
     if final_preview_url:
         final_item = dict(
             deliverables.get("final_mp4") or {"label": "final.mp4"}
@@ -813,6 +821,9 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
         "composed_ready": composed_ready,
         "composed_reason": composed_reason,
         "final": composed.get("final") or {"exists": False},
+        "historical_final": composed.get("historical_final") or {"exists": False},
+        "final_fresh": bool(composed.get("final_fresh")),
+        "final_stale_reason": composed.get("final_stale_reason"),
         "scene_pack": scene_pack,
         "scene_pack_pending_reason": scene_pack_pending_reason,
         "scene_pack_action_url": f"/tasks/{task_id}",

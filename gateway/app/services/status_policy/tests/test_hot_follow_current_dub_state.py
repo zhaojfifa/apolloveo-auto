@@ -21,6 +21,7 @@ except Exception:
 
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.services import voice_state as voice_state_service
 
 
 def _settings():
@@ -39,11 +40,20 @@ def _settings():
     )
 
 
+def _patch_voice_storage(monkeypatch, exists_fn, head_fn, meta_fn):
+    monkeypatch.setattr(voice_state_service, "object_exists", exists_fn)
+    monkeypatch.setattr(voice_state_service, "object_head", head_fn)
+    monkeypatch.setattr(voice_state_service, "media_meta_from_head", meta_fn)
+
+
 def test_fresh_matching_male_artifact_is_current_even_if_tokens_are_stale(monkeypatch):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: True)
-    monkeypatch.setattr(tasks_router, "object_head", lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"})
-    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (4096, "audio/mpeg"))
+    _patch_voice_storage(
+        monkeypatch,
+        lambda _key: True,
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
 
     task = {
         "task_id": "hf-male",
@@ -77,9 +87,12 @@ def test_fresh_matching_male_artifact_is_current_even_if_tokens_are_stale(monkey
 
 def test_stale_female_artifact_is_not_current_for_male_request(monkeypatch):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
-    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: True)
-    monkeypatch.setattr(tasks_router, "object_head", lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"})
-    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (4096, "audio/mpeg"))
+    _patch_voice_storage(
+        monkeypatch,
+        lambda _key: True,
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
 
     task = {
         "task_id": "hf-stale",
@@ -110,18 +123,13 @@ def test_stale_female_artifact_is_not_current_for_male_request(monkeypatch):
 def test_previous_final_can_coexist_with_failed_current_redub(monkeypatch, tmp_path):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
     monkeypatch.setattr(tasks_router, "task_base_dir", lambda _task_id: tmp_path / _task_id)
-    monkeypatch.setattr(tasks_router, "object_exists", lambda key: str(key).endswith(("audio_mm.mp3", "final.mp4")))
-    monkeypatch.setattr(
-        tasks_router,
-        "object_head",
+    _patch_voice_storage(
+        monkeypatch,
+        lambda key: str(key).endswith(("audio_mm.mp3", "final.mp4")),
         lambda key: {
             "ContentLength": "4096" if str(key).endswith("audio_mm.mp3") else "8192",
             "Content-Type": "audio/mpeg" if str(key).endswith("audio_mm.mp3") else "video/mp4",
         },
-    )
-    monkeypatch.setattr(
-        tasks_router,
-        "media_meta_from_head",
         lambda meta: (int(meta.get("ContentLength") or 0), str(meta.get("Content-Type") or "")),
     )
     # Also patch on hf_router since _collect_hot_follow_workbench_ui lives there
@@ -186,7 +194,7 @@ def test_rerun_presentation_reports_last_final_and_current_failure():
         "updated_at": "2026-03-14T09:55:00+00:00",
     }
 
-    presentation = hf_router._hf_rerun_presentation_state(task, voice_state, final_info, "failed")
+    presentation = hf_router._hf_rerun_presentation_state(task, voice_state, final_info, final_info, "failed")
 
     assert presentation["last_successful_output"]["final_exists"] is True
     assert presentation["last_successful_output"]["final_url"] == "/v1/tasks/hf-rerun-presentation/final"
@@ -217,7 +225,7 @@ def test_rerun_presentation_reports_current_success_without_regressing_baseline(
         "updated_at": "2026-03-14T09:58:00+00:00",
     }
 
-    presentation = hf_router._hf_rerun_presentation_state(task, voice_state, final_info, "done")
+    presentation = hf_router._hf_rerun_presentation_state(task, voice_state, final_info, final_info, "done")
 
     assert presentation["last_successful_output"]["final_exists"] is True
     assert presentation["current_attempt"]["dub_status"] == "done"
@@ -231,6 +239,12 @@ def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
         "hf-rerun-presentation",
         {},
         final_info={
+            "exists": True,
+            "url": "/v1/tasks/hf-rerun-presentation/final",
+            "asset_version": "etag-123",
+            "updated_at": "2026-03-14T09:55:00+00:00",
+        },
+        historical_final={
             "exists": True,
             "url": "/v1/tasks/hf-rerun-presentation/final",
             "asset_version": "etag-123",
@@ -279,6 +293,12 @@ def test_artifact_facts_and_operator_summary_preserve_voice_led_success_baseline
         "hf-success-presentation",
         {},
         final_info={
+            "exists": True,
+            "url": "/v1/tasks/hf-success-presentation/final",
+            "asset_version": "etag-456",
+            "updated_at": "2026-03-14T09:58:00+00:00",
+        },
+        historical_final={
             "exists": True,
             "url": "/v1/tasks/hf-success-presentation/final",
             "asset_version": "etag-456",
@@ -355,6 +375,12 @@ def test_screen_text_candidate_summary_prefers_normalized_text_for_subtitle_led(
 
 def test_collect_hot_follow_workbench_ui_does_not_keep_no_dub_when_audio_is_current(monkeypatch):
     monkeypatch.setattr(hf_router, "get_settings", _settings)
+    _patch_voice_storage(
+        monkeypatch,
+        lambda _key: True,
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
     monkeypatch.setattr(hf_router, "object_head", lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"})
     monkeypatch.setattr(hf_router, "media_meta_from_head", lambda _meta: (4096, "audio/mpeg"))
@@ -461,13 +487,14 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
     result = hf_router.patch_hot_follow_subtitles("hf-save", payload, repo=repo)
 
     assert repo.task["mm_srt_path"] == "deliver/tasks/hf-save/mm.srt"
+    assert repo.task["compose_status"] == "pending"
     assert result["subtitles"]["srt_text"].strip().endswith("မင်္ဂလာပါ")
 
 
 def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch, tmp_path):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
-    monkeypatch.setattr(tasks_router, "_hf_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})
-    monkeypatch.setattr(tasks_router, "_hf_dual_channel_state", lambda *_args, **_kwargs: {"content_mode": "voice_led"})
+    monkeypatch.setattr(tasks_router, "_compat_hot_follow_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})
+    monkeypatch.setattr(tasks_router, "_compat_hot_follow_dual_channel_state", lambda *_args, **_kwargs: {"content_mode": "voice_led"})
 
     class _Workspace:
         def __init__(self, task_id):

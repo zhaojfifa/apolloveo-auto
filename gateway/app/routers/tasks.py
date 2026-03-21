@@ -2874,6 +2874,9 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "dub_error": None,
                     "audio_sha256": audio_sha256,
                     "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+                    "compose_status": "pending",
+                    "compose_error": None,
+                    "compose_error_reason": None,
                     "config": {**config, "tts_completed_token": request_token},
                 },
             )
@@ -2950,6 +2953,9 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                         "dub_error": None,
                         "audio_sha256": audio_sha256,
                         "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+                        "compose_status": "pending",
+                        "compose_error": None,
+                        "compose_error_reason": None,
                         "config": {**config, "tts_completed_token": request_token},
                     },
                 )
@@ -3135,6 +3141,9 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "dub_error": None,
             "audio_sha256": audio_sha256,
             "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+            "compose_status": "pending",
+            "compose_error": None,
+            "compose_error_reason": None,
             "config": {**config, "tts_completed_token": request_token},
         },
     )

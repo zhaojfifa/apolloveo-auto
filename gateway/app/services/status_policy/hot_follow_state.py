@@ -1,11 +1,9 @@
-"""Hot Follow state inference (v2.0 — Declarative Ready Gate).
+"""Hot Follow state inference using the declarative ready-gate engine.
 
-Refactored in TASK-2.3: the L3/L4 readiness logic that was previously
-hardcoded as 120 lines of if/else is now delegated to the declarative
-``evaluate_ready_gate()`` engine with a line-bound ready-gate spec.
-
-The function signature and output format of ``compute_hot_follow_state()``
-are **identical** to pre-refactor — callers require zero changes.
+Business contract:
+- ``state["final"]`` is the current final only and must be fresh.
+- ``state["historical_final"]`` tracks previously successful physical output.
+- Physical file existence does not imply current-ready.
 """
 
 from __future__ import annotations
@@ -16,11 +14,6 @@ from gateway.app.services.ready_gate import evaluate_ready_gate
 from gateway.app.services.status_policy.registry import get_status_runtime_binding
 
 
-# ---------------------------------------------------------------------------
-# Helpers (unchanged from pre-refactor)
-# ---------------------------------------------------------------------------
-
-
 def _as_dict(value: Any) -> Dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
@@ -29,110 +22,118 @@ def _as_list(value: Any) -> list[Any]:
     return value if isinstance(value, list) else []
 
 
-def _pick_final(task: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
+def _pick_current_final(task: Dict[str, Any], state: Dict[str, Any]) -> Dict[str, Any]:
     final = _as_dict(state.get("final")) or _as_dict(task.get("final"))
     if bool(final.get("exists")):
-        return final
-
-    for d in _as_list(state.get("deliverables")):
-        if not isinstance(d, dict):
-            continue
-        if str(d.get("kind") or "").strip().lower() == "final":
-            if str(d.get("status") or d.get("state") or "").strip().lower() == "done" or d.get("url"):
-                return {
-                    "exists": True,
-                    "key": d.get("key"),
-                    "url": d.get("url"),
-                    "content_type": "video/mp4",
-                }
-
-    deliverables = _as_dict(state.get("deliverables"))
-    final_item = _as_dict(deliverables.get("final_mp4"))
-    if final_item.get("url"):
-        return {
-            "exists": True,
-            "key": final_item.get("key"),
-            "url": final_item.get("url"),
-            "content_type": "video/mp4",
-        }
-
+        return dict(final)
     return {"exists": False}
 
 
-def _resolve_final_url(task_id: str, task: Dict[str, Any], state: Dict[str, Any], final: Dict[str, Any]) -> tuple[str | None, bool]:
+def _pick_historical_final(
+    task: Dict[str, Any],
+    state: Dict[str, Any],
+    current_final: Dict[str, Any],
+) -> Dict[str, Any]:
+    historical = _as_dict(state.get("historical_final"))
+    if historical:
+        return dict(historical)
+    if bool(current_final.get("exists")):
+        return dict(current_final)
+    task_final = _as_dict(task.get("historical_final")) or _as_dict(task.get("final"))
+    if task_final:
+        return dict(task_final)
+    return {"exists": False}
+
+
+def _resolve_current_final_url(
+    task_id: str,
+    task: Dict[str, Any],
+    state: Dict[str, Any],
+    current_final: Dict[str, Any],
+) -> str | None:
+    if not bool(current_final.get("exists")):
+        return None
     deliverables = state.get("deliverables")
-    evidence = bool(final.get("exists"))
-    url = None
     if isinstance(deliverables, dict):
-        url = _as_dict(deliverables.get("final_mp4")).get("url")
-        evidence = evidence or bool(_as_dict(deliverables.get("final_mp4")))
-    if not url:
-        for d in _as_list(deliverables):
-            if not isinstance(d, dict):
+        final_item = _as_dict(deliverables.get("final_mp4"))
+        if final_item.get("url"):
+            return str(final_item.get("url"))
+    if isinstance(deliverables, list):
+        for row in deliverables:
+            if not isinstance(row, dict):
                 continue
-            if str(d.get("kind") or "").strip().lower() == "final":
-                evidence = evidence or str(d.get("status") or d.get("state") or "").strip().lower() == "done" or bool(d.get("key"))
-                if d.get("url"):
-                    url = d.get("url")
-                    break
+            if str(row.get("kind") or "").strip().lower() == "final" and row.get("url"):
+                return str(row.get("url"))
     media = _as_dict(state.get("media")) or _as_dict(task.get("media"))
     extra = _as_dict(state.get("extra")) or _as_dict(task.get("extra"))
-    url = (
-        url
-        or media.get("final_url")
-        or media.get("final_video_url")
-        or extra.get("final_video_url")
-        or state.get("final_url")
-        or state.get("final_video_url")
-        or final.get("url")
-        or None
-    )
-    if url:
-        return str(url), True
-    compose = _as_dict(state.get("compose"))
-    compose_last = _as_dict(compose.get("last"))
-    compose_status = str(compose_last.get("status") or state.get("compose_status") or task.get("compose_status") or "").strip().lower()
-    evidence = evidence or compose_status in {"done", "ready", "success", "completed"}
-    if evidence and task_id:
-        return f"/v1/tasks/{task_id}/final", True
-    return None, evidence
+    for candidate in (
+        current_final.get("url"),
+        media.get("final_url"),
+        media.get("final_video_url"),
+        extra.get("final_video_url"),
+        state.get("final_url"),
+        state.get("final_video_url"),
+    ):
+        if candidate:
+            return str(candidate)
+    if task_id:
+        return f"/v1/tasks/{task_id}/final"
+    return None
 
 
-# ---------------------------------------------------------------------------
-# Phase ①: Artifact resolution (side effects on state dict)
-# ---------------------------------------------------------------------------
+def _resolve_historical_final_url(
+    task_id: str,
+    state: Dict[str, Any],
+    historical_final: Dict[str, Any],
+    current_final_url: str | None,
+) -> str | None:
+    if current_final_url:
+        return current_final_url
+    if historical_final.get("url"):
+        return str(historical_final.get("url"))
+    if bool(historical_final.get("exists")) and task_id:
+        return f"/v1/tasks/{task_id}/final"
+    return None
 
 
 def _resolve_artifacts(task_id: str, task: Dict[str, Any], state: Dict[str, Any]) -> None:
-    """Resolve final video existence and patch state with URLs/deliverables.
+    current_final = _pick_current_final(task, state)
+    historical_final = _pick_historical_final(task, state, current_final)
 
-    This is pure side-effect code — it writes to *state* so that downstream
-    consumers (workbench hub response) get correct URLs.  Unchanged from
-    pre-refactor lines 95-149.
-    """
-    final = _pick_final(task, state)
-    final_url, final_evidence = _resolve_final_url(task_id, task, state, final)
-    final_exists = bool(final.get("exists") or final_evidence)
-    if final_exists and not final_url and task_id:
-        final_url = f"/v1/tasks/{task_id}/final"
+    current_exists = bool(current_final.get("exists"))
+    historical_exists = bool(historical_final.get("exists") or current_exists)
+    current_final_url = _resolve_current_final_url(task_id, task, state, current_final)
+    historical_final_url = _resolve_historical_final_url(
+        task_id, state, historical_final, current_final_url if current_exists else None
+    )
 
-    final_out = dict(final)
-    final_out["exists"] = final_exists
-    if final_url and not final_out.get("url"):
-        final_out["url"] = final_url
-    state["final"] = final_out
+    current_out = dict(current_final)
+    current_out["exists"] = current_exists
+    current_out["url"] = current_final_url if current_exists else None
+    if not current_exists:
+        current_out["key"] = None
+
+    historical_out = dict(historical_final)
+    historical_out["exists"] = historical_exists
+    historical_out["url"] = historical_final_url if historical_exists else None
+
+    state["final"] = current_out
+    state["historical_final"] = historical_out
 
     media = dict(_as_dict(state.get("media")))
-    media["final_url"] = final_url
-    media["final_video_url"] = final_url
+    media["final_url"] = current_final_url if current_exists else None
+    media["final_video_url"] = current_final_url if current_exists else None
     state["media"] = media
-    state["final_url"] = final_url
-    state["final_video_url"] = final_url
+    state["final_url"] = current_final_url if current_exists else None
+    state["final_video_url"] = current_final_url if current_exists else None
 
     if isinstance(state.get("deliverables"), dict):
         deliverables = dict(state.get("deliverables") or {})
         final_item = dict(_as_dict(deliverables.get("final_mp4")) or {"label": "final.mp4"})
-        final_item["url"] = final_url
+        final_item["url"] = current_final_url if current_exists else None
+        final_item["historical"] = bool(historical_exists and not current_exists)
+        final_item["status"] = "done" if current_exists else "pending"
+        final_item["state"] = "done" if current_exists else "pending"
         deliverables["final_mp4"] = final_item
         state["deliverables"] = deliverables
     elif isinstance(state.get("deliverables"), list):
@@ -144,10 +145,10 @@ def _resolve_artifacts(task_id: str, task: Dict[str, Any], state: Dict[str, Any]
                 continue
             row = dict(item)
             if str(row.get("kind") or "").strip().lower() == "final":
-                row["url"] = final_url
-                if final_exists:
-                    row["status"] = "done"
-                    row["state"] = "done"
+                row["url"] = current_final_url if current_exists else None
+                row["historical"] = bool(historical_exists and not current_exists)
+                row["status"] = "done" if current_exists else "pending"
+                row["state"] = "done" if current_exists else "pending"
                 seen_final = True
             patched.append(row)
         if not seen_final:
@@ -156,97 +157,70 @@ def _resolve_artifacts(task_id: str, task: Dict[str, Any], state: Dict[str, Any]
                     "kind": "final",
                     "title": "Final Video",
                     "label": "Final Video",
-                    "key": None,
-                    "url": final_url,
-                    "status": "done" if final_exists else "pending",
-                    "state": "done" if final_exists else "pending",
+                    "key": current_out.get("key"),
+                    "url": current_final_url if current_exists else None,
+                    "status": "done" if current_exists else "pending",
+                    "state": "done" if current_exists else "pending",
                     "size": None,
                     "sha256": None,
+                    "historical": bool(historical_exists and not current_exists),
                 }
             )
         state["deliverables"] = patched
 
 
-# ---------------------------------------------------------------------------
-# Phase ③: Gate side-effect application
-# ---------------------------------------------------------------------------
-
-
 def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any]) -> None:
-    """Apply compose/pipeline/deliverables mutations based on gate result.
+    compose_ready = bool(gate_result["compose_ready"])
+    historical_exists = bool((_as_dict(state.get("historical_final"))).get("exists"))
 
-    Unchanged from pre-refactor lines 190-250.
-    """
-    compose_ready = gate_result["compose_ready"]
-
-    # Compose status
     compose = dict(_as_dict(state.get("compose")))
     last = dict(_as_dict(compose.get("last")))
     if compose_ready:
         last["status"] = "done"
         last["error"] = None
         state["compose_status"] = "done"
-    elif last:
-        last["status"] = "pending"
+    else:
+        if last:
+            last["status"] = "pending"
+        state["compose_status"] = "pending"
     if last:
         compose["last"] = last
     state["compose"] = compose
 
-    # Pipeline status
     pipeline = list(_as_list(state.get("pipeline")))
-    if compose_ready and pipeline:
-        for step in pipeline:
-            if not isinstance(step, dict):
-                continue
-            if str(step.get("key") or "").strip().lower() == "compose":
-                step["status"] = "done"
-                step["state"] = "done"
-                step["error"] = None
-                step["message"] = step.get("message") or "final video merge"
-    elif pipeline:
-        for step in pipeline:
-            if not isinstance(step, dict):
-                continue
-            if str(step.get("key") or "").strip().lower() == "compose":
-                step["status"] = "pending"
-                step["state"] = "pending"
+    for step in pipeline:
+        if not isinstance(step, dict):
+            continue
+        if str(step.get("key") or "").strip().lower() != "compose":
+            continue
+        step["status"] = "done" if compose_ready else "pending"
+        step["state"] = "done" if compose_ready else "pending"
+        if compose_ready:
+            step["error"] = None
+            step["message"] = step.get("message") or "final video merge"
     state["pipeline"] = pipeline
 
-    # Deliverables status
     if isinstance(state.get("deliverables"), list):
         for item in state.get("deliverables") or []:
             if not isinstance(item, dict):
                 continue
-            if str(item.get("kind") or "").strip().lower() == "final":
-                item["status"] = "done" if compose_ready else "pending"
-                item["state"] = "done" if compose_ready else "pending"
-                break
-
-
-# ---------------------------------------------------------------------------
-# Public API (signature unchanged)
-# ---------------------------------------------------------------------------
+            if str(item.get("kind") or "").strip().lower() != "final":
+                continue
+            item["status"] = "done" if compose_ready else "pending"
+            item["state"] = "done" if compose_ready else "pending"
+            item["historical"] = bool(historical_exists and not compose_ready)
+            if not compose_ready:
+                item["url"] = None
+            break
 
 
 def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    """Compute the operational readiness state for a Hot Follow task.
-
-    Operational policy for Hot Follow v1.9/2.0:
-      1. execution state = runtime step result
-      2. artifact truth = actual current generated outputs
-      3. operational readiness = operator-facing readiness derived from artifacts
-      4. legacy/status summary fields are compatibility-only, not the source of truth
-
-    Returns *state* with ``ready_gate`` dict (9 fields) and side-effect
-    mutations on compose/pipeline/deliverables status.
-    """
     state: Dict[str, Any] = dict(base_state or {})
     task_id = str(state.get("task_id") or task.get("task_id") or task.get("id") or "")
 
     state.setdefault("task_id", task_id)
     state.setdefault("kind", task.get("kind", "hot_follow"))
 
-    # ① Artifact resolution (side effects on state)
     _resolve_artifacts(task_id, task, state)
 
     runtime_task = dict(task)
@@ -257,13 +231,15 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
             f"ready gate spec is not bound for task kind={binding.kind or state.get('kind')!r}"
         )
 
-    # ② Declarative ready-gate evaluation (pure function)
     gate_result = evaluate_ready_gate(binding.ready_gate_spec, task, state)
-
-    # ③ Side-effect application (compose status, pipeline, deliverables)
     _apply_gate_side_effects(state, gate_result)
 
-    state["composed_ready"] = gate_result["compose_ready"]
-    state["composed_reason"] = "ready" if gate_result["compose_ready"] else "not_ready"
+    composed_ready = bool(gate_result["compose_ready"])
+    state["composed_ready"] = composed_ready
+    state["composed_reason"] = (
+        "ready"
+        if composed_ready
+        else str(state.get("final_stale_reason") or state.get("composed_reason") or "not_ready")
+    )
     state["ready_gate"] = gate_result
     return state
