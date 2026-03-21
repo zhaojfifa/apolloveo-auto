@@ -261,12 +261,15 @@ class TestAfterRecompose:
     def test_revision_snapshot_fields_are_written_by_upload_and_verify(self):
         """Integration: verify _upload_and_verify would write snapshot keys."""
         from gateway.app.services.compose_service import CompositionService
-        # The return dict of _upload_and_verify must include the 4 source snapshot fields.
+        # The return dict of _upload_and_verify must include actual burned subtitle snapshot fields.
         expected_keys = {
             "final_source_audio_sha256",
             "final_source_dub_generated_at",
             "final_source_subtitles_content_hash",
             "final_source_subtitle_updated_at",
+            "final_source_subtitle_storage_key",
+            "final_source_subtitle_storage_etag",
+            "final_source_subtitle_sha256",
         }
         import inspect
         src = inspect.getsource(CompositionService._upload_and_verify)
@@ -313,7 +316,7 @@ class TestComputeComposedStateReturnShape:
         assert final_fresh is True
 
     def test_upload_and_verify_contains_snapshot_keys(self):
-        """Integration: _upload_and_verify must persist 4 compose snapshot fields."""
+        """Integration: _upload_and_verify must persist actual burned subtitle snapshot fields."""
         import inspect
         from gateway.app.services.compose_service import CompositionService
         src = inspect.getsource(CompositionService._upload_and_verify)
@@ -322,6 +325,9 @@ class TestComputeComposedStateReturnShape:
             "final_source_dub_generated_at",
             "final_source_subtitles_content_hash",
             "final_source_subtitle_updated_at",
+            "final_source_subtitle_storage_key",
+            "final_source_subtitle_storage_etag",
+            "final_source_subtitle_sha256",
         ):
             assert f'"{key}"' in src, f"Missing snapshot key in _upload_and_verify: {key}"
 

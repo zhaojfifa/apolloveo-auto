@@ -12,6 +12,7 @@ Historical bug-fix preservation:
 
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import shutil
@@ -113,6 +114,20 @@ def _current_final_is_fresh(
     if not composed_sub_hash and not composed_sub_at and current_sub_hash:
         return False
     return True
+
+
+def _subtitle_content_hash(text: str | None) -> str | None:
+    source = "" if text is None else str(text)
+    if not source:
+        return None
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
+
+
+def _read_text_compat(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return path.read_text(encoding="utf-8", errors="ignore")
 
 
 def compose_fail(
@@ -227,6 +242,10 @@ class _WorkspaceFiles:
     video_duration: float
     voice_duration: float
     compose_policy: str
+    subtitle_key: str | None = None
+    subtitle_object_etag: str | None = None
+    subtitle_content_hash: str | None = None
+    subtitle_sha256: str | None = None
     compose_warning: str | None = None
     ffmpeg_cmd_used: str | None = None
     overlay_subtitles: bool = True
@@ -758,6 +777,10 @@ class CompositionService:
         bundled_fonts_dir = Path(__file__).resolve().parents[1] / "assets" / "fonts"
         bundled_myanmar_ttf = bundled_fonts_dir / "NotoSansMyanmar-Regular.ttf"
         overlay_subtitles = inputs.overlay_subtitles
+        subtitle_key_used: str | None = None
+        subtitle_object_etag: str | None = None
+        subtitle_content_hash: str | None = None
+        subtitle_sha256: str | None = None
 
         if overlay_subtitles:
             if not bundled_myanmar_ttf.exists() or bundled_myanmar_ttf.stat().st_size == 0:
@@ -765,6 +788,13 @@ class CompositionService:
             subtitle_key = subtitle_resolver(task, task_id, inputs.target_lang)
             if not subtitle_key:
                 compose_fail("subtitles_missing", "overlay_subtitles enabled but target subtitle key is missing")
+            subtitle_key_used = str(subtitle_key)
+            subtitle_meta = object_head(subtitle_key_used)
+            subtitle_object_etag = (
+                str(subtitle_meta.get("etag") or "").strip() or None
+                if isinstance(subtitle_meta, dict)
+                else None
+            )
             self._storage.download_file(str(subtitle_key), str(subtitle_path))
             if not subtitle_path.exists() or subtitle_path.stat().st_size == 0:
                 if inputs.subtitle_only_compose:
@@ -773,6 +803,29 @@ class CompositionService:
                     overlay_subtitles = False
                 else:
                     compose_fail("subtitles_missing", "overlay_subtitles enabled but subtitle file is empty")
+            if overlay_subtitles:
+                subtitle_text = _read_text_compat(subtitle_path)
+                subtitle_content_hash = _subtitle_content_hash(subtitle_text)
+                subtitle_sha256 = sha256_file(subtitle_path)
+                expected_subtitle_hash = str(task.get("subtitles_content_hash") or "").strip() or None
+                logger.info(
+                    "COMPOSE_SUBTITLE_BOUND",
+                    extra={
+                        "task_id": task_id,
+                        "subtitle_key": subtitle_key_used,
+                        "subtitle_etag": subtitle_object_etag,
+                        "expected_subtitle_hash": expected_subtitle_hash,
+                        "downloaded_subtitle_hash": subtitle_content_hash,
+                    },
+                )
+                if expected_subtitle_hash and subtitle_content_hash and expected_subtitle_hash != subtitle_content_hash:
+                    compose_fail(
+                        "subtitle_revision_mismatch",
+                        (
+                            "downloaded authoritative subtitle does not match current saved subtitle "
+                            f"(expected {expected_subtitle_hash}, got {subtitle_content_hash})"
+                        ),
+                    )
 
         # ── BGM download ──
         bgm_path: Path | None = None
@@ -793,6 +846,10 @@ class CompositionService:
             video_duration=video_duration,
             voice_duration=voice_duration,
             compose_policy=compose_policy,
+            subtitle_key=subtitle_key_used,
+            subtitle_object_etag=subtitle_object_etag,
+            subtitle_content_hash=subtitle_content_hash,
+            subtitle_sha256=subtitle_sha256,
             compose_warning=compose_warning,
             overlay_subtitles=overlay_subtitles,
         )
@@ -1205,8 +1262,13 @@ class CompositionService:
             # detect when subtitle or audio changed after the last compose ran.
             "final_source_audio_sha256": str(task.get("audio_sha256") or "").strip() or None,
             "final_source_dub_generated_at": str(task.get("dub_generated_at") or "").strip() or None,
-            "final_source_subtitles_content_hash": str(task.get("subtitles_content_hash") or "").strip() or None,
+            "final_source_subtitles_content_hash": ws.subtitle_content_hash
+            or str(task.get("subtitles_content_hash") or "").strip()
+            or None,
             "final_source_subtitle_updated_at": str(task.get("subtitles_override_updated_at") or "").strip() or None,
+            "final_source_subtitle_storage_key": ws.subtitle_key,
+            "final_source_subtitle_storage_etag": ws.subtitle_object_etag,
+            "final_source_subtitle_sha256": ws.subtitle_sha256,
             "compose_provider": "ffmpeg",
             "compose_version": int(task.get("compose_version") or 0) + 1,
             "compose_status": "done",

@@ -445,15 +445,32 @@ def _hf_subtitles_override_path(task_id: str) -> Path:
     return task_base_dir(task_id) / "subtitles" / "subtitles_override.srt"
 
 
+def _hf_subtitle_content_hash(text: str | None) -> str | None:
+    source = "" if text is None else str(text)
+    if not source:
+        return None
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
+
+
 def _hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text: str | None = None) -> str | None:
-    text = str(saved_text if saved_text is not None else _hf_load_subtitles_text(task_id, task) or "").strip()
+    text = str(saved_text if saved_text is not None else _hf_load_subtitles_text(task_id, task) or "")
+    desired_hash = _hf_subtitle_content_hash(text)
     current_key = _task_key(task, "mm_srt_path")
     if current_key and object_exists(str(current_key)):
         head = object_head(str(current_key))
         size, _ = media_meta_from_head(head)
         if int(size or 0) > 0:
-            return str(current_key)
-    if not text:
+            current_bytes = get_object_bytes(str(current_key))
+            current_text = None
+            if current_bytes:
+                try:
+                    current_text = current_bytes.decode("utf-8")
+                except Exception:
+                    current_text = current_bytes.decode("utf-8", errors="ignore")
+            current_hash = _hf_subtitle_content_hash(current_text)
+            if desired_hash and current_hash == desired_hash:
+                return str(current_key)
+    if not text.strip():
         return str(current_key) if current_key else None
 
     workspace = Workspace(task_id)
@@ -1920,7 +1937,7 @@ def patch_hot_follow_subtitles(
         raise HTTPException(status_code=404, detail="Task not found")
     text, text_mode = _hf_normalize_subtitles_save_text(task, payload.srt_text or "")
     # Phase 0.2: compute content hash for revision consistency
-    _subtitle_content_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16] if text else None
+    _subtitle_content_hash = _hf_subtitle_content_hash(text)
     override_path = _hf_subtitles_override_path(task_id)
     override_path.parent.mkdir(parents=True, exist_ok=True)
     override_path.write_text(text, encoding="utf-8")
