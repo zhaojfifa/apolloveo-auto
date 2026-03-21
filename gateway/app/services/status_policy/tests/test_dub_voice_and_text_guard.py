@@ -98,7 +98,7 @@ def test_hot_follow_reconcile_compose_done_from_final_exists():
         {"task_id": "hf-1", "compose_status": "pending"},
         {
             "task_id": "hf-1",
-            "final": {"exists": True},
+            "final": {"exists": True, "fresh": True},
             "compose": {"last": {"status": "pending"}},
             "audio": {"status": "done", "tts_voice": "my-MM-NilarNeural", "voiceover_url": "/a.mp3", "audio_ready": True},
             "pipeline": [{"key": "compose", "status": "pending", "state": "pending", "message": ""}],
