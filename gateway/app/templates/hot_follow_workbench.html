@@ -62,7 +62,18 @@
               </div>
               <div class="rounded-xl border border-gray-200 p-4">
                 <div class="text-xs text-gray-500">{{ t("label.source_url") }}</div>
-                <div class="mt-1 truncate">{{ source_url }}</div>
+                <div id="hf_source_url_view_block" class="mt-1">
+                  <div id="hf_source_url_text" class="truncate">{{ source_url }}</div>
+                  <button id="hf_source_url_edit_btn" type="button" class="mt-2 btn-secondary text-xs">编辑链接</button>
+                </div>
+                <div id="hf_source_url_edit_block" class="mt-1 hidden">
+                  <textarea id="hf_source_url_input" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" rows="3">{{ source_url if source_url != "-" else "" }}</textarea>
+                  <div class="mt-2 flex items-center gap-2">
+                    <button id="hf_source_url_save_btn" type="button" class="btn-secondary text-xs">保存链接</button>
+                    <button id="hf_source_url_cancel_btn" type="button" class="btn-secondary text-xs">取消</button>
+                  </div>
+                </div>
+                <div id="hf_source_url_msg" class="mt-2 text-xs text-gray-500"></div>
               </div>
             </div>
           </div>

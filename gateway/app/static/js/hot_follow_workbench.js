@@ -165,6 +165,14 @@
   const sourcePosterEl = document.getElementById("hf_source_poster");
   const sourceLinkEl = document.getElementById("hf_source_video_link");
   const finalLinkEl = document.getElementById("hf_final_video_link");
+  const sourceUrlViewBlockEl = document.getElementById("hf_source_url_view_block");
+  const sourceUrlTextEl = document.getElementById("hf_source_url_text");
+  const sourceUrlEditBtn = document.getElementById("hf_source_url_edit_btn");
+  const sourceUrlEditBlockEl = document.getElementById("hf_source_url_edit_block");
+  const sourceUrlInputEl = document.getElementById("hf_source_url_input");
+  const sourceUrlSaveBtn = document.getElementById("hf_source_url_save_btn");
+  const sourceUrlCancelBtn = document.getElementById("hf_source_url_cancel_btn");
+  const sourceUrlMsgEl = document.getElementById("hf_source_url_msg");
   const tabSourceEl = document.getElementById("hf-tab-source");
   const tabFinalEl = document.getElementById("hf-tab-final");
   const composeConfirmEl = document.getElementById("hf_compose_confirm");
@@ -220,6 +228,7 @@
   let assistedInputDirty = false;
   let assistedInputHydrated = false;
   let composeSubmissionRevision = "";
+  let sourceUrlEditing = false;
 
   function readAssistedInputDraft() {
     try {
@@ -346,6 +355,25 @@
     } catch (_) {
       return String(url);
     }
+  }
+
+  function getCurrentSourceUrl() {
+    const input = (currentHub && currentHub.input) || {};
+    const task = (currentHub && currentHub.task) || {};
+    const seed = window.__TASK_JSON__ || {};
+    return String(input.source_url || task.source_url || seed.source_url || "").trim();
+  }
+
+  function setSourceUrlEditMode(editing) {
+    sourceUrlEditing = Boolean(editing);
+    if (sourceUrlViewBlockEl) sourceUrlViewBlockEl.classList.toggle("hidden", sourceUrlEditing);
+    if (sourceUrlEditBlockEl) sourceUrlEditBlockEl.classList.toggle("hidden", !sourceUrlEditing);
+  }
+
+  function renderSourceUrlEditor() {
+    const value = getCurrentSourceUrl();
+    if (sourceUrlTextEl) sourceUrlTextEl.textContent = value || "-";
+    if (sourceUrlInputEl && !sourceUrlEditing) sourceUrlInputEl.value = value;
   }
 
   function setMediaSrcStable(el, url, label, assetVersion) {
@@ -1202,6 +1230,7 @@
     renderDeliverables();
     renderEvents();
     renderConsistencyPanel();
+    renderSourceUrlEditor();
     updateComposeButtonState();
     const composeWarning = ((currentHub && currentHub.compose) || {}).warning;
     if (composeMsgEl && composeWarning) composeMsgEl.textContent = String(composeWarning);
@@ -1228,6 +1257,16 @@
       body: JSON.stringify(payload || {}),
     });
     if (!res.ok) throw new Error((await res.text()) || "save audio config failed");
+    return res.json();
+  }
+
+  async function patchSourceUrl(sourceUrl) {
+    const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/source_url`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source_url: String(sourceUrl || "") }),
+    });
+    if (!res.ok) throw new Error((await res.text()) || "save source url failed");
     return res.json();
   }
 
@@ -1434,6 +1473,40 @@
 
   if (tabSourceEl) tabSourceEl.addEventListener("click", (e) => { e.preventDefault(); setTab("source"); });
   if (tabFinalEl) tabFinalEl.addEventListener("click", (e) => { e.preventDefault(); setTab("final"); });
+  if (sourceUrlEditBtn) {
+    sourceUrlEditBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (sourceUrlMsgEl) sourceUrlMsgEl.textContent = "";
+      setSourceUrlEditMode(true);
+      if (sourceUrlInputEl) sourceUrlInputEl.focus();
+    });
+  }
+  if (sourceUrlCancelBtn) {
+    sourceUrlCancelBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      if (sourceUrlMsgEl) sourceUrlMsgEl.textContent = "";
+      setSourceUrlEditMode(false);
+      renderSourceUrlEditor();
+    });
+  }
+  if (sourceUrlSaveBtn) {
+    sourceUrlSaveBtn.addEventListener("click", async (e) => {
+      e.preventDefault();
+      const next = sourceUrlInputEl ? String(sourceUrlInputEl.value || "").trim() : "";
+      try {
+        sourceUrlSaveBtn.disabled = true;
+        if (sourceUrlMsgEl) sourceUrlMsgEl.textContent = "保存中...";
+        await patchSourceUrl(next);
+        await loadHub();
+        setSourceUrlEditMode(false);
+        if (sourceUrlMsgEl) sourceUrlMsgEl.textContent = "链接已更新";
+      } catch (err) {
+        if (sourceUrlMsgEl) sourceUrlMsgEl.textContent = err.message || "save source url failed";
+      } finally {
+        sourceUrlSaveBtn.disabled = false;
+      }
+    });
+  }
   if (finalVideoEl) {
     finalVideoEl.addEventListener("error", async () => {
       const finalUrl = resolveFinalUrl(currentHub || {});

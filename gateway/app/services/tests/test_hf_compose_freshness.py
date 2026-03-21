@@ -508,3 +508,63 @@ class TestStateTransitions:
 
         stale = compute_final_staleness(task, final_exists=True, compose_done=True)
         assert stale is None
+
+
+class TestCurrentVsHistoricalExposure:
+    def test_current_final_healthy_does_not_duplicate_into_historical(self, monkeypatch):
+        task = {
+            "task_id": "hf-current-only",
+            "compose_status": "done",
+            "compose_last_status": "done",
+            "raw_path": "deliver/tasks/hf-current-only/raw/raw.mp4",
+            "mm_audio_key": "deliver/tasks/hf-current-only/audio_mm.mp3",
+            "final_video_key": "deliver/tasks/hf-current-only/final.mp4",
+            "audio_sha256": "SHA_A",
+            "final_source_audio_sha256": "SHA_A",
+            "subtitles_content_hash": "HASH_A",
+            "final_source_subtitles_content_hash": "HASH_A",
+            "final_updated_at": _ts(minutes_ago=1),
+        }
+        monkeypatch.setattr("gateway.app.services.task_view_helpers.object_exists", lambda _key: True)
+        monkeypatch.setattr(
+            "gateway.app.services.task_view_helpers.object_head",
+            lambda _key: {"content_length": 999999, "content_type": "video/mp4", "etag": "etag-final"},
+        )
+        monkeypatch.setattr(
+            "gateway.app.services.voice_state.collect_voice_execution_state",
+            lambda _task, _settings: {"audio_ready": True, "audio_ready_reason": "ready"},
+        )
+
+        composed = compute_composed_state(task, "hf-current-only")
+        assert composed["final"]["exists"] is True
+        assert composed["final"]["fresh"] is True
+        assert composed["historical_final"]["exists"] is False
+
+    def test_stale_current_final_exposes_historical_fallback(self, monkeypatch):
+        task = {
+            "task_id": "hf-historical-fallback",
+            "compose_status": "done",
+            "compose_last_status": "done",
+            "raw_path": "deliver/tasks/hf-historical-fallback/raw/raw.mp4",
+            "mm_audio_key": "deliver/tasks/hf-historical-fallback/audio_mm.mp3",
+            "final_video_key": "deliver/tasks/hf-historical-fallback/final.mp4",
+            "audio_sha256": "SHA_A",
+            "final_source_audio_sha256": "SHA_A",
+            "subtitles_content_hash": "HASH_B",
+            "final_source_subtitles_content_hash": "HASH_A",
+            "final_updated_at": _ts(minutes_ago=5),
+        }
+        monkeypatch.setattr("gateway.app.services.task_view_helpers.object_exists", lambda _key: True)
+        monkeypatch.setattr(
+            "gateway.app.services.task_view_helpers.object_head",
+            lambda _key: {"content_length": 999999, "content_type": "video/mp4", "etag": "etag-final"},
+        )
+        monkeypatch.setattr(
+            "gateway.app.services.voice_state.collect_voice_execution_state",
+            lambda _task, _settings: {"audio_ready": True, "audio_ready_reason": "ready"},
+        )
+
+        composed = compute_composed_state(task, "hf-historical-fallback")
+        assert composed["final"]["exists"] is False
+        assert composed["final"]["stale_reason"] == "final_stale_after_subtitles"
+        assert composed["historical_final"]["exists"] is True

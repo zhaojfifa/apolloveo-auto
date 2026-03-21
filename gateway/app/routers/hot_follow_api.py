@@ -141,6 +141,10 @@ class HotFollowAudioConfigRequest(BaseModel):
     audio_fit_max_speed: float | None = None
 
 
+class HotFollowSourceUrlPatchRequest(BaseModel):
+    source_url: str = ""
+
+
 
 class HotFollowSubtitlesRequest(BaseModel):
     srt_text: str = ""
@@ -1129,7 +1133,7 @@ def _hf_rerun_presentation_state(
     dub_status: str | None,
 ) -> dict[str, Any]:
     voice = voice_state or {}
-    final_payload = historical_final or final_info or {}
+    final_payload = final_info or historical_final or {}
     final_exists = bool(final_payload.get("exists"))
     final_url = str(final_payload.get("url") or "").strip() or None
     final_asset_version = str(final_payload.get("asset_version") or "").strip() or None
@@ -1164,14 +1168,16 @@ def _hf_artifact_facts(
     subtitle_lane: dict[str, Any] | None,
     scene_pack: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    final_payload = historical_final or final_info or {}
+    current_final_payload = final_info or {}
+    historical_payload = historical_final or {}
+    final_payload = current_final_payload if bool(current_final_payload.get("exists")) else historical_payload
     audio_payload = persisted_audio or {}
     subtitle_payload = subtitle_lane or {}
     pack_payload = scene_pack or {}
     subtitle_url = _deliverable_url(task_id, task, "mm_srt")
     pack_url = _deliverable_url(task_id, task, "pack_zip") or pack_payload.get("download_url")
     return {
-        "final_exists": bool(final_payload.get("exists")),
+        "final_exists": bool(current_final_payload.get("exists") or historical_payload.get("exists")),
         "final_url": str(final_payload.get("url") or "").strip() or None,
         "final_updated_at": final_payload.get("updated_at") or task.get("final_updated_at") or task.get("updated_at"),
         "final_asset_version": str(final_payload.get("asset_version") or "").strip() or None,
@@ -1924,6 +1930,24 @@ def patch_hot_follow_compose_plan(
     plan["compose_policy"] = "freeze_tail" if bool(plan.get("freeze_tail_enabled")) else "match_video"
     _policy_upsert(repo, task_id, {"compose_plan": plan})
     return {"task_id": task_id, "compose_plan": plan}
+
+
+@hot_follow_api_router.patch("/hot_follow/tasks/{task_id}/source_url")
+def patch_hot_follow_source_url(
+    task_id: str,
+    payload: HotFollowSourceUrlPatchRequest,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    source_url = str(payload.source_url or "").strip()
+    _policy_upsert(repo, task_id, {"source_url": source_url})
+    latest = repo.get(task_id) or task
+    return {
+        "task_id": task_id,
+        "source_url": str(latest.get("source_url") or ""),
+    }
 
 
 @hot_follow_api_router.patch("/hot_follow/tasks/{task_id}/subtitles")

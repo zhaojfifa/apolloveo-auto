@@ -483,18 +483,22 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     else:
         composed_reason = "final_missing"
 
+    # historical_final is only exposed when it is acting as fallback/reference.
+    # If current final is fresh and valid, do not mirror the same object into
+    # historical_final by default.
+    historical_exposed = bool(final_exists and not final_fresh)
     historical_final_info = {
-        "exists": final_exists,
-        "key": str(final_key) if final_key else None,
+        "exists": historical_exposed,
+        "key": str(final_key) if (historical_exposed and final_key) else None,
         "size_bytes": int(final_size) if final_size is not None else None,
         "duration_ms": int(task.get("final_duration_ms"))
         if task.get("final_duration_ms") is not None
         else None,
-        "asset_version": str(final_asset_version) if final_asset_version else None,
-        "updated_at": task.get("final_updated_at"),
+        "asset_version": str(final_asset_version) if (historical_exposed and final_asset_version) else None,
+        "updated_at": task.get("final_updated_at") if historical_exposed else None,
         "content_type": task.get("final_mime") or final_ctype or "video/mp4",
         "url": task_endpoint(task_id, "final")
-        if final_exists and int(final_size or 0) >= MIN_VIDEO_BYTES
+        if historical_exposed and int(final_size or 0) >= MIN_VIDEO_BYTES
         else None,
     }
     final_info = {

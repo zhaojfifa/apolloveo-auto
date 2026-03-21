@@ -37,9 +37,12 @@ def _pick_historical_final(
     historical = _as_dict(state.get("historical_final"))
     if historical:
         return dict(historical)
-    if bool(current_final.get("exists")):
-        return dict(current_final)
     task_final = _as_dict(task.get("historical_final")) or _as_dict(task.get("final"))
+    if bool(current_final.get("exists")) and task_final:
+        task_final_key = str(task_final.get("key") or "").strip() or None
+        current_key = str(current_final.get("key") or "").strip() or None
+        if task_final_key and current_key and task_final_key == current_key:
+            return {"exists": False}
     if task_final:
         return dict(task_final)
     return {"exists": False}
@@ -83,12 +86,9 @@ def _resolve_current_final_url(
 
 def _resolve_historical_final_url(
     task_id: str,
-    state: Dict[str, Any],
+    _state: Dict[str, Any],
     historical_final: Dict[str, Any],
-    current_final_url: str | None,
 ) -> str | None:
-    if current_final_url:
-        return current_final_url
     if historical_final.get("url"):
         return str(historical_final.get("url"))
     if bool(historical_final.get("exists")) and task_id:
@@ -101,10 +101,10 @@ def _resolve_artifacts(task_id: str, task: Dict[str, Any], state: Dict[str, Any]
     historical_final = _pick_historical_final(task, state, current_final)
 
     current_exists = bool(current_final.get("exists"))
-    historical_exists = bool(historical_final.get("exists") or current_exists)
+    historical_exists = bool(historical_final.get("exists"))
     current_final_url = _resolve_current_final_url(task_id, task, state, current_final)
     historical_final_url = _resolve_historical_final_url(
-        task_id, state, historical_final, current_final_url if current_exists else None
+        task_id, state, historical_final
     )
 
     current_out = dict(current_final)

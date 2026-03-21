@@ -491,6 +491,58 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
     assert result["subtitles"]["srt_text"].strip().endswith("မင်္ဂလာပါ")
 
 
+def test_patch_hot_follow_source_url_updates_workbench_metadata(monkeypatch):
+    class _Repo:
+        def __init__(self):
+            self.task = {"task_id": "hf-source-edit", "kind": "hot_follow", "source_url": "https://old.example/video"}
+
+        def get(self, task_id):
+            assert task_id == "hf-source-edit"
+            return dict(self.task)
+
+    repo = _Repo()
+    monkeypatch.setattr(hf_router, "_policy_upsert", lambda _repo, _task_id, updates, **_kwargs: repo.task.update(updates))
+
+    payload = hf_router.HotFollowSourceUrlPatchRequest(source_url="https://new.example/video?id=1")
+    result = hf_router.patch_hot_follow_source_url("hf-source-edit", payload, repo=repo)
+
+    assert repo.task["source_url"] == "https://new.example/video?id=1"
+    assert result["source_url"] == "https://new.example/video?id=1"
+
+
+def test_patch_hot_follow_source_url_does_not_invalidate_compose_freshness(monkeypatch):
+    class _Repo:
+        def __init__(self):
+            self.task = {
+                "task_id": "hf-source-non-stale",
+                "kind": "hot_follow",
+                "source_url": "https://old.example/video",
+                "compose_status": "done",
+                "compose_last_status": "done",
+                "subtitles_content_hash": "HASH_A",
+                "final_source_subtitles_content_hash": "HASH_A",
+                "audio_sha256": "SHA_A",
+                "final_source_audio_sha256": "SHA_A",
+            }
+
+        def get(self, task_id):
+            assert task_id == "hf-source-non-stale"
+            return dict(self.task)
+
+    repo = _Repo()
+    monkeypatch.setattr(hf_router, "_policy_upsert", lambda _repo, _task_id, updates, **_kwargs: repo.task.update(updates))
+
+    payload = hf_router.HotFollowSourceUrlPatchRequest(source_url="https://new.example/video")
+    hf_router.patch_hot_follow_source_url("hf-source-non-stale", payload, repo=repo)
+
+    assert repo.task["compose_status"] == "done"
+    assert repo.task["compose_last_status"] == "done"
+    assert repo.task["subtitles_content_hash"] == "HASH_A"
+    assert repo.task["final_source_subtitles_content_hash"] == "HASH_A"
+    assert repo.task["audio_sha256"] == "SHA_A"
+    assert repo.task["final_source_audio_sha256"] == "SHA_A"
+
+
 def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch, tmp_path):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
     monkeypatch.setattr(tasks_router, "_compat_hot_follow_subtitle_lane_state", lambda *_args, **_kwargs: {"dub_input_text": "မင်္ဂလာပါ"})
