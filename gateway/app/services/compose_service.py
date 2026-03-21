@@ -69,20 +69,48 @@ def _current_final_is_fresh(
     current_audio_sha = str(revision.get("audio_sha256") or "").strip() or None
     current_sub_hash = str(revision.get("subtitle_content_hash") or "").strip() or None
     current_sub_at = str(revision.get("subtitle_updated_at") or "").strip() or None
+    current_dub_at = str(task.get("dub_generated_at") or "").strip() or None
     composed_audio_sha = str(task.get("final_source_audio_sha256") or "").strip() or None
+    composed_dub_at = str(task.get("final_source_dub_generated_at") or "").strip() or None
     composed_sub_hash = str(task.get("final_source_subtitles_content_hash") or "").strip() or None
     composed_sub_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
+    compose_finished_at = str(task.get("compose_last_finished_at") or task.get("final_updated_at") or "").strip() or None
+
+    def _parse_dt(value: str | None) -> datetime | None:
+        if not value:
+            return None
+        try:
+            dt = datetime.fromisoformat(value)
+        except (TypeError, ValueError):
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
 
     # No compose snapshot → cannot confirm what was baked into the final → recompose.
-    if not composed_audio_sha and not composed_sub_hash:
+    if not composed_audio_sha and not composed_sub_hash and not composed_dub_at and not composed_sub_at:
         return False
 
     if composed_audio_sha and current_audio_sha and composed_audio_sha != current_audio_sha:
         return False
+    if composed_dub_at and current_dub_at and composed_dub_at != current_dub_at:
+        return False
+    if current_dub_at and compose_finished_at:
+        current_dub_dt = _parse_dt(current_dub_at)
+        compose_finished_dt = _parse_dt(compose_finished_at)
+        if current_dub_dt is not None and compose_finished_dt is not None and current_dub_dt > compose_finished_dt:
+            return False
     if composed_sub_hash and current_sub_hash:
         if composed_sub_hash != current_sub_hash:
             return False
-    elif composed_sub_at and current_sub_at and composed_sub_at != current_sub_at:
+    if composed_sub_at and current_sub_at and composed_sub_at != current_sub_at:
+        return False
+    if current_sub_at and compose_finished_at:
+        current_sub_dt = _parse_dt(current_sub_at)
+        compose_finished_dt = _parse_dt(compose_finished_at)
+        if current_sub_dt is not None and compose_finished_dt is not None and current_sub_dt > compose_finished_dt:
+            return False
+    if not composed_sub_hash and not composed_sub_at and current_sub_hash:
         return False
     return True
 

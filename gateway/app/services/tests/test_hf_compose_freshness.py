@@ -111,6 +111,20 @@ class TestComputeFinalStaleness:
         result = compute_final_staleness(task, final_exists=True, compose_done=True)
         assert result == "final_stale_after_subtitles"
 
+    def test_subtitle_timestamp_newer_than_compose_stales_even_when_hash_matches(self):
+        compose_time = _ts(minutes_ago=10)
+        sub_time = _ts(minutes_ago=5)
+        task = {
+            **TASK_BASE,
+            "compose_last_finished_at": compose_time,
+            "subtitles_content_hash": "HASH_A",
+            "final_source_subtitles_content_hash": "HASH_A",
+            "subtitles_override_updated_at": sub_time,
+            "final_source_subtitle_updated_at": compose_time,
+        }
+        result = compute_final_staleness(task, final_exists=True, compose_done=True)
+        assert result == "final_stale_after_subtitles"
+
     def test_no_staleness_when_final_does_not_exist(self):
         task = {
             **TASK_BASE,
@@ -189,6 +203,15 @@ class TestCurrentFinalIsFresh:
     def test_not_fresh_when_subtitle_hash_changed(self):
         task = self._fresh_task()
         task["subtitles_content_hash"] = "HASH_B"  # subtitle edited and saved
+        assert _current_final_is_fresh(
+            task, revision=self._revision(task), final_exists=True, final_size=500_000
+        ) is False
+
+    def test_not_fresh_when_subtitle_timestamp_changed_after_repeated_cycle(self):
+        task = self._fresh_task()
+        task["compose_last_finished_at"] = _ts(minutes_ago=10)
+        task["subtitles_override_updated_at"] = _ts(minutes_ago=5)
+        task["final_source_subtitle_updated_at"] = _ts(minutes_ago=10)
         assert _current_final_is_fresh(
             task, revision=self._revision(task), final_exists=True, final_size=500_000
         ) is False
@@ -438,3 +461,44 @@ class TestStateTransitions:
             final_exists=True,
             final_size=500_000,
         ) is False
+
+    def test_third_cycle_subtitle_edit_and_redub_reinvalidates_previous_final(self):
+        """Second compose may be fresh, but a third subtitle save + redub must stale it again."""
+        second_compose_finished = _ts(minutes_ago=10)
+        third_subtitle_save = _ts(minutes_ago=5)
+        third_dub_generated = _ts(minutes_ago=4)
+        task = {
+            **TASK_BASE,
+            "compose_last_finished_at": second_compose_finished,
+            "final_updated_at": second_compose_finished,
+            "audio_sha256": "SHA_C",
+            "final_source_audio_sha256": "SHA_B",
+            "dub_generated_at": third_dub_generated,
+            "final_source_dub_generated_at": second_compose_finished,
+            "subtitles_content_hash": "HASH_C",
+            "final_source_subtitles_content_hash": "HASH_B",
+            "subtitles_override_updated_at": third_subtitle_save,
+            "final_source_subtitle_updated_at": second_compose_finished,
+        }
+
+        stale = compute_final_staleness(task, final_exists=True, compose_done=True)
+        assert stale == "final_stale_after_dub"
+
+    def test_third_cycle_recompose_promotes_latest_subtitle_snapshot(self):
+        third_compose_finished = _ts(minutes_ago=1)
+        task = {
+            **TASK_BASE,
+            "compose_last_finished_at": third_compose_finished,
+            "final_updated_at": third_compose_finished,
+            "audio_sha256": "SHA_C",
+            "final_source_audio_sha256": "SHA_C",
+            "dub_generated_at": third_compose_finished,
+            "final_source_dub_generated_at": third_compose_finished,
+            "subtitles_content_hash": "HASH_C",
+            "final_source_subtitles_content_hash": "HASH_C",
+            "subtitles_override_updated_at": third_compose_finished,
+            "final_source_subtitle_updated_at": third_compose_finished,
+        }
+
+        stale = compute_final_staleness(task, final_exists=True, compose_done=True)
+        assert stale is None

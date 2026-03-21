@@ -385,11 +385,11 @@ def compute_final_staleness(task: dict, final_exists: bool, compose_done: bool) 
     composed_dub_at = str(task.get("final_source_dub_generated_at") or "").strip() or None
     compose_finished_at = str(task.get("compose_last_finished_at") or task.get("final_updated_at") or "").strip() or None
 
-    if composed_audio_sha and current_audio_sha:
-        audio_stale = composed_audio_sha != current_audio_sha
-    elif composed_dub_at and current_dub_at:
-        audio_stale = composed_dub_at != current_dub_at
-    elif current_dub_at and compose_finished_at:
+    if composed_audio_sha and current_audio_sha and composed_audio_sha != current_audio_sha:
+        audio_stale = True
+    if not audio_stale and composed_dub_at and current_dub_at and composed_dub_at != current_dub_at:
+        audio_stale = True
+    if not audio_stale and current_dub_at and compose_finished_at:
         _dub_dt = _coerce_dt(current_dub_at)
         _compose_dt = _coerce_dt(compose_finished_at)
         if _dub_dt is not None and _compose_dt is not None:
@@ -402,11 +402,11 @@ def compute_final_staleness(task: dict, final_exists: bool, compose_done: bool) 
     current_sub_at = str(task.get("subtitles_override_updated_at") or "").strip() or None
     composed_sub_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
 
-    if composed_sub_hash and current_sub_hash:
-        subtitle_stale = composed_sub_hash != current_sub_hash
-    elif composed_sub_at and current_sub_at:
-        subtitle_stale = composed_sub_at != current_sub_at
-    elif current_sub_at and compose_finished_at:
+    if composed_sub_hash and current_sub_hash and composed_sub_hash != current_sub_hash:
+        subtitle_stale = True
+    if not subtitle_stale and composed_sub_at and current_sub_at and composed_sub_at != current_sub_at:
+        subtitle_stale = True
+    if not subtitle_stale and current_sub_at and compose_finished_at:
         _sub_dt = _coerce_dt(current_sub_at)
         _compose_dt = _coerce_dt(compose_finished_at)
         if _sub_dt is not None and _compose_dt is not None:
