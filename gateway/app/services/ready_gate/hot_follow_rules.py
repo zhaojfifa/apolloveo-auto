@@ -38,10 +38,14 @@ def _d(v: Any) -> Dict[str, Any]:
 
 def _extract_final_exists(task: dict, state: dict) -> bool:
     """Check if a final video file physically exists (any version, fresh or stale)."""
-    # The final_exists signal is computed by _resolve_artifacts() before
-    # the engine runs, and stored in state["final"]["exists"].
     final = _d(state.get("final"))
+    historical_final = _d(state.get("historical_final"))
+    artifact_facts = _d(state.get("artifact_facts"))
     if bool(final.get("exists")):
+        return True
+    if bool(historical_final.get("exists")):
+        return True
+    if bool(artifact_facts.get("final_exists")):
         return True
     # Also check evidence from URL resolution
     if state.get("final_url") or state.get("final_video_url"):

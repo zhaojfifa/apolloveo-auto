@@ -43,18 +43,42 @@ def test_hot_follow_publish_hub_includes_final_preview_url_and_ready(monkeypatch
         },
     )
 
-    def _fake_composed(_task, _task_id):
-        return {
-            "composed_ready": False,
-            "composed_reason": "final_missing",
-            "final": {"exists": True, "url": None, "size_bytes": 0},
-            "compose_error_reason": None,
-            "compose_error_message": None,
-            "raw_exists": True,
-            "voice_exists": True,
-        }
-
-    monkeypatch.setattr(hf_router, "_compute_composed_state", _fake_composed)
+    monkeypatch.setattr(
+        hf_router,
+        "_publish_hub_payload",
+        lambda _task: {
+            "task_id": task_id,
+            "media": {
+                "final_video_url": f"/v1/tasks/{task_id}/final",
+                "final_url": f"/v1/tasks/{task_id}/final",
+                "voiceover_url": f"/v1/tasks/{task_id}/audio_mm",
+            },
+            "final_url": f"/v1/tasks/{task_id}/final",
+            "final_video_url": f"/v1/tasks/{task_id}/final",
+            "deliverables": {
+                "final_mp4": {"label": "final.mp4", "url": f"/v1/tasks/{task_id}/final"},
+            },
+            "composed_ready": True,
+            "composed_reason": "ready",
+            "final": {"exists": True, "fresh": True, "url": f"/v1/tasks/{task_id}/final"},
+            "historical_final": {"exists": True, "url": f"/v1/tasks/{task_id}/final"},
+            "final_fresh": True,
+            "final_stale_reason": None,
+            "audio": {
+                "status": "done",
+                "audio_ready": True,
+                "audio_ready_reason": "ready",
+                "tts_voice": "mm_female_1",
+            },
+            "subtitles": {
+                "subtitle_ready": True,
+                "subtitle_ready_reason": "ready",
+                "edited_text": "stub subtitle",
+            },
+            "scene_pack": {"exists": False, "status": "running"},
+            "scene_pack_pending_reason": "scenes.running",
+        },
+    )
 
     app = FastAPI()
     app.include_router(tasks_router.api_router)

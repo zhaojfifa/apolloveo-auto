@@ -774,7 +774,7 @@ def _hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
     )
 
 
-def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
+def _hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None = None) -> tuple[str, str]:
     last_step = str(task.get("last_step") or "").lower()
     task_status = str(task.get("status") or "").lower()
     if step == "parse":
@@ -818,8 +818,11 @@ def _hf_pipeline_state(task: dict, step: str) -> tuple[str, str]:
         return status, summary
     if step == "compose":
         status = _hf_state_from_status(task.get("compose_status"))
-        final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
-        if status == "pending" and final_key and object_exists(str(final_key)):
+        composed_state = composed or _compute_composed_state(
+            task,
+            str(task.get("task_id") or task.get("id") or ""),
+        )
+        if status == "pending" and bool(composed_state.get("composed_ready")):
             status = "done"
         if status == "pending" and task_status == "processing" and last_step in {"compose", "final"}:
             status = "running"
@@ -1105,10 +1108,11 @@ def _hf_rerun_presentation_state(
     task: dict,
     voice_state: dict[str, Any] | None,
     final_info: dict[str, Any] | None,
+    historical_final: dict[str, Any] | None,
     dub_status: str | None,
 ) -> dict[str, Any]:
     voice = voice_state or {}
-    final_payload = final_info or {}
+    final_payload = historical_final or final_info or {}
     final_exists = bool(final_payload.get("exists"))
     final_url = str(final_payload.get("url") or "").strip() or None
     final_asset_version = str(final_payload.get("asset_version") or "").strip() or None
@@ -1138,11 +1142,12 @@ def _hf_artifact_facts(
     task: dict,
     *,
     final_info: dict[str, Any] | None,
+    historical_final: dict[str, Any] | None,
     persisted_audio: dict[str, Any] | None,
     subtitle_lane: dict[str, Any] | None,
     scene_pack: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    final_payload = final_info or {}
+    final_payload = historical_final or final_info or {}
     audio_payload = persisted_audio or {}
     subtitle_payload = subtitle_lane or {}
     pack_payload = scene_pack or {}
@@ -1241,6 +1246,7 @@ def _hf_safe_presentation_aggregates(
     task: dict,
     *,
     final_info: dict[str, Any] | None,
+    historical_final: dict[str, Any] | None,
     persisted_audio: dict[str, Any] | None,
     subtitle_lane: dict[str, Any] | None,
     scene_pack: dict[str, Any] | None,
@@ -1256,6 +1262,7 @@ def _hf_safe_presentation_aggregates(
             task_id,
             task,
             final_info=final_info,
+            historical_final=historical_final,
             persisted_audio=persisted_audio,
             subtitle_lane=subtitle_lane,
             scene_pack=scene_pack,
@@ -1458,13 +1465,14 @@ def get_hot_follow_workbench_hub(
     subtitles_state, subtitles_summary = _hf_pipeline_state(task, "subtitles")
     dub_state, dub_summary = _hf_pipeline_state(task, "audio")
     pack_state, pack_summary = _hf_pipeline_state(task, "pack")
-    compose_state, compose_summary = _hf_pipeline_state(task, "compose")
+    compose_state, compose_summary = _hf_pipeline_state(task, "compose", composed=composed)
 
     raw_key = _task_key(task, "raw_path")
     raw_url = _task_endpoint(task_id, "raw") if raw_key and object_exists(raw_key) else None
     mute_key = _task_key(task, "mute_video_key") or _task_key(task, "mute_video_path")
     mute_url = _task_endpoint(task_id, "raw") if mute_key and object_exists(str(mute_key)) else raw_url
     final_info = composed.get("final") or {}
+    historical_final = composed.get("historical_final") or {}
     scene_pack = _scene_pack_info(task, task_id)
     scenes_key = _task_key(task, "scenes_key")
     scenes_status = _scenes_status_from_ssot(task)
@@ -1612,6 +1620,7 @@ def get_hot_follow_workbench_hub(
         "composed_ready": composed_ready,
         "composed_reason": composed_reason,
         "final": final_info,
+        "historical_final": historical_final,
         "compose": {
             "last": compose_last,
             "warning": task.get("compose_warning"),
@@ -1626,10 +1635,12 @@ def get_hot_follow_workbench_hub(
     # Propagate into payload so compute_hot_follow_state / ready-gate engine
     # can read it via state["final_stale_reason"] in _extract_final_fresh().
     payload["final_stale_reason"] = final_stale_reason
+    payload["final_fresh"] = bool(composed.get("final_fresh"))
     artifact_facts, current_attempt, operator_summary = _hf_safe_presentation_aggregates(
         task_id,
         task,
         final_info=final_info,
+        historical_final=historical_final,
         persisted_audio=persisted_audio,
         subtitle_lane=subtitle_lane,
         scene_pack=scene_pack,
@@ -1643,7 +1654,13 @@ def get_hot_follow_workbench_hub(
     payload["artifact_facts"] = artifact_facts
     payload["current_attempt"] = current_attempt
     payload["operator_summary"] = operator_summary
-    payload["presentation"] = _hf_rerun_presentation_state(task, voice_state, final_info, dub_state)
+    payload["presentation"] = _hf_rerun_presentation_state(
+        task,
+        voice_state,
+        final_info,
+        historical_final,
+        dub_state,
+    )
     final_url = _resolve_hub_final_url(task_id, payload)
     if final_url:
         payload["media"]["final_url"] = final_url
@@ -1663,9 +1680,11 @@ def get_hot_follow_workbench_hub(
                 if composed_ready:
                     item["status"] = "done"
                     item["state"] = "done"
+                    item["historical"] = False
                 else:
                     item["status"] = "pending"
                     item["state"] = "pending"
+                    item["historical"] = bool((historical_final or {}).get("exists"))
                 break
 
     payload["task"] = {
@@ -1735,6 +1754,7 @@ def get_hot_follow_workbench_hub(
                 if str(item.get("kind") or "").strip().lower() == "final":
                     item["status"] = "done"
                     item["state"] = "done"
+                    item["historical"] = False
                     if final_url:
                         item["url"] = final_url
                     break
@@ -1776,6 +1796,8 @@ def get_hot_follow_workbench_hub(
                 if str(item.get("kind") or "").strip().lower() == "final":
                     item["status"] = "pending"
                     item["state"] = "pending"
+                    item["historical"] = bool((payload.get("historical_final") or {}).get("exists"))
+                    item["url"] = None
                     break
     payload.update(_hot_follow_operational_defaults())
     payload.update(_safe_collect_hot_follow_workbench_ui(task, get_settings()))
@@ -1913,6 +1935,9 @@ def patch_hot_follow_subtitles(
             "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
             "subtitles_override_mode": text_mode,
             "subtitles_content_hash": _subtitle_content_hash,
+            "compose_status": "pending",
+            "compose_error": None,
+            "compose_error_reason": None,
             "error_message": None,
             "error_reason": None,
         },

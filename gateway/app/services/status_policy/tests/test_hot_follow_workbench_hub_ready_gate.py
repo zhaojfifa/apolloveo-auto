@@ -41,9 +41,10 @@ class _Repo:
 def _patch_workbench_storage_dependencies(monkeypatch):
     monkeypatch.setattr(hf_router, "_scene_pack_info", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(hf_router, "_deliverable_url", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(hf_router, "_hf_persisted_audio_state", lambda *_args, **_kwargs: {"exists": False, "voiceover_url": None})
 
 
-def test_hot_follow_workbench_ready_gate_backfills_compose_when_final_exists(monkeypatch):
+def test_hot_follow_workbench_ready_gate_backfills_compose_when_current_final_is_fresh(monkeypatch):
     task_id = "hf-workbench-ready-gate-01"
     repo = _Repo()
     repo.upsert(
@@ -54,15 +55,19 @@ def test_hot_follow_workbench_ready_gate_backfills_compose_when_final_exists(mon
             "status": "processing",
             "compose_status": "pending",
             "compose_last_status": "pending",
-            "final": {"exists": True},
+            "voice_id": "mm_female_1",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
         },
     )
 
     def _fake_composed(_task, _task_id):
         return {
-            "composed_ready": False,
-            "composed_reason": "final_missing",
-            "final": {"exists": True, "url": None, "size_bytes": 0},
+            "composed_ready": True,
+            "composed_reason": "ready",
+            "final": {"exists": True, "fresh": True, "url": f"/v1/tasks/{task_id}/final", "size_bytes": 123456},
+            "historical_final": {"exists": True, "url": f"/v1/tasks/{task_id}/final", "size_bytes": 123456},
+            "final_fresh": True,
+            "final_stale_reason": None,
             "compose_error_reason": None,
             "compose_error_message": None,
             "raw_exists": True,
@@ -70,6 +75,19 @@ def test_hot_follow_workbench_ready_gate_backfills_compose_when_final_exists(mon
         }
 
     monkeypatch.setattr(hf_router, "_compute_composed_state", _fake_composed)
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "mm_female_1",
+        },
+    )
     _patch_workbench_storage_dependencies(monkeypatch)
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
@@ -108,18 +126,22 @@ def test_hot_follow_workbench_compose_view_is_done_when_final_ready(monkeypatch)
             "status": "processing",
             "compose_status": "pending",
             "compose_last_status": "pending",
+            "voice_id": "mm_female_1",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
             "deliverables": [
                 {"kind": "final", "status": "pending", "state": "pending", "url": None},
             ],
-            "final": {"exists": True},
         },
     )
 
     def _fake_composed(_task, _task_id):
         return {
-            "composed_ready": False,
-            "composed_reason": "final_missing",
-            "final": {"exists": True, "url": None, "size_bytes": 0},
+            "composed_ready": True,
+            "composed_reason": "ready",
+            "final": {"exists": True, "fresh": True, "url": f"/v1/tasks/{task_id}/final", "size_bytes": 123456},
+            "historical_final": {"exists": True, "url": f"/v1/tasks/{task_id}/final", "size_bytes": 123456},
+            "final_fresh": True,
+            "final_stale_reason": None,
             "compose_error_reason": None,
             "compose_error_message": None,
             "raw_exists": True,
@@ -127,6 +149,19 @@ def test_hot_follow_workbench_compose_view_is_done_when_final_ready(monkeypatch)
         }
 
     monkeypatch.setattr(hf_router, "_compute_composed_state", _fake_composed)
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "mm_female_1",
+        },
+    )
     _patch_workbench_storage_dependencies(monkeypatch)
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
@@ -159,6 +194,89 @@ def test_hot_follow_workbench_compose_view_is_done_when_final_ready(monkeypatch)
         {},
     )
     assert final_row.get("status") == "done"
+    assert final_row.get("historical") is False
+
+
+def test_hot_follow_workbench_stale_final_is_historical_only_after_redub(monkeypatch):
+    task_id = "hf-workbench-stale-final-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "done",
+            "compose_last_status": "done",
+            "voice_id": "mm_female_1",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
+            "deliverables": [
+                {"kind": "final", "status": "done", "state": "done", "url": f"/v1/tasks/{task_id}/final"},
+            ],
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "final_stale_after_dub",
+            "final": {"exists": False, "fresh": False, "url": None, "size_bytes": 123456, "stale_reason": "final_stale_after_dub"},
+            "historical_final": {"exists": True, "url": f"/v1/tasks/{task_id}/final", "size_bytes": 123456},
+            "final_fresh": False,
+            "final_stale_reason": "final_stale_after_dub",
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": True,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "mm_female_1",
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    assert data.get("composed_ready") is False
+    assert data.get("composed_reason") == "final_stale_after_dub"
+    assert (data.get("final") or {}).get("exists") is False
+    assert ((data.get("historical_final") or {}).get("exists")) is True
+    assert ((data.get("artifact_facts") or {}).get("final_exists")) is True
+    assert ((data.get("current_attempt") or {}).get("requires_recompose")) is True
+    assert ((data.get("ready_gate") or {}).get("compose_ready")) is False
+    assert ((data.get("ready_gate") or {}).get("publish_ready")) is False
+
+    final_row = next(
+        (x for x in (data.get("deliverables") or []) if str(x.get("kind") or "").lower() == "final"),
+        {},
+    )
+    assert final_row.get("status") == "pending"
+    assert final_row.get("historical") is True
+    assert final_row.get("url") is None
 
 
 def test_hot_follow_workbench_parse_uses_raw_artifacts_over_failed_legacy_status(monkeypatch):
@@ -262,6 +380,22 @@ def test_hot_follow_workbench_hub_survives_optional_presentation_aggregation_fai
     )
 
     monkeypatch.setattr(hf_router, "_hf_artifact_facts", lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "final_missing",
+            "final": {"exists": False, "fresh": False, "url": None},
+            "historical_final": {"exists": False, "url": None},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": False,
+            "voice_exists": False,
+        },
+    )
     _patch_workbench_storage_dependencies(monkeypatch)
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
