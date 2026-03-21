@@ -63,6 +63,27 @@ def _patch_workbench_dependencies(monkeypatch):
     )
 
 
+def _advisory_payload(
+    *,
+    ready_gate=None,
+    artifact_facts=None,
+    current_attempt=None,
+    operator_summary=None,
+):
+    return {
+        "kind": "hot_follow",
+        "ready_gate": ready_gate or {},
+        "artifact_facts": artifact_facts or {},
+        "current_attempt": current_attempt or {},
+        "operator_summary": operator_summary or {},
+        "pipeline": [],
+        "pipeline_legacy": {},
+        "deliverables": [],
+        "media": {},
+        "source_video": {},
+    }
+
+
 def test_hot_follow_advisory_bundle_resolves_from_line_contract():
     line = LineRegistry.for_kind("hot_follow")
 
@@ -72,6 +93,159 @@ def test_hot_follow_advisory_bundle_resolves_from_line_contract():
     assert bundle.bundle_id == "hot_follow_advisory_v0"
     assert bundle.bundle_ref == "docs/skills/"
     assert bundle.hook_kind == "advisory"
+
+
+def test_hot_follow_advisory_v0_recommends_recompose_for_stale_final():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-skills-v0-recompose", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": True,
+                "compose_ready": False,
+                "publish_ready": False,
+                "blocking": ["compose_not_done", "final_stale"],
+            },
+            artifact_facts={
+                "final_exists": True,
+                "audio_exists": True,
+                "subtitle_exists": True,
+            },
+            current_attempt={
+                "audio_ready": True,
+                "compose_status": "pending",
+                "requires_recompose": True,
+                "final_stale_reason": "final_stale_after_dub",
+                "current_subtitle_source": "mm.srt",
+            },
+            operator_summary={"last_successful_output_available": True},
+        ),
+    )
+
+    assert advisory == {
+        "id": "hf_advisory_recompose_required",
+        "kind": "operator_guidance",
+        "level": "warning",
+        "recommended_next_action": "recompose_final",
+        "operator_hint": "recompose recommended",
+        "explanation": "当前字幕或配音已更新，建议重新合成最终视频以生成最新版本。",
+        "evidence": {
+            "final_exists": True,
+            "compose_status": "pending",
+            "final_stale_reason": "final_stale_after_dub",
+            "blocking": ["compose_not_done", "final_stale"],
+        },
+    }
+
+
+def test_hot_follow_advisory_v0_recommends_subtitle_review_when_missing():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-skills-v0-subtitle", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": False,
+                "subtitle_ready_reason": "subtitle_missing",
+                "audio_ready": False,
+                "compose_ready": False,
+                "publish_ready": False,
+                "blocking": ["compose_not_done", "subtitle_not_ready"],
+            },
+            artifact_facts={
+                "final_exists": False,
+                "audio_exists": False,
+                "subtitle_exists": False,
+            },
+            current_attempt={
+                "audio_ready": False,
+                "compose_status": "never",
+                "requires_recompose": False,
+            },
+        ),
+    )
+
+    assert advisory == {
+        "id": "hf_advisory_review_subtitles",
+        "kind": "operator_guidance",
+        "level": "info",
+        "recommended_next_action": "review_subtitles",
+        "operator_hint": "subtitle review recommended",
+        "explanation": "当前主字幕还未准备完成，建议先检查并保存 mm.srt 后再继续后续链路。",
+        "evidence": {
+            "subtitle_ready": False,
+            "subtitle_ready_reason": "subtitle_missing",
+            "subtitle_exists": False,
+        },
+    }
+
+
+def test_hot_follow_advisory_v0_recommends_continue_qa_when_final_is_ready():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-skills-v0-final-ready", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": True,
+                "compose_ready": True,
+                "publish_ready": True,
+                "blocking": [],
+            },
+            artifact_facts={
+                "final_exists": True,
+                "audio_exists": True,
+                "subtitle_exists": True,
+            },
+            current_attempt={
+                "audio_ready": True,
+                "compose_status": "done",
+                "requires_recompose": False,
+                "current_subtitle_source": "mm.srt",
+            },
+            operator_summary={"last_successful_output_available": True},
+        ),
+    )
+
+    assert advisory == {
+        "id": "hf_advisory_final_ready",
+        "kind": "operator_guidance",
+        "level": "info",
+        "recommended_next_action": "continue_qa",
+        "operator_hint": "no further action currently required",
+        "explanation": "当前成片已可用，可继续做字幕、配音或成片 QA 复核。",
+        "evidence": {
+            "final_exists": True,
+            "compose_ready": True,
+            "publish_ready": True,
+            "last_successful_output_available": True,
+        },
+    }
+
+
+def test_hot_follow_advisory_v0_noops_for_non_hot_follow_kind():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "skills-noop-non-hf", "kind": "avatar"},
+        _advisory_payload(
+            ready_gate={"subtitle_ready": True},
+            artifact_facts={"final_exists": True},
+            current_attempt={"audio_ready": True},
+        ),
+    )
+
+    assert advisory is None
+
+
+def test_hot_follow_advisory_v0_safe_fallback_on_hook_failure(monkeypatch):
+    monkeypatch.setattr(skills_advisory, "_HOT_FOLLOW_ADVISORY_HOOK", lambda _input: (_ for _ in ()).throw(RuntimeError("boom")))
+
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-skills-v0-safe-fallback", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={"subtitle_ready": True},
+            artifact_facts={"final_exists": True},
+            current_attempt={"audio_ready": True},
+        ),
+    )
+
+    assert advisory is None
 
 
 def test_hot_follow_advisory_noop_preserves_workbench_payload(monkeypatch):

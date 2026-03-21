@@ -310,3 +310,26 @@
 - 不实现第二条产线 skills
 - 不改 compose / publish / ready gate / status policy 主链
 - 不做 OpenClaw 或平台化扩张
+
+## PR-S2 Hot Follow Advisory Content v0
+
+日期：2026-03-21
+
+本节点完成：
+
+- 为 Hot Follow advisory skeleton 增加最小可用的 advisory content v0
+- 仅基于现有只读输入面生成建议，不改 truth-source ownership
+- 保持 bundle 缺失、无 advisory 命中、或 advisory 计算失败时的 no-op-safe 行为
+
+本次收口说明：
+
+- advisory 仅覆盖小范围确定性 case：字幕检查、配音刷新、重新合成、成片可 QA、以及主字幕来源对齐提示
+- advisory 输出仍为 small, structured, read-only block
+- 未引入 generic rule engine、multi-line support 或 direct action execution
+
+本节点明确不做：
+
+- 不改 compose / publish / ready gate / status policy 逻辑
+- 不写 repo state 或 deliverables
+- 不扩第二条产线
+- 不做 UI redesign 或 generalized skills runtime
