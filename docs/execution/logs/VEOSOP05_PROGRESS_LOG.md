@@ -475,3 +475,27 @@
 - 不改 baseline / legacy flow behavior
 - 不改 compose / publish / ready gate / status / Skills ownership
 - 不开启第二条产线、OpenClaw 或平台化扩张
+
+## New Scenario Readiness Review
+
+日期：2026-03-22
+
+本节点完成：
+
+- 完成 new-scenario discussion 前的 readiness review
+- 明确当前 Hot Follow cleanup line 已接近 closure，但未 fully closed
+- 明确 Avatar / baseline 不再作为 Hot Follow cleanup judgment 的内含项
+
+本次收口说明：
+
+- 当前判断为 `Conditionally Ready`
+- 当前样本已足够作为新 scenario discussion 的参考起点
+- 剩余 Hot Follow router-space residue 仍需保持为显式 carry-forward debt
+- Avatar / baseline / platform work 需继续分开跟踪，避免混回当前判断
+
+本节点明确不做：
+
+- 不启动 new scenario implementation
+- 不改 runtime logic
+- 不改 tests
+- 不把当前 readiness review 扩写成 broad platform strategy
