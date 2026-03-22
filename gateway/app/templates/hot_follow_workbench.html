@@ -103,6 +103,28 @@
             </div>
           </div>
 
+          <div id="hf_advisory_card" class="hidden bg-white rounded-2xl border border-amber-200 shadow-sm p-6">
+            <div class="flex items-center justify-between gap-3 mb-3">
+              <h3 class="text-base font-semibold text-gray-900">附加建议（只读）</h3>
+              <span id="hf_advisory_level" class="text-[11px] rounded-full bg-amber-50 text-amber-700 px-2 py-1">-</span>
+            </div>
+            <div class="space-y-2">
+              <div class="text-xs text-gray-600">
+                <span class="font-semibold text-gray-700">建议动作：</span>
+                <span id="hf_advisory_action">-</span>
+              </div>
+              <div class="text-xs text-gray-600">
+                <span class="font-semibold text-gray-700">路线提示：</span>
+                <span id="hf_advisory_hint">-</span>
+              </div>
+              <div id="hf_advisory_explanation" class="text-sm text-gray-800 leading-6">-</div>
+            </div>
+            <div id="hf_advisory_evidence_block" class="hidden mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div class="text-[11px] font-semibold text-gray-700">Evidence</div>
+              <div id="hf_advisory_evidence" class="mt-2 space-y-1 text-[11px] text-gray-600"></div>
+            </div>
+          </div>
+
           <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-6">
             <h3 class="text-base font-semibold mb-3" data-i18n="hot_follow_workbench_subtitle_edit">字幕编辑</h3>
             <div id="hf_subtitle_channel_intro" class="hidden mb-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">

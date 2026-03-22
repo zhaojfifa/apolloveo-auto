@@ -333,3 +333,26 @@
 - 不写 repo state 或 deliverables
 - 不扩第二条产线
 - 不做 UI redesign 或 generalized skills runtime
+
+## PR-S3 Advisory Rendering + Operator UX Integration
+
+日期：2026-03-22
+
+本节点完成：
+
+- 在 Hot Follow workbench 中接入 advisory block 的只读展示
+- advisory 仅作为 operator guidance 附加区块显示，不接管现有状态块
+- advisory 缺失时页面安全降级，不影响既有工作流与页面结构
+
+本次收口说明：
+
+- 展示位置固定在 workbench 左侧指导区，与任务判断卡相邻，但语义保持次级
+- 展示字段仅消费已冻结的 advisory contract：level、recommended_next_action、operator_hint、explanation、evidence
+- 未增加新的 advisory 生成逻辑，也未把 advisory 升格为 gate 或 action controller
+
+本节点明确不做：
+
+- 不新增 advisory rules
+- 不自动触发按钮或动作
+- 不改 compose / publish / ready gate / status policy
+- 不扩展到第二条产线或通用 UI framework

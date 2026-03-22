@@ -154,6 +154,13 @@
   const opsGuideModeEl = document.getElementById("hf_ops_guide_mode");
   const opsGuidePathEl = document.getElementById("hf_ops_guide_path");
   const opsGuideReasonEl = document.getElementById("hf_ops_guide_reason");
+  const advisoryCardEl = document.getElementById("hf_advisory_card");
+  const advisoryLevelEl = document.getElementById("hf_advisory_level");
+  const advisoryActionEl = document.getElementById("hf_advisory_action");
+  const advisoryHintEl = document.getElementById("hf_advisory_hint");
+  const advisoryExplanationEl = document.getElementById("hf_advisory_explanation");
+  const advisoryEvidenceBlockEl = document.getElementById("hf_advisory_evidence_block");
+  const advisoryEvidenceEl = document.getElementById("hf_advisory_evidence");
   const translationQaCountsEl = document.getElementById("hf_translation_qa_counts");
   const translationQaWarningEl = document.getElementById("hf_translation_qa_warning");
   const translateMmBtn = document.getElementById("hf_translate_mm_btn");
@@ -906,6 +913,65 @@
     if (opsGuideReasonEl) opsGuideReasonEl.textContent = model.reason;
   }
 
+  function formatAdvisoryLevel(level) {
+    const value = String(level || "").trim().toLowerCase();
+    if (value === "warning") return "注意";
+    if (value === "error") return "风险";
+    return "提示";
+  }
+
+  function formatAdvisoryEvidenceValue(value) {
+    if (value == null) return "-";
+    if (Array.isArray(value)) return value.map((item) => String(item || "").trim()).filter(Boolean).join(", ") || "-";
+    if (typeof value === "object") {
+      try {
+        return JSON.stringify(value);
+      } catch (_) {
+        return String(value);
+      }
+    }
+    if (typeof value === "boolean") return value ? "yes" : "no";
+    return String(value);
+  }
+
+  function renderAdvisory() {
+    if (!advisoryCardEl) return;
+    const advisory = (currentHub && currentHub.advisory) || null;
+    const hasAdvisory = Boolean(advisory && typeof advisory === "object");
+    advisoryCardEl.classList.toggle("hidden", !hasAdvisory);
+    if (!hasAdvisory) {
+      if (advisoryLevelEl) advisoryLevelEl.textContent = "-";
+      if (advisoryActionEl) advisoryActionEl.textContent = "-";
+      if (advisoryHintEl) advisoryHintEl.textContent = "-";
+      if (advisoryExplanationEl) advisoryExplanationEl.textContent = "-";
+      if (advisoryEvidenceEl) advisoryEvidenceEl.innerHTML = "";
+      if (advisoryEvidenceBlockEl) advisoryEvidenceBlockEl.classList.add("hidden");
+      return;
+    }
+
+    const level = String(advisory.level || "").trim().toLowerCase() || "info";
+    const levelLabel = formatAdvisoryLevel(level);
+    if (advisoryLevelEl) {
+      advisoryLevelEl.textContent = levelLabel;
+      advisoryLevelEl.className = "text-[11px] rounded-full px-2 py-1";
+      if (level === "warning") advisoryLevelEl.classList.add("bg-amber-50", "text-amber-700");
+      else if (level === "error") advisoryLevelEl.classList.add("bg-red-50", "text-red-700");
+      else advisoryLevelEl.classList.add("bg-sky-50", "text-sky-700");
+    }
+    if (advisoryActionEl) advisoryActionEl.textContent = String(advisory.recommended_next_action || "-");
+    if (advisoryHintEl) advisoryHintEl.textContent = String(advisory.operator_hint || "-");
+    if (advisoryExplanationEl) advisoryExplanationEl.textContent = String(advisory.explanation || "-");
+
+    const evidence = advisory.evidence && typeof advisory.evidence === "object" ? advisory.evidence : null;
+    const evidenceEntries = evidence ? Object.entries(evidence).filter(([key]) => String(key || "").trim()) : [];
+    if (advisoryEvidenceEl) {
+      advisoryEvidenceEl.innerHTML = evidenceEntries.map(([key, value]) => (
+        `<div><span class="font-semibold text-gray-700">${escapeHtml(key)}:</span> ${escapeHtml(formatAdvisoryEvidenceValue(value))}</div>`
+      )).join("");
+    }
+    if (advisoryEvidenceBlockEl) advisoryEvidenceBlockEl.classList.toggle("hidden", evidenceEntries.length === 0);
+  }
+
   function renderAudio() {
     const audio = (currentHub && currentHub.audio) || {};
     const media = (currentHub && currentHub.media) || {};
@@ -1225,6 +1291,7 @@
     renderMedia(finalUrl);
     renderSubtitles();
     renderAudio();
+    renderAdvisory();
     renderComposedReadiness();
     renderScenePack();
     renderDeliverables();
