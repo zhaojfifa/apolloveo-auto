@@ -2,32 +2,30 @@
 
 ## Current Stage
 
-Hot Follow Skills MVP v0 Closure
+Hot Follow Cleanup Stage Review Freeze
 
 ## Current Main Line
 
 - Hot Follow
 - first business-validated Skills sample
-- stabilization and controlled continuation
+- controlled cleanup continuation
 
 ## Current Completion
 
-- four-layer state schema frozen
-- Skills MVP entry contract frozen
-- advisory skeleton landed
-- advisory content v0 landed
-- advisory UI rendering landed
+- Hot Follow Skills MVP v0 closure remains frozen
+- recent `tasks.py` thinning and compatibility residue narrowing are completed for this stage
 - current business flow remains stable and non-blocking
 
 ## Remaining Structural Risks
 
 - `tasks.py` still structurally large
 - compatibility residue still exists
-- advisory remains deterministic v0
-- no generalized loader/platform yet
+- Avatar / baseline route behavior still remains in router space
+- some scenario-aware façade logic still remains
 
 ## Recommended Next Direction
 
-- deepen Hot Follow sample first
+- continue controlled Hot Follow cleanup first
+- prefer a small explicit entry review before broader next-phase work
 - keep business regression and verification baseline mandatory
-- avoid premature second-line or broad platform expansion
+- avoid Avatar refactor, baseline rewrite, second-line expansion, or broad platformization in this path

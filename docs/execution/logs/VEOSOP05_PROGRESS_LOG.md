@@ -427,3 +427,27 @@
 - 不改 compose service business contract
 - 不改 publish / ready gate / status / Skills ownership
 - 不扩展到第二条产线、OpenClaw 或平台化抽象
+
+## Hot Follow Cleanup Stage Freeze / Review
+
+日期：2026-03-22
+
+本节点完成：
+
+- 冻结当前 Hot Follow cleanup stage review
+- 明确本阶段已完成的 `tasks.py` thinning 与 compat residue narrowing
+- 明确 Avatar / baseline 仍是 recorded-not-refactored
+- 明确下一步仍需保持 controlled continuation
+
+本次收口说明：
+
+- Hot Follow sample 已明显更干净，但尚未 fully thinned
+- `tasks.py` 仍偏大，compatibility residue 仍存在
+- 当前建议仍是继续小范围、显式的 Hot Follow cleanup，而不是切换到新阶段扩张
+
+本节点明确不做：
+
+- 不改 runtime logic
+- 不改 tests
+- 不改 Avatar / baseline behavior
+- 不开启第二条产线或 generalized platform work
