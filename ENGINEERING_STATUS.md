@@ -2,30 +2,32 @@
 
 ## Current Stage
 
-post-VeoSop05 baseline consolidation and Hot Follow cleanup continuation
+Hot Follow Skills MVP v0 Closure
 
 ## Current Main Line
 
-- Hot Follow runtime cleanup
-- documentation system refoundation
-- validation discipline hardening
+- Hot Follow
+- first business-validated Skills sample
+- stabilization and controlled continuation
 
-## Completed Items
+## Current Completion
 
-- router direct coupling removed
-- compose flow behind service contract
-- minimal line-aware gate binding landed
-- verification baseline frozen
-- parse/subtitle consistency fixed
-- compose duration made video-master
+- four-layer state schema frozen
+- Skills MVP entry contract frozen
+- advisory skeleton landed
+- advisory content v0 landed
+- advisory UI rendering landed
+- current business flow remains stable and non-blocking
 
-## Next Steps
+## Remaining Structural Risks
 
-- further thin `tasks.py`
-- isolate compatibility-only helpers
-- clean remaining Hot Follow workbench/detail/presentation residue
+- `tasks.py` still structurally large
+- compatibility residue still exists
+- advisory remains deterministic v0
+- no generalized loader/platform yet
 
-## Current Blockers
+## Recommended Next Direction
 
-- no structural blocker on docs
-- runtime-side work remains constrained by mandatory business regression and scope discipline
+- deepen Hot Follow sample first
+- keep business regression and verification baseline mandatory
+- avoid premature second-line or broad platform expansion

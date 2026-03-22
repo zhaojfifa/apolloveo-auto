@@ -356,3 +356,26 @@
 - 不自动触发按钮或动作
 - 不改 compose / publish / ready gate / status policy
 - 不扩展到第二条产线或通用 UI framework
+
+## PR-S4 Docs — Hot Follow Skills MVP v0 Closure Freeze
+
+日期：2026-03-22
+
+本节点完成：
+
+- 冻结 `Hot Follow Skills MVP v0 Closure` 阶段文档
+- 更新 product / architecture / execution baseline 与 `ENGINEERING_STATUS.md`
+- 明确当前阶段已闭合、仍 partial、以及下一步建议
+
+本次收口说明：
+
+- Hot Follow 现为当前唯一完成 Skills MVP v0 closure 的业务样本
+- baseline 口径已同步为 Hot Follow first、controlled continuation、no broad expansion
+- 下一阶段尚未启动
+
+本节点明确不做：
+
+- 不改 runtime logic
+- 不改 tests
+- 不启动第二条产线
+- 不启动 generalized platform / loader / Skills runtime 扩张

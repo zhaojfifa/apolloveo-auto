@@ -15,6 +15,7 @@
 
 - ApolloVeo 当前不是平台扩张期，而是 post-review、post-VeoSop05 的基座收口期
 - Hot Follow 是当前唯一已经完成一轮真实业务验证的主线
+- Hot Follow 现在也是当前唯一完成 Skills MVP v0 closure 的业务样本
 - `TASK-1.3`、`TASK-2.0`、`TASK-2.3`、verification baseline、PR-5、PR-6 的收口结果已进入当前 baseline
 
 ## Partial
@@ -43,4 +44,5 @@
 2. `ARCHITECTURE_BASELINE.md`
 3. `EXECUTION_BASELINE.md`
 4. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
-5. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
+5. `docs/execution/HOT_FOLLOW_SKILLS_MVP_V0_CLOSURE.md`
+6. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`

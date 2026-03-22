@@ -10,18 +10,20 @@
 - Hot Follow compose 主链已收口到 service contract 背后
 - router direct coupling 已清零
 - deliverables-first / status-derived 的方向已进入实际修复与展示逻辑
-- 四层 state schema 已在 Hot Follow 上形成第一条真实 reference implementation，但正式模板仍以 contract 文档为准
+- 四层 state schema 已冻结为正式输入模板，并在 Hot Follow 上形成第一条真实 reference implementation
+- 第一个 Skills advisory hook 已挂在 Hot Follow workbench / operator guidance surface
+- 当前 Skills implementation 仍是 Hot-Follow-only、显式映射、read-only advisory，而不是 generalized runtime
 
 ## Partial Reality
 
 - line contract 已进入最小 runtime binding，但尚未成为 full runtime backbone
 - `tasks.py` 仍保留一部分 Hot Follow-specific orchestration / presentation residue
 - compatibility wrappers 仍存在，尤其在 Hot Follow router 边界
-- current gate/profile resolution 仍是 single-line focused，而不是 generic multi-line loader
+- current gate/profile resolution 与 skills bundle resolution 仍是 single-line focused，而不是 generic multi-line loader
 
 ## Postponed
 
-- Skills runtime
+- generalized Skills runtime / loader / platform
 - multi-line runtime loading
 - broad asset sink / worker profile runtimeization
 - OpenClaw control mesh integration
@@ -35,6 +37,8 @@
 ## Read Next
 
 - `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
+- `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
+- `docs/execution/HOT_FOLLOW_SKILLS_MVP_V0_CLOSURE.md`
 - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
 - `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
 - `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
