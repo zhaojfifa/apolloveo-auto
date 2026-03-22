@@ -402,3 +402,28 @@
 - 不改 baseline / legacy flow behavior
 - 不改 compose / gate / status 逻辑
 - 不开启第二条产线或 OpenClaw 范围
+
+## Tasks Router Thinning — Hot Follow Boundary-Safe Residue Cleanup
+
+日期：2026-03-22
+
+本节点完成：
+
+- 将 `tasks.py` 中剩余的 Hot Follow compose compat wiring 收口到 `hot_follow_runtime_bridge.py`
+- 将 dub 入口前的 subtitle-lane / route-state / no-dub 候选整形收口到同一兼容边界
+- 为新 compat helper 增加回归测试，验证只是搬运边界而非改变业务判断
+
+本次收口说明：
+
+- `tasks.py` 继续保留 route ownership、request parsing、dispatch 与 response mapping
+- Hot Follow compose / dub 的 line-specific compat residue 现在由更窄的 bridge owner 负责
+- Avatar 与 baseline / legacy 触点未改行为；只维持既有 router 入口 ownership
+- compose ownership、publish ownership、ready gate / status truth、Skills ownership 均未变化
+
+本节点明确不做：
+
+- 不改 Avatar behavior
+- 不改 baseline / legacy flow behavior
+- 不改 compose service business contract
+- 不改 publish / ready gate / status / Skills ownership
+- 不扩展到第二条产线、OpenClaw 或平台化抽象

@@ -16,6 +16,25 @@ from __future__ import annotations
 from typing import Any
 
 
+def compat_hot_follow_compose_runtime(
+    repo,
+    *,
+    hub_loader=None,
+    subtitle_resolver=None,
+    subtitle_only_check=None,
+    lipsync_runner=None,
+) -> dict[str, Any]:
+    return {
+        "hub_loader": lambda task_id, current_repo=repo, loader=(hub_loader or compat_get_hot_follow_workbench_hub): loader(
+            task_id,
+            repo=current_repo,
+        ),
+        "subtitle_resolver": subtitle_resolver or compat_resolve_target_srt_key,
+        "subtitle_only_check": subtitle_only_check or compat_allow_subtitle_only_compose,
+        "lipsync_runner": lipsync_runner or compat_maybe_run_hot_follow_lipsync_stub,
+    }
+
+
 def compat_hot_follow_operational_defaults() -> dict[str, Any]:
     from gateway.app.routers.hot_follow_api import _hot_follow_operational_defaults
 
@@ -81,6 +100,49 @@ def compat_hot_follow_target_lang_gate(text: str, *, target_lang: str) -> dict[s
     return _hf_target_lang_gate(text, target_lang=target_lang)
 
 
+def compat_hot_follow_dub_route_state(
+    task_id: str,
+    task: dict[str, Any],
+    *,
+    mm_text_override: str | None = None,
+    subtitle_lane_loader=None,
+    dual_channel_loader=None,
+) -> dict[str, Any]:
+    subtitle_lane = (subtitle_lane_loader or compat_hot_follow_subtitle_lane_state)(task_id, task)
+    route_state = (dual_channel_loader or compat_hot_follow_dual_channel_state)(task_id, task, subtitle_lane)
+    lane_text = str(subtitle_lane.get("dub_input_text") or "").strip()
+    override_text = str(mm_text_override or "").strip()
+    dub_input_text = override_text or lane_text
+    no_dub_candidate = (
+        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
+        and not override_text
+        and not lane_text
+    )
+    return {
+        "subtitle_lane": subtitle_lane,
+        "route_state": route_state,
+        "dub_input_text": dub_input_text,
+        "no_dub_candidate": no_dub_candidate,
+    }
+
+
+def compat_hot_follow_no_dub_updates(route_state: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "last_step": "dub",
+        "dub_status": "skipped",
+        "dub_error": None,
+        "compose_status": "pending",
+        "pipeline_config_updates": {
+            "no_dub": "true",
+            "dub_skip_reason": (
+                "subtitle_led"
+                if route_state.get("content_mode") == "subtitle_led"
+                else "no_speech_detected"
+            ),
+        },
+    }
+
+
 def compat_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
     from gateway.app.routers.hot_follow_api import _hf_allow_subtitle_only_compose
 
@@ -97,6 +159,10 @@ def compat_resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> 
 # explicit compatibility surface above.
 def hot_follow_operational_defaults() -> dict[str, Any]:
     return compat_hot_follow_operational_defaults()
+
+
+def hot_follow_compose_runtime(repo) -> dict[str, Any]:
+    return compat_hot_follow_compose_runtime(repo)
 
 
 def safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
@@ -140,6 +206,27 @@ def hf_dual_channel_state(
 
 def hf_target_lang_gate(text: str, *, target_lang: str) -> dict[str, Any]:
     return compat_hot_follow_target_lang_gate(text, target_lang=target_lang)
+
+
+def hf_dub_route_state(
+    task_id: str,
+    task: dict[str, Any],
+    *,
+    mm_text_override: str | None = None,
+    subtitle_lane_loader=None,
+    dual_channel_loader=None,
+) -> dict[str, Any]:
+    return compat_hot_follow_dub_route_state(
+        task_id,
+        task,
+        mm_text_override=mm_text_override,
+        subtitle_lane_loader=subtitle_lane_loader,
+        dual_channel_loader=dual_channel_loader,
+    )
+
+
+def hf_no_dub_updates(route_state: dict[str, Any]) -> dict[str, Any]:
+    return compat_hot_follow_no_dub_updates(route_state)
 
 
 def hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:

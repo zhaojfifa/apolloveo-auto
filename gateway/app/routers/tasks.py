@@ -261,8 +261,11 @@ from gateway.app.services.voice_state import (  # noqa: E402
 from gateway.app.services.hot_follow_runtime_bridge import (  # noqa: E402
     compat_allow_subtitle_only_compose as _compat_allow_subtitle_only_compose,
     compat_collect_hot_follow_workbench_ui as _compat_collect_hot_follow_workbench_ui,
+    compat_hot_follow_compose_runtime as _compat_hot_follow_compose_runtime,
     compat_get_hot_follow_workbench_hub as _compat_get_hot_follow_workbench_hub,
+    compat_hot_follow_dub_route_state as _compat_hot_follow_dub_route_state,
     compat_hot_follow_dual_channel_state as _compat_hot_follow_dual_channel_state,
+    compat_hot_follow_no_dub_updates as _compat_hot_follow_no_dub_updates,
     compat_hot_follow_operational_defaults as _compat_hot_follow_operational_defaults,
     compat_hot_follow_subtitle_lane_state as _compat_hot_follow_subtitle_lane_state,
     compat_hot_follow_target_lang_gate as _compat_hot_follow_target_lang_gate,
@@ -2186,6 +2189,13 @@ def compose_task(
 
     req = payload or ComposeTaskRequest()
     svc = CompositionService(storage=get_storage_service(), settings=get_settings())
+    compose_runtime = _compat_hot_follow_compose_runtime(
+        repo,
+        hub_loader=_compat_get_hot_follow_workbench_hub,
+        subtitle_resolver=_compat_resolve_target_srt_key,
+        subtitle_only_check=_compat_allow_subtitle_only_compose,
+        lipsync_runner=_compat_maybe_run_hot_follow_lipsync_stub,
+    )
     result = svc.run_hot_follow_compose(
         task_id,
         task,
@@ -2197,10 +2207,10 @@ def compose_task(
         ),
         repo=repo,
         policy_upsert=_policy_upsert,
-        hub_loader=lambda current_task_id, current_repo: _compat_get_hot_follow_workbench_hub(current_task_id, repo=current_repo),
-        subtitle_resolver=_compat_resolve_target_srt_key,
-        subtitle_only_check=_compat_allow_subtitle_only_compose,
-        lipsync_runner=_compat_maybe_run_hot_follow_lipsync_stub,
+        hub_loader=compose_runtime["hub_loader"],
+        subtitle_resolver=compose_runtime["subtitle_resolver"],
+        subtitle_only_check=compose_runtime["subtitle_only_check"],
+        lipsync_runner=compose_runtime["lipsync_runner"],
     )
     if result.status_code != 200:
         return JSONResponse(status_code=result.status_code, content=result.body)
@@ -2485,28 +2495,29 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             provider,
         )
     mm_text_override = (payload.mm_text or "").strip() or None
-    subtitle_lane = _compat_hot_follow_subtitle_lane_state(task_id, task)
-    route_state = _compat_hot_follow_dual_channel_state(task_id, task, subtitle_lane)
-    no_dub_candidate = (
-        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
-        and not mm_text_override
-        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    dub_route_state = _compat_hot_follow_dub_route_state(
+        task_id,
+        task,
+        mm_text_override=mm_text_override,
+        subtitle_lane_loader=_compat_hot_follow_subtitle_lane_state,
+        dual_channel_loader=_compat_hot_follow_dual_channel_state,
     )
+    subtitle_lane = dub_route_state["subtitle_lane"]
+    route_state = dub_route_state["route_state"]
+    no_dub_candidate = bool(dub_route_state["no_dub_candidate"])
     if no_dub_candidate:
         pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-        pipeline_config["no_dub"] = "true"
-        pipeline_config["dub_skip_reason"] = (
-            "subtitle_led" if route_state.get("content_mode") == "subtitle_led" else "no_speech_detected"
-        )
+        no_dub_updates = _compat_hot_follow_no_dub_updates(route_state)
+        pipeline_config.update(no_dub_updates["pipeline_config_updates"])
         _policy_upsert(
             repo,
             task_id,
             {
                 "pipeline_config": pipeline_config_to_storage(pipeline_config),
-                "last_step": "dub",
-                "dub_status": "skipped",
-                "dub_error": None,
-                "compose_status": "pending",
+                "last_step": no_dub_updates["last_step"],
+                "dub_status": no_dub_updates["dub_status"],
+                "dub_error": no_dub_updates["dub_error"],
+                "compose_status": no_dub_updates["compose_status"],
             },
         )
         stored = repo.get(task_id) or task
@@ -2518,7 +2529,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             audio_sha256=None,
             mm_audio_key=None,
         )
-    dub_input_text = mm_text_override or str(subtitle_lane.get("dub_input_text") or "").strip()
+    dub_input_text = str(dub_route_state["dub_input_text"] or "").strip()
     target_lang_gate = _compat_hot_follow_target_lang_gate(dub_input_text, target_lang=target_lang)
     if not target_lang_gate.get("allow", True):
         raise HTTPException(

@@ -57,3 +57,64 @@ def test_explicit_compat_subtitle_compose_bridge_matches_legacy_alias(monkeypatc
     assert compat_bridge.hf_allow_subtitle_only_compose("hf-compat-compose", task) is True
     assert compat_bridge.compat_resolve_target_srt_key(task, "hf-compat-compose", "mm") == "hf-compat-compose:mm"
     assert compat_bridge.resolve_target_srt_key(task, "hf-compat-compose", "mm") == "hf-compat-compose:mm"
+
+
+def test_compose_runtime_groups_existing_compat_hooks(monkeypatch):
+    calls = {}
+
+    monkeypatch.setattr(
+        compat_bridge,
+        "compat_get_hot_follow_workbench_hub",
+        lambda task_id, repo: {"task_id": task_id, "repo": repo},
+    )
+    monkeypatch.setattr(
+        compat_bridge,
+        "compat_resolve_target_srt_key",
+        lambda task, task_code, lang: f"{task_code}:{lang}:{task['task_id']}",
+    )
+    monkeypatch.setattr(
+        compat_bridge,
+        "compat_allow_subtitle_only_compose",
+        lambda task_id, task: task_id == task["task_id"],
+    )
+    monkeypatch.setattr(
+        compat_bridge,
+        "compat_maybe_run_hot_follow_lipsync_stub",
+        lambda task_id, enabled=False: f"{task_id}:{enabled}",
+    )
+
+    repo = object()
+    runtime = compat_bridge.compat_hot_follow_compose_runtime(repo)
+    task = {"task_id": "hf-runtime"}
+
+    assert runtime["hub_loader"]("hf-runtime") == {"task_id": "hf-runtime", "repo": repo}
+    assert runtime["subtitle_resolver"](task, "hf-runtime", "mm") == "hf-runtime:mm:hf-runtime"
+    assert runtime["subtitle_only_check"]("hf-runtime", task) is True
+    assert runtime["lipsync_runner"]("hf-runtime", enabled=True) == "hf-runtime:True"
+
+
+def test_dub_route_state_and_no_dub_updates_preserve_existing_compat_logic(monkeypatch):
+    monkeypatch.setattr(
+        compat_bridge,
+        "compat_hot_follow_subtitle_lane_state",
+        lambda *_args, **_kwargs: {"dub_input_text": "  ", "lane": "subtitle"},
+    )
+    monkeypatch.setattr(
+        compat_bridge,
+        "compat_hot_follow_dual_channel_state",
+        lambda *_args, **_kwargs: {"content_mode": "subtitle_led"},
+    )
+
+    state = compat_bridge.compat_hot_follow_dub_route_state("hf-dub", {"task_id": "hf-dub"})
+
+    assert state["subtitle_lane"]["lane"] == "subtitle"
+    assert state["route_state"]["content_mode"] == "subtitle_led"
+    assert state["dub_input_text"] == ""
+    assert state["no_dub_candidate"] is True
+
+    updates = compat_bridge.compat_hot_follow_no_dub_updates(state["route_state"])
+    assert updates["last_step"] == "dub"
+    assert updates["dub_status"] == "skipped"
+    assert updates["compose_status"] == "pending"
+    assert updates["pipeline_config_updates"]["no_dub"] == "true"
+    assert updates["pipeline_config_updates"]["dub_skip_reason"] == "subtitle_led"
