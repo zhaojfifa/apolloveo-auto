@@ -451,3 +451,27 @@
 - 不改 tests
 - 不改 Avatar / baseline behavior
 - 不开启第二条产线或 generalized platform work
+
+## Hot Follow Boundary Cleanup 3
+
+日期：2026-03-22
+
+本节点完成：
+
+- 将 Hot Follow workbench page context 的 compat hook 选择从 `tasks.py` 收口到 presenter owner
+- 将 task detail/status payload 的 Hot Follow status-shape hook 选择从 `tasks.py` 收口到 presenter owner
+- 为 presenter 默认 compat fallback 增加回归测试
+
+本次收口说明：
+
+- `tasks.py` 继续保留 route ownership、request parsing、dispatch 与 response mapping
+- Hot Follow 的只读 shaping hook 进一步离开 router，owner 更接近 presenter / compatibility boundary
+- Avatar 与 baseline 触点未改行为，只继续保留 audit 结论
+- compose ownership、publish ownership、ready gate / status truth ownership、Skills ownership 均未变化
+
+本节点明确不做：
+
+- 不改 Avatar behavior
+- 不改 baseline / legacy flow behavior
+- 不改 compose / publish / ready gate / status / Skills ownership
+- 不开启第二条产线、OpenClaw 或平台化扩张

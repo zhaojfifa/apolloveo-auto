@@ -3,6 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Callable
 
+from gateway.app.services.hot_follow_runtime_bridge import (
+    compat_collect_hot_follow_workbench_ui,
+    compat_hot_follow_operational_defaults,
+    compat_hot_follow_task_status_shape,
+)
+
 
 def filter_tasks_for_kind(items: list[dict[str, Any]], kind_norm: str) -> list[dict[str, Any]]:
     kind_value = str(kind_norm or "").strip().lower()
@@ -98,8 +104,8 @@ def build_task_workbench_page_context(
         paths,
         workbench_kind=spec.kind,
         settings=settings,
-        hot_follow_operational_defaults=hot_follow_operational_defaults,
-        hot_follow_ui_collector=hot_follow_ui_collector,
+        hot_follow_operational_defaults=hot_follow_operational_defaults or compat_hot_follow_operational_defaults,
+        hot_follow_ui_collector=hot_follow_ui_collector or compat_collect_hot_follow_workbench_ui,
     )
     task_view = build_task_workbench_view(
         task,
@@ -260,7 +266,7 @@ def build_task_status_payload(
     task: dict,
     detail: Any,
     *,
-    task_status_shape: Callable[[dict], dict[str, str]],
+    task_status_shape: Callable[[dict], dict[str, str]] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     updated_at = getattr(detail, "updated_at", None)
     updated_ts = None
@@ -316,7 +322,7 @@ def build_task_status_payload(
     payload["stale_reason"] = "running_but_not_updated" if stale else None
     payload["stale_for_seconds"] = stale_for
 
-    shape = task_status_shape(task)
+    shape = (task_status_shape or compat_hot_follow_task_status_shape)(task)
     log_extra = {
         "task_id": task_id,
         "status": payload.get("status"),

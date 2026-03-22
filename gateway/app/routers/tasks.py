@@ -260,16 +260,13 @@ from gateway.app.services.voice_state import (  # noqa: E402
 )
 from gateway.app.services.hot_follow_runtime_bridge import (  # noqa: E402
     compat_allow_subtitle_only_compose as _compat_allow_subtitle_only_compose,
-    compat_collect_hot_follow_workbench_ui as _compat_collect_hot_follow_workbench_ui,
     compat_hot_follow_compose_runtime as _compat_hot_follow_compose_runtime,
     compat_get_hot_follow_workbench_hub as _compat_get_hot_follow_workbench_hub,
     compat_hot_follow_dub_route_state as _compat_hot_follow_dub_route_state,
     compat_hot_follow_dual_channel_state as _compat_hot_follow_dual_channel_state,
     compat_hot_follow_no_dub_updates as _compat_hot_follow_no_dub_updates,
-    compat_hot_follow_operational_defaults as _compat_hot_follow_operational_defaults,
     compat_hot_follow_subtitle_lane_state as _compat_hot_follow_subtitle_lane_state,
     compat_hot_follow_target_lang_gate as _compat_hot_follow_target_lang_gate,
-    compat_hot_follow_task_status_shape as _compat_hot_follow_task_status_shape,
     compat_maybe_run_hot_follow_lipsync_stub as _compat_maybe_run_hot_follow_lipsync_stub,
     compat_resolve_target_srt_key as _compat_resolve_target_srt_key,
 )
@@ -1677,8 +1674,6 @@ async def task_workbench_page(
         build_task_workbench_task_json=_build_task_workbench_task_json,
         build_task_workbench_view=_build_task_workbench_view,
         extract_first_http_url=_extract_first_http_url,
-        hot_follow_operational_defaults=_compat_hot_follow_operational_defaults,
-        hot_follow_ui_collector=_compat_collect_hot_follow_workbench_ui,
         features=get_features(),
     )
     return render_template(
@@ -2139,7 +2134,6 @@ def get_task(task_id: str, repo=Depends(get_task_repository)):
         task_id,
         t,
         detail,
-        task_status_shape=_compat_hot_follow_task_status_shape,
     )
 
     logger.info(

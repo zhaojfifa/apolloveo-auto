@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import gateway.app.services.task_router_presenters as presenters
 from gateway.app.services.task_router_presenters import (
     build_task_summaries_page,
     build_task_workbench_page_context,
@@ -94,6 +95,22 @@ def test_build_task_status_payload_keeps_stale_logic_and_shape_log_fields():
     assert log_extra["step"] == "subtitles"
     assert log_extra["phase"] == "running"
     assert log_extra["provider"] == "gemini"
+
+
+def test_build_task_status_payload_uses_compat_shape_by_default(monkeypatch):
+    detail = _make_detail()
+    monkeypatch.setattr(
+        presenters,
+        "compat_hot_follow_task_status_shape",
+        lambda _task: {"step": "dub", "phase": "ready", "provider": "azure-speech"},
+    )
+
+    payload, log_extra = build_task_status_payload("hf-1", {"kind": "hot_follow"}, detail)
+
+    assert payload["stale"] is False
+    assert log_extra["step"] == "dub"
+    assert log_extra["phase"] == "ready"
+    assert log_extra["provider"] == "azure-speech"
 
 
 def test_build_task_workbench_view_uses_first_source_url():
@@ -204,6 +221,49 @@ def test_build_task_workbench_page_context_keeps_hot_follow_enrichment():
     assert ctx["features"] == {"ops": True}
     assert ctx["workbench_kind"] == "hot_follow"
     assert ctx["workbench_js"] == "/static/js/hf.js"
+
+
+def test_build_task_workbench_page_context_uses_compat_hooks_by_default(monkeypatch):
+    detail = _make_detail()
+
+    class _Spec:
+        kind = "hot_follow"
+        js = "/static/js/hf.js"
+
+    class _Settings:
+        workspace_root = "/tmp/ws"
+        douyin_api_base = "https://douyin.example"
+        whisper_model = "whisper-x"
+        gpt_model = "gpt-x"
+        asr_backend = "whisper"
+        subtitles_backend = "gemini"
+        gemini_model = "gemini-x"
+
+    monkeypatch.setattr(
+        presenters,
+        "compat_hot_follow_operational_defaults",
+        lambda: {"compose_status": "compat-default"},
+    )
+    monkeypatch.setattr(
+        presenters,
+        "compat_collect_hot_follow_workbench_ui",
+        lambda _task, _settings: {"subtitle_ready": True},
+    )
+
+    ctx = build_task_workbench_page_context(
+        {"kind": "hot_follow", "source_url": "https://example.com/source"},
+        spec=_Spec(),
+        settings=_Settings(),
+        task_to_detail=lambda _task: detail,
+        resolve_download_urls=lambda _task: {"mm_txt_path": "/v1/tasks/hf-1/mm_txt"},
+        build_task_workbench_task_json=build_task_workbench_task_json,
+        build_task_workbench_view=build_task_workbench_view,
+        extract_first_http_url=lambda text: "https://example.com/source" if text else None,
+        features={"ops": True},
+    )
+
+    assert ctx["task_json"]["compose_status"] == "compat-default"
+    assert ctx["task_json"]["subtitle_ready"] is True
 
 
 def test_build_task_summaries_page_preserves_router_summary_fields():
