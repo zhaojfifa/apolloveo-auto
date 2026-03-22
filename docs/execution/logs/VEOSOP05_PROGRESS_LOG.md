@@ -379,3 +379,26 @@
 - 不改 tests
 - 不启动第二条产线
 - 不启动 generalized platform / loader / Skills runtime 扩张
+
+## Tasks Router Thinning — Hot Follow Continuation
+
+日期：2026-03-22
+
+本节点完成：
+
+- 继续将任务列表整形、workbench 页面上下文组装、任务列表 summary 组装移出 `tasks.py`
+- 将这些只读呈现职责收口到更明确的 presenter owner
+- 追加 Avatar / baseline touchpoints 审计说明
+
+本次收口说明：
+
+- `tasks.py` 保留 router façade、request parsing、route ownership 与必要兼容入口
+- Avatar / baseline 触点仅记录，不改变行为
+- 未新增 router-to-router coupling，也未扩写成广义平台重构
+
+本节点明确不做：
+
+- 不改 Avatar behavior
+- 不改 baseline / legacy flow behavior
+- 不改 compose / gate / status 逻辑
+- 不开启第二条产线或 OpenClaw 范围
