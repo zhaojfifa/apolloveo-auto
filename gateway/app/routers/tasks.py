@@ -75,6 +75,10 @@ from gateway.app.services.tts_policy import (
     public_target_lang,
     resolve_tts_voice,
 )
+from gateway.app.services.hot_follow_language_profiles import (
+    hot_follow_subtitle_filename,
+    hot_follow_subtitle_txt_filename,
+)
 from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
 from gateway.app.steps.subtitles import _parse_srt_to_segments, segments_to_srt
 from gateway.app.providers.gemini_subtitles import GeminiSubtitlesError, translate_segments_with_gemini
@@ -393,6 +397,26 @@ def _load_dub_text(task_id: str) -> tuple[str, str]:
     if mm_txt_path.exists():
         return mm_txt_path.read_text(encoding="utf-8"), "mm_txt"
     return "", "mm_txt"
+
+
+def _upload_target_subtitle_artifacts(task: dict, task_id: str, target_lang: str) -> tuple[str | None, str | None]:
+    workspace = Workspace(task_id, target_lang=target_lang)
+    subtitle_name = hot_follow_subtitle_filename(target_lang)
+    subtitle_txt_name = hot_follow_subtitle_txt_filename(target_lang)
+    origin_key = (
+        upload_task_artifact(task, workspace.origin_srt_path, "origin.srt", task_id=task_id)
+        if workspace.origin_srt_path.exists()
+        else None
+    )
+    target_key = (
+        upload_task_artifact(task, workspace.mm_srt_path, subtitle_name, task_id=task_id)
+        if workspace.mm_srt_path.exists()
+        else None
+    )
+    target_txt_path = workspace.mm_srt_path.with_suffix(".txt")
+    if target_txt_path.exists():
+        upload_task_artifact(task, target_txt_path, subtitle_txt_name, task_id=task_id)
+    return origin_key, target_key
 
 
 def _resolve_text_path(task_id: str, kind: str) -> Path | None:
@@ -1527,20 +1551,7 @@ def _run_pipeline_background(task_id: str, repo) -> None:
             with_scenes=True,
         )
         asyncio.run(run_subtitles_step_v1(subs_req))
-        workspace = Workspace(task_id)
-        origin_key = (
-            upload_task_artifact(task, workspace.origin_srt_path, "origin.srt", task_id=task_id)
-            if workspace.origin_srt_path.exists()
-            else None
-        )
-        mm_key = (
-            upload_task_artifact(task, workspace.mm_srt_path, "mm.srt", task_id=task_id)
-            if workspace.mm_srt_path.exists()
-            else None
-        )
-        mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
-        if mm_txt_path.exists():
-            upload_task_artifact(task, mm_txt_path, "mm.txt", task_id=task_id)
+        origin_key, mm_key = _upload_target_subtitle_artifacts(task, task_id, target_lang)
         _repo_upsert(
             repo,
             task_id,
@@ -2322,20 +2333,7 @@ def _run_subtitles_job(
         )
     )
 
-    workspace = Workspace(task_id)
-    origin_key = (
-        upload_task_artifact(task, workspace.origin_srt_path, "origin.srt", task_id=task_id)
-        if workspace.origin_srt_path.exists()
-        else None
-    )
-    mm_key = (
-        upload_task_artifact(task, workspace.mm_srt_path, "mm.srt", task_id=task_id)
-        if workspace.mm_srt_path.exists()
-        else None
-    )
-    mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
-    if mm_txt_path.exists():
-        upload_task_artifact(task, mm_txt_path, "mm.txt", task_id=task_id)
+    origin_key, mm_key = _upload_target_subtitle_artifacts(task, task_id, target_lang)
 
     subtitles_dir = Path("deliver") / "subtitles" / task_id
     subtitles_key = str(subtitles_dir / "subtitles.json")

@@ -600,3 +600,23 @@
 
 - 不改 Gemini / Whisper provider 本身
 - 不扩成新的字幕架构
+
+## Hot Follow Target Subtitle Upload Path Fix
+
+日期：2026-03-27
+
+本节点完成：
+
+- 修复自动 subtitles job / auto pipeline 在目标字幕落库时遗漏 `target_lang` 的问题
+- 修复越南语任务仍按默认 `mm.srt` / `mm.txt` 回写，导致真实 `vi.srt` / `vi.txt` 丢失的问题
+- 追加缅甸语 / 越南语两条目标字幕上传路径回归测试
+
+本次收口说明：
+
+- 本次修复聚焦 Hot Follow 现有字幕上传链，不改 dub / compose 已稳定路径
+- 根因是目标语言 profile 没有贯穿到旧的字幕收尾上传 helper
+
+本节点明确不做：
+
+- 不重构 tasks router 其他旧 helper
+- 不扩到非 Hot Follow 线路
