@@ -579,3 +579,24 @@
 - 不改越南语之外的 provider 配置边界
 - 不做 broad compose redesign
 - 不重写 workbench 架构
+
+## Hot Follow Subtitle Step Error Classification Fix
+
+日期：2026-03-27
+
+本节点完成：
+
+- 修复 subtitles step 收尾阶段错误引用未定义局部变量，避免解析完成后被误打成 step error
+- 接通 `translation_incomplete` 在 pipeline config / workbench / ready 判定中的真实传递
+- 调整目标字幕 currentness 诊断优先级：翻译未完成优先于空目标字幕占位
+- workbench / pipeline 摘要现在可区分 `no_subtitles`、`translation_incomplete` 与真实异常
+
+本次收口说明：
+
+- 这次修复的是 Hot Follow 既有字幕链路的错误分类与状态回写，不是新功能
+- 目标是让“无法解析 / 无字幕 / 翻译未完成”在现有单线里被事实化区分
+
+本节点明确不做：
+
+- 不改 Gemini / Whisper provider 本身
+- 不扩成新的字幕架构

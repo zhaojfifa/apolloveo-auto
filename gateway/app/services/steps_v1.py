@@ -98,6 +98,18 @@ def _truthy_env(name: str, default: str = "1") -> bool:
     return v is not None and v.strip().lower() not in ("0", "false", "no", "")
 
 
+def _subtitle_result_contract(result: dict | None) -> tuple[str, str, str, dict[str, object]]:
+    payload = dict(result or {})
+    origin_text = str(payload.get("origin_srt") or "")
+    normalized_origin_text = str(payload.get("origin_normalized_srt") or origin_text or "")
+    target_text = str(payload.get("mm_srt") or "")
+    translation_qa_raw = payload.get("translation_qa")
+    translation_qa = dict(translation_qa_raw) if isinstance(translation_qa_raw, dict) else {}
+    if "complete" not in translation_qa:
+        translation_qa["complete"] = not bool(payload.get("translation_incomplete"))
+    return origin_text, normalized_origin_text, target_text, translation_qa
+
+
 async def _hydrate_raw_from_url(
     *,
     task_id: str,
@@ -780,6 +792,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
         if clean_generated:
             updates["clean_video_generated"] = "true"
         _update_pipeline_config(req.task_id, updates)
+        origin_text, normalized_origin_text, mm_text, translation_qa_payload = _subtitle_result_contract(result)
 
         workspace = Workspace(req.task_id, target_lang=req.target_lang)
         subtitle_filename = hot_follow_subtitle_filename(req.target_lang)

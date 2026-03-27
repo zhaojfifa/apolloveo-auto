@@ -292,7 +292,7 @@ def test_hot_follow_workbench_vi_currentness_blocks_false_done_states(monkeypatc
         data = res.json()
 
     assert data["subtitles"]["target_subtitle_current"] is False
-    assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_source_copy"
+    assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
     assert data["ready_gate"]["subtitle_ready"] is False
     assert data["ready_gate"]["compose_ready"] is False
 

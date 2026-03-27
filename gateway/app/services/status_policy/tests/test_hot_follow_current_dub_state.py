@@ -318,7 +318,7 @@ def test_vi_subtitle_lane_blocks_source_copy_until_real_target_is_current(monkey
 
     assert subtitle_lane["target_subtitle_current"] is False
     assert subtitle_lane["subtitle_ready"] is False
-    assert subtitle_lane["target_subtitle_current_reason"] == "target_subtitle_source_copy"
+    assert subtitle_lane["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
 
 
 def test_vi_voice_state_requires_current_target_subtitle(monkeypatch):

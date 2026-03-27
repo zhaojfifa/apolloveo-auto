@@ -73,12 +73,12 @@ def compute_hot_follow_target_subtitle_currentness(
     elif not authoritative_source:
         current = False
         reason = "target_subtitle_source_mismatch"
-    elif not target_exists:
-        current = False
-        reason = "target_subtitle_empty"
     elif translation_incomplete and not has_saved_revision:
         current = False
         reason = "target_subtitle_translation_incomplete"
+    elif not target_exists:
+        current = False
+        reason = "target_subtitle_empty"
     elif source_copy and not has_saved_revision:
         current = False
         reason = "target_subtitle_source_copy"

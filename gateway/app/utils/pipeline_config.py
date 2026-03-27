@@ -17,6 +17,7 @@ _EXTRA_KEYS = {
     "has_audio",
     "has_hard_subtitles",
     "no_subtitles",
+    "translation_incomplete",
     "no_dub",
     "dub_skip_reason",
     "subtitle_track_kind",

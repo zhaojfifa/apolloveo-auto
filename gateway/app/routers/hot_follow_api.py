@@ -895,11 +895,23 @@ def _hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None
         return status, summary
     if step == "subtitles":
         status = _hf_state_from_status(task.get("subtitles_status"))
+        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+        no_subtitles = str(pipeline_config.get("no_subtitles") or "").strip().lower() == "true"
+        translation_incomplete = str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
+        current_reason = str(task.get("target_subtitle_current_reason") or "").strip()
+        summary = "origin/mm subtitles"
         if status == "pending" and (task.get("origin_srt_path") or task.get("mm_srt_path")):
             status = "done"
         if status == "pending" and task_status == "processing" and last_step == "subtitles":
             status = "running"
-        summary = "origin/mm subtitles"
+        if status == "error":
+            summary = str(task.get("subtitles_error") or "subtitles_error")
+        elif no_subtitles:
+            summary = "no_subtitles"
+        elif translation_incomplete:
+            summary = "translation_incomplete"
+        elif current_reason and current_reason not in {"ready", "unknown"}:
+            summary = current_reason
         return status, summary
     if step == "audio":
         status = _hf_state_from_status(task.get("dub_status"))
