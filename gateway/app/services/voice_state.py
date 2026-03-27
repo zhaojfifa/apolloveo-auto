@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from gateway.app.config import get_settings
+from gateway.app.services.hot_follow_language_profiles import get_hot_follow_language_profile
 from gateway.app.services.tts_policy import (
     normalize_provider,
     normalize_target_lang,
@@ -30,21 +31,20 @@ from gateway.app.services.media_validation import MIN_AUDIO_BYTES, media_meta_fr
 def build_hot_follow_voice_options(
     settings, target_lang: str | None
 ) -> dict[str, list[dict[str, str]]]:
-    if normalize_target_lang(target_lang) != "my":
-        return {"azure_speech": [], "edge_tts": []}
-
     options: dict[str, list[dict[str, str]]] = {"azure_speech": [], "edge_tts": []}
+    profile = get_hot_follow_language_profile(target_lang)
+    labels = {
+        "female": "女声",
+        "male": "男声",
+    }
     azure_map = getattr(settings, "azure_tts_voice_map", {}) or {}
-    if azure_map.get("mm_female_1"):
-        options["azure_speech"].append({"value": "mm_female_1", "label": "女声"})
-    if azure_map.get("mm_male_1"):
-        options["azure_speech"].append({"value": "mm_male_1", "label": "男声"})
-
     edge_map = getattr(settings, "edge_tts_voice_map", {}) or {}
-    if edge_map.get("mm_female_1"):
-        options["edge_tts"].append({"value": "mm_female_1", "label": "女声"})
-    if edge_map.get("mm_male_1"):
-        options["edge_tts"].append({"value": "mm_male_1", "label": "男声"})
+    for voice_id in profile.allowed_voice_options:
+        label = labels["female"] if "female" in voice_id else labels["male"]
+        if azure_map.get(voice_id):
+            options["azure_speech"].append({"value": voice_id, "label": label})
+        if edge_map.get(voice_id):
+            options["edge_tts"].append({"value": voice_id, "label": label})
     return options
 
 
@@ -79,11 +79,12 @@ def resolve_hot_follow_requested_voice(
     if getattr(settings, "lovo_speaker_mm_male_1", None):
         reverse_lovo[str(getattr(settings, "lovo_speaker_mm_male_1")).strip()] = "mm_male_1"
 
+    profile = get_hot_follow_language_profile(task.get("target_lang") or task.get("content_lang") or "mm")
     for candidate in (task.get("voice_id"), task.get("mm_audio_voice_id")):
         voice = str(candidate or "").strip() or None
         if not voice:
             continue
-        if voice in {"mm_female_1", "mm_male_1", "mm_female_2"}:
+        if voice in profile.allowed_voice_options:
             return voice
         if provider_norm == "edge-tts" and voice in reverse_edge:
             return reverse_edge[voice]
@@ -103,10 +104,11 @@ def hot_follow_expected_provider(
     )
     if (
         str(task.get("kind") or "").strip().lower() == "hot_follow"
-        and target_lang == "my"
+        and target_lang in {"my", "vi"}
     ):
         requested = str(requested_voice or "").strip()
-        if not requested or requested in {"mm_female_1", "mm_male_1"}:
+        profile = get_hot_follow_language_profile(target_lang)
+        if not requested or requested in profile.allowed_voice_options:
             return "azure-speech"
     return provider
 

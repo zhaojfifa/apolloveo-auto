@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from gateway.app.services.hot_follow_language_profiles import get_hot_follow_language_profile
+
 
 def normalize_target_lang(value: str | None, default: str = "my") -> str:
     raw = str(value or "").strip().lower()
@@ -34,17 +36,21 @@ def normalize_provider(provider: str | None, default: str = "edge-tts") -> str:
 
 def _default_voice_for_lang(settings: Any, provider: str, target_lang: str) -> str | None:
     lang = normalize_target_lang(target_lang)
-    if lang == "my":
+    if lang in {"my", "vi"}:
+        profile = get_hot_follow_language_profile(lang)
+        default_voice_id = profile.default_voice_id(provider)
         if provider == "azure-speech":
             return (
-                settings.azure_tts_voice_map.get("mm_female_1")
-                or settings.edge_tts_voice_map.get("mm_female_1")
-                or "my-MM-NilarNeural"
+                settings.azure_tts_voice_map.get(default_voice_id)
+                or settings.edge_tts_voice_map.get(default_voice_id)
             )
         if provider == "edge-tts":
-            return settings.edge_tts_voice_map.get("mm_female_1") or "my-MM-NilarNeural"
-        if provider == "lovo":
-            return getattr(settings, "lovo_speaker_mm_female_1", None) or getattr(settings, "lovo_voice_id_mm", None) or "mm_female_1"
+            return settings.edge_tts_voice_map.get(default_voice_id)
+        if provider == "lovo" and lang == "my":
+            if default_voice_id == "mm_female_1":
+                return getattr(settings, "lovo_speaker_mm_female_1", None) or getattr(settings, "lovo_voice_id_mm", None) or default_voice_id
+            if default_voice_id == "mm_male_1":
+                return getattr(settings, "lovo_speaker_mm_male_1", None) or default_voice_id
     if lang == "zh":
         return "zh-CN-XiaoxiaoNeural"
     if lang == "en":
@@ -64,6 +70,8 @@ def is_voice_compatible(target_lang: str | None, voice: str | None) -> bool:
             or lower_voice.startswith("mm_")
             or "burmese" in lower_voice
         )
+    if normalized_lang == "vi":
+        return lower_voice.startswith("vi-vn-") or lower_voice.startswith("vi_") or "vietnamese" in lower_voice
     return True
 
 
@@ -93,7 +101,7 @@ def resolve_tts_voice(
             return mapped, mapped != requested
         if requested in provider_map.values():
             return requested, False
-        if requested.lower().startswith("mm_"):
+        if requested.lower().startswith(("mm_", "vi_")):
             return None, True
         return requested, False
     fallback = _default_voice_for_lang(settings, provider_name, normalize_target_lang(target_lang))

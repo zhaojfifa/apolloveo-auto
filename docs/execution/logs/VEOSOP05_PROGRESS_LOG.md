@@ -499,3 +499,28 @@
 - 不改 runtime logic
 - 不改 tests
 - 不把当前 readiness review 扩写成 broad platform strategy
+
+## Hot Follow Localization Extension: Vietnamese Profile
+
+日期：2026-03-27
+
+本节点完成：
+
+- 在现有 Hot Follow 单线内新增 Vietnamese (`vi`) 目标语言 profile，未创建第二条业务线
+- 将 Hot Follow 的目标字幕文件名、目标配音文件名、允许 voice options、默认 voice mapping 收口到单一 profile truth source
+- 复用既有 `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION`，未新增 Render secrets
+- 维持 Myanmar (`my` / `mm`) 既有 workflow 与 deliverable 语义不变
+
+本次收口说明：
+
+- Hot Follow line 仍然 singular；只是新增第二个 supported target-language instance
+- Myanmar 继续使用 `mm.srt` / `audio_mm.mp3`
+- Vietnamese 新增 `vi.srt` / `audio_vi.mp3`
+- compose / deliverable semantics / workbench ownership / ready gate ownership 均未改边界
+
+本节点明确不做：
+
+- 不新建 Vietnamese-specific line 或 workbench
+- 不做 menu-wide i18n 扩张
+- 不重构 unrelated scenarios
+- 不改 Hot Follow 之外的 ownership truth source

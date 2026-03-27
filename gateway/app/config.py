@@ -67,6 +67,8 @@ class Settings(BaseSettings):
         default_factory=lambda: {
             "mm_female_1": "my-MM-NilarNeural",
             "mm_male_1": "my-MM-ThihaNeural",
+            "vi_female_1": "vi-VN-HoaiMyNeural",
+            "vi_male_1": "vi-VN-NamMinhNeural",
         }
     )
     edge_tts_rate: str = Field("+0%", env="EDGE_TTS_RATE")
@@ -83,6 +85,8 @@ class Settings(BaseSettings):
         default_factory=lambda: {
             "mm_female_1": "my-MM-NilarNeural",
             "mm_male_1": "my-MM-ThihaNeural",
+            "vi_female_1": "vi-VN-HoaiMyNeural",
+            "vi_male_1": "vi-VN-NamMinhNeural",
         }
     )
 

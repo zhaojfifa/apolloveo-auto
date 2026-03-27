@@ -29,10 +29,14 @@ def _settings():
         edge_tts_voice_map={
             "mm_female_1": "my-MM-NilarNeural",
             "mm_male_1": "my-MM-ThihaNeural",
+            "vi_female_1": "vi-VN-HoaiMyNeural",
+            "vi_male_1": "vi-VN-NamMinhNeural",
         },
         azure_tts_voice_map={
             "mm_female_1": "my-MM-NilarNeural",
             "mm_male_1": "my-MM-ThihaNeural",
+            "vi_female_1": "vi-VN-HoaiMyNeural",
+            "vi_male_1": "vi-VN-NamMinhNeural",
         },
         dub_provider="azure-speech",
         azure_speech_key="test-key",
@@ -171,6 +175,41 @@ def test_previous_final_can_coexist_with_failed_current_redub(monkeypatch, tmp_p
     assert payload["final_exists"] is True
     assert payload["audio_ready"] is False
     assert payload["dub_current"] is False
+
+
+def test_vi_voice_options_and_burn_source_follow_profile(monkeypatch):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda task_id: Path("/tmp") / task_id)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda _key: b"1\n00:00:00,000 --> 00:00:02,000\nXin chao\n")
+    _patch_voice_storage(
+        monkeypatch,
+        lambda _key: True,
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
+    task = {
+        "task_id": "hf-vi",
+        "kind": "hot_follow",
+        "target_lang": "vi",
+        "dub_status": "done",
+        "mm_audio_key": "deliver/tasks/hf-vi/audio_vi.mp3",
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "vi-VN-HoaiMyNeural",
+        "mm_srt_path": "deliver/tasks/hf-vi/vi.srt",
+        "config": {
+            "tts_requested_voice": "vi_female_1",
+            "tts_resolved_voice": "vi-VN-HoaiMyNeural",
+            "tts_provider": "azure-speech",
+        },
+    }
+
+    state = tasks_router._collect_voice_execution_state(task, _settings())
+    subtitle_lane = hf_router._hf_subtitle_lane_state("hf-vi", task)
+
+    assert state["requested_voice"] == "vi_female_1"
+    assert state["resolved_voice"] == "vi-VN-HoaiMyNeural"
+    assert subtitle_lane["actual_burn_subtitle_source"] == "vi.srt"
 
 
 def test_rerun_presentation_reports_last_final_and_current_failure():
@@ -424,7 +463,8 @@ def test_sync_saved_target_subtitle_artifact_writes_canonical_mm_srt(monkeypatch
     monkeypatch.setattr(hf_router, "media_meta_from_head", lambda _meta: (0, None))
 
     class _Workspace:
-        def __init__(self, task_id):
+        def __init__(self, task_id, target_lang: str | None = None):
+            _ = target_lang
             base = tmp_path / task_id
             base.mkdir(parents=True, exist_ok=True)
             self.mm_srt_path = base / "mm.srt"
@@ -469,7 +509,8 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
     monkeypatch.setattr(hf_router, "media_meta_from_head", lambda _meta: (0, None))
 
     class _Workspace:
-        def __init__(self, task_id):
+        def __init__(self, task_id, target_lang: str | None = None):
+            _ = target_lang
             base = tmp_path / task_id
             base.mkdir(parents=True, exist_ok=True)
             self.mm_srt_path = base / "mm.srt"

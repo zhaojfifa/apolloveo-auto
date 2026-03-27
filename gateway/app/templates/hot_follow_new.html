@@ -92,9 +92,8 @@
               <div>
                 <label class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_target_lang">目标语言</label>
                 <select name="target_lang" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
-                  <option value="zh" data-i18n="lang.zh">中文</option>
                   <option value="mm" data-i18n="lang.mm">မြန်မာ</option>
-                  <option value="en" data-i18n="lang.en">English</option>
+                  <option value="vi">Tiếng Việt</option>
                 </select>
               </div>
 
@@ -157,6 +156,9 @@
   </div>
 
   <script src="/static/js/i18n_v185.js"></script>
+  <script>
+    window.__HF_LANGUAGE_PROFILES__ = {{ language_profiles|tojson }};
+  </script>
   <script src="/static/js/hot_follow_new.js"></script>
 </body>
 </html>

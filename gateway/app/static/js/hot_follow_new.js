@@ -15,6 +15,8 @@
   const voiceIdEl = document.getElementById("hf-voice-id");
   const publishAccountEl = document.querySelector('select[name="publish_account"]');
   const taskTitleEl = document.getElementById("hf-task-title");
+  const languageProfiles = Array.isArray(window.__HF_LANGUAGE_PROFILES__) ? window.__HF_LANGUAGE_PROFILES__ : [];
+  const profileByLang = new Map(languageProfiles.map((profile) => [String(profile.target_lang || "").toLowerCase(), profile]));
 
   let lastProbe = null;
   let debounceTimer = null;
@@ -43,6 +45,30 @@
     probeMsg.textContent = msg || "";
     createBtn.disabled = !ok;
     refreshLocale(probeCard || document);
+  }
+
+  function currentProfile() {
+    const lang = String((targetLangEl && targetLangEl.value) || "mm").toLowerCase();
+    return profileByLang.get(lang) || profileByLang.get("mm") || null;
+  }
+
+  function refreshVoiceOptions() {
+    if (!voiceIdEl) return;
+    const profile = currentProfile();
+    const allowed = Array.isArray(profile && profile.allowed_voice_options) ? profile.allowed_voice_options : ["mm_female_1", "mm_male_1"];
+    const labels = {
+      female: "女声",
+      male: "男声",
+    };
+    const current = String(voiceIdEl.value || "");
+    voiceIdEl.innerHTML = "";
+    allowed.forEach((voiceId) => {
+      const option = document.createElement("option");
+      option.value = voiceId;
+      option.textContent = voiceId.indexOf("male") >= 0 ? labels.male : labels.female;
+      voiceIdEl.appendChild(option);
+    });
+    voiceIdEl.value = allowed.includes(current) ? current : String((((profile || {}).default_voice_by_provider || {})["azure-speech"]) || allowed[0] || "");
   }
 
   async function doProbe() {
@@ -154,6 +180,7 @@
 
   if (urlEl) urlEl.addEventListener("input", scheduleProbe);
   if (platformEl) platformEl.addEventListener("change", scheduleProbe);
+  if (targetLangEl) targetLangEl.addEventListener("change", refreshVoiceOptions);
   if (createBtn) {
     createBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -161,5 +188,6 @@
     });
   }
 
+  refreshVoiceOptions();
   refreshLocale(document);
 })();

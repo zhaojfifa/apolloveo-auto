@@ -60,7 +60,8 @@ def test_sync_saved_target_subtitle_reuploads_when_existing_mm_srt_differs(monke
     uploads: list[tuple[str, str]] = []
 
     class _Workspace:
-        def __init__(self, _task_id: str):
+        def __init__(self, _task_id: str, target_lang: str | None = None):
+            _ = target_lang
             self.mm_srt_path = tmp_path / "subtitles" / "mm.srt"
 
     def _fake_upload(_task, local_path, artifact_name, task_id=None, **_kwargs):
@@ -83,6 +84,33 @@ def test_sync_saved_target_subtitle_reuploads_when_existing_mm_srt_differs(monke
     assert synced_key == "deliver/tasks/hf-bind-1/mm.srt"
     assert uploads == [("mm.srt", saved_text)]
     assert task["mm_srt_path"] == "deliver/tasks/hf-bind-1/mm.srt"
+
+
+def test_sync_saved_target_subtitle_reuploads_vi_artifact_for_vi_task(monkeypatch, tmp_path):
+    uploads: list[tuple[str, str]] = []
+
+    class _Workspace:
+        def __init__(self, _task_id: str, target_lang: str | None = None):
+            assert target_lang == "vi"
+            self.mm_srt_path = tmp_path / "subtitles" / "vi.srt"
+
+    def _fake_upload(_task, local_path, artifact_name, task_id=None, **_kwargs):
+        uploads.append((artifact_name, Path(local_path).read_text(encoding="utf-8")))
+        return f"deliver/tasks/{task_id}/{artifact_name}"
+
+    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "_srt_to_txt", lambda _text: "")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "upload_task_artifact", _fake_upload)
+
+    task = {"task_id": "hf-bind-vi", "target_lang": "vi", "mm_srt_path": "deliver/tasks/hf-bind-vi/vi.srt"}
+    saved_text = "new 30s vietnamese subtitle payload"
+
+    synced_key = hf_router._hf_sync_saved_target_subtitle_artifact("hf-bind-vi", task, saved_text)
+
+    assert synced_key == "deliver/tasks/hf-bind-vi/vi.srt"
+    assert uploads == [("vi.srt", saved_text)]
+    assert task["mm_srt_path"] == "deliver/tasks/hf-bind-vi/vi.srt"
 
 
 def test_prepare_workspace_records_actual_downloaded_subtitle_snapshot(monkeypatch, tmp_path):

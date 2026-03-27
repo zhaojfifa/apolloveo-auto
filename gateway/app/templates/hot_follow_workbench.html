@@ -175,13 +175,13 @@
             </div>
             <div class="mb-2 text-xs text-gray-500">当前目标语言字幕编辑区（SRT 主对象）</div>
             <textarea id="hf_subtitles_text" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm" rows="10" placeholder="在此编辑 SRT 文本" data-i18n-placeholder="hot_follow_workbench_subtitle_placeholder"></textarea>
-            <div id="hf_subtitles_edit_hint" class="mt-2 text-[11px] text-gray-500">这里是当前目标语言 SRT 主编辑区。保存后会更新 mm.srt，并影响后续配音与合成。</div>
+            <div id="hf_subtitles_edit_hint" class="mt-2 text-[11px] text-gray-500">这里是当前目标语言 SRT 主编辑区。保存后会更新目标字幕文件，并影响后续配音与合成。</div>
             <div id="hf_translation_qa_counts" class="text-xs text-gray-500 mt-2" data-i18n="hot_follow_workbench_translation_cues_default">Translation cues: - / -</div>
             <div id="hf_translation_qa_warning" class="hidden mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
               <span data-i18n="hot_follow_workbench_translation_mismatch">Translation cues mismatch. Please refresh or re-run subtitles.</span>
             </div>
             <div class="flex flex-wrap items-center gap-3 mt-3">
-              <button id="hf_translate_mm_btn" class="btn-secondary hidden" type="button">翻译为缅语</button>
+              <button id="hf_translate_mm_btn" class="btn-secondary hidden" type="button">翻译为目标语言</button>
               <button id="hf_subtitles_refresh_btn" class="btn-secondary" data-i18n="hot_follow_workbench_subtitle_refresh">刷新字幕</button>
               <button id="hf_subtitles_save_btn" class="btn-secondary" data-i18n="hot_follow_workbench_subtitle_save">保存字幕</button>
               <span id="hf_subtitles_msg" class="text-xs text-gray-500"></span>

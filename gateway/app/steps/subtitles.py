@@ -562,8 +562,8 @@ async def generate_subtitles(
         },
     )
 
-    workspace = Workspace(task_id)
     target_lang = target_lang or "my"
+    workspace = Workspace(task_id, target_lang=target_lang)
     probe_result: dict = {
         "status": "unknown",
         "has_audio": None,

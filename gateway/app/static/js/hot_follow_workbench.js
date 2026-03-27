@@ -34,6 +34,22 @@
     return fallback;
   }
 
+  function currentTargetProfile() {
+    const profile = (currentHub && currentHub.target_lang_profile) || {};
+    return {
+      targetLang: String(profile.target_lang || ((currentHub && currentHub.input && currentHub.input.target_lang) || "mm")).toLowerCase(),
+      displayName: String(profile.display_name || "Myanmar"),
+      subtitleFilename: String(profile.subtitle_filename || "mm.srt"),
+      subtitleTxtFilename: String(profile.subtitle_txt_filename || "mm.txt"),
+      dubFilename: String(profile.dub_filename || "audio_mm.mp3"),
+    };
+  }
+
+  function translateButtonLabel() {
+    const profile = currentTargetProfile();
+    return profile.targetLang === "vi" ? "翻译为越南语" : "翻译为缅语";
+  }
+
   function pickFinalVideoUrl(task) {
     if (typeof window.__HF_PICK_FINAL_URL__ === "function") return window.__HF_PICK_FINAL_URL__(task);
     const media = (task && task.media) || {};
@@ -481,9 +497,10 @@
         : "这里显示当前素材提取到的来源字幕或识别文本。";
     }
     if (subtitlesEditHintEl) {
+      const profile = currentTargetProfile();
       subtitlesEditHintEl.textContent = isHotFollowOpsGuideV1Enabled()
-        ? "这是当前目标语言 SRT 主编辑区。保存后会更新 mm.srt；辅助输入和 OCR 候选都只是辅助，不会自动覆盖这里。"
-        : "这里是当前目标语言 SRT 主编辑区。保存后会更新 mm.srt，并影响后续配音与合成。";
+        ? `这是当前目标语言 SRT 主编辑区。保存后会更新 ${profile.subtitleFilename}；辅助输入和 OCR 候选都只是辅助，不会自动覆盖这里。`
+        : `这里是当前目标语言 SRT 主编辑区。保存后会更新 ${profile.subtitleFilename}，并影响后续配音与合成。`;
     }
     if (assistedInputBlockEl) assistedInputBlockEl.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
     // Auto-expand the assisted input block for no-speech tasks that need manual input
@@ -521,7 +538,10 @@
       translationQaCountsEl.textContent = `${t("hot_follow_workbench_translation_cues_prefix", "Translation cues")}: ${sourceCount} / ${translatedCount}`;
     }
     if (translationQaWarningEl) translationQaWarningEl.classList.toggle("hidden", !hasMismatch);
-    if (translateMmBtn) translateMmBtn.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
+    if (translateMmBtn) {
+      translateMmBtn.classList.toggle("hidden", !isHotFollowOpsGuideV1Enabled());
+      translateMmBtn.textContent = translateButtonLabel();
+    }
     renderOcrCandidate();
   }
 
@@ -594,7 +614,7 @@
     if (!options.length) {
       const opt = document.createElement("option");
       opt.value = "";
-      opt.textContent = "当前 provider 无可用缅语声线";
+      opt.textContent = `当前 provider 无可用${currentTargetProfile().displayName}声线`;
       ttsVoiceEl.appendChild(opt);
       ttsVoiceEl.disabled = true;
       return;
@@ -1044,10 +1064,10 @@
       mode = "ready_subtitle_only"; path = "合成字幕版"; badge = "待合成";
     } else if (!subReady && noDub) {
       if (subtitleRunning) {
-        title = "等待字幕检测"; desc = "正在自动检测字幕，当前素材可能无可提取语音。也可直接在下方字幕编辑区手工输入缅语文字，保存后即可合成。";
+        title = "等待字幕检测"; desc = `正在自动检测字幕，当前素材可能无可提取语音。也可直接在下方字幕编辑区手工输入${currentTargetProfile().displayName}文字，保存后即可合成。`;
         mode = "subtitle_running_no_speech"; path = "等待检测 / 手工输入字幕 → 合成"; badge = "检测中";
       } else {
-        title = "请手工输入字幕"; desc = "当前素材未检测到可提取字幕，请在下方字幕编辑区手工输入缅语文字并保存，然后合成字幕版。";
+        title = "请手工输入字幕"; desc = `当前素材未检测到可提取字幕，请在下方字幕编辑区手工输入${currentTargetProfile().displayName}文字并保存，然后合成字幕版。`;
         mode = "manual_subtitle_needed"; path = "手工输入字幕 → 保存 → 合成"; badge = "待输入";
       }
     } else if (subReady && !audioReady) {
@@ -1141,6 +1161,17 @@
       text: source.trim(),
       shouldBlockMyanmarTts: source.trim() && myanmarRatio < 0.6 && nonMyanmar >= Math.max(4, myanmarMatches.length),
     };
+  }
+
+  function analyzeTargetDubCandidate(text) {
+    const profile = currentTargetProfile();
+    if (profile.targetLang !== "mm") {
+      return {
+        text: String(text || "").trim(),
+        shouldBlockMyanmarTts: false,
+      };
+    }
+    return analyzeMyanmarDubCandidate(text);
   }
 
   function renderDubOutdatedBadge() {
@@ -1351,7 +1382,7 @@
     const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/translate_subtitles`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text || "", target_lang: "mm" }),
+      body: JSON.stringify({ text: text || "", target_lang: currentTargetProfile().targetLang }),
     });
     if (!res.ok) throw new Error((await res.text()) || "translate subtitles failed");
     return res.json();
@@ -1751,9 +1782,10 @@
       e.preventDefault();
       try {
         const currentText = subtitlesTextEl ? subtitlesTextEl.value : "";
-        const analysis = analyzeMyanmarDubCandidate(currentText);
+        const profile = currentTargetProfile();
+        const analysis = analyzeTargetDubCandidate(currentText);
         if (analysis.text && analysis.shouldBlockMyanmarTts) {
-          const warning = "当前文本尚未翻译为缅语，不建议直接生成缅语配音。请先翻译为缅语并保存字幕成品，或直接走字幕版合成。";
+          const warning = `当前文本尚未翻译为${profile.displayName}，不建议直接生成${profile.displayName}配音。请先翻译并保存字幕成品，或直接走字幕版合成。`;
           if (audioMsgEl) audioMsgEl.textContent = warning;
           if (subtitlesMsgEl) subtitlesMsgEl.textContent = warning;
           return;
@@ -1817,7 +1849,7 @@
         const text = assistedText || targetText;
         if (!text) throw new Error("请先在辅助输入区或当前编辑区输入中文文本。");
         translateMmBtn.disabled = true;
-        if (subtitlesMsgEl) subtitlesMsgEl.textContent = "正在翻译为缅语...";
+        if (subtitlesMsgEl) subtitlesMsgEl.textContent = `正在翻译为${currentTargetProfile().displayName}...`;
         const data = await translateCurrentSubtitles(text);
         applyTranslatedTextToTargetEditor(
           String(data.translated_text || ""),

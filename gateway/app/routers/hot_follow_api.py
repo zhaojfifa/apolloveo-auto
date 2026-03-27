@@ -118,6 +118,13 @@ from gateway.app.services.task_router_actions import (
     run_task_pipeline_entry as _run_task_pipeline_entry,
 )
 from gateway.app.services.compose_service import CompositionService, HotFollowComposeRequestContract
+from gateway.app.services.hot_follow_language_profiles import (
+    get_hot_follow_language_profile,
+    hot_follow_internal_lang,
+    hot_follow_subtitle_filename,
+    hot_follow_subtitle_txt_filename,
+    resolve_hot_follow_voice_id,
+)
 from gateway.app.services.hot_follow_skills_advisory import (
     maybe_build_hot_follow_advisory as _maybe_build_hot_follow_advisory,
 )
@@ -468,6 +475,9 @@ def _hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text
     text = str(saved_text if saved_text is not None else _hf_load_subtitles_text(task_id, task) or "")
     desired_hash = _hf_subtitle_content_hash(text)
     current_key = _task_key(task, "mm_srt_path")
+    target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    subtitle_filename = hot_follow_subtitle_filename(target_lang)
+    subtitle_txt_filename = hot_follow_subtitle_txt_filename(target_lang)
     if current_key and object_exists(str(current_key)):
         head = object_head(str(current_key))
         size, _ = media_meta_from_head(head)
@@ -485,15 +495,15 @@ def _hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text
     if not text.strip():
         return str(current_key) if current_key else None
 
-    workspace = Workspace(task_id)
+    workspace = Workspace(task_id, target_lang=target_lang)
     workspace.mm_srt_path.parent.mkdir(parents=True, exist_ok=True)
     workspace.mm_srt_path.write_text(text, encoding="utf-8")
-    synced_key = upload_task_artifact(task, workspace.mm_srt_path, "mm.srt", task_id=task_id)
+    synced_key = upload_task_artifact(task, workspace.mm_srt_path, subtitle_filename, task_id=task_id)
     mm_txt_text = _srt_to_txt(text).strip()
     if mm_txt_text:
         mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
         mm_txt_path.write_text(mm_txt_text + "\n", encoding="utf-8")
-        upload_task_artifact(task, mm_txt_path, "mm.txt", task_id=task_id)
+        upload_task_artifact(task, mm_txt_path, subtitle_txt_filename, task_id=task_id)
     if synced_key and isinstance(task, dict):
         task["mm_srt_path"] = synced_key
     return str(synced_key) if synced_key else (str(current_key) if current_key else None)
@@ -569,7 +579,9 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
     edited_text = _hf_load_subtitles_text(task_id, task)
     srt_text = edited_text or normalized_source_text or raw_source_text
     dub_input_text = _hf_dub_input_text(task_id, task) or ""
-    actual_burn_subtitle_source = "mm.srt" if _task_key(task, "mm_srt_path") else None
+    actual_burn_subtitle_source = hot_follow_subtitle_filename(
+        task.get("target_lang") or task.get("content_lang") or "mm"
+    ) if _task_key(task, "mm_srt_path") else None
     subtitle_artifact_exists = bool(_task_key(task, "mm_srt_path") and object_exists(str(_task_key(task, "mm_srt_path"))))
     subtitle_ready = bool(subtitle_artifact_exists or str(edited_text or normalized_source_text or raw_source_text).strip())
     subtitle_ready_reason = "ready" if subtitle_ready else "subtitle_missing"
@@ -869,6 +881,7 @@ def _hf_deliverable_state(task: dict, key: str | None, fallback_status_field: st
 
 
 def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
+    profile = get_hot_follow_language_profile(task.get("target_lang") or task.get("content_lang") or "mm")
     raw_key = _task_key(task, "raw_path")
     origin_key = _task_key(task, "origin_srt_path")
     mm_key = _task_key(task, "mm_srt_path")
@@ -913,14 +926,14 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
         ),
         _entry(
             "subtitle",
-            "mm.srt",
+            profile.subtitle_filename,
             mm_key,
             _task_endpoint(task_id, "mm") if mm_key and object_exists(mm_key) else None,
             _hf_deliverable_state(task, mm_key, "subtitles_status"),
         ),
         _entry(
             "audio",
-            "Voiceover",
+            profile.dub_filename,
             audio_key,
             _task_endpoint(task_id, "audio") if audio_key and object_exists(str(audio_key)) else None,
             _hf_deliverable_state(task, audio_key, "dub_status"),
@@ -1280,29 +1293,27 @@ def _hf_audio_display_error(dub_state: str, dub_error: str | None, voice_state: 
 
 def _normalize_compose_target_lang(value: str | None) -> str:
     """Normalize a target language code for compose subtitle resolution."""
-    v = str(value or "").strip().lower()
-    if not v:
-        return "mm"
-    return "mm" if v == "my" else v
+    return hot_follow_internal_lang(value or "mm")
 
 
 def _resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> str | None:
     """Compatibility subtitle resolver for remaining router-driven compose calls."""
     lang_norm = _normalize_compose_target_lang(lang)
     synced_mm_key = _hf_sync_saved_target_subtitle_artifact(task_code, task_obj)
+    subtitle_filename = hot_follow_subtitle_filename(lang_norm)
     candidates: list[str] = []
-    if lang_norm == "mm":
+    if lang_norm == "my":
         if synced_mm_key:
             candidates.append(str(synced_mm_key))
         mm_path = _task_key(task_obj, "mm_srt_path")
         if mm_path:
             candidates.append(str(mm_path))
-        candidates.append(deliver_key(task_code, "mm.srt"))
+        candidates.append(deliver_key(task_code, subtitle_filename))
     else:
         lang_path = _task_key(task_obj, f"{lang_norm}_srt_path")
         if lang_path:
             candidates.append(str(lang_path))
-        candidates.append(deliver_key(task_code, f"{lang_norm}.srt"))
+        candidates.append(deliver_key(task_code, subtitle_filename))
         if synced_mm_key:
             candidates.append(str(synced_mm_key))
         mm_path = _task_key(task_obj, "mm_srt_path")
@@ -1342,39 +1353,40 @@ def create_hot_follow_task(
     data["category_key"] = data.get("category_key") or "hot_follow"
     if data.get("auto_start") is None:
         data["auto_start"] = True
-    target_lang = normalize_target_lang(data.get("content_lang") or "my")
-    if target_lang == "my":
-        settings = get_settings()
-        config = dict(data.get("config") or {})
-        requested_voice = (
-            str(data.get("voice_id") or "").strip()
-            or str(config.get("tts_requested_voice") or config.get("hot_follow_tts_requested_voice") or "").strip()
-            or os.getenv("DEFAULT_MM_VOICE_ID", "mm_female_1").strip()
-            or "mm_female_1"
-        )
-        expected_provider = _hot_follow_expected_provider(
-            {
-                "kind": "hot_follow",
-                "target_lang": target_lang,
-                "content_lang": target_lang,
-            },
-            requested_voice,
-            data.get("dub_provider") or config.get("tts_provider") or settings.dub_provider,
-        )
-        resolved_voice, _ = resolve_tts_voice(
-            settings=settings,
-            provider=expected_provider,
-            target_lang=target_lang,
-            requested_voice=requested_voice,
-        )
-        data["voice_id"] = requested_voice
-        data["dub_provider"] = expected_provider
-        if resolved_voice:
-            config["tts_requested_voice"] = requested_voice
-            config["hot_follow_tts_requested_voice"] = requested_voice
-            config["tts_provider"] = expected_provider
-            config["tts_resolved_voice"] = resolved_voice
-            data["config"] = config
+    target_lang = hot_follow_internal_lang(data.get("content_lang") or "my")
+    settings = get_settings()
+    config = dict(data.get("config") or {})
+    profile = get_hot_follow_language_profile(target_lang)
+    requested_voice = resolve_hot_follow_voice_id(
+        target_lang,
+        str(data.get("voice_id") or "").strip()
+        or str(config.get("tts_requested_voice") or config.get("hot_follow_tts_requested_voice") or "").strip()
+        or os.getenv("DEFAULT_MM_VOICE_ID", profile.default_voice_id("azure-speech")).strip(),
+        data.get("dub_provider") or config.get("tts_provider") or settings.dub_provider,
+    )
+    expected_provider = _hot_follow_expected_provider(
+        {
+            "kind": "hot_follow",
+            "target_lang": target_lang,
+            "content_lang": target_lang,
+        },
+        requested_voice,
+        data.get("dub_provider") or config.get("tts_provider") or settings.dub_provider,
+    )
+    resolved_voice, _ = resolve_tts_voice(
+        settings=settings,
+        provider=expected_provider,
+        target_lang=target_lang,
+        requested_voice=requested_voice,
+    )
+    data["voice_id"] = requested_voice
+    data["dub_provider"] = expected_provider
+    if resolved_voice:
+        config["tts_requested_voice"] = requested_voice
+        config["hot_follow_tts_requested_voice"] = requested_voice
+        config["tts_provider"] = expected_provider
+        config["tts_resolved_voice"] = resolved_voice
+        data["config"] = config
     normalized = TaskCreate(**data)
     return _create_task_entry(normalized, background_tasks, repo)
 
@@ -1481,6 +1493,7 @@ def get_hot_follow_workbench_hub(
             dub_summary = "voiceover artifact invalid"
     audio_error = _hf_audio_display_error(str(dub_state), task.get("dub_error"), voice_state)
     deliverables = _hf_deliverables(task_id, task)
+    target_profile = get_hot_follow_language_profile(target_lang_internal)
     compose_last_status_raw = str(
         task.get("compose_last_status")
         or task.get("compose_status")
@@ -1595,6 +1608,16 @@ def get_hot_follow_workbench_hub(
             "deprecated": True,
         },
         "deliverables": deliverables if isinstance(deliverables, list) else [],
+        "target_lang_profile": {
+            "target_lang": target_profile.public_lang,
+            "internal_lang": target_profile.internal_lang,
+            "display_name": target_profile.display_name,
+            "subtitle_filename": target_profile.subtitle_filename,
+            "subtitle_txt_filename": target_profile.subtitle_txt_filename,
+            "dub_filename": target_profile.dub_filename,
+            "allowed_voice_options": list(target_profile.allowed_voice_options),
+            "default_voice_by_provider": dict(target_profile.default_voice_by_provider),
+        },
         "events": task.get("events") or [],
         "compose_plan": compose_plan,
         "scene_outputs": scene_outputs,
@@ -1813,13 +1836,17 @@ def patch_hot_follow_audio_config(
     if payload.tts_engine is not None:
         updates["dub_provider"] = normalize_provider(provider)
     if payload.tts_voice is not None:
-        requested_voice = payload.tts_voice.strip() or None
+        target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+        requested_voice = resolve_hot_follow_voice_id(
+            target_lang,
+            payload.tts_voice.strip() or None,
+            updates.get("dub_provider") or task.get("dub_provider") or settings.dub_provider,
+        )
         effective_provider = _hot_follow_expected_provider(
             task,
             requested_voice,
             updates.get("dub_provider") or task.get("dub_provider") or settings.dub_provider,
         )
-        target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
         resolved_voice, _ = resolve_tts_voice(
             settings=settings,
             provider=effective_provider,
@@ -1976,8 +2003,8 @@ def translate_hot_follow_subtitles(
             translations = translate_segments_with_gemini(segments=segments, target_lang=target_lang)
             for seg in segments:
                 idx = int(seg.get("index") or 0)
-                seg["mm"] = str(translations.get(idx) or seg.get("origin") or "").strip()
-            translated_text = segments_to_srt(segments, "mm")
+                seg[target_lang] = str(translations.get(idx) or seg.get("origin") or "").strip()
+            translated_text = segments_to_srt(segments, target_lang)
         else:
             translated_text = _hf_translate_plain_lines(source_text, target_lang=target_lang)
     except GeminiSubtitlesError as exc:

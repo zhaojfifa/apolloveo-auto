@@ -3,6 +3,9 @@ import shutil
 from pathlib import Path
 
 from gateway.app.config import get_settings
+from gateway.app.services.hot_follow_language_profiles import (
+    hot_follow_internal_lang,
+)
 
 
 def task_base_dir(task_id: str) -> Path:
@@ -34,8 +37,9 @@ def get_task_workspace(task_id: str) -> dict[str, Path]:
 class Workspace:
     """Workspace helper for resolving per-task subtitle artifacts."""
 
-    def __init__(self, task_id: str):
+    def __init__(self, task_id: str, target_lang: str | None = None):
         self.task_id = task_id
+        self.target_lang = hot_follow_internal_lang(target_lang)
 
     @property
     def base_dir(self) -> Path:
@@ -71,24 +75,24 @@ class Workspace:
 
     @property
     def mm_srt_path(self) -> Path:
-        """Canonical path for translated (Burmese) subtitles.
+        """Canonical path for translated Hot Follow subtitles."""
 
-        Historically stored via translated_srt_path; prefer the mm suffix but
-        fall back to my for backward compatibility.
-        """
-
-        primary = translated_srt_path(self.task_id, "mm")
+        primary = translated_srt_path(self.task_id, self.target_lang)
         alternate = translated_srt_path(self.task_id, "my")
+        legacy = translated_srt_path(self.task_id, "mm")
 
         if not primary.exists() and alternate.exists():
             return alternate
+        if not primary.exists() and legacy.exists():
+            return legacy
 
         return primary
 
     def mm_srt_exists(self) -> bool:
-        primary = translated_srt_path(self.task_id, "mm")
+        primary = translated_srt_path(self.task_id, self.target_lang)
         alternate = translated_srt_path(self.task_id, "my")
-        return primary.exists() or alternate.exists()
+        legacy = translated_srt_path(self.task_id, "mm")
+        return primary.exists() or alternate.exists() or legacy.exists()
 
     @property
     def mm_txt_path(self) -> Path:
@@ -125,7 +129,7 @@ class Workspace:
 
     def write_mm_srt(self, text: str) -> Path:
         self.subtitles_dir.mkdir(parents=True, exist_ok=True)
-        path = translated_srt_path(self.task_id, "mm")
+        path = translated_srt_path(self.task_id, self.target_lang)
         path.write_text(text, encoding="utf-8")
         return path
 
@@ -138,15 +142,15 @@ class Workspace:
     # Audio helpers
     @property
     def mm_audio_primary_path(self) -> Path:
-        return audio_dir(self.task_id) / f"{self.task_id}_mm.wav"
+        return audio_dir(self.task_id) / f"{self.task_id}_{self.target_lang}.wav"
 
     @property
     def mm_audio_mp3_path(self) -> Path:
-        return audio_dir(self.task_id) / f"{self.task_id}_mm.mp3"
+        return audio_dir(self.task_id) / f"{self.task_id}_{self.target_lang}.mp3"
 
     @property
     def mm_audio_legacy_path(self) -> Path:
-        return dubbed_audio_path(self.task_id)
+        return dubbed_audio_path(self.task_id, self.target_lang)
 
     @property
     def mm_audio_path(self) -> Path:
@@ -168,7 +172,7 @@ class Workspace:
     def write_mm_audio(self, content: bytes, suffix: str = "wav") -> Path:
         audio_dir(self.task_id).mkdir(parents=True, exist_ok=True)
         suffix = suffix.lstrip(".") or "wav"
-        path = audio_dir(self.task_id) / f"{self.task_id}_mm.{suffix}"
+        path = audio_dir(self.task_id) / f"{self.task_id}_{self.target_lang}.{suffix}"
         path.write_bytes(content)
         ensure_public_audio(path)
         return path
@@ -296,8 +300,9 @@ def translated_srt_path(task_id: str, target_lang: str) -> Path:
     return path
 
 
-def dubbed_audio_path(task_id: str) -> Path:
-    path = audio_dir(task_id) / f"{task_id}_mm_vo.wav"
+def dubbed_audio_path(task_id: str, target_lang: str | None = None) -> Path:
+    lang = hot_follow_internal_lang(target_lang)
+    path = audio_dir(task_id) / f"{task_id}_{lang}_vo.wav"
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
 

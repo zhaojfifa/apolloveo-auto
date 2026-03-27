@@ -18,6 +18,7 @@ except Exception:
     sys.modules["pydantic_settings"] = shim
 
 from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
+from gateway.app.services.hot_follow_language_profiles import get_hot_follow_language_profile
 from gateway.app.services.steps_v1 import _resolve_mm_txt_text
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 from gateway.app.services.tts_policy import normalize_target_lang, resolve_tts_voice
@@ -26,6 +27,15 @@ from gateway.app.services.tts_policy import normalize_target_lang, resolve_tts_v
 def test_normalize_target_lang_mm_to_my():
     assert normalize_target_lang("mm") == "my"
     assert normalize_target_lang("my") == "my"
+    assert normalize_target_lang("vi") == "vi"
+
+
+def test_hot_follow_language_profile_for_vi_uses_vi_artifacts():
+    profile = get_hot_follow_language_profile("vi")
+    assert profile.subtitle_filename == "vi.srt"
+    assert profile.subtitle_txt_filename == "vi.txt"
+    assert profile.dub_filename == "audio_vi.mp3"
+    assert profile.allowed_voice_options == ("vi_female_1", "vi_male_1")
 
 
 def test_resolve_tts_voice_mm_rejects_zh_voice():
@@ -60,6 +70,25 @@ def test_resolve_tts_voice_mm_male_alias_maps_to_provider_voice():
         requested_voice="mm_male_1",
     )
     assert voice == "my-MM-ThihaNeural"
+    assert overridden is True
+
+
+def test_resolve_tts_voice_vi_male_alias_maps_to_provider_voice():
+    settings = SimpleNamespace(
+        edge_tts_voice_map={
+            "vi_female_1": "vi-VN-HoaiMyNeural",
+            "vi_male_1": "vi-VN-NamMinhNeural",
+        },
+        azure_tts_voice_map={},
+        lovo_voice_id_mm="mm_female_1",
+    )
+    voice, overridden = resolve_tts_voice(
+        settings=settings,
+        provider="edge-tts",
+        target_lang="vi",
+        requested_voice="vi_male_1",
+    )
+    assert voice == "vi-VN-NamMinhNeural"
     assert overridden is True
 
 

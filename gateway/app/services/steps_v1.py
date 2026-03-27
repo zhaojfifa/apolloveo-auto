@@ -37,6 +37,12 @@ from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
 from gateway.app.services.parse import detect_platform, parse_video
 from gateway.app.services.publish_service import publish_task_pack
 from gateway.app.services.scene_split import run_scenes_build
+from gateway.app.services.hot_follow_language_profiles import (
+    get_hot_follow_language_profile,
+    hot_follow_audio_filename,
+    hot_follow_subtitle_filename,
+    hot_follow_subtitle_txt_filename,
+)
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, resolve_tts_voice
 from gateway.app.deps import get_task_repository
@@ -189,8 +195,6 @@ def _truthy_env(name: str, default: str = "1") -> bool:
 # 寮哄埗鎵€鏈?key 閮借惤鍒?artifacts/ 涓嬶紝纭繚 /files/<key> 璺緞涓€鑷淬€佸彲棰勬湡
 RAW_ARTIFACT = "raw/raw.mp4"
 ORIGIN_SRT_ARTIFACT = "subs/origin.srt"
-MM_SRT_ARTIFACT = "subs/mm.srt"
-MM_TXT_ARTIFACT = "subs/mm.txt"
 TRANSLATION_QA_ARTIFACT = "subs/translation_qa.json"
 VOICE_ALIGNMENT_ARTIFACT = "dub/voice_alignment.json"
 
@@ -198,7 +202,7 @@ README_TEMPLATE = """CapCut pack usage
 
 1. Create a new CapCut project and import the extracted zip files.
 2. Place raw/raw.mp4 on the video track.
-3. Import subs/mm.srt and adjust styling.
+3. Import subs/{subtitle_filename} and adjust styling.
 4. Place audio/{audio_filename} on the audio track and align with subtitles.
 5. Add transitions or stickers as needed.
 """
@@ -774,7 +778,9 @@ async def run_subtitles_step(req: SubtitlesRequest):
             updates["clean_video_generated"] = "true"
         _update_pipeline_config(req.task_id, updates)
 
-        workspace = Workspace(req.task_id)
+        workspace = Workspace(req.task_id, target_lang=req.target_lang)
+        subtitle_filename = hot_follow_subtitle_filename(req.target_lang)
+        subtitle_txt_filename = hot_follow_subtitle_txt_filename(req.target_lang)
 
         origin_key = None
         mm_key = None
@@ -784,12 +790,12 @@ async def run_subtitles_step(req: SubtitlesRequest):
         if workspace.origin_srt_path.exists():
             origin_key = _upload_artifact(req.task_id, workspace.origin_srt_path, ORIGIN_SRT_ARTIFACT)
 
-        # 浣犵殑 Workspace 閲?mm_srt_path / mm_srt_exists() 鍙兘鏈夊樊寮傦紝杩欓噷鎸夆€滆矾寰勫瓨鍦ㄢ€濆垽鏂?        if workspace.mm_srt_path.exists():
-            mm_key = _upload_artifact(req.task_id, workspace.mm_srt_path, MM_SRT_ARTIFACT)
+        if workspace.mm_srt_path.exists():
+            mm_key = _upload_artifact(req.task_id, workspace.mm_srt_path, f"subs/{subtitle_filename}")
 
             mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
             if mm_txt_path.exists():
-                mm_txt_key = _upload_artifact(req.task_id, mm_txt_path, MM_TXT_ARTIFACT)
+                mm_txt_key = _upload_artifact(req.task_id, mm_txt_path, f"subs/{subtitle_txt_filename}")
         translation_qa_path = workspace.subtitles_dir / "translation_qa.json"
         if translation_qa_path.exists():
             translation_qa_key = _upload_artifact(req.task_id, translation_qa_path, TRANSLATION_QA_ARTIFACT)
@@ -799,7 +805,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
         if workspace.origin_srt_path.exists():
             shutil.copy2(workspace.origin_srt_path, subtitles_dir / "origin.srt")
         if workspace.mm_srt_path.exists():
-            shutil.copy2(workspace.mm_srt_path, subtitles_dir / "mm.srt")
+            shutil.copy2(workspace.mm_srt_path, subtitles_dir / subtitle_filename)
         if translation_qa_path.exists():
             shutil.copy2(translation_qa_path, subtitles_dir / "translation_qa.json")
         if workspace.segments_json.exists():
@@ -888,7 +894,9 @@ async def run_dub_step(req: DubRequest):
     if not resolved_voice_id:
         _fail_dub(req, "TTS_VOICE_MISSING", provider, status_code=422)
     req.voice_id = resolved_voice_id
-    workspace = Workspace(req.task_id)
+    workspace = Workspace(req.task_id, target_lang=req.target_lang)
+    subtitle_txt_artifact = f"subs/{hot_follow_subtitle_txt_filename(req.target_lang)}"
+    dubbed_audio_artifact = hot_follow_audio_filename(req.target_lang)
     origin_exists = workspace.origin_srt_path.exists()
     mm_exists = workspace.mm_srt_exists()
 
@@ -925,7 +933,7 @@ async def run_dub_step(req: DubRequest):
     if pipeline_config.get("no_subtitles") == "true":
         _fail_dub(req, "NO_SUBTITLES", provider)
 
-    existing_key = _get_task_mm_audio_key(req.task_id) or deliver_key(req.task_id, "audio_mm.mp3")
+    existing_key = _get_task_mm_audio_key(req.task_id) or deliver_key(req.task_id, dubbed_audio_artifact)
     if not req.force and existing_key:
         try:
             size, _ = assert_artifact_ready(
@@ -1002,7 +1010,7 @@ async def run_dub_step(req: DubRequest):
     if used_fallback and mm_txt_resolved:
         mm_txt_path.parent.mkdir(parents=True, exist_ok=True)
         mm_txt_path.write_text(mm_txt_resolved + "\n", encoding="utf-8")
-        mm_txt_key = _upload_artifact(req.task_id, mm_txt_path, MM_TXT_ARTIFACT)
+        mm_txt_key = _upload_artifact(req.task_id, mm_txt_path, subtitle_txt_artifact)
         if mm_txt_key:
             _update_task(req.task_id, mm_txt_path=mm_txt_key)
         logger.info(
@@ -1227,7 +1235,7 @@ async def run_dub_step(req: DubRequest):
                 output_size, output_duration = assert_local_audio_ok(mp3_path)
             except ValueError:
                 _fail_dub(req, "EMPTY_OR_INVALID_AUDIO", provider)
-            out_key = deliver_key(req.task_id, "audio_mm.mp3")
+            out_key = deliver_key(req.task_id, dubbed_audio_artifact)
             storage = get_storage_service()
             uploaded_key = storage.upload_file(
                 str(mp3_path),
@@ -1276,7 +1284,7 @@ async def run_dub_step(req: DubRequest):
         mm_txt_path = workspace.mm_txt_path
         mm_txt_path.parent.mkdir(parents=True, exist_ok=True)
         mm_txt_path.write_text(edited_text, encoding="utf-8")
-        _upload_artifact(req.task_id, mm_txt_path, MM_TXT_ARTIFACT)
+        _upload_artifact(req.task_id, mm_txt_path, subtitle_txt_artifact)
     if voice_alignment_path and voice_alignment_path.exists():
         _upload_artifact(req.task_id, voice_alignment_path, VOICE_ALIGNMENT_ARTIFACT)
     _update_pipeline_config(
@@ -1328,7 +1336,11 @@ async def run_dub_step(req: DubRequest):
 async def run_pack_step(req: PackRequest):
     start_time = time.perf_counter()
     task_id = req.task_id
-    workspace = Workspace(task_id)
+    profile = get_hot_follow_language_profile(req.target_lang)
+    workspace = Workspace(task_id, target_lang=req.target_lang)
+    subtitle_filename = profile.subtitle_filename
+    subtitle_txt_filename = profile.subtitle_txt_filename
+    deliverable_audio_filename = profile.dub_filename
 
     raw_file = raw_path(task_id)
     zip_path = deliver_pack_zip_path(task_id)
@@ -1350,10 +1362,11 @@ async def run_pack_step(req: PackRequest):
     if audio_file.exists():
         audio_file = _mix_with_bgm_if_configured(task_id, audio_file, workspace)
 
-    # subs锛氫紭鍏?translated_srt_path(task_id, "my")锛宖allback "mm"
-    subs_mm_srt = translated_srt_path(task_id, "my")
-    if not subs_mm_srt.exists():
+    subs_mm_srt = translated_srt_path(task_id, profile.internal_lang)
+    if not subs_mm_srt.exists() and profile.internal_lang == "vi":
         subs_mm_srt = translated_srt_path(task_id, "mm")
+    if not subs_mm_srt.exists():
+        subs_mm_srt = translated_srt_path(task_id, "my")
     try:
         _maybe_fill_missing_for_pack(
             raw_path=raw_file,
@@ -1380,18 +1393,17 @@ async def run_pack_step(req: PackRequest):
             for d in (raw_dir, audio_dir, subs_dir, scenes_dir):
                 d.mkdir(parents=True, exist_ok=True)
 
-            audio_ext = audio_file.suffix if audio_file.suffix else ".wav"
-            audio_filename = f"voice_my{audio_ext}"
+            audio_filename = deliverable_audio_filename
 
             shutil.copy(raw_file, raw_dir / "raw.mp4")
             shutil.copy(audio_file, audio_dir / audio_filename)
-            shutil.copy(subs_mm_srt, subs_dir / "mm.srt")
+            shutil.copy(subs_mm_srt, subs_dir / subtitle_filename)
 
             mm_txt_path = subs_mm_srt.with_suffix(".txt")
             if mm_txt_path.exists():
-                shutil.copy(mm_txt_path, subs_dir / "mm.txt")
+                shutil.copy(mm_txt_path, subs_dir / subtitle_txt_filename)
             else:
-                _ensure_txt_from_srt(subs_dir / "mm.txt", subs_mm_srt)
+                _ensure_txt_from_srt(subs_dir / subtitle_txt_filename, subs_mm_srt)
 
             (scenes_dir / ".keep").write_text("", encoding="utf-8")
 
@@ -1399,11 +1411,11 @@ async def run_pack_step(req: PackRequest):
                 "version": "1.8",
                 "pack_type": "capcut_v18",
                 "task_id": task_id,
-                "language": "my",
+                "language": profile.internal_lang,
                 "assets": {
                     "raw_video": "raw/raw.mp4",
                     "voice": f"audio/{audio_filename}",
-                    "subtitle": "subs/mm.srt",
+                    "subtitle": f"subs/{subtitle_filename}",
                     "scenes_dir": "scenes/",
                 },
             }
@@ -1412,7 +1424,7 @@ async def run_pack_step(req: PackRequest):
                 encoding="utf-8",
             )
             (tmp_path / "README.md").write_text(
-                README_TEMPLATE.format(audio_filename=audio_filename),
+                README_TEMPLATE.format(audio_filename=audio_filename, subtitle_filename=subtitle_filename),
                 encoding="utf-8",
             )
 
@@ -1434,8 +1446,8 @@ async def run_pack_step(req: PackRequest):
     files = [
         f"deliver/packs/{task_id}/raw/raw.mp4",
         f"deliver/packs/{task_id}/audio/{audio_filename}",
-        f"deliver/packs/{task_id}/subs/mm.srt",
-        f"deliver/packs/{task_id}/subs/mm.txt",
+        f"deliver/packs/{task_id}/subs/{subtitle_filename}",
+        f"deliver/packs/{task_id}/subs/{subtitle_txt_filename}",
         f"deliver/packs/{task_id}/scenes/.keep",
         f"deliver/packs/{task_id}/manifest.json",
         f"deliver/packs/{task_id}/README.md",

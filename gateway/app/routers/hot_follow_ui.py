@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 
+from gateway.app.services.hot_follow_language_profiles import list_hot_follow_language_profiles
 from gateway.app.web.templates import render_template
 
 router = APIRouter()
@@ -15,7 +16,13 @@ async def hot_follow_tasks_page(request: Request) -> HTMLResponse:
 
 @router.get("/tasks/hot-follow/new", response_class=HTMLResponse)
 async def hot_follow_new_page(request: Request) -> HTMLResponse:
-    return render_template(request=request, name="hot_follow_new.html")
+    return render_template(
+        request=request,
+        name="hot_follow_new.html",
+        context={
+            "language_profiles": list_hot_follow_language_profiles(),
+        },
+    )
 
 
 @router.get("/tasks/hot/new", response_class=HTMLResponse)
