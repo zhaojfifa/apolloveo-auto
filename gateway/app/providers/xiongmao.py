@@ -22,6 +22,36 @@ class XiongmaoError(Exception):
     """Raised when the Xiongmao provider fails."""
 
 
+def _provider_http_error_message(
+    exc: httpx.HTTPError,
+    *,
+    response: httpx.Response | None = None,
+) -> str:
+    detail = str(exc).strip()
+    if response is not None:
+        status_code = getattr(response, "status_code", None)
+        body = ""
+        try:
+            body = str(response.text or "").strip()
+        except Exception:
+            body = ""
+        if len(body) > 200:
+            body = f"{body[:197]}..."
+        if status_code and body:
+            return f"http {status_code}: {body}"
+        if status_code:
+            return f"http {status_code}"
+    if detail:
+        return detail
+    request = getattr(exc, "request", None)
+    if request is not None:
+        method = str(getattr(request, "method", "") or "").strip().upper()
+        url = str(getattr(request, "url", "") or "").strip()
+        if method and url:
+            return f"{exc.__class__.__name__} {method} {url}"
+    return exc.__class__.__name__
+
+
 def _normalize_platform_hint(value: Optional[str]) -> Optional[str]:
     raw = str(value or "").strip().lower()
     if raw in {"", "auto", "none", "unknown"}:
@@ -114,16 +144,29 @@ async def parse_with_xiongmao(link: str, platform_hint: Optional[str] = None) ->
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.get(url, params=params)
-            response.raise_for_status()
     except httpx.HTTPError as exc:  # pragma: no cover - network dependent
+        message = _provider_http_error_message(exc)
         logger.exception(
             "[hotfollow][probe] error=%s provider=xiongmao source_url=%s platform=%s resolved_url=%s",
-            str(exc),
+            message,
             link,
             platform_value or "auto",
             link,
         )
-        raise XiongmaoError(f"provider error: {exc}") from exc
+        raise XiongmaoError(f"provider error: {message}") from exc
+
+    try:
+        response.raise_for_status()
+    except httpx.HTTPError as exc:  # pragma: no cover - network dependent
+        message = _provider_http_error_message(exc, response=response)
+        logger.exception(
+            "[hotfollow][probe] error=%s provider=xiongmao source_url=%s platform=%s resolved_url=%s",
+            message,
+            link,
+            platform_value or "auto",
+            link,
+        )
+        raise XiongmaoError(f"provider error: {message}") from exc
 
     try:
         data = response.json()
