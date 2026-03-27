@@ -556,3 +556,26 @@
 - 不做 menu-wide i18n 扩张
 - 不重构 unrelated scenarios
 - 不改 Hot Follow 之外的 ownership truth source
+
+## Hot Follow Vietnamese Route Narrow Fix Pack
+
+日期：2026-03-27
+
+本节点完成：
+
+- 修正 Hot Follow 新建页声线标签判断，恢复女声 / 男声正确显示
+- 收紧 Hot Follow 目标语言 SRT truth chain，目标字幕主编辑区不再回退显示来源中文
+- 越南语 workbench 配音前增加目标字幕当前性校验，要求先翻译并保存 `vi.srt`
+- 越南语 compose 关闭底部黑色遮罩框，保留目标字幕烧录本身
+
+本次收口说明：
+
+- 仍在既有 Hot Follow 单线内完成
+- 未新增新场景、第二条产线或平台级 i18n 抽象
+- root fix 落在 subtitle truth / compose filter / page option rendering 三个直接链路
+
+本节点明确不做：
+
+- 不改越南语之外的 provider 配置边界
+- 不做 broad compose redesign
+- 不重写 workbench 架构

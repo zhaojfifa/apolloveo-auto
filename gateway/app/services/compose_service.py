@@ -153,8 +153,10 @@ def escape_subtitles_path(path: Path) -> str:
     return raw.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
 
-def source_subtitle_cover_filter(cleanup_mode: str) -> str:
+def source_subtitle_cover_filter(cleanup_mode: str, target_lang: str | None = None) -> str:
     """Return an FFmpeg drawbox filter for subtitle area masking."""
+    if str(target_lang or "").strip().lower() == "vi":
+        return ""
     mode = str(cleanup_mode or "").strip().lower()
     if mode == "bottom_mask":
         return "drawbox=x=0:y=ih*0.80:w=iw:h=ih*0.20:color=black@0.92:t=fill"
@@ -163,7 +165,12 @@ def source_subtitle_cover_filter(cleanup_mode: str) -> str:
     return ""
 
 
-def compose_subtitle_vf(subtitle_path_obj: Path, fontsdir: Path, cleanup_mode: str) -> str:
+def compose_subtitle_vf(
+    subtitle_path_obj: Path,
+    fontsdir: Path,
+    cleanup_mode: str,
+    target_lang: str | None = None,
+) -> str:
     """Build the complete subtitle video-filter string for FFmpeg."""
     subtitle_filter = (
         f"subtitles='{escape_subtitles_path(subtitle_path_obj)}':"
@@ -171,7 +178,7 @@ def compose_subtitle_vf(subtitle_path_obj: Path, fontsdir: Path, cleanup_mode: s
         f"fontsdir='{escape_subtitles_path(Path(fontsdir))}':"
         "force_style='FontName=Noto Sans Myanmar,FontSize=18,Outline=2,Shadow=1,MarginV=40'"
     )
-    cover_filter = source_subtitle_cover_filter(cleanup_mode)
+    cover_filter = source_subtitle_cover_filter(cleanup_mode, target_lang=target_lang)
     return f"{cover_filter},{subtitle_filter}" if cover_filter else subtitle_filter
 
 
@@ -963,7 +970,7 @@ class CompositionService:
 
     def _compose_subtitle_only_with_bgm(self, ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
         if ws.overlay_subtitles:
-            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode)
+            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode, inputs.target_lang)
             filter_complex = (
                 f"[0:v]{subtitle_filter}[v];"
                 + self._bgm_only_filter_expr(1, inputs.bgm_mix, ws.compose_policy, ws.video_duration)
@@ -991,7 +998,7 @@ class CompositionService:
 
     def _compose_subtitle_only_no_bgm(self, ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
         if ws.overlay_subtitles:
-            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode)
+            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode, inputs.target_lang)
             cmd = [
                 ws.ffmpeg, "-y",
                 "-i", str(ws.video_input_path),
@@ -1019,7 +1026,7 @@ class CompositionService:
         """Branch: voice + BGM compose."""
         voice_filter = self._voice_filter_expr(ws)
         if ws.overlay_subtitles:
-            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode)
+            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode, inputs.target_lang)
             filter_complex = (
                 f"[0:v]{subtitle_filter}[v];"
                 + (voice_filter + "[voice];")
@@ -1056,7 +1063,7 @@ class CompositionService:
         """Branch: voice without BGM.  Includes CRF23 fallback retry."""
         voice_filter = self._voice_filter_expr(ws)
         if ws.overlay_subtitles:
-            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode)
+            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode, inputs.target_lang)
             filter_complex = (
                 f"[0:v]{subtitle_filter}[v];"
                 + (voice_filter + ",alimiter=limit=0.95[mix]")

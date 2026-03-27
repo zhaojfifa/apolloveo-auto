@@ -865,11 +865,14 @@ async def generate_subtitles(
 
             for seg in segments:
                 idx = int(seg.get("index", 0))
-                mm_text = (translations.get(idx) or "").strip() if translations else ""
-                seg["mm"] = mm_text if mm_text else str(seg.get("origin") or "")
+                translated_text = (translations.get(idx) or "").strip() if translations else ""
+                if translate_enabled_local:
+                    seg["mm"] = translated_text
+                else:
+                    seg["mm"] = str(seg.get("origin") or "")
 
             mm_text = segments_to_srt(segments, "mm")
-            if not mm_text.strip():
+            if not mm_text.strip() and not translate_enabled_local:
                 mm_text = origin_text
 
             scenes_payload = {

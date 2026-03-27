@@ -8,7 +8,12 @@ from fastapi import HTTPException
 
 from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.services import compose_service as compose_module
-from gateway.app.services.compose_service import CompositionService, _ComposeInputs, _WorkspaceFiles
+from gateway.app.services.compose_service import (
+    CompositionService,
+    _ComposeInputs,
+    _WorkspaceFiles,
+    compose_subtitle_vf,
+)
 
 
 def _hash16(text: str) -> str:
@@ -156,6 +161,62 @@ def test_resolve_target_srt_key_blocks_vi_compose_when_target_subtitle_not_curre
     resolved_key = hf_router._resolve_target_srt_key(task, "hf-bind-vi-stale", "vi")
 
     assert resolved_key is None
+
+
+def test_subtitle_lane_keeps_target_editor_empty_when_only_origin_exists(monkeypatch):
+    store = {
+        "deliver/tasks/hf-origin-only/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\n\xe4\xbd\xa0\xe5\xa5\xbd\n",
+    }
+
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+
+    lane = hf_router._hf_subtitle_lane_state(
+        "hf-origin-only",
+        {
+            "task_id": "hf-origin-only",
+            "target_lang": "vi",
+            "origin_srt_path": "deliver/tasks/hf-origin-only/origin.srt",
+        },
+    )
+
+    assert lane["raw_source_text"]
+    assert lane["edited_text"] == ""
+    assert lane["primary_editable_text"] == ""
+    assert lane["srt_text"] == ""
+    assert lane["subtitle_ready"] is False
+
+
+def test_vi_dub_input_does_not_fallback_to_source_when_target_missing(monkeypatch):
+    store = {
+        "deliver/tasks/hf-vi-dub/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\n\xe4\xbd\xa0\xe5\xa5\xbd\n",
+    }
+
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+
+    dub_text = hf_router._hf_dub_input_text(
+        "hf-vi-dub",
+        {
+            "task_id": "hf-vi-dub",
+            "target_lang": "vi",
+            "origin_srt_path": "deliver/tasks/hf-vi-dub/origin.srt",
+        },
+    )
+
+    assert dub_text == ""
+
+
+def test_vi_compose_subtitle_filter_does_not_add_black_cover_box(tmp_path):
+    subtitle_path = tmp_path / "vi.srt"
+    subtitle_path.write_text("1\n00:00:00,000 --> 00:00:02,000\nXin chao\n", encoding="utf-8")
+
+    vf = compose_subtitle_vf(subtitle_path, tmp_path, "bottom_mask", "vi")
+
+    assert "drawbox=" not in vf
+    assert "subtitles='" in vf
 
 
 def test_prepare_workspace_records_actual_downloaded_subtitle_snapshot(monkeypatch, tmp_path):

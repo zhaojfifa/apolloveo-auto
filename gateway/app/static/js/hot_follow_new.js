@@ -65,7 +65,7 @@
     allowed.forEach((voiceId) => {
       const option = document.createElement("option");
       option.value = voiceId;
-      option.textContent = voiceId.indexOf("male") >= 0 ? labels.male : labels.female;
+      option.textContent = voiceId.indexOf("female") >= 0 ? labels.female : labels.male;
       voiceIdEl.appendChild(option);
     });
     voiceIdEl.value = allowed.includes(current) ? current : String((((profile || {}).default_voice_by_provider || {})["azure-speech"]) || allowed[0] || "");

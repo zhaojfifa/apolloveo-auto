@@ -546,15 +546,6 @@ def _hf_load_subtitles_text(task_id: str, task: dict) -> str:
                 return data.decode("utf-8")
             except Exception:
                 return data.decode("utf-8", errors="ignore")
-
-    origin_key = _task_key(task, "origin_srt_path")
-    if origin_key and object_exists(origin_key):
-        data = get_object_bytes(origin_key)
-        if data:
-            try:
-                return data.decode("utf-8")
-            except Exception:
-                return data.decode("utf-8", errors="ignore")
     return ""
 
 
@@ -611,9 +602,12 @@ def _hf_load_normalized_source_text(task_id: str, task: dict) -> str:
 
 
 def _hf_dub_input_text(task_id: str, task: dict) -> str:
+    target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     edited = _hf_load_subtitles_text(task_id, task)
     if str(edited or "").strip():
         return edited
+    if target_lang == "vi":
+        return ""
     normalized = _hf_load_normalized_source_text(task_id, task)
     if str(normalized or "").strip():
         return normalized
@@ -624,7 +618,7 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
     raw_source_text = _hf_load_origin_subtitles_text(task)
     normalized_source_text = _hf_load_normalized_source_text(task_id, task)
     edited_text = _hf_load_subtitles_text(task_id, task)
-    srt_text = edited_text or normalized_source_text or raw_source_text
+    srt_text = edited_text or ""
     dub_input_text = _hf_dub_input_text(task_id, task) or ""
     target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     expected_key = _hf_task_target_subtitle_key(task, target_lang) or _task_key(task, "mm_srt_path")
@@ -654,7 +648,7 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "normalized_source_text": normalized_source_text or "",
         "edited_text": edited_text or "",
         "srt_text": srt_text or "",
-        "primary_editable_text": srt_text or "",
+        "primary_editable_text": edited_text or "",
         "primary_editable_format": "srt",
         "dub_input_text": dub_input_text,
         "dub_input_format": "srt" if _hf_is_srt_text(dub_input_text) else "plain_text",

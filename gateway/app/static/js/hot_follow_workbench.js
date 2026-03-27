@@ -1783,6 +1783,18 @@
       try {
         const currentText = subtitlesTextEl ? subtitlesTextEl.value : "";
         const profile = currentTargetProfile();
+        const subtitleReady = Boolean(currentHub && currentHub.subtitle_ready);
+        const subtitleReason = String(
+          (currentHub && (currentHub.target_subtitle_current_reason || currentHub.subtitle_ready_reason)) || ""
+        ).trim();
+        if (profile.targetLang === "vi" && !subtitleReady) {
+          const warning = subtitleReason === "target_subtitle_translation_incomplete"
+            ? `当前${profile.displayName}目标字幕仍未翻译完成，请先翻译并保存 ${profile.subtitleFilename}，再生成${profile.displayName}配音。`
+            : `当前${profile.displayName}目标字幕还不是可配音的当前版本，请先翻译并保存 ${profile.subtitleFilename}，再生成${profile.displayName}配音。`;
+          if (audioMsgEl) audioMsgEl.textContent = warning;
+          if (subtitlesMsgEl) subtitlesMsgEl.textContent = warning;
+          return;
+        }
         const analysis = analyzeTargetDubCandidate(currentText);
         if (analysis.text && analysis.shouldBlockMyanmarTts) {
           const warning = `当前文本尚未翻译为${profile.displayName}，不建议直接生成${profile.displayName}配音。请先翻译并保存字幕成品，或直接走字幕版合成。`;
