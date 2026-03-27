@@ -12,6 +12,7 @@ from gateway.app.services.compose_service import (
     CompositionService,
     _ComposeInputs,
     _WorkspaceFiles,
+    _with_live_hot_follow_subtitle_currentness,
     compose_subtitle_vf,
 )
 
@@ -217,6 +218,74 @@ def test_vi_compose_subtitle_filter_does_not_add_black_cover_box(tmp_path):
 
     assert "drawbox=" not in vf
     assert "subtitles='" in vf
+
+
+def test_compose_refreshes_live_vi_subtitle_currentness_before_voice_ready(monkeypatch):
+    monkeypatch.setattr(
+        "gateway.app.services.hot_follow_runtime_bridge.compat_hot_follow_subtitle_lane_state",
+        lambda _task_id, _task: {
+            "target_subtitle_current": True,
+            "target_subtitle_current_reason": "ready",
+        },
+    )
+
+    refreshed = _with_live_hot_follow_subtitle_currentness(
+        "hf-vi-compose-live",
+        {
+            "task_id": "hf-vi-compose-live",
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "target_subtitle_current": False,
+            "target_subtitle_current_reason": "subtitle_missing",
+        },
+    )
+
+    assert refreshed["target_subtitle_current"] is True
+    assert refreshed["target_subtitle_current_reason"] == "ready"
+
+
+def test_validate_inputs_uses_live_vi_subtitle_currentness(monkeypatch):
+    seen: dict[str, object] = {}
+    svc = CompositionService(storage=object(), settings=object())
+
+    monkeypatch.setattr(
+        "gateway.app.services.hot_follow_runtime_bridge.compat_hot_follow_subtitle_lane_state",
+        lambda _task_id, _task: {
+            "target_subtitle_current": True,
+            "target_subtitle_current_reason": "ready",
+        },
+    )
+    def _fake_collect_voice_execution_state(task, _settings):
+        seen["task"] = dict(task)
+        return {"audio_ready": True, "audio_ready_reason": "ready"}
+
+    monkeypatch.setattr(
+        compose_module,
+        "collect_voice_execution_state",
+        _fake_collect_voice_execution_state,
+    )
+    monkeypatch.setattr(compose_module, "assert_artifact_ready", lambda **_kwargs: None)
+    monkeypatch.setattr(compose_module.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
+
+    inputs = svc._validate_inputs(
+        "hf-vi-compose-validate",
+        {
+            "task_id": "hf-vi-compose-validate",
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "target_subtitle_current": False,
+            "target_subtitle_current_reason": "subtitle_missing",
+            "mute_video_key": "video-key",
+            "mm_audio_key": "audio-key",
+            "compose_plan": {},
+            "config": {},
+        },
+        lambda *_args, **_kwargs: False,
+    )
+
+    assert seen["task"]["target_subtitle_current"] is True
+    assert seen["task"]["target_subtitle_current_reason"] == "ready"
+    assert inputs.voice_state["audio_ready"] is True
 
 
 def test_prepare_workspace_records_actual_downloaded_subtitle_snapshot(monkeypatch, tmp_path):

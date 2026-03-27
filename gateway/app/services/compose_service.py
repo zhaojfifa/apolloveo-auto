@@ -182,6 +182,23 @@ def compose_subtitle_vf(
     return f"{cover_filter},{subtitle_filter}" if cover_filter else subtitle_filter
 
 
+def _with_live_hot_follow_subtitle_currentness(task_id: str, task: dict) -> dict:
+    live_task = dict(task or {})
+    if str(live_task.get("kind") or "").strip().lower() != "hot_follow":
+        return live_task
+    try:
+        from gateway.app.services.hot_follow_runtime_bridge import compat_hot_follow_subtitle_lane_state
+
+        subtitle_lane = compat_hot_follow_subtitle_lane_state(task_id, live_task)
+    except Exception:
+        logger.exception("HF_COMPOSE_SUBTITLE_CURRENTNESS_REFRESH_FAILED", extra={"task_id": task_id})
+        return live_task
+
+    live_task["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
+    live_task["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
+    return live_task
+
+
 # ---------------------------------------------------------------------------
 # Internal dataclasses
 # ---------------------------------------------------------------------------
@@ -619,18 +636,19 @@ class CompositionService:
         task: dict,
         subtitle_only_check: Callable[[str, dict], bool],
     ) -> _ComposeInputs:
-        voice_state = collect_voice_execution_state(task, self._settings)
-        subtitle_only_compose = subtitle_only_check(task_id, task)
+        live_task = _with_live_hot_follow_subtitle_currentness(task_id, task)
+        voice_state = collect_voice_execution_state(live_task, self._settings)
+        subtitle_only_compose = subtitle_only_check(task_id, live_task)
 
         # Resolve artifact keys
         from gateway.app.services.task_view_helpers import task_key as _task_key  # noqa: PLC0415
 
         video_key = (
-            _task_key(task, "mute_video_key")
-            or _task_key(task, "mute_video_path")
-            or _task_key(task, "raw_path")
+            _task_key(live_task, "mute_video_key")
+            or _task_key(live_task, "mute_video_path")
+            or _task_key(live_task, "raw_path")
         )
-        audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
+        audio_key = _task_key(live_task, "mm_audio_key") or _task_key(live_task, "mm_audio_path")
 
         if not video_key:
             compose_fail("missing_raw", "missing video source for compose")
@@ -658,7 +676,7 @@ class CompositionService:
             compose_fail("compose_failed", "ffmpeg not found in PATH")
 
         # Extract compose plan config
-        config = dict(task.get("config") or {})
+        config = dict(live_task.get("config") or {})
         bgm = dict(config.get("bgm") or {})
         bgm_key: str | None = str(bgm.get("bgm_key") or "").strip() or None
         if bgm_key and not object_exists(bgm_key):
@@ -674,12 +692,12 @@ class CompositionService:
             bgm_mix = 0.3
         bgm_mix = max(0.0, min(1.0, bgm_mix))
 
-        compose_plan = dict(task.get("compose_plan") or {})
+        compose_plan = dict(live_task.get("compose_plan") or {})
         overlay_subtitles = bool(compose_plan.get("overlay_subtitles"))
         strip_subtitle_streams = bool(compose_plan.get("strip_subtitle_streams", True))
         cleanup_mode = str(compose_plan.get("cleanup_mode") or "none").strip().lower()
         target_lang = str(
-            compose_plan.get("target_lang") or task.get("target_lang") or task.get("content_lang") or "mm"
+            compose_plan.get("target_lang") or live_task.get("target_lang") or live_task.get("content_lang") or "mm"
         )
         freeze_tail_enabled = bool(compose_plan.get("freeze_tail_enabled", False))
         try:
