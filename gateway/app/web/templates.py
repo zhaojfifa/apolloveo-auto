@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 
 from starlette.requests import Request
 from starlette.templating import Jinja2Templates
@@ -30,7 +30,14 @@ def get_templates() -> Jinja2Templates:
     return _templates
 
 
-def render_template(*, request: Request, name: str, ctx: Optional[Dict[str, Any]] = None):
+def render_template(
+    *,
+    request: Request,
+    name: str,
+    ctx: Optional[Dict[str, Any]] = None,
+    status_code: int = 200,
+    headers: Optional[Mapping[str, str]] = None,
+):
     """
     Render a template with per-request i18n globals injected.
     """
@@ -38,4 +45,10 @@ def render_template(*, request: Request, name: str, ctx: Optional[Dict[str, Any]
     if ctx:
         data.update(ctx)
     data.update(get_template_globals(request))
-    return get_templates().TemplateResponse(name, data)
+    return get_templates().TemplateResponse(
+        request=request,
+        name=name,
+        context=data,
+        status_code=status_code,
+        headers=headers,
+    )
