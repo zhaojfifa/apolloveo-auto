@@ -131,12 +131,31 @@ def test_resolve_target_srt_key_prefers_vi_artifact_before_legacy_mm_fallback(mo
     task = {
         "task_id": "hf-bind-vi",
         "target_lang": "vi",
+        "target_subtitle_current": True,
         "mm_srt_path": "deliver/tasks/hf-bind-vi/vi.srt",
     }
 
     resolved_key = hf_router._resolve_target_srt_key(task, "hf-bind-vi", "vi")
 
     assert resolved_key == "deliver/tasks/hf-bind-vi/vi.srt"
+
+
+def test_resolve_target_srt_key_blocks_vi_compose_when_target_subtitle_not_current(monkeypatch):
+    monkeypatch.setattr(
+        hf_router,
+        "_hf_subtitle_lane_state",
+        lambda _task_id, _task: {"target_subtitle_current": False},
+    )
+
+    task = {
+        "task_id": "hf-bind-vi-stale",
+        "target_lang": "vi",
+        "mm_srt_path": "deliver/tasks/hf-bind-vi-stale/vi.srt",
+    }
+
+    resolved_key = hf_router._resolve_target_srt_key(task, "hf-bind-vi-stale", "vi")
+
+    assert resolved_key is None
 
 
 def test_prepare_workspace_records_actual_downloaded_subtitle_snapshot(monkeypatch, tmp_path):

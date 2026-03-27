@@ -43,6 +43,9 @@ from gateway.app.services.hot_follow_language_profiles import (
     hot_follow_subtitle_filename,
     hot_follow_subtitle_txt_filename,
 )
+from gateway.app.services.hot_follow_subtitle_currentness import (
+    compute_hot_follow_target_subtitle_currentness,
+)
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, resolve_tts_voice
 from gateway.app.deps import get_task_repository
@@ -811,6 +814,16 @@ async def run_subtitles_step(req: SubtitlesRequest):
         if workspace.segments_json.exists():
             shutil.copy2(workspace.segments_json, subtitles_dir / "subtitles.json")
         subtitles_key = relative_to_workspace(subtitles_dir / "subtitles.json")
+        target_subtitle_currentness = compute_hot_follow_target_subtitle_currentness(
+            target_lang=req.target_lang,
+            target_text=mm_text,
+            source_texts=(normalized_origin_text, origin_text),
+            subtitle_artifact_exists=bool(mm_key),
+            expected_subtitle_source=subtitle_filename,
+            actual_subtitle_source=subtitle_filename if mm_key else None,
+            translation_incomplete=not bool(translation_qa_payload.get("complete")),
+            has_saved_revision=False,
+        )
 
         _update_task(
             req.task_id,
@@ -821,6 +834,8 @@ async def run_subtitles_step(req: SubtitlesRequest):
             subtitles_key=subtitles_key,
             subtitle_structure_path=subtitles_key,
             subtitles_error=None,
+            target_subtitle_current=bool(target_subtitle_currentness.get("target_subtitle_current")),
+            target_subtitle_current_reason=target_subtitle_currentness.get("target_subtitle_current_reason"),
         )
         logger.info(
             "SUB2_DONE",

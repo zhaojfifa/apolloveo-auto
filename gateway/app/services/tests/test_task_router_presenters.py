@@ -166,6 +166,7 @@ def test_build_tasks_page_rows_preserves_board_payload_shape():
             "title": "task",
             "category_key": "hot_follow",
             "content_lang": "mm",
+            "target_lang": "mm",
             "status": "ready",
             "parse_status": None,
             "dub_status": None,
@@ -176,6 +177,11 @@ def test_build_tasks_page_rows_preserves_board_payload_shape():
             "final_url": None,
             "final_video_url": None,
             "ready_gate": None,
+            "target_subtitle_current": None,
+            "target_subtitle_current_reason": None,
+            "subtitles_content_hash": None,
+            "subtitles_override_updated_at": None,
+            "pipeline_config": None,
             "created_at": "2026-03-22T00:00:00+00:00",
             "pack_path": "deliver/tasks/hf-1/pack.zip",
             "pack_key": "deliver/tasks/hf-1/pack.zip",
@@ -228,6 +234,43 @@ def test_build_task_summaries_page_projects_ready_from_final_facts_before_unknow
     assert summaries[0].status == "ready"
 
 
+def test_build_task_summaries_page_keeps_vi_processing_when_target_subtitle_not_current():
+    summaries, total = build_task_summaries_page(
+        [
+            {
+                "task_id": "hf-vi-stale",
+                "title": "task",
+                "kind": "hot_follow",
+                "source_url": "https://example.com/source",
+                "platform": "hot_follow",
+                "category_key": "hot_follow",
+                "content_lang": "vi",
+                "target_lang": "vi",
+                "ui_lang": "zh",
+                "status": "",
+                "compose_status": "done",
+                "final_video_key": "deliver/tasks/hf-vi-stale/final.mp4",
+                "target_subtitle_current": False,
+                "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+                "created_at": "2026-03-22T00:00:00+00:00",
+            }
+        ],
+        kind_norm="hot_follow",
+        page=1,
+        page_size=20,
+        resolve_download_urls=lambda _task: {"pack_path": None, "scenes_path": None},
+        derive_status=derive_status,
+        extract_first_http_url=lambda text: "https://example.com/source" if text else None,
+        coerce_datetime=lambda value: datetime.fromisoformat(str(value).replace("Z", "+00:00")) if value else None,
+        parse_pipeline_config=lambda value: dict(value or {}),
+        normalize_selected_tool_ids=lambda value: list(value or []),
+        task_summary_cls=_Detail,
+    )
+
+    assert total == 1
+    assert summaries[0].status == "processing"
+
+
 def test_build_tasks_page_rows_carry_fact_fields_needed_for_board_ready_projection():
     rows = build_tasks_page_rows(
         [
@@ -253,6 +296,36 @@ def test_build_tasks_page_rows_carry_fact_fields_needed_for_board_ready_projecti
 
     assert semantics["db_status"] == "ready"
     assert semantics["filter_status"] == "done"
+
+
+def test_build_tasks_page_rows_do_not_project_ready_for_vi_when_target_subtitle_is_not_current():
+    rows = build_tasks_page_rows(
+        [
+            {
+                "task_id": "hf-vi-board-stale",
+                "platform": "hot_follow",
+                "source_url": "https://example.com/vi",
+                "title": "task",
+                "category_key": "hot_follow",
+                "content_lang": "vi",
+                "target_lang": "vi",
+                "status": "",
+                "compose_status": "done",
+                "final_video_key": "deliver/tasks/hf-vi-board-stale/final.mp4",
+                "target_subtitle_current": False,
+                "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+                "created_at": "2026-03-22T00:00:00+00:00",
+            }
+        ],
+        kind_norm="hot_follow",
+        pack_path_for_list=lambda _task: None,
+        normalize_selected_tool_ids=lambda value: list(value or []),
+    )
+
+    semantics = derive_task_semantics(rows[0])
+
+    assert semantics["db_status"] == "processing"
+    assert semantics["filter_status"] == "processing"
 
 
 def test_build_task_workbench_page_context_keeps_hot_follow_enrichment():

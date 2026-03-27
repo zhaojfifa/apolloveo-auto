@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any, Dict
 
 from gateway.app.i18n import DEFAULT_LOCALE, t
@@ -25,12 +26,72 @@ def _scene_key(task: dict) -> str:
     return "baseline"
 
 
+def _target_lang(task: dict) -> str:
+    raw = _lower(
+        task.get("target_lang")
+        or task.get("content_lang")
+        or task.get("language")
+        or ""
+    )
+    return "my" if raw == "mm" else raw
+
+
+def _pipeline_config(task: dict) -> dict:
+    value = task.get("pipeline_config")
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return {}
+        try:
+            decoded = json.loads(text)
+        except Exception:
+            return {}
+        return decoded if isinstance(decoded, dict) else {}
+    return {}
+
+
+def _target_subtitle_current_fact(task: dict) -> bool | None:
+    if _target_lang(task) != "vi":
+        return None
+    explicit = task.get("target_subtitle_current")
+    if explicit is not None:
+        return bool(explicit)
+    ready_gate = task.get("ready_gate") if isinstance(task.get("ready_gate"), dict) else {}
+    if "subtitle_ready" in ready_gate:
+        return bool(ready_gate.get("subtitle_ready"))
+    pipeline_config = _pipeline_config(task)
+    translation_incomplete = str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
+    has_saved_revision = bool(
+        str(task.get("subtitles_content_hash") or "").strip()
+        or str(task.get("subtitles_override_updated_at") or "").strip()
+    )
+    if translation_incomplete and not has_saved_revision:
+        return False
+    return None
+
+
 _DONE_STATES = {"ready", "done", "success", "completed"}
 _RUNNING_STATES = {"processing", "running", "queued", "pending"}
 _FAILED_STATES = {"failed", "error"}
 
 
 def project_task_fact_status(task: dict) -> str:
+    target_subtitle_current = _target_subtitle_current_fact(task)
+    if target_subtitle_current is False:
+        statuses = [
+            _lower(task.get("status") or ""),
+            _lower(task.get("dub_status") or ""),
+            _lower(task.get("subtitles_status") or ""),
+            _lower(task.get("parse_status") or ""),
+            _lower(task.get("pack_status") or ""),
+            _lower(task.get("publish_status") or ""),
+        ]
+        if any(status in _FAILED_STATES for status in statuses):
+            return "failed"
+        return "processing"
+
     ready_gate = task.get("ready_gate") if isinstance(task.get("ready_gate"), dict) else {}
     if bool(ready_gate.get("publish_ready") or ready_gate.get("compose_ready")):
         return "ready"

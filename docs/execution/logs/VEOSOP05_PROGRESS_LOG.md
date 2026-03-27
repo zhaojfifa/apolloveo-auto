@@ -1,5 +1,21 @@
 # VeoSop05 启动进度文档
 
+## PR-Localization Closure Pack v2: Vietnamese Subtitle Currentness + Gate Alignment
+
+日期：2026-03-27
+
+本节点完成：
+
+- 将越南语目标字幕 currentness 明确收口为可验证事实，而不是继续按 artifact existence 近似判定
+- 让 `vi.srt` 只有在成为真实当前越南语目标字幕后才被视为 ready / authoritative burn source
+- 让配音、合成、board/list/workbench 状态共同服从同一份越南语目标字幕 currentness 事实，避免 false done
+
+本次边界说明：
+
+- Hot Follow 仍保持单一产线
+- 未引入新 scenario / 新工作台 / 新 compose path
+- 未扩大为平台级 gate/status 重写
+
 ## PR-Localization Closure Pack: Vietnamese Profile + Compose Burn Source + Board Status
 
 日期：2026-03-27

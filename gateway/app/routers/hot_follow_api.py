@@ -125,6 +125,9 @@ from gateway.app.services.hot_follow_language_profiles import (
     hot_follow_subtitle_txt_filename,
     resolve_hot_follow_voice_id,
 )
+from gateway.app.services.hot_follow_subtitle_currentness import (
+    compute_hot_follow_target_subtitle_currentness,
+)
 from gateway.app.services.hot_follow_skills_advisory import (
     maybe_build_hot_follow_advisory as _maybe_build_hot_follow_advisory,
 )
@@ -567,6 +570,32 @@ def _hf_load_origin_subtitles_text(task: dict) -> str:
     return ""
 
 
+def _hf_target_subtitle_currentness_state(
+    task: dict,
+    *,
+    target_lang: str,
+    raw_source_text: str,
+    normalized_source_text: str,
+    edited_text: str,
+    subtitle_artifact_exists: bool,
+    expected_key: str | None,
+) -> dict[str, object]:
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    return compute_hot_follow_target_subtitle_currentness(
+        target_lang=target_lang,
+        target_text=edited_text,
+        source_texts=(normalized_source_text, raw_source_text),
+        subtitle_artifact_exists=subtitle_artifact_exists,
+        expected_subtitle_source=_hf_expected_subtitle_filename(target_lang),
+        actual_subtitle_source=(Path(str(expected_key)).name if expected_key else None),
+        translation_incomplete=str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true",
+        has_saved_revision=bool(
+            str(task.get("subtitles_content_hash") or "").strip()
+            or str(task.get("subtitles_override_updated_at") or "").strip()
+        ),
+    )
+
+
 def _hf_load_normalized_source_text(task_id: str, task: dict) -> str:
     try:
         normalized_path = task_base_dir(task_id) / "subs" / "origin_normalized.srt"
@@ -606,8 +635,20 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         else (_hf_expected_subtitle_filename(target_lang) if expected_key else None)
     )
     subtitle_artifact_exists = bool(expected_key and object_exists(str(expected_key)))
-    subtitle_ready = bool(subtitle_artifact_exists or str(edited_text or normalized_source_text or raw_source_text).strip())
-    subtitle_ready_reason = "ready" if subtitle_ready else "subtitle_missing"
+    target_currentness = _hf_target_subtitle_currentness_state(
+        task,
+        target_lang=target_lang,
+        raw_source_text=raw_source_text or "",
+        normalized_source_text=normalized_source_text or "",
+        edited_text=edited_text or "",
+        subtitle_artifact_exists=subtitle_artifact_exists,
+        expected_key=expected_key,
+    )
+    subtitle_ready = bool(target_currentness.get("target_subtitle_current"))
+    subtitle_ready_reason = str(
+        target_currentness.get("target_subtitle_current_reason")
+        or ("ready" if subtitle_ready else "subtitle_missing")
+    )
     return {
         "raw_source_text": raw_source_text or "",
         "normalized_source_text": normalized_source_text or "",
@@ -621,6 +662,10 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "subtitle_artifact_exists": bool(subtitle_artifact_exists),
         "subtitle_ready": bool(subtitle_ready),
         "subtitle_ready_reason": subtitle_ready_reason,
+        "target_subtitle_current": bool(target_currentness.get("target_subtitle_current")),
+        "target_subtitle_current_reason": str(target_currentness.get("target_subtitle_current_reason") or subtitle_ready_reason),
+        "target_subtitle_authoritative_source": bool(target_currentness.get("target_subtitle_authoritative_source")),
+        "target_subtitle_source_copy": bool(target_currentness.get("target_subtitle_source_copy")),
     }
 
 
@@ -775,6 +820,10 @@ def _hot_follow_operational_defaults() -> dict[str, Any]:
         "no_dub_reason": None,
         "no_dub_message": None,
         "actual_burn_subtitle_source": None,
+        "target_subtitle_current": False,
+        "target_subtitle_current_reason": "unknown",
+        "target_subtitle_authoritative_source": False,
+        "target_subtitle_source_copy": False,
     }
 
 
@@ -861,8 +910,11 @@ def _hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None
     if step == "audio":
         status = _hf_state_from_status(task.get("dub_status"))
         voice_state = _collect_voice_execution_state(task, get_settings())
+        target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
         if status == "pending" and voice_state.get("audio_ready"):
             status = "done"
+        if status == "done" and target_lang == "vi" and not voice_state.get("audio_ready"):
+            status = "pending"
         if status == "pending" and task_status == "processing" and last_step == "dub":
             status = "running"
         audio_cfg = _hf_audio_config(task)
@@ -886,8 +938,11 @@ def _hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None
             task,
             str(task.get("task_id") or task.get("id") or ""),
         )
+        target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
         if status == "pending" and bool(composed_state.get("composed_ready")):
             status = "done"
+        if status == "done" and target_lang == "vi" and not bool(composed_state.get("composed_ready")):
+            status = "pending"
         if status == "pending" and task_status == "processing" and last_step in {"compose", "final"}:
             status = "running"
         summary = "final video merge"
@@ -1121,13 +1176,16 @@ def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
 def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     task_id = str(task.get("task_id") or task.get("id") or "")
     subtitle_lane = _hf_subtitle_lane_state(task_id, task)
+    task_runtime = dict(task)
+    task_runtime["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
+    task_runtime["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
     _sub_status_b, _ = _hf_pipeline_state(task, "subtitles")
     _sub_done_b = _sub_status_b in ("done", "ready", "success", "completed", "failed", "error")
-    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane, subtitles_step_done=_sub_done_b)
+    route_state = _hf_dual_channel_state(task_id, task_runtime, subtitle_lane, subtitles_step_done=_sub_done_b)
     audio_lane = _hf_source_audio_lane_summary(task, route_state)
     screen_text_candidate = _hf_screen_text_candidate_summary(subtitle_lane, route_state)
-    voice_state = _collect_voice_execution_state(task, settings)
-    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
+    voice_state = _collect_voice_execution_state(task_runtime, settings)
+    final_key = _task_key(task_runtime, "final_video_key") or _task_key(task_runtime, "final_video_path")
     final_exists = bool(final_key and object_exists(str(final_key)))
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
@@ -1322,6 +1380,14 @@ def _normalize_compose_target_lang(value: str | None) -> str:
 def _resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> str | None:
     """Compatibility subtitle resolver for remaining router-driven compose calls."""
     lang_norm = _normalize_compose_target_lang(lang)
+    if lang_norm == "vi":
+        explicit_current = task_obj.get("target_subtitle_current")
+        if explicit_current is False:
+            return None
+        if explicit_current is not True:
+            subtitle_lane = _hf_subtitle_lane_state(task_code, task_obj)
+            if not bool(subtitle_lane.get("target_subtitle_current")):
+                return None
     synced_mm_key = _hf_sync_saved_target_subtitle_artifact(task_code, task_obj)
     subtitle_filename = hot_follow_subtitle_filename(lang_norm)
     candidates: list[str] = []
@@ -1479,38 +1545,41 @@ def get_hot_follow_workbench_hub(
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
         scene_outputs = []
-    composed = _compute_composed_state(task, task_id)
-    parse_state, parse_summary = _hf_pipeline_state(task, "parse")
-    subtitles_state, subtitles_summary = _hf_pipeline_state(task, "subtitles")
-    dub_state, dub_summary = _hf_pipeline_state(task, "audio")
-    pack_state, pack_summary = _hf_pipeline_state(task, "pack")
-    compose_state, compose_summary = _hf_pipeline_state(task, "compose", composed=composed)
+    subtitle_lane = _hf_subtitle_lane_state(task_id, task)
+    task_runtime = dict(task)
+    task_runtime["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
+    task_runtime["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
+    composed = _compute_composed_state(task_runtime, task_id)
+    parse_state, parse_summary = _hf_pipeline_state(task_runtime, "parse")
+    subtitles_state, subtitles_summary = _hf_pipeline_state(task_runtime, "subtitles")
+    dub_state, dub_summary = _hf_pipeline_state(task_runtime, "audio")
+    pack_state, pack_summary = _hf_pipeline_state(task_runtime, "pack")
+    compose_state, compose_summary = _hf_pipeline_state(task_runtime, "compose", composed=composed)
 
-    raw_key = _task_key(task, "raw_path")
+    raw_key = _task_key(task_runtime, "raw_path")
     raw_url = _task_endpoint(task_id, "raw") if raw_key and object_exists(raw_key) else None
-    mute_key = _task_key(task, "mute_video_key") or _task_key(task, "mute_video_path")
+    mute_key = _task_key(task_runtime, "mute_video_key") or _task_key(task_runtime, "mute_video_path")
     mute_url = _task_endpoint(task_id, "raw") if mute_key and object_exists(str(mute_key)) else raw_url
     final_info = composed.get("final") or {}
     historical_final = composed.get("historical_final") or {}
-    scene_pack = _scene_pack_info(task, task_id)
-    scenes_key = _task_key(task, "scenes_key")
-    scenes_status = _scenes_status_from_ssot(task)
+    scene_pack = _scene_pack_info(task_runtime, task_id)
+    scenes_key = _task_key(task_runtime, "scenes_key")
+    scenes_status = _scenes_status_from_ssot(task_runtime)
     scenes_url = _task_endpoint(task_id, "scenes") if scenes_key else None
-    subtitles_text = _hf_load_subtitles_text(task_id, task)
-    origin_text = _hf_load_origin_subtitles_text(task)
-    normalized_source_text = _hf_load_normalized_source_text(task_id, task)
-    subtitle_lane = _hf_subtitle_lane_state(task_id, task)
+    subtitles_text = _hf_load_subtitles_text(task_id, task_runtime)
+    origin_text = _hf_load_origin_subtitles_text(task_runtime)
+    normalized_source_text = _hf_load_normalized_source_text(task_id, task_runtime)
     _sub_step_done = str(subtitles_state).strip().lower() in ("done", "ready", "success", "completed", "failed", "error")
-    route_state = _hf_dual_channel_state(task_id, task, subtitle_lane, subtitles_step_done=_sub_step_done)
-    audio_cfg = _hf_audio_config(task)
-    voice_state = _collect_voice_execution_state(task, get_settings())
-    persisted_audio = _hf_persisted_audio_state(task_id, task)
-    target_lang_internal = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    route_state = _hf_dual_channel_state(task_id, task_runtime, subtitle_lane, subtitles_step_done=_sub_step_done)
+    audio_cfg = _hf_audio_config(task_runtime)
+    voice_state = _collect_voice_execution_state(task_runtime, get_settings())
+    persisted_audio = _hf_persisted_audio_state(task_id, task_runtime)
+    target_lang_internal = normalize_target_lang(task_runtime.get("target_lang") or task_runtime.get("content_lang") or "mm")
     text_guard = clean_and_analyze_dub_text(subtitles_text or "", target_lang_internal)
     audio_warning = str(text_guard.get("warning") or "").strip() or None
     if (
         not (audio_cfg.get("voiceover_url") or "").strip()
-        and (task.get("mm_audio_key") or task.get("mm_audio_path"))
+        and (task_runtime.get("mm_audio_key") or task_runtime.get("mm_audio_path"))
         and str(dub_state).strip().lower() not in {"running", "processing", "queued"}
         and str(voice_state.get("dub_current_reason") or "").strip().lower() not in {"dub_running", "dub_not_done"}
     ):
@@ -1518,7 +1587,7 @@ def get_hot_follow_workbench_hub(
         if not dub_summary:
             dub_summary = "voiceover artifact invalid"
     audio_error = _hf_audio_display_error(str(dub_state), task.get("dub_error"), voice_state)
-    deliverables = _hf_deliverables(task_id, task)
+    deliverables = _hf_deliverables(task_id, task_runtime)
     target_profile = get_hot_follow_language_profile(target_lang_internal)
     compose_last_status_raw = str(
         task.get("compose_last_status")
@@ -1590,6 +1659,10 @@ def get_hot_follow_workbench_hub(
             "error": task.get("subtitles_error"),
             "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
             "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),
+            "target_subtitle_current": bool(subtitle_lane.get("target_subtitle_current")),
+            "target_subtitle_current_reason": subtitle_lane.get("target_subtitle_current_reason"),
+            "target_subtitle_authoritative_source": bool(subtitle_lane.get("target_subtitle_authoritative_source")),
+            "target_subtitle_source_copy": bool(subtitle_lane.get("target_subtitle_source_copy")),
             "editable": True,
             "updated_at": task.get("subtitles_override_updated_at") or task.get("updated_at"),
         },
@@ -1738,10 +1811,14 @@ def get_hot_follow_workbench_hub(
         "synthesis": {"status": pack_state, "summary": pack_summary, "updated_at": task.get("updated_at")},
         "compose": {"status": compose_state, "summary": compose_summary, "updated_at": task.get("updated_at")},
     }
-    payload = compute_hot_follow_state(task, payload)
+    payload = compute_hot_follow_state(task_runtime, payload)
     if _backfill_compose_done_if_final_ready(repo, task_id, task, bool(payload.get("composed_ready"))):
         latest = repo.get(task_id) or task
-        payload = compute_hot_follow_state(latest, payload)
+        latest_runtime = dict(latest)
+        latest_lane = _hf_subtitle_lane_state(task_id, latest)
+        latest_runtime["target_subtitle_current"] = bool(latest_lane.get("target_subtitle_current"))
+        latest_runtime["target_subtitle_current_reason"] = latest_lane.get("target_subtitle_current_reason")
+        payload = compute_hot_follow_state(latest_runtime, payload)
         task = latest
 
     # UI consistency guard: once final is ready, compose-facing fields must all read done.
@@ -1980,6 +2057,20 @@ def patch_hot_follow_subtitles(
     override_path.parent.mkdir(parents=True, exist_ok=True)
     override_path.write_text(text, encoding="utf-8")
     synced_mm_key = _hf_sync_saved_target_subtitle_artifact(task_id, task, text)
+    target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    target_currentness = compute_hot_follow_target_subtitle_currentness(
+        target_lang=target_lang,
+        target_text=text,
+        source_texts=(
+            _hf_load_normalized_source_text(task_id, task),
+            _hf_load_origin_subtitles_text(task),
+        ),
+        subtitle_artifact_exists=bool(synced_mm_key),
+        expected_subtitle_source=_hf_expected_subtitle_filename(target_lang),
+        actual_subtitle_source=(Path(str(synced_mm_key)).name if synced_mm_key else None),
+        translation_incomplete=False,
+        has_saved_revision=bool(text.strip()),
+    )
     _policy_upsert(
         repo,
         task_id,
@@ -1995,6 +2086,8 @@ def patch_hot_follow_subtitles(
             "compose_error_reason": None,
             "error_message": None,
             "error_reason": None,
+            "target_subtitle_current": bool(target_currentness.get("target_subtitle_current")),
+            "target_subtitle_current_reason": target_currentness.get("target_subtitle_current_reason"),
         },
     )
     return {

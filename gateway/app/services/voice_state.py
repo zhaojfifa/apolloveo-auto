@@ -272,6 +272,10 @@ def collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         and not audio_exists
     ):
         audio_ready_reason = "dub_not_current"
+    subtitle_current = task.get("target_subtitle_current")
+    subtitle_current_reason = str(task.get("target_subtitle_current_reason") or "").strip() or "subtitle_not_current"
+    if target_lang == "vi" and subtitle_current is False:
+        audio_ready_reason = subtitle_current_reason
     audio_ready = audio_ready_reason == "ready"
     dub_current = audio_ready and audio_exists and matches_expected
     return {
