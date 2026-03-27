@@ -1,6 +1,7 @@
 # gateway/app/main.py
 
 import importlib.util
+import json
 import logging
 import os
 import shutil
@@ -168,18 +169,85 @@ if get_settings().enable_apollo_avatar:
     app.include_router(apollo_avatar_router)
 
 
+def _auth_login_fallback_response(next_url: str) -> HTMLResponse:
+    next_literal = json.dumps(next_url or "/tasks")
+    body = f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Operator Login</title>
+  <style>
+    body {{ font-family: system-ui, -apple-system, Segoe UI, sans-serif; background:#f6f7f9; }}
+    .card {{ max-width: 520px; margin: 60px auto; background:#fff; padding: 20px; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,.06); }}
+    label {{ display:block; margin-top: 12px; font-weight: 600; }}
+    input {{ width:100%; padding:10px; margin-top:6px; border:1px solid #d7dbe0; border-radius:10px; }}
+    button {{ margin-top: 16px; width:100%; padding:10px 12px; border:0; border-radius:10px; background:#2563eb; color:#fff; font-weight:700; cursor:pointer; }}
+    .muted {{ color:#6b7280; font-size: 12px; margin-top: 10px; }}
+    .error {{ color:#b91c1c; margin-top: 10px; font-weight: 600; display:none; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>Operator Login</h2>
+    <div class="muted">Enter your operator name and access key.</div>
+
+    <div id="err" class="error">Invalid key</div>
+
+    <label>Operator</label>
+    <input id="op" placeholder="operator" />
+
+    <label>Access key</label>
+    <input id="key" placeholder="Enter access key" />
+
+    <button id="btn">Sign in</button>
+  </div>
+
+<script>
+  const nextUrl = {next_literal};
+  const err = document.getElementById("err");
+  document.getElementById("btn").addEventListener("click", async () => {{
+    err.style.display = "none";
+    const username = (document.getElementById("op").value || "").trim();
+    const key = (document.getElementById("key").value || "").trim();
+
+    const res = await fetch("/api/auth/login", {{
+      method: "POST",
+      headers: {{"Content-Type":"application/json"}},
+      body: JSON.stringify({{username, key}}),
+    }});
+
+    if (!res.ok) {{
+      err.style.display = "block";
+      return;
+    }}
+    location.href = nextUrl || "/tasks";
+  }});
+</script>
+</body>
+</html>
+"""
+    return HTMLResponse(body)
+
+
 @app.get("/auth/login", response_class=HTMLResponse, include_in_schema=False)
 def auth_login_page(request: Request, next: str = "/tasks"):
-    return render_template(
-        request=request,
-        name="auth_login.html",
-        ctx={
-            "next": next,
-            "topbar_title": None,
-            "topbar_nav": None,
-            "topbar_actions": None,
-        },
-    )
+    try:
+        return render_template(
+            request=request,
+            name="auth_login.html",
+            ctx={
+                "next": next,
+                "topbar_title": None,
+                "topbar_nav": None,
+                "topbar_actions": None,
+            },
+        )
+    except AssertionError as exc:
+        if "jinja2 must be installed" not in str(exc):
+            raise
+        logger.warning("auth login template rendering unavailable; serving fallback login page: %s", exc)
+        return _auth_login_fallback_response(next)
 
 
 @app.get("/admin/tools", response_class=HTMLResponse, include_in_schema=False)
@@ -287,5 +355,3 @@ def serve_workspace_file(rel_path: str):
         raise HTTPException(status_code=404, detail="Not Found")
 
     return FileResponse(path=str(file_path))
-
-
