@@ -19,7 +19,7 @@ async def hot_follow_new_page(request: Request) -> HTMLResponse:
     return render_template(
         request=request,
         name="hot_follow_new.html",
-        context={
+        ctx={
             "language_profiles": list_hot_follow_language_profiles(),
         },
     )
