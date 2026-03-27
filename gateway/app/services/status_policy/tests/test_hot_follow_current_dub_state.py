@@ -209,6 +209,10 @@ def test_vi_voice_options_and_burn_source_follow_profile(monkeypatch):
 
     assert state["requested_voice"] == "vi_female_1"
     assert state["resolved_voice"] == "vi-VN-HoaiMyNeural"
+    assert [item["value"] for item in state["voice_options_by_provider"]["azure_speech"]] == [
+        "vi_female_1",
+        "vi_male_1",
+    ]
     assert subtitle_lane["actual_burn_subtitle_source"] == "vi.srt"
 
 
@@ -271,6 +275,24 @@ def test_rerun_presentation_reports_current_success_without_regressing_baseline(
     assert presentation["current_attempt"]["audio_ready"] is True
     assert presentation["current_attempt"]["dub_current"] is True
     assert presentation["current_attempt"]["resolved_voice"] == "my-MM-NilarNeural"
+
+
+def test_subtitle_lane_uses_final_composed_vi_burn_source_when_present(monkeypatch):
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda task_id: Path("/tmp") / task_id)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda _key: b"1\n00:00:00,000 --> 00:00:02,000\nXin chao\n")
+
+    task = {
+        "task_id": "hf-vi-final",
+        "kind": "hot_follow",
+        "target_lang": "vi",
+        "mm_srt_path": "deliver/tasks/hf-vi-final/vi.srt",
+        "final_source_subtitle_storage_key": "deliver/tasks/hf-vi-final/vi.srt",
+    }
+
+    subtitle_lane = hf_router._hf_subtitle_lane_state("hf-vi-final", task)
+
+    assert subtitle_lane["actual_burn_subtitle_source"] == "vi.srt"
 
 
 def test_artifact_facts_and_operator_summary_keep_previous_final_visible():

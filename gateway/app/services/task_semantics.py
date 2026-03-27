@@ -25,6 +25,56 @@ def _scene_key(task: dict) -> str:
     return "baseline"
 
 
+_DONE_STATES = {"ready", "done", "success", "completed"}
+_RUNNING_STATES = {"processing", "running", "queued", "pending"}
+_FAILED_STATES = {"failed", "error"}
+
+
+def project_task_fact_status(task: dict) -> str:
+    ready_gate = task.get("ready_gate") if isinstance(task.get("ready_gate"), dict) else {}
+    if bool(ready_gate.get("publish_ready") or ready_gate.get("compose_ready")):
+        return "ready"
+
+    final_exists = bool(
+        task.get("final_video_key")
+        or task.get("final_video_path")
+        or task.get("final_url")
+        or task.get("final_video_url")
+    )
+    if final_exists:
+        return "ready"
+
+    compose_status = _lower(task.get("compose_status") or task.get("compose_last_status") or "")
+    if compose_status in _DONE_STATES:
+        return "ready"
+
+    pack_exists = bool(
+        task.get("pack_path")
+        or task.get("pack_key")
+        or task.get("deliver_pack_key")
+        or task.get("pack_url")
+    )
+    if pack_exists:
+        return "ready"
+
+    statuses = [
+        compose_status,
+        _lower(task.get("status") or ""),
+        _lower(task.get("dub_status") or ""),
+        _lower(task.get("subtitles_status") or ""),
+        _lower(task.get("parse_status") or ""),
+        _lower(task.get("pack_status") or ""),
+        _lower(task.get("publish_status") or ""),
+    ]
+    if any(status in _FAILED_STATES for status in statuses):
+        return "failed"
+    if any(status in _RUNNING_STATES for status in statuses):
+        return "processing"
+    if any(status in _DONE_STATES for status in statuses):
+        return "ready"
+    return "unknown"
+
+
 def derive_task_semantics(task: dict) -> dict:
     """
     Derive UI semantics for /tasks board without changing backend contract.
@@ -41,9 +91,10 @@ def derive_task_semantics(task: dict) -> dict:
 
     cover_url = task.get("cover_url") or None
 
-    db_status = _lower(task.get("status") or "")
-    if not db_status:
-        db_status = "unknown"
+    raw_status = _lower(task.get("status") or "")
+    db_status = project_task_fact_status(task)
+    if db_status == "unknown" and raw_status:
+        db_status = raw_status
 
     pack_exists = bool(
         task.get("pack_path")
@@ -51,14 +102,14 @@ def derive_task_semantics(task: dict) -> dict:
         or task.get("deliver_pack_key")
         or task.get("pack_url")
     )
-    pack_ready = pack_exists or db_status in {"ready", "done"}
-    needs_attention = (db_status in {"failed", "error"}) and (not pack_exists)
-    yellow_row = (db_status in {"failed", "error"}) and pack_exists
+    pack_ready = pack_exists or db_status in _DONE_STATES
+    needs_attention = (db_status in _FAILED_STATES) and (not pack_exists)
+    yellow_row = (db_status in _FAILED_STATES) and pack_exists
     if needs_attention:
         filter_status = "attention"
     elif pack_ready:
         filter_status = "done"
-    elif db_status in {"processing", "queued"}:
+    elif db_status in {"processing", "queued", "running", "pending"}:
         filter_status = "processing"
     else:
         filter_status = "other"

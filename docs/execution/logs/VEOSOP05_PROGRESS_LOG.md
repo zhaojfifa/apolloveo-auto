@@ -1,5 +1,21 @@
 # VeoSop05 启动进度文档
 
+## PR-Localization Closure Pack: Vietnamese Profile + Compose Burn Source + Board Status
+
+日期：2026-03-27
+
+本节点完成：
+
+- 将 Hot Follow 越南语 profile 显式收口到现有语言 profile source，补齐正确展示名与 female/male voice 选项
+- 修复越南语目标字幕 artifact / compose burn source 对齐，确保 `vi.srt` 为真实目标烧录来源，而不是静默回退到 Myanmar 默认
+- 修复 Hot Follow board/list 状态投影，优先由 final / compose / ready_gate 等事实字段推导 completed，而不是在原始状态缺失时落回 `unknown`
+
+本次边界说明：
+
+- Hot Follow 仍保持单一产线
+- 未引入新的 scenario / workbench / compose path
+- 未扩大为菜单级 i18n 或平台级状态治理改造
+
 ## PR-1 Runtime Contract Freeze
 
 日期：2026-03-19

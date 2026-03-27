@@ -19,6 +19,7 @@ from fastapi import HTTPException
 
 from gateway.app.config import get_settings
 from gateway.app.schemas import TaskDetail
+from gateway.app.services.task_semantics import project_task_fact_status
 from gateway.app.services.artifact_storage import (
     get_download_url,
     get_object_bytes,
@@ -253,15 +254,11 @@ def scenes_status_from_ssot(task: dict) -> str:
 
 
 def derive_status(task: dict) -> str:
-    pack_key = task_value(task, "pack_key") or task_value(task, "pack_path")
-    if pack_key:
-        try:
-            if object_exists(str(pack_key)):
-                return "ready"
-        except Exception:
-            pass
-        return "ready"
-    return task.get("status") or "processing"
+    projected = project_task_fact_status(task)
+    if projected != "unknown":
+        return projected
+    raw_status = str(task.get("status") or "").strip().lower()
+    return raw_status or "unknown"
 
 
 def _compose_done_like(status: Any) -> bool:

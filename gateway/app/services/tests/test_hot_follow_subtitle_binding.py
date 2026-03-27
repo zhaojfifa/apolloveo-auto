@@ -113,6 +113,32 @@ def test_sync_saved_target_subtitle_reuploads_vi_artifact_for_vi_task(monkeypatc
     assert task["mm_srt_path"] == "deliver/tasks/hf-bind-vi/vi.srt"
 
 
+def test_resolve_target_srt_key_prefers_vi_artifact_before_legacy_mm_fallback(monkeypatch):
+    monkeypatch.setattr(
+        hf_router,
+        "_hf_sync_saved_target_subtitle_artifact",
+        lambda _task_id, _task, saved_text=None: "deliver/tasks/hf-bind-vi/mm.srt",
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "object_exists",
+        lambda key: str(key) in {
+            "deliver/tasks/hf-bind-vi/vi.srt",
+            "deliver/tasks/hf-bind-vi/mm.srt",
+        },
+    )
+
+    task = {
+        "task_id": "hf-bind-vi",
+        "target_lang": "vi",
+        "mm_srt_path": "deliver/tasks/hf-bind-vi/vi.srt",
+    }
+
+    resolved_key = hf_router._resolve_target_srt_key(task, "hf-bind-vi", "vi")
+
+    assert resolved_key == "deliver/tasks/hf-bind-vi/vi.srt"
+
+
 def test_prepare_workspace_records_actual_downloaded_subtitle_snapshot(monkeypatch, tmp_path):
     subtitle_text = "latest authoritative subtitle"
     task = {"subtitles_content_hash": _hash16(subtitle_text)}

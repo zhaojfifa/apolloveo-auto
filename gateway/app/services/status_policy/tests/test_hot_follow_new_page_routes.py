@@ -46,3 +46,10 @@ def test_hot_follow_new_routes_render_without_template_signature_error():
     assert len(calls) == 2
     assert all(call["name"] == "hot_follow_new.html" for call in calls)
     assert all("language_profiles" in call["ctx"] for call in calls)
+    vi_profile = next(
+        profile
+        for profile in calls[-1]["ctx"]["language_profiles"]
+        if str(profile.get("target_lang")) == "vi"
+    )
+    assert vi_profile["display_name"] == "Tiếng Việt"
+    assert vi_profile["allowed_voice_options"] == ["vi_female_1", "vi_male_1"]

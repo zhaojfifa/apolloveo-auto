@@ -464,6 +464,23 @@ def _hf_subtitles_override_path(task_id: str) -> Path:
     return task_base_dir(task_id) / "subtitles" / "subtitles_override.srt"
 
 
+def _hf_expected_subtitle_filename(target_lang: str | None) -> str:
+    return hot_follow_subtitle_filename(target_lang or "mm")
+
+
+def _hf_task_target_subtitle_key(task: dict, target_lang: str | None) -> str | None:
+    expected_name = _hf_expected_subtitle_filename(target_lang)
+    lang_norm = hot_follow_internal_lang(target_lang)
+    candidates = [
+        _task_key(task, f"{lang_norm}_srt_path"),
+        _task_key(task, "mm_srt_path"),
+    ]
+    for key in candidates:
+        if key and Path(str(key)).name == expected_name:
+            return str(key)
+    return None
+
+
 def _hf_subtitle_content_hash(text: str | None) -> str | None:
     source = "" if text is None else str(text)
     if not source:
@@ -474,8 +491,8 @@ def _hf_subtitle_content_hash(text: str | None) -> str | None:
 def _hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text: str | None = None) -> str | None:
     text = str(saved_text if saved_text is not None else _hf_load_subtitles_text(task_id, task) or "")
     desired_hash = _hf_subtitle_content_hash(text)
-    current_key = _task_key(task, "mm_srt_path")
     target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    current_key = _hf_task_target_subtitle_key(task, target_lang) or _task_key(task, "mm_srt_path")
     subtitle_filename = hot_follow_subtitle_filename(target_lang)
     subtitle_txt_filename = hot_follow_subtitle_txt_filename(target_lang)
     if current_key and object_exists(str(current_key)):
@@ -517,7 +534,8 @@ def _hf_load_subtitles_text(task_id: str, task: dict) -> str:
         except Exception:
             return override_path.read_text(encoding="utf-8", errors="ignore")
 
-    mm_key = _task_key(task, "mm_srt_path")
+    target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    mm_key = _hf_task_target_subtitle_key(task, target_lang) or _task_key(task, "mm_srt_path")
     if mm_key and object_exists(mm_key):
         data = get_object_bytes(mm_key)
         if data:
@@ -579,10 +597,15 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
     edited_text = _hf_load_subtitles_text(task_id, task)
     srt_text = edited_text or normalized_source_text or raw_source_text
     dub_input_text = _hf_dub_input_text(task_id, task) or ""
-    actual_burn_subtitle_source = hot_follow_subtitle_filename(
-        task.get("target_lang") or task.get("content_lang") or "mm"
-    ) if _task_key(task, "mm_srt_path") else None
-    subtitle_artifact_exists = bool(_task_key(task, "mm_srt_path") and object_exists(str(_task_key(task, "mm_srt_path"))))
+    target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    expected_key = _hf_task_target_subtitle_key(task, target_lang) or _task_key(task, "mm_srt_path")
+    composed_key = str(task.get("final_source_subtitle_storage_key") or "").strip() or None
+    actual_burn_subtitle_source = (
+        Path(composed_key).name
+        if composed_key
+        else (_hf_expected_subtitle_filename(target_lang) if expected_key else None)
+    )
+    subtitle_artifact_exists = bool(expected_key and object_exists(str(expected_key)))
     subtitle_ready = bool(subtitle_artifact_exists or str(edited_text or normalized_source_text or raw_source_text).strip())
     subtitle_ready_reason = "ready" if subtitle_ready else "subtitle_missing"
     return {
@@ -1302,6 +1325,9 @@ def _resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> str | 
     synced_mm_key = _hf_sync_saved_target_subtitle_artifact(task_code, task_obj)
     subtitle_filename = hot_follow_subtitle_filename(lang_norm)
     candidates: list[str] = []
+    current_target_key = _hf_task_target_subtitle_key(task_obj, lang_norm)
+    if current_target_key:
+        candidates.append(str(current_target_key))
     if lang_norm == "my":
         if synced_mm_key:
             candidates.append(str(synced_mm_key))

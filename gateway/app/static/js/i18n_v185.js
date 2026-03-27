@@ -37,6 +37,7 @@
       "tasks.wizard.hint_hot": "适合快速复制爆款视频，批量产出同类内容",
       "tasks.wizard.hint_baseline": "适合常规素材处理、批量混剪等通用需求",
       "lang.zh": "中文",
+      "lang.vi": "越南语",
       hot_follow_new_pipeline_config: "加工流水线配置",
       hot_follow_new_target_lang: "目标语言",
       hot_follow_new_process_mode: "处理模式",
@@ -293,6 +294,7 @@
       common_loading: "...",
       common_ok: "OK",
       "lang.mm": "မြန်မာ",
+      "lang.vi": "ဗီယက်နမ်",
       "lang.en": "English",
     },
     en: {
@@ -375,6 +377,7 @@
       common_ok: "OK",
       "lang.zh": "Chinese",
       "lang.mm": "Burmese",
+      "lang.vi": "Vietnamese",
       "lang.en": "English",
     },
   };

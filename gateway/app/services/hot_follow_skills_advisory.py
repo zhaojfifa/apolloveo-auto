@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 import gateway.app.lines.hot_follow as _line_reg_hot_follow  # noqa: F401
 from gateway.app.lines.base import LineRegistry, ProductionLine
+from gateway.app.services.hot_follow_language_profiles import hot_follow_subtitle_filename
 
 
 logger = logging.getLogger(__name__)
@@ -100,17 +101,21 @@ def _build_hot_follow_advisory_v0(advisory_input: dict[str, Any]) -> dict[str, A
     compose_status = str(current_attempt.get("compose_status") or "").strip().lower() or None
     final_stale_reason = str(current_attempt.get("final_stale_reason") or "").strip() or None
     current_subtitle_source = str(current_attempt.get("current_subtitle_source") or "").strip() or None
+    expected_subtitle_source = hot_follow_subtitle_filename(
+        advisory_input.get("task", {}).get("target_lang") or advisory_input.get("task", {}).get("content_lang") or "mm"
+    )
 
-    if current_subtitle_source and current_subtitle_source != "mm.srt":
+    if current_subtitle_source and current_subtitle_source != expected_subtitle_source:
         return {
             "id": "hf_advisory_subtitle_source_mismatch",
             "kind": "operator_guidance",
             "level": "warning",
             "recommended_next_action": "review_subtitles",
             "operator_hint": "subtitle review recommended",
-            "explanation": "当前烧录字幕来源不是主可编辑字幕 mm.srt，建议先确认主字幕对象再继续当前链路。",
+            "explanation": f"当前烧录字幕来源不是主可编辑字幕 {expected_subtitle_source}，建议先确认主字幕对象再继续当前链路。",
             "evidence": _evidence(
                 current_subtitle_source=current_subtitle_source,
+                expected_subtitle_source=expected_subtitle_source,
                 subtitle_exists=subtitle_exists,
                 subtitle_ready=subtitle_ready,
             ),
@@ -172,7 +177,7 @@ def _build_hot_follow_advisory_v0(advisory_input: dict[str, Any]) -> dict[str, A
             "level": "info",
             "recommended_next_action": "review_subtitles",
             "operator_hint": "subtitle review recommended",
-            "explanation": "当前主字幕还未准备完成，建议先检查并保存 mm.srt 后再继续后续链路。",
+            "explanation": f"当前主字幕还未准备完成，建议先检查并保存 {expected_subtitle_source} 后再继续后续链路。",
             "evidence": _evidence(
                 subtitle_ready=subtitle_ready,
                 subtitle_ready_reason=subtitle_ready_reason,
