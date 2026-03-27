@@ -288,6 +288,98 @@ def test_validate_inputs_uses_live_vi_subtitle_currentness(monkeypatch):
     assert inputs.voice_state["audio_ready"] is True
 
 
+def test_compose_passes_live_vi_task_to_prepare_workspace(monkeypatch, tmp_path):
+    seen: dict[str, object] = {}
+    svc = CompositionService(storage=object(), settings=object())
+
+    monkeypatch.setattr(
+        compose_module,
+        "_with_live_hot_follow_subtitle_currentness",
+        lambda _task_id, task: {
+            **task,
+            "target_subtitle_current": True,
+            "target_subtitle_current_reason": "ready",
+        },
+    )
+    monkeypatch.setattr(
+        CompositionService,
+        "_validate_inputs",
+        lambda self, _task_id, _task, _subtitle_only_check: _ComposeInputs(
+            video_key="video-key",
+            audio_key="audio-key",
+            subtitle_only_compose=False,
+            voice_state={"audio_ready": True},
+            bgm_key=None,
+            bgm_mix=0.3,
+            overlay_subtitles=True,
+            strip_subtitle_streams=True,
+            cleanup_mode="none",
+            target_lang="vi",
+            freeze_tail_enabled=False,
+            freeze_tail_cap_sec=8.0,
+            compose_policy="match_video",
+            ffmpeg="ffmpeg",
+        ),
+    )
+
+    def _fake_prepare(self, _task_id, task, _inputs, _tmp, _subtitle_resolver):
+        seen["task"] = dict(task)
+        final_path = tmp_path / "final.mp4"
+        return _WorkspaceFiles(
+            task_id="hf-vi-compose-subtitle",
+            tmp=tmp_path,
+            video_input_path=tmp_path / "video.mp4",
+            voice_path=tmp_path / "voice.mp3",
+            final_path=final_path,
+            subtitle_path=tmp_path / "subs_target.srt",
+            bgm_path=None,
+            fontsdir=tmp_path,
+            ffmpeg="ffmpeg",
+            video_duration=8.0,
+            voice_duration=8.0,
+            compose_policy="match_video",
+            subtitle_key="deliver/tasks/hf-vi-compose-subtitle/vi.srt",
+            subtitle_object_etag=None,
+            subtitle_content_hash=None,
+            subtitle_sha256=None,
+            compose_warning=None,
+            ffmpeg_cmd_used="ffmpeg -i ...",
+            overlay_subtitles=True,
+        )
+
+    monkeypatch.setattr(CompositionService, "_prepare_workspace", _fake_prepare)
+    monkeypatch.setattr(CompositionService, "_compose_voice_only", lambda self, _ws, _inputs: None)
+    monkeypatch.setattr(
+        CompositionService,
+        "_validate_and_probe_output",
+        lambda self, _task_id, ws, _inputs: (ws.final_path, 12000, 8.0, None),
+    )
+    monkeypatch.setattr(
+        CompositionService,
+        "_upload_and_verify",
+        lambda self, _task_id, _task, _final_path, **_kwargs: {"compose_status": "done"},
+    )
+
+    result = svc.compose(
+        "hf-vi-compose-subtitle",
+        {
+            "task_id": "hf-vi-compose-subtitle",
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "target_subtitle_current": False,
+            "target_subtitle_current_reason": "subtitle_missing",
+        },
+        subtitle_resolver=lambda task, _task_code, _lang: "deliver/tasks/hf-vi-compose-subtitle/vi.srt"
+        if task.get("target_subtitle_current")
+        else None,
+        subtitle_only_check=lambda *_args, **_kwargs: False,
+    )
+
+    assert result["compose_status"] == "done"
+    assert seen["task"]["target_subtitle_current"] is True
+    assert seen["task"]["target_subtitle_current_reason"] == "ready"
+
+
 def test_prepare_workspace_records_actual_downloaded_subtitle_snapshot(monkeypatch, tmp_path):
     subtitle_text = "latest authoritative subtitle"
     task = {"subtitles_content_hash": _hash16(subtitle_text)}

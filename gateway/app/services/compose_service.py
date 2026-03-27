@@ -305,12 +305,13 @@ class CompositionService:
         subtitle_only_check: Callable[[str, dict], bool],
     ) -> dict[str, Any]:
         """Run the full compose pipeline.  Returns the 27-field update dict."""
-        inputs = self._validate_inputs(task_id, task, subtitle_only_check)
+        live_task = _with_live_hot_follow_subtitle_currentness(task_id, task)
+        inputs = self._validate_inputs(task_id, live_task, subtitle_only_check)
 
         compose_started_at = task.get("compose_last_started_at") or datetime.now(timezone.utc).isoformat()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            ws = self._prepare_workspace(task_id, task, inputs, Path(tmpdir), subtitle_resolver)
+            ws = self._prepare_workspace(task_id, live_task, inputs, Path(tmpdir), subtitle_resolver)
 
             # Dispatch to the correct compose branch
             if inputs.subtitle_only_compose:
