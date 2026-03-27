@@ -111,7 +111,24 @@ async def auth_middleware(request: Request, call_next):
     if _is_allowed_path(path):
         return await call_next(request)
 
-    s = load_auth_settings()
+    try:
+        s = load_auth_settings()
+    except RuntimeError as exc:
+        logger.error("AUTH_MISCONFIG path=%s error=%s", path, str(exc))
+        if _is_api_path(path):
+            return JSONResponse(
+                status_code=503,
+                content={"detail": str(exc) or "AUTH misconfigured"},
+            )
+        return HTMLResponse(
+            content=(
+                "<!doctype html><html><head><meta charset='utf-8'><title>Service Unavailable</title></head>"
+                "<body><h1>Service Unavailable</h1><p>"
+                f"{str(exc) or 'AUTH misconfigured'}"
+                "</p></body></html>"
+            ),
+            status_code=503,
+        )
     if s.auth_mode == "off":
         return await call_next(request)
 
