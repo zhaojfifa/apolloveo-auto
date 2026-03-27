@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import tempfile
 from pathlib import Path
 from typing import Any, Optional
 
 from gateway.app.core.workspace import workspace_root
 from gateway.ports.task_repository import ITaskRepository
+
+logger = logging.getLogger(__name__)
 
 
 def _task_id_from_payload(task: dict[str, Any]) -> str:
@@ -32,17 +36,43 @@ def _task_path(base: Path, tenant: str, category: str, task_id: str) -> Path:
 
 def _atomic_write(path: Path, payload: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp_path = path.with_suffix(path.suffix + ".tmp")
+    tmp_path: Path | None = None
     data = json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8")
-    with open(tmp_path, "wb") as handle:
-        handle.write(data)
-        handle.flush()
-        os.fsync(handle.fileno())
-    os.replace(tmp_path, path)
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="wb",
+            prefix=f"{path.name}.",
+            suffix=".tmp",
+            dir=path.parent,
+            delete=False,
+        ) as handle:
+            tmp_path = Path(handle.name)
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, path)
+    finally:
+        if tmp_path is not None and tmp_path.exists():
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
 
 
 def _load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _load_json_or_none(path: Path) -> dict[str, Any] | None:
+    try:
+        return _load_json(path)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        logger.warning(
+            "TASK_REPO_SKIP_CORRUPTED_JSON path=%s error=%s",
+            str(path),
+            str(exc),
+        )
+        return None
 
 
 def _matches_filters(task: dict[str, Any], filters: dict[str, Any]) -> bool:
@@ -76,7 +106,9 @@ class FileTaskRepository(ITaskRepository):
         if not base.exists():
             return None
         for path in base.rglob(f"{task_id}.json"):
-            return _load_json(path)
+            payload = _load_json_or_none(path)
+            if payload is not None:
+                return payload
         return None
 
     def list_tasks(self, filters: Optional[dict[str, Any]] = None) -> list[Any]:
@@ -87,7 +119,9 @@ class FileTaskRepository(ITaskRepository):
             return []
         results: list[Any] = []
         for path in base.rglob("*.json"):
-            payload = _load_json(path)
+            payload = _load_json_or_none(path)
+            if payload is None:
+                continue
             if _matches_filters(payload, filters):
                 results.append(payload)
         return results
