@@ -65,7 +65,11 @@ def test_build_task_workbench_task_json_applies_hot_follow_enrichment():
     task_json = build_task_workbench_task_json(
         {"kind": "hot_follow"},
         detail,
-        {"mm_txt_path": "/v1/tasks/hf-1/mm_txt"},
+        {
+            "mm_txt_path": "/v1/tasks/hf-1/mm_txt",
+            "raw_download_url": "/op/dl/hf-1?kind=raw",
+            "pack_download_url": "/op/dl/hf-1?kind=pack",
+        },
         workbench_kind="hot_follow",
         settings=object(),
         hot_follow_operational_defaults=lambda: {"compose_status": "never"},
@@ -74,6 +78,8 @@ def test_build_task_workbench_task_json_applies_hot_follow_enrichment():
 
     assert task_json["task_id"] == "hf-1"
     assert task_json["mm_txt_path"] == "/v1/tasks/hf-1/mm_txt"
+    assert task_json["raw_download_url"] == "/op/dl/hf-1?kind=raw"
+    assert task_json["pack_download_url"] == "/op/dl/hf-1?kind=pack"
     assert task_json["compose_status"] == "never"
     assert task_json["subtitle_ready"] is True
 
@@ -298,6 +304,20 @@ def test_build_tasks_page_rows_carry_fact_fields_needed_for_board_ready_projecti
     assert semantics["filter_status"] == "done"
 
 
+def test_derive_task_semantics_enables_download_when_final_exists_without_pack():
+    semantics = derive_task_semantics(
+        {
+            "task_id": "hf-final-only",
+            "status": "ready",
+            "final_video_key": "deliver/tasks/hf-final-only/final.mp4",
+        }
+    )
+
+    assert semantics["download_kind"] == "final_mp4"
+    assert semantics["downloadable_exists"] is True
+    assert semantics["download_class"]
+
+
 def test_build_tasks_page_rows_do_not_project_ready_for_vi_when_target_subtitle_is_not_current():
     rows = build_tasks_page_rows(
         [
@@ -349,7 +369,11 @@ def test_build_task_workbench_page_context_keeps_hot_follow_enrichment():
         spec=_Spec(),
         settings=_Settings(),
         task_to_detail=lambda _task: detail,
-        resolve_download_urls=lambda _task: {"mm_txt_path": "/v1/tasks/hf-1/mm_txt"},
+        resolve_download_urls=lambda _task: {
+            "mm_txt_path": "/v1/tasks/hf-1/mm_txt",
+            "raw_download_url": "/op/dl/hf-1?kind=raw",
+            "pack_download_url": "/op/dl/hf-1?kind=pack",
+        },
         build_task_workbench_task_json=build_task_workbench_task_json,
         build_task_workbench_view=build_task_workbench_view,
         extract_first_http_url=lambda text: "https://example.com/source" if text else None,
@@ -361,6 +385,7 @@ def test_build_task_workbench_page_context_keeps_hot_follow_enrichment():
     assert ctx["task"].task_id == "hf-1"
     assert ctx["task_json"]["compose_status"] == "never"
     assert ctx["task_json"]["subtitle_ready"] is True
+    assert ctx["task_json"]["pack_download_url"] == "/op/dl/hf-1?kind=pack"
     assert ctx["task_view"]["source_url_open"] == "https://example.com/source"
     assert ctx["env_summary"]["workspace_root"] == "/tmp/ws"
     assert ctx["features"] == {"ops": True}

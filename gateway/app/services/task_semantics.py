@@ -163,6 +163,28 @@ def derive_task_semantics(task: dict) -> dict:
         or task.get("deliver_pack_key")
         or task.get("pack_url")
     )
+    final_exists = bool(
+        task.get("final_video_key")
+        or task.get("final_video_path")
+        or task.get("final_url")
+        or task.get("final_video_url")
+    )
+    raw_exists = bool(
+        task.get("raw_url")
+        or task.get("video_url")
+        or task.get("preview_url")
+        or task.get("raw_path")
+        or task.get("raw_key")
+    )
+    if pack_exists:
+        download_kind = "pack"
+    elif final_exists:
+        download_kind = "final_mp4"
+    elif raw_exists:
+        download_kind = "raw"
+    else:
+        download_kind = ""
+    downloadable_exists = bool(download_kind)
     pack_ready = pack_exists or db_status in _DONE_STATES
     needs_attention = (db_status in _FAILED_STATES) and (not pack_exists)
     yellow_row = (db_status in _FAILED_STATES) and pack_exists
@@ -177,14 +199,14 @@ def derive_task_semantics(task: dict) -> dict:
 
     primary_action_href = f"/tasks/{task_id}" if task_id else ""
 
-    if pack_exists and yellow_row:
+    if downloadable_exists and yellow_row:
         download_label_key = "action.force_download"
-    elif pack_exists:
+    elif downloadable_exists:
         download_label_key = "action.download"
     else:
         download_label_key = "action.download_disabled"
 
-    pack_download_href = f"/v1/tasks/{task_id}/pack" if task_id else ""
+    pack_download_href = ""
 
     scene_key = _scene_key(task)
     scene_label_key = f"tasks.filter.scene.{scene_key}"
@@ -199,13 +221,7 @@ def derive_task_semantics(task: dict) -> dict:
         subtitle_parts.append(f"ID: {task_id}")
     subtitle = " · ".join(subtitle_parts)
 
-    video_exists = bool(
-        task.get("raw_url")
-        or task.get("video_url")
-        or task.get("preview_url")
-        or task.get("raw_path")
-        or task.get("raw_key")
-    )
+    video_exists = raw_exists or final_exists
 
     row_class = "bg-yellow-50/30" if yellow_row else ""
     show_pack_badge = pack_exists or pack_ready
@@ -222,7 +238,7 @@ def derive_task_semantics(task: dict) -> dict:
     show_video_badge = video_exists
     video_badge_class = "bg-blue-50 text-blue-700 ring-blue-700/10"
 
-    if pack_exists:
+    if downloadable_exists:
         if yellow_row:
             download_class = "rounded bg-indigo-50 text-indigo-600 ring-indigo-300 hover:bg-indigo-100 px-2 py-1 text-sm font-semibold ring-1 ring-inset"
         else:
@@ -246,6 +262,8 @@ def derive_task_semantics(task: dict) -> dict:
         "primary_action_href": primary_action_href,
         "download_label_key": download_label_key,
         "pack_download_href": pack_download_href,
+        "download_kind": download_kind,
+        "downloadable_exists": downloadable_exists,
         "scene_key": scene_key,
         "scene_label_key": scene_label_key,
         "created_label": created_label,

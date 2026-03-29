@@ -76,6 +76,7 @@ from gateway.app.services.tts_policy import (
     resolve_tts_voice,
 )
 from gateway.app.services.hot_follow_language_profiles import (
+    hot_follow_audio_filename,
     hot_follow_subtitle_filename,
     hot_follow_subtitle_txt_filename,
 )
@@ -479,7 +480,15 @@ async def tasks_page(
         normalize_selected_tool_ids=_normalize_selected_tool_ids,
     )
 
-    items = [derive_task_semantics(row) for row in rows]
+    items = []
+    for row in rows:
+        item = derive_task_semantics(row)
+        task_id = str(item.get("task_id") or "")
+        download_kind = str(item.get("download_kind") or "").strip()
+        item["pack_download_href"] = (
+            _signed_op_url(task_id, download_kind) if task_id and download_kind else ""
+        )
+        items.append(item)
 
     if rows:
         x = rows[0]
@@ -1238,6 +1247,62 @@ def _text_or_redirect(key: str, inline: bool) -> Response:
     return RedirectResponse(url=get_download_url(key), status_code=302)
 
 
+def _deliverable_download_redirect(task_id: str, task: dict, kind: str) -> RedirectResponse:
+    target_lang = task.get("target_lang") or task.get("content_lang") or "mm"
+    key = None
+    filename = None
+    content_type = None
+
+    if kind == "raw":
+        key = _task_key(task, "raw_path")
+        filename = "raw.mp4"
+        content_type = "video/mp4"
+    elif kind == "pack":
+        key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
+        filename = "pack.zip"
+        content_type = "application/zip"
+    elif kind == "scenes":
+        key = _task_value(task, "scenes_pack_key") or _task_value(task, "scenes_key")
+        filename = "scenes.zip"
+        content_type = "application/zip"
+    elif kind == "final_mp4":
+        key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
+        filename = "final.mp4"
+        content_type = "video/mp4"
+    elif kind == "origin_srt":
+        key = _task_key(task, "origin_srt_path")
+        filename = "origin.srt"
+        content_type = "application/x-subrip"
+    elif kind == "mm_srt":
+        key = _task_key(task, "mm_srt_path")
+        filename = hot_follow_subtitle_filename(target_lang)
+        content_type = "application/x-subrip"
+    elif kind == "mm_txt":
+        mm_key = _task_key(task, "mm_srt_path")
+        if mm_key:
+            key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
+        filename = hot_follow_subtitle_txt_filename(target_lang)
+        content_type = "text/plain"
+    elif kind == "mm_audio":
+        key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
+        filename = hot_follow_audio_filename(target_lang)
+        content_type = "audio/mpeg"
+    elif kind == "publish_bundle":
+        return RedirectResponse(url=_task_endpoint(task_id, "publish_bundle"), status_code=302)
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported kind")
+
+    if not key or not object_exists(str(key)):
+        raise HTTPException(status_code=404, detail="Deliverable not found")
+    url = get_download_url(
+        str(key),
+        disposition="attachment",
+        filename=filename,
+        content_type=content_type,
+    )
+    return RedirectResponse(url=url, status_code=302)
+
+
 def _ensure_mp3_audio(src_path: Path, dst_path: Path) -> Path:
     if src_path.suffix.lower() == ".mp3":
         return src_path
@@ -1735,18 +1800,18 @@ def op_download_proxy(
     repo=Depends(get_task_repository),
 ):
     kind = (kind or "").strip().lower()
-    kind_map = {
-        "raw": "raw",
-        "pack": "pack",
-        "scenes": "scenes",
-        "final_mp4": "final",
-        "origin_srt": "origin",
-        "mm_srt": "mm",
-        "mm_txt": "mm_txt",
-        "mm_audio": "audio",
-        "publish_bundle": "publish_bundle",
+    allowed_kinds = {
+        "raw",
+        "pack",
+        "scenes",
+        "final_mp4",
+        "origin_srt",
+        "mm_srt",
+        "mm_txt",
+        "mm_audio",
+        "publish_bundle",
     }
-    if kind not in kind_map:
+    if kind not in allowed_kinds:
         raise HTTPException(status_code=400, detail="Unsupported kind")
     if _get_op_access_key():
         if exp is None or not sig:
@@ -1761,11 +1826,7 @@ def op_download_proxy(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-
-    url = _task_endpoint(task_id, kind_map[kind])
-    if not url:
-        raise HTTPException(status_code=404, detail="Deliverable not found")
-    return RedirectResponse(url=url, status_code=302)
+    return _deliverable_download_redirect(task_id, task, kind)
 
 
 @pages_router.get("/d/{code}")

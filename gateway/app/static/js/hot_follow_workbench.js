@@ -1242,28 +1242,40 @@
     // Final item — full width highlight
     if (finalItem) {
       const status = escapeHtml(finalItem.status || finalItem.state || "pending");
-      const hasUrl = Boolean(finalItem.url);
+      const openUrl = finalItem.open_url || finalItem.url || null;
+      const downloadUrl = finalItem.download_url || finalItem.url || null;
+      const hasOpenUrl = Boolean(openUrl);
+      const hasDownloadUrl = Boolean(downloadUrl);
       const isDone = ["done", "ready", "success"].includes(status.toLowerCase());
       html += `<div class="col-span-full rounded-xl border ${isDone ? "border-green-200 bg-green-50" : "border-gray-200"} p-4">
         <div class="flex items-center justify-between gap-3">
           <div class="text-base font-bold">${escapeHtml(finalItem.label || "Final Video")}</div>
           <div class="text-xs rounded-full ${isDone ? "bg-green-100 text-green-700" : "bg-gray-100"} px-2 py-1">${status}</div>
         </div>
-        ${hasUrl ? `<a class="btn-primary mt-3 inline-block text-sm" href="${finalItem.url}" target="_blank" rel="noopener">Download</a>` : '<span class="text-sm text-gray-500 mt-2 inline-block">Pending</span>'}
+        <div class="mt-3 flex flex-wrap gap-2">
+          ${hasDownloadUrl ? `<a class="btn-primary inline-block text-sm" href="${downloadUrl}" target="_blank" rel="noopener">Download</a>` : ""}
+          ${hasOpenUrl ? `<a class="btn-secondary inline-block text-sm" href="${openUrl}" target="_blank" rel="noopener">Open</a>` : ""}
+          ${!hasDownloadUrl && !hasOpenUrl ? '<span class="text-sm text-gray-500 inline-block">Pending</span>' : ""}
+        </div>
       </div>`;
     }
     // Ready items
     readyItems.forEach(d => {
       const label = escapeHtml(d.label || d.title || d.kind || "-");
       const status = escapeHtml(d.status || d.state || "pending");
-      const hasUrl = Boolean(d.url);
-      const btnClass = hasUrl ? "btn-secondary" : "btn-secondary opacity-50 pointer-events-none";
+      const downloadUrl = d.download_url || d.url || null;
+      const openUrl = d.open_url || null;
+      const hasDownloadUrl = Boolean(downloadUrl);
+      const btnClass = hasDownloadUrl ? "btn-secondary" : "btn-secondary opacity-50 pointer-events-none";
       html += `<div class="rounded-lg border border-gray-200 p-3">
         <div class="flex items-center justify-between gap-3">
           <div class="text-sm font-semibold">${label}</div>
           <div class="text-xs rounded-full bg-gray-100 px-2 py-1">${status}</div>
         </div>
-        <a class="${btnClass} mt-2 inline-block text-xs" href="${hasUrl ? d.url : "#"}" target="_blank" rel="noopener">${hasUrl ? "Download" : "Pending"}</a>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <a class="${btnClass} inline-block text-xs" href="${hasDownloadUrl ? downloadUrl : "#"}" target="_blank" rel="noopener">${hasDownloadUrl ? "Download" : "Pending"}</a>
+          ${openUrl ? `<a class="btn-secondary inline-block text-xs" href="${openUrl}" target="_blank" rel="noopener">Open</a>` : ""}
+        </div>
       </div>`;
     });
     // Pending items — collapsed summary

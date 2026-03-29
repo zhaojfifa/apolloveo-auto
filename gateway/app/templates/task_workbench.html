@@ -213,7 +213,7 @@
         <div class="deliverable-card primary">
           <div class="deliverable-title">{{ t("workbench.pack") }}</div>
           <div class="deliverable-actions">
-            <a id="pack-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/pack" target="_blank" rel="noopener">{{ t("action.download") }}</a>
+            <a id="pack-link" class="download-link disabled" href="{{ task_json.pack_download_url or ('/v1/tasks/' ~ task.task_id ~ '/pack') }}" target="_blank" rel="noopener">{{ t("action.download") }}</a>
             <span id="pack-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <div class="muted" style="margin-top:6px;">{{ t("workbench.deliverables.subtitle") }}</div>
@@ -221,7 +221,7 @@
         <div class="deliverable-card">
           <div class="deliverable-title">{{ t("workbench.scenes") }}</div>
           <div class="deliverable-actions">
-            <a id="scenes-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">{{ t("workbench.scenes_download") }}</a>
+            <a id="scenes-link" class="download-link disabled" href="{{ task_json.scenes_download_url or ('/v1/tasks/' ~ task.task_id ~ '/scenes') }}" target="_blank" rel="noopener">{{ t("workbench.scenes_download") }}</a>
             <span id="scenes-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <div class="muted" style="margin-top:6px;">{{ t("workbench.scenes_desc") }}</div>
@@ -229,23 +229,23 @@
         <div class="deliverable-card">
           <div class="deliverable-title">{{ t("workbench.video") }}</div>
           <div class="deliverable-actions">
-            <a id="raw-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/raw" target="_blank" rel="noopener">raw.mp4</a>
+            <a id="raw-link" class="download-link disabled" href="{{ task_json.raw_download_url or ('/v1/tasks/' ~ task.task_id ~ '/raw') }}" target="_blank" rel="noopener">raw.mp4</a>
             <span id="video-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
         </div>
         <div class="deliverable-card">
           <div class="deliverable-title">{{ t("workbench.mm_subtitles") }}</div>
           <div class="deliverable-actions">
-            <a id="mm-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_mm" target="_blank" rel="noopener">mm.srt</a>
-            <a id="mm-txt-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/mm_txt" target="_blank" rel="noopener">mm.txt</a>
-            <a id="origin-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/subs_origin" target="_blank" rel="noopener">origin.srt</a>
+            <a id="mm-link" class="download-link disabled" href="{{ task_json.mm_srt_download_url or ('/v1/tasks/' ~ task.task_id ~ '/subs_mm') }}" target="_blank" rel="noopener">mm.srt</a>
+            <a id="mm-txt-link" class="download-link disabled" href="{{ task_json.mm_txt_download_url or ('/v1/tasks/' ~ task.task_id ~ '/mm_txt') }}" target="_blank" rel="noopener">mm.txt</a>
+            <a id="origin-link" class="download-link disabled" href="{{ task_json.origin_srt_download_url or ('/v1/tasks/' ~ task.task_id ~ '/subs_origin') }}" target="_blank" rel="noopener">origin.srt</a>
             <span id="subs-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
         </div>
         <div class="deliverable-card">
           <div class="deliverable-title">{{ t("workbench.mm_audio") }}</div>
           <div class="deliverable-actions">
-            <a id="audio-link" class="download-link disabled" href="/v1/tasks/{{ task.task_id }}/audio_mm" target="_blank" rel="noopener">mm_audio</a>
+            <a id="audio-link" class="download-link disabled" href="{{ task_json.mm_audio_download_url or ('/v1/tasks/' ~ task.task_id ~ '/audio_mm') }}" target="_blank" rel="noopener">mm_audio</a>
             <span id="audio-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <audio id="audio-preview" controls style="display:none; width: 100%; margin-top:6px;"></audio>
@@ -269,7 +269,7 @@
           <label>{{ t("workbench.scenes_action") }}</label>
           <div class="action-row" style="margin-top:8px; flex-wrap:wrap; gap:8px;">
             <button id="btn-scenes" class="btn-primary">{{ t("workbench.scenes_generate") }}</button>
-            <a id="btn-scenes-download" class="btn-secondary disabled" href="/v1/tasks/{{ task.task_id }}/scenes" target="_blank" rel="noopener">{{ t("workbench.scenes_download") }}</a>
+            <a id="btn-scenes-download" class="btn-secondary disabled" href="{{ task_json.scenes_download_url or ('/v1/tasks/' ~ task.task_id ~ '/scenes') }}" target="_blank" rel="noopener">{{ t("workbench.scenes_download") }}</a>
             <span id="scenes-step-status" class="muted">{{ t("workbench.status.not_ready") }}</span>
           </div>
           <div id="scenes-error" class="muted" style="margin-top:6px;"></div>
@@ -484,7 +484,7 @@
       el.textContent = isReady ? readyText : missingText;
     }
 
-    function taskEndpoint(taskId, kind) {
+    function openTaskEndpoint(taskId, kind) {
       const id = encodeURIComponent(taskId);
       const map = {
         raw: `/v1/tasks/${id}/raw`,
@@ -496,6 +496,35 @@
         scenes: `/v1/tasks/${id}/scenes`,
       };
       return map[kind] || null;
+    }
+
+    function downloadTaskEndpoint(taskId, kind, data) {
+      const id = encodeURIComponent(taskId);
+      const source = data || window.currentTask || {};
+      const fieldMap = {
+        raw: "raw_download_url",
+        origin_srt: "origin_srt_download_url",
+        mm_srt: "mm_srt_download_url",
+        mm_txt: "mm_txt_download_url",
+        audio_mm: "mm_audio_download_url",
+        pack: "pack_download_url",
+        scenes: "scenes_download_url",
+        final_mp4: "final_download_url",
+      };
+      const explicit = source[fieldMap[kind] || ""];
+      if (explicit) return explicit;
+      const kindMap = {
+        raw: "raw",
+        origin_srt: "origin_srt",
+        mm_srt: "mm_srt",
+        mm_txt: "mm_txt",
+        audio_mm: "mm_audio",
+        pack: "pack",
+        scenes: "scenes",
+        final_mp4: "final_mp4",
+      };
+      const downloadKind = kindMap[kind];
+      return downloadKind ? `/op/dl/${id}?kind=${encodeURIComponent(downloadKind)}` : null;
     }
 
     function isPresignedLike(url) {
@@ -514,14 +543,14 @@
       const hasPack = !!data.pack_path;
       const hasScenes = !!data.scenes_path;
 
-      setDownloadLink("raw-link", hasRaw ? taskEndpoint(taskId, "raw") : null);
-      setDownloadLink("origin-link", hasOrigin ? taskEndpoint(taskId, "origin_srt") : null);
-      setDownloadLink("mm-link", hasMmSrt ? taskEndpoint(taskId, "mm_srt") : null);
-      setDownloadLink("mm-txt-link", hasMmTxt ? taskEndpoint(taskId, "mm_txt") : null);
-      setDownloadLink("audio-link", hasAudio ? taskEndpoint(taskId, "audio_mm") : null);
-      setDownloadLink("pack-link", hasPack ? taskEndpoint(taskId, "pack") : null);
-      setDownloadLink("scenes-link", hasScenes ? taskEndpoint(taskId, "scenes") : null);
-      setDownloadLink("btn-scenes-download", hasScenes ? taskEndpoint(taskId, "scenes") : null);
+      setDownloadLink("raw-link", hasRaw ? downloadTaskEndpoint(taskId, "raw", data) : null);
+      setDownloadLink("origin-link", hasOrigin ? downloadTaskEndpoint(taskId, "origin_srt", data) : null);
+      setDownloadLink("mm-link", hasMmSrt ? downloadTaskEndpoint(taskId, "mm_srt", data) : null);
+      setDownloadLink("mm-txt-link", hasMmTxt ? downloadTaskEndpoint(taskId, "mm_txt", data) : null);
+      setDownloadLink("audio-link", hasAudio ? downloadTaskEndpoint(taskId, "audio_mm", data) : null);
+      setDownloadLink("pack-link", hasPack ? downloadTaskEndpoint(taskId, "pack", data) : null);
+      setDownloadLink("scenes-link", hasScenes ? downloadTaskEndpoint(taskId, "scenes", data) : null);
+      setDownloadLink("btn-scenes-download", hasScenes ? downloadTaskEndpoint(taskId, "scenes", data) : null);
 
       setStatusText("video-status", hasRaw, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
       setStatusText("subs-status", hasMmSrt || hasMmTxt, window.__V185_I18N__.t("workbench.status.ready"), window.__V185_I18N__.t("workbench.status.not_ready"));
@@ -532,7 +561,7 @@
       const audioEl = document.getElementById("audio-preview");
       if (audioEl) {
         if (hasAudio) {
-          audioEl.src = taskEndpoint(taskId, "audio_mm");
+          audioEl.src = openTaskEndpoint(taskId, "audio_mm");
           audioEl.style.display = "block";
         } else {
           audioEl.removeAttribute("src");
@@ -713,7 +742,7 @@
       const taskId = data.task_id;
       let url = data.publish_url || "-";
       if (url === "-" || isPresignedLike(url)) {
-        url = data.pack_path ? taskEndpoint(taskId, "pack") : "-";
+        url = data.pack_path ? downloadTaskEndpoint(taskId, "pack", data) : "-";
       }
 
       const providerEl = document.getElementById("publish-provider");
@@ -778,7 +807,7 @@
           return;
         }
         const data = await resp.json();
-        window.currentTask = data;
+        window.currentTask = Object.assign({}, window.currentTask || {}, data);
         pipelineConfig = window.currentTask.pipeline_config || {};
         ingestMode = pipelineConfig.ingest_mode || "";
         updateDownloadsFromTask(data);
@@ -1169,5 +1198,3 @@
   </script>
 </body>
 </html>
-
-

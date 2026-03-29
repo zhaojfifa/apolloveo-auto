@@ -97,6 +97,7 @@ from gateway.app.services.task_view_helpers import (
     resolve_hub_final_url as _resolve_hub_final_url,
     scene_pack_info as _scene_pack_info,
     scenes_status_from_ssot as _scenes_status_from_ssot,
+    signed_op_url as _signed_op_url,
     task_endpoint as _task_endpoint,
     task_key as _task_key,
     task_to_detail as _task_to_detail,
@@ -975,7 +976,14 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
     bgm_key = str(((task.get("config") or {}).get("bgm") or {}).get("bgm_key") or "").strip() or None
 
-    def _entry(kind: str, title: str, key: str | None, url: str | None, state: str) -> dict[str, Any]:
+    def _entry(
+        kind: str,
+        title: str,
+        key: str | None,
+        open_url: str | None,
+        download_url: str | None,
+        state: str,
+    ) -> dict[str, Any]:
         sha = None
         if kind == "audio":
             sha = task.get("audio_sha256")
@@ -986,7 +994,9 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             "title": title,
             "label": title,
             "key": key,
-            "url": url,
+            "url": open_url or download_url,
+            "open_url": open_url,
+            "download_url": download_url,
             "state": state,
             "status": state,
             "size": None,
@@ -999,6 +1009,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             "Raw Video",
             raw_key,
             _task_endpoint(task_id, "raw") if raw_key and object_exists(raw_key) else None,
+            _signed_op_url(task_id, "raw") if raw_key and object_exists(raw_key) else None,
             "done" if _hf_parse_artifact_ready(task) else _hf_deliverable_state(task, raw_key, "parse_status"),
         ),
         _entry(
@@ -1006,6 +1017,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             "origin.srt",
             origin_key,
             _task_endpoint(task_id, "origin") if origin_key and object_exists(origin_key) else None,
+            _signed_op_url(task_id, "origin_srt") if origin_key and object_exists(origin_key) else None,
             _hf_deliverable_state(task, origin_key, "subtitles_status"),
         ),
         _entry(
@@ -1013,6 +1025,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             profile.subtitle_filename,
             mm_key,
             _task_endpoint(task_id, "mm") if mm_key and object_exists(mm_key) else None,
+            _signed_op_url(task_id, "mm_srt") if mm_key and object_exists(mm_key) else None,
             _hf_deliverable_state(task, mm_key, "subtitles_status"),
         ),
         _entry(
@@ -1020,6 +1033,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             profile.dub_filename,
             audio_key,
             _task_endpoint(task_id, "audio") if audio_key and object_exists(str(audio_key)) else None,
+            _signed_op_url(task_id, "mm_audio") if audio_key and object_exists(str(audio_key)) else None,
             _hf_deliverable_state(task, audio_key, "dub_status"),
         ),
         _entry(
@@ -1027,20 +1041,23 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             "BGM",
             bgm_key,
             get_download_url(str(bgm_key)) if bgm_key and object_exists(str(bgm_key)) else None,
+            get_download_url(str(bgm_key)) if bgm_key and object_exists(str(bgm_key)) else None,
             "done" if bgm_key and object_exists(str(bgm_key)) else "pending",
         ),
         _entry(
             "pack",
             "Pack ZIP",
             pack_key,
-            _task_endpoint(task_id, "pack") if pack_key and object_exists(pack_key) else None,
+            None,
+            _signed_op_url(task_id, "pack") if pack_key and object_exists(pack_key) else None,
             _hf_deliverable_state(task, pack_key, "pack_status"),
         ),
         _entry(
             "scenes",
             "Scenes ZIP",
             scenes_key,
-            _task_endpoint(task_id, "scenes") if scenes_key and object_exists(scenes_key) else None,
+            None,
+            _signed_op_url(task_id, "scenes") if scenes_key and object_exists(scenes_key) else None,
             "done" if scenes_key else _hf_deliverable_state(task, scenes_key, "scenes_status"),
         ),
         _entry(
@@ -1048,6 +1065,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             "Final Video",
             final_key,
             _task_endpoint(task_id, "final") if final_key and object_exists(str(final_key)) else None,
+            _signed_op_url(task_id, "final_mp4") if final_key and object_exists(str(final_key)) else None,
             _hf_deliverable_state(task, final_key, "compose_status"),
         ),
     ]
@@ -1571,7 +1589,7 @@ def get_hot_follow_workbench_hub(
     scene_pack = _scene_pack_info(task_runtime, task_id)
     scenes_key = _task_key(task_runtime, "scenes_key")
     scenes_status = _scenes_status_from_ssot(task_runtime)
-    scenes_url = _task_endpoint(task_id, "scenes") if scenes_key else None
+    scenes_url = _signed_op_url(task_id, "scenes") if scenes_key else None
     subtitles_text = _hf_load_subtitles_text(task_id, task_runtime)
     origin_text = _hf_load_origin_subtitles_text(task_runtime)
     normalized_source_text = _hf_load_normalized_source_text(task_id, task_runtime)
@@ -1786,6 +1804,7 @@ def get_hot_follow_workbench_hub(
                 continue
             if str(item.get("kind") or "").strip().lower() == "final":
                 item["url"] = final_url
+                item["open_url"] = final_url
                 if composed_ready:
                     item["status"] = "done"
                     item["state"] = "done"
@@ -1870,6 +1889,7 @@ def get_hot_follow_workbench_hub(
                     item["historical"] = False
                     if final_url:
                         item["url"] = final_url
+                        item["open_url"] = final_url
                     break
 
         media = payload.get("media")
@@ -1911,6 +1931,7 @@ def get_hot_follow_workbench_hub(
                     item["state"] = "pending"
                     item["historical"] = bool((payload.get("historical_final") or {}).get("exists"))
                     item["url"] = None
+                    item["open_url"] = None
                     break
     advisory = _maybe_build_hot_follow_advisory(task, payload)
     if advisory is not None:

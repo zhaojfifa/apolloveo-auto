@@ -126,3 +126,75 @@ def test_tasks_page_returns_200_when_repo_skips_corrupted_json(tmp_path, monkeyp
 
     assert response.status_code == 200
     assert "good-task" in response.text
+
+
+def test_tasks_page_enables_download_when_final_video_exists_without_pack(monkeypatch):
+    class _Repo:
+        def list(self):
+            return [
+                {
+                    "task_id": "final-only",
+                    "tenant": "default",
+                    "category_key": "hot_follow",
+                    "title": "final only",
+                    "created_at": "2026-03-28T00:00:00+00:00",
+                    "final_video_key": "deliver/tasks/final-only/final.mp4",
+                }
+            ]
+
+    monkeypatch.setenv("AUTH_MODE", "off")
+    monkeypatch.setattr(tasks_router, "_pack_path_for_list", lambda _task: None)
+    monkeypatch.setattr(tasks_router, "_signed_op_url", lambda task_id, kind: f"/signed/{task_id}/{kind}")
+    monkeypatch.setattr(
+        tasks_router,
+        "render_template",
+        lambda *, request, name, ctx=None, status_code=200, headers=None: HTMLResponse(
+            content="|".join(
+                f"{item.get('task_id')}:{item.get('pack_download_href')}:{bool(item.get('download_class'))}"
+                for item in (ctx or {}).get("items", [])
+            ),
+            status_code=status_code,
+            headers=headers,
+        ),
+    )
+    app.dependency_overrides[get_task_repository] = lambda: _Repo()
+    client = TestClient(app, raise_server_exceptions=False)
+
+    try:
+        response = client.get("/tasks")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert "/signed/final-only/final_mp4" in response.text
+    assert response.text.endswith(":True")
+
+
+def test_op_download_proxy_uses_attachment_redirect_for_final_video(monkeypatch):
+    class _Repo:
+        def get(self, task_id):
+            return {
+                "task_id": task_id,
+                "target_lang": "vi",
+                "final_video_key": f"deliver/tasks/{task_id}/final.mp4",
+            }
+
+    monkeypatch.setenv("AUTH_MODE", "off")
+    monkeypatch.delenv("OP_ACCESS_KEY", raising=False)
+    monkeypatch.setattr(tasks_router, "object_exists", lambda key: str(key).endswith("/final.mp4"))
+    monkeypatch.setattr(
+        tasks_router,
+        "get_download_url",
+        lambda key, **kwargs: f"https://cdn.example/{kwargs.get('filename')}?disposition={kwargs.get('disposition')}&key={key}",
+    )
+    app.dependency_overrides[get_task_repository] = lambda: _Repo()
+    client = TestClient(app, raise_server_exceptions=False)
+
+    try:
+        response = client.get("/op/dl/final-only?kind=final_mp4", follow_redirects=False)
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 302
+    assert response.headers["location"].startswith("https://cdn.example/final.mp4")
+    assert "disposition=attachment" in response.headers["location"]

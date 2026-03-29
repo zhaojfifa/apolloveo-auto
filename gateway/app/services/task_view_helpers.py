@@ -32,6 +32,9 @@ from gateway.app.services.media_validation import (
     deliver_key,
     media_meta_from_head,
 )
+from gateway.app.services.hot_follow_language_profiles import (
+    get_hot_follow_language_profile,
+)
 from gateway.app.services.status_policy.service import policy_upsert
 from gateway.app.utils.pipeline_config import parse_pipeline_config
 
@@ -61,7 +64,7 @@ def task_key(task: dict, field: str) -> Optional[str]:
 
 
 def task_endpoint(task_id: str, kind: str) -> Optional[str]:
-    """Return the download URL path for the given deliverable *kind*."""
+    """Return the open/preview URL path for the given deliverable *kind*."""
     safe_id = str(task_id)
     if kind == "raw":
         return f"/v1/tasks/{safe_id}/raw"
@@ -298,6 +301,9 @@ def compose_error_parts(task: dict) -> tuple[str | None, str | None]:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
+    if kind == "raw_video":
+        key = task_key(task, "raw_path")
+        return signed_op_url(task_id, "raw") if key and object_exists(str(key)) else None
     if kind == "final_mp4":
         key = task_key(task, "final_video_key") or task_key(task, "final_video_path")
         return signed_op_url(task_id, "final_mp4") if key and object_exists(str(key)) else None
@@ -339,6 +345,49 @@ def deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
         return signed_op_url(task_id, "mm_audio") if key and object_exists(key) else None
     if kind == "edit_bundle_zip":
         return signed_op_url(task_id, "publish_bundle")
+    return None
+
+
+def deliverable_open_url(task_id: str, task: dict, kind: str) -> Optional[str]:
+    profile = get_hot_follow_language_profile(
+        task.get("target_lang") or task.get("content_lang") or "mm"
+    )
+    if kind == "final_mp4":
+        key = task_key(task, "final_video_key") or task_key(task, "final_video_path")
+        return task_endpoint(task_id, "final") if key and object_exists(str(key)) else None
+    if kind == "pack_zip":
+        pack_key = task_value(task, "pack_key") or task_value(task, "pack_path")
+        return task_endpoint(task_id, "pack") if pack_key and object_exists(str(pack_key)) else None
+    if kind == "scenes_zip":
+        scenes_key = task_value(task, "scenes_pack_key") or task_value(task, "scenes_key")
+        return task_endpoint(task_id, "scenes") if scenes_key and object_exists(str(scenes_key)) else None
+    if kind == "origin_srt":
+        key = task_key(task, "origin_srt_path")
+        return task_endpoint(task_id, "origin") if key and object_exists(key) else None
+    if kind == "mm_srt":
+        key = task_key(task, "mm_srt_path")
+        return task_endpoint(task_id, "mm") if key and object_exists(key) else None
+    if kind == "mm_txt":
+        mm_key = task_key(task, "mm_srt_path")
+        if not mm_key:
+            return None
+        txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
+        return task_endpoint(task_id, "mm_txt") if object_exists(txt_key) else None
+    if kind == "mm_audio":
+        key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
+        return task_endpoint(task_id, "audio") if key and object_exists(str(key)) else None
+    if kind == "raw_video":
+        key = task_key(task, "raw_path")
+        return task_endpoint(task_id, "raw") if key and object_exists(str(key)) else None
+    if kind == "publish_bundle":
+        pack_key = task_value(task, "pack_key") or task_value(task, "pack_path")
+        return task_endpoint(task_id, "publish_bundle") if pack_key and object_exists(str(pack_key)) else None
+    if profile and kind == "subtitle_txt":
+        key = task_key(task, "mm_srt_path")
+        if not key:
+            return None
+        txt_key = key[:-4] + ".txt" if key.endswith(".srt") else f"{key}.txt"
+        return task_endpoint(task_id, "mm_txt") if object_exists(txt_key) else None
     return None
 
 
@@ -585,7 +634,7 @@ def _deliverables_final_url(deliverables: Any) -> str | None:
     if isinstance(deliverables, dict):
         final_item = deliverables.get("final_mp4")
         if isinstance(final_item, dict):
-            url = final_item.get("url")
+            url = final_item.get("open_url") or final_item.get("url")
             if url:
                 return str(url)
     if isinstance(deliverables, list):
@@ -603,7 +652,7 @@ def _deliverables_final_url(deliverables: Any) -> str | None:
                 or "final video" in label
                 or label == "final.mp4"
             ):
-                url = item.get("url")
+                url = item.get("open_url") or item.get("url")
                 if url:
                     return str(url)
     return None
@@ -770,9 +819,12 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
         ("mm_audio", "mm_audio"),
         ("edit_bundle_zip", "scenes_bundle.zip"),
     ):
-        url = deliverable_url(task_id, task, key)
-        if url:
-            item = {"label": label, "url": url}
+        download_url = deliverable_url(task_id, task, key)
+        open_url = deliverable_open_url(task_id, task, key)
+        if download_url or open_url:
+            item = {"label": label, "url": download_url or open_url}
+            item["download_url"] = download_url
+            item["open_url"] = open_url
             if key == "edit_bundle_zip":
                 item["artifact"] = "scenes_bundle"
                 item["description"] = (
@@ -806,6 +858,8 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
         final_item = dict(
             deliverables.get("final_mp4") or {"label": "final.mp4"}
         )
+        final_item["download_url"] = deliverable_url(task_id, task, "final_mp4")
+        final_item["open_url"] = final_preview_url
         final_item["url"] = final_preview_url
         deliverables["final_mp4"] = final_item
 
@@ -876,15 +930,31 @@ def resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
         if task_value(task, "scenes_key")
         else None
     )
+    raw_download_url = deliverable_url(task_id, task, "raw_video")
+    origin_download_url = deliverable_url(task_id, task, "origin_srt")
+    mm_download_url = deliverable_url(task_id, task, "mm_srt")
+    mm_txt_download_url = deliverable_url(task_id, task, "mm_txt")
+    audio_download_url = deliverable_url(task_id, task, "mm_audio")
+    pack_download_url = deliverable_url(task_id, task, "pack_zip")
+    scenes_download_url = deliverable_url(task_id, task, "scenes_zip")
+    final_download_url = deliverable_url(task_id, task, "final_mp4")
 
     return {
         "raw_path": raw_url,
+        "raw_download_url": raw_download_url,
         "origin_srt_path": origin_url,
+        "origin_srt_download_url": origin_download_url,
         "mm_srt_path": mm_url,
+        "mm_srt_download_url": mm_download_url,
         "mm_audio_path": audio_url,
+        "mm_audio_download_url": audio_download_url,
         "mm_txt_path": mm_txt_url,
+        "mm_txt_download_url": mm_txt_download_url,
         "pack_path": pack_url,
+        "pack_download_url": pack_download_url,
         "scenes_path": scenes_url,
+        "scenes_download_url": scenes_download_url,
+        "final_download_url": final_download_url,
     }
 
 
