@@ -182,6 +182,9 @@ def test_build_tasks_page_rows_preserves_board_payload_shape():
             "final_video_path": None,
             "final_url": None,
             "final_video_url": None,
+            "publish_status": None,
+            "publish_key": None,
+            "publish_url": None,
             "ready_gate": None,
             "target_subtitle_current": None,
             "target_subtitle_current_reason": None,
@@ -304,6 +307,35 @@ def test_build_tasks_page_rows_carry_fact_fields_needed_for_board_ready_projecti
     assert semantics["filter_status"] == "done"
 
 
+def test_build_tasks_page_rows_project_hot_follow_done_from_publishable_main_deliverable():
+    rows = build_tasks_page_rows(
+        [
+            {
+                "task_id": "hf-publish-ready",
+                "platform": "hot_follow",
+                "source_url": "https://example.com/hf",
+                "title": "publish ready",
+                "category_key": "hot_follow",
+                "content_lang": "vi",
+                "status": "processing",
+                "publish_status": "ready",
+                "publish_key": "deliver/publish/hf-publish-ready.zip",
+                "created_at": "2026-03-31T00:00:00+00:00",
+                "pack_status": "pending",
+                "scenes_status": "pending",
+            }
+        ],
+        kind_norm="hot_follow",
+        pack_path_for_list=lambda _task: None,
+        normalize_selected_tool_ids=lambda value: list(value or []),
+    )
+
+    semantics = derive_task_semantics(rows[0])
+
+    assert semantics["db_status"] == "ready"
+    assert semantics["filter_status"] == "done"
+
+
 def test_derive_task_semantics_enables_download_when_final_exists_without_pack():
     semantics = derive_task_semantics(
         {
@@ -346,6 +378,40 @@ def test_build_tasks_page_rows_do_not_project_ready_for_vi_when_target_subtitle_
 
     assert semantics["db_status"] == "processing"
     assert semantics["filter_status"] == "processing"
+
+
+def test_derive_task_semantics_keeps_hot_follow_processing_when_main_chain_is_still_running():
+    semantics = derive_task_semantics(
+        {
+            "task_id": "hf-running",
+            "platform": "hot_follow",
+            "category_key": "hot_follow",
+            "status": "processing",
+            "subtitles_status": "running",
+            "pack_status": "pending",
+            "scenes_status": "pending",
+        }
+    )
+
+    assert semantics["db_status"] == "processing"
+    assert semantics["filter_status"] == "processing"
+
+
+def test_derive_task_semantics_keeps_hot_follow_attention_for_main_chain_failure():
+    semantics = derive_task_semantics(
+        {
+            "task_id": "hf-failed",
+            "platform": "hot_follow",
+            "category_key": "hot_follow",
+            "status": "processing",
+            "dub_status": "failed",
+            "pack_status": "pending",
+            "scenes_status": "pending",
+        }
+    )
+
+    assert semantics["db_status"] == "failed"
+    assert semantics["filter_status"] == "attention"
 
 
 def test_build_task_workbench_page_context_keeps_hot_follow_enrichment():
