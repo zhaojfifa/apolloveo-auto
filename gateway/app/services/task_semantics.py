@@ -92,21 +92,6 @@ _FAILED_STATES = {"failed", "error"}
 
 def project_task_fact_status(task: dict) -> str:
     hot_follow = _is_hot_follow(task)
-    target_subtitle_current = _target_subtitle_current_fact(task)
-    if target_subtitle_current is False:
-        statuses = [
-            _lower(task.get("status") or ""),
-            _lower(task.get("dub_status") or ""),
-            _lower(task.get("subtitles_status") or ""),
-            _lower(task.get("parse_status") or ""),
-            _lower(task.get("publish_status") or ""),
-        ]
-        if not hot_follow:
-            statuses.append(_lower(task.get("pack_status") or ""))
-        if any(status in _FAILED_STATES for status in statuses):
-            return "failed"
-        return "processing"
-
     ready_gate = task.get("ready_gate") if isinstance(task.get("ready_gate"), dict) else {}
     if bool(ready_gate.get("publish_ready") or ready_gate.get("compose_ready")):
         return "ready"
@@ -122,6 +107,21 @@ def project_task_fact_status(task: dict) -> str:
     )
     if final_exists:
         return "ready"
+
+    target_subtitle_current = _target_subtitle_current_fact(task)
+    if target_subtitle_current is False:
+        statuses = [
+            _lower(task.get("status") or ""),
+            _lower(task.get("dub_status") or ""),
+            _lower(task.get("subtitles_status") or ""),
+            _lower(task.get("parse_status") or ""),
+            _lower(task.get("publish_status") or ""),
+        ]
+        if not hot_follow:
+            statuses.append(_lower(task.get("pack_status") or ""))
+        if any(status in _FAILED_STATES for status in statuses):
+            return "failed"
+        return "processing"
 
     compose_status = _lower(task.get("compose_status") or task.get("compose_last_status") or "")
     if compose_status in _DONE_STATES:

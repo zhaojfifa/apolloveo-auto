@@ -379,7 +379,7 @@ def test_build_task_summaries_page_bind_hot_follow_status_to_computed_ready_gate
     assert summaries[0].status == "ready"
 
 
-def test_build_task_summaries_page_keeps_vi_processing_when_target_subtitle_not_current():
+def test_build_task_summaries_page_marks_vi_ready_when_final_exists_even_if_target_subtitle_fact_is_stale():
     summaries, total = build_task_summaries_page(
         [
             {
@@ -413,7 +413,7 @@ def test_build_task_summaries_page_keeps_vi_processing_when_target_subtitle_not_
     )
 
     assert total == 1
-    assert summaries[0].status == "processing"
+    assert summaries[0].status == "ready"
 
 
 def test_build_tasks_page_rows_carry_fact_fields_needed_for_board_ready_projection():
@@ -487,7 +487,7 @@ def test_derive_task_semantics_enables_download_when_final_exists_without_pack()
     assert semantics["download_class"]
 
 
-def test_build_tasks_page_rows_do_not_project_ready_for_vi_when_target_subtitle_is_not_current():
+def test_build_tasks_page_rows_project_ready_for_vi_when_final_exists_even_if_target_subtitle_is_stale():
     rows = build_tasks_page_rows(
         [
             {
@@ -501,6 +501,34 @@ def test_build_tasks_page_rows_do_not_project_ready_for_vi_when_target_subtitle_
                 "status": "",
                 "compose_status": "done",
                 "final_video_key": "deliver/tasks/hf-vi-board-stale/final.mp4",
+                "target_subtitle_current": False,
+                "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+                "created_at": "2026-03-22T00:00:00+00:00",
+            }
+        ],
+        kind_norm="hot_follow",
+        pack_path_for_list=lambda _task: None,
+        normalize_selected_tool_ids=lambda value: list(value or []),
+    )
+
+    semantics = derive_task_semantics(rows[0])
+
+    assert semantics["db_status"] == "ready"
+    assert semantics["filter_status"] == "done"
+
+
+def test_build_tasks_page_rows_keep_vi_processing_when_target_subtitle_is_stale_and_final_is_missing():
+    rows = build_tasks_page_rows(
+        [
+            {
+                "task_id": "hf-vi-board-no-final",
+                "platform": "hot_follow",
+                "source_url": "https://example.com/vi",
+                "title": "task",
+                "category_key": "hot_follow",
+                "content_lang": "vi",
+                "target_lang": "vi",
+                "status": "processing",
                 "target_subtitle_current": False,
                 "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
                 "created_at": "2026-03-22T00:00:00+00:00",
