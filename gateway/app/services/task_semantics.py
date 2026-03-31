@@ -209,17 +209,31 @@ def derive_task_semantics(task: dict) -> dict:
     else:
         download_kind = ""
     downloadable_exists = bool(download_kind)
-    pack_ready = pack_exists or db_status in _DONE_STATES
-    needs_attention = (db_status in _FAILED_STATES) and (not pack_exists)
-    yellow_row = (db_status in _FAILED_STATES) and pack_exists
-    if needs_attention:
-        filter_status = "attention"
-    elif pack_ready:
-        filter_status = "done"
-    elif db_status in {"processing", "queued", "running", "pending"}:
-        filter_status = "processing"
+    hot_follow = _is_hot_follow(task)
+    if hot_follow:
+        pack_ready = pack_exists
+        needs_attention = db_status in _FAILED_STATES
+        yellow_row = False
+        if needs_attention:
+            filter_status = "attention"
+        elif db_status in _DONE_STATES:
+            filter_status = "done"
+        elif db_status in {"processing", "queued", "running", "pending"}:
+            filter_status = "processing"
+        else:
+            filter_status = "other"
     else:
-        filter_status = "other"
+        pack_ready = pack_exists or db_status in _DONE_STATES
+        needs_attention = (db_status in _FAILED_STATES) and (not pack_exists)
+        yellow_row = (db_status in _FAILED_STATES) and pack_exists
+        if needs_attention:
+            filter_status = "attention"
+        elif pack_ready:
+            filter_status = "done"
+        elif db_status in {"processing", "queued", "running", "pending"}:
+            filter_status = "processing"
+        else:
+            filter_status = "other"
 
     primary_action_href = f"/tasks/{task_id}" if task_id else ""
 
@@ -248,7 +262,7 @@ def derive_task_semantics(task: dict) -> dict:
     video_exists = raw_exists or final_exists
 
     row_class = "bg-yellow-50/30" if yellow_row else ""
-    show_pack_badge = pack_exists or pack_ready
+    show_pack_badge = pack_exists or (pack_ready and not hot_follow)
     if pack_ready:
         pack_badge_label_key = "tasks.badge.pack_ready"
         pack_badge_class = "bg-green-50 text-green-700 ring-green-600/20"

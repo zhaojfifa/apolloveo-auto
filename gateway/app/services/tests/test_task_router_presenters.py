@@ -334,6 +334,7 @@ def test_build_tasks_page_rows_project_hot_follow_done_from_publishable_main_del
 
     assert semantics["db_status"] == "ready"
     assert semantics["filter_status"] == "done"
+    assert semantics["show_pack_badge"] is False
 
 
 def test_derive_task_semantics_enables_download_when_final_exists_without_pack():
@@ -412,6 +413,41 @@ def test_derive_task_semantics_keeps_hot_follow_attention_for_main_chain_failure
 
     assert semantics["db_status"] == "failed"
     assert semantics["filter_status"] == "attention"
+
+
+def test_derive_task_semantics_does_not_let_optional_pack_hide_hot_follow_failure():
+    semantics = derive_task_semantics(
+        {
+            "task_id": "hf-failed-with-pack",
+            "platform": "hot_follow",
+            "category_key": "hot_follow",
+            "status": "processing",
+            "compose_status": "failed",
+            "pack_key": "deliver/tasks/hf-failed-with-pack/pack.zip",
+        }
+    )
+
+    assert semantics["db_status"] == "failed"
+    assert semantics["filter_status"] == "attention"
+    assert semantics["yellow_row"] is False
+    assert semantics["show_pack_badge"] is True
+
+
+def test_derive_task_semantics_keeps_pack_secondary_for_hot_follow_completed_state():
+    semantics = derive_task_semantics(
+        {
+            "task_id": "hf-done-no-pack",
+            "platform": "hot_follow",
+            "category_key": "hot_follow",
+            "status": "processing",
+            "publish_status": "ready",
+            "publish_key": "deliver/publish/hf-done-no-pack.zip",
+        }
+    )
+
+    assert semantics["db_status"] == "ready"
+    assert semantics["filter_status"] == "done"
+    assert semantics["show_pack_badge"] is False
 
 
 def test_build_task_workbench_page_context_keeps_hot_follow_enrichment():
