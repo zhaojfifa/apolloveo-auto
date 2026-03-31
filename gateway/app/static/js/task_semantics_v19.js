@@ -9,17 +9,14 @@
 
   function sceneKeyFromTask(t) {
     const kind = lower(t.kind || t.category || t.task_kind || t.platform || "");
-    // canonical scenes: avatar / hot / baseline
     if (kind.includes("apollo_avatar") || kind.includes("apollo-avatar") || kind.includes("avatar")) return "avatar";
     if (kind.includes("hot") || kind.includes("follow")) return "hot";
     return "baseline";
   }
 
   function dbStatusFromTask(t) {
-    // prefer explicit fields if present
     const s = lower(t.status || t.db_status || t.state || "");
     if (!s) return "unknown";
-    // normalize
     if (["done", "ready", "success"].includes(s)) return "ready";
     if (["running", "processing", "in_progress"].includes(s)) return "processing";
     if (["queued", "pending"].includes(s)) return "queued";
@@ -28,7 +25,6 @@
   }
 
   function packExistsFromTask(t) {
-    // keep loose: accept any known key/path fields from legacy
     return !!(
       t.pack_key || t.pack_path || t.deliver_pack_key || t.deliverables_pack_key ||
       t.pack_url || t.pack_download_url || (t.deliverables && (t.deliverables.pack || t.deliverables.pack_zip))
@@ -43,7 +39,6 @@
   }
 
   function downloadUrlForPack(t) {
-    // prefer backend-generated url if exists; else fallback to /v1/tasks/{id}/pack
     const id = t.task_id || t.id || "";
     return t.pack_download_url || t.pack_url || (id ? `/v1/tasks/${encodeURIComponent(id)}/pack` : null);
   }
@@ -54,7 +49,6 @@
   }
 
   function createdLabel(t) {
-    // use created_ago if server provides; else fall back to created_at
     return t.created_ago || t.created_at || t.created || "";
   }
 
@@ -70,21 +64,27 @@
     if (platform) parts.push(platform);
     if (id) parts.push(`ID: ${id}`);
     if (account) parts.push(`@${account}`);
-    return parts.join(" ¡¤ ");
+    return parts.join(" Â· ");
   }
 
   function derive(t) {
     const sceneKey = sceneKeyFromTask(t);
+    const hotFollow = sceneKey === "hot" || sceneKey === "hot_follow";
     const dbStatus = dbStatusFromTask(t);
     const packExists = packExistsFromTask(t);
     const videoExists = videoExistsFromTask(t);
 
-    const done = packExists || dbStatus === "ready";
-    const processing = !done && (dbStatus === "processing" || dbStatus === "queued");
-    const needsAttention = (dbStatus === "failed" && !packExists);
+    let done = packExists || dbStatus === "ready";
+    let processing = !done && (dbStatus === "processing" || dbStatus === "queued");
+    let needsAttention = (dbStatus === "failed" && !packExists);
+    let yellow = (dbStatus === "failed" && packExists);
 
-    // Yellow card strategy (must):
-    const yellow = (dbStatus === "failed" && packExists);
+    if (hotFollow) {
+      done = dbStatus === "ready";
+      processing = !done && (dbStatus === "processing" || dbStatus === "queued");
+      needsAttention = dbStatus === "failed";
+      yellow = false;
+    }
 
     return {
       raw: t,

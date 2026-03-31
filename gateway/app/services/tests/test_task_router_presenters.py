@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 import gateway.app.services.task_router_presenters as presenters
 from gateway.app.services.task_router_presenters import (
     build_task_summaries_page,
@@ -14,6 +16,37 @@ from gateway.app.services.task_router_presenters import (
 )
 from gateway.app.services.task_semantics import derive_task_semantics
 from gateway.app.services.task_view_helpers import derive_status
+
+
+@pytest.fixture(autouse=True)
+def _stub_hot_follow_projection(monkeypatch):
+    monkeypatch.setattr(
+        presenters,
+        "publish_hub_payload",
+        lambda task: {
+            "task_id": str(task.get("task_id") or task.get("id") or ""),
+            "ready_gate": task.get("ready_gate") if isinstance(task.get("ready_gate"), dict) else {},
+            "composed_ready": str(task.get("compose_status") or task.get("compose_last_status") or "").lower()
+            in {"done", "ready", "success", "completed"},
+            "final": {
+                "exists": bool(
+                    task.get("final_video_key")
+                    or task.get("final_video_path")
+                    or task.get("final_url")
+                    or task.get("final_video_url")
+                ),
+                "key": task.get("final_video_key") or task.get("final_video_path"),
+                "url": task.get("final_url") or task.get("final_video_url"),
+            },
+            "final_url": task.get("final_url") or task.get("final_video_url"),
+            "final_video_url": task.get("final_video_url") or task.get("final_url"),
+        },
+    )
+    monkeypatch.setattr(
+        presenters,
+        "compute_hot_follow_state",
+        lambda _task, base_state: dict(base_state or {}),
+    )
 
 
 class _Detail:
@@ -142,7 +175,13 @@ def test_filter_tasks_for_kind_keeps_apollo_avatar_compat_rule():
     assert [item["task_id"] for item in filtered] == ["1", "2"]
 
 
-def test_build_tasks_page_rows_preserves_board_payload_shape():
+def test_build_tasks_page_rows_preserves_board_payload_shape(monkeypatch):
+    monkeypatch.setattr(presenters, "publish_hub_payload", lambda _task: {})
+    monkeypatch.setattr(
+        presenters,
+        "compute_hot_follow_state",
+        lambda _task, base_state: dict(base_state or {}),
+    )
     rows = build_tasks_page_rows(
         [
             {
@@ -225,6 +264,103 @@ def test_build_task_summaries_page_projects_ready_from_final_facts_before_unknow
                 "compose_status": "done",
                 "final_video_key": "deliver/tasks/hf-vi-done/final.mp4",
                 "created_at": "2026-03-22T00:00:00+00:00",
+            }
+        ],
+        kind_norm="hot_follow",
+        page=1,
+        page_size=20,
+        resolve_download_urls=lambda _task: {"pack_path": None, "scenes_path": None},
+        derive_status=derive_status,
+        extract_first_http_url=lambda text: "https://example.com/source" if text else None,
+        coerce_datetime=lambda value: datetime.fromisoformat(str(value).replace("Z", "+00:00")) if value else None,
+        parse_pipeline_config=lambda value: dict(value or {}),
+        normalize_selected_tool_ids=lambda value: list(value or []),
+        task_summary_cls=_Detail,
+    )
+
+    assert total == 1
+    assert summaries[0].status == "ready"
+
+
+def test_build_tasks_page_rows_bind_hot_follow_board_to_computed_ready_gate(monkeypatch):
+    monkeypatch.setattr(presenters, "publish_hub_payload", lambda _task: {"task_id": "hf-derived"})
+    monkeypatch.setattr(
+        presenters,
+        "compute_hot_follow_state",
+        lambda _task, base_state: {
+            **dict(base_state or {}),
+            "ready_gate": {"publish_ready": True, "compose_ready": True},
+            "composed_ready": True,
+            "final": {
+                "exists": True,
+                "key": "deliver/tasks/hf-derived/final.mp4",
+                "url": "/v1/tasks/hf-derived/final",
+            },
+            "final_url": "/v1/tasks/hf-derived/final",
+            "final_video_url": "/v1/tasks/hf-derived/final",
+        },
+    )
+
+    rows = build_tasks_page_rows(
+        [
+            {
+                "task_id": "hf-derived",
+                "kind": "hot_follow",
+                "platform": "hot_follow",
+                "category_key": "hot_follow",
+                "content_lang": "vi",
+                "status": "processing",
+                "pack_status": "pending",
+                "scenes_status": "pending",
+                "created_at": "2026-03-31T00:00:00+00:00",
+            }
+        ],
+        kind_norm="hot_follow",
+        pack_path_for_list=lambda _task: None,
+        normalize_selected_tool_ids=lambda value: list(value or []),
+    )
+
+    semantics = derive_task_semantics(rows[0])
+
+    assert rows[0]["ready_gate"] == {"publish_ready": True, "compose_ready": True}
+    assert rows[0]["final_video_key"] == "deliver/tasks/hf-derived/final.mp4"
+    assert rows[0]["compose_status"] == "done"
+    assert semantics["db_status"] == "ready"
+    assert semantics["filter_status"] == "done"
+
+
+def test_build_task_summaries_page_bind_hot_follow_status_to_computed_ready_gate(monkeypatch):
+    monkeypatch.setattr(presenters, "publish_hub_payload", lambda _task: {"task_id": "hf-summary"})
+    monkeypatch.setattr(
+        presenters,
+        "compute_hot_follow_state",
+        lambda _task, base_state: {
+            **dict(base_state or {}),
+            "ready_gate": {"publish_ready": True, "compose_ready": True},
+            "composed_ready": True,
+            "final": {
+                "exists": True,
+                "key": "deliver/tasks/hf-summary/final.mp4",
+                "url": "/v1/tasks/hf-summary/final",
+            },
+            "final_url": "/v1/tasks/hf-summary/final",
+            "final_video_url": "/v1/tasks/hf-summary/final",
+        },
+    )
+
+    summaries, total = build_task_summaries_page(
+        [
+            {
+                "task_id": "hf-summary",
+                "title": "task",
+                "kind": "hot_follow",
+                "platform": "hot_follow",
+                "category_key": "hot_follow",
+                "content_lang": "vi",
+                "status": "processing",
+                "pack_status": "pending",
+                "scenes_status": "pending",
+                "created_at": "2026-03-31T00:00:00+00:00",
             }
         ],
         kind_norm="hot_follow",

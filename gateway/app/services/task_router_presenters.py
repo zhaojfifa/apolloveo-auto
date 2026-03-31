@@ -8,6 +8,8 @@ from gateway.app.services.hot_follow_runtime_bridge import (
     compat_hot_follow_operational_defaults,
     compat_hot_follow_task_status_shape,
 )
+from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
+from gateway.app.services.task_view_helpers import publish_hub_payload
 
 
 def filter_tasks_for_kind(items: list[dict[str, Any]], kind_norm: str) -> list[dict[str, Any]]:
@@ -38,49 +40,58 @@ def build_tasks_page_rows(
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for t in filter_tasks_for_kind(db_tasks, kind_norm):
-        rows.append(
-            {
-                "task_id": t.get("task_id") or t.get("id"),
-                "platform": t.get("platform"),
-                "source_url": t.get("source_url"),
-                "title": t.get("title") or "",
-                "category_key": t.get("category_key") or "",
-                "content_lang": t.get("content_lang") or "",
-                "target_lang": t.get("target_lang") or t.get("content_lang") or "",
-                "status": t.get("status") or "pending",
-                "parse_status": t.get("parse_status"),
-                "dub_status": t.get("dub_status"),
-                "compose_status": t.get("compose_status"),
-                "compose_last_status": t.get("compose_last_status"),
-                "final_video_key": t.get("final_video_key"),
-                "final_video_path": t.get("final_video_path"),
-                "final_url": t.get("final_url"),
-                "final_video_url": t.get("final_video_url"),
-                "publish_status": t.get("publish_status"),
-                "publish_key": t.get("publish_key"),
-                "publish_url": t.get("publish_url"),
-                "ready_gate": t.get("ready_gate"),
-                "target_subtitle_current": t.get("target_subtitle_current"),
-                "target_subtitle_current_reason": t.get("target_subtitle_current_reason"),
-                "subtitles_content_hash": t.get("subtitles_content_hash"),
-                "subtitles_override_updated_at": t.get("subtitles_override_updated_at"),
-                "pipeline_config": t.get("pipeline_config"),
-                "created_at": t.get("created_at") or "",
-                "pack_path": pack_path_for_list(t),
-                "pack_key": t.get("pack_key"),
-                "pack_url": t.get("pack_url"),
-                "deliver_pack_key": t.get("deliver_pack_key"),
-                "cover_url": t.get("cover_url"),
-                "thumb_url": t.get("thumb_url"),
-                "raw_path": t.get("raw_path"),
-                "raw_key": t.get("raw_key"),
-                "raw_url": t.get("raw_url"),
-                "video_url": t.get("video_url"),
-                "preview_url": t.get("preview_url"),
-                "ui_lang": t.get("ui_lang") or "",
-                "selected_tool_ids": normalize_selected_tool_ids(t.get("selected_tool_ids")),
-            }
-        )
+        row = {
+            "task_id": t.get("task_id") or t.get("id"),
+            "platform": t.get("platform"),
+            "source_url": t.get("source_url"),
+            "title": t.get("title") or "",
+            "category_key": t.get("category_key") or "",
+            "content_lang": t.get("content_lang") or "",
+            "target_lang": t.get("target_lang") or t.get("content_lang") or "",
+            "status": t.get("status") or "pending",
+            "parse_status": t.get("parse_status"),
+            "dub_status": t.get("dub_status"),
+            "compose_status": t.get("compose_status"),
+            "compose_last_status": t.get("compose_last_status"),
+            "final_video_key": t.get("final_video_key"),
+            "final_video_path": t.get("final_video_path"),
+            "final_url": t.get("final_url"),
+            "final_video_url": t.get("final_video_url"),
+            "publish_status": t.get("publish_status"),
+            "publish_key": t.get("publish_key"),
+            "publish_url": t.get("publish_url"),
+            "ready_gate": t.get("ready_gate"),
+            "target_subtitle_current": t.get("target_subtitle_current"),
+            "target_subtitle_current_reason": t.get("target_subtitle_current_reason"),
+            "subtitles_content_hash": t.get("subtitles_content_hash"),
+            "subtitles_override_updated_at": t.get("subtitles_override_updated_at"),
+            "pipeline_config": t.get("pipeline_config"),
+            "created_at": t.get("created_at") or "",
+            "pack_path": pack_path_for_list(t),
+            "pack_key": t.get("pack_key"),
+            "pack_url": t.get("pack_url"),
+            "deliver_pack_key": t.get("deliver_pack_key"),
+            "cover_url": t.get("cover_url"),
+            "thumb_url": t.get("thumb_url"),
+            "raw_path": t.get("raw_path"),
+            "raw_key": t.get("raw_key"),
+            "raw_url": t.get("raw_url"),
+            "video_url": t.get("video_url"),
+            "preview_url": t.get("preview_url"),
+            "ui_lang": t.get("ui_lang") or "",
+            "selected_tool_ids": normalize_selected_tool_ids(t.get("selected_tool_ids")),
+        }
+        kind_value = str(t.get("kind") or t.get("category_key") or t.get("platform") or "").strip().lower()
+        if kind_value == "hot_follow":
+            payload = compute_hot_follow_state(t, publish_hub_payload(t))
+            final_payload = payload.get("final") if isinstance(payload.get("final"), dict) else {}
+            row["ready_gate"] = payload.get("ready_gate") if isinstance(payload.get("ready_gate"), dict) else row["ready_gate"]
+            row["final_url"] = payload.get("final_url") or row["final_url"] or final_payload.get("url")
+            row["final_video_url"] = payload.get("final_video_url") or row["final_video_url"] or final_payload.get("url")
+            row["final_video_key"] = row["final_video_key"] or final_payload.get("key")
+            if bool(payload.get("composed_ready")) and not str(row["compose_status"] or "").strip():
+                row["compose_status"] = "done"
+        rows.append(row)
     return rows
 
 
@@ -160,62 +171,75 @@ def build_task_summaries_page(
 
     summaries: list[Any] = []
     for t in page_items:
-        download_paths = resolve_download_urls(t)
+        bound_task = t
+        kind_value = str(t.get("kind") or t.get("category_key") or t.get("platform") or "").strip().lower()
+        if kind_value == "hot_follow":
+            payload = compute_hot_follow_state(t, publish_hub_payload(t))
+            final_payload = payload.get("final") if isinstance(payload.get("final"), dict) else {}
+            bound_task = dict(t)
+            if isinstance(payload.get("ready_gate"), dict):
+                bound_task["ready_gate"] = payload.get("ready_gate")
+            bound_task["final_url"] = payload.get("final_url") or bound_task.get("final_url") or final_payload.get("url")
+            bound_task["final_video_url"] = payload.get("final_video_url") or bound_task.get("final_video_url") or final_payload.get("url")
+            bound_task["final_video_key"] = bound_task.get("final_video_key") or final_payload.get("key")
+            if bool(payload.get("composed_ready")) and not str(bound_task.get("compose_status") or "").strip():
+                bound_task["compose_status"] = "done"
+        download_paths = resolve_download_urls(bound_task)
         pack_path = download_paths.get("pack_path")
         scenes_path = download_paths.get("scenes_path")
-        status = derive_status(t)
+        status = derive_status(bound_task)
         summaries.append(
             task_summary_cls(
-                task_id=str(t.get("task_id") or t.get("id")),
-                title=t.get("title"),
-                kind=t.get("kind"),
-                source_url=str(t.get("source_url")) if t.get("source_url") else None,
-                source_link_url=extract_first_http_url(t.get("source_url")),
-                platform=t.get("platform"),
-                account_id=t.get("account_id"),
-                account_name=t.get("account_name"),
-                video_type=t.get("video_type"),
-                template=t.get("template"),
-                category_key=t.get("category_key") or "beauty",
-                content_lang=t.get("content_lang") or "my",
-                ui_lang=t.get("ui_lang") or "en",
-                style_preset=t.get("style_preset"),
-                face_swap_enabled=bool(t.get("face_swap_enabled")),
+                task_id=str(bound_task.get("task_id") or bound_task.get("id")),
+                title=bound_task.get("title"),
+                kind=bound_task.get("kind"),
+                source_url=str(bound_task.get("source_url")) if bound_task.get("source_url") else None,
+                source_link_url=extract_first_http_url(bound_task.get("source_url")),
+                platform=bound_task.get("platform"),
+                account_id=bound_task.get("account_id"),
+                account_name=bound_task.get("account_name"),
+                video_type=bound_task.get("video_type"),
+                template=bound_task.get("template"),
+                category_key=bound_task.get("category_key") or "beauty",
+                content_lang=bound_task.get("content_lang") or "my",
+                ui_lang=bound_task.get("ui_lang") or "en",
+                style_preset=bound_task.get("style_preset"),
+                face_swap_enabled=bool(bound_task.get("face_swap_enabled")),
                 status=status,
-                last_step=t.get("last_step"),
-                duration_sec=t.get("duration_sec"),
-                thumb_url=t.get("thumb_url"),
-                cover_url=t.get("cover_url"),
+                last_step=bound_task.get("last_step"),
+                duration_sec=bound_task.get("duration_sec"),
+                thumb_url=bound_task.get("thumb_url"),
+                cover_url=bound_task.get("cover_url"),
                 pack_path=pack_path,
                 scenes_path=scenes_path,
-                scenes_status=t.get("scenes_status"),
-                scenes_key=t.get("scenes_key"),
-                scenes_error=t.get("scenes_error"),
-                subtitles_status=t.get("subtitles_status"),
-                subtitles_key=t.get("subtitles_key"),
-                subtitles_error=t.get("subtitles_error"),
+                scenes_status=bound_task.get("scenes_status"),
+                scenes_key=bound_task.get("scenes_key"),
+                scenes_error=bound_task.get("scenes_error"),
+                subtitles_status=bound_task.get("subtitles_status"),
+                subtitles_key=bound_task.get("subtitles_key"),
+                subtitles_error=bound_task.get("subtitles_error"),
                 created_at=(
-                    coerce_datetime(t.get("created_at") or t.get("created") or t.get("createdAt"))
+                    coerce_datetime(bound_task.get("created_at") or bound_task.get("created") or bound_task.get("createdAt"))
                     or datetime(1970, 1, 1, tzinfo=timezone.utc)
                 ),
-                updated_at=coerce_datetime(t.get("updated_at") or t.get("updatedAt")),
-                error_message=t.get("error_message"),
-                error_reason=t.get("error_reason"),
-                parse_provider=t.get("parse_provider"),
-                subtitles_provider=t.get("subtitles_provider"),
-                dub_provider=t.get("dub_provider"),
-                pack_provider=t.get("pack_provider"),
-                face_swap_provider=t.get("face_swap_provider"),
-                publish_status=t.get("publish_status"),
-                publish_provider=t.get("publish_provider"),
-                publish_key=t.get("publish_key"),
-                publish_url=t.get("publish_url"),
-                published_at=t.get("published_at"),
-                priority=t.get("priority"),
-                assignee=t.get("assignee"),
-                ops_notes=t.get("ops_notes"),
-                selected_tool_ids=normalize_selected_tool_ids(t.get("selected_tool_ids")),
-                pipeline_config=parse_pipeline_config(t.get("pipeline_config")),
+                updated_at=coerce_datetime(bound_task.get("updated_at") or bound_task.get("updatedAt")),
+                error_message=bound_task.get("error_message"),
+                error_reason=bound_task.get("error_reason"),
+                parse_provider=bound_task.get("parse_provider"),
+                subtitles_provider=bound_task.get("subtitles_provider"),
+                dub_provider=bound_task.get("dub_provider"),
+                pack_provider=bound_task.get("pack_provider"),
+                face_swap_provider=bound_task.get("face_swap_provider"),
+                publish_status=bound_task.get("publish_status"),
+                publish_provider=bound_task.get("publish_provider"),
+                publish_key=bound_task.get("publish_key"),
+                publish_url=bound_task.get("publish_url"),
+                published_at=bound_task.get("published_at"),
+                priority=bound_task.get("priority"),
+                assignee=bound_task.get("assignee"),
+                ops_notes=bound_task.get("ops_notes"),
+                selected_tool_ids=normalize_selected_tool_ids(bound_task.get("selected_tool_ids")),
+                pipeline_config=parse_pipeline_config(bound_task.get("pipeline_config")),
             )
         )
     return summaries, total
