@@ -1,5 +1,9 @@
 (function () {
   const urlEl = document.getElementById("hf-url");
+  const sourceModeEls = Array.from(document.querySelectorAll('input[name="source_mode"]'));
+  const localBlockEl = document.getElementById("hf-local-block");
+  const localFileEl = document.getElementById("hf-local-file");
+  const sourceLangEl = document.getElementById("hf-source-lang");
   const platformEl = document.getElementById("hf-platform");
   const probeCard = document.getElementById("hf-probe");
   const coverEl = document.getElementById("hf-cover");
@@ -20,6 +24,10 @@
 
   let lastProbe = null;
   let debounceTimer = null;
+
+  function currentSourceMode() {
+    return sourceModeEls.find((el) => el.checked)?.value || "link";
+  }
 
   function readLocale() {
     const i18n = window.__V185_I18N__ || {};
@@ -47,6 +55,10 @@
     refreshLocale(probeCard || document);
   }
 
+  function localFileReady() {
+    return !!(localFileEl && localFileEl.files && localFileEl.files[0]);
+  }
+
   function currentProfile() {
     const lang = String((targetLangEl && targetLangEl.value) || "mm").toLowerCase();
     return profileByLang.get(lang) || profileByLang.get("mm") || null;
@@ -72,6 +84,7 @@
   }
 
   async function doProbe() {
+    if (currentSourceMode() !== "link") return;
     const url = (urlEl.value || "").trim();
     if (!url) {
       setProbeState(false, "");
@@ -108,8 +121,50 @@
     debounceTimer = setTimeout(doProbe, 600);
   }
 
+  function renderLocalSelection() {
+    const file = localFileEl && localFileEl.files ? localFileEl.files[0] : null;
+    if (!file) {
+      lastProbe = null;
+      coverEl.removeAttribute("src");
+      coverEl.style.visibility = "hidden";
+      titleEl.textContent = "";
+      durationEl.textContent = "";
+      platformTextEl.textContent = "";
+      setProbeState(false, "");
+      return;
+    }
+    lastProbe = {
+      title: file.name,
+      platform: "local",
+    };
+    coverEl.removeAttribute("src");
+    coverEl.style.visibility = "hidden";
+    titleEl.textContent = file.name;
+    durationEl.textContent = `${Math.max(1, Math.round(file.size / 1024 / 1024))} MB`;
+    platformTextEl.textContent = sourceLangEl && sourceLangEl.value === "en" ? "Local video · English" : "Local video · 中文";
+    setProbeState(true, "");
+  }
+
+  function setSourceMode(mode) {
+    const local = mode === "local";
+    if (localBlockEl) localBlockEl.classList.toggle("hidden", !local);
+    if (urlEl) {
+      urlEl.disabled = local;
+      urlEl.required = !local;
+    }
+    if (platformEl) platformEl.disabled = local;
+    if (local) {
+      renderLocalSelection();
+      return;
+    }
+    lastProbe = null;
+    if (localFileEl) localFileEl.value = "";
+    scheduleProbe();
+  }
+
   async function createTask() {
-    if (!lastProbe) return;
+    if (currentSourceMode() === "link" && !lastProbe) return;
+    if (currentSourceMode() === "local" && !localFileReady()) return;
     createBtn.disabled = true;
     createMsg.textContent = "...";
 
@@ -125,24 +180,43 @@
       };
       if (publishAccountEl && publishAccountEl.value) pipelineConfig.publish_account = publishAccountEl.value;
 
-      const res = await fetch("/api/hot_follow/tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source_url: url,
-          platform: platform === "auto" ? null : platform,
-          title: (taskTitleEl && taskTitleEl.value ? taskTitleEl.value : "") || lastProbe.title || null,
-          category_key: "hot_follow",
-          kind: "hot_follow",
-          account_id: publishAccountEl ? publishAccountEl.value : null,
-          account_name: publishAccountEl ? publishAccountEl.value : null,
-          content_lang: targetLangEl ? targetLangEl.value : "mm",
-          voice_id: voiceIdEl ? voiceIdEl.value : "mm_female_1",
-          ui_lang: locale,
-          pipeline_config: pipelineConfig,
-          auto_start: true,
-        }),
-      });
+      let res;
+      if (currentSourceMode() === "local") {
+        const file = localFileEl.files[0];
+        const fd = new FormData();
+        fd.append("file", file);
+        fd.append("target_lang", targetLangEl ? targetLangEl.value : "mm");
+        fd.append("source_lang", sourceLangEl ? sourceLangEl.value : "zh");
+        fd.append("voice_id", voiceIdEl ? voiceIdEl.value : "mm_female_1");
+        fd.append("process_mode", processMode);
+        fd.append("publish_account", publishAccountEl ? publishAccountEl.value : "default");
+        fd.append("ui_lang", locale);
+        fd.append("task_title", (taskTitleEl && taskTitleEl.value ? taskTitleEl.value : "") || file.name.replace(/\.[^.]+$/, ""));
+        fd.append("auto_start", "false");
+        res = await fetch("/api/hot_follow/tasks/local_upload", {
+          method: "POST",
+          body: fd,
+        });
+      } else {
+        res = await fetch("/api/hot_follow/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            source_url: url,
+            platform: platform === "auto" ? null : platform,
+            title: (taskTitleEl && taskTitleEl.value ? taskTitleEl.value : "") || lastProbe.title || null,
+            category_key: "hot_follow",
+            kind: "hot_follow",
+            account_id: publishAccountEl ? publishAccountEl.value : null,
+            account_name: publishAccountEl ? publishAccountEl.value : null,
+            content_lang: targetLangEl ? targetLangEl.value : "mm",
+            voice_id: voiceIdEl ? voiceIdEl.value : "mm_female_1",
+            ui_lang: locale,
+            pipeline_config: pipelineConfig,
+            auto_start: true,
+          }),
+        });
+      }
       if (!res.ok) {
         const text = await res.text();
         createMsg.textContent = text || "create failed";
@@ -180,6 +254,9 @@
 
   if (urlEl) urlEl.addEventListener("input", scheduleProbe);
   if (platformEl) platformEl.addEventListener("change", scheduleProbe);
+  sourceModeEls.forEach((el) => el.addEventListener("change", () => setSourceMode(currentSourceMode())));
+  if (localFileEl) localFileEl.addEventListener("change", renderLocalSelection);
+  if (sourceLangEl) sourceLangEl.addEventListener("change", renderLocalSelection);
   if (targetLangEl) targetLangEl.addEventListener("change", refreshVoiceOptions);
   if (createBtn) {
     createBtn.addEventListener("click", (e) => {
@@ -189,5 +266,6 @@
   }
 
   refreshVoiceOptions();
+  setSourceMode(currentSourceMode());
   refreshLocale(document);
 })();

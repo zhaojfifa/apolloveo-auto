@@ -33,9 +33,38 @@
             </div>
             <div class="space-y-4">
               <div>
+                <div class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_source_mode">来源方式</div>
+                <div class="mt-2 flex flex-wrap gap-4 text-sm">
+                  <label class="inline-flex items-center gap-2">
+                    <input type="radio" name="source_mode" value="link" checked />
+                    <span data-i18n="hot_follow_new_source_mode_link">{{ t("tasks.new.source_mode.url") }}</span>
+                  </label>
+                  <label class="inline-flex items-center gap-2">
+                    <input type="radio" name="source_mode" value="local" />
+                    <span data-i18n="hot_follow_new_source_mode_local">{{ t("tasks.new.source_mode.local") }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
                 <label for="hf-url" class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_source_link">{{ t("label.source_url") }}</label>
                 <input id="hf-url" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="text" placeholder="{{ t('label.source_url.placeholder') }}" data-i18n-placeholder="hot_follow_new_source_link_ph" />
                 <div class="text-xs text-gray-500 mt-1" id="hf-url-hint" data-i18n="hot_follow_new_hint"></div>
+              </div>
+
+              <div id="hf-local-block" class="hidden space-y-4">
+                <div>
+                  <label for="hf-local-file" class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_local_video">本地视频</label>
+                  <input id="hf-local-file" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2" type="file" accept=".mp4,.mov,.mkv,video/*" />
+                  <div class="text-xs text-gray-500 mt-1" data-i18n="hot_follow_new_local_video_hint">支持 mp4 / mov / mkv，本地导入后继续进入 Hot Follow 工作台</div>
+                </div>
+                <div>
+                  <label for="hf-source-lang" class="block text-sm font-semibold text-gray-700" data-i18n="hot_follow_new_source_language">源视频语言</label>
+                  <select id="hf-source-lang" class="mt-2 w-full rounded-xl border border-gray-300 px-3 py-2">
+                    <option value="zh" data-i18n="hot_follow_new_source_language_zh">中文</option>
+                    <option value="en" data-i18n="hot_follow_new_source_language_en">English</option>
+                  </select>
+                </div>
               </div>
 
               <div>

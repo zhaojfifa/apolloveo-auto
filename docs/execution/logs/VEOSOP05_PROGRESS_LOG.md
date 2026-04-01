@@ -1,5 +1,61 @@
 # VeoSop05 启动进度文档
 
+## Hot Follow Local Video Entry Narrow Enhancement
+
+日期：2026-04-01
+
+本节点完成：
+
+- 在既有 Hot Follow 新建页增加 `link / local video` 两种 source mode
+- local video 模式支持上传本地视频并创建正常 Hot Follow 任务，不新增 task kind / scenario / production line
+- 上传后任务按既有 Hot Follow truth shape 写入 `raw.mp4` / `raw_path`，继续进入既有 workbench / subtitles / dub / compose 流
+- 初版仅显式支持源视频语言 `zh / en` 作为入口提示与 pipeline config hint
+
+本次收口说明：
+
+- 仍保持 Hot Follow 为单线；只是新增 baseline-style local import entry
+- link-based create flow 未改行为；仍沿用 probe -> create -> optional BGM -> run
+- local-upload path 只做入口归一化，不扩成媒体库、批量上传或新场景
+
+本节点明确不做：
+
+- 不改全局菜单 / 导航
+- 不改翻译质量、字幕清洗或 compose 主链策略
+- 不新增 image/multi-asset upload
+
+## Vietnamese Hot Follow Runtime Validation: Chain Confirmed Green
+
+日期：2026-03-27
+
+本节点确认：
+
+- Hot Follow 仍为单一产线，当前目标语言实例为 Myanmar / Vietnamese 两条 profile
+- Vietnamese 已完成链路验证：
+  - 新建任务页可正常选择越南语
+  - male / female voice 选项均可用
+  - parse 正常进入后续链路
+  - 目标语言字幕可生成、可再编辑
+  - dub 可继续使用当前越南语目标字幕完成配音
+  - compose 可完成最终合成
+- 当前状态应视为 Vietnamese Hot Follow runtime chain 已打通，而不是继续处于 closure gap 阶段
+
+本节点验证命令：
+
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_new_page_routes.py -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hf_compose_freshness.py -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+
+本节点边界说明：
+
+- 未新增文件，仅更新现有进度记录
+- 未扩展为新 scenario / 新工作台 / 新产线
+- 未混入新的越南语功能开发，仅记录已验证通过的运行状态
+
 ## PR-Localization Closure Pack v2: Vietnamese Subtitle Currentness + Gate Alignment
 
 日期：2026-03-27

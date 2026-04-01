@@ -18,6 +18,7 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Optional
+from uuid import uuid4
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import JSONResponse
@@ -80,7 +81,9 @@ from gateway.app.services.compose_helpers import (
     task_compose_lock as _task_compose_lock,
 )
 from gateway.app.services.media_helpers import (
+    merge_probe_into_pipeline_config as _merge_probe_into_pipeline_config,
     probe_url_metadata as _probe_url_metadata,
+    save_upload_to_paths as _save_upload_to_paths,
     sha256_file as _sha256_file,
     update_pipeline_probe as _update_pipeline_probe,
     upload_task_bgm_impl as _upload_task_bgm_impl,
@@ -118,6 +121,7 @@ from gateway.app.services.task_router_actions import (
     rerun_dub_entry as _rerun_dub_entry,
     run_task_pipeline_entry as _run_task_pipeline_entry,
 )
+from gateway.app.task_repo_utils import normalize_task_payload
 from gateway.app.services.compose_service import CompositionService, HotFollowComposeRequestContract
 from gateway.app.services.hot_follow_language_profiles import (
     get_hot_follow_language_profile,
@@ -1458,27 +1462,26 @@ def _hf_compose_final_video(task_id: str, task: dict) -> dict[str, Any]:
     )
 
 
-@hot_follow_api_router.post("/hot_follow/tasks", response_model=TaskDetail)
-def create_hot_follow_task(
-    payload: TaskCreate,
-    background_tasks: BackgroundTasks,
-    repo=Depends(get_task_repository),
-):
-    data = payload.dict()
-    data["kind"] = "hot_follow"
-    data["category_key"] = data.get("category_key") or "hot_follow"
-    if data.get("auto_start") is None:
-        data["auto_start"] = True
-    target_lang = hot_follow_internal_lang(data.get("content_lang") or "my")
+def _build_hot_follow_create_data(data: dict[str, Any]) -> dict[str, Any]:
+    prepared = dict(data or {})
+    prepared["kind"] = "hot_follow"
+    prepared["category_key"] = prepared.get("category_key") or "hot_follow"
+    if prepared.get("auto_start") is None:
+        prepared["auto_start"] = True
+
+    target_lang = hot_follow_internal_lang(prepared.get("content_lang") or prepared.get("target_lang") or "my")
+    prepared["target_lang"] = target_lang
+    prepared["content_lang"] = target_lang
+
     settings = get_settings()
-    config = dict(data.get("config") or {})
+    config = dict(prepared.get("config") or {})
     profile = get_hot_follow_language_profile(target_lang)
     requested_voice = resolve_hot_follow_voice_id(
         target_lang,
-        str(data.get("voice_id") or "").strip()
+        str(prepared.get("voice_id") or "").strip()
         or str(config.get("tts_requested_voice") or config.get("hot_follow_tts_requested_voice") or "").strip()
         or os.getenv("DEFAULT_MM_VOICE_ID", profile.default_voice_id("azure-speech")).strip(),
-        data.get("dub_provider") or config.get("tts_provider") or settings.dub_provider,
+        prepared.get("dub_provider") or config.get("tts_provider") or settings.dub_provider,
     )
     expected_provider = _hot_follow_expected_provider(
         {
@@ -1487,7 +1490,7 @@ def create_hot_follow_task(
             "content_lang": target_lang,
         },
         requested_voice,
-        data.get("dub_provider") or config.get("tts_provider") or settings.dub_provider,
+        prepared.get("dub_provider") or config.get("tts_provider") or settings.dub_provider,
     )
     resolved_voice, _ = resolve_tts_voice(
         settings=settings,
@@ -1495,16 +1498,147 @@ def create_hot_follow_task(
         target_lang=target_lang,
         requested_voice=requested_voice,
     )
-    data["voice_id"] = requested_voice
-    data["dub_provider"] = expected_provider
+    prepared["voice_id"] = requested_voice
+    prepared["dub_provider"] = expected_provider
     if resolved_voice:
         config["tts_requested_voice"] = requested_voice
         config["hot_follow_tts_requested_voice"] = requested_voice
         config["tts_provider"] = expected_provider
         config["tts_resolved_voice"] = resolved_voice
-        data["config"] = config
-    normalized = TaskCreate(**data)
+    prepared["config"] = config
+    return prepared
+
+
+@hot_follow_api_router.post("/hot_follow/tasks", response_model=TaskDetail)
+def create_hot_follow_task(
+    payload: TaskCreate,
+    background_tasks: BackgroundTasks,
+    repo=Depends(get_task_repository),
+):
+    normalized = TaskCreate(**_build_hot_follow_create_data(payload.dict()))
     return _create_task_entry(normalized, background_tasks, repo)
+
+
+@hot_follow_api_router.post("/hot_follow/tasks/local_upload", response_model=TaskDetail)
+def create_hot_follow_task_local_upload(
+    file: UploadFile = File(...),
+    background_tasks: BackgroundTasks = None,
+    target_lang: str = Form(default="mm"),
+    source_lang: str = Form(default="zh"),
+    voice_id: str | None = Form(default=None),
+    process_mode: str | None = Form(default=None),
+    publish_account: str | None = Form(default=None),
+    platform: str | None = Form(default=None),
+    task_title: str | None = Form(default=None),
+    ui_lang: str | None = Form(default=None),
+    auto_start: bool = Form(default=False),
+    repo=Depends(get_task_repository),
+):
+    _ = background_tasks
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="file is required")
+
+    ext = Path(file.filename).suffix.lower()
+    if ext not in {".mp4", ".mov", ".mkv"}:
+        raise HTTPException(status_code=400, detail="unsupported file type")
+
+    source_lang_norm = str(source_lang or "zh").strip().lower()
+    if source_lang_norm not in {"zh", "en"}:
+        raise HTTPException(status_code=400, detail="unsupported source language")
+
+    task_id = uuid4().hex[:12]
+    max_mb = int(os.getenv("MAX_LOCAL_UPLOAD_MB", "200"))
+    max_bytes = max_mb * 1024 * 1024
+    raw_file_path = raw_path(task_id)
+    _save_upload_to_paths(
+        upload=file,
+        inputs_path=raw_file_path,
+        raw_path_target=raw_file_path,
+        max_bytes=max_bytes,
+    )
+    try:
+        assert_local_video_ok(raw_file_path)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"invalid local video: {exc}") from exc
+
+    probe = None
+    try:
+        probe = probe_subtitles(raw_file_path)
+    except Exception:
+        logger.exception("HOT_FOLLOW_LOCAL_SUBTITLE_PROBE_FAIL", extra={"task_id": task_id})
+
+    prepared = _build_hot_follow_create_data(
+        {
+            "kind": "hot_follow",
+            "category_key": "hot_follow",
+            "content_lang": target_lang,
+            "ui_lang": ui_lang or "zh",
+            "title": task_title or Path(file.filename).stem,
+            "voice_id": voice_id,
+            "auto_start": bool(auto_start),
+            "pipeline_config": _merge_probe_into_pipeline_config(
+                {
+            "ingest_mode": "local",
+            "source_language_hint": source_lang_norm,
+            "process_mode": str(process_mode or "fast_clone"),
+            "publish_account": str(publish_account or "default"),
+        },
+        probe,
+    ),
+        }
+    )
+    task_payload = {
+        "task_id": task_id,
+        "title": prepared.get("title"),
+        "kind": "hot_follow",
+        "source_url": None,
+        "platform": platform or "local",
+        "voice_id": prepared.get("voice_id"),
+        "dub_provider": prepared.get("dub_provider"),
+        "config": prepared.get("config") or {},
+        "account_id": None,
+        "account_name": None,
+        "video_type": None,
+        "template": None,
+        "category_key": "hot_follow",
+        "content_lang": prepared.get("content_lang") or "my",
+        "target_lang": prepared.get("target_lang") or prepared.get("content_lang") or "my",
+        "ui_lang": prepared.get("ui_lang") or "zh",
+        "style_preset": None,
+        "face_swap_enabled": False,
+        "selected_tool_ids": None,
+        "pipeline_config": pipeline_config_to_storage(prepared.get("pipeline_config") or {}),
+        "status": "pending",
+        "last_step": None,
+        "error_message": None,
+        "source_type": "local",
+        "source_filename": file.filename,
+    }
+    task_payload = normalize_task_payload(task_payload, is_new=True)
+    repo.create(task_payload)
+    stored_task = repo.get(task_id)
+    if not stored_task:
+        raise HTTPException(status_code=500, detail=f"Task persistence failed for task_id={task_id}")
+
+    if probe:
+        _update_pipeline_probe(repo, task_id, probe)
+
+    raw_key = upload_task_artifact(stored_task, raw_file_path, "raw.mp4", task_id=task_id)
+    policy_upsert(
+        repo,
+        task_id,
+        stored_task,
+        {
+            "raw_path": raw_key,
+            "error_message": None,
+            "error_reason": None,
+        },
+        step="router.hot_follow_api.local_upload",
+    )
+    latest = repo.get(task_id)
+    return _task_to_detail(latest or stored_task)
 
 
 @hot_follow_api_router.post("/hot_follow/tasks/{task_id}/bgm")

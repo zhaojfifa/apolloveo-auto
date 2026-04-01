@@ -10,6 +10,9 @@ _SUBTITLES_MODES = {"whisper-only", "whisper+gemini"}
 _DUB_MODES = {"edge", "lovo", "auto-fallback"}
 _EXTRA_KEYS = {
     "ingest_mode",
+    "source_language_hint",
+    "process_mode",
+    "publish_account",
     "subtitle_stream",
     "clean_video_generated",
     "subtitle_codecs",
