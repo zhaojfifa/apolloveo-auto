@@ -1,5 +1,28 @@
 # VeoSop05 启动进度文档
 
+## Hot Follow Local Upload Parse Binding Fix
+
+日期：2026-04-02
+
+本节点完成：
+
+- 修复 Hot Follow local-upload 任务在 `/run` 后仍落入 link-based parse 校验的问题
+- local ingest 任务若 `raw.mp4 / raw_path` 已就绪，则后台 pipeline 直接将 parse 视为 source-ready，不再构造 `ParseRequest.link`
+- 同步 parse route 对 local ingest 的状态回写与后台 pipeline 保持一致
+- 补齐后台 pipeline 中 `Workspace(task_id, target_lang=...)` 的显式绑定，避免 local-upload 继续向下游时踩未定义变量
+
+本次收口说明：
+
+- 仅修 Hot Follow 既有 local-upload entry 到 parse/subtitles 的绑定缺口
+- 未新增 scenario / task kind / workbench path
+- 未改 translation、subtitle quality、compose 主链策略
+
+本节点明确不做：
+
+- 不改新建页交互
+- 不做字幕/翻译功能扩张
+- 不做广义 runtime 重构
+
 ## Hot Follow Local Video Entry Narrow Enhancement
 
 日期：2026-04-01

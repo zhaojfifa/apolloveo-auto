@@ -1487,6 +1487,15 @@ def _kickoff_autostart(
         background_tasks.add_task(auto_run_pipeline, task_id, repo)
 
 
+def _is_local_ingest_task(task: dict) -> bool:
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    if str(pipeline_config.get("ingest_mode") or "").strip().lower() == "local":
+        return True
+    if str(task.get("source_type") or "").strip().lower() == "local":
+        return True
+    return str(task.get("platform") or "").strip().lower() == "local"
+
+
 def auto_run_pipeline(task_id: str, repo) -> None:
     logger.info("AUTO_PIPELINE_START", extra={"task_id": task_id})
     try:
@@ -1575,18 +1584,22 @@ def _run_pipeline_background(task_id: str, repo) -> None:
     default_voice = os.getenv("DEFAULT_MM_VOICE_ID", "mm_female_1")
     target_lang = task.get("content_lang") or default_lang
     voice_id = task.get("voice_id") or default_voice
+    workspace = Workspace(task_id, target_lang=target_lang)
 
     current_step = "parse"
     try:
         _repo_upsert(repo, task_id, {**status_update, "last_step": current_step})
-        parse_req = ParseRequest(
-            task_id=task_id,
-            platform=task.get("platform"),
-            link=task.get("source_url") or task.get("link") or "",
-        )
-        parse_res = asyncio.run(run_parse_step_v1(parse_req))
         raw_file = raw_path(task_id)
-        raw_key = None
+        parse_res = None
+        raw_key = task.get("raw_path")
+        local_ingest = _is_local_ingest_task(task)
+        if not (local_ingest and (bool(raw_key) or raw_file.exists())):
+            parse_req = ParseRequest(
+                task_id=task_id,
+                platform=task.get("platform"),
+                link=task.get("source_url") or task.get("link") or "",
+            )
+            parse_res = asyncio.run(run_parse_step_v1(parse_req))
         if raw_file.exists():
             raw_key = upload_task_artifact(task, raw_file, "raw.mp4", task_id=task_id)
             try:
@@ -1603,6 +1616,8 @@ def _run_pipeline_background(task_id: str, repo) -> None:
                 "last_step": current_step,
                 "raw_path": raw_key,
                 "duration_sec": duration_sec,
+                "parse_status": "done" if raw_key else None,
+                "parse_error": None,
             },
         )
 
@@ -2318,6 +2333,8 @@ def build_parse(
             {
                 "status": task.get("status") or "processing",
                 "last_step": "parse",
+                "parse_status": "done" if task.get("raw_path") else task.get("parse_status"),
+                "parse_error": None,
                 "error_message": None,
                 "error_reason": None,
             },
