@@ -22,28 +22,6 @@ from gateway.app.services.task_view_helpers import derive_status
 def _stub_hot_follow_projection(monkeypatch):
     monkeypatch.setattr(
         presenters,
-        "publish_hub_payload",
-        lambda task: {
-            "task_id": str(task.get("task_id") or task.get("id") or ""),
-            "ready_gate": task.get("ready_gate") if isinstance(task.get("ready_gate"), dict) else {},
-            "composed_ready": str(task.get("compose_status") or task.get("compose_last_status") or "").lower()
-            in {"done", "ready", "success", "completed"},
-            "final": {
-                "exists": bool(
-                    task.get("final_video_key")
-                    or task.get("final_video_path")
-                    or task.get("final_url")
-                    or task.get("final_video_url")
-                ),
-                "key": task.get("final_video_key") or task.get("final_video_path"),
-                "url": task.get("final_url") or task.get("final_video_url"),
-            },
-            "final_url": task.get("final_url") or task.get("final_video_url"),
-            "final_video_url": task.get("final_video_url") or task.get("final_url"),
-        },
-    )
-    monkeypatch.setattr(
-        presenters,
         "compute_hot_follow_state",
         lambda _task, base_state: dict(base_state or {}),
     )
@@ -176,7 +154,6 @@ def test_filter_tasks_for_kind_keeps_apollo_avatar_compat_rule():
 
 
 def test_build_tasks_page_rows_preserves_board_payload_shape(monkeypatch):
-    monkeypatch.setattr(presenters, "publish_hub_payload", lambda _task: {})
     monkeypatch.setattr(
         presenters,
         "compute_hot_follow_state",
@@ -224,7 +201,7 @@ def test_build_tasks_page_rows_preserves_board_payload_shape(monkeypatch):
             "publish_status": None,
             "publish_key": None,
             "publish_url": None,
-            "ready_gate": None,
+                "ready_gate": {},
             "target_subtitle_current": None,
             "target_subtitle_current_reason": None,
             "subtitles_content_hash": None,
@@ -283,7 +260,6 @@ def test_build_task_summaries_page_projects_ready_from_final_facts_before_unknow
 
 
 def test_build_tasks_page_rows_bind_hot_follow_board_to_computed_ready_gate(monkeypatch):
-    monkeypatch.setattr(presenters, "publish_hub_payload", lambda _task: {"task_id": "hf-derived"})
     monkeypatch.setattr(
         presenters,
         "compute_hot_follow_state",
@@ -330,7 +306,6 @@ def test_build_tasks_page_rows_bind_hot_follow_board_to_computed_ready_gate(monk
 
 
 def test_build_task_summaries_page_bind_hot_follow_status_to_computed_ready_gate(monkeypatch):
-    monkeypatch.setattr(presenters, "publish_hub_payload", lambda _task: {"task_id": "hf-summary"})
     monkeypatch.setattr(
         presenters,
         "compute_hot_follow_state",
@@ -441,6 +416,48 @@ def test_build_tasks_page_rows_carry_fact_fields_needed_for_board_ready_projecti
 
     assert semantics["db_status"] == "ready"
     assert semantics["filter_status"] == "done"
+
+
+def test_build_tasks_page_rows_do_not_require_publish_hub_payload_like_storage_probe(monkeypatch):
+    calls = []
+
+    def _fake_compute(_task, base_state):
+        calls.append(base_state)
+        return {
+            **dict(base_state or {}),
+            "ready_gate": {"publish_ready": True, "compose_ready": True},
+            "composed_ready": True,
+            "final": {
+                "exists": True,
+                "key": "deliver/tasks/hf-board/final.mp4",
+                "url": "/v1/tasks/hf-board/final",
+            },
+            "final_url": "/v1/tasks/hf-board/final",
+            "final_video_url": "/v1/tasks/hf-board/final",
+        }
+
+    monkeypatch.setattr(presenters, "compute_hot_follow_state", _fake_compute)
+
+    rows = build_tasks_page_rows(
+        [
+            {
+                "task_id": "hf-board",
+                "kind": "hot_follow",
+                "platform": "hot_follow",
+                "category_key": "hot_follow",
+                "status": "processing",
+                "final_video_key": "deliver/tasks/hf-board/final.mp4",
+                "created_at": "2026-04-03T00:00:00+00:00",
+            }
+        ],
+        kind_norm="hot_follow",
+        pack_path_for_list=lambda _task: None,
+        normalize_selected_tool_ids=lambda value: list(value or []),
+    )
+
+    assert calls
+    assert calls[0]["final"]["exists"] is True
+    assert rows[0]["final_video_key"] == "deliver/tasks/hf-board/final.mp4"
 
 
 def test_build_tasks_page_rows_project_hot_follow_done_from_publishable_main_deliverable():
