@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import logging
 from typing import Any, Callable
 
 from gateway.app.services.hot_follow_runtime_bridge import (
@@ -9,7 +10,83 @@ from gateway.app.services.hot_follow_runtime_bridge import (
     compat_hot_follow_task_status_shape,
 )
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
-from gateway.app.services.task_view_helpers import publish_hub_payload
+
+logger = logging.getLogger(__name__)
+
+
+def _as_dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _hot_follow_board_base_state(task: dict[str, Any]) -> dict[str, Any]:
+    task_id = str(task.get("task_id") or task.get("id") or "")
+    final_url = task.get("final_url") or task.get("final_video_url")
+    final_key = task.get("final_video_key") or task.get("final_video_path")
+    compose_status = task.get("compose_status")
+    compose_last_status = task.get("compose_last_status")
+
+    final_payload = dict(_as_dict(task.get("final")))
+    if final_key:
+        final_payload.setdefault("key", final_key)
+    if final_url:
+        final_payload.setdefault("url", final_url)
+    if final_payload.get("exists") is None:
+        final_payload["exists"] = bool(final_key or final_url)
+
+    historical_final = dict(_as_dict(task.get("historical_final")))
+    media = dict(_as_dict(task.get("media")))
+    if final_url:
+        media.setdefault("final_url", final_url)
+        media.setdefault("final_video_url", final_url)
+
+    deliverables_raw = task.get("deliverables")
+    if isinstance(deliverables_raw, dict):
+        deliverables: dict[str, Any] | list[Any] = dict(deliverables_raw)
+    elif isinstance(deliverables_raw, list):
+        deliverables = [
+            dict(item) if isinstance(item, dict) else item
+            for item in deliverables_raw
+        ]
+    else:
+        deliverables = {}
+
+    if isinstance(deliverables, dict) and bool(final_payload.get("exists")):
+        final_item = dict(_as_dict(deliverables.get("final_mp4")) or {"label": "final.mp4"})
+        if final_key:
+            final_item.setdefault("key", final_key)
+        if final_url:
+            final_item.setdefault("url", final_url)
+        final_item.setdefault("status", "done" if final_payload.get("exists") else "pending")
+        final_item.setdefault("state", "done" if final_payload.get("exists") else "pending")
+        deliverables["final_mp4"] = final_item
+
+    return {
+        "task_id": task_id,
+        "kind": "hot_follow",
+        "ready_gate": dict(_as_dict(task.get("ready_gate"))),
+        "final": final_payload,
+        "historical_final": historical_final,
+        "final_url": final_url,
+        "final_video_url": final_url,
+        "media": media,
+        "deliverables": deliverables,
+        "audio": dict(_as_dict(task.get("audio"))),
+        "subtitles": dict(_as_dict(task.get("subtitles"))),
+        "compose_status": compose_status,
+        "compose_last_status": compose_last_status,
+    }
+
+
+def _bind_hot_follow_projection(task: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return compute_hot_follow_state(task, _hot_follow_board_base_state(task))
+    except Exception as exc:
+        logger.warning(
+            "HOT_FOLLOW_BOARD_STATE_FALLBACK task_id=%s error=%s",
+            str(task.get("task_id") or task.get("id") or ""),
+            str(exc),
+        )
+        return {}
 
 
 def filter_tasks_for_kind(items: list[dict[str, Any]], kind_norm: str) -> list[dict[str, Any]]:
@@ -83,7 +160,7 @@ def build_tasks_page_rows(
         }
         kind_value = str(t.get("kind") or t.get("category_key") or t.get("platform") or "").strip().lower()
         if kind_value == "hot_follow":
-            payload = compute_hot_follow_state(t, publish_hub_payload(t))
+            payload = _bind_hot_follow_projection(t)
             final_payload = payload.get("final") if isinstance(payload.get("final"), dict) else {}
             row["ready_gate"] = payload.get("ready_gate") if isinstance(payload.get("ready_gate"), dict) else row["ready_gate"]
             row["final_url"] = payload.get("final_url") or row["final_url"] or final_payload.get("url")
@@ -174,7 +251,7 @@ def build_task_summaries_page(
         bound_task = t
         kind_value = str(t.get("kind") or t.get("category_key") or t.get("platform") or "").strip().lower()
         if kind_value == "hot_follow":
-            payload = compute_hot_follow_state(t, publish_hub_payload(t))
+            payload = _bind_hot_follow_projection(t)
             final_payload = payload.get("final") if isinstance(payload.get("final"), dict) else {}
             bound_task = dict(t)
             if isinstance(payload.get("ready_gate"), dict):

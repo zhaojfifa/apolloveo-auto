@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from starlette.responses import HTMLResponse
@@ -168,6 +169,51 @@ def test_tasks_page_enables_download_when_final_video_exists_without_pack(monkey
     assert response.status_code == 200
     assert "/signed/final-only/final_mp4" in response.text
     assert response.text.endswith(":True")
+
+
+def test_tasks_page_hot_follow_returns_200_without_storage_probe(monkeypatch):
+    class _Repo:
+        def list(self):
+            return [
+                {
+                    "task_id": "hf-board-stable",
+                    "tenant": "default",
+                    "kind": "hot_follow",
+                    "platform": "hot_follow",
+                    "category_key": "hot_follow",
+                    "title": "stable board",
+                    "created_at": "2026-04-03T00:00:00+00:00",
+                    "final_video_key": "deliver/tasks/hf-board-stable/final.mp4",
+                    "status": "processing",
+                }
+            ]
+
+    monkeypatch.setenv("AUTH_MODE", "off")
+    monkeypatch.setattr(tasks_router, "_pack_path_for_list", lambda _task: None)
+    monkeypatch.setattr(
+        tasks_router,
+        "render_template",
+        lambda *, request, name, ctx=None, status_code=200, headers=None: HTMLResponse(
+            content=" ".join(str(item.get("task_id") or "") for item in (ctx or {}).get("items", [])),
+            status_code=status_code,
+            headers=headers,
+        ),
+    )
+    app.dependency_overrides[get_task_repository] = lambda: _Repo()
+    client = TestClient(app, raise_server_exceptions=False)
+
+    try:
+        response = client.get("/tasks")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert "hf-board-stable" in response.text
+
+
+def test_tasks_template_no_longer_depends_on_tailwind_cdn():
+    template = (Path(__file__).resolve().parents[2] / "templates" / "tasks.html").read_text(encoding="utf-8")
+    assert "cdn.tailwindcss.com" not in template
 
 
 def test_op_download_proxy_uses_attachment_redirect_for_final_video(monkeypatch):
