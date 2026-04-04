@@ -14,6 +14,7 @@ from gateway.app.services.compose_service import (
     _WorkspaceFiles,
     _with_live_hot_follow_subtitle_currentness,
     compose_subtitle_vf,
+    optimize_hot_follow_subtitle_layout_srt,
 )
 
 
@@ -220,6 +221,69 @@ def test_vi_compose_subtitle_filter_does_not_add_black_cover_box(tmp_path):
     assert "subtitles='" in vf
 
 
+@pytest.mark.parametrize(
+    ("target_lang", "source_line"),
+    [
+        ("zh", "这是一条明显过长的中文字幕需要在最终烧录时被更自然地分成两行显示"),
+        ("en", "This is a deliberately long English subtitle line that should be wrapped into a more readable two-line layout for final compose"),
+        ("my", "ဤစာကြောင်းသည် နောက်ဆုံးဗီဒီယိုစာတန်းထိုးတွင် ဖတ်ရလွယ်ကူစေရန် နှစ်ကြောင်းအတွင်း ပြန်စီရမည့် မြန်မာစာတန်းဖြစ်သည်"),
+        ("vi", "Day la mot cau phu de tieng Viet rat dai can duoc chia thanh hai dong de de doc hon trong ban ghi cuoi"),
+    ],
+)
+def test_optimize_hot_follow_subtitle_layout_caps_common_path_to_two_lines(target_lang, source_line):
+    source = f"1\n00:00:00,000 --> 00:00:04,000\n{source_line}\n"
+
+    result = optimize_hot_follow_subtitle_layout_srt(source, target_lang)
+
+    body_lines = [line for line in result.splitlines() if line and not line.isdigit() and '-->' not in line]
+    assert 1 <= len(body_lines) <= 2
+    assert "".join(body_lines).replace(" ", "") in source_line.replace(" ", "")
+
+
+def test_compose_subtitle_vf_uses_bottom_safe_zone_defaults_for_hot_follow(tmp_path):
+    subtitle_path = tmp_path / "mm.srt"
+    subtitle_path.write_text("1\n00:00:00,000 --> 00:00:02,000\nမင်္ဂလာပါ\n", encoding="utf-8")
+
+    vf = compose_subtitle_vf(subtitle_path, tmp_path, "none", "my")
+
+    assert "Alignment=2" in vf
+    assert "MarginV=22" in vf
+    assert "WrapStyle=1" in vf
+
+
+def test_prepare_workspace_rewrites_local_burn_subtitles_for_layout(monkeypatch, tmp_path):
+    subtitle_text = (
+        "1\n00:00:00,000 --> 00:00:03,000\n"
+        "This is a deliberately long English subtitle line that should wrap for safer bottom placement\n"
+    )
+    svc = CompositionService(storage=_FakeStorage(subtitle_text), settings=object())
+
+    monkeypatch.setattr(compose_module, "object_head", lambda _key: {})
+    monkeypatch.setattr(compose_module, "assert_local_video_ok", lambda _path: (1024, 6.0))
+    monkeypatch.setattr(compose_module, "assert_local_audio_ok", lambda _path: (256, 6.0))
+    monkeypatch.setattr(compose_module, "sha256_file", lambda _path: "subtitle-sha")
+
+    inputs = _compose_inputs()
+    inputs.target_lang = "en"
+    task = {"task_id": "hf-layout-en", "subtitles_content_hash": _hash16(subtitle_text)}
+
+    ws = svc._prepare_workspace(
+        "hf-layout-en",
+        task,
+        inputs,
+        tmp_path,
+        subtitle_resolver=lambda *_args, **_kwargs: "subtitle-key",
+    )
+
+    assert ws.subtitle_path is not None
+    body_lines = [
+        line
+        for line in ws.subtitle_path.read_text(encoding="utf-8").splitlines()
+        if line and not line.isdigit() and "-->" not in line
+    ]
+    assert len(body_lines) == 2
+
+
 def test_compose_refreshes_live_vi_subtitle_currentness_before_voice_ready(monkeypatch):
     monkeypatch.setattr(
         "gateway.app.services.hot_follow_runtime_bridge.compat_hot_follow_subtitle_lane_state",
@@ -402,7 +466,13 @@ def test_prepare_workspace_records_actual_downloaded_subtitle_snapshot(monkeypat
     assert ws.subtitle_content_hash == _hash16(subtitle_text)
     assert ws.subtitle_sha256
     assert ws.subtitle_path is not None
-    assert ws.subtitle_path.read_text(encoding="utf-8") == subtitle_text
+    rendered_lines = [
+        line
+        for line in ws.subtitle_path.read_text(encoding="utf-8").splitlines()
+        if line and not line.isdigit() and "-->" not in line
+    ]
+    assert 1 <= len(rendered_lines) <= 2
+    assert "".join(rendered_lines).replace(" ", "") in subtitle_text.replace(" ", "")
 
 
 def test_prepare_workspace_rejects_mismatched_downloaded_subtitle_payload(monkeypatch, tmp_path):
