@@ -1,5 +1,32 @@
 # VeoSop05 启动进度文档
 
+## PR-Subtitle Font Micro-Tuning After Cleanup v1
+
+日期：2026-04-04
+
+本节点完成：
+
+- 将 Hot Follow target subtitle 的最终烧录字号再收一档，降低底部字幕块的视觉重量
+- 将字幕在底部 safe-zone 内再下压一小步，并同步收紧两行宽度阈值
+- 将 `bottom_mask / safe_band` 的 core band 高度与羽化层一并收紧，使 cleanup 区域更贴近实际字幕块高度
+
+本次收口说明：
+
+- 仅做字幕字体、底边距、两行阈值与 cleanup band 高度的微调
+- 不改 cleanup 逻辑家族、不改 compose ownership、不改状态链或发布语义
+- 不引入 OCR / CV / vision API，不扩成通用 subtitle removal
+
+本节点验证：
+
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hf_compose_freshness.py -q gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+
+剩余风险：
+
+- 本次是视觉参数微调，不是自动视觉评估；最终观感仍建议结合真实 beauty/tutorial 素材抽样复核
+- 当前字体资源仍未扩展，本次只微调已有布局/cleanup 参数
+
 ## PR-Render Binding Fix: Cleanup / Layout Snapshot Wiring
 
 日期：2026-04-04

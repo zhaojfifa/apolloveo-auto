@@ -205,12 +205,12 @@ def _normalize_layout_lang(target_lang: str | None) -> str:
 def _subtitle_layout_profile(target_lang: str | None) -> dict[str, float | str]:
     lang = _normalize_layout_lang(target_lang)
     if lang == "zh":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 17, "margin_v": 24, "line_width": 12.5}
+        return {"font_name": "Noto Sans Myanmar", "font_size": 16, "margin_v": 18, "line_width": 11.5}
     if lang == "en":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 16, "margin_v": 24, "line_width": 28.0}
+        return {"font_name": "Noto Sans Myanmar", "font_size": 15, "margin_v": 18, "line_width": 24.0}
     if lang == "vi":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 16, "margin_v": 24, "line_width": 25.0}
-    return {"font_name": "Noto Sans Myanmar", "font_size": 17, "margin_v": 22, "line_width": 14.0}
+        return {"font_name": "Noto Sans Myanmar", "font_size": 15, "margin_v": 18, "line_width": 22.0}
+    return {"font_name": "Noto Sans Myanmar", "font_size": 16, "margin_v": 18, "line_width": 13.0}
 
 
 def subtitle_render_signature(*, target_lang: str | None, cleanup_mode: str | None) -> str:
@@ -356,24 +356,24 @@ def source_subtitle_cover_filter(cleanup_mode: str, target_lang: str | None = No
     mode = str(cleanup_mode or "").strip().lower()
     if mode == "bottom_mask":
         return _feathered_bottom_band_filter(
-            core_start=0.835,
-            core_height=0.165,
-            core_alpha=0.72,
+            core_start=0.850,
+            core_height=0.150,
+            core_alpha=0.68,
             feather_bands=[
-                (0.805, 0.030, 0.26),
-                (0.780, 0.025, 0.14),
-                (0.760, 0.020, 0.08),
+                (0.825, 0.025, 0.22),
+                (0.803, 0.022, 0.12),
+                (0.785, 0.018, 0.06),
             ],
         )
     if mode == "safe_band":
         return _feathered_bottom_band_filter(
-            core_start=0.790,
-            core_height=0.210,
-            core_alpha=0.62,
+            core_start=0.820,
+            core_height=0.180,
+            core_alpha=0.56,
             feather_bands=[
-                (0.750, 0.040, 0.24),
-                (0.720, 0.030, 0.12),
-                (0.700, 0.020, 0.06),
+                (0.790, 0.030, 0.20),
+                (0.765, 0.025, 0.10),
+                (0.745, 0.020, 0.05),
             ],
         )
     return ""

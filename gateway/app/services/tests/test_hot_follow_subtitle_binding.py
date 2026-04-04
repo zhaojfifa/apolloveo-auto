@@ -227,18 +227,22 @@ def test_bottom_mask_uses_feathered_bottom_band_cleanup():
     vf = compose_module.source_subtitle_cover_filter("bottom_mask", target_lang="my")
 
     assert vf.count("drawbox=") == 4
-    assert "color=black@0.72" in vf
-    assert "color=black@0.26" in vf
-    assert "color=black@0.08" in vf
+    assert "y=ih*0.850" in vf
+    assert "h=ih*0.150" in vf
+    assert "color=black@0.68" in vf
+    assert "color=black@0.22" in vf
+    assert "color=black@0.06" in vf
 
 
 def test_safe_band_uses_wider_feathered_cleanup():
     vf = compose_module.source_subtitle_cover_filter("safe_band", target_lang="vi")
 
     assert vf.count("drawbox=") == 4
-    assert "color=black@0.62" in vf
-    assert "color=black@0.24" in vf
-    assert "color=black@0.06" in vf
+    assert "y=ih*0.820" in vf
+    assert "h=ih*0.180" in vf
+    assert "color=black@0.56" in vf
+    assert "color=black@0.20" in vf
+    assert "color=black@0.05" in vf
 
 
 @pytest.mark.parametrize(
@@ -267,7 +271,8 @@ def test_compose_subtitle_vf_uses_bottom_safe_zone_defaults_for_hot_follow(tmp_p
     vf = compose_subtitle_vf(subtitle_path, tmp_path, "none", "my")
 
     assert "Alignment=2" in vf
-    assert "MarginV=22" in vf
+    assert "FontSize=16" in vf
+    assert "MarginV=18" in vf
     assert "WrapStyle=1" in vf
 
 
