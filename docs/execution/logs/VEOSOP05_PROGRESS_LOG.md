@@ -1,5 +1,32 @@
 # VeoSop05 启动进度文档
 
+## PR-2 Hot Follow Subtitle Layout Safe-Zone Optimization
+
+日期：2026-04-04
+
+本节点完成：
+
+- 将 Hot Follow 最终烧录字幕收口到更稳定的底部 safe-zone 样式，显式固定 `Alignment=2`
+- 将常见字幕烧录路径压回两行默认展示，避免长字幕在成片中占据过高垂直空间
+- 在 compose 临时工作目录内对烧录用 SRT 做窄范围 layout 重排，改进中英缅越长句断行可读性
+
+本次收口说明：
+
+- 只改最终烧录展示，不改 source/target subtitle truth、dub freshness、compose ownership 或 publish/workbench 状态链
+- 不引入新字体依赖或外部 layout 服务
+- 不扩成字幕清洗、翻译质量或 bridge 方案改造
+
+本节点验证：
+
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hf_compose_freshness.py -q gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+
+剩余风险：
+
+- 当前仓库只内置 Myanmar 字体资源；本 PR 仅优化 safe-zone / wrap，不额外引入 CJK / Latin 字体资产
+- 两行策略是 common-path 优化，不是完整排版引擎；极端超长字幕仍可能需要上游字幕编辑配合
+
 ## Hot Follow Local Upload Parse Binding Fix
 
 日期：2026-04-02
