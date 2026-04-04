@@ -23,6 +23,7 @@ except Exception:
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.services import voice_state as voice_state_service
+from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 
 def _settings():
@@ -391,6 +392,43 @@ def test_mm_voice_state_invalidates_stale_dub_after_subtitle_edit(monkeypatch):
     assert state["audio_ready_reason"] == "dub_stale_after_subtitles"
     assert state["dub_current"] is False
     assert state["dub_matches_current_subtitle"] is False
+
+
+def test_mm_voice_state_invalidates_stale_dub_after_speed_change(monkeypatch):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    _patch_voice_storage(
+        monkeypatch,
+        lambda _key: True,
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
+
+    task = {
+        "task_id": "hf-mm-speed-stale",
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "dub_status": "done",
+        "target_subtitle_current": True,
+        "target_subtitle_current_reason": "ready",
+        "pipeline_config": {"audio_fit_max_speed": "1.45"},
+        "dub_source_audio_fit_max_speed": "1.25",
+        "mm_audio_key": "deliver/tasks/hf-mm-speed-stale/audio_mm.mp3",
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "my-MM-ThihaNeural",
+        "config": {
+            "tts_requested_voice": "mm_male_1",
+            "tts_resolved_voice": "my-MM-ThihaNeural",
+            "tts_provider": "azure-speech",
+        },
+    }
+
+    state = tasks_router._collect_voice_execution_state(task, _settings())
+
+    assert state["audio_ready"] is False
+    assert state["audio_ready_reason"] == "dub_stale_after_speed_change"
+    assert state["dub_current"] is False
+    assert state["current_audio_fit_max_speed"] == "1.45"
+    assert state["dub_source_audio_fit_max_speed"] == "1.25"
 
 
 def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
@@ -862,7 +900,7 @@ def test_successful_redub_persists_current_subtitle_snapshot(monkeypatch, tmp_pa
                 "dub_status": stored.get("dub_status"),
                 "dub_provider": stored.get("dub_provider"),
                 "voice_id": stored.get("voice_id"),
-                "pipeline_config": stored.get("pipeline_config"),
+                "pipeline_config": parse_pipeline_config(stored.get("pipeline_config")),
                 "mm_audio_path": stored.get("mm_audio_path"),
             }
         ),
@@ -902,6 +940,7 @@ def test_successful_redub_persists_current_subtitle_snapshot(monkeypatch, tmp_pa
                 "dub_provider": "azure-speech",
                 "subtitles_content_hash": "HASH_LATEST",
                 "subtitles_override_updated_at": "2026-04-04T10:00:00+00:00",
+                "pipeline_config": {"audio_fit_max_speed": "1.45"},
                 "config": {
                     "tts_requested_voice": "mm_female_1",
                     "tts_resolved_voice": "my-MM-NilarNeural",
@@ -918,6 +957,7 @@ def test_successful_redub_persists_current_subtitle_snapshot(monkeypatch, tmp_pa
         provider="azure-speech",
         voice_id="mm_female_1",
         mm_text="မင်္ဂလာပါ",
+        tts_speed=1.45,
         force=True,
     )
 
@@ -927,3 +967,4 @@ def test_successful_redub_persists_current_subtitle_snapshot(monkeypatch, tmp_pa
     assert repo.task["dub_status"] == "ready"
     assert repo.task["dub_source_subtitles_content_hash"] == "HASH_LATEST"
     assert repo.task["dub_source_subtitle_updated_at"] == "2026-04-04T10:00:00+00:00"
+    assert repo.task["dub_source_audio_fit_max_speed"] == "1.45"

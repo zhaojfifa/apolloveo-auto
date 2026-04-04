@@ -730,3 +730,35 @@
 剩余风险：
 
 - 旧任务在首次重新标准配音前，可能还缺少 `dub_source_*` 快照字段；该类任务会在重新配音一次后进入新的 freshness 基线
+
+## Hot Follow Dub Speed Binding + Freshness Invalidation
+
+日期：2026-04-04
+
+本节点完成：
+
+- 修复 `audio_fit_max_speed` 未被 `pipeline_config` 规范化保留，导致 workbench/hub 一直回退显示默认 `1.25`
+- 让 workbench hub / `audio_config` 返回当前 authoritative dub speed，避免 UI slider 与 API 返回值分裂
+- 将 dub speed 纳入当前 dub freshness：当前 speed 与 dub 生成时 snapshot 不一致时，旧 dub 不再视为 current
+- speed 变更时若旧任务还没有 speed snapshot，会回填当前旧 speed 作为 dub 基线，从而在下一次 speed 改动后立即失效旧 dub
+- 成功 re-dub 时持久化 `dub_source_audio_fit_max_speed`，让新 speed 成为 authoritative dub config 的一部分
+
+本次收口说明：
+
+- 本次只修 Hot Follow 既有 dub speed request/persistence/currentness 链
+- 不改 compose/publish ownership，不新增 provider，不改翻译桥接
+
+本节点明确不做：
+
+- 不新增外部 TTS provider
+- 不重写 workbench UI 架构
+- 不扩展到 Hot Follow 以外线路
+
+验证结果：
+
+- `python3.11 -m py_compile gateway/app/services/voice_state.py gateway/app/routers/tasks.py gateway/app/routers/hot_follow_api.py gateway/app/utils/pipeline_config.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -q gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q gateway/app/services/tests/test_hf_compose_freshness.py -q gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+
+剩余风险：
+
+- 极早期旧任务若没有 audio speed snapshot，首次 speed 调整会依赖本次补上的旧 speed 回填来进入新的 freshness 基线；再完成一次标准配音后即可稳定落到新模型

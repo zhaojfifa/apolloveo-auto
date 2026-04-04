@@ -2656,10 +2656,6 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     config["tts_provider"] = provider
     config["tts_request_token"] = request_token
     config["tts_completed_token"] = None
-    dub_subtitle_snapshot = {
-        "dub_source_subtitles_content_hash": str(task.get("subtitles_content_hash") or "").strip() or None,
-        "dub_source_subtitle_updated_at": str(task.get("subtitles_override_updated_at") or "").strip() or None,
-    }
     for stale_path in (
         workspace.mm_audio_primary_path,
         workspace.mm_audio_mp3_path,
@@ -2687,6 +2683,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "audio_sha256": None,
             "dub_source_subtitles_content_hash": None,
             "dub_source_subtitle_updated_at": None,
+            "dub_source_audio_fit_max_speed": None,
         },
     )
     task = repo.get(task_id) or task
@@ -2710,6 +2707,15 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 {"pipeline_config": pipeline_config_to_storage(pipeline_config)},
             )
             task = repo.get(task_id) or task
+
+        dub_subtitle_snapshot = {
+            "dub_source_subtitles_content_hash": str(task.get("subtitles_content_hash") or "").strip() or None,
+            "dub_source_subtitle_updated_at": str(task.get("subtitles_override_updated_at") or "").strip() or None,
+            "dub_source_audio_fit_max_speed": str(
+                parse_pipeline_config(task.get("pipeline_config")).get("audio_fit_max_speed") or "1.25"
+            ).strip()
+            or "1.25",
+        }
 
         class TaskAdapter:
             def __init__(
@@ -2992,6 +2998,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "audio_sha256": None,
                     "dub_source_subtitles_content_hash": None,
                     "dub_source_subtitle_updated_at": None,
+                    "dub_source_audio_fit_max_speed": None,
                 },
             )
             stored = _repo_refresh_task(repo, task_id)
@@ -3036,6 +3043,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "audio_sha256": None,
                     "dub_source_subtitles_content_hash": None,
                     "dub_source_subtitle_updated_at": None,
+                    "dub_source_audio_fit_max_speed": None,
                 },
             )
             stored = _repo_refresh_task(repo, task_id)

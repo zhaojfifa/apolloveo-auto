@@ -9,6 +9,7 @@ DEFAULT_DUB_MODE = "auto-fallback"
 _SUBTITLES_MODES = {"whisper-only", "whisper+gemini"}
 _DUB_MODES = {"edge", "lovo", "auto-fallback"}
 _EXTRA_KEYS = {
+    "audio_fit_max_speed",
     "ingest_mode",
     "source_language_hint",
     "process_mode",
