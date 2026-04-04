@@ -51,13 +51,20 @@ def build_hot_follow_current_attempt_summary(
 ) -> dict[str, Any]:
     compose_status_norm = str(compose_status or "").strip().lower() or "never"
     compose_reason_norm = str(composed_reason or "").strip().lower() or "unknown"
+    audio_ready = bool(voice_state.get("audio_ready"))
+    requires_redub = bool(
+        subtitle_lane.get("subtitle_ready")
+        and not audio_ready
+        and str(voice_state.get("audio_ready_reason") or "").strip().lower()
+        not in {"dub_running", "dub_not_done", "audio_missing", "unknown"}
+    )
     requires_recompose = bool(
-        voice_state.get("audio_ready")
+        audio_ready
         and (final_stale_reason or compose_reason_norm != "ready")
     )
     return {
         "dub_status": str(dub_status or "").strip().lower() or "never",
-        "audio_ready": bool(voice_state.get("audio_ready")),
+        "audio_ready": audio_ready,
         "audio_ready_reason": str(voice_state.get("audio_ready_reason") or "").strip() or "unknown",
         "dub_current": bool(voice_state.get("dub_current")),
         "dub_current_reason": str(voice_state.get("dub_current_reason") or "").strip() or "unknown",
@@ -67,6 +74,7 @@ def build_hot_follow_current_attempt_summary(
         "compose_status": compose_status_norm,
         "compose_reason": compose_reason_norm,
         "final_stale_reason": final_stale_reason or None,
+        "requires_redub": requires_redub,
         "requires_recompose": requires_recompose,
         "current_subtitle_source": str(subtitle_lane.get("actual_burn_subtitle_source") or "").strip() or None,
     }
@@ -92,6 +100,8 @@ def build_hot_follow_operator_summary(
         recommended_next_action = "当前素材无可提取字幕，正在等待自动检测完成；也可直接在下方字幕编辑区手工输入缅语文字，保存后即可合成字幕版。"
     elif no_dub:
         recommended_next_action = "当前素材适合字幕驱动路径，可先保存字幕并直接合成字幕版。"
+    elif current_attempt.get("requires_redub"):
+        recommended_next_action = "当前目标字幕已更新，需重新配音后才能继续合成最新成片。"
     elif current_attempt.get("requires_recompose"):
         recommended_next_action = "当前配音已更新，建议重新合成最终视频以生成最新版本。"
     elif show_previous_final_as_primary and current_attempt_failed:
@@ -108,4 +118,3 @@ def build_hot_follow_operator_summary(
         "show_previous_final_as_primary": show_previous_final_as_primary,
         "recommended_next_action": recommended_next_action,
     }
-

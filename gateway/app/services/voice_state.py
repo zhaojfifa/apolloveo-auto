@@ -28,6 +28,17 @@ from gateway.app.services.media_validation import MIN_AUDIO_BYTES, media_meta_fr
 
 # ── Helpers (alphabetical by call-chain depth) ───────────────────────────────
 
+def hf_dub_matches_current_subtitle(task: dict) -> tuple[bool, str]:
+    current_hash = str(task.get("subtitles_content_hash") or "").strip() or None
+    dub_hash = str(task.get("dub_source_subtitles_content_hash") or "").strip() or None
+    current_updated_at = str(task.get("subtitles_override_updated_at") or "").strip() or None
+    dub_updated_at = str(task.get("dub_source_subtitle_updated_at") or "").strip() or None
+    if current_hash and dub_hash and current_hash != dub_hash:
+        return False, "dub_stale_after_subtitles"
+    if current_updated_at and dub_updated_at and current_updated_at != dub_updated_at:
+        return False, "dub_stale_after_subtitles"
+    return True, "ready"
+
 def build_hot_follow_voice_options(
     settings, target_lang: str | None
 ) -> dict[str, list[dict[str, str]]]:
@@ -274,8 +285,11 @@ def collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         audio_ready_reason = "dub_not_current"
     subtitle_current = task.get("target_subtitle_current")
     subtitle_current_reason = str(task.get("target_subtitle_current_reason") or "").strip() or "subtitle_not_current"
-    if target_lang == "vi" and subtitle_current is False:
+    dub_matches_current_subtitle, dub_subtitle_reason = hf_dub_matches_current_subtitle(task)
+    if subtitle_current is False:
         audio_ready_reason = subtitle_current_reason
+    elif not dub_matches_current_subtitle:
+        audio_ready_reason = dub_subtitle_reason
     audio_ready = audio_ready_reason == "ready"
     dub_current = audio_ready and audio_exists and matches_expected
     return {
@@ -296,4 +310,6 @@ def collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         ),
         "dub_current": bool(dub_current),
         "dub_current_reason": audio_ready_reason if not dub_current else "ready",
+        "dub_matches_current_subtitle": bool(dub_matches_current_subtitle),
+        "dub_subtitle_reason": dub_subtitle_reason,
     }
