@@ -217,8 +217,28 @@ def test_vi_compose_subtitle_filter_does_not_add_black_cover_box(tmp_path):
 
     vf = compose_subtitle_vf(subtitle_path, tmp_path, "bottom_mask", "vi")
 
-    assert "drawbox=" not in vf
+    assert "drawbox=" in vf
     assert "subtitles='" in vf
+    assert "color=black@0.92" not in vf
+    assert "color=black@0.96" not in vf
+
+
+def test_bottom_mask_uses_feathered_bottom_band_cleanup():
+    vf = compose_module.source_subtitle_cover_filter("bottom_mask", target_lang="my")
+
+    assert vf.count("drawbox=") == 4
+    assert "color=black@0.72" in vf
+    assert "color=black@0.26" in vf
+    assert "color=black@0.08" in vf
+
+
+def test_safe_band_uses_wider_feathered_cleanup():
+    vf = compose_module.source_subtitle_cover_filter("safe_band", target_lang="vi")
+
+    assert vf.count("drawbox=") == 4
+    assert "color=black@0.62" in vf
+    assert "color=black@0.24" in vf
+    assert "color=black@0.06" in vf
 
 
 @pytest.mark.parametrize(

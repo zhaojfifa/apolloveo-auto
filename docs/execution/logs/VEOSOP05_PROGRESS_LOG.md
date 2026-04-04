@@ -1,5 +1,32 @@
 # VeoSop05 启动进度文档
 
+## PR-3 Hot Follow Original Subtitle Cleanup / Mask Overlay v1
+
+日期：2026-04-04
+
+本节点完成：
+
+- 将 Hot Follow 现有 `bottom_mask / safe_band` 收口为底部字幕带的分层柔化遮罩，而不是单块重黑遮挡
+- 保持 target subtitle 继续在底部 safe-zone 烧录，并让 cleanup band 与现有 target subtitle overlay 路径兼容
+- 让越南语路径也能复用同一套柔和底部 cleanup，而不是继续完全跳过底部遮罩
+
+本次收口说明：
+
+- 仅改最终合成的视觉 cleanup 路径，不改 source/target subtitle truth、dub/compose/publish ownership 或状态链
+- 这是 rule-based/template-style 的 v1 底部字幕带 cleanup，不是通用 AI subtitle removal
+- 未引入 OCR / CV / vision API，也未扩成手动清理编辑器
+
+本节点验证：
+
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hf_compose_freshness.py -q gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+
+剩余风险：
+
+- 当前 v1 只针对常见底部 hard-subtitle band；不覆盖任意位置、彩色描边、复杂背景或动态字幕
+- 柔化遮罩改善的是常见场景的视觉观感，不应被描述成 universal subtitle removal
+
 ## PR-2 Hot Follow Subtitle Layout Safe-Zone Optimization
 
 日期：2026-04-04
