@@ -122,7 +122,11 @@ from gateway.app.services.task_router_actions import (
     run_task_pipeline_entry as _run_task_pipeline_entry,
 )
 from gateway.app.task_repo_utils import normalize_task_payload
-from gateway.app.services.compose_service import CompositionService, HotFollowComposeRequestContract
+from gateway.app.services.compose_service import (
+    CompositionService,
+    HotFollowComposeRequestContract,
+    subtitle_render_signature,
+)
 from gateway.app.services.hot_follow_language_profiles import (
     get_hot_follow_language_profile,
     hot_follow_internal_lang,
@@ -201,10 +205,15 @@ class ComposePlanPatchRequest(BaseModel):
 
 
 def _hf_compose_revision_snapshot(task: dict) -> dict[str, str | None]:
+    compose_plan = dict(task.get("compose_plan") or {})
     return {
         "subtitle_updated_at": str(task.get("subtitles_override_updated_at") or "").strip() or None,
         "subtitle_content_hash": str(task.get("subtitles_content_hash") or "").strip() or None,
         "audio_sha256": str(task.get("audio_sha256") or "").strip() or None,
+        "render_signature": subtitle_render_signature(
+            target_lang=compose_plan.get("target_lang") or task.get("target_lang") or task.get("content_lang"),
+            cleanup_mode=compose_plan.get("cleanup_mode"),
+        ),
     }
 
 

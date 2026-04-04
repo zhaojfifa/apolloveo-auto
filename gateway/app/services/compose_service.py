@@ -77,11 +77,13 @@ def _current_final_is_fresh(
     current_audio_sha = str(revision.get("audio_sha256") or "").strip() or None
     current_sub_hash = str(revision.get("subtitle_content_hash") or "").strip() or None
     current_sub_at = str(revision.get("subtitle_updated_at") or "").strip() or None
+    current_render_signature = str(revision.get("render_signature") or "").strip() or None
     current_dub_at = str(task.get("dub_generated_at") or "").strip() or None
     composed_audio_sha = str(task.get("final_source_audio_sha256") or "").strip() or None
     composed_dub_at = str(task.get("final_source_dub_generated_at") or "").strip() or None
     composed_sub_hash = str(task.get("final_source_subtitles_content_hash") or "").strip() or None
     composed_sub_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
+    composed_render_signature = str(task.get("final_source_render_signature") or "").strip() or None
     compose_finished_at = str(task.get("compose_last_finished_at") or task.get("final_updated_at") or "").strip() or None
 
     def _parse_dt(value: str | None) -> datetime | None:
@@ -96,7 +98,13 @@ def _current_final_is_fresh(
         return dt
 
     # No compose snapshot → cannot confirm what was baked into the final → recompose.
-    if not composed_audio_sha and not composed_sub_hash and not composed_dub_at and not composed_sub_at:
+    if (
+        not composed_audio_sha
+        and not composed_sub_hash
+        and not composed_dub_at
+        and not composed_sub_at
+        and not composed_render_signature
+    ):
         return False
 
     if composed_audio_sha and current_audio_sha and composed_audio_sha != current_audio_sha:
@@ -113,12 +121,16 @@ def _current_final_is_fresh(
             return False
     if composed_sub_at and current_sub_at and composed_sub_at != current_sub_at:
         return False
+    if composed_render_signature and current_render_signature and composed_render_signature != current_render_signature:
+        return False
     if current_sub_at and compose_finished_at:
         current_sub_dt = _parse_dt(current_sub_at)
         compose_finished_dt = _parse_dt(compose_finished_at)
         if current_sub_dt is not None and compose_finished_dt is not None and current_sub_dt > compose_finished_dt:
             return False
     if not composed_sub_hash and not composed_sub_at and current_sub_hash:
+        return False
+    if not composed_render_signature and current_render_signature:
         return False
     return True
 
@@ -199,6 +211,24 @@ def _subtitle_layout_profile(target_lang: str | None) -> dict[str, float | str]:
     if lang == "vi":
         return {"font_name": "Noto Sans Myanmar", "font_size": 16, "margin_v": 24, "line_width": 25.0}
     return {"font_name": "Noto Sans Myanmar", "font_size": 17, "margin_v": 22, "line_width": 14.0}
+
+
+def subtitle_render_signature(*, target_lang: str | None, cleanup_mode: str | None) -> str:
+    profile = _subtitle_layout_profile(target_lang)
+    lang = _normalize_layout_lang(target_lang)
+    cleanup = str(cleanup_mode or "none").strip().lower() or "none"
+    return "|".join(
+        [
+            f"lang={lang}",
+            f"cleanup={cleanup}",
+            f"font={profile['font_name']}",
+            f"size={int(profile['font_size'])}",
+            f"margin_v={int(profile['margin_v'])}",
+            f"line_width={float(profile['line_width']):.2f}",
+            "align=2",
+            "wrap=1",
+        ]
+    )
 
 
 def _text_display_width(text: str) -> float:
@@ -1495,6 +1525,12 @@ class CompositionService:
             "final_source_subtitle_storage_key": ws.subtitle_key,
             "final_source_subtitle_storage_etag": ws.subtitle_object_etag,
             "final_source_subtitle_sha256": ws.subtitle_sha256,
+            "final_source_render_signature": subtitle_render_signature(
+                target_lang=(task.get("compose_plan") or {}).get("target_lang")
+                or task.get("target_lang")
+                or task.get("content_lang"),
+                cleanup_mode=(task.get("compose_plan") or {}).get("cleanup_mode"),
+            ),
             "compose_provider": "ffmpeg",
             "compose_version": int(task.get("compose_version") or 0) + 1,
             "compose_status": "done",

@@ -28,7 +28,7 @@ from gateway.app.services.task_view_helpers import (
     compute_composed_state,
     compute_final_staleness,
 )
-from gateway.app.services.compose_service import _current_final_is_fresh
+from gateway.app.services.compose_service import _current_final_is_fresh, subtitle_render_signature
 
 
 # ---------------------------------------------------------------------------
@@ -270,6 +270,7 @@ class TestAfterRecompose:
             "final_source_subtitle_storage_key",
             "final_source_subtitle_storage_etag",
             "final_source_subtitle_sha256",
+            "final_source_render_signature",
         }
         import inspect
         src = inspect.getsource(CompositionService._upload_and_verify)
@@ -328,8 +329,60 @@ class TestComputeComposedStateReturnShape:
             "final_source_subtitle_storage_key",
             "final_source_subtitle_storage_etag",
             "final_source_subtitle_sha256",
+            "final_source_render_signature",
         ):
             assert f'"{key}"' in src, f"Missing snapshot key in _upload_and_verify: {key}"
+
+
+class TestRenderBindingFreshness:
+    def test_cleanup_mode_change_stales_existing_final(self):
+        current_render = subtitle_render_signature(target_lang="my", cleanup_mode="safe_band")
+        previous_render = subtitle_render_signature(target_lang="my", cleanup_mode="none")
+        task = {
+            "compose_last_status": "done",
+            "audio_sha256": "SHA_A",
+            "final_source_audio_sha256": "SHA_A",
+            "subtitles_content_hash": "HASH_A",
+            "final_source_subtitles_content_hash": "HASH_A",
+            "final_source_render_signature": previous_render,
+        }
+        revision = {
+            "audio_sha256": "SHA_A",
+            "subtitle_content_hash": "HASH_A",
+            "subtitle_updated_at": None,
+            "render_signature": current_render,
+        }
+
+        assert _current_final_is_fresh(
+            task,
+            revision=revision,
+            final_exists=True,
+            final_size=500_000,
+        ) is False
+
+    def test_matching_render_signature_keeps_existing_final_fresh(self):
+        render_signature = subtitle_render_signature(target_lang="vi", cleanup_mode="safe_band")
+        task = {
+            "compose_last_status": "done",
+            "audio_sha256": "SHA_A",
+            "final_source_audio_sha256": "SHA_A",
+            "subtitles_content_hash": "HASH_A",
+            "final_source_subtitles_content_hash": "HASH_A",
+            "final_source_render_signature": render_signature,
+        }
+        revision = {
+            "audio_sha256": "SHA_A",
+            "subtitle_content_hash": "HASH_A",
+            "subtitle_updated_at": None,
+            "render_signature": render_signature,
+        }
+
+        assert _current_final_is_fresh(
+            task,
+            revision=revision,
+            final_exists=True,
+            final_size=500_000,
+        ) is True
 
 
 # ---------------------------------------------------------------------------

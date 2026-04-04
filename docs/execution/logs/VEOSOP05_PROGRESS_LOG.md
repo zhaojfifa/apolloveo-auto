@@ -1,5 +1,32 @@
 # VeoSop05 启动进度文档
 
+## PR-Render Binding Fix: Cleanup / Layout Snapshot Wiring
+
+日期：2026-04-04
+
+本节点完成：
+
+- 将 Hot Follow `cleanup_mode` 与 subtitle layout render policy 绑定进 compose freshness snapshot
+- 当 cleanup/layout render signature 变化时，旧 final 不再被误判为 fresh
+- 让 compose plan、最终 render 行为与成片结果重新一致，而不是继续复用旧 final
+
+本次收口说明：
+
+- 这是 render binding 修复，不新增 cleanup feature family，不改 source/target subtitle truth、dub/compose/publish ownership
+- 不引入 OCR / CV / vision API
+- 不扩成通用 subtitle removal 或广义 video cleanup 平台
+
+本节点验证：
+
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/routers/hot_follow_api.py gateway/app/services/tests/test_hf_compose_freshness.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hf_compose_freshness.py -q gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+
+剩余风险：
+
+- 当前修复保证 render plan 变化会触发新 compose；它不替代真实视频视觉对比工具
+- cleanup/layout 仍是 rule-based v1 行为，不应描述成 universal subtitle removal
+
 ## PR-3 Hot Follow Original Subtitle Cleanup / Mask Overlay v1
 
 日期：2026-04-04
