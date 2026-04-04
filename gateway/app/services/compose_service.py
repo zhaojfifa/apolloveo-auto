@@ -160,6 +160,29 @@ def escape_subtitles_path(path: Path) -> str:
     return raw.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
 
 
+def _feathered_bottom_band_filter(
+    *,
+    core_start: float,
+    core_height: float,
+    core_alpha: float,
+    feather_bands: list[tuple[float, float, float]],
+) -> str:
+    filters = [
+        (
+            "drawbox="
+            f"x=0:y=ih*{core_start:.3f}:w=iw:h=ih*{core_height:.3f}:"
+            f"color=black@{core_alpha:.2f}:t=fill"
+        )
+    ]
+    for start, height, alpha in feather_bands:
+        filters.append(
+            "drawbox="
+            f"x=0:y=ih*{start:.3f}:w=iw:h=ih*{height:.3f}:"
+            f"color=black@{alpha:.2f}:t=fill"
+        )
+    return ",".join(filters)
+
+
 def _normalize_layout_lang(target_lang: str | None) -> str:
     raw = str(target_lang or "").strip().lower()
     if raw == "mm":
@@ -300,13 +323,29 @@ def optimize_hot_follow_subtitle_layout_srt(srt_text: str, target_lang: str | No
 
 def source_subtitle_cover_filter(cleanup_mode: str, target_lang: str | None = None) -> str:
     """Return an FFmpeg drawbox filter for subtitle area masking."""
-    if str(target_lang or "").strip().lower() == "vi":
-        return ""
     mode = str(cleanup_mode or "").strip().lower()
     if mode == "bottom_mask":
-        return "drawbox=x=0:y=ih*0.80:w=iw:h=ih*0.20:color=black@0.92:t=fill"
+        return _feathered_bottom_band_filter(
+            core_start=0.835,
+            core_height=0.165,
+            core_alpha=0.72,
+            feather_bands=[
+                (0.805, 0.030, 0.26),
+                (0.780, 0.025, 0.14),
+                (0.760, 0.020, 0.08),
+            ],
+        )
     if mode == "safe_band":
-        return "drawbox=x=0:y=ih*0.74:w=iw:h=ih*0.26:color=black@0.96:t=fill"
+        return _feathered_bottom_band_filter(
+            core_start=0.790,
+            core_height=0.210,
+            core_alpha=0.62,
+            feather_bands=[
+                (0.750, 0.040, 0.24),
+                (0.720, 0.030, 0.12),
+                (0.700, 0.020, 0.06),
+            ],
+        )
     return ""
 
 
