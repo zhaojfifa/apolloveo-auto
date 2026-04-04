@@ -21,6 +21,7 @@ except Exception:
 from gateway.app.deps import get_task_repository
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 
 class _Repo:
@@ -459,6 +460,135 @@ def test_hot_follow_workbench_mm_stale_dub_downgrades_audio_step(monkeypatch):
     assert dub_step.get("status") != "done"
     assert data.get("audio", {}).get("audio_ready") is False
     assert data.get("audio", {}).get("audio_ready_reason") == "dub_stale_after_subtitles"
+
+
+def test_patch_hot_follow_audio_config_persists_speed_and_backfills_old_dub_speed_snapshot(monkeypatch):
+    class _Repo:
+        def __init__(self):
+            self.task = {
+                "task_id": "hf-audio-speed-config",
+                "kind": "hot_follow",
+                "target_lang": "mm",
+                "dub_provider": "azure-speech",
+                "voice_id": "mm_female_1",
+                "mm_audio_key": "deliver/tasks/hf-audio-speed-config/audio_mm.mp3",
+                "pipeline_config": {"audio_fit_max_speed": "1.25"},
+                "config": {
+                    "tts_requested_voice": "mm_female_1",
+                    "tts_resolved_voice": "my-MM-NilarNeural",
+                    "tts_provider": "azure-speech",
+                },
+            }
+
+        def get(self, task_id):
+            assert task_id == "hf-audio-speed-config"
+            return dict(self.task)
+
+    repo = _Repo()
+    monkeypatch.setattr(
+        hf_router,
+        "_policy_upsert",
+        lambda _repo, _task_id, updates, **_kwargs: repo.task.update(updates),
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda task, _settings: {
+            "voiceover_url": None,
+            "requested_voice": "mm_female_1",
+            "resolved_voice": "my-MM-NilarNeural",
+            "expected_provider": "azure-speech",
+        },
+    )
+
+    result = hf_router.patch_hot_follow_audio_config(
+        "hf-audio-speed-config",
+        hf_router.HotFollowAudioConfigRequest(audio_fit_max_speed=1.45),
+        repo=repo,
+    )
+
+    assert parse_pipeline_config(repo.task["pipeline_config"])["audio_fit_max_speed"] == "1.45"
+    assert result["audio_config"]["audio_fit_max_speed"] == 1.45
+    assert repo.task["dub_source_audio_fit_max_speed"] == "1.25"
+
+
+def test_hot_follow_workbench_hub_echoes_current_speed_and_stale_speed_reason(monkeypatch):
+    task_id = "hf-workbench-speed-stale-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "ready",
+            "target_lang": "mm",
+            "content_lang": "mm",
+            "compose_status": "done",
+            "compose_last_status": "done",
+            "dub_status": "done",
+            "voice_id": "mm_female_1",
+            "pipeline_config": {"audio_fit_max_speed": "1.45"},
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
+            "mm_audio_voice_id": "my-MM-NilarNeural",
+            "mm_audio_provider": "azure-speech",
+            "mm_srt_path": f"deliver/tasks/{task_id}/mm.srt",
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "audio_not_ready",
+            "final": {"exists": False, "fresh": False, "url": None, "size_bytes": None},
+            "historical_final": {"exists": False, "url": None, "size_bytes": None},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": True,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda task, _settings: {
+            "audio_ready": False,
+            "audio_ready_reason": "dub_stale_after_speed_change",
+            "dub_current": False,
+            "dub_current_reason": "dub_stale_after_speed_change",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "mm_female_1",
+            "voiceover_url": None,
+            "deliverable_audio_done": True,
+            "current_audio_fit_max_speed": "1.45",
+            "dub_source_audio_fit_max_speed": "1.25",
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    assert data.get("audio", {}).get("audio_fit_max_speed") == 1.45
+    assert data.get("audio", {}).get("audio_ready_reason") == "dub_stale_after_speed_change"
+    assert data.get("audio", {}).get("current_audio_fit_max_speed") == "1.45"
+    assert data.get("audio", {}).get("dub_source_audio_fit_max_speed") == "1.25"
+    assert data.get("ready_gate", {}).get("compose_ready") is False
 
 
 def test_hot_follow_workbench_parse_uses_raw_artifacts_over_failed_legacy_status(monkeypatch):

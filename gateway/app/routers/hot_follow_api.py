@@ -459,6 +459,7 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
     return {
         "tts_engine": _hf_engine_public(provider),
         "tts_voice": voice_state.get("resolved_voice"),
+        "requested_voice": voice_state.get("requested_voice"),
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
@@ -1826,6 +1827,7 @@ def get_hot_follow_workbench_hub(
         "audio": {
             "tts_engine": audio_cfg.get("tts_engine"),
             "tts_voice": audio_cfg.get("tts_voice"),
+            "audio_fit_max_speed": audio_cfg.get("audio_fit_max_speed"),
             "voiceover_url": audio_cfg.get("voiceover_url") or audio_cfg.get("audio_url"),
             "bgm_url": audio_cfg.get("bgm_url"),
             "bgm_mix": audio_cfg.get("bgm_mix"),
@@ -1841,6 +1843,8 @@ def get_hot_follow_workbench_hub(
             "deliverable_audio_done": bool(voice_state.get("deliverable_audio_done")),
             "dub_current": bool(voice_state.get("dub_current")),
             "dub_current_reason": voice_state.get("dub_current_reason"),
+            "dub_source_audio_fit_max_speed": voice_state.get("dub_source_audio_fit_max_speed"),
+            "current_audio_fit_max_speed": voice_state.get("current_audio_fit_max_speed"),
             "no_dub": bool(route_state.get("content_mode") in {"silent_candidate", "subtitle_led_candidate"} and not str(subtitle_lane.get("dub_input_text") or "").strip()),
             "no_dub_reason": (
                 "subtitle_led" if route_state.get("content_mode") == "subtitle_led"
@@ -2088,6 +2092,7 @@ def patch_hot_follow_audio_config(
     settings = get_settings()
     config = dict(task.get("config") or {})
     bgm = dict(config.get("bgm") or {})
+    current_audio_config = _hf_audio_config(task)
     if payload.bgm_mix is not None:
         mix = max(0.0, min(1.0, float(payload.bgm_mix)))
         bgm["mix_ratio"] = mix
@@ -2130,6 +2135,13 @@ def patch_hot_follow_audio_config(
         pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
         pipeline_config["audio_fit_max_speed"] = f"{speed:.2f}"
         updates["pipeline_config"] = pipeline_config_to_storage(pipeline_config)
+        current_speed = f"{float(current_audio_config.get('audio_fit_max_speed') or 1.25):.2f}"
+        if (
+            f"{speed:.2f}" != current_speed
+            and not str(task.get("dub_source_audio_fit_max_speed") or "").strip()
+            and bool(task.get("mm_audio_key") or task.get("mm_audio_path"))
+        ):
+            updates["dub_source_audio_fit_max_speed"] = current_speed
 
     if updates:
         _policy_upsert(repo, task_id, updates)

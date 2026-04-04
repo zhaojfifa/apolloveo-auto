@@ -24,6 +24,7 @@ from gateway.app.services.tts_policy import (
 )
 from gateway.app.services.artifact_storage import object_exists, object_head
 from gateway.app.services.media_validation import MIN_AUDIO_BYTES, media_meta_from_head
+from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 
 # ── Helpers (alphabetical by call-chain depth) ───────────────────────────────
@@ -37,6 +38,24 @@ def hf_dub_matches_current_subtitle(task: dict) -> tuple[bool, str]:
         return False, "dub_stale_after_subtitles"
     if current_updated_at and dub_updated_at and current_updated_at != dub_updated_at:
         return False, "dub_stale_after_subtitles"
+    return True, "ready"
+
+
+def hf_current_audio_fit_max_speed(task: dict) -> str:
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    try:
+        speed = float(pipeline_config.get("audio_fit_max_speed") or 1.25)
+    except Exception:
+        speed = 1.25
+    speed = max(1.0, min(1.6, speed))
+    return f"{speed:.2f}"
+
+
+def hf_dub_matches_current_audio_config(task: dict) -> tuple[bool, str]:
+    current_speed = hf_current_audio_fit_max_speed(task)
+    dub_speed = str(task.get("dub_source_audio_fit_max_speed") or "").strip() or None
+    if dub_speed and dub_speed != current_speed:
+        return False, "dub_stale_after_speed_change"
     return True, "ready"
 
 def build_hot_follow_voice_options(
@@ -286,10 +305,13 @@ def collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     subtitle_current = task.get("target_subtitle_current")
     subtitle_current_reason = str(task.get("target_subtitle_current_reason") or "").strip() or "subtitle_not_current"
     dub_matches_current_subtitle, dub_subtitle_reason = hf_dub_matches_current_subtitle(task)
+    dub_matches_current_audio_config, dub_config_reason = hf_dub_matches_current_audio_config(task)
     if subtitle_current is False:
         audio_ready_reason = subtitle_current_reason
     elif not dub_matches_current_subtitle:
         audio_ready_reason = dub_subtitle_reason
+    elif not dub_matches_current_audio_config:
+        audio_ready_reason = dub_config_reason
     audio_ready = audio_ready_reason == "ready"
     dub_current = audio_ready and audio_exists and matches_expected
     return {
@@ -312,4 +334,8 @@ def collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         "dub_current_reason": audio_ready_reason if not dub_current else "ready",
         "dub_matches_current_subtitle": bool(dub_matches_current_subtitle),
         "dub_subtitle_reason": dub_subtitle_reason,
+        "current_audio_fit_max_speed": hf_current_audio_fit_max_speed(task),
+        "dub_source_audio_fit_max_speed": str(task.get("dub_source_audio_fit_max_speed") or "").strip() or None,
+        "dub_matches_current_audio_config": bool(dub_matches_current_audio_config),
+        "dub_config_reason": dub_config_reason,
     }

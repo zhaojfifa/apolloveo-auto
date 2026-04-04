@@ -1176,7 +1176,11 @@
 
   function renderDubOutdatedBadge() {
     if (!dubOutdatedBadgeEl) return;
-    dubOutdatedBadgeEl.classList.toggle("hidden", !subtitlesChangedSinceDub);
+    const audio = (currentHub && currentHub.audio) || {};
+    const currentAttempt = (currentHub && currentHub.current_attempt) || {};
+    const reason = String(audio.dub_current_reason || audio.audio_ready_reason || "").trim().toLowerCase();
+    const serverMarkedStale = Boolean(currentAttempt.requires_redub) || ["dub_stale_after_subtitles", "dub_stale_after_speed_change", "dub_not_current"].includes(reason);
+    dubOutdatedBadgeEl.classList.toggle("hidden", !(subtitlesChangedSinceDub || serverMarkedStale));
   }
 
   // Phase 1.7: Horizontal pipeline bar
