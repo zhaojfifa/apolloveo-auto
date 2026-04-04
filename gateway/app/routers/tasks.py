@@ -2656,6 +2656,10 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     config["tts_provider"] = provider
     config["tts_request_token"] = request_token
     config["tts_completed_token"] = None
+    dub_subtitle_snapshot = {
+        "dub_source_subtitles_content_hash": str(task.get("subtitles_content_hash") or "").strip() or None,
+        "dub_source_subtitle_updated_at": str(task.get("subtitles_override_updated_at") or "").strip() or None,
+    }
     for stale_path in (
         workspace.mm_audio_primary_path,
         workspace.mm_audio_mp3_path,
@@ -2681,6 +2685,8 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "mm_audio_provider": None,
             "mm_audio_voice_id": None,
             "audio_sha256": None,
+            "dub_source_subtitles_content_hash": None,
+            "dub_source_subtitle_updated_at": None,
         },
     )
     task = repo.get(task_id) or task
@@ -2853,6 +2859,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "compose_status": "pending",
                     "compose_error": None,
                     "compose_error_reason": None,
+                    **dub_subtitle_snapshot,
                     "config": {**config, "tts_completed_token": request_token},
                 },
             )
@@ -2932,6 +2939,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                         "compose_status": "pending",
                         "compose_error": None,
                         "compose_error_reason": None,
+                        **dub_subtitle_snapshot,
                         "config": {**config, "tts_completed_token": request_token},
                     },
                 )
@@ -2982,6 +2990,8 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "mm_audio_provider": None,
                     "mm_audio_voice_id": None,
                     "audio_sha256": None,
+                    "dub_source_subtitles_content_hash": None,
+                    "dub_source_subtitle_updated_at": None,
                 },
             )
             stored = _repo_refresh_task(repo, task_id)
@@ -3024,6 +3034,8 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "mm_audio_provider": None,
                     "mm_audio_voice_id": None,
                     "audio_sha256": None,
+                    "dub_source_subtitles_content_hash": None,
+                    "dub_source_subtitle_updated_at": None,
                 },
             )
             stored = _repo_refresh_task(repo, task_id)
@@ -3120,6 +3132,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "compose_status": "pending",
             "compose_error": None,
             "compose_error_reason": None,
+            **dub_subtitle_snapshot,
             "config": {**config, "tts_completed_token": request_token},
         },
     )

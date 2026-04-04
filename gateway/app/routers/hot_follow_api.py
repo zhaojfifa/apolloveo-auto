@@ -921,10 +921,9 @@ def _hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None
     if step == "audio":
         status = _hf_state_from_status(task.get("dub_status"))
         voice_state = _collect_voice_execution_state(task, get_settings())
-        target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
         if status == "pending" and voice_state.get("audio_ready"):
             status = "done"
-        if status == "done" and target_lang == "vi" and not voice_state.get("audio_ready"):
+        if status == "done" and not voice_state.get("audio_ready"):
             status = "pending"
         if status == "pending" and task_status == "processing" and last_step == "dub":
             status = "running"

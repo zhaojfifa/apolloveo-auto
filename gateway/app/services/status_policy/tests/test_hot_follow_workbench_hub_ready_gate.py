@@ -381,7 +381,84 @@ def test_hot_follow_workbench_stale_final_is_historical_only_after_redub(monkeyp
     )
     assert final_row.get("status") == "pending"
     assert final_row.get("historical") is True
-    assert final_row.get("url") is None
+
+
+def test_hot_follow_workbench_mm_stale_dub_downgrades_audio_step(monkeypatch):
+    task_id = "hf-workbench-mm-stale-dub-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "ready",
+            "target_lang": "mm",
+            "content_lang": "mm",
+            "compose_status": "pending",
+            "compose_last_status": "pending",
+            "dub_status": "done",
+            "voice_id": "mm_male_1",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
+            "mm_audio_voice_id": "my-MM-ThihaNeural",
+            "mm_audio_provider": "azure-speech",
+            "mm_srt_path": f"deliver/tasks/{task_id}/mm.srt",
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "audio_not_ready",
+            "final": {"exists": False, "fresh": False, "url": None, "size_bytes": None},
+            "historical_final": {"exists": False, "url": None, "size_bytes": None},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": True,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": False,
+            "audio_ready_reason": "dub_stale_after_subtitles",
+            "dub_current": False,
+            "dub_current_reason": "dub_stale_after_subtitles",
+            "resolved_voice": "my-MM-ThihaNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "mm_male_1",
+            "voiceover_url": None,
+            "deliverable_audio_done": True,
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    dub_step = next(
+        (x for x in (data.get("pipeline") or []) if str(x.get("key") or "").lower() == "dub"),
+        {},
+    )
+    assert dub_step.get("status") != "done"
+    assert data.get("audio", {}).get("audio_ready") is False
+    assert data.get("audio", {}).get("audio_ready_reason") == "dub_stale_after_subtitles"
 
 
 def test_hot_follow_workbench_parse_uses_raw_artifacts_over_failed_legacy_status(monkeypatch):

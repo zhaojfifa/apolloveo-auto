@@ -3,6 +3,7 @@ from pathlib import Path
 import sys
 import types
 from types import SimpleNamespace
+from datetime import datetime, timezone
 
 import pytest
 from pydantic import BaseModel
@@ -355,6 +356,43 @@ def test_vi_voice_state_requires_current_target_subtitle(monkeypatch):
     assert state["dub_current"] is False
 
 
+def test_mm_voice_state_invalidates_stale_dub_after_subtitle_edit(monkeypatch):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    _patch_voice_storage(
+        monkeypatch,
+        lambda _key: True,
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
+
+    task = {
+        "task_id": "hf-mm-dub-stale",
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "dub_status": "done",
+        "target_subtitle_current": True,
+        "target_subtitle_current_reason": "ready",
+        "subtitles_content_hash": "HASH_B",
+        "dub_source_subtitles_content_hash": "HASH_A",
+        "mm_audio_key": "deliver/tasks/hf-mm-dub-stale/audio_mm.mp3",
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "my-MM-ThihaNeural",
+        "config": {
+            "tts_requested_voice": "mm_male_1",
+            "tts_resolved_voice": "my-MM-ThihaNeural",
+            "tts_provider": "azure-speech",
+        },
+    }
+
+    state = tasks_router._collect_voice_execution_state(task, _settings())
+
+    assert state["deliverable_audio_done"] is True
+    assert state["audio_ready"] is False
+    assert state["audio_ready_reason"] == "dub_stale_after_subtitles"
+    assert state["dub_current"] is False
+    assert state["dub_matches_current_subtitle"] is False
+
+
 def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
     artifact_facts = hf_router._hf_artifact_facts(
         "hf-rerun-presentation",
@@ -459,6 +497,36 @@ def test_artifact_facts_and_operator_summary_preserve_voice_led_success_baseline
     assert operator_summary["show_previous_final_as_primary"] is False
 
 
+def test_operator_summary_requires_redub_when_subtitles_changed():
+    current_attempt = hf_router._hf_current_attempt_summary(
+        voice_state={
+            "audio_ready": False,
+            "audio_ready_reason": "dub_stale_after_subtitles",
+            "dub_current": False,
+            "dub_current_reason": "dub_stale_after_subtitles",
+            "requested_voice": "mm_male_1",
+            "resolved_voice": "my-MM-ThihaNeural",
+            "actual_provider": "azure-speech",
+        },
+        subtitle_lane={
+            "subtitle_ready": True,
+            "actual_burn_subtitle_source": "mm.srt",
+        },
+        dub_status="done",
+        compose_status="pending",
+        composed_reason="audio_not_ready",
+    )
+    operator_summary = hf_router._hf_operator_summary(
+        artifact_facts={"final_exists": False},
+        current_attempt=current_attempt,
+        no_dub=False,
+        subtitle_ready=True,
+    )
+
+    assert current_attempt["requires_redub"] is True
+    assert operator_summary["recommended_next_action"] == "当前目标字幕已更新，需重新配音后才能继续合成最新成片。"
+
+
 def test_source_audio_lane_summary_distinguishes_voice_led_and_silent_candidates():
     voice_led = hf_router._hf_source_audio_lane_summary(
         {"title": "standard talking head"},
@@ -507,7 +575,11 @@ def test_collect_hot_follow_workbench_ui_does_not_keep_no_dub_when_audio_is_curr
     monkeypatch.setattr(hf_router, "media_meta_from_head", lambda _meta: (4096, "audio/mpeg"))
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
     monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
-    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(
+        hf_router,
+        "_hf_load_subtitles_text",
+        lambda _task_id, _task: "1\n00:00:00,000 --> 00:00:02,000\nမင်္ဂလာပါ\n",
+    )
 
     task = {
         "task_id": "hf-a9-ui",
@@ -734,3 +806,124 @@ def test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged(monkeypatch,
 
     assert exc.value.status_code == 500
     assert captured["force_dub"] is True
+
+
+def test_successful_redub_persists_current_subtitle_snapshot(monkeypatch, tmp_path):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    monkeypatch.setattr(
+        tasks_router,
+        "_compat_hot_follow_dub_route_state",
+        lambda *_args, **_kwargs: {
+            "subtitle_lane": {
+                "target_subtitle_current": True,
+                "subtitle_ready": True,
+            },
+            "route_state": {"content_mode": "voice_led"},
+            "no_dub_candidate": False,
+            "dub_input_text": "မင်္ဂလာပါ",
+        },
+    )
+    monkeypatch.setattr(
+        tasks_router,
+        "_compat_hot_follow_target_lang_gate",
+        lambda *_args, **_kwargs: {"allow": True},
+    )
+
+    class _Workspace:
+        def __init__(self, task_id):
+            base = tmp_path / task_id
+            base.mkdir(parents=True, exist_ok=True)
+            self.base_dir = base
+            self.mm_audio_primary_path = base / "audio_primary.wav"
+            self.mm_audio_mp3_path = base / "audio.mp3"
+            self.mm_audio_legacy_path = base / "audio_legacy.wav"
+            self.mm_audio_path = base / "audio.wav"
+
+        def mm_audio_exists(self):
+            return self.mm_audio_mp3_path.exists() or self.mm_audio_path.exists()
+
+    monkeypatch.setattr(tasks_router, "Workspace", _Workspace)
+    monkeypatch.setattr(tasks_router, "task_base_dir", lambda task_id: tmp_path / task_id)
+    monkeypatch.setattr(tasks_router, "_repo_refresh_task", lambda repo, _task_id: dict(repo.task))
+    monkeypatch.setattr(
+        tasks_router,
+        "_task_to_detail",
+        lambda stored: SimpleNamespace(
+            dict=lambda exclude=None: {
+                "task_id": stored["task_id"],
+                "kind": stored.get("kind"),
+                "category_key": stored.get("category_key", "hot_follow"),
+                "content_lang": stored.get("content_lang", "mm"),
+                "ui_lang": stored.get("ui_lang", "zh"),
+                "face_swap_enabled": False,
+                "status": stored.get("status", "ready"),
+                "created_at": stored.get("created_at", datetime.now(timezone.utc)),
+                "updated_at": stored.get("updated_at", datetime.now(timezone.utc)),
+                "dub_status": stored.get("dub_status"),
+                "dub_provider": stored.get("dub_provider"),
+                "voice_id": stored.get("voice_id"),
+                "pipeline_config": stored.get("pipeline_config"),
+                "mm_audio_path": stored.get("mm_audio_path"),
+            }
+        ),
+    )
+    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(tasks_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (0, "audio/mpeg"))
+    monkeypatch.setattr(tasks_router, "assert_local_audio_ok", lambda _path: (4096, 2.5))
+    monkeypatch.setattr(tasks_router, "_sha256_file", lambda _path: "SHA_DUB")
+
+    class _Storage:
+        def upload_file(self, *_args, **_kwargs):
+            return None
+
+    monkeypatch.setattr(tasks_router, "get_storage_service", lambda: _Storage())
+
+    def _fake_upsert(repo, task_id, updates, **_kwargs):
+        assert task_id == repo.task["task_id"]
+        repo.task.update(updates)
+        return repo.task
+
+    monkeypatch.setattr(tasks_router, "_policy_upsert", _fake_upsert)
+
+    async def _fake_run_dub_step_ssot(task_adapter):
+        ws = _Workspace(task_adapter.task_id)
+        ws.mm_audio_mp3_path.write_bytes(b"fake-mp3")
+
+    monkeypatch.setattr(tasks_router, "run_dub_step_ssot", _fake_run_dub_step_ssot)
+
+    class _Repo:
+        def __init__(self):
+            self.task = {
+                "task_id": "hf-redub-snapshot",
+                "kind": "hot_follow",
+                "target_lang": "mm",
+                "voice_id": "mm_female_1",
+                "dub_provider": "azure-speech",
+                "subtitles_content_hash": "HASH_LATEST",
+                "subtitles_override_updated_at": "2026-04-04T10:00:00+00:00",
+                "config": {
+                    "tts_requested_voice": "mm_female_1",
+                    "tts_resolved_voice": "my-MM-NilarNeural",
+                    "tts_provider": "azure-speech",
+                },
+            }
+            self.session = SimpleNamespace(expire_all=lambda: None)
+
+        def get(self, _task_id):
+            return dict(self.task)
+
+    repo = _Repo()
+    payload = tasks_router.DubProviderRequest(
+        provider="azure-speech",
+        voice_id="mm_female_1",
+        mm_text="မင်္ဂလာပါ",
+        force=True,
+    )
+
+    result = asyncio.run(tasks_router._run_dub_job("hf-redub-snapshot", payload, repo))
+
+    assert result.audio_sha256 == "SHA_DUB"
+    assert repo.task["dub_status"] == "ready"
+    assert repo.task["dub_source_subtitles_content_hash"] == "HASH_LATEST"
+    assert repo.task["dub_source_subtitle_updated_at"] == "2026-04-04T10:00:00+00:00"

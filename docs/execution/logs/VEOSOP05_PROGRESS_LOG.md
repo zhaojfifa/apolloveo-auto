@@ -699,3 +699,34 @@
 
 - 不重构 tasks router 其他旧 helper
 - 不扩到非 Hot Follow 线路
+
+## Hot Follow Standard Dub Freshness Alignment
+
+日期：2026-04-04
+
+本节点完成：
+
+- 将 Hot Follow 标准配音链继续作为默认主路径，未引入新的 provider 或第二条 truth-source
+- 成功配音时回写“当前目标字幕快照”，让配音 currentness 与当前 authoritative target subtitle 绑定
+- 字幕编辑后若 target subtitle 已变化，旧 dub 不再视为 current，compose readiness 与 workbench audio step 会同步降级
+- workbench/operator summary 明确给出“需重新配音”提示，而不是把 stale dub 继续当成可合成状态
+
+本次收口说明：
+
+- 本次只修既有 subtitle/dub/compose currentness 链，不改 compose/publish ownership
+- 目标是消除旧 dub freshness drift，而不是扩展翻译桥接或改 UI 架构
+
+本节点明确不做：
+
+- 不新增外部 TTS provider
+- 不新建状态层或新 helper 文件
+- 不改 Hot Follow 以外的业务线路
+
+验证结果：
+
+- `python3.11 -m py_compile gateway/app/services/voice_state.py gateway/app/routers/tasks.py gateway/app/routers/hot_follow_api.py gateway/app/services/hot_follow_workbench_presenter.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -q gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q gateway/app/services/tests/test_hf_compose_freshness.py -q gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+
+剩余风险：
+
+- 旧任务在首次重新标准配音前，可能还缺少 `dub_source_*` 快照字段；该类任务会在重新配音一次后进入新的 freshness 基线
