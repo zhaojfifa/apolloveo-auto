@@ -994,3 +994,41 @@
 - line contract 目前已进入 runtime metadata 主链，但 ready gate 仍使用现有 Python 规则镜像，尚未读取 docs YAML
 - worker profile / skills bundle / confirmation policy 目前是 live metadata / hook refs，还不是可执行 loader
 - `tasks.py` orchestration 仍未完成最终 contract-driven layering，这部分留给 PR-4
+
+## PR-4 Declarative Ready Gate For Hot Follow
+
+日期：2026-04-06
+
+本节点完成：
+
+- 将 Hot Follow ready gate spec 的 runtime source 切到 `docs/contracts/hot_follow_ready_gate.yaml`
+- 为 YAML 增加 machine-readable `runtime_rules`，覆盖 signal / override / gate / blocking rule
+- 在 `gateway/app/services/ready_gate/hot_follow_rules.py` 中保留 signal/reason extractor 库，但由 YAML 规则动态构建 `HOT_FOLLOW_GATE_SPEC`
+- 将 `gateway/app/lines/hot_follow.py` 与 `docs/architecture/line_contracts/hot_follow_line.yaml` 的 `ready_gate_ref` 对齐到 YAML
+- 保持 `compute_hot_follow_state()` 只消费 evaluator 结果，不新增任何 truth 写回
+
+本次收口说明：
+
+- 本次只做 declarative ready gate evaluator/source 收口
+- 不做 worker gateway
+- 不做 skills runtime loader
+- 不做 broader status-system rewrite
+- workbench/publish 继续经由 `compute_hot_follow_state()` 消费 ready gate 输出
+
+本节点明确不做：
+
+- 不在本次 PR 引入多产线通用 profile 平台
+- 不在本次 PR 让 evaluator 直接写 repo/status truth
+- 不在本次 PR 改 route / UI / publish write path
+
+验证结果：
+
+- `python3.11 -m py_compile gateway/app/lines/hot_follow.py gateway/app/services/ready_gate/hot_follow_rules.py gateway/app/services/ready_gate/registry.py gateway/app/services/status_policy/hot_follow_state.py gateway/app/services/ready_gate/tests/test_line_binding.py gateway/app/services/status_policy/tests/test_line_runtime_binding.py gateway/app/services/status_policy/tests/test_hot_follow_state_line_binding.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_line_binding_service.py`
+- `python3.11 -m pytest gateway/app/services/ready_gate/tests/test_line_binding.py -q gateway/app/services/status_policy/tests/test_line_runtime_binding.py -q gateway/app/services/status_policy/tests/test_hot_follow_state_line_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py -q gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q gateway/app/services/tests/test_line_binding_service.py -q gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+
+剩余风险：
+
+- YAML 目前只驱动 Hot Follow 一条线，signal extractor 库仍是 Python 映射，不是完全通用 DSL
+- optional artifact / richer operator confirmation hooks 仍未扩展为通用 evaluator input model
+- worker gateway / skills runtime / broader line-driven orchestration 继续留给下一阶段

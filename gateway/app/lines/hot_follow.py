@@ -19,7 +19,7 @@ HOT_FOLLOW_LINE: ProductionLine = LineRegistry.register(
         skills_bundle_ref="docs/skills/",
         worker_profile_ref="docs/contracts/worker_gateway_contract.md",
         asset_sink_profile_ref="docs/contracts/status_ownership_matrix.md",
-        ready_gate_ref="gateway/app/services/ready_gate/hot_follow_rules.py",
+        ready_gate_ref="docs/contracts/hot_follow_ready_gate.yaml",
         status_policy_ref="gateway/app/services/status_policy/hot_follow_state.py",
         deliverable_kinds=(
             "final_video",

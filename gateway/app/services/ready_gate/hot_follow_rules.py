@@ -1,8 +1,7 @@
-"""Hot Follow ready-gate rules (TASK-2.3).
+"""Hot Follow ready-gate rules (TASK-2.3 / VeoMVP01 PR-4).
 
-Declares the complete ``ReadyGateSpec`` for the Hot Follow production line,
-translating the hardcoded if/else logic from ``compute_hot_follow_state()``
-into declarative Signal / Gate / Blocking / Override rules.
+Loads the ``ReadyGateSpec`` for the Hot Follow production line from the frozen
+YAML contract, while keeping the signal extractor library in Python.
 
 Every extract callable maps 1:1 to the original code lines in
 ``hot_follow_state.py`` (pre-refactor).
@@ -10,7 +9,10 @@ Every extract callable maps 1:1 to the original code lines in
 
 from __future__ import annotations
 
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict
+import yaml
 
 from .engine import (
     BlockingRule,
@@ -19,6 +21,11 @@ from .engine import (
     ReadyGateSpec,
     Signal,
 )
+
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+HOT_FOLLOW_READY_GATE_CONTRACT_REF = "docs/contracts/hot_follow_ready_gate.yaml"
+HOT_FOLLOW_READY_GATE_RUNTIME_REF = "gateway/app/services/ready_gate/hot_follow_rules.py"
 
 
 # ---------------------------------------------------------------------------
@@ -171,72 +178,126 @@ def _reason_no_dub(task: dict, state: dict) -> str:
     return str(audio.get("no_dub_reason") or "").strip() or ""
 
 
-# ---------------------------------------------------------------------------
-# HOT_FOLLOW_GATE_SPEC
-# ---------------------------------------------------------------------------
+_SIGNAL_EXTRACTORS = {
+    "final_exists": _extract_final_exists,
+    "final_fresh": _extract_final_fresh,
+    "audio_done": _extract_audio_done,
+    "voiceover_exists": _extract_voiceover_exists,
+    "tts_voice_valid": _extract_tts_voice_valid,
+    "audio_ready": _extract_audio_ready,
+    "subtitle_artifact_exists": _extract_subtitle_artifact_exists,
+    "subtitle_ready": _extract_subtitle_ready,
+    "no_dub": _extract_no_dub,
+}
 
-HOT_FOLLOW_GATE_SPEC = ReadyGateSpec(
-    line_id="hot_follow_line",
+_REASON_EXTRACTORS = {
+    "subtitle_ready_reason": _reason_subtitle_ready,
+    "audio_ready_reason": _reason_audio_ready,
+    "no_dub_reason": _reason_no_dub,
+}
 
-    # ── Signals ───────────────────────────────────────────────────────────
-    signals=(
-        Signal("final_exists",             _extract_final_exists),
-        Signal("final_fresh",              _extract_final_fresh),
-        Signal("audio_done",               _extract_audio_done),
-        Signal("voiceover_exists",         _extract_voiceover_exists),
-        Signal("tts_voice_valid",          _extract_tts_voice_valid),
-        Signal(
-            "audio_ready",
-            _extract_audio_ready,
-            reason_key="audio_ready_reason",
-            reason_extract=_reason_audio_ready,
-        ),
-        Signal("subtitle_artifact_exists", _extract_subtitle_artifact_exists),
-        Signal(
-            "subtitle_ready",
-            _extract_subtitle_ready,
-            reason_key="subtitle_ready_reason",
-            reason_extract=_reason_subtitle_ready,
-        ),
-        Signal(
-            "no_dub",
-            _extract_no_dub,
-            reason_key="no_dub_reason",
-            reason_extract=_reason_no_dub,
-        ),
-    ),
 
-    # ── Overrides (artifact wins over flag) ───────────────────────────────
-    overrides=(
-        OverrideRule(evidence_signal="voiceover_exists", target_signal="no_dub", force_value=False),
-        OverrideRule(evidence_signal="audio_ready",      target_signal="no_dub", force_value=False),
-    ),
+def _resolve_repo_path(ref: str) -> Path:
+    path = Path(str(ref or "").strip())
+    if not str(path):
+        raise RuntimeError("empty ready gate contract ref")
+    if path.is_absolute():
+        return path
+    return REPO_ROOT / path
 
-    # ── Gates ─────────────────────────────────────────────────────────────
-    # compose_ready = final_exists AND final_fresh AND (audio_ready OR no_dub)
-    # final_fresh = False when subtitle or audio changed after the last compose.
-    gates=(
-        GateRule("compose_ready",  requires=("final_exists", "final_fresh"), unless=("audio_ready", "no_dub")),
-        GateRule("publish_ready",  requires=("compose_ready",), unless=()),
-    ),
 
-    # ── Blocking rules (all gated by compose_ready=False) ─────────────────
-    blocking=(
-        # Always emit when gate is false
-        BlockingRule("compose_not_done",   when_missing="__always__"),
-        # Final is stale (composed before current subtitle/audio)
-        BlockingRule("final_stale",        when_missing="final_fresh",        extra_requires=("final_exists",)),
-        # Subtitle not ready
-        BlockingRule("subtitle_not_ready", when_missing="subtitle_ready"),
-        # Audio steps — skipped if no_dub
-        BlockingRule("audio_not_done",     when_missing="audio_done",         unless_signal="no_dub"),
-        BlockingRule("voiceover_missing",  when_missing="voiceover_exists",   unless_signal="no_dub"),
-        BlockingRule("tts_voice_invalid",  when_missing="tts_voice_valid",    unless_signal="no_dub"),
-        # audio_not_ready only when final exists (original L232-233)
-        BlockingRule("audio_not_ready",    when_missing="audio_ready",        unless_signal="no_dub",
-                     extra_requires=("final_exists",)),
-        # Dynamic no_dub_reason: only when no_dub=True AND subtitle not ready (original L236-237)
-        BlockingRule("",                   when_missing="subtitle_ready",
-                     extra_requires=("no_dub",), reason_from="no_dub_reason"),
-    ),
-)
+def _coerce_names(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        value = [value]
+    if not isinstance(value, (list, tuple)):
+        return ()
+    names: list[str] = []
+    for item in value:
+        name = str(item or "").strip()
+        if name:
+            names.append(name)
+    return tuple(names)
+
+
+@lru_cache(maxsize=8)
+def load_hot_follow_gate_spec(contract_ref: str = HOT_FOLLOW_READY_GATE_CONTRACT_REF) -> ReadyGateSpec:
+    path = _resolve_repo_path(contract_ref)
+    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    if not isinstance(payload, dict):
+        raise RuntimeError(f"invalid ready gate contract payload: {path}")
+    runtime_rules = payload.get("runtime_rules") or {}
+    if not isinstance(runtime_rules, dict):
+        raise RuntimeError(f"missing runtime_rules in ready gate contract: {path}")
+
+    signal_defs = runtime_rules.get("signals") or {}
+    if not isinstance(signal_defs, dict) or not signal_defs:
+        raise RuntimeError(f"missing signals in ready gate contract: {path}")
+
+    signals: list[Signal] = []
+    for signal_name, raw_cfg in signal_defs.items():
+        cfg = raw_cfg if isinstance(raw_cfg, dict) else {"source": raw_cfg}
+        source = str(cfg.get("source") or signal_name).strip()
+        extract = _SIGNAL_EXTRACTORS.get(source)
+        if extract is None:
+            raise RuntimeError(f"unknown ready gate signal source={source!r} in {path}")
+        reason_key = str(cfg.get("reason_key") or "").strip() or None
+        reason_source_name = str(cfg.get("reason_source") or "").strip() or None
+        reason_extract = _REASON_EXTRACTORS.get(reason_source_name) if reason_source_name else None
+        signals.append(
+            Signal(
+                name=str(signal_name).strip(),
+                extract=extract,
+                reason_key=reason_key,
+                reason_extract=reason_extract,
+            )
+        )
+
+    overrides: list[OverrideRule] = []
+    for raw_cfg in runtime_rules.get("overrides") or []:
+        if not isinstance(raw_cfg, dict):
+            continue
+        overrides.append(
+            OverrideRule(
+                evidence_signal=str(raw_cfg.get("evidence_signal") or "").strip(),
+                target_signal=str(raw_cfg.get("target_signal") or "").strip(),
+                force_value=bool(raw_cfg.get("force_value", False)),
+            )
+        )
+
+    gates: list[GateRule] = []
+    for raw_cfg in runtime_rules.get("gates") or []:
+        if not isinstance(raw_cfg, dict):
+            continue
+        gates.append(
+            GateRule(
+                name=str(raw_cfg.get("name") or "").strip(),
+                requires=_coerce_names(raw_cfg.get("requires")),
+                unless=_coerce_names(raw_cfg.get("unless_any") or raw_cfg.get("unless")),
+            )
+        )
+
+    blocking: list[BlockingRule] = []
+    for raw_cfg in runtime_rules.get("blocking_rules") or []:
+        if not isinstance(raw_cfg, dict):
+            continue
+        blocking.append(
+            BlockingRule(
+                reason=str(raw_cfg.get("reason") or "").strip(),
+                when_missing=str(raw_cfg.get("when_missing") or "").strip() or "__always__",
+                unless_signal=str(raw_cfg.get("unless_signal") or "").strip() or None,
+                extra_requires=_coerce_names(raw_cfg.get("extra_requires")),
+                reason_from=str(raw_cfg.get("reason_from") or "").strip() or None,
+                parent_gate=str(raw_cfg.get("parent_gate") or "compose_ready").strip() or "compose_ready",
+            )
+        )
+
+    return ReadyGateSpec(
+        line_id=str(payload.get("line_id") or "hot_follow_line").strip() or "hot_follow_line",
+        signals=tuple(signals),
+        overrides=tuple(overrides),
+        gates=tuple(gates),
+        blocking=tuple(blocking),
+    )
+
+
+HOT_FOLLOW_GATE_SPEC = load_hot_follow_gate_spec()

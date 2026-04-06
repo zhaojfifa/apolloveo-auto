@@ -6,11 +6,16 @@ import gateway.app.lines.hot_follow as _line_reg_hot_follow  # noqa: F401
 from gateway.app.lines.base import LineRegistry, ProductionLine
 
 from .engine import ReadyGateSpec
-from .hot_follow_rules import HOT_FOLLOW_GATE_SPEC
+from .hot_follow_rules import (
+    HOT_FOLLOW_GATE_SPEC,
+    HOT_FOLLOW_READY_GATE_CONTRACT_REF,
+    HOT_FOLLOW_READY_GATE_RUNTIME_REF,
+)
 
 
 _READY_GATE_SPECS_BY_REF: dict[str, ReadyGateSpec] = {
-    "gateway/app/services/ready_gate/hot_follow_rules.py": HOT_FOLLOW_GATE_SPEC,
+    HOT_FOLLOW_READY_GATE_CONTRACT_REF: HOT_FOLLOW_GATE_SPEC,
+    HOT_FOLLOW_READY_GATE_RUNTIME_REF: HOT_FOLLOW_GATE_SPEC,
 }
 
 _READY_GATE_SPECS_BY_LINE_ID: dict[str, ReadyGateSpec] = {

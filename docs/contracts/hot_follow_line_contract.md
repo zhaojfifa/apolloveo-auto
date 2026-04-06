@@ -30,7 +30,7 @@ This file is intentionally paired with the current runtime mirrors:
 | `asset_sink_profile_ref` | deliverable sink is downstream of line/service truth, not worker-owned | `docs/contracts/status_ownership_matrix.md` |
 | `confirmation_policy` | before publish only | this document, `docs/runbooks/hot_follow_sop.md` |
 | `status_policy_ref` | `gateway/app/services/status_policy/hot_follow_state.py` | `docs/contracts/status_ownership_matrix.md` |
-| `ready_gate_ref` | `docs/contracts/hot_follow_ready_gate.yaml` | runtime mirror: `gateway/app/services/ready_gate/hot_follow_rules.py` |
+| `ready_gate_ref` | `docs/contracts/hot_follow_ready_gate.yaml` | runtime loader: `gateway/app/services/ready_gate/hot_follow_rules.py` |
 
 ## 3. Business Result Contract
 
@@ -203,7 +203,7 @@ The docs-first ready gate declaration is:
 
 - `docs/contracts/hot_follow_ready_gate.yaml`
 
-The current runtime mirror is:
+The current runtime loader path is:
 
 - `gateway/app/services/ready_gate/hot_follow_rules.py`
 - `gateway/app/services/ready_gate/engine.py`

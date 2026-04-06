@@ -8,7 +8,8 @@
 
 - line contract 文档：`docs/architecture/line_contracts/hot_follow_line.yaml`
 - line 注册：`gateway/app/lines/hot_follow.py`
-- gate spec 来源：`gateway/app/services/ready_gate/hot_follow_rules.py::HOT_FOLLOW_GATE_SPEC`
+- gate spec 来源：`docs/contracts/hot_follow_ready_gate.yaml`
+- runtime loader：`gateway/app/services/ready_gate/hot_follow_rules.py::load_hot_follow_gate_spec`
 - gate spec 绑定入口：`gateway/app/services/ready_gate/registry.py`
 - gate 解释执行：`gateway/app/services/ready_gate/engine.py::evaluate_ready_gate`
 - status 聚合入口：`gateway/app/services/status_policy/hot_follow_state.py::compute_hot_follow_state`
@@ -18,14 +19,15 @@
 
 当前来源冻结为：
 
-- Hot Follow 的 ready gate spec 来自 Python 代码常量 `HOT_FOLLOW_GATE_SPEC`
-- 该常量定义在 `gateway/app/services/ready_gate/hot_follow_rules.py`
+- Hot Follow 的 ready gate spec 来自 `docs/contracts/hot_follow_ready_gate.yaml`
+- `gateway/app/services/ready_gate/hot_follow_rules.py` 负责把 YAML 规则装载成运行时 `HOT_FOLLOW_GATE_SPEC`
 - 运行时通过 `ready_gate/registry.py` 把 line contract 上的 `ready_gate_ref` 绑定到该对象
 
 这表示当前状态是：
 
 - gate engine 已落地
 - gate spec 已声明式化
+- gate spec 已切到 YAML-backed runtime loader
 - gate spec 已有最小 line-aware 绑定入口
 - 但还不是通用多产线 profile loader
 
@@ -35,7 +37,7 @@
 
 1. `hot_follow_line.yaml` 负责声明这是 `hot_follow_line`
 2. `gateway/app/lines/hot_follow.py` 负责把 `task_kind=hot_follow` 注册到 `LineRegistry`
-3. `hot_follow_line.yaml` 与 `gateway/app/lines/hot_follow.py` 共同声明 `ready_gate_ref`
+3. `hot_follow_line.yaml` 与 `gateway/app/lines/hot_follow.py` 共同声明 `ready_gate_ref=docs/contracts/hot_follow_ready_gate.yaml`
 4. `gateway/app/services/ready_gate/registry.py` 负责把 `LineRegistry.for_kind(task.kind)` 解析到 gate spec 对象
 5. `gateway/app/services/status_policy/registry.py::get_status_runtime_binding()` 负责给 status/runtime 提供最小 line-aware 绑定结果
 6. `compute_hot_follow_state()` 负责消费 runtime 绑定出来的 gate spec
@@ -43,7 +45,8 @@
 当前连接链路是：
 
 - `task.kind -> LineRegistry.for_kind() -> hot_follow_line`
-- `hot_follow_line.ready_gate_ref -> HOT_FOLLOW_GATE_SPEC`
+- `hot_follow_line.ready_gate_ref -> docs/contracts/hot_follow_ready_gate.yaml`
+- `load_hot_follow_gate_spec(...) -> HOT_FOLLOW_GATE_SPEC`
 - `get_status_runtime_binding(task) -> ready_gate_spec`
 - `compute_hot_follow_state() -> evaluate_ready_gate(ready_gate_spec, ...)`
 
@@ -69,7 +72,7 @@
 因此，本阶段已经满足的最小 line-aware 目标是：
 
 - 能从 `task.kind=hot_follow` 追溯到 `hot_follow_line`
-- 能从 `hot_follow_line.ready_gate_ref` 追溯到 `HOT_FOLLOW_GATE_SPEC`
+- 能从 `hot_follow_line.ready_gate_ref` 追溯到 YAML-backed `HOT_FOLLOW_GATE_SPEC`
 - 能让 `compute_hot_follow_state()` 真实消费这条绑定链
 
 ## 6. 当前仍未完成的部分
@@ -89,7 +92,7 @@
 
 ### 当前不做
 
-- 不发明新的 gate profile loader
+- 不发明新的多产线平台配置中心
 - 不做 Skills runtime
 - 不扩第二条产线
 - 不宣称 line contract 已全面接管所有 runtime 主链

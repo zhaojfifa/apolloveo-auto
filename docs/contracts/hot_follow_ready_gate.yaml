@@ -11,6 +11,86 @@ contract_refs:
   runtime_mirror_spec: "gateway/app/services/ready_gate/hot_follow_rules.py::HOT_FOLLOW_GATE_SPEC"
   runtime_evaluator: "gateway/app/services/ready_gate/engine.py::evaluate_ready_gate"
 
+runtime_rules:
+  signals:
+    final_exists:
+      source: final_exists
+    final_fresh:
+      source: final_fresh
+    audio_done:
+      source: audio_done
+    voiceover_exists:
+      source: voiceover_exists
+    tts_voice_valid:
+      source: tts_voice_valid
+    audio_ready:
+      source: audio_ready
+      reason_key: audio_ready_reason
+      reason_source: audio_ready_reason
+    subtitle_artifact_exists:
+      source: subtitle_artifact_exists
+    subtitle_ready:
+      source: subtitle_ready
+      reason_key: subtitle_ready_reason
+      reason_source: subtitle_ready_reason
+    no_dub:
+      source: no_dub
+      reason_key: no_dub_reason
+      reason_source: no_dub_reason
+  overrides:
+    - evidence_signal: voiceover_exists
+      target_signal: no_dub
+      force_value: false
+    - evidence_signal: audio_ready
+      target_signal: no_dub
+      force_value: false
+  gates:
+    - name: compose_ready
+      requires:
+        - final_exists
+        - final_fresh
+      unless_any:
+        - audio_ready
+        - no_dub
+    - name: publish_ready
+      requires:
+        - compose_ready
+  blocking_rules:
+    - reason: compose_not_done
+      when_missing: __always__
+      parent_gate: compose_ready
+    - reason: final_stale
+      when_missing: final_fresh
+      extra_requires:
+        - final_exists
+      parent_gate: compose_ready
+    - reason: subtitle_not_ready
+      when_missing: subtitle_ready
+      parent_gate: compose_ready
+    - reason: audio_not_done
+      when_missing: audio_done
+      unless_signal: no_dub
+      parent_gate: compose_ready
+    - reason: voiceover_missing
+      when_missing: voiceover_exists
+      unless_signal: no_dub
+      parent_gate: compose_ready
+    - reason: tts_voice_invalid
+      when_missing: tts_voice_valid
+      unless_signal: no_dub
+      parent_gate: compose_ready
+    - reason: audio_not_ready
+      when_missing: audio_ready
+      unless_signal: no_dub
+      extra_requires:
+        - final_exists
+      parent_gate: compose_ready
+    - when_missing: subtitle_ready
+      extra_requires:
+        - no_dub
+      reason_from: no_dub_reason
+      parent_gate: compose_ready
+
 signal_families:
   artifact_facts:
     - "final.exists"
@@ -85,6 +165,6 @@ operator_confirmation_hooks:
     purpose: "final publish confirmation"
 
 policy_notes:
-  - "This YAML freezes the intended contract first; current runtime mirror still lives in Python."
+  - "This YAML now provides the runtime-backed gate spec source; Python keeps the signal extractor library and evaluator only."
   - "Optional artifacts such as pack/scene pack are not compose_ready or publish_ready prerequisites."
   - "Board/workbench/publish projection should consume ready-gate truth rather than raw step status alone."
