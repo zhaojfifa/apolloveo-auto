@@ -11,6 +11,8 @@ status: active
 
 target_result_type: final_video
 task_kind: hot_follow
+input_contract_ref: docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md
+deliverable_profile_ref: docs/architecture/line_contracts/hot_follow_line.yaml
 
 # ─── Deliverable profile ──────────────────────────────────────────────────────
 
@@ -31,7 +33,7 @@ deliverables:
 
 # ─── SOP profile (骨架路径) ───────────────────────────────────────────────────
 
-sop_profile_ref: docs/sop/hot_follow_v1.md
+sop_profile_ref: docs/runbooks/hot_follow_sop.md
 
 # SOP steps (ordered):
 sop_steps:
@@ -76,6 +78,7 @@ worker_profile:
   fallback_tts_provider: edge_tts
   default_asr_provider: gemini
   ffmpeg_required: true
+worker_profile_ref: docs/contracts/worker_gateway_contract.md
 
 # ─── Asset sink profile ───────────────────────────────────────────────────────
 
@@ -89,6 +92,7 @@ asset_sink:
   fingerprint_async: true
   tag_extraction_async: true
   promote_policy: manual          # promotion to canonical asset requires ops review
+asset_sink_profile_ref: docs/contracts/status_ownership_matrix.md
 
 # ─── Confirmation policy ──────────────────────────────────────────────────────
 

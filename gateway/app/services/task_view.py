@@ -22,6 +22,7 @@ from gateway.app.services.hot_follow_workbench_presenter import (
     build_hot_follow_current_attempt_summary,
     build_hot_follow_operator_summary,
 )
+from gateway.app.services.line_binding_service import get_line_runtime_binding
 from gateway.app.services.scenes_service import build_scenes_for_task
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 from gateway.app.services.subtitle_helpers import (
@@ -577,6 +578,7 @@ def build_hot_follow_publish_hub(
     publish_payload_builder=publish_hub_payload,
     state_computer=compute_hot_follow_state,
     backfill_compose_done=backfill_compose_done_if_final_ready,
+    line_binding_loader=get_line_runtime_binding,
 ) -> dict[str, Any]:
     task = repo.get(task_id)
     if not task:
@@ -587,6 +589,7 @@ def build_hot_follow_publish_hub(
     if backfill_compose_done(repo, task_id, task, bool(payload.get("composed_ready"))):
         task = repo.get(task_id) or task
         payload = state_computer(task, publish_payload_builder(task))
+    payload["line"] = line_binding_loader(task).to_payload()
     return payload
 
 
@@ -616,6 +619,7 @@ def build_hot_follow_workbench_hub(
     workbench_ui_loader=safe_collect_hot_follow_workbench_ui,
     state_computer=compute_hot_follow_state,
     backfill_compose_done=backfill_compose_done_if_final_ready,
+    line_binding_loader=get_line_runtime_binding,
 ) -> dict[str, Any]:
     task = repo.get(task_id)
     if not task:
@@ -1005,6 +1009,7 @@ def build_hot_follow_workbench_hub(
                     item["url"] = None
                     item["open_url"] = None
                     break
+    payload["line"] = line_binding_loader(task).to_payload()
     advisory = maybe_build_hot_follow_advisory(task, payload)
     if advisory is not None:
         payload["advisory"] = advisory

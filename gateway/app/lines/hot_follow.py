@@ -13,8 +13,12 @@ HOT_FOLLOW_LINE: ProductionLine = LineRegistry.register(
         line_version="1.9.0",
         target_result_type="final_video",
         task_kind="hot_follow",
-        sop_profile_ref="docs/sop/hot_follow_v1.md",
+        input_contract_ref="docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md",
+        deliverable_profile_ref="docs/architecture/line_contracts/hot_follow_line.yaml",
+        sop_profile_ref="docs/runbooks/hot_follow_sop.md",
         skills_bundle_ref="docs/skills/",
+        worker_profile_ref="docs/contracts/worker_gateway_contract.md",
+        asset_sink_profile_ref="docs/contracts/status_ownership_matrix.md",
         ready_gate_ref="gateway/app/services/ready_gate/hot_follow_rules.py",
         status_policy_ref="gateway/app/services/status_policy/hot_follow_state.py",
         deliverable_kinds=(
@@ -24,6 +28,9 @@ HOT_FOLLOW_LINE: ProductionLine = LineRegistry.register(
             "pack",
         ),
         auto_sink_enabled=True,
+        confirmation_before_execute=False,
+        confirmation_before_result_accept=False,
         confirmation_before_publish=True,
+        confirmation_before_retry=False,
     )
 )

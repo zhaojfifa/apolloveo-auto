@@ -4,9 +4,9 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Callable
 
-import gateway.app.lines.hot_follow as _line_reg_hot_follow  # noqa: F401
-from gateway.app.lines.base import LineRegistry, ProductionLine
+from gateway.app.lines.base import ProductionLine
 from gateway.app.services.hot_follow_language_profiles import hot_follow_subtitle_filename
+from gateway.app.services.line_binding_service import get_line_runtime_binding
 
 
 logger = logging.getLogger(__name__)
@@ -232,8 +232,8 @@ def maybe_build_hot_follow_advisory(
     task: dict[str, Any],
     payload: dict[str, Any],
 ) -> dict[str, Any] | None:
-    kind = str((task or {}).get("kind") or (payload or {}).get("kind") or "").strip().lower()
-    line = LineRegistry.for_kind(kind)
+    binding = get_line_runtime_binding(task or payload)
+    line = binding.line
     bundle = resolve_hot_follow_skills_bundle(line)
     if bundle is None:
         return None

@@ -280,6 +280,7 @@ from gateway.app.services.hot_follow_runtime_bridge import (  # noqa: E402
     compat_maybe_run_hot_follow_lipsync_stub as _compat_maybe_run_hot_follow_lipsync_stub,
     compat_resolve_target_srt_key as _compat_resolve_target_srt_key,
 )
+from gateway.app.services.line_binding_service import get_line_runtime_binding  # noqa: E402
 from gateway.app.services.compose_service import (  # noqa: E402
     CompositionService,
     HotFollowComposeRequestContract,
@@ -2244,6 +2245,7 @@ def _execute_compose_task_contract(
     lipsync_runner = lipsync_runner or (lambda _task_id, _enabled: None)
 
     current = repo.get(task_id) or task
+    line_binding = get_line_runtime_binding(current)
     svc.validate_expected_revision(current, request, revision_snapshot=revision_snapshot)
     if svc.compose_lock_active(current):
         _policy_upsert(repo, task_id, svc.build_compose_lock_updates(current))
@@ -2280,6 +2282,7 @@ def _execute_compose_task_contract(
                 final_key=fresh_final_key,
                 compose_status=latest.get("compose_status"),
                 hub=hub_loader(task_id, repo),
+                line=line_binding.to_payload(),
             )
 
         _policy_upsert(
@@ -2310,6 +2313,7 @@ def _execute_compose_task_contract(
             final_key=compose_result.final_key,
             compose_status=latest.get("compose_status"),
             hub=hub_loader(task_id, repo),
+            line=line_binding.to_payload(),
         )
     except HTTPException as exc:
         detail = exc.detail if isinstance(exc.detail, dict) else {"reason": "compose_failed", "message": str(exc.detail)}

@@ -24,7 +24,7 @@ This file is intentionally paired with the current runtime mirrors:
 | `target_result_type` | `final_video` | `docs/architecture/line_contracts/hot_follow_line.yaml` |
 | `input_contract_ref` | link ingest + local video ingest into the same Hot Follow runtime | `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`, `docs/runbooks/hot_follow_sop.md` |
 | `deliverable_profile_ref` | final video primary, subtitle/audio secondary, pack optional | `docs/architecture/line_contracts/hot_follow_line.yaml`, `docs/contracts/status_ownership_matrix.md` |
-| `sop_profile_ref` | Hot Follow operator/engineer SOP baseline | `docs/runbooks/hot_follow_sop.md`, runtime mirror currently still points at `docs/sop/hot_follow_v1.md` |
+| `sop_profile_ref` | Hot Follow operator/engineer SOP baseline | `docs/runbooks/hot_follow_sop.md`, `gateway/app/lines/hot_follow.py` |
 | `skills_bundle_ref` | interpretation/language/tts/compliance/media-compose bundle for Hot Follow | `docs/skills/`, `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md` |
 | `worker_profile_ref` | hybrid worker execution under gateway boundary | `docs/contracts/worker_gateway_contract.md` |
 | `asset_sink_profile_ref` | deliverable sink is downstream of line/service truth, not worker-owned | `docs/contracts/status_ownership_matrix.md` |
@@ -112,8 +112,8 @@ The current operator/engineer skeleton is:
 
 Current runtime note:
 
-- `gateway/app/lines/hot_follow.py` still mirrors the legacy SOP ref `docs/sop/hot_follow_v1.md`
-- the docs-first freeze in this PR establishes `docs/runbooks/hot_follow_sop.md` as the forward contract target for later runtime binding cleanup
+- `gateway/app/lines/hot_follow.py` now mirrors `docs/runbooks/hot_follow_sop.md`
+- compose/workbench/publish assembly now reads line contract metadata through the line binding service instead of leaving the line declaration ceremonial
 
 ## 7. Skills Bundle Reference
 
@@ -214,10 +214,11 @@ The current binding baseline is:
 
 ## 13. Runtime Status Of This Contract
 
-This contract is frozen before the `tasks.py` decomposition, but current runtime consumption is still partial:
+This contract is frozen before the full `tasks.py` decomposition, and runtime consumption is now partially bound:
 
 - `LineRegistry.for_kind("hot_follow")` already exists
 - ready gate already has a line-aware binding path
+- publish/workbench/compose shell paths now consume bound line metadata at runtime
 - router/service assembly is not yet fully contract-driven
 - `tasks.py` still carries orchestration and view responsibilities that should move out in P0/P1 refactor steps
 

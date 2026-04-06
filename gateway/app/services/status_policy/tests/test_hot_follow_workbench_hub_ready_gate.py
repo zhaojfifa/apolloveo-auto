@@ -108,6 +108,8 @@ def test_hot_follow_workbench_ready_gate_backfills_compose_when_current_final_is
 
     assert data.get("ready_gate", {}).get("compose_ready") is True
     assert data.get("ready_gate", {}).get("publish_ready") is True
+    assert (data.get("line") or {}).get("line_id") == "hot_follow_line"
+    assert ((data.get("line") or {}).get("hook_refs") or {}).get("status_policy_ref") == "gateway/app/services/status_policy/hot_follow_state.py"
     assert data.get("composed_ready") is True
     assert data.get("composed_reason") == "ready"
     assert str(data.get("final_video_url") or "").endswith(f"/v1/tasks/{task_id}/final")

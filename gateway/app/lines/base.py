@@ -4,8 +4,8 @@ RFC-0001: Production Line Contract
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import ClassVar
+from dataclasses import dataclass
+from typing import Any, ClassVar
 
 
 @dataclass(frozen=True)
@@ -36,11 +36,23 @@ class ProductionLine:
     """Value of ``task.kind`` that this line handles, e.g. "hot_follow"."""
 
     # --- References (relative to repo root) ---
+    input_contract_ref: str
+    """Path to the runtime/input contract document for this line."""
+
+    deliverable_profile_ref: str
+    """Path to the deliverable profile reference for this line."""
+
     sop_profile_ref: str
     """Path to the SOP profile document for this line."""
 
     skills_bundle_ref: str
     """Path to the Skills bundle directory for this line."""
+
+    worker_profile_ref: str
+    """Path to the worker profile contract for this line."""
+
+    asset_sink_profile_ref: str
+    """Path to the asset sink profile reference for this line."""
 
     ready_gate_ref: str = ""
     """Path to the ready-gate spec source for this line."""
@@ -61,8 +73,51 @@ class ProductionLine:
     auto_sink_enabled: bool = True
     """Whether results are automatically sunk to the asset store."""
 
+    confirmation_before_execute: bool = False
+    """Whether a human confirmation gate is required before execute."""
+
+    confirmation_before_result_accept: bool = False
+    """Whether a human confirmation gate is required before result accept."""
+
     confirmation_before_publish: bool = True
     """Whether a human confirmation gate is required before publish."""
+
+    confirmation_before_retry: bool = False
+    """Whether a human confirmation gate is required before retry."""
+
+    def confirmation_policy(self) -> dict[str, bool]:
+        return {
+            "before_execute": bool(self.confirmation_before_execute),
+            "before_result_accept": bool(self.confirmation_before_result_accept),
+            "before_publish": bool(self.confirmation_before_publish),
+            "before_retry": bool(self.confirmation_before_retry),
+        }
+
+    def contract_metadata(self) -> dict[str, Any]:
+        return {
+            "line_id": self.line_id,
+            "line_name": self.line_name,
+            "line_version": self.line_version,
+            "task_kind": self.task_kind,
+            "target_result_type": self.target_result_type,
+            "input_contract_ref": self.input_contract_ref or None,
+            "deliverable_profile_ref": self.deliverable_profile_ref or None,
+            "sop_profile_ref": self.sop_profile_ref or None,
+            "skills_bundle_ref": self.skills_bundle_ref or None,
+            "worker_profile_ref": self.worker_profile_ref or None,
+            "asset_sink_profile_ref": self.asset_sink_profile_ref or None,
+            "ready_gate_ref": self.ready_gate_ref or None,
+            "status_policy_ref": self.status_policy_ref or None,
+            "deliverable_kinds": list(self.deliverable_kinds),
+            "auto_sink_enabled": bool(self.auto_sink_enabled),
+            "confirmation_policy": self.confirmation_policy(),
+            "hook_refs": {
+                "skills_bundle_ref": self.skills_bundle_ref or None,
+                "worker_profile_ref": self.worker_profile_ref or None,
+                "ready_gate_ref": self.ready_gate_ref or None,
+                "status_policy_ref": self.status_policy_ref or None,
+            },
+        }
 
 
 class LineRegistry:

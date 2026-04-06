@@ -92,6 +92,8 @@ def test_hot_follow_publish_hub_includes_final_preview_url_and_ready(monkeypatch
 
     assert data["media"]["final_video_url"].endswith(f"/v1/tasks/{task_id}/final")
     assert data["final_video_url"].endswith(f"/v1/tasks/{task_id}/final")
+    assert (data.get("line") or {}).get("line_id") == "hot_follow_line"
+    assert (data.get("line") or {}).get("sop_profile_ref") == "docs/runbooks/hot_follow_sop.md"
     assert data["composed_ready"] is True
     assert data["composed_reason"] == "ready"
     assert data.get("ready_gate", {}).get("publish_ready") is True

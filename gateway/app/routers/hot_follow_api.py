@@ -143,6 +143,7 @@ from gateway.app.services.hot_follow_workbench_presenter import (
     build_hot_follow_current_attempt_summary as _build_hot_follow_current_attempt_summary,
     build_hot_follow_operator_summary as _build_hot_follow_operator_summary,
 )
+from gateway.app.services.line_binding_service import get_line_runtime_binding
 from gateway.app.services.task_view import (
     build_hot_follow_publish_hub as _build_hot_follow_publish_hub,
     build_hot_follow_workbench_hub as _build_hot_follow_workbench_hub,
@@ -250,6 +251,7 @@ def _execute_hot_follow_compose_contract(
     lipsync_runner = lipsync_runner or (lambda _task_id, _enabled: None)
 
     current = repo.get(task_id) or task
+    line_binding = get_line_runtime_binding(current)
     svc.validate_expected_revision(current, request, revision_snapshot=revision_snapshot)
     if svc.compose_lock_active(current):
         _policy_upsert(repo, task_id, svc.build_compose_lock_updates(current))
@@ -286,6 +288,7 @@ def _execute_hot_follow_compose_contract(
                 final_key=fresh_final_key,
                 compose_status=latest.get("compose_status"),
                 hub=hub_loader(task_id, repo),
+                line=line_binding.to_payload(),
             )
 
         _policy_upsert(
@@ -316,6 +319,7 @@ def _execute_hot_follow_compose_contract(
             final_key=compose_result.final_key,
             compose_status=latest.get("compose_status"),
             hub=hub_loader(task_id, repo),
+            line=line_binding.to_payload(),
         )
     except HTTPException as exc:
         detail = exc.detail if isinstance(exc.detail, dict) else {"reason": "compose_failed", "message": str(exc.detail)}

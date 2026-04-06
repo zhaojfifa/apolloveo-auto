@@ -66,6 +66,7 @@ def test_build_hot_follow_compose_response_preserves_success_shape():
         final_key="deliver/tasks/hf-compose-ok/final.mp4",
         compose_status="done",
         hub={"task_id": "hf-compose-ok", "kind": "hot_follow"},
+        line={"line_id": "hot_follow_line", "sop_profile_ref": "docs/runbooks/hot_follow_sop.md"},
     )
 
     assert result.status_code == 200
@@ -73,6 +74,7 @@ def test_build_hot_follow_compose_response_preserves_success_shape():
     assert result.body["final_key"] == "deliver/tasks/hf-compose-ok/final.mp4"
     assert result.body["compose_status"] == "done"
     assert result.body["hub"]["kind"] == "hot_follow"
+    assert result.body["line"]["line_id"] == "hot_follow_line"
 
 
 def test_run_ffmpeg_timeout_raises_structured_http_exception(monkeypatch):

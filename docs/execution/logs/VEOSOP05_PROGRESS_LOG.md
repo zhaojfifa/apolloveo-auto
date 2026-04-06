@@ -957,3 +957,40 @@
 
 - `tasks.py` 与 `hot_follow_api.py` 仍各自保留一层 compose orchestration shell；后续若做 PR-3/PR-4，应在不回退 status ownership 的前提下继续收口到更稳定的 controller/runtime boundary
 - line contract 与 ready gate 目前仍未成为 compose controller 的 runtime 主输入，这部分留给后续 PR
+
+## PR-3 Hot Follow Contract Binding
+
+日期：2026-04-06
+
+本节点完成：
+
+- 为 `ProductionLine` 补齐 PR-0 冻结的合同字段：input/deliverable/worker/asset sink/confirmation policy
+- 新增 `gateway/app/services/line_binding_service.py`，把 `LineRegistry.for_kind(...)` 收口为统一 runtime binding 入口
+- 将 Hot Follow publish/workbench hub 和 compose 成功响应接入 line binding 元数据，使 runtime 真实消费 line contract，而不是只保留仪式性声明
+- 对齐 runtime-critical SOP 引用：`gateway/app/lines/hot_follow.py` 与 `docs/architecture/line_contracts/hot_follow_line.yaml` 现均指向 `docs/runbooks/hot_follow_sop.md`
+
+本次收口说明：
+
+- 本次只做 line contract metadata binding
+- 不做 declarative ready gate evaluator
+- 不做 worker gateway 实现
+- 不做 skills runtime loader
+- 不改变 status truth / deliverable truth 的写入边界
+
+本节点明确不做：
+
+- 不在本次 PR 把 ready gate 变成 YAML evaluator
+- 不在本次 PR 让 line metadata 直接驱动 status 写回
+- 不在本次 PR 改 URL / route / UI
+
+验证结果：
+
+- `python3.11 -m py_compile gateway/app/lines/base.py gateway/app/lines/hot_follow.py gateway/app/services/line_binding_service.py gateway/app/services/task_view.py gateway/app/services/hot_follow_skills_advisory.py gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/tests/test_line_binding_service.py gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_line_binding_service.py -q gateway/app/services/tests/test_compose_service_contract.py -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py -q gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q gateway/app/services/status_policy/tests/test_line_runtime_binding.py -q gateway/app/services/status_policy/tests/test_hot_follow_state_line_binding.py -q gateway/app/services/tests/test_hot_follow_skills_advisory.py -q gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+
+剩余风险：
+
+- line contract 目前已进入 runtime metadata 主链，但 ready gate 仍使用现有 Python 规则镜像，尚未读取 docs YAML
+- worker profile / skills bundle / confirmation policy 目前是 live metadata / hook refs，还不是可执行 loader
+- `tasks.py` orchestration 仍未完成最终 contract-driven layering，这部分留给 PR-4

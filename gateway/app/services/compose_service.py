@@ -780,6 +780,7 @@ class CompositionService:
         final_key: str,
         compose_status: str | None,
         hub: dict[str, Any],
+        line: dict[str, Any] | None = None,
     ) -> HotFollowComposeResponseContract:
         return HotFollowComposeResponseContract(
             status_code=200,
@@ -789,6 +790,7 @@ class CompositionService:
                 "final_video_url": task_endpoint(task_id, "final"),
                 "final_key": str(final_key or ""),
                 "hub": hub,
+                "line": dict(line or {}),
                 "compose_status": compose_status,
             },
         )
