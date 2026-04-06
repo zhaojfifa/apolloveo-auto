@@ -16,7 +16,6 @@ except Exception:
     shim.BaseSettings = _BaseSettings
     sys.modules["pydantic_settings"] = shim
 
-from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.services import hot_follow_runtime_bridge as compat_bridge
 
 
@@ -26,8 +25,8 @@ def test_explicit_compat_workbench_bridge_matches_legacy_alias(monkeypatch):
     expected = {"content_mode": "voice_led", "audio_ready": True}
 
     monkeypatch.setattr(
-        hf_router,
-        "_safe_collect_hot_follow_workbench_ui",
+        compat_bridge,
+        "_svc_safe_collect_hot_follow_workbench_ui",
         lambda current_task, current_settings: expected
         if current_task is task and current_settings is settings
         else {},
@@ -41,13 +40,13 @@ def test_explicit_compat_subtitle_compose_bridge_matches_legacy_alias(monkeypatc
     task = {"task_id": "hf-compat-compose", "kind": "hot_follow"}
 
     monkeypatch.setattr(
-        hf_router,
-        "_hf_allow_subtitle_only_compose",
+        compat_bridge,
+        "_svc_hf_allow_subtitle_only_compose",
         lambda current_task_id, current_task: current_task_id == "hf-compat-compose" and current_task is task,
     )
     monkeypatch.setattr(
-        hf_router,
-        "_resolve_target_srt_key",
+        compat_bridge,
+        "_svc_resolve_target_srt_key",
         lambda current_task, task_code, lang: f"{task_code}:{lang}"
         if current_task is task
         else None,

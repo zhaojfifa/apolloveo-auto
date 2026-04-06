@@ -263,6 +263,13 @@ from gateway.app.services.voice_state import (  # noqa: E402
     resolve_hot_follow_requested_voice as _resolve_hot_follow_requested_voice,
     voice_state_config as _voice_state_config,
 )
+from gateway.app.services.artifact_helpers import (  # noqa: E402
+    is_storage_key as _artifact_is_storage_key,
+    load_dub_text as _load_dub_text,
+    mm_edited_path as _artifact_mm_edited_path,
+    upload_target_subtitle_artifacts as _artifact_upload_target_subtitle_artifacts,
+    pack_path_for_list as _artifact_pack_path_for_list,
+)
 from gateway.app.services.hot_follow_runtime_bridge import (  # noqa: E402
     compat_allow_subtitle_only_compose as _compat_allow_subtitle_only_compose,
     compat_hot_follow_compose_runtime as _compat_hot_follow_compose_runtime,
@@ -360,64 +367,25 @@ def _infer_platform_from_url(url: str) -> Optional[str]:
 
 
 def _is_storage_key(value: Optional[str]) -> bool:
-    if not value:
-        return False
-    lowered = value.lower()
-    return lowered.startswith(("http://", "https://", "s3://", "r2://"))
+    return _artifact_is_storage_key(value)
 
 
 def _pack_path_for_list(task: dict) -> Optional[str]:
-    task_id = str(_task_value(task, "task_id") or _task_value(task, "id") or "")
-    pack_type = _task_value(task, "pack_type")
-    pack_key = _task_value(task, "pack_key")
-    pack_path = _task_value(task, "pack_path")
-    if pack_type == "capcut_v18" and pack_key:
-        return str(pack_key)
-    if pack_path:
-        pack_path = str(pack_path)
-        if pack_path.startswith(("pack/", "published/")) and not _is_storage_key(pack_path):
-            return pack_path
-    pack_file = deliver_pack_zip_path(task_id)
-    if pack_file.exists():
-        return relative_to_workspace(pack_file)
-    return None
+    return _artifact_pack_path_for_list(task, task_value=_task_value)
 
 
 def _mm_edited_path(task_id: str) -> Path:
-    return task_base_dir(task_id) / "mm_edited.txt"
-
-
-def _load_dub_text(task_id: str) -> tuple[str, str]:
-    edited_path = _mm_edited_path(task_id)
-    if edited_path.exists():
-        text = edited_path.read_text(encoding="utf-8").strip()
-        if text:
-            return text, "mm_edited"
-    workspace = Workspace(task_id)
-    mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
-    if mm_txt_path.exists():
-        return mm_txt_path.read_text(encoding="utf-8"), "mm_txt"
-    return "", "mm_txt"
+    return _artifact_mm_edited_path(task_id)
 
 
 def _upload_target_subtitle_artifacts(task: dict, task_id: str, target_lang: str) -> tuple[str | None, str | None]:
-    workspace = Workspace(task_id, target_lang=target_lang)
-    subtitle_name = hot_follow_subtitle_filename(target_lang)
-    subtitle_txt_name = hot_follow_subtitle_txt_filename(target_lang)
-    origin_key = (
-        upload_task_artifact(task, workspace.origin_srt_path, "origin.srt", task_id=task_id)
-        if workspace.origin_srt_path.exists()
-        else None
+    return _artifact_upload_target_subtitle_artifacts(
+        task,
+        task_id,
+        target_lang,
+        workspace_factory=Workspace,
+        artifact_uploader=upload_task_artifact,
     )
-    target_key = (
-        upload_task_artifact(task, workspace.mm_srt_path, subtitle_name, task_id=task_id)
-        if workspace.mm_srt_path.exists()
-        else None
-    )
-    target_txt_path = workspace.mm_srt_path.with_suffix(".txt")
-    if target_txt_path.exists():
-        upload_task_artifact(task, target_txt_path, subtitle_txt_name, task_id=task_id)
-    return origin_key, target_key
 
 
 def _resolve_text_path(task_id: str, kind: str) -> Path | None:
