@@ -10,6 +10,8 @@
   - review、诊断、架构对齐与工程分析
 - `docs/contracts/`
   - 当前 runtime / service contract
+- `docs/adr/`
+  - 架构决策记录（ADR）
 - `docs/architecture/`
   - 架构说明、line contracts、结构化 YAML
 - `docs/runbooks/`
@@ -36,6 +38,8 @@
   - 保留 review 诊断与架构对齐材料
 - `contracts/`
   - 固化当前运行时与服务边界
+- `adr/`
+  - 固化已经接受的架构决策与拆解原则
 - `architecture/`
   - 保留结构性设计、line contract 和架构规范
 - `runbooks/`
@@ -53,18 +57,24 @@
 4. `docs/baseline/PRODUCT_BASELINE.md`
 5. `docs/baseline/ARCHITECTURE_BASELINE.md`
 6. `docs/baseline/EXECUTION_BASELINE.md`
-7. `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
-8. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
-9. `docs/execution/HOT_FOLLOW_SKILLS_MVP_V0_CLOSURE.md`
-10. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
-11. `docs/runbooks/VERIFICATION_BASELINE.md`
+7. `docs/contracts/hot_follow_line_contract.md`
+8. `docs/contracts/status_ownership_matrix.md`
+9. `docs/contracts/hot_follow_ready_gate.yaml`
+10. `docs/contracts/worker_gateway_contract.md`
+11. `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
 12. `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
 13. `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
 14. `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
-15. `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
-16. `docs/execution/SKILLS_MVP_ENTRY_REVIEW.md`
-17. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
-18. `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`
+15. `docs/adr/ADR-task-router-decomposition.md`
+16. `docs/runbooks/hot_follow_sop.md`
+17. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
+18. `docs/runbooks/VERIFICATION_BASELINE.md`
+19. `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
+20. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
+21. `docs/execution/HOT_FOLLOW_SKILLS_MVP_V0_CLOSURE.md`
+22. `docs/execution/SKILLS_MVP_ENTRY_REVIEW.md`
+23. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
+24. `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`
 
 ## Important Review References
 
@@ -74,6 +84,8 @@
   - 重要架构对齐文件，保留在 `reviews/`
 - `docs/reviews/ALIGNMENT_EXECUTION_REVIEW_20260321.md`
   - 面向执行边界的后续对齐 review
+- `docs/reviews/review_jellyfish_importability_for_factory.md`
+  - 只作为中间契约/分层吸收参考，不作为 studio product 导入依据
 - `docs/reviews/REVIEW_AFTER_VEOSOP04_WITH_DEMINING_PRIORITY.md`
 - `docs/reviews/TASK_1_3_PORT_MERGE_PLAN.md`
 - `docs/reviews/TASK_2_0_COMPOSE_SURGERY.md`

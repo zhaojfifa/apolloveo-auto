@@ -870,3 +870,50 @@
 剩余风险：
 
 - 极早期旧任务若没有 audio speed snapshot，首次 speed 调整会依赖本次补上的旧 speed 回填来进入新的 freshness 基线；再完成一次标准配音后即可稳定落到新模型
+
+## PR-0 Hot Follow Contracts / ADR / SOP Freeze
+
+日期：2026-04-06
+
+本节点完成：
+
+- 冻结 Hot Follow 人类可读 line contract：明确 line id、input/deliverable/SOP/skills/worker/asset sink/status/ready gate 引用
+- 冻结 Hot Follow ready gate YAML 草案，明确 compose/publish ready、artifact/step/currentness 条件与 operator confirmation hook
+- 冻结 Worker Gateway contract，明确 request/response shape、internal/external/hybrid 模式与禁止直接写 truth 的边界
+- 冻结 Status Ownership Matrix，明确谁写 truth、谁算 derived、谁只做 display projection
+- 新增 `tasks.py` 拆解 ADR，明确按职责拆，不按文件大小拆
+- 新增 Hot Follow SOP runbook，并更新 docs 索引把 Jellyfish importability review 纳入参考阅读链
+
+本次收口说明：
+
+- 本次只做 docs-first / rules-first 冻结，为后续 `tasks.py` P0 拆解和 line-contract-driven runtime 提供边界
+- 本次不改业务代码、不改 URL、不改 UI、不扩第二条产线
+
+本节点明确不做：
+
+- 不在本次 PR 建 Skills Runtime
+- 不在本次 PR 建 Worker Gateway 实现
+- 不在本次 PR 改 compose/publish ownership
+- 不在本次 PR 引入新的 business feature
+
+验证结果：
+
+- 新增/更新文档已覆盖：
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/worker_gateway_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/adr/ADR-task-router-decomposition.md`
+  - `docs/runbooks/hot_follow_sop.md`
+  - `docs/README.md`
+- 文档内容已与以下现有 runtime/baseline/review 对齐：
+  - `docs/architecture/line_contracts/hot_follow_line.yaml`
+  - `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
+  - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+  - `gateway/app/services/ready_gate/hot_follow_rules.py`
+  - `docs/reviews/review_jellyfish_importability_for_factory.md`
+
+剩余风险：
+
+- 这些 contracts/ADR 先是 docs-first 冻结，运行时主链仍需后续 PR 把 `tasks.py` / `hot_follow_api.py` / ready gate binding 真正对齐到合同消费
+- `status` 与 `ready_gate` 的历史兼容字段仍可能在旧逻辑里并存，代码拆解时必须按本矩阵继续收口

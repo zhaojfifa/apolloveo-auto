@@ -1,0 +1,90 @@
+version: "0.1"
+contract_status: "frozen-draft-for-p0"
+line_id: "hot_follow_line"
+task_kind: "hot_follow"
+target_result_type: "final_video"
+
+contract_refs:
+  line_contract: "docs/contracts/hot_follow_line_contract.md"
+  sop_profile: "docs/runbooks/hot_follow_sop.md"
+  status_policy: "gateway/app/services/status_policy/hot_follow_state.py"
+  runtime_mirror_spec: "gateway/app/services/ready_gate/hot_follow_rules.py::HOT_FOLLOW_GATE_SPEC"
+  runtime_evaluator: "gateway/app/services/ready_gate/engine.py::evaluate_ready_gate"
+
+signal_families:
+  artifact_facts:
+    - "final.exists"
+    - "historical_final.exists"
+    - "voiceover.exists"
+    - "target_subtitle.exists"
+  step_facts:
+    - "audio.status"
+    - "subtitles.subtitle_ready"
+    - "audio.audio_ready"
+    - "audio.no_dub"
+  currentness_facts:
+    - "final.fresh"
+    - "target subtitle authoritative/current"
+    - "dub current against subtitle + audio config"
+
+gates:
+  compose_ready:
+    description: >
+      The main final deliverable is materially ready and does not require
+      another compose run for the current subtitle/dub/render inputs.
+    runtime_formula:
+      all_of:
+        - "final_exists"
+        - "final_fresh"
+      any_of:
+        - "audio_ready"
+        - "no_dub"
+    required_artifact_conditions:
+      - "current final output exists"
+      - "if audio path is used, voiceover artifact exists"
+      - "target subtitle artifact exists or subtitle lane explicitly reports ready"
+    required_step_conditions:
+      - "subtitle lane must be ready before compose is operationally unblocked"
+      - "dub lane must be ready unless no_dub branch is active"
+    currentness_conditions:
+      - "final must be fresh against current subtitle/dub/render inputs"
+      - "target subtitle must be the authoritative current target subtitle"
+      - "current dub must match the authoritative target subtitle and active audio config"
+    blocking_reasons:
+      - "compose_not_done"
+      - "final_stale"
+      - "subtitle_not_ready"
+      - "audio_not_done"
+      - "voiceover_missing"
+      - "tts_voice_invalid"
+      - "audio_not_ready"
+      - "no_dub_reason when no_dub is true and subtitle lane is not ready"
+    operator_confirmation_hooks: []
+
+  publish_ready:
+    description: >
+      Final output may proceed to publish/distribution because compose-ready
+      truth is satisfied.
+    runtime_formula:
+      all_of:
+        - "compose_ready"
+    required_artifact_conditions:
+      - "current final output exists"
+    required_step_conditions:
+      - "compose_ready is true"
+    currentness_conditions:
+      - "final remains fresh for the current subtitle/dub/render inputs"
+    operator_confirmation_hooks:
+      - "before_publish"
+
+operator_confirmation_hooks:
+  before_publish:
+    enabled: true
+    owner: "operator"
+    source: "hot_follow_line_contract.confirmation_policy.before_publish"
+    purpose: "final publish confirmation"
+
+policy_notes:
+  - "This YAML freezes the intended contract first; current runtime mirror still lives in Python."
+  - "Optional artifacts such as pack/scene pack are not compose_ready or publish_ready prerequisites."
+  - "Board/workbench/publish projection should consume ready-gate truth rather than raw step status alone."
