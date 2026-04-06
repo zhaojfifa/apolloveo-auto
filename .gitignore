@@ -27,3 +27,5 @@ Thumbs.db
 # plan documents
 _drafts
 venv/
+
+shortvideo.db
