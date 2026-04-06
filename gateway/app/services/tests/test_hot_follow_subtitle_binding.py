@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.services import compose_service as compose_module
 from gateway.app.services.compose_service import (
+    ComposeResult,
     CompositionService,
     _ComposeInputs,
     _WorkspaceFiles,
@@ -464,7 +465,8 @@ def test_compose_passes_live_vi_task_to_prepare_workspace(monkeypatch, tmp_path)
         subtitle_only_check=lambda *_args, **_kwargs: False,
     )
 
-    assert result["compose_status"] == "done"
+    assert result.compose_status == "done"
+    assert result.updates["compose_status"] == "done"
     assert seen["task"]["target_subtitle_current"] is True
     assert seen["task"]["target_subtitle_current_reason"] == "ready"
 
@@ -570,8 +572,9 @@ def test_upload_and_verify_uses_workspace_subtitle_snapshot_without_nameerror(mo
         ffmpeg_cmd_used=ws.ffmpeg_cmd_used,
     )
 
-    assert updates["compose_status"] == "done"
-    assert updates["final_source_subtitles_content_hash"] == "HASH_LATEST"
-    assert updates["final_source_subtitle_storage_key"] == "deliver/tasks/hf-bind-upload/mm.srt"
-    assert updates["final_source_subtitle_storage_etag"] == "etag-sub"
-    assert updates["final_source_subtitle_sha256"] == "sha256-sub"
+    assert isinstance(updates, ComposeResult)
+    assert updates.compose_status == "done"
+    assert updates.updates["final_source_subtitles_content_hash"] == "HASH_LATEST"
+    assert updates.updates["final_source_subtitle_storage_key"] == "deliver/tasks/hf-bind-upload/mm.srt"
+    assert updates.updates["final_source_subtitle_storage_etag"] == "etag-sub"
+    assert updates.updates["final_source_subtitle_sha256"] == "sha256-sub"

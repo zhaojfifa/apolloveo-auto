@@ -917,3 +917,43 @@
 
 - 这些 contracts/ADR 先是 docs-first 冻结，运行时主链仍需后续 PR 把 `tasks.py` / `hot_follow_api.py` / ready gate binding 真正对齐到合同消费
 - `status` 与 `ready_gate` 的历史兼容字段仍可能在旧逻辑里并存，代码拆解时必须按本矩阵继续收口
+
+## PR-2 Compose Service Extraction Boundary
+
+日期：2026-04-06
+
+本节点完成：
+
+- 将 Hot Follow compose 的 repo/status 写路径从 `compose_service.py` 中移出，改为由 `tasks.py` / `hot_follow_api.py` 外层 orchestration shell 负责
+- 保留 `compose_service.py` 作为执行边界：负责 compose plan 规范化、输入校验、workspace 准备、FFmpeg 调用、输出校验、上传验证与结构化 compose result 返回
+- 引入 `ComposePlan` / `ComposeResult`，使 compose execution 输出不再只是匿名 dict
+- 保留并强化 FFmpeg timeout 保护：所有 subprocess/ffmpeg 路径继续统一走 `_run_ffmpeg(...)`
+- 保持临时目录生命周期在 `TemporaryDirectory()` / finally-managed flow 内，不把 temp/intermediate 文件生命周期泄漏到 router
+- 保持 `_hf_compose_final_video()` 仅为向后兼容的薄包装器，不再承载 execution body
+
+本次收口说明：
+
+- 本次只做 compose execution ownership boundary 收口
+- 不做 line contract runtime binding
+- 不做 declarative ready gate evaluator
+- 不改 URL / route shape / UI / compose 输出语义
+
+本节点明确不做：
+
+- 不实现 Worker Gateway
+- 不实现 Skills Runtime loader
+- 不改 publish ownership
+- 不改 ready gate 主判断逻辑
+
+验证结果：
+
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_service_contract.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hf_compose_freshness.py -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q gateway/app/services/status_policy/tests/test_app_import_smoke.py -q gateway/app/services/tests/test_compose_video_master_duration.py -q`
+
+剩余风险：
+
+- `tasks.py` 与 `hot_follow_api.py` 仍各自保留一层 compose orchestration shell；后续若做 PR-3/PR-4，应在不回退 status ownership 的前提下继续收口到更稳定的 controller/runtime boundary
+- line contract 与 ready gate 目前仍未成为 compose controller 的 runtime 主输入，这部分留给后续 PR

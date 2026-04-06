@@ -21,6 +21,7 @@ except Exception:
 from gateway.app.deps import get_task_repository
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.services.compose_service import ComposeResult
 from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 
@@ -762,3 +763,62 @@ def test_hot_follow_compose_rejects_stale_revision_submission(monkeypatch):
     assert res.status_code == 409
     detail = res.json().get("detail") or {}
     assert detail.get("reason") == "compose_revision_mismatch"
+
+
+def test_hot_follow_compose_route_applies_service_updates_outside_compose_service(monkeypatch):
+    task_id = "hf-compose-route-success-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "ready",
+            "target_lang": "my",
+            "content_lang": "my",
+            "compose_plan": {"overlay_subtitles": True},
+        },
+    )
+
+    monkeypatch.setattr(hf_router, "get_storage_service", lambda: object())
+    monkeypatch.setattr(hf_router.CompositionService, "resolve_fresh_final_key", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        hf_router.CompositionService,
+        "compose",
+        lambda self, _task_id, _task, **_kwargs: ComposeResult(
+            updates={
+                "compose_status": "done",
+                "compose_last_status": "done",
+                "final_video_key": f"deliver/tasks/{task_id}/final.mp4",
+                "final_video_path": f"deliver/tasks/{task_id}/final.mp4",
+                "status": "ready",
+                "last_step": "compose",
+            },
+            final_key=f"deliver/tasks/{task_id}/final.mp4",
+            final_url=f"/v1/tasks/{task_id}/final",
+            compose_status="done",
+        ),
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_service_build_hot_follow_workbench_hub",
+        lambda current_task_id, repo=None: {"task_id": current_task_id, "compose_status": (repo.get(current_task_id) or {}).get("compose_status")},
+    )
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.post(f"/api/hot_follow/tasks/{task_id}/compose", json={})
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["compose_status"] == "done"
+    assert data["final_key"] == f"deliver/tasks/{task_id}/final.mp4"
+    assert (data["hub"] or {}).get("compose_status") == "done"
+
+    saved = repo.get(task_id) or {}
+    assert saved["compose_status"] == "done"
+    assert saved["final_video_key"] == f"deliver/tasks/{task_id}/final.mp4"
