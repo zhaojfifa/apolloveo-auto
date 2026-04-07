@@ -61,20 +61,27 @@
 8. `docs/contracts/status_ownership_matrix.md`
 9. `docs/contracts/hot_follow_ready_gate.yaml`
 10. `docs/contracts/worker_gateway_contract.md`
-11. `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
-12. `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
-13. `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
-14. `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
-15. `docs/adr/ADR-task-router-decomposition.md`
-16. `docs/runbooks/hot_follow_sop.md`
-17. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
-18. `docs/runbooks/VERIFICATION_BASELINE.md`
-19. `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
-20. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
-21. `docs/execution/HOT_FOLLOW_SKILLS_MVP_V0_CLOSURE.md`
-22. `docs/execution/SKILLS_MVP_ENTRY_REVIEW.md`
-23. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
-24. `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`
+11. `docs/contracts/skills_runtime_contract.md`
+12. `docs/contracts/worker_gateway_runtime_contract.md`
+13. `docs/contracts/script_video_planning_contract.md`
+14. `docs/contracts/action_replica_planning_assets_contract.md`
+15. `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
+16. `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+17. `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
+18. `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
+19. `docs/adr/ADR-task-router-decomposition.md`
+20. `docs/adr/ADR-phase2-skills-worker-planning.md`
+21. `docs/runbooks/hot_follow_sop.md`
+22. `docs/runbooks/phase2_execution_plan.md`
+23. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
+24. `docs/runbooks/VERIFICATION_BASELINE.md`
+25. `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
+26. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
+27. `docs/execution/HOT_FOLLOW_SKILLS_MVP_V0_CLOSURE.md`
+28. `docs/execution/SKILLS_MVP_ENTRY_REVIEW.md`
+29. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
+30. `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`
+31. `docs/execution/logs/PHASE2_PROGRESS_LOG.md`
 
 ## Important Review References
 
@@ -105,3 +112,4 @@
 
 - `_drafts/` 的结论必须被吸收到 `docs/baseline/`、`docs/execution/`、`docs/reviews/`，不能让 `_drafts/` 继续承担活文档职责。
 - 本 docs system 反映的是 post-review、post-VeoSop05 reality，而不是未来平台理想态。
+- Phase-2 contract freeze 文档进入 source-of-truth 阅读顺序，不等于 Phase-2 runtime 已实现；实现状态仍以对应 PR 和 progress log 为准。

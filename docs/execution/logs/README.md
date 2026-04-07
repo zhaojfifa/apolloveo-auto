@@ -11,3 +11,4 @@
 当前日志：
 
 - `VEOSOP05_PROGRESS_LOG.md`
+- `PHASE2_PROGRESS_LOG.md`
