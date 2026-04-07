@@ -1,5 +1,43 @@
 # Phase-2 Progress Log
 
+## PR-7 Worker Gateway MVP
+
+Date: 2026-04-07
+
+This node completed:
+
+- introduced explicit Worker Gateway request / result runtime objects
+- introduced execution-mode support for `internal`, `external`, and `hybrid`
+- added a minimal gateway registry and dispatcher
+- routed Hot Follow compose FFmpeg execution through the Worker Gateway internal adapter
+- aligned Hot Follow line metadata so `worker_profile_ref` points to the runtime worker contract
+
+Scope boundary:
+
+- kept the change narrow to execution boundary
+- preserved repo truth, deliverable truth, publish truth, and status truth outside the gateway
+- did not start a broad provider rewrite
+
+Intentionally not done:
+
+- did not migrate every provider-backed path into Worker Gateway
+- did not introduce OpenClaw runtime integration
+- did not add new business features or UI work
+- did not let Worker Gateway perform repo or status writes
+
+Verification:
+
+- Worker Gateway registry dispatch is covered for external/hybrid mode selection
+- internal subprocess adapter timeout surface is covered
+- compose `_run_ffmpeg(...)` now executes through Worker Gateway in tests
+- Hot Follow publish/workbench line binding and import smoke remain green
+
+Remaining risks:
+
+- the only live execution path in this PR is compose FFmpeg internal execution
+- external and hybrid modes are real runtime contract types, but broader provider migration is still deferred
+- parse / ASR / TTS provider branching remains outside the gateway for now
+
 ## PR-6 Hot Follow Skills Runtime MVP
 
 Date: 2026-04-07

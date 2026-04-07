@@ -61,13 +61,21 @@
 
 - `gateway/app/services/compose_service.py`
   - 承接 compose 主体执行
-  - 统一 FFmpeg 子进程 timeout
+  - 通过 Worker Gateway internal adapter 统一 FFmpeg 执行与 timeout
   - 返回 compose 更新结果 dict
+ - `gateway/app/services/worker_gateway.py`
+  - 提供 Worker Request / Result contract 与执行边界
+ - `gateway/app/services/worker_gateway_registry.py`
+  - 提供当前最小 worker gateway registry 和默认 compose internal adapter 注册
 - `gateway/app/services/status_policy/hot_follow_state.py`
   - 负责 Hot Follow 状态聚合
   - 通过 `compute_hot_follow_state()` 输出 `ready_gate` 与兼容状态字段
 - `gateway/app/services/ready_gate/hot_follow_rules.py`
   - 提供 `HOT_FOLLOW_GATE_SPEC`
+- `gateway/app/services/skills_runtime.py`
+  - 提供当前最小 line-scoped skills bundle loader
+- `gateway/app/services/hot_follow_skills_advisory.py`
+  - 通过 live skills bundle 生成 read-only advisory
 - `gateway/app/services/status_policy/registry.py`
   - 当前仍是按 `kind` 的最小 registry，不是 line-aware runtime
 
@@ -123,9 +131,9 @@ service 当前不直接承担：
 
 - 不修改 `tasks.py` 与 `hot_follow_api.py` 业务逻辑
 - 不把 workbench hub 在本 PR 中重构成显式 schema
-- 不在本 PR 中建立新的 provider/runtime 平台抽象
+- 不在本阶段中建立完整 provider/runtime 平台抽象
 - 不扩第二条产线
-- 不启动 skills runtime 实现
+- 不在本文件里扩成 worker truth layer 或 generic multi-line skills platform
 
 ## 6. 后续 PR 直接使用方式
 

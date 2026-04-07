@@ -6,13 +6,12 @@ Phase-2 controlled foundation on `VeoPhase2-SkillsWorker`
 
 ## Current Main Line
 
-- Hot Follow Skills Runtime MVP
-- Worker Gateway boundary freeze and preparation
+- Worker Gateway MVP
+- preserve Hot Follow skills/runtime behavior under explicit execution boundary
 - planning-first contracts for future `script_video_line` / `action_replica_line`
 
 ## Allowed Next Work
 
-- PR-6: line-scoped Hot Follow skills runtime MVP
 - PR-7: worker gateway MVP
 - PR-8: script video planning contract landing
 - PR-9: action replica planning asset contract landing

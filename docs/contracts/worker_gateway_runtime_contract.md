@@ -8,7 +8,7 @@ It complements, but does not replace, the broader ownership baseline in:
 
 - `docs/contracts/worker_gateway_contract.md`
 
-This file focuses on runtime slots, request/response shape, and execution boundary needed for PR-7.
+This file focuses on runtime slots, request/response shape, and execution boundary used by PR-7.
 
 ## 2. Runtime Role
 
@@ -209,6 +209,10 @@ It should first absorb execution boundaries already present in Hot Follow:
 - provider-backed parsing / ASR / TTS calls
 - compose subprocess execution boundary
 - hybrid local + remote steps
+
+Current live MVP path:
+
+- Hot Follow compose FFmpeg execution now goes through the Worker Gateway `internal` adapter path
 
 It should not, in PR-7:
 

@@ -78,7 +78,7 @@ worker_profile:
   fallback_tts_provider: edge_tts
   default_asr_provider: gemini
   ffmpeg_required: true
-worker_profile_ref: docs/contracts/worker_gateway_contract.md
+worker_profile_ref: docs/contracts/worker_gateway_runtime_contract.md
 
 # ─── Asset sink profile ───────────────────────────────────────────────────────
 

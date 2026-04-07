@@ -27,6 +27,7 @@ from typing import Any, Callable
 from fastapi import HTTPException
 
 from gateway.app.services.artifact_storage import object_exists, object_head
+from gateway.app.services.line_binding_service import get_line_runtime_binding
 from gateway.app.services.media_helpers import sha256_file
 from gateway.app.services.media_validation import (
     MIN_VIDEO_BYTES,
@@ -37,6 +38,8 @@ from gateway.app.services.media_validation import (
     media_meta_from_head,
 )
 from gateway.app.services.voice_state import collect_voice_execution_state
+from gateway.app.services.worker_gateway import WorkerExecutionMode, WorkerRequest
+from gateway.app.services.worker_gateway_registry import get_worker_gateway
 from gateway.app.services.task_view_helpers import task_endpoint, task_key
 from gateway.app.core.constants import COMPOSE_RETRY_AFTER_MS
 
@@ -1121,23 +1124,39 @@ class CompositionService:
             purpose,
             effective_timeout,
         )
-        try:
-            proc = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                timeout=effective_timeout,
-            )
-        except subprocess.TimeoutExpired as exc:
-            stderr_tail = str(exc.stderr or "")[-800:]
+        binding = get_line_runtime_binding({"kind": "hot_follow"})
+        line = binding.line
+        request = WorkerRequest(
+            request_id=f"{task_id}:{purpose}",
+            line_id=str(getattr(line, "line_id", None) or "hot_follow_line"),
+            task_id=task_id,
+            step_id="compose",
+            worker_capability="ffmpeg",
+            execution_mode=WorkerExecutionMode.INTERNAL,
+            worker_profile_ref=getattr(line, "worker_profile_ref", None),
+            input_refs={"task_ref": task_id},
+            strategy_hints={"purpose": purpose},
+            runtime_config={"timeout_seconds": effective_timeout},
+            payload={"cmd": list(cmd)},
+        )
+        result = get_worker_gateway().execute(request)
+        if result.result == "timeout":
+            stderr_tail = str((result.raw_output or {}).get("stderr") or "")[-800:]
             compose_fail(
                 "compose_timeout",
                 f"{purpose} timed out after {effective_timeout}s",
                 ffmpeg_cmd=" ".join(cmd),
                 stderr_tail=stderr_tail,
             )
-        return proc  # type: ignore[possibly-undefined]
+        returncode = (result.output_facts or {}).get("returncode")
+        if returncode is None:
+            returncode = 1
+        return subprocess.CompletedProcess(
+            list(cmd),
+            int(returncode),
+            str((result.raw_output or {}).get("stdout") or ""),
+            str((result.raw_output or {}).get("stderr") or ""),
+        )
 
     # ── Filter expression helpers (ex-nested, now methods) ────────────────
 

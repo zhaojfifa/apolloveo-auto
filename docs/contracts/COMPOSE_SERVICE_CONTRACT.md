@@ -67,11 +67,12 @@
 
 ### 5.1 timeout
 
-归属 `compose_service.py`。
+归属 `compose_service.py` 与 Worker Gateway internal adapter 边界。
 
 冻结依据：
 
-- `_run_ffmpeg()` 已是统一子进程入口
+- `_run_ffmpeg()` 已是统一 compose 执行入口
+- 实际 subprocess 执行现在通过 Worker Gateway internal adapter 发起
 - `ComposeTimeouts` 已明确 `freeze_tail / compose / probe / clamp` 四类超时
 
 ### 5.2 retry

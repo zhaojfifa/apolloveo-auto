@@ -12,6 +12,7 @@ from gateway.app.services.compose_service import (
     CompositionService,
     HotFollowComposeRequestContract,
 )
+from gateway.app.services.worker_gateway import WorkerExecutionMode, WorkerResult
 
 
 def test_prepare_hot_follow_compose_task_returns_mutations_without_repo_writes():
@@ -80,14 +81,21 @@ def test_build_hot_follow_compose_response_preserves_success_shape():
 def test_run_ffmpeg_timeout_raises_structured_http_exception(monkeypatch):
     svc = CompositionService(storage=object(), settings=object())
 
-    def _boom(*_args, **_kwargs):
-        raise subprocess.TimeoutExpired(
-            cmd=["ffmpeg", "-i", "in.mp4", "out.mp4"],
-            timeout=3,
-            stderr="ffmpeg timeout stderr",
-        )
+    class _Gateway:
+        def execute(self, request):
+            return WorkerResult(
+                request_id=request.request_id,
+                task_id=request.task_id,
+                step_id=request.step_id,
+                result="timeout",
+                attempt_facts={"worker_mode": "internal"},
+                output_facts={"returncode": None},
+                error={"reason": "timeout", "message": "worker timed out after 3s"},
+                retry_hint={"retryable": False},
+                raw_output={"stderr": "ffmpeg timeout stderr"},
+            )
 
-    monkeypatch.setattr(subprocess, "run", _boom)
+    monkeypatch.setattr("gateway.app.services.compose_service.get_worker_gateway", lambda: _Gateway())
 
     with pytest.raises(HTTPException) as exc:
         svc._run_ffmpeg(["ffmpeg", "-i", "in.mp4", "out.mp4"], "hf-timeout", "compose", timeout=3)
@@ -97,6 +105,36 @@ def test_run_ffmpeg_timeout_raises_structured_http_exception(monkeypatch):
     assert "timed out after 3s" in detail["message"]
     assert "ffmpeg -i in.mp4 out.mp4" in detail["ffmpeg_cmd"]
     assert "timeout stderr" in detail["stderr_tail"]
+
+
+def test_run_ffmpeg_executes_through_worker_gateway(monkeypatch):
+    svc = CompositionService(storage=object(), settings=object())
+    seen = {}
+
+    class _Gateway:
+        def execute(self, request):
+            seen["request"] = request
+            return WorkerResult(
+                request_id=request.request_id,
+                task_id=request.task_id,
+                step_id=request.step_id,
+                result="success",
+                attempt_facts={"worker_mode": "internal"},
+                output_facts={"returncode": 0},
+                retry_hint={"retryable": False},
+                raw_output={"stdout": "ok", "stderr": ""},
+            )
+
+    monkeypatch.setattr("gateway.app.services.compose_service.get_worker_gateway", lambda: _Gateway())
+
+    proc = svc._run_ffmpeg(["ffmpeg", "-i", "in.mp4", "out.mp4"], "hf-worker", "compose")
+
+    assert proc.returncode == 0
+    assert proc.stdout == "ok"
+    assert seen["request"].line_id == "hot_follow_line"
+    assert seen["request"].step_id == "compose"
+    assert seen["request"].worker_capability == "ffmpeg"
+    assert seen["request"].execution_mode == WorkerExecutionMode.INTERNAL
 
 
 def test_compose_result_keeps_updates_and_final_reference():

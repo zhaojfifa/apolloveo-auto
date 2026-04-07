@@ -26,7 +26,7 @@ This file is intentionally paired with the current runtime mirrors:
 | `deliverable_profile_ref` | final video primary, subtitle/audio secondary, pack optional | `docs/architecture/line_contracts/hot_follow_line.yaml`, `docs/contracts/status_ownership_matrix.md` |
 | `sop_profile_ref` | Hot Follow operator/engineer SOP baseline | `docs/runbooks/hot_follow_sop.md`, `gateway/app/lines/hot_follow.py` |
 | `skills_bundle_ref` | runtime Hot Follow skills bundle path with stage modules and defaults | `skills/hot_follow`, `docs/contracts/skills_runtime_contract.md` |
-| `worker_profile_ref` | hybrid worker execution under gateway boundary | `docs/contracts/worker_gateway_contract.md` |
+| `worker_profile_ref` | hybrid worker execution under live gateway boundary | `docs/contracts/worker_gateway_runtime_contract.md` |
 | `asset_sink_profile_ref` | deliverable sink is downstream of line/service truth, not worker-owned | `docs/contracts/status_ownership_matrix.md` |
 | `confirmation_policy` | before publish only | this document, `docs/runbooks/hot_follow_sop.md` |
 | `status_policy_ref` | `gateway/app/services/status_policy/hot_follow_state.py` | `docs/contracts/status_ownership_matrix.md` |
