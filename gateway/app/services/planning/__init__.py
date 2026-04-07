@@ -1,5 +1,17 @@
 """Planning-first service layer for Phase-2 line-scoped draft structures."""
 
+from .action_replica_planning import (
+    ACTION_REPLICA_LINE_ID,
+    ActionReplicaExecutionNeed,
+    ActionReplicaPlanningService,
+    ActionReplicaPlanningView,
+    HandProp,
+    PlanningBindingStatus,
+    ReplicaIdentity,
+    RoleBinding,
+    ShotBinding,
+    Wardrobe,
+)
 from .prompt_registry import (
     SCRIPT_VIDEO_PROMPT_REGISTRY_REF,
     PlanningPromptRegistry,
@@ -22,20 +34,30 @@ from .script_video_planning import (
 )
 
 __all__ = [
+    "ACTION_REPLICA_LINE_ID",
+    "ActionReplicaExecutionNeed",
+    "ActionReplicaPlanningService",
+    "ActionReplicaPlanningView",
     "SCRIPT_VIDEO_LINE_ID",
     "SCRIPT_VIDEO_PROMPT_REGISTRY_REF",
     "CandidateAssetStatus",
     "ExtractedPlanningEntity",
+    "HandProp",
     "LinkedAssetStatus",
+    "PlanningBindingStatus",
     "PlanningAssetCandidate",
     "PlanningAssetLink",
     "PlanningDraftStatus",
     "PlanningPromptRegistry",
     "PlanningUsageRecord",
     "PromptTemplateSpec",
+    "ReplicaIdentity",
+    "RoleBinding",
     "ScriptVideoPlanningDraft",
     "ScriptVideoPlanningService",
     "SegmentDraft",
+    "ShotBinding",
     "ShotUnitDraft",
+    "Wardrobe",
     "load_planning_prompt_registry",
 ]

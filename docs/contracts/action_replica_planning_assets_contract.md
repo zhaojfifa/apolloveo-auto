@@ -194,7 +194,21 @@ Planning assets may not directly own:
 - asset sink truth
 - ready-gate truth
 
-## 9. Explicit Non-Goals
+## 9. Current Phase-2 Runtime Baseline Reference
+
+Current code-level baseline reference:
+
+- `gateway/app/services/planning/action_replica_planning.py`
+- `gateway/app/services/planning/__init__.py`
+
+The current runtime scope is intentionally limited to:
+
+- planning asset objects
+- role / shot binding structures
+- line-scoped usage index hooks
+- mapping skeleton to future execution needs
+
+## 10. Explicit Non-Goals
 
 This contract does not authorize:
 

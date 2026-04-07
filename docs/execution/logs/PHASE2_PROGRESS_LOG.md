@@ -1,5 +1,44 @@
 # Phase-2 Progress Log
 
+## PR-9 Action Replica Planning Asset View MVP
+
+Date: 2026-04-07
+
+This node completed:
+
+- introduced a code-level `action_replica_line` planning asset baseline
+- introduced planning asset models for `ReplicaIdentity`, `Wardrobe`, `HandProp`, `RoleBinding`, and `ShotBinding`
+- introduced planning-side relationship binding between identity, wardrobe, prop, role, and shot structures
+- introduced a small execution-mapping skeleton that converts planning assets into future execution needs without writing truth
+
+Scope boundary:
+
+- planning-first only
+- no UI shell or workbench expansion
+- no Action Replica execution overhaul
+- no provider migration
+
+Intentionally not done:
+
+- did not introduce Action Replica routes or editor UI
+- did not bind planning assets into repo truth
+- did not move worker/provider execution into Action Replica planning
+- did not start generator or publish-path implementation
+
+Verification:
+
+- action replica planning view can build identity / wardrobe / prop / role / shot structures
+- candidate and linked asset refs remain dual-state after linking
+- usage index stays line-scoped and run-scoped
+- execution-need mapping prefers linked refs and keeps planning ownership only
+- existing Script Video planning, Hot Follow skills, Worker Gateway, and import smoke remain green
+
+Remaining risks:
+
+- current mapping skeleton is intentionally non-executable and does not submit worker requests
+- there is still no Action Replica line runtime binding or editor surface
+- planning assets remain in-memory service structures only in this PR
+
 ## PR-8 Script Video Planning Layer MVP
 
 Date: 2026-04-07

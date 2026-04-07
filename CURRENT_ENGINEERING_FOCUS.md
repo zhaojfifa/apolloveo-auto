@@ -6,13 +6,14 @@ Phase-2 controlled foundation on `VeoPhase2-SkillsWorker`
 
 ## Current Main Line
 
-- Action Replica Planning Asset View
-- preserve Hot Follow skills/worker/runtime behavior while keeping `script_video_line` planning draft baseline stable
-- keep broader execution migration and product shell work out of scope
+- Phase-2 baseline closure and validation
+- preserve Hot Follow skills/worker/runtime behavior and keep `script_video_line` / `action_replica_line` planning baselines stable
+- require explicit next-phase scope decision before any execution expansion beyond current planning/runtime hooks
 
 ## Allowed Next Work
 
-- PR-9: action replica planning asset contract landing
+- Phase-2 validation / merge / release preparation
+- scoped docs / runbook / verification maintenance tied to the completed Phase-2 baseline
 - docs / runbook / validation maintenance tied to Phase-2 controlled execution
 
 ## Forbidden Work
