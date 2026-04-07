@@ -5,6 +5,7 @@ RFC-0001: Production Line Contract
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib
 from typing import Any, ClassVar
 
 
@@ -132,6 +133,12 @@ class LineRegistry:
     _by_kind: ClassVar[dict[str, ProductionLine]] = {}
 
     @classmethod
+    def _ensure_default_lines_loaded(cls) -> None:
+        if cls._lines or cls._by_kind:
+            return
+        importlib.import_module("gateway.app.lines")
+
+    @classmethod
     def register(cls, line: ProductionLine) -> ProductionLine:
         """Register *line* and return it (supports one-liner module-level assignment)."""
         cls._lines[line.line_id] = line
@@ -141,14 +148,17 @@ class LineRegistry:
     @classmethod
     def get(cls, line_id: str) -> ProductionLine | None:
         """Look up a line by its stable ``line_id``."""
+        cls._ensure_default_lines_loaded()
         return cls._lines.get(line_id)
 
     @classmethod
     def for_kind(cls, task_kind: str) -> ProductionLine | None:
         """Look up a line by the ``task.kind`` field value."""
+        cls._ensure_default_lines_loaded()
         return cls._by_kind.get(task_kind)
 
     @classmethod
     def all(cls) -> list[ProductionLine]:
         """Return all registered lines in registration order."""
+        cls._ensure_default_lines_loaded()
         return list(cls._lines.values())

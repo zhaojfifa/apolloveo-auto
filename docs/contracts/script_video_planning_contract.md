@@ -185,6 +185,12 @@ This contract is intended to support:
 - later feeding `action_replica_line`
 - later feeding line-scoped worker execution without importing studio shell semantics
 
+Current Phase-2 runtime baseline reference:
+
+- `gateway/app/services/planning/script_video_planning.py`
+- `gateway/app/services/planning/prompt_registry.py`
+- `gateway/app/prompts/script_video_planning_defaults.yaml`
+
 ## 9. Explicit Non-Goals
 
 This contract does not authorize:

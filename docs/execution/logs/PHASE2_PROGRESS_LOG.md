@@ -1,5 +1,44 @@
 # Phase-2 Progress Log
 
+## PR-8 Script Video Planning Layer MVP
+
+Date: 2026-04-07
+
+This node completed:
+
+- introduced a code-level `script_video_line` planning draft baseline
+- introduced candidate-vs-linked asset dual-state in executable planning code
+- introduced line-scoped planning usage indexing hooks
+- introduced a minimal prompt template registry skeleton for planning use
+
+Scope boundary:
+
+- planning-first only
+- no studio shell or project/chapter navigation
+- no execution truth writes
+- no provider migration
+
+Intentionally not done:
+
+- did not introduce planning routes or UI
+- did not bind planning drafts into repo truth
+- did not start Action Replica execution or asset view work
+- did not migrate worker/provider paths
+
+Verification:
+
+- planning registry resolves the default `script_video_line` template family
+- planning service builds draft/segment/shot/entity structures
+- candidate and linked assets remain dual-state after linking
+- planning usage index remains line-scoped and run-scoped
+- existing Hot Follow skills/worker/import smoke regressions remain green
+
+Remaining risks:
+
+- current planning service is intentionally deterministic and hint-driven, not a full script extraction pipeline
+- prompt template registry is a skeleton, not a broad prompt product system
+- route/UI/editor integration is deferred by design
+
 ## PR-7 Worker Gateway MVP
 
 Date: 2026-04-07

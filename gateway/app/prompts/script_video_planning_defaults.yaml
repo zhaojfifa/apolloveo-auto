@@ -1,0 +1,22 @@
+line_id: script_video_line
+families:
+  - category: shot_planning
+    family: story_beats
+    default_variant: default
+    templates:
+      - template_id: script_video.story_beats.default
+        variant: default
+        description: Default story-beat planning template
+        system_prompt: |
+          Divide the source script into concise executable shot beats.
+          Keep planning output line-scoped, editable, and non-truth-owning.
+  - category: asset_candidates
+    family: extraction
+    default_variant: default
+    templates:
+      - template_id: script_video.asset_candidates.default
+        variant: default
+        description: Default asset-candidate extraction template
+        system_prompt: |
+          Extract candidate scenes, props, and role hints from the script.
+          Keep candidate assets separate from linked accepted assets.

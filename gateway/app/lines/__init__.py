@@ -10,3 +10,5 @@ Usage:
 
 See RFC-0001 for the full ProductionLine contract specification.
 """
+
+from . import hot_follow  # noqa: F401
