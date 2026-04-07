@@ -2,26 +2,28 @@
 
 ## Current Stage
 
-post-VeoSop05 Hot Follow cleanup continuation
+Phase-2 controlled foundation on `VeoPhase2-SkillsWorker`
 
 ## Current Main Line
 
-- further thin `tasks.py`
-- isolate compatibility-only helpers
-- clean remaining Hot Follow workbench / detail / presentation assembly
+- Hot Follow Skills Runtime MVP
+- Worker Gateway boundary freeze and preparation
+- planning-first contracts for future `script_video_line` / `action_replica_line`
 
 ## Allowed Next Work
 
-- narrow Hot Follow cleanup
-- contract-aligned runtime thinning
-- docs / runbook / validation maintenance tied to Hot Follow cleanup
+- PR-6: line-scoped Hot Follow skills runtime MVP
+- PR-7: worker gateway MVP
+- PR-8: script video planning contract landing
+- PR-9: action replica planning asset contract landing
+- docs / runbook / validation maintenance tied to Phase-2 controlled execution
 
 ## Forbidden Work
 
-- Skills implementation
-- second production line
-- OpenClaw expansion
-- broad platform abstractions
+- generic agent platform build
+- second production line business rollout
+- OpenClaw expansion beyond boundary preparation
+- broad studio shell / product-shell import
 - unrelated runtime rewrites
 
 ## Merge Gates
@@ -37,3 +39,4 @@ post-VeoSop05 Hot Follow cleanup continuation
 - do not let bridge / compatibility files become new God files
 - do not reintroduce router-to-router coupling
 - do not let presentation drift away from artifact truth
+- do not let skills or workers become hidden truth writers

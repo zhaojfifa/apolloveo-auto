@@ -25,7 +25,7 @@ This file is intentionally paired with the current runtime mirrors:
 | `input_contract_ref` | link ingest + local video ingest into the same Hot Follow runtime | `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`, `docs/runbooks/hot_follow_sop.md` |
 | `deliverable_profile_ref` | final video primary, subtitle/audio secondary, pack optional | `docs/architecture/line_contracts/hot_follow_line.yaml`, `docs/contracts/status_ownership_matrix.md` |
 | `sop_profile_ref` | Hot Follow operator/engineer SOP baseline | `docs/runbooks/hot_follow_sop.md`, `gateway/app/lines/hot_follow.py` |
-| `skills_bundle_ref` | interpretation/language/tts/compliance/media-compose bundle for Hot Follow | `docs/skills/`, `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md` |
+| `skills_bundle_ref` | runtime Hot Follow skills bundle path with stage modules and defaults | `skills/hot_follow`, `docs/contracts/skills_runtime_contract.md` |
 | `worker_profile_ref` | hybrid worker execution under gateway boundary | `docs/contracts/worker_gateway_contract.md` |
 | `asset_sink_profile_ref` | deliverable sink is downstream of line/service truth, not worker-owned | `docs/contracts/status_ownership_matrix.md` |
 | `confirmation_policy` | before publish only | this document, `docs/runbooks/hot_follow_sop.md` |
@@ -138,7 +138,8 @@ Hard boundary:
 
 Reference anchors:
 
-- `docs/skills/`
+- `skills/hot_follow`
+- `docs/contracts/skills_runtime_contract.md`
 - `docs/contracts/worker_gateway_contract.md`
 - `docs/contracts/status_ownership_matrix.md`
 

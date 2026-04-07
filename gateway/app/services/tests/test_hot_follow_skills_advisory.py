@@ -90,9 +90,9 @@ def test_hot_follow_advisory_bundle_resolves_from_line_contract():
     bundle = skills_advisory.resolve_hot_follow_skills_bundle(line)
 
     assert bundle is not None
-    assert bundle.bundle_id == "hot_follow_advisory_v0"
-    assert bundle.bundle_ref == "docs/skills/"
-    assert bundle.hook_kind == "advisory"
+    assert bundle.bundle_id == "hot_follow_skills_v1"
+    assert bundle.bundle_ref == "skills/hot_follow"
+    assert bundle.hook_kind == "advisory_runtime"
 
 
 def test_hot_follow_advisory_v0_recommends_recompose_for_stale_final():
@@ -366,6 +366,7 @@ def test_hot_follow_advisory_result_attaches_to_workbench_payload(monkeypatch):
 
     assert captured["task"]["task_id"] == task_id
     assert captured["line"]["line_id"] == "hot_follow_line"
+    assert captured["line"]["skills_bundle_ref"] == "skills/hot_follow"
     assert "ready_gate" in captured
     assert "artifact_facts" in captured
     assert "current_attempt" in captured

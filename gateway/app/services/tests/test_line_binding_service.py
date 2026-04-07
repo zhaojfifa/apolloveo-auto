@@ -9,6 +9,7 @@ def test_hot_follow_line_binding_exposes_runtime_contract_metadata():
     assert binding.line is not None
     assert payload["bound"] is True
     assert payload["line_id"] == "hot_follow_line"
+    assert payload["skills_bundle_ref"] == "skills/hot_follow"
     assert payload["sop_profile_ref"] == "docs/runbooks/hot_follow_sop.md"
     assert payload["input_contract_ref"] == "docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md"
     assert payload["worker_profile_ref"] == "docs/contracts/worker_gateway_contract.md"

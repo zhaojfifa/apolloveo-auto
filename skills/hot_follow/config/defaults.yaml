@@ -1,0 +1,81 @@
+bundle_id: hot_follow_skills_v1
+line_id: hot_follow_line
+hook_kind: advisory
+stage_order:
+  - input
+  - routing
+  - quality
+  - recovery
+advisories:
+  subtitle_source_mismatch:
+    id: hf_advisory_subtitle_source_mismatch
+    kind: operator_guidance
+    level: warning
+    recommended_next_action: review_subtitles
+    operator_hint: subtitle review recommended
+    explanation: "当前烧录字幕来源不是主可编辑字幕 {expected_subtitle_source}，建议先确认主字幕对象再继续当前链路。"
+    evidence_fields:
+      - current_subtitle_source
+      - expected_subtitle_source
+      - subtitle_exists
+      - subtitle_ready
+  recompose_required:
+    id: hf_advisory_recompose_required
+    kind: operator_guidance
+    level: warning
+    recommended_next_action: recompose_final
+    operator_hint: recompose recommended
+    explanation: "当前字幕或配音已更新，建议重新合成最终视频以生成最新版本。"
+    evidence_fields:
+      - final_exists
+      - compose_status
+      - final_stale_reason
+      - blocking
+  compose_missing_final:
+    id: hf_advisory_compose_missing_final
+    kind: operator_guidance
+    level: info
+    recommended_next_action: recompose_final
+    operator_hint: recompose recommended
+    explanation: "当前字幕和配音都已就绪，但还没有可用成片，建议执行重新合成。"
+    evidence_fields:
+      - subtitle_ready
+      - audio_ready
+      - final_exists
+      - blocking
+  refresh_dub:
+    id: hf_advisory_refresh_dub
+    kind: operator_guidance
+    level: info
+    recommended_next_action: refresh_dub
+    operator_hint: dub refresh recommended
+    explanation: "当前主字幕已具备，但配音尚未准备完成，建议先刷新当前配音。"
+    evidence_fields:
+      - subtitle_ready
+      - audio_ready
+      - audio_ready_reason
+      - audio_exists
+      - compose_status
+  review_subtitles:
+    id: hf_advisory_review_subtitles
+    kind: operator_guidance
+    level: info
+    recommended_next_action: review_subtitles
+    operator_hint: subtitle review recommended
+    explanation: "当前主字幕还未准备完成，建议先检查并保存 {expected_subtitle_source} 后再继续后续链路。"
+    evidence_fields:
+      - subtitle_ready
+      - subtitle_ready_reason
+      - subtitle_exists
+  final_ready:
+    id: hf_advisory_final_ready
+    kind: operator_guidance
+    level: info
+    recommended_next_action: continue_qa
+    operator_hint: no further action currently required
+    explanation: "当前成片已可用，可继续做字幕、配音或成片 QA 复核。"
+    evidence_fields:
+      - final_exists
+      - compose_ready
+      - publish_ready
+      - last_successful_output_available

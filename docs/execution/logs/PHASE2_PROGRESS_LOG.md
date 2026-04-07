@@ -1,5 +1,42 @@
 # Phase-2 Progress Log
 
+## PR-6 Hot Follow Skills Runtime MVP
+
+Date: 2026-04-07
+
+This node completed:
+
+- introduced a minimal line-scoped skills runtime loader
+- added the first live Hot Follow skills bundle at `skills/hot_follow`
+- moved Hot Follow advisory judgment into `input / routing / quality / recovery` stage modules
+- updated Hot Follow line metadata so `skills_bundle_ref` points to the real runtime bundle path
+
+Scope boundary:
+
+- kept the runtime narrow to Hot Follow
+- preserved current advisory/workbench behavior
+- kept all status, deliverable, publish, and sink writes outside skills
+
+Intentionally not done:
+
+- did not implement worker gateway
+- did not introduce a generic multi-line plugin platform
+- did not move compose or publish truth ownership into skills
+- did not start planning-line runtimeization
+
+Verification:
+
+- bundle loader resolves `skills/hot_follow` from live line binding
+- existing Hot Follow advisory outputs remain stable in tests
+- workbench payload still attaches advisory as read-only secondary guidance
+- import smoke and line binding tests remain green
+
+Remaining risks:
+
+- current loader is intentionally minimal and line-scoped; generic multi-line expansion is deferred
+- only advisory-oriented strategy logic moved in this PR; broader execution routing stays for PR-7
+- top-level engineering focus still needs explicit branch-stage alignment if Phase-2 implementation broadens further
+
 ## PR-5 Phase-2 Docs / Contracts / ADR Freeze
 
 Date: 2026-04-07

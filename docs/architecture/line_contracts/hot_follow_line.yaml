@@ -62,7 +62,7 @@ sop_steps:
 
 # ─── Skills bundle ────────────────────────────────────────────────────────────
 
-skills_bundle_ref: docs/skills/
+skills_bundle_ref: skills/hot_follow
 skills:
   - content          # 内容模式识别（voice_led / silent_candidate / subtitle_led）
   - language         # 目标语言检测与翻译门控

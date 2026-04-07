@@ -61,7 +61,7 @@ The first line expected to consume this shape is:
 
 - `hot_follow_line`
 
-Planned first bundle:
+Live Phase-2 MVP bundle:
 
 - `skills/hot_follow/input_skill.py`
 - `skills/hot_follow/routing_skill.py`
