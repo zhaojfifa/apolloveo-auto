@@ -1,5 +1,21 @@
 # Phase-2 Progress Log
 
+## Phase-2 Milestone Closure
+
+Date: 2026-04-07
+
+Closure note:
+
+- annotated milestone tag created: `VeoPhase2-Foundation`
+- Phase-2 milestone branch `VeoPhase2-SkillsWorker` merged into `main`
+- Phase-3 execution/validation branch created: `VeoPhase3-ExecValidation`
+
+Closure boundary:
+
+- no new runtime refactor was started in the closure task
+- Phase-2 remains frozen as the foundation baseline for skills, worker gateway, and planning-first structures
+- next work moves to execution-path migration and live business validation
+
 ## PR-9 Action Replica Planning Asset View MVP
 
 Date: 2026-04-07

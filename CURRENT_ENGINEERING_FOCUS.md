@@ -2,18 +2,20 @@
 
 ## Current Stage
 
-Phase-2 controlled foundation on `VeoPhase2-SkillsWorker`
+Phase-3 execution-path migration and business validation on `VeoPhase3-ExecValidation`
 
 ## Current Main Line
 
-- Phase-2 baseline closure and validation
-- preserve Hot Follow skills/worker/runtime behavior and keep `script_video_line` / `action_replica_line` planning baselines stable
-- require explicit next-phase scope decision before any execution expansion beyond current planning/runtime hooks
+- execution-path migration under the existing Phase-2 boundaries
+- live provider / media validation for Hot Follow Burmese (`my`) and Vietnamese (`vi`)
+- action replica planning-to-runtime binding preparation without reopening Phase-2 foundation refactors
 
 ## Allowed Next Work
 
-- Phase-2 validation / merge / release preparation
-- scoped docs / runbook / verification maintenance tied to the completed Phase-2 baseline
+- execution-path migration only where it is required for live validation
+- live provider / media validation for `my` and `vi`
+- action replica planning-to-runtime binding preparation
+- scoped docs / runbook / verification maintenance tied to Phase-3 execution validation
 - docs / runbook / validation maintenance tied to Phase-2 controlled execution
 
 ## Forbidden Work
@@ -23,6 +25,7 @@ Phase-2 controlled foundation on `VeoPhase2-SkillsWorker`
 - OpenClaw expansion beyond boundary preparation
 - broad studio shell / product-shell import
 - unrelated runtime rewrites
+- reopening Phase-2 foundation refactors in the same task
 
 ## Merge Gates
 
