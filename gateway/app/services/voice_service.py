@@ -114,6 +114,40 @@ def hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None 
     }
 
 
+def hf_source_audio_semantics(task: dict, voice_state: dict[str, Any] | None) -> dict[str, Any]:
+    voice = voice_state or {}
+    policy = source_audio_policy_from_task(task)
+    tts_url = str(voice.get("voiceover_url") or "").strip() or None
+    tts_ready = bool(voice.get("dub_current") and tts_url)
+    preserve_source = policy == "preserve"
+    if tts_ready and preserve_source:
+        mode = "tts_voiceover_plus_source_audio"
+        label = "TTS voiceover + preserved source audio"
+        reason = "当前配音来自 TTS voiceover，原视频音轨只作为保留的 source-audio bed。"
+    elif tts_ready:
+        mode = "tts_voiceover_only"
+        label = "TTS voiceover only"
+        reason = "当前配音来自 TTS voiceover，原视频音轨按静音/替换策略不进入配音预览。"
+    elif preserve_source:
+        mode = "source_audio_preserved_no_tts"
+        label = "Source audio preserved; TTS voiceover not ready"
+        reason = "已选择保留原视频音轨，但它不是 TTS 配音，也不会让 dub_current=true。"
+    else:
+        mode = "muted_no_tts"
+        label = "Original audio muted; TTS voiceover not ready"
+        reason = "已选择静音/替换原视频音轨，当前还没有可用的 TTS 配音。"
+    return {
+        "source_audio_policy": policy,
+        "source_audio_preserved": preserve_source,
+        "tts_voiceover_ready": tts_ready,
+        "tts_voiceover_url": tts_url if tts_ready else None,
+        "dub_preview_url": tts_url if tts_ready else None,
+        "audio_flow_mode": mode,
+        "audio_flow_label": label,
+        "audio_flow_reason": reason,
+    }
+
+
 def hf_screen_text_candidate_summary(
     subtitle_lane: dict[str, Any] | None = None,
     route_state: dict[str, Any] | None = None,
@@ -160,6 +194,7 @@ def hf_audio_config(task: dict) -> dict[str, Any]:
     audio_fit_max_speed = max(1.0, min(1.6, audio_fit_max_speed))
     voice_state = collect_voice_execution_state(task, settings)
     provider = normalize_provider(voice_state.get("expected_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
+    semantics = hf_source_audio_semantics(task, voice_state)
     return {
         "tts_engine": hf_engine_public(provider),
         "tts_voice": voice_state.get("resolved_voice"),
@@ -167,7 +202,7 @@ def hf_audio_config(task: dict) -> dict[str, Any]:
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
-        "source_audio_policy": source_audio_policy_from_task(task),
+        **semantics,
         "voiceover_url": voice_state.get("voiceover_url"),
         "audio_url": voice_state.get("voiceover_url"),
         "audio_fit_max_speed": audio_fit_max_speed,

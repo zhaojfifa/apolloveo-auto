@@ -115,6 +115,10 @@
   const resolvedVoiceEl = document.getElementById("hf_resolved_voice");
   const audioExistsEl = document.getElementById("hf_audio_exists");
   const audioMatchesSubtitlesEl = document.getElementById("hf_audio_matches_subtitles");
+  const sourceAudioPolicyEl = document.getElementById("hf_source_audio_policy");
+  const audioFlowModeEl = document.getElementById("hf_audio_flow_mode");
+  const ttsVoiceoverReadyEl = document.getElementById("hf_tts_voiceover_ready");
+  const audioFlowReasonEl = document.getElementById("hf_audio_flow_reason");
   const subtitleReadyEl = document.getElementById("hf_subtitle_ready");
   const audioReadyEl = document.getElementById("hf_audio_ready");
   const audioReadyReasonEl = document.getElementById("hf_audio_ready_reason");
@@ -227,6 +231,8 @@
   const lipsyncHintEl = document.getElementById("hf_lipsync_hint");
   const contentModeEl = document.getElementById("hf_content_mode");
   const sourceAudioLaneEl = document.getElementById("hf_source_audio_lane");
+  const routeSourceAudioPolicyEl = document.getElementById("hf_route_source_audio_policy");
+  const routeAudioFlowModeEl = document.getElementById("hf_route_audio_flow_mode");
   const speechPresenceEl = document.getElementById("hf_speech_presence");
   const bgmPresenceEl = document.getElementById("hf_bgm_presence");
   const audioMixModeEl = document.getElementById("hf_audio_mix_mode");
@@ -331,7 +337,7 @@
     const media = (currentHub && currentHub.media) || {};
     const status = String(audio.status || "").trim().toLowerCase();
     const reason = String(audio.dub_current_reason || audio.audio_ready_reason || "").trim().toLowerCase();
-    const hasVoiceover = Boolean(media.voiceover_url || audio.voiceover_url || audio.audio_url);
+    const hasVoiceover = Boolean(audio.dub_preview_url || audio.tts_voiceover_url || media.voiceover_url || audio.voiceover_url);
     const deliverableDone = Boolean(audio.deliverable_audio_done);
     const audioReady = Boolean(audio.audio_ready);
 
@@ -648,7 +654,7 @@
       artifactFacts.audio_exists
       || media.voiceover_url
       || audio.voiceover_url
-      || audio.audio_url
+      || audio.tts_voiceover_url
       || (currentHub && currentHub.deliverable_audio_done)
     );
     const noDub = Boolean(currentHub && currentHub.no_dub);
@@ -659,6 +665,10 @@
     if (resolvedVoiceEl) resolvedVoiceEl.textContent = (currentHub && currentHub.resolved_voice) || "-";
     if (audioExistsEl) audioExistsEl.textContent = hasAudio ? "是" : "否";
     if (audioMatchesSubtitlesEl) audioMatchesSubtitlesEl.textContent = (currentHub && currentHub.dub_current) ? "是" : "否";
+    if (sourceAudioPolicyEl) sourceAudioPolicyEl.textContent = audio.source_audio_policy || (currentHub && currentHub.source_audio_policy) || "-";
+    if (audioFlowModeEl) audioFlowModeEl.textContent = audio.audio_flow_label || audio.audio_flow_mode || (currentHub && currentHub.audio_flow_label) || "-";
+    if (ttsVoiceoverReadyEl) ttsVoiceoverReadyEl.textContent = (audio.tts_voiceover_ready || (currentHub && currentHub.tts_voiceover_ready)) ? "yes" : "no";
+    if (audioFlowReasonEl) audioFlowReasonEl.textContent = audio.audio_flow_reason || (currentHub && currentHub.audio_flow_reason) || "-";
     if (subtitleReadyEl) subtitleReadyEl.textContent = (currentHub && currentHub.subtitle_ready) ? "yes" : "no";
     if (audioReadyEl) audioReadyEl.textContent = (currentHub && currentHub.audio_ready) ? "yes" : "no";
     if (audioReadyReasonEl) audioReadyReasonEl.textContent = (currentHub && currentHub.audio_ready_reason) || "-";
@@ -854,6 +864,8 @@
 
   function renderRoutingState() {
     if (contentModeEl) contentModeEl.textContent = (currentHub && currentHub.content_mode) || "-";
+    if (routeSourceAudioPolicyEl) routeSourceAudioPolicyEl.textContent = (currentHub && currentHub.source_audio_policy) || ((currentHub && currentHub.audio) || {}).source_audio_policy || "-";
+    if (routeAudioFlowModeEl) routeAudioFlowModeEl.textContent = (currentHub && currentHub.audio_flow_label) || ((currentHub && currentHub.audio) || {}).audio_flow_label || "-";
     if (sourceAudioLaneEl) sourceAudioLaneEl.textContent = (currentHub && currentHub.source_audio_lane) || "-";
     if (speechPresenceEl) speechPresenceEl.textContent = (currentHub && currentHub.speech_presence) || "-";
     if (bgmPresenceEl) bgmPresenceEl.textContent = (currentHub && currentHub.bgm_presence) || "-";
@@ -995,7 +1007,7 @@
   function renderAudio() {
     const audio = (currentHub && currentHub.audio) || {};
     const media = (currentHub && currentHub.media) || {};
-    const voiceUrl = media.voiceover_url || audio.voiceover_url || audio.audio_url || null;
+    const voiceUrl = audio.dub_preview_url || audio.tts_voiceover_url || media.voiceover_url || audio.voiceover_url || null;
     if (ttsEngineEl) ttsEngineEl.value = audio.tts_engine || "azure_speech";
     renderVoiceOptions(audio.tts_engine || "azure_speech");
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
@@ -1462,7 +1474,7 @@
   async function composeFinal() {
     const media = (currentHub && currentHub.media) || {};
     const audio = (currentHub && currentHub.audio) || {};
-    const voiceUrl = media.voiceover_url || audio.voiceover_url || null;
+    const voiceUrl = audio.dub_preview_url || audio.tts_voiceover_url || media.voiceover_url || audio.voiceover_url || null;
     const subtitleOnlyAllowed = canUseSubtitleOnlyCompose();
     if (composeConfirmEl && !composeConfirmEl.checked) throw new Error("Please confirm before composing.");
     if (!voiceUrl && !subtitleOnlyAllowed) throw new Error("No voiceover yet; run Re-Run Audio first.");
@@ -1537,7 +1549,7 @@
     const media = (currentHub && currentHub.media) || {};
     const audio = (currentHub && currentHub.audio) || {};
     const hasRaw = Boolean(media.raw_url || media.source_video_url);
-    const hasVoiceover = Boolean(media.voiceover_url || audio.voiceover_url);
+    const hasVoiceover = Boolean(audio.dub_preview_url || audio.tts_voiceover_url || media.voiceover_url || audio.voiceover_url);
     const subtitleOnlyAllowed = canUseSubtitleOnlyCompose();
     const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
     const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
@@ -1841,7 +1853,7 @@
       try {
         const media = (currentHub && currentHub.media) || {};
         const audio = (currentHub && currentHub.audio) || {};
-        const voiceUrl = media.voiceover_url || audio.voiceover_url || audio.audio_url || null;
+        const voiceUrl = audio.dub_preview_url || audio.tts_voiceover_url || media.voiceover_url || audio.voiceover_url || null;
         if (!voiceUrl) {
           if (audioMsgEl) audioMsgEl.textContent = "No voiceover yet; run Re-Run Audio first.";
           return;

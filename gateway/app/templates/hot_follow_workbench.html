@@ -314,9 +314,13 @@
                     <div><span class="font-semibold">Resolved Voice:</span> <span id="hf_resolved_voice">-</span></div>
                     <div><span class="font-semibold">当前音频是否存在：</span> <span id="hf_audio_exists">-</span></div>
                     <div><span class="font-semibold">当前音频是否匹配当前字幕：</span> <span id="hf_audio_matches_subtitles">-</span></div>
+                    <div><span class="font-semibold">Source Audio Policy:</span> <span id="hf_source_audio_policy">-</span></div>
+                    <div><span class="font-semibold">Audio Flow:</span> <span id="hf_audio_flow_mode">-</span></div>
+                    <div><span class="font-semibold">TTS Voiceover Ready:</span> <span id="hf_tts_voiceover_ready">-</span></div>
                     <div><span class="font-semibold">Subtitle Ready:</span> <span id="hf_subtitle_ready">-</span></div>
                     <div><span class="font-semibold">Audio Ready:</span> <span id="hf_audio_ready">-</span></div>
                     <div><span class="font-semibold">Audio Ready Reason:</span> <span id="hf_audio_ready_reason">-</span></div>
+                    <div id="hf_audio_flow_reason" class="text-[11px] text-gray-600">-</div>
                     <div id="hf_audio_currentness_hint" class="hidden text-[11px] text-amber-700">当前重新配音未更新，最终视频仍为上次版本。</div>
                     <div id="hf_audio_no_dub_hint" class="hidden text-[11px] text-amber-700">当前任务可不做配音，可继续走字幕驱动路径。</div>
                   </div>
@@ -467,6 +471,8 @@
             </button>
             <div class="hidden rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 space-y-1 mb-4" id="hf_diag_route_panel">
               <div><span class="font-semibold">Content Mode:</span> <span id="hf_content_mode">-</span></div>
+              <div><span class="font-semibold">Source Audio Policy:</span> <span id="hf_route_source_audio_policy">-</span></div>
+              <div><span class="font-semibold">Audio Flow:</span> <span id="hf_route_audio_flow_mode">-</span></div>
               <div><span class="font-semibold">Source Audio Lane:</span> <span id="hf_source_audio_lane">-</span></div>
               <div><span class="font-semibold">Speech Presence:</span> <span id="hf_speech_presence">-</span></div>
               <div><span class="font-semibold">BGM Presence:</span> <span id="hf_bgm_presence">-</span></div>
