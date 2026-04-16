@@ -36,6 +36,7 @@ from gateway.app.services.hot_follow_language_profiles import (
     get_hot_follow_language_profile,
 )
 from gateway.app.services.status_policy.service import policy_upsert
+from gateway.app.services.source_audio_policy import source_audio_policy_from_task
 from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 logger = logging.getLogger(__name__)
@@ -429,8 +430,14 @@ def compute_final_staleness(task: dict, final_exists: bool, compose_done: bool) 
     composed_audio_sha = str(task.get("final_source_audio_sha256") or "").strip() or None
     current_dub_at = str(task.get("dub_generated_at") or "").strip() or None
     composed_dub_at = str(task.get("final_source_dub_generated_at") or "").strip() or None
+    current_source_audio_policy = source_audio_policy_from_task(task)
+    composed_source_audio_policy = str(task.get("final_source_audio_policy") or "").strip().lower() or None
     compose_finished_at = str(task.get("compose_last_finished_at") or task.get("final_updated_at") or "").strip() or None
 
+    if composed_source_audio_policy and composed_source_audio_policy != current_source_audio_policy:
+        audio_stale = True
+    if not audio_stale and not composed_source_audio_policy and current_source_audio_policy != "mute":
+        audio_stale = True
     if composed_audio_sha and current_audio_sha and composed_audio_sha != current_audio_sha:
         audio_stale = True
     if not audio_stale and composed_dub_at and current_dub_at and composed_dub_at != current_dub_at:

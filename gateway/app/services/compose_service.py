@@ -37,11 +37,13 @@ from gateway.app.services.media_validation import (
     deliver_key,
     media_meta_from_head,
 )
+from gateway.app.services.source_audio_policy import source_audio_policy_from_task
 from gateway.app.services.voice_state import collect_voice_execution_state
 from gateway.app.services.worker_gateway import WorkerExecutionMode, WorkerRequest
 from gateway.app.services.worker_gateway_registry import get_worker_gateway
 from gateway.app.services.task_view_helpers import task_endpoint, task_key
 from gateway.app.core.constants import COMPOSE_RETRY_AFTER_MS
+from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 logger = logging.getLogger(__name__)
 
@@ -80,12 +82,14 @@ def _current_final_is_fresh(
     current_sub_hash = str(revision.get("subtitle_content_hash") or "").strip() or None
     current_sub_at = str(revision.get("subtitle_updated_at") or "").strip() or None
     current_render_signature = str(revision.get("render_signature") or "").strip() or None
+    current_source_audio_policy = str(revision.get("source_audio_policy") or "mute").strip().lower() or "mute"
     current_dub_at = str(task.get("dub_generated_at") or "").strip() or None
     composed_audio_sha = str(task.get("final_source_audio_sha256") or "").strip() or None
     composed_dub_at = str(task.get("final_source_dub_generated_at") or "").strip() or None
     composed_sub_hash = str(task.get("final_source_subtitles_content_hash") or "").strip() or None
     composed_sub_at = str(task.get("final_source_subtitle_updated_at") or "").strip() or None
     composed_render_signature = str(task.get("final_source_render_signature") or "").strip() or None
+    composed_source_audio_policy = str(task.get("final_source_audio_policy") or "").strip().lower() or None
     compose_finished_at = str(task.get("compose_last_finished_at") or task.get("final_updated_at") or "").strip() or None
 
     def _parse_dt(value: str | None) -> datetime | None:
@@ -106,6 +110,7 @@ def _current_final_is_fresh(
         and not composed_dub_at
         and not composed_sub_at
         and not composed_render_signature
+        and not composed_source_audio_policy
     ):
         return False
 
@@ -124,6 +129,10 @@ def _current_final_is_fresh(
     if composed_sub_at and current_sub_at and composed_sub_at != current_sub_at:
         return False
     if composed_render_signature and current_render_signature and composed_render_signature != current_render_signature:
+        return False
+    if composed_source_audio_policy and composed_source_audio_policy != current_source_audio_policy:
+        return False
+    if not composed_source_audio_policy and current_source_audio_policy != "mute":
         return False
     if current_sub_at and compose_finished_at:
         current_sub_dt = _parse_dt(current_sub_at)
@@ -496,6 +505,8 @@ class _ComposeInputs:
     voice_state: dict
     bgm_key: str | None
     bgm_mix: float
+    source_audio_policy: str
+    source_audio_available: bool
     overlay_subtitles: bool
     strip_subtitle_streams: bool
     cleanup_mode: str
@@ -570,8 +581,13 @@ class CompositionService:
             ws = self._prepare_workspace(task_id, live_task, inputs, Path(tmpdir), subtitle_resolver)
 
             # Dispatch to the correct compose branch
+            preserve_source = inputs.source_audio_policy == "preserve" and inputs.source_audio_available
             if inputs.subtitle_only_compose:
                 self._compose_subtitle_only(ws, inputs)
+            elif preserve_source and ws.bgm_path and ws.bgm_path.exists():
+                self._compose_voice_source_audio_bgm(ws, inputs)
+            elif preserve_source:
+                self._compose_voice_source_audio(ws, inputs)
             elif ws.bgm_path and ws.bgm_path.exists():
                 self._compose_voice_bgm(ws, inputs)
             else:
@@ -870,6 +886,7 @@ class CompositionService:
             compose_fail("compose_failed", "ffmpeg not found in PATH")
 
         # Extract compose plan config
+        source_audio_policy = source_audio_policy_from_task(live_task)
         config = dict(live_task.get("config") or {})
         bgm = dict(config.get("bgm") or {})
         bgm_key: str | None = str(bgm.get("bgm_key") or "").strip() or None
@@ -885,6 +902,8 @@ class CompositionService:
         except Exception:
             bgm_mix = 0.3
         bgm_mix = max(0.0, min(1.0, bgm_mix))
+        source_has_audio_hint = parse_pipeline_config(live_task.get("pipeline_config")).get("has_audio")
+        source_audio_available = str(source_has_audio_hint or "").strip().lower() != "false"
 
         compose_plan = dict(live_task.get("compose_plan") or {})
         overlay_subtitles = bool(compose_plan.get("overlay_subtitles"))
@@ -908,6 +927,8 @@ class CompositionService:
                 "audio_key": str(audio_key),
                 "bgm_key": str(bgm_key) if bgm_key else None,
                 "mix": bgm_mix,
+                "source_audio_policy": source_audio_policy,
+                "source_audio_available": source_audio_available,
                 "overlay_subtitles": overlay_subtitles,
                 "strip_subtitle_streams": strip_subtitle_streams,
                 "target_lang": target_lang,
@@ -924,6 +945,8 @@ class CompositionService:
             voice_state=voice_state,
             bgm_key=bgm_key,
             bgm_mix=bgm_mix,
+            source_audio_policy=source_audio_policy,
+            source_audio_available=source_audio_available,
             overlay_subtitles=overlay_subtitles,
             strip_subtitle_streams=strip_subtitle_streams,
             cleanup_mode=cleanup_mode,
@@ -1172,6 +1195,12 @@ class CompositionService:
             base += f",apad,atrim=0:{video_duration:.3f}"
         return base + ",alimiter=limit=0.95[mix]"
 
+    def _source_audio_filter_expr(self, bgm_mix: float, compose_policy: str, video_duration: float) -> str:
+        base = f"[0:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}"
+        if compose_policy == "match_video":
+            base += f",apad,atrim=0:{video_duration:.3f}"
+        return base
+
     def _voice_filter_expr(self, ws: _WorkspaceFiles) -> str:
         base = "[1:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=1.0"
         if ws.compose_policy != "match_video":
@@ -1197,10 +1226,83 @@ class CompositionService:
 
     def _compose_subtitle_only(self, ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
         """Branch: subtitle-only compose (no voice audio)."""
-        if ws.bgm_path and ws.bgm_path.exists():
+        preserve_source = inputs.source_audio_policy == "preserve" and inputs.source_audio_available
+        if preserve_source and ws.bgm_path and ws.bgm_path.exists():
+            self._compose_subtitle_only_source_audio_bgm(ws, inputs)
+        elif preserve_source:
+            self._compose_subtitle_only_source_audio(ws, inputs)
+        elif ws.bgm_path and ws.bgm_path.exists():
             self._compose_subtitle_only_with_bgm(ws, inputs)
         else:
             self._compose_subtitle_only_no_bgm(ws, inputs)
+
+    def _compose_subtitle_only_source_audio(self, ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
+        if ws.overlay_subtitles:
+            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode, inputs.target_lang)
+            filter_complex = (
+                f"[0:v]{subtitle_filter}[v];"
+                + self._source_audio_filter_expr(inputs.bgm_mix, ws.compose_policy, ws.video_duration)
+                + ",alimiter=limit=0.95[mix]"
+            )
+            map_video = "[v]"
+            video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+        else:
+            filter_complex = self._source_audio_filter_expr(inputs.bgm_mix, ws.compose_policy, ws.video_duration) + ",alimiter=limit=0.95[mix]"
+            map_video = "0:v:0"
+            video_codec_args = ["-c:v", "copy"]
+        cmd = [
+            ws.ffmpeg, "-y",
+            "-i", str(ws.video_input_path),
+            "-filter_complex", filter_complex,
+            "-map", map_video,
+            "-map", "[mix]",
+            *video_codec_args,
+            "-c:a", "aac",
+            "-movflags", "+faststart",
+            *(["-sn"] if inputs.strip_subtitle_streams else []),
+            str(ws.final_path),
+        ]
+        self._execute_compose_cmd(cmd, ws, inputs)
+
+    def _compose_subtitle_only_source_audio_bgm(self, ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
+        source_filter = self._source_audio_filter_expr(inputs.bgm_mix, ws.compose_policy, ws.video_duration)
+        bgm_filter = self._bgm_only_filter_expr(1, inputs.bgm_mix, ws.compose_policy, ws.video_duration).removesuffix(",alimiter=limit=0.95[mix]")
+        if ws.overlay_subtitles:
+            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode, inputs.target_lang)
+            filter_complex = (
+                f"[0:v]{subtitle_filter}[v];"
+                + source_filter
+                + "[source];"
+                + bgm_filter
+                + "[bgm];"
+                + "[source][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+            )
+            map_video = "[v]"
+            video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+        else:
+            filter_complex = (
+                source_filter
+                + "[source];"
+                + bgm_filter
+                + "[bgm];"
+                + "[source][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+            )
+            map_video = "0:v:0"
+            video_codec_args = ["-c:v", "copy"]
+        cmd = [
+            ws.ffmpeg, "-y",
+            "-i", str(ws.video_input_path),
+            "-i", str(ws.bgm_path),
+            "-filter_complex", filter_complex,
+            "-map", map_video,
+            "-map", "[mix]",
+            *video_codec_args,
+            "-c:a", "aac",
+            "-movflags", "+faststart",
+            *(["-sn"] if inputs.strip_subtitle_streams else []),
+            str(ws.final_path),
+        ]
+        self._execute_compose_cmd(cmd, ws, inputs)
 
     def _compose_subtitle_only_with_bgm(self, ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
         if ws.overlay_subtitles:
@@ -1274,6 +1376,94 @@ class CompositionService:
                 (voice_filter + "[voice];")
                 + self._bgm_filter_expr(inputs.bgm_mix, ws.compose_policy, ws.video_duration)
                 + "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+            )
+            map_video = "0:v:0"
+            video_codec_args = ["-c:v", "copy"]
+        cmd = [
+            ws.ffmpeg, "-y",
+            "-i", str(ws.video_input_path),
+            "-i", str(ws.voice_path),
+            "-i", str(ws.bgm_path),
+            "-filter_complex", filter_complex,
+            "-map", map_video,
+            "-map", "[mix]",
+            *video_codec_args,
+            "-c:a", "aac",
+            "-movflags", "+faststart",
+            *(["-sn"] if inputs.strip_subtitle_streams else []),
+            str(ws.final_path),
+        ]
+        self._execute_compose_cmd(cmd, ws, inputs)
+
+    def _compose_voice_source_audio(self, ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
+        """Branch: voice + preserved source audio bed."""
+        voice_filter = self._voice_filter_expr(ws)
+        source_filter = self._source_audio_filter_expr(inputs.bgm_mix, ws.compose_policy, ws.video_duration)
+        if ws.overlay_subtitles:
+            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode, inputs.target_lang)
+            filter_complex = (
+                f"[0:v]{subtitle_filter}[v];"
+                + voice_filter
+                + "[voice];"
+                + source_filter
+                + "[source];"
+                + "[voice][source]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+            )
+            map_video = "[v]"
+            video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+        else:
+            filter_complex = (
+                voice_filter
+                + "[voice];"
+                + source_filter
+                + "[source];"
+                + "[voice][source]amix=inputs=2:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+            )
+            map_video = "0:v:0"
+            video_codec_args = ["-c:v", "copy"]
+        cmd = [
+            ws.ffmpeg, "-y",
+            "-i", str(ws.video_input_path),
+            "-i", str(ws.voice_path),
+            "-filter_complex", filter_complex,
+            "-map", map_video,
+            "-map", "[mix]",
+            *video_codec_args,
+            "-c:a", "aac",
+            "-movflags", "+faststart",
+            *(["-sn"] if inputs.strip_subtitle_streams else []),
+            str(ws.final_path),
+        ]
+        self._execute_compose_cmd(cmd, ws, inputs)
+
+    def _compose_voice_source_audio_bgm(self, ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
+        """Branch: voice + preserved source audio bed + uploaded BGM."""
+        voice_filter = self._voice_filter_expr(ws)
+        source_filter = self._source_audio_filter_expr(inputs.bgm_mix, ws.compose_policy, ws.video_duration)
+        bgm_filter = self._bgm_filter_expr(inputs.bgm_mix, ws.compose_policy, ws.video_duration).removesuffix("[bgm];")
+        if ws.overlay_subtitles:
+            subtitle_filter = compose_subtitle_vf(ws.subtitle_path, ws.fontsdir, inputs.cleanup_mode, inputs.target_lang)
+            filter_complex = (
+                f"[0:v]{subtitle_filter}[v];"
+                + voice_filter
+                + "[voice];"
+                + source_filter
+                + "[source];"
+                + bgm_filter
+                + "[bgm];"
+                + "[voice][source][bgm]amix=inputs=3:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
+            )
+            map_video = "[v]"
+            video_codec_args = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+        else:
+            filter_complex = (
+                voice_filter
+                + "[voice];"
+                + source_filter
+                + "[source];"
+                + bgm_filter
+                + "[bgm];"
+                + "[voice][source][bgm]amix=inputs=3:duration=longest:dropout_transition=2,alimiter=limit=0.95[mix]"
             )
             map_video = "0:v:0"
             video_codec_args = ["-c:v", "copy"]
@@ -1505,6 +1695,7 @@ class CompositionService:
             # detect when subtitle or audio changed after the last compose ran.
             "final_source_audio_sha256": str(task.get("audio_sha256") or "").strip() or None,
             "final_source_dub_generated_at": str(task.get("dub_generated_at") or "").strip() or None,
+            "final_source_audio_policy": source_audio_policy_from_task(task),
             "final_source_subtitles_content_hash": ws.subtitle_content_hash
             or str(task.get("subtitles_content_hash") or "").strip()
             or None,

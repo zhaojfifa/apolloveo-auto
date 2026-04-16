@@ -126,6 +126,44 @@ def test_stale_female_artifact_is_not_current_for_male_request(monkeypatch):
     assert state["deliverable_audio_done"] is True
 
 
+def test_preserved_bgm_artifact_does_not_count_as_current_tts_dub(monkeypatch):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    _patch_voice_storage(
+        monkeypatch,
+        lambda _key: True,
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
+
+    task = {
+        "task_id": "hf-source-audio-not-dub",
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "dub_status": "done",
+        "mm_audio_key": "deliver/tasks/hf-source-audio-not-dub/bgm/user_bgm.mp3",
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "my-MM-NilarNeural",
+        "config": {
+            "bgm": {
+                "strategy": "keep",
+                "bgm_key": "deliver/tasks/hf-source-audio-not-dub/bgm/user_bgm.mp3",
+                "mix_ratio": 0.4,
+            },
+            "tts_requested_voice": "mm_female_1",
+            "tts_resolved_voice": "my-MM-NilarNeural",
+            "tts_provider": "azure-speech",
+        },
+    }
+
+    state = tasks_router._collect_voice_execution_state(task, _settings())
+
+    assert state["audio_ready"] is False
+    assert state["audio_ready_reason"] == "voiceover_artifact_not_tts"
+    assert state["dub_current"] is False
+    assert state["voiceover_url"] is None
+    assert state["audio_artifact_role"] == "source_audio"
+
+
 def test_previous_final_can_coexist_with_failed_current_redub(monkeypatch, tmp_path):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
     monkeypatch.setattr(tasks_router, "task_base_dir", lambda _task_id: tmp_path / _task_id)

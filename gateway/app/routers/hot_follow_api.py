@@ -29,6 +29,7 @@ from gateway.app.deps import get_task_repository
 from gateway.app.ports.storage_provider import get_storage_service
 from gateway.ports.repository import ITaskRepository
 from gateway.app.services.status_policy.service import policy_upsert
+from gateway.app.services.source_audio_policy import normalize_source_audio_policy, source_audio_policy_from_task
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, public_target_lang, resolve_tts_voice
 from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
@@ -213,6 +214,7 @@ def _hf_compose_revision_snapshot(task: dict) -> dict[str, str | None]:
         "subtitle_updated_at": str(task.get("subtitles_override_updated_at") or "").strip() or None,
         "subtitle_content_hash": str(task.get("subtitles_content_hash") or "").strip() or None,
         "audio_sha256": str(task.get("audio_sha256") or "").strip() or None,
+        "source_audio_policy": source_audio_policy_from_task(task),
         "render_signature": subtitle_render_signature(
             target_lang=compose_plan.get("target_lang") or task.get("target_lang") or task.get("content_lang"),
             cleanup_mode=compose_plan.get("cleanup_mode"),
@@ -577,6 +579,7 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
+        "source_audio_policy": source_audio_policy_from_task(task),
         "voiceover_url": voice_state.get("voiceover_url"),
         "audio_url": voice_state.get("voiceover_url"),
         "audio_fit_max_speed": audio_fit_max_speed,
@@ -833,6 +836,7 @@ def _hf_dual_channel_state(task_id: str, task: dict, subtitle_lane: dict[str, An
 
 def _hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None = None) -> dict[str, Any]:
     route = route_state or {}
+    source_audio_policy = source_audio_policy_from_task(task)
     content_mode = str(route.get("content_mode") or "").strip().lower()
     speech_detected = bool(route.get("speech_detected"))
     title_hint = str(task.get("title") or "").strip().lower()
@@ -842,6 +846,7 @@ def _hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None
         return {
             "source_audio_lane": "silent_candidate",
             "source_audio_lane_reason": "未检测到稳定人声，建议优先字幕驱动。",
+            "source_audio_policy": source_audio_policy,
             "speech_presence": "none",
             "bgm_presence": "possible" if has_bgm_hint else "unknown",
             "audio_mix_mode": "silent_or_fx",
@@ -850,6 +855,7 @@ def _hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None
         return {
             "source_audio_lane": "music_or_text_led",
             "source_audio_lane_reason": "画面文字线索更强，当前素材更像字幕或画面驱动。",
+            "source_audio_policy": source_audio_policy,
             "speech_presence": "low",
             "bgm_presence": "possible",
             "audio_mix_mode": "text_led",
@@ -858,6 +864,7 @@ def _hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None
         return {
             "source_audio_lane": "mixed_audio",
             "source_audio_lane_reason": "检测到人声，同时素材特征显示可能带明显配乐。",
+            "source_audio_policy": source_audio_policy,
             "speech_presence": "high",
             "bgm_presence": "possible",
             "audio_mix_mode": "speech_plus_bgm",
@@ -866,6 +873,7 @@ def _hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None
         return {
             "source_audio_lane": "speech_primary",
             "source_audio_lane_reason": "检测到稳定人声，适合标准配音替换路径。",
+            "source_audio_policy": source_audio_policy,
             "speech_presence": "high",
             "bgm_presence": "low",
             "audio_mix_mode": "speech_primary",
@@ -873,6 +881,7 @@ def _hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None
     return {
         "source_audio_lane": "unknown",
         "source_audio_lane_reason": "当前音频结构信息不足，建议先检查来源字幕和原视频。",
+        "source_audio_policy": source_audio_policy,
         "speech_presence": "unknown",
         "bgm_presence": "unknown",
         "audio_mix_mode": "unknown",
@@ -1642,6 +1651,7 @@ def create_hot_follow_task_local_upload(
     voice_id: str | None = Form(default=None),
     process_mode: str | None = Form(default=None),
     publish_account: str | None = Form(default=None),
+    source_audio_policy: str | None = Form(default=None),
     platform: str | None = Form(default=None),
     task_title: str | None = Form(default=None),
     ui_lang: str | None = Form(default=None),
@@ -1698,6 +1708,8 @@ def create_hot_follow_task_local_upload(
             "source_language_hint": source_lang_norm,
             "process_mode": str(process_mode or "fast_clone"),
             "publish_account": str(publish_account or "default"),
+            "source_audio_policy": normalize_source_audio_policy(source_audio_policy),
+            "bgm_strategy": "keep" if normalize_source_audio_policy(source_audio_policy) == "preserve" else "replace",
         },
         probe,
     ),

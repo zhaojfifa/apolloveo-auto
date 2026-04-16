@@ -12,6 +12,7 @@ from typing import Any
 
 from gateway.app.config import get_settings
 from gateway.app.services.artifact_storage import get_download_url
+from gateway.app.services.source_audio_policy import source_audio_policy_from_task
 from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang
 from gateway.app.services.voice_state import collect_voice_execution_state
 from gateway.app.utils.pipeline_config import parse_pipeline_config
@@ -61,6 +62,7 @@ def hf_engine_internal(engine: str | None) -> str | None:
 
 def hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None = None) -> dict[str, Any]:
     route = route_state or {}
+    source_audio_policy = source_audio_policy_from_task(task)
     content_mode = str(route.get("content_mode") or "").strip().lower()
     speech_detected = bool(route.get("speech_detected"))
     title_hint = str(task.get("title") or "").strip().lower()
@@ -70,6 +72,7 @@ def hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None 
         return {
             "source_audio_lane": "silent_candidate",
             "source_audio_lane_reason": "未检测到稳定人声，建议优先字幕驱动。",
+            "source_audio_policy": source_audio_policy,
             "speech_presence": "none",
             "bgm_presence": "possible" if has_bgm_hint else "unknown",
             "audio_mix_mode": "silent_or_fx",
@@ -78,6 +81,7 @@ def hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None 
         return {
             "source_audio_lane": "music_or_text_led",
             "source_audio_lane_reason": "画面文字线索更强，当前素材更像字幕或画面驱动。",
+            "source_audio_policy": source_audio_policy,
             "speech_presence": "low",
             "bgm_presence": "possible",
             "audio_mix_mode": "text_led",
@@ -86,6 +90,7 @@ def hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None 
         return {
             "source_audio_lane": "mixed_audio",
             "source_audio_lane_reason": "检测到人声，同时素材特征显示可能带明显配乐。",
+            "source_audio_policy": source_audio_policy,
             "speech_presence": "high",
             "bgm_presence": "possible",
             "audio_mix_mode": "speech_plus_bgm",
@@ -94,6 +99,7 @@ def hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None 
         return {
             "source_audio_lane": "speech_primary",
             "source_audio_lane_reason": "检测到稳定人声，适合标准配音替换路径。",
+            "source_audio_policy": source_audio_policy,
             "speech_presence": "high",
             "bgm_presence": "low",
             "audio_mix_mode": "speech_primary",
@@ -101,6 +107,7 @@ def hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None 
     return {
         "source_audio_lane": "unknown",
         "source_audio_lane_reason": "当前音频结构信息不足，建议先检查来源字幕和原视频。",
+        "source_audio_policy": source_audio_policy,
         "speech_presence": "unknown",
         "bgm_presence": "unknown",
         "audio_mix_mode": "unknown",
@@ -160,6 +167,7 @@ def hf_audio_config(task: dict) -> dict[str, Any]:
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
+        "source_audio_policy": source_audio_policy_from_task(task),
         "voiceover_url": voice_state.get("voiceover_url"),
         "audio_url": voice_state.get("voiceover_url"),
         "audio_fit_max_speed": audio_fit_max_speed,
