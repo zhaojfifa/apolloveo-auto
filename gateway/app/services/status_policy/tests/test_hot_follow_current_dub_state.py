@@ -323,6 +323,32 @@ def test_vi_subtitle_lane_blocks_source_copy_until_real_target_is_current(monkey
     assert subtitle_lane["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
 
 
+def test_myanmar_subtitle_lane_blocks_source_copy_target_as_not_current(monkeypatch):
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda task_id: Path("/tmp") / task_id)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+
+    def _fake_bytes(key):
+        text = "1\n00:00:00,000 --> 00:00:02,000\n原始文案\n"
+        return text.encode("utf-8")
+
+    monkeypatch.setattr(hf_router, "get_object_bytes", _fake_bytes)
+
+    task = {
+        "task_id": "hf-mm-source-copy",
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "origin_srt_path": "deliver/tasks/hf-mm-source-copy/origin.srt",
+        "mm_srt_path": "deliver/tasks/hf-mm-source-copy/mm.srt",
+        "pipeline_config": {"translation_incomplete": "false"},
+    }
+
+    subtitle_lane = hf_router._hf_subtitle_lane_state("hf-mm-source-copy", task)
+
+    assert subtitle_lane["target_subtitle_current"] is False
+    assert subtitle_lane["subtitle_ready"] is False
+    assert subtitle_lane["target_subtitle_current_reason"] == "target_subtitle_source_copy"
+
+
 def test_vi_voice_state_requires_current_target_subtitle(monkeypatch):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
     _patch_voice_storage(

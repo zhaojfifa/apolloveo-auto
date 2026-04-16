@@ -306,6 +306,112 @@ def test_hot_follow_workbench_vi_currentness_blocks_false_done_states(monkeypatc
     assert compose_step.get("status") == "pending"
 
 
+def test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states(monkeypatch):
+    task_id = "hf-workbench-mm-currentness-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "ready",
+            "target_lang": "mm",
+            "content_lang": "mm",
+            "compose_status": "done",
+            "compose_last_status": "done",
+            "dub_status": "done",
+            "voice_id": "mm_female_1",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
+            "mm_audio_voice_id": "my-MM-NilarNeural",
+            "mm_audio_provider": "azure-speech",
+            "final_video_key": f"deliver/tasks/{task_id}/final.mp4",
+            "origin_srt_path": f"deliver/tasks/{task_id}/origin.srt",
+            "mm_srt_path": f"deliver/tasks/{task_id}/mm.srt",
+            "pipeline_config": {"translation_incomplete": "true"},
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": True,
+            "composed_reason": "ready",
+            "final": {"exists": True, "fresh": True, "url": f"/v1/tasks/{task_id}/final", "size_bytes": 123456},
+            "historical_final": {"exists": False, "url": None, "size_bytes": None},
+            "final_fresh": True,
+            "final_stale_reason": None,
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": True,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda task, _settings: {
+            "audio_ready": bool(task.get("target_subtitle_current")),
+            "audio_ready_reason": (
+                "ready"
+                if task.get("target_subtitle_current")
+                else str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current")
+            ),
+            "dub_current": bool(task.get("target_subtitle_current")),
+            "dub_current_reason": (
+                "ready"
+                if task.get("target_subtitle_current")
+                else str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current")
+            ),
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "mm_female_1",
+            "voiceover_url": "/v1/tasks/hf-workbench-mm-currentness-01/audio_mm",
+            "deliverable_audio_done": True,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_hf_persisted_audio_state",
+        lambda *_args, **_kwargs: {"exists": True, "voiceover_url": f"/v1/tasks/{task_id}/audio_mm"},
+    )
+    monkeypatch.setattr(hf_router, "_scene_pack_info", lambda *_args, **_kwargs: {})
+    monkeypatch.setattr(hf_router, "_deliverable_url", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda current_task_id: Path("/tmp") / current_task_id)
+    monkeypatch.setattr(
+        hf_router,
+        "object_exists",
+        lambda key: str(key).endswith(("origin.srt", "mm.srt", "final.mp4")),
+    )
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(
+        hf_router,
+        "get_object_bytes",
+        lambda _key: "1\n00:00:00,000 --> 00:00:02,000\n原始文案\n".encode("utf-8"),
+    )
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    assert data["subtitles"]["target_subtitle_current"] is False
+    assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
+    assert data["ready_gate"]["subtitle_ready"] is False
+    assert data["ready_gate"]["compose_ready"] is False
+    assert data["ready_gate"]["publish_ready"] is False
+
+    dub_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "dub"), {})
+    compose_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "compose"), {})
+    assert dub_step.get("status") == "pending"
+    assert compose_step.get("status") == "pending"
+
+
 def test_hot_follow_workbench_stale_final_is_historical_only_after_redub(monkeypatch):
     task_id = "hf-workbench-stale-final-01"
     repo = _Repo()

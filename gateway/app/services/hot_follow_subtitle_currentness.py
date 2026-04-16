@@ -3,8 +3,6 @@ from __future__ import annotations
 import re
 from typing import Iterable
 
-from gateway.app.services.tts_policy import normalize_target_lang
-
 
 def _normalize_subtitle_compare_text(text: str | None) -> str:
     source = str(text or "")
@@ -47,7 +45,6 @@ def compute_hot_follow_target_subtitle_currentness(
     translation_incomplete: bool = False,
     has_saved_revision: bool = False,
 ) -> dict[str, object]:
-    lang = normalize_target_lang(target_lang)
     target_exists = bool(_normalize_subtitle_compare_text(target_text))
     authoritative_source = bool(
         subtitle_artifact_exists
@@ -57,29 +54,19 @@ def compute_hot_follow_target_subtitle_currentness(
     )
     source_copy = _matches_any_source(target_text, source_texts)
 
-    if lang != "vi":
-        current = bool(subtitle_artifact_exists and target_exists)
-        reason = "ready" if current else "subtitle_missing"
-        return {
-            "target_subtitle_current": current,
-            "target_subtitle_current_reason": reason,
-            "target_subtitle_authoritative_source": authoritative_source,
-            "target_subtitle_source_copy": source_copy,
-        }
-
     if not subtitle_artifact_exists or not expected_subtitle_source or not actual_subtitle_source:
         current = False
         reason = "subtitle_missing"
     elif not authoritative_source:
         current = False
         reason = "target_subtitle_source_mismatch"
-    elif translation_incomplete and not has_saved_revision:
+    elif translation_incomplete:
         current = False
         reason = "target_subtitle_translation_incomplete"
     elif not target_exists:
         current = False
         reason = "target_subtitle_empty"
-    elif source_copy and not has_saved_revision:
+    elif source_copy:
         current = False
         reason = "target_subtitle_source_copy"
     else:

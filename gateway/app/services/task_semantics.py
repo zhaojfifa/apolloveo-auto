@@ -57,7 +57,7 @@ def _pipeline_config(task: dict) -> dict:
 
 
 def _target_subtitle_current_fact(task: dict) -> bool | None:
-    if _target_lang(task) != "vi":
+    if _target_lang(task) not in {"my", "vi"}:
         return None
     explicit = task.get("target_subtitle_current")
     if explicit is not None:

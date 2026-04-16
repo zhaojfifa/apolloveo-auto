@@ -244,7 +244,7 @@ def hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None 
         target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
         if status == "pending" and bool(composed_state.get("composed_ready")):
             status = "done"
-        if status == "done" and target_lang == "vi" and not bool(composed_state.get("composed_ready")):
+        if status == "done" and target_lang in {"my", "vi"} and not bool(composed_state.get("composed_ready")):
             status = "pending"
         if status == "pending" and task_status == "processing" and last_step in {"compose", "final"}:
             status = "running"
