@@ -81,6 +81,37 @@ def test_run_subtitles_step_marks_vi_translation_incomplete_without_step_error(m
     assert pipeline_updates[-1]["translation_incomplete"] == "true"
 
 
+def test_run_subtitles_step_marks_myanmar_translation_incomplete_without_step_error(monkeypatch, tmp_path):
+    updates: list[dict] = []
+    pipeline_updates: list[dict] = []
+
+    async def _generate_subtitles(**kwargs):
+        return _fake_generate_subtitles(tmp_path, kwargs["task_id"], kwargs["target_lang"], complete=False)
+
+    monkeypatch.setattr(
+        steps_v1,
+        "Workspace",
+        lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
+    )
+    monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: updates.append(dict(kwargs)))
+    monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda _task_id, payload: pipeline_updates.append(dict(payload)))
+    monkeypatch.setattr(steps_v1, "_upload_artifact", lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}")
+    monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
+    monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
+
+    req = SubtitlesRequest(task_id="hf-mm-sub-incomplete", target_lang="my", force=True, translate=True)
+    result = asyncio.run(steps_v1.run_subtitles_step(req))
+
+    assert result["translation_incomplete"] is True
+    final_update = updates[-1]
+    assert final_update["subtitles_status"] == "ready"
+    assert final_update["subtitles_error"] is None
+    assert final_update["target_subtitle_current"] is False
+    assert final_update["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
+    assert pipeline_updates[-1]["translation_incomplete"] == "true"
+
+
 def test_subtitles_pipeline_state_distinguishes_no_subtitles_and_translation_incomplete():
     no_subtitles_status, no_subtitles_summary = steps_v1_hot_follow_pipeline_state(
         {

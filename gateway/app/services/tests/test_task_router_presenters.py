@@ -562,6 +562,34 @@ def test_build_tasks_page_rows_keep_vi_processing_when_target_subtitle_is_stale_
     assert semantics["filter_status"] == "processing"
 
 
+def test_build_tasks_page_rows_keep_myanmar_processing_when_target_subtitle_is_stale_and_final_is_missing():
+    rows = build_tasks_page_rows(
+        [
+            {
+                "task_id": "hf-mm-board-no-final",
+                "platform": "hot_follow",
+                "source_url": "https://example.com/mm",
+                "title": "task",
+                "category_key": "hot_follow",
+                "content_lang": "mm",
+                "target_lang": "mm",
+                "status": "processing",
+                "target_subtitle_current": False,
+                "target_subtitle_current_reason": "target_subtitle_source_copy",
+                "created_at": "2026-03-22T00:00:00+00:00",
+            }
+        ],
+        kind_norm="hot_follow",
+        pack_path_for_list=lambda _task: None,
+        normalize_selected_tool_ids=lambda value: list(value or []),
+    )
+
+    semantics = derive_task_semantics(rows[0])
+
+    assert semantics["db_status"] == "processing"
+    assert semantics["filter_status"] == "processing"
+
+
 def test_derive_task_semantics_keeps_hot_follow_processing_when_main_chain_is_still_running():
     semantics = derive_task_semantics(
         {

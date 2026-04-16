@@ -1,5 +1,41 @@
 # VeoSop05 启动进度文档
 
+## PR-Myanmar Target Subtitle Currentness Alignment
+
+日期：2026-04-16
+
+本节点完成：
+
+- 将 Myanmar Hot Follow target subtitle currentness 对齐到 Vietnamese 已有的严格规则
+- Myanmar target subtitle 不再因为 artifact 存在或内容非空就被视为 current
+- source-copy 与 translation-incomplete 的 Myanmar target subtitle 会阻断 `subtitle_ready`、`dub_current`、`compose_ready`、`publish_ready`
+- 保留 Vietnamese target subtitle currentness 行为，并补充 Myanmar false-ready 回归覆盖
+
+本次收口说明：
+
+- 仅修正 Hot Follow target subtitle truth-source 与直接下游 gating
+- 不新增 localization_line，不做 translation bridge/tooling，不重命名 `mm_*` 兼容字段
+- 不改 UI 设计、不重写 compose ownership、不扩成宽状态/runtime 重构
+
+本节点验证：
+
+- `python3.11 --version` -> Python 3.11.15
+- `python3.11 -m py_compile gateway/app/services/hot_follow_subtitle_currentness.py gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/task_view.py gateway/app/services/task_semantics.py gateway/app/services/steps_v1.py gateway/app/services/tests/test_hot_follow_subtitle_currentness.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_task_router_presenters.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_currentness.py -q` -> 4 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py -q` -> 4 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -q` -> 24 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q` -> 13 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_task_router_presenters.py -q` -> 24 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py -q` -> 13 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q` -> 58 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_currentness.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q` -> 21 passed
+
+剩余风险：
+
+- 本次不清理历史 `mm_*` 命名与兼容字段，后续不得把命名清理混入 currentness 修复
+- Direct dub 仍依赖已计算出的 target subtitle currentness fact；缺失 fact 的强制重跑路径保持原有行为以保护 happy path
+- 真实素材仍需按 Hot Follow business regression 抽样验证 target subtitle 内容质量
+
 ## PR-Subtitle Font Micro-Tuning After Cleanup v1
 
 日期：2026-04-04

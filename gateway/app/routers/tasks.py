@@ -2670,12 +2670,18 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             mm_audio_key=None,
         )
     dub_input_text = str(dub_route_state["dub_input_text"] or "").strip()
-    if normalize_target_lang(target_lang) == "vi" and not bool(subtitle_lane.get("target_subtitle_current", subtitle_lane.get("subtitle_ready"))):
+    target_subtitle_current = subtitle_lane.get("target_subtitle_current")
+    subtitle_not_current = target_subtitle_current is False or (
+        target_subtitle_current is None
+        and "subtitle_ready" in subtitle_lane
+        and not bool(subtitle_lane.get("subtitle_ready"))
+    )
+    if normalize_target_lang(target_lang) in {"my", "vi"} and subtitle_not_current:
         raise HTTPException(
             status_code=422,
             detail={
                 "reason": subtitle_lane.get("target_subtitle_current_reason") or "target_subtitle_not_current",
-                "message": "当前越南语目标字幕尚未成为真实当前版本，请先完成并保存越南语目标字幕，再生成配音。",
+                "message": "当前目标字幕尚未成为真实当前版本，请先完成并保存目标字幕，再生成配音。",
                 "target_lang": target_lang,
             },
         )
