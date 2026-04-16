@@ -1,5 +1,38 @@
 # VeoSop05 启动进度文档
 
+## PR-Source Audio Semantics Alignment / Operator Flow
+
+日期：2026-04-16
+
+本节点完成：
+
+- 将 Hot Follow audio payload 显式区分 `source_audio_policy`、preserved source audio、current TTS voiceover、dub preview URL
+- preserved source audio / BGM 只显示为 source-audio bed，不再作为 TTS preview 或 dubbing completed 语义展示
+- 工作台音频诊断与路由诊断增加当前 source-audio policy 与 audio flow 语义
+- 标准配音预览与 compose 前端判断改为优先使用 true TTS voiceover / dub preview URL
+- 保持 mute path、标准 subtitle -> TTS dub -> compose happy path 与 compose source-audio policy 不变
+
+本次收口说明：
+
+- 只做 Hot Follow source-audio operator-facing semantics、diagnostics 与 preview binding 对齐
+- 不改 subtitle truth chain、不重写 compose / publish ownership、不新增 scenario 或 task kind
+- 不做 translation bridge、不清理 `mm_*` 兼容命名、不做 UI redesign
+
+本节点验证：
+
+- `python3.11 --version` -> Python 3.11.15
+- `python3.11 -m py_compile gateway/app/services/voice_service.py gateway/app/routers/hot_follow_api.py gateway/app/services/task_view.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py`
+- `node --check gateway/app/static/js/hot_follow_workbench.js`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -q` -> 28 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q` -> 13 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/tests/test_hf_compose_freshness.py -q` -> 43 passed
+
+剩余风险：
+
+- source-audio preserve 的真实混音观感仍需按 Hot Follow business regression 用真实素材抽样确认
+- `compose_service.py`、`hot_follow_api.py`、`tasks.py` 仍超过结构阈值；本 PR 不处理 thinning
+- `audio_mm` / `mm_*` 兼容命名仍可能造成表层理解成本，命名清理继续保持独立后续 PR
+
 ## PR-Source Audio Policy Binding / Dub Truth Correction
 
 日期：2026-04-16

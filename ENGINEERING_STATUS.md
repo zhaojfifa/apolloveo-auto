@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Hot Follow Source Audio Policy Binding
+Hot Follow Source Audio Semantics Alignment
 
 ## Current Main Line
 
@@ -16,6 +16,7 @@ Hot Follow Source Audio Policy Binding
 - Hot Follow cleanup line is now near closure, not fully closed
 - Myanmar target subtitles now use the same source-copy / translation-incomplete currentness discipline as Vietnamese
 - `preserve original BGM/source audio` is bound into compose without being treated as current TTS dub
+- workbench diagnostics and preview binding now distinguish preserved source audio from current TTS voiceover
 - current business flow remains stable and non-blocking
 
 ## Remaining Structural Risks
@@ -24,7 +25,7 @@ Hot Follow Source Audio Policy Binding
 - compatibility residue still exists
 - some scenario-aware façade logic still remains
 - historical `mm_*` compatibility naming still exists and is intentionally out of scope for this fix
-- source-audio preserve still needs real-material business sampling for mix quality
+- source-audio preserve still needs real-material business sampling for mix quality and operator-facing mix review
 - remaining Avatar / baseline router-space behavior is separately tracked, not part of Hot Follow closure
 
 ## Recommended Next Direction

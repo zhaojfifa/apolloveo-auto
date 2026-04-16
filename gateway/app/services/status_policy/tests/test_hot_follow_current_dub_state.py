@@ -164,6 +164,112 @@ def test_preserved_bgm_artifact_does_not_count_as_current_tts_dub(monkeypatch):
     assert state["audio_artifact_role"] == "source_audio"
 
 
+def test_audio_config_marks_preserved_source_audio_as_not_tts_preview(monkeypatch):
+    monkeypatch.setattr(hf_router, "get_download_url", lambda key: f"/download/{key}")
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "expected_provider": "azure-speech",
+            "resolved_voice": "my-MM-NilarNeural",
+            "requested_voice": "mm_female_1",
+            "audio_ready": False,
+            "audio_ready_reason": "audio_missing",
+            "dub_current": False,
+            "dub_current_reason": "audio_missing",
+            "voiceover_url": None,
+        },
+    )
+
+    task = {
+        "task_id": "hf-preserve-no-tts-preview",
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "config": {
+            "bgm": {
+                "strategy": "keep",
+                "bgm_key": "deliver/tasks/hf-preserve-no-tts-preview/bgm/source.mp3",
+                "mix_ratio": 0.4,
+            }
+        },
+    }
+
+    audio_cfg = hf_router._hf_audio_config(task)
+
+    assert audio_cfg["source_audio_policy"] == "preserve"
+    assert audio_cfg["source_audio_preserved"] is True
+    assert audio_cfg["tts_voiceover_ready"] is False
+    assert audio_cfg["audio_flow_mode"] == "source_audio_preserved_no_tts"
+    assert audio_cfg["voiceover_url"] is None
+    assert audio_cfg["audio_url"] is None
+    assert audio_cfg["dub_preview_url"] is None
+
+
+def test_audio_config_marks_tts_plus_preserved_source_audio_when_voiceover_current(monkeypatch):
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "expected_provider": "azure-speech",
+            "resolved_voice": "my-MM-NilarNeural",
+            "requested_voice": "mm_female_1",
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "voiceover_url": "/v1/tasks/hf-tts-preserve/audio_mm",
+        },
+    )
+
+    task = {
+        "task_id": "hf-tts-preserve",
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "config": {"bgm": {"strategy": "keep", "mix_ratio": 0.4}},
+    }
+
+    audio_cfg = hf_router._hf_audio_config(task)
+
+    assert audio_cfg["source_audio_policy"] == "preserve"
+    assert audio_cfg["source_audio_preserved"] is True
+    assert audio_cfg["tts_voiceover_ready"] is True
+    assert audio_cfg["audio_flow_mode"] == "tts_voiceover_plus_source_audio"
+    assert audio_cfg["dub_preview_url"] == "/v1/tasks/hf-tts-preserve/audio_mm"
+    assert audio_cfg["voiceover_url"] == "/v1/tasks/hf-tts-preserve/audio_mm"
+
+
+def test_audio_config_keeps_mute_tts_only_semantics(monkeypatch):
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "expected_provider": "azure-speech",
+            "resolved_voice": "my-MM-NilarNeural",
+            "requested_voice": "mm_female_1",
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "voiceover_url": "/v1/tasks/hf-tts-mute/audio_mm",
+        },
+    )
+
+    task = {
+        "task_id": "hf-tts-mute",
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "config": {"bgm": {"strategy": "replace", "mix_ratio": 0.0}},
+    }
+
+    audio_cfg = hf_router._hf_audio_config(task)
+
+    assert audio_cfg["source_audio_policy"] == "mute"
+    assert audio_cfg["source_audio_preserved"] is False
+    assert audio_cfg["tts_voiceover_ready"] is True
+    assert audio_cfg["audio_flow_mode"] == "tts_voiceover_only"
+    assert audio_cfg["dub_preview_url"] == "/v1/tasks/hf-tts-mute/audio_mm"
+
+
 def test_previous_final_can_coexist_with_failed_current_redub(monkeypatch, tmp_path):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
     monkeypatch.setattr(tasks_router, "task_base_dir", lambda _task_id: tmp_path / _task_id)

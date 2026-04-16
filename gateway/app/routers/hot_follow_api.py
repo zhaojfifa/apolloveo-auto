@@ -139,6 +139,7 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
 from gateway.app.services.hot_follow_skills_advisory import (
     maybe_build_hot_follow_advisory as _maybe_build_hot_follow_advisory,
 )
+from gateway.app.services.voice_service import hf_source_audio_semantics
 from gateway.app.services.hot_follow_workbench_presenter import (
     build_hot_follow_artifact_facts as _build_hot_follow_artifact_facts,
     build_hot_follow_current_attempt_summary as _build_hot_follow_current_attempt_summary,
@@ -572,6 +573,7 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
     audio_fit_max_speed = max(1.0, min(1.6, audio_fit_max_speed))
     voice_state = _collect_voice_execution_state(task, settings)
     provider = normalize_provider(voice_state.get("expected_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
+    semantics = hf_source_audio_semantics(task, voice_state)
     return {
         "tts_engine": _hf_engine_public(provider),
         "tts_voice": voice_state.get("resolved_voice"),
@@ -579,7 +581,7 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         "bgm_key": bgm.get("bgm_key"),
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
-        "source_audio_policy": source_audio_policy_from_task(task),
+        **semantics,
         "voiceover_url": voice_state.get("voiceover_url"),
         "audio_url": voice_state.get("voiceover_url"),
         "audio_fit_max_speed": audio_fit_max_speed,
@@ -1359,6 +1361,7 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
         **subtitle_lane,
         **route_state,
         **audio_lane,
+        **hf_source_audio_semantics(task_runtime, voice_state),
         **screen_text_candidate,
         **voice_state,
         "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
