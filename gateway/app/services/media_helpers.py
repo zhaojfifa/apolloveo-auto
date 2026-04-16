@@ -15,6 +15,7 @@ from typing import Any
 from fastapi import HTTPException, UploadFile
 
 from gateway.app.services.artifact_storage import get_download_url, upload_task_artifact
+from gateway.app.services.source_audio_policy import normalize_source_audio_policy
 from gateway.app.services.status_policy.service import policy_upsert
 from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 
@@ -112,13 +113,26 @@ def upload_task_bgm_impl(
             ratio = 0.8
     ratio = max(0.0, min(float(ratio), 1.0))
 
+    strategy_norm = str(strategy or "replace").strip().lower() or "replace"
+    if strategy_norm not in {"keep", "preserve", "replace", "mute"}:
+        strategy_norm = "replace"
+    source_audio_policy = normalize_source_audio_policy(strategy_norm)
     config = dict(task.get("config") or {})
     config["bgm"] = {
-        "strategy": strategy or "replace",
+        "strategy": "keep" if source_audio_policy == "preserve" else strategy_norm,
         "bgm_key": bgm_key,
         "mix_ratio": ratio,
     }
-    policy_upsert(repo, task_id, None, {"config": config}, step="media_helpers.bgm")
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    pipeline_config["source_audio_policy"] = source_audio_policy
+    pipeline_config["bgm_strategy"] = config["bgm"]["strategy"]
+    policy_upsert(
+        repo,
+        task_id,
+        None,
+        {"config": config, "pipeline_config": pipeline_config_to_storage(pipeline_config)},
+        step="media_helpers.bgm",
+    )
 
     bgm_url = get_download_url(str(bgm_key)) if bgm_key else None
     return {

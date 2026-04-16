@@ -1,5 +1,43 @@
 # VeoSop05 启动进度文档
 
+## PR-Source Audio Policy Binding / Dub Truth Correction
+
+日期：2026-04-16
+
+本节点完成：
+
+- 将 Hot Follow 新建页的 `replace / keep / mute` source-audio 选择写入任务配置
+- 将 `keep original` 绑定到 compose audio policy，最终合成可使用原视频音轨作为 source-audio bed
+- 保持 `replace / mute` 不携带原视频音轨的既有静音/替换语义
+- preserved source audio / uploaded BGM 不再能冒充当前 TTS voiceover，也不会让 `dub_current=true`
+- 将 source-audio policy 写入 final freshness snapshot，policy 改变会触发重新 compose
+
+本次收口说明：
+
+- 只修复 Hot Follow source-audio policy binding、compose audio input selection、dub truth-source gating
+- 不改 subtitle truth chain、不重写 compose ownership、不改 publish ownership
+- 不做 UI redesign、不新增外部 API、不混入 translation bridge / cleanup / `mm_*` 命名清理
+
+本节点验证：
+
+- `python3.11 --version` -> Python 3.11.15
+- `python3.11 -m py_compile gateway/app/services/source_audio_policy.py gateway/app/services/compose_service.py gateway/app/services/voice_state.py gateway/app/services/voice_service.py gateway/app/services/media_helpers.py gateway/app/routers/hot_follow_api.py gateway/app/services/task_view_helpers.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py -q` -> 5 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -q` -> 25 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hf_compose_freshness.py -q` -> 38 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q` -> 40 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_new_page_routes.py gateway/app/services/tests/test_tasks_subtitle_upload_paths.py -q` -> 7 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q` -> 108 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_app_import_smoke.py -q` -> 1 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py -q` -> 14 passed
+
+剩余风险：
+
+- `compose_service.py`、`hot_follow_api.py`、`tasks.py` 仍超过结构阈值；本 PR 只做窄 truth-source 修复，后续需要专门 thinning PR
+- source-audio preserve 依赖源视频实际存在音轨；若上游 probe 明确 `has_audio=false`，compose 会回落为无 source-audio bed
+- 真实素材仍需按 Hot Follow business regression 抽样确认原声 bed 与 TTS 混音观感
+- 曾尝试运行 `test_hot_follow_provider_mismatch_gate.py`，失败点是该测试的 AST-only loader 保留了过期 helper 名称，不能代表本 PR 的 runtime regression
+
 ## PR-Myanmar Target Subtitle Currentness Alignment
 
 日期：2026-04-16

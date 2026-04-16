@@ -234,6 +234,23 @@ class TestCurrentFinalIsFresh:
             task, revision=self._revision(task), final_exists=True, final_size=500_000
         ) is False
 
+    def test_not_fresh_when_source_audio_policy_changes_to_preserve(self):
+        task = self._fresh_task()
+        task["final_source_audio_policy"] = "mute"
+        revision = {**self._revision(task), "source_audio_policy": "preserve"}
+
+        assert _current_final_is_fresh(
+            task, revision=revision, final_exists=True, final_size=500_000
+        ) is False
+
+    def test_legacy_final_without_policy_snapshot_stays_fresh_for_mute_policy(self):
+        task = self._fresh_task()
+        revision = {**self._revision(task), "source_audio_policy": "mute"}
+
+        assert _current_final_is_fresh(
+            task, revision=revision, final_exists=True, final_size=500_000
+        ) is True
+
     def test_not_fresh_when_compose_status_not_done(self):
         task = self._fresh_task()
         task["compose_last_status"] = "failed"

@@ -199,14 +199,29 @@ def hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
     from gateway.app.services.task_view_helpers import task_key
 
     audio_key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
+    config = dict(task.get("config") or {})
+    bgm_key = str((dict(config.get("bgm") or {})).get("bgm_key") or "").strip() or None
+    source_audio_keys = {
+        str(value).strip()
+        for value in (
+            bgm_key,
+            task_key(task, "raw_path"),
+            task_key(task, "raw_video_key"),
+            task_key(task, "mute_video_key"),
+            task_key(task, "mute_video_path"),
+        )
+        if str(value or "").strip()
+    }
+    artifact_role = "source_audio" if audio_key and str(audio_key).strip() in source_audio_keys else "tts_voiceover"
     exists = False
     size_bytes = 0
-    if audio_key and object_exists(str(audio_key)):
+    if audio_key and artifact_role == "tts_voiceover" and object_exists(str(audio_key)):
         meta = object_head(str(audio_key))
         size_bytes, _ = media_meta_from_head(meta)
         exists = int(size_bytes or 0) >= MIN_AUDIO_BYTES
     return {
         "audio_key": str(audio_key) if audio_key else None,
+        "audio_artifact_role": artifact_role if audio_key else None,
         "exists": bool(exists),
         "size_bytes": int(size_bytes or 0),
         "voiceover_url": f"/v1/tasks/{task_id}/audio_mm"
@@ -276,6 +291,7 @@ def collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         )
     )
     persisted_audio = hf_persisted_audio_state(task_id, task)
+    audio_artifact_role = str(persisted_audio.get("audio_artifact_role") or "").strip() or None
     audio_exists = bool(persisted_audio.get("exists"))
     dub_status = str(task.get("dub_status") or "").strip().lower()
     dub_running = dub_status in {"queued", "running", "processing"}
@@ -289,6 +305,8 @@ def collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     audio_ready_reason = "ready"
     if dub_running and not audio_exists:
         audio_ready_reason = "dub_running"
+    elif audio_artifact_role and audio_artifact_role != "tts_voiceover":
+        audio_ready_reason = "voiceover_artifact_not_tts"
     elif not audio_exists:
         audio_ready_reason = "audio_missing"
     elif not dub_done:
@@ -324,6 +342,7 @@ def collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
         "expected_resolved_voice": expected_resolved_voice,
         "audio_ready": audio_ready,
         "audio_ready_reason": audio_ready_reason,
+        "audio_artifact_role": audio_artifact_role,
         "voiceover_url": persisted_audio.get("voiceover_url")
         if dub_current
         else None,

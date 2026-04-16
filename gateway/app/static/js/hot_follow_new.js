@@ -175,8 +175,13 @@
     try {
       const processModeEl = document.querySelector('input[name="process_mode"]:checked');
       const processMode = processModeEl ? processModeEl.value : "fast_clone";
+      const strategyEl = document.querySelector('input[name="bgm_strategy"]:checked');
+      const strategy = strategyEl ? strategyEl.value : "replace";
+      const sourceAudioPolicy = strategy === "keep" ? "preserve" : "mute";
       const pipelineConfig = {
         process_mode: processMode,
+        source_audio_policy: sourceAudioPolicy,
+        bgm_strategy: strategy,
       };
       if (publishAccountEl && publishAccountEl.value) pipelineConfig.publish_account = publishAccountEl.value;
 
@@ -190,6 +195,7 @@
         fd.append("voice_id", voiceIdEl ? voiceIdEl.value : "mm_female_1");
         fd.append("process_mode", processMode);
         fd.append("publish_account", publishAccountEl ? publishAccountEl.value : "default");
+        fd.append("source_audio_policy", sourceAudioPolicy);
         fd.append("ui_lang", locale);
         fd.append("task_title", (taskTitleEl && taskTitleEl.value ? taskTitleEl.value : "") || file.name.replace(/\.[^.]+$/, ""));
         fd.append("auto_start", "false");
@@ -231,8 +237,6 @@
         return;
       }
 
-      const strategyEl = document.querySelector('input[name="bgm_strategy"]:checked');
-      const strategy = strategyEl ? strategyEl.value : "replace";
       if (bgmFile && bgmFile.files && bgmFile.files[0]) {
         const fd = new FormData();
         fd.append("file", bgmFile.files[0]);
