@@ -325,6 +325,11 @@
     };
   }
 
+  function resolveTtsPreviewUrl(audio) {
+    const audioPayload = audio || ((currentHub && currentHub.audio) || {});
+    return audioPayload.dub_preview_url || audioPayload.tts_voiceover_url || null;
+  }
+
   function setStep(step, status, summary) {
     const stateEl = document.querySelector(`[data-hf-step-status="${step}"]`);
     const summaryEl = document.querySelector(`[data-hf-step-summary="${step}"]`);
@@ -334,10 +339,9 @@
 
   function getAudioDisplayState() {
     const audio = (currentHub && currentHub.audio) || {};
-    const media = (currentHub && currentHub.media) || {};
     const status = String(audio.status || "").trim().toLowerCase();
     const reason = String(audio.dub_current_reason || audio.audio_ready_reason || "").trim().toLowerCase();
-    const hasVoiceover = Boolean(audio.dub_preview_url || audio.tts_voiceover_url || media.voiceover_url || audio.voiceover_url);
+    const hasVoiceover = Boolean(resolveTtsPreviewUrl(audio));
     const deliverableDone = Boolean(audio.deliverable_audio_done);
     const audioReady = Boolean(audio.audio_ready);
 
@@ -644,7 +648,6 @@
 
   function renderVoiceMeta() {
     const audio = (currentHub && currentHub.audio) || {};
-    const media = (currentHub && currentHub.media) || {};
     const artifactFacts = (currentHub && currentHub.artifact_facts) || {};
     const operatorSummary = (currentHub && currentHub.operator_summary) || {};
     const presentation = (currentHub && currentHub.presentation) || {};
@@ -652,9 +655,7 @@
     const currentAttempt = presentation.current_attempt || {};
     const hasAudio = Boolean(
       artifactFacts.audio_exists
-      || media.voiceover_url
-      || audio.voiceover_url
-      || audio.tts_voiceover_url
+      || resolveTtsPreviewUrl(audio)
       || (currentHub && currentHub.deliverable_audio_done)
     );
     const noDub = Boolean(currentHub && currentHub.no_dub);
@@ -1006,8 +1007,7 @@
 
   function renderAudio() {
     const audio = (currentHub && currentHub.audio) || {};
-    const media = (currentHub && currentHub.media) || {};
-    const voiceUrl = audio.dub_preview_url || audio.tts_voiceover_url || media.voiceover_url || audio.voiceover_url || null;
+    const voiceUrl = resolveTtsPreviewUrl(audio);
     if (ttsEngineEl) ttsEngineEl.value = audio.tts_engine || "azure_speech";
     renderVoiceOptions(audio.tts_engine || "azure_speech");
     if (bgmMixEl && audio.bgm_mix != null) bgmMixEl.value = String(audio.bgm_mix);
@@ -1474,9 +1474,8 @@
   }
 
   async function composeFinal() {
-    const media = (currentHub && currentHub.media) || {};
     const audio = (currentHub && currentHub.audio) || {};
-    const voiceUrl = audio.dub_preview_url || audio.tts_voiceover_url || media.voiceover_url || audio.voiceover_url || null;
+    const voiceUrl = resolveTtsPreviewUrl(audio);
     const subtitleOnlyAllowed = canUseSubtitleOnlyCompose();
     if (composeConfirmEl && !composeConfirmEl.checked) throw new Error("Please confirm before composing.");
     if (!voiceUrl && !subtitleOnlyAllowed) throw new Error("No voiceover yet; run Re-Run Audio first.");
@@ -1551,7 +1550,7 @@
     const media = (currentHub && currentHub.media) || {};
     const audio = (currentHub && currentHub.audio) || {};
     const hasRaw = Boolean(media.raw_url || media.source_video_url);
-    const hasVoiceover = Boolean(audio.dub_preview_url || audio.tts_voiceover_url || media.voiceover_url || audio.voiceover_url);
+    const hasVoiceover = Boolean(resolveTtsPreviewUrl(audio));
     const subtitleOnlyAllowed = canUseSubtitleOnlyCompose();
     const confirmed = composeConfirmEl ? composeConfirmEl.checked : true;
     const composeLast = ((currentHub && currentHub.compose) || {}).last || {};
@@ -1853,9 +1852,8 @@
     ttsPreviewBtn.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
-        const media = (currentHub && currentHub.media) || {};
         const audio = (currentHub && currentHub.audio) || {};
-        const voiceUrl = audio.dub_preview_url || audio.tts_voiceover_url || media.voiceover_url || audio.voiceover_url || null;
+        const voiceUrl = resolveTtsPreviewUrl(audio);
         if (!voiceUrl) {
           if (audioMsgEl) audioMsgEl.textContent = "No voiceover yet; run Re-Run Audio first.";
           return;

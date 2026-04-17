@@ -1,5 +1,37 @@
 # VeoSop05 启动进度文档
 
+## PR-Preview Player Binding Audit / Fix
+
+日期：2026-04-17
+
+本节点完成：
+
+- 将 Hot Follow workbench 的 TTS 预览 / voiceover audio / compose gate 统一收敛到 `dub_preview_url` / `tts_voiceover_url`
+- 移除播放器侧对 `media.voiceover_url`、`audio.voiceover_url` 兼容别名的 fallback，避免 preserved source audio / BGM 被误当成 dubbing preview
+- 补充静态回归，要求 workbench preview player 只使用显式 TTS preview truth
+- 保持 source video、final video、compose ownership、status projection 不变
+
+本次收口说明：
+
+- 只做 PR-3 preview/player binding audit/fix
+- 不做 PR-4 status truth projection、不改 ready gate、不改 publish/task board status
+- 不做 UI redesign、不做 `mm_*` / `/audio_mm` / `audio_url` 命名清理
+
+本节点验证：
+
+- Interpreter: `Python 3.11.15` via `python3.11`
+- `node --check gateway/app/static/js/hot_follow_workbench.js`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_subtitle_template_semantics.py -q` -> 3 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -q` -> 28 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/tests/test_hf_compose_freshness.py -q` -> 59 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_source_audio_policy_persistence.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q` -> 3 passed
+
+剩余风险：
+
+- PR-4 status truth binding audit/fix 仍需独立确认 task board、workbench、publish hub 不绕过 voice state / ready gate
+- compatibility naming cleanup 继续后置；本 PR 不移除兼容 payload 字段或路由
+- 真实素材的试听观感仍需按 Hot Follow business regression 抽样确认
+
 ## PR-Source Audio Policy Persistence Audit / Fix
 
 日期：2026-04-17
