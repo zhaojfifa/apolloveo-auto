@@ -1,5 +1,38 @@
 # VeoSop05 启动进度文档
 
+## PR-Compose Input Binding Audit / Source-Audio Preserve Fix
+
+日期：2026-04-17
+
+本节点完成：
+
+- 修正 Hot Follow compose video input selection，使 `preserve original BGM/source audio` 优先使用 `raw_path` 作为 compose carrier
+- 保持 `mute original audio` 继续优先使用 `mute_video_key / mute_video_path`
+- 当 probe 明确 `has_audio=false` 时，即使策略为 preserve，也关闭 source-audio lane，避免把静音 carrier 当作 source-audio bed
+- 补充 compose input binding 回归，覆盖 preserve/raw、mute/mute-video、preserve/no-source-audio 三条路径
+
+本次收口说明：
+
+- 只做 PR-1 compose input binding audit/fix
+- 不做 UI 语义调整、不做 preview/player binding、不改状态投影、不做 source-audio policy persistence 审计
+- 不做 `mm_*` / `/audio_mm` / `audio_url` 命名清理，不新增外部 API，不重写 compose ownership
+
+本节点验证：
+
+- Interpreter: `Python 3.11.15` via `python3.11`
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/tests/test_compose_video_master_duration.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py -q` -> 8 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q` -> 67 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q` -> 41 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q` -> 114 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_app_import_smoke.py -q` -> 1 passed
+
+剩余风险：
+
+- `compose_service.py` 仍超过 service oversized threshold；本 PR 只做 policy-aware input binding，后续仍需要专门 thinning PR
+- PR-2 source-audio policy persistence、PR-3 preview/player binding、PR-4 status truth binding 继续独立执行
+- 真实素材仍需按 Hot Follow business regression 抽样确认 source-audio preserve 最终混音观感
+
 ## PR-Source Audio Semantics Alignment / Operator Flow
 
 日期：2026-04-16

@@ -432,6 +432,19 @@ def _with_live_hot_follow_subtitle_currentness(task_id: str, task: dict) -> dict
     return live_task
 
 
+def _resolve_compose_video_key(task: dict, source_audio_policy: str) -> tuple[str | None, bool]:
+    """Resolve compose video input and whether it can provide preserved source audio."""
+    raw_key = task_key(task, "raw_path") or task_key(task, "raw_video_key")
+    mute_key = task_key(task, "mute_video_key") or task_key(task, "mute_video_path")
+    if str(source_audio_policy or "").strip().lower() == "preserve" and raw_key:
+        return str(raw_key), True
+    if mute_key:
+        return str(mute_key), False
+    if raw_key:
+        return str(raw_key), str(source_audio_policy or "").strip().lower() == "preserve"
+    return None, False
+
+
 # ---------------------------------------------------------------------------
 # Internal dataclasses
 # ---------------------------------------------------------------------------
@@ -851,14 +864,9 @@ class CompositionService:
         subtitle_only_compose = subtitle_only_check(task_id, live_task)
 
         # Resolve artifact keys
-        from gateway.app.services.task_view_helpers import task_key as _task_key  # noqa: PLC0415
-
-        video_key = (
-            _task_key(live_task, "mute_video_key")
-            or _task_key(live_task, "mute_video_path")
-            or _task_key(live_task, "raw_path")
-        )
-        audio_key = _task_key(live_task, "mm_audio_key") or _task_key(live_task, "mm_audio_path")
+        source_audio_policy = source_audio_policy_from_task(live_task)
+        video_key, video_has_source_audio = _resolve_compose_video_key(live_task, source_audio_policy)
+        audio_key = task_key(live_task, "mm_audio_key") or task_key(live_task, "mm_audio_path")
 
         if not video_key:
             compose_fail("missing_raw", "missing video source for compose")
@@ -886,7 +894,6 @@ class CompositionService:
             compose_fail("compose_failed", "ffmpeg not found in PATH")
 
         # Extract compose plan config
-        source_audio_policy = source_audio_policy_from_task(live_task)
         config = dict(live_task.get("config") or {})
         bgm = dict(config.get("bgm") or {})
         bgm_key: str | None = str(bgm.get("bgm_key") or "").strip() or None
@@ -903,7 +910,10 @@ class CompositionService:
             bgm_mix = 0.3
         bgm_mix = max(0.0, min(1.0, bgm_mix))
         source_has_audio_hint = parse_pipeline_config(live_task.get("pipeline_config")).get("has_audio")
-        source_audio_available = str(source_has_audio_hint or "").strip().lower() != "false"
+        source_audio_available = bool(
+            video_has_source_audio
+            and str(source_has_audio_hint or "").strip().lower() != "false"
+        )
 
         compose_plan = dict(live_task.get("compose_plan") or {})
         overlay_subtitles = bool(compose_plan.get("overlay_subtitles"))

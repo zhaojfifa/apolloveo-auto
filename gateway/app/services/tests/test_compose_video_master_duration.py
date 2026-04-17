@@ -3,6 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from gateway.app.services import compose_service as compose_module
 from gateway.app.services.compose_service import CompositionService, _ComposeInputs, _WorkspaceFiles
 
 
@@ -159,3 +160,90 @@ def test_preserve_source_audio_policy_carries_source_audio_for_subtitle_only_com
     assert "[0:a]aformat" in cmd_text
     assert "-map [mix]" in cmd_text
     assert "-an" not in captured
+
+
+def _patch_validate_input_deps(monkeypatch):
+    monkeypatch.setattr(
+        compose_module,
+        "_with_live_hot_follow_subtitle_currentness",
+        lambda _task_id, task: dict(task),
+    )
+    monkeypatch.setattr(
+        compose_module,
+        "collect_voice_execution_state",
+        lambda *_args, **_kwargs: {"audio_ready": True, "audio_ready_reason": "ready"},
+    )
+    monkeypatch.setattr(compose_module, "assert_artifact_ready", lambda **_kwargs: None)
+    monkeypatch.setattr(compose_module.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
+
+
+def test_preserve_source_audio_policy_uses_raw_video_instead_of_mute_video(monkeypatch):
+    _patch_validate_input_deps(monkeypatch)
+    service = CompositionService(storage=object(), settings=object())
+
+    inputs = service._validate_inputs(
+        "hf-preserve-raw-input",
+        {
+            "task_id": "hf-preserve-raw-input",
+            "kind": "hot_follow",
+            "raw_path": "deliver/tasks/hf-preserve-raw-input/raw.mp4",
+            "mute_video_key": "deliver/tasks/hf-preserve-raw-input/mute.mp4",
+            "mm_audio_key": "deliver/tasks/hf-preserve-raw-input/audio_mm.mp3",
+            "config": {"bgm": {"strategy": "keep"}},
+            "pipeline_config": {"has_audio": "true"},
+            "compose_plan": {},
+        },
+        lambda *_args, **_kwargs: False,
+    )
+
+    assert inputs.video_key == "deliver/tasks/hf-preserve-raw-input/raw.mp4"
+    assert inputs.source_audio_policy == "preserve"
+    assert inputs.source_audio_available is True
+
+
+def test_mute_source_audio_policy_keeps_mute_video_input(monkeypatch):
+    _patch_validate_input_deps(monkeypatch)
+    service = CompositionService(storage=object(), settings=object())
+
+    inputs = service._validate_inputs(
+        "hf-mute-input",
+        {
+            "task_id": "hf-mute-input",
+            "kind": "hot_follow",
+            "raw_path": "deliver/tasks/hf-mute-input/raw.mp4",
+            "mute_video_key": "deliver/tasks/hf-mute-input/mute.mp4",
+            "mm_audio_key": "deliver/tasks/hf-mute-input/audio_mm.mp3",
+            "config": {"bgm": {"strategy": "replace"}},
+            "pipeline_config": {"has_audio": "true"},
+            "compose_plan": {},
+        },
+        lambda *_args, **_kwargs: False,
+    )
+
+    assert inputs.video_key == "deliver/tasks/hf-mute-input/mute.mp4"
+    assert inputs.source_audio_policy == "mute"
+    assert inputs.source_audio_available is False
+
+
+def test_preserve_source_audio_policy_disables_source_lane_when_probe_says_no_audio(monkeypatch):
+    _patch_validate_input_deps(monkeypatch)
+    service = CompositionService(storage=object(), settings=object())
+
+    inputs = service._validate_inputs(
+        "hf-preserve-no-source-audio",
+        {
+            "task_id": "hf-preserve-no-source-audio",
+            "kind": "hot_follow",
+            "raw_path": "deliver/tasks/hf-preserve-no-source-audio/raw.mp4",
+            "mute_video_key": "deliver/tasks/hf-preserve-no-source-audio/mute.mp4",
+            "mm_audio_key": "deliver/tasks/hf-preserve-no-source-audio/audio_mm.mp3",
+            "config": {"bgm": {"strategy": "keep"}},
+            "pipeline_config": {"has_audio": "false"},
+            "compose_plan": {},
+        },
+        lambda *_args, **_kwargs: False,
+    )
+
+    assert inputs.video_key == "deliver/tasks/hf-preserve-no-source-audio/raw.mp4"
+    assert inputs.source_audio_policy == "preserve"
+    assert inputs.source_audio_available is False
