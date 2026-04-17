@@ -231,6 +231,54 @@ def hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
     }
 
 
+def hf_current_voiceover_asset(
+    task_id: str,
+    task: dict,
+    settings=None,
+) -> dict[str, Any]:
+    """Return the current TTS voiceover asset, never preserved source/BGM audio."""
+    settings_obj = settings or get_settings()
+    state = collect_voice_execution_state(task, settings_obj)
+    persisted = hf_persisted_audio_state(task_id, task)
+    if not bool(state.get("dub_current")):
+        return {
+            "key": None,
+            "url": None,
+            "exists": False,
+            "size_bytes": int(persisted.get("size_bytes") or 0),
+            "content_type": None,
+            "reason": str(state.get("dub_current_reason") or state.get("audio_ready_reason") or "audio_not_current"),
+        }
+    if str(persisted.get("audio_artifact_role") or "") != "tts_voiceover":
+        return {
+            "key": None,
+            "url": None,
+            "exists": False,
+            "size_bytes": int(persisted.get("size_bytes") or 0),
+            "content_type": None,
+            "reason": "voiceover_artifact_not_tts",
+        }
+    key = str(persisted.get("audio_key") or "").strip() or None
+    if not key or not bool(persisted.get("exists")):
+        return {
+            "key": None,
+            "url": None,
+            "exists": False,
+            "size_bytes": int(persisted.get("size_bytes") or 0),
+            "content_type": None,
+            "reason": "audio_missing",
+        }
+    ctype = str(task.get("mm_audio_mime") or "").strip() or "audio/mpeg"
+    return {
+        "key": key,
+        "url": str(state.get("voiceover_url") or persisted.get("voiceover_url") or "").strip() or None,
+        "exists": True,
+        "size_bytes": int(persisted.get("size_bytes") or 0),
+        "content_type": ctype,
+        "reason": "ready",
+    }
+
+
 def hf_audio_matches_expected(
     *,
     actual_provider: str | None,

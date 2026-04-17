@@ -1,5 +1,48 @@
 # VeoSop05 启动进度文档
 
+## PR-Voiceover Asset Binding Fix After Compose Input Repair
+
+日期：2026-04-17
+
+本节点完成：
+
+- 将 Hot Follow dub preview / dub download / audio deliverable projection 绑定到当前真实 TTS voiceover truth，而不是 raw `mm_audio_key` 存在性
+- 新增 `hf_current_voiceover_asset()`，只在 `dub_current=true` 且 persisted artifact role 为 `tts_voiceover` 时返回 voiceover key/url
+- `/v1/tasks/{task_id}/audio_mm` 对 Hot Follow 任务只服务当前真实 TTS voiceover；preserved source audio / BGM key 返回 `voiceover_not_ready`
+- `TaskDetail` audio URL、download URL、Hot Follow deliverables 不再把 preserved source audio / BGM 暴露为 dub file
+- 保持 compose input repair 不变：mute、preserve source-audio、TTS + preserved source-audio 的 final compose 行为不改
+
+确认根因：
+
+- 真实 TTS voiceover 生成后写入 `mm_audio_key/mm_audio_path = deliver/tasks/{task_id}/audio_mm.mp3`，并携带 `mm_audio_provider`、`mm_audio_voice_id`、`audio_sha256`
+- preserved source audio / BGM 不应进入 dubbing truth；但部分 projection/download 路径仍按 raw `mm_audio_key` + object existence 暴露 `/audio_mm`
+- 因此即使 `collect_voice_execution_state()` 已拒绝 source-audio/BGM 作为 current dub，detail/download/deliverables 仍可能把它显示成“dub file”
+
+本次收口说明：
+
+- 只修复 Hot Follow voiceover asset binding
+- 不做 UI 文案重写、不做 `mm_*` / `audio_url` / `/audio_mm` 命名清理
+- 不重写 compose ownership、不改 publish ownership、不改 subtitle/translation/cleanup/layout
+- 不把 preserved source audio / BGM 作为 voiceover preview 或 download fallback
+
+本节点验证：
+
+- Interpreter: `Python 3.11.15` via `python3.11`
+- `python3.11 -m py_compile gateway/app/services/voice_state.py gateway/app/services/task_view_helpers.py gateway/app/services/task_view.py gateway/app/routers/tasks.py gateway/app/routers/hot_follow_api.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py` -> passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -q` -> 31 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q` -> 15 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_source_audio_policy_persistence.py -q` -> 50 passed
+- `node --check gateway/app/static/js/hot_follow_workbench.js` -> passed
+- runtime source-selection evidence:
+  - true TTS task: `dub_current=true`, artifact role `tts_voiceover`, preview `/v1/tasks/hf-runtime-tts/audio_mm`, detail audio URL `/v1/tasks/hf-runtime-tts/audio_mm`, route key `deliver/tasks/hf-runtime-tts/audio_mm.mp3`
+  - source/BGM task: `dub_current=false`, artifact role `source_audio`, preview `None`, detail/download URL `None`, `/audio_mm` route `404`
+
+剩余风险：
+
+- compatibility names remain intentionally unchanged and still carry historical ambiguity
+- real provider business sampling should still verify operator playback/download with live Hot Follow tasks
+- `tasks.py`, `hot_follow_api.py`, and `compose_service.py` remain structurally large; this PR does not thin them
+
 ## PR-Compose Input Binding Audit / Source-Audio Bed Volume Fix
 
 日期：2026-04-17

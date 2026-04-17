@@ -58,6 +58,7 @@ from gateway.app.services.voice_service import (
 from gateway.app.services.voice_state import (
     build_hot_follow_voice_options,
     collect_voice_execution_state,
+    hf_current_voiceover_asset,
     hf_persisted_audio_state,
 )
 from gateway.app.utils.pipeline_config import parse_pipeline_config
@@ -268,7 +269,8 @@ def hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
     raw_key = task_key(task, "raw_path")
     origin_key = task_key(task, "origin_srt_path")
     mm_key = task_key(task, "mm_srt_path")
-    audio_key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
+    audio_asset = hf_current_voiceover_asset(task_id, task, get_settings())
+    audio_key = str(audio_asset.get("key") or "").strip() or None
     pack_key = task_key(task, "pack_key") or task_key(task, "pack_path")
     scenes_key = task_key(task, "scenes_key")
     final_key = task_key(task, "final_video_key") or task_key(task, "final_video_path")
@@ -332,7 +334,7 @@ def hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             audio_key,
             task_endpoint(task_id, "audio") if audio_key and object_exists(str(audio_key)) else None,
             signed_op_url(task_id, "mm_audio") if audio_key and object_exists(str(audio_key)) else None,
-            hf_deliverable_state(task, audio_key, "dub_status"),
+            "done" if audio_key and bool(audio_asset.get("exists")) else hf_deliverable_state(task, None, "dub_status"),
         ),
         _entry(
             "bgm",

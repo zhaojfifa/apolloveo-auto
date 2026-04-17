@@ -1099,7 +1099,13 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
     raw_key = _task_key(task, "raw_path")
     origin_key = _task_key(task, "origin_srt_path")
     mm_key = _task_key(task, "mm_srt_path")
-    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
+    voice_state = _collect_voice_execution_state(task, get_settings())
+    raw_audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
+    audio_key = (
+        str(raw_audio_key).strip()
+        if raw_audio_key and bool(voice_state.get("dub_current")) and str(voice_state.get("voiceover_url") or "").strip()
+        else None
+    )
     pack_key = _task_key(task, "pack_key") or _task_key(task, "pack_path")
     scenes_key = _task_key(task, "scenes_key")
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
@@ -1163,7 +1169,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             audio_key,
             _task_endpoint(task_id, "audio") if audio_key and object_exists(str(audio_key)) else None,
             _signed_op_url(task_id, "mm_audio") if audio_key and object_exists(str(audio_key)) else None,
-            _hf_deliverable_state(task, audio_key, "dub_status"),
+            "done" if audio_key and object_exists(str(audio_key)) else _hf_deliverable_state(task, None, "dub_status"),
         ),
         _entry(
             "bgm",
