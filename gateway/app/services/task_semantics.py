@@ -96,7 +96,7 @@ def project_task_fact_status(task: dict) -> str:
     if bool(ready_gate.get("publish_ready") or ready_gate.get("compose_ready")):
         return "ready"
 
-    if _publishable_main_deliverable(task):
+    if not hot_follow and _publishable_main_deliverable(task):
         return "ready"
 
     final_exists = bool(
@@ -105,7 +105,7 @@ def project_task_fact_status(task: dict) -> str:
         or task.get("final_url")
         or task.get("final_video_url")
     )
-    if final_exists:
+    if final_exists and not hot_follow:
         return "ready"
 
     target_subtitle_current = _target_subtitle_current_fact(task)
@@ -124,7 +124,7 @@ def project_task_fact_status(task: dict) -> str:
         return "processing"
 
     compose_status = _lower(task.get("compose_status") or task.get("compose_last_status") or "")
-    if compose_status in _DONE_STATES:
+    if compose_status in _DONE_STATES and not hot_follow:
         return "ready"
 
     pack_exists = bool(
@@ -155,6 +155,10 @@ def project_task_fact_status(task: dict) -> str:
         return "failed"
     if raw_status in _RUNNING_STATES and not any(status in _DONE_STATES for status in statuses):
         return "processing"
+    if hot_follow:
+        if any(status in _DONE_STATES for status in statuses) or raw_status in _DONE_STATES or final_exists:
+            return "processing"
+        return "unknown"
     if any(status in _DONE_STATES for status in statuses):
         return "ready"
     return "unknown"

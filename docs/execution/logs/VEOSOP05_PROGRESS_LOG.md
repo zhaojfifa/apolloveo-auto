@@ -1,5 +1,37 @@
 # VeoSop05 启动进度文档
 
+## PR-Status Truth Binding Audit / Fix
+
+日期：2026-04-17
+
+本节点完成：
+
+- 收紧 Hot Follow ready gate 的 voiceover/audio extraction：raw `mm_audio_key` / `mm_audio_path` 不再能满足 `voiceover_exists` 或 fallback `audio_ready`
+- Hot Follow task board / summary status 不再用 `final_video_key`、`publish_key`、`compose_status=done` 直接投影 ready
+- 保持真正的 ready 投影来自 computed `ready_gate.compose_ready` / `ready_gate.publish_ready`
+- 补充回归，覆盖 legacy audio key 不能让 ready gate 误判 audio ready，以及 board/summary 不再被 final/publish artifact 单独置 ready
+
+本次收口说明：
+
+- 只做 PR-4 status truth binding audit/fix
+- 不改 compose input binding、不改 source-audio policy persistence、不改 preview/player binding
+- 不做 UI redesign、不做 `mm_*` / `/audio_mm` / `audio_url` 命名清理，不重写 publish ownership
+
+本节点验证：
+
+- Interpreter: `Python 3.11.15` via `python3.11`
+- `python3.11 -m py_compile gateway/app/services/ready_gate/hot_follow_rules.py gateway/app/services/task_semantics.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_task_router_presenters.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_task_router_presenters.py gateway/app/services/tests/test_hf_compose_freshness.py -q` -> 63 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q` -> 41 passed
+- `python3.11 -m pytest gateway/app/services/ready_gate/tests/test_line_binding.py gateway/app/services/status_policy/tests/test_line_runtime_binding.py gateway/app/services/status_policy/tests/test_hot_follow_state_line_binding.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q` -> 6 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/tests/test_source_audio_policy_persistence.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_subtitle_template_semantics.py -q` -> 6 passed
+
+剩余风险：
+
+- compatibility naming cleanup 仍后置，尤其是 `mm_audio_key`、`/audio_mm`、`audio_url` 等历史命名
+- 真实素材仍需按 Hot Follow business regression 抽样确认 final/source playback 与 operator-facing 状态一致
+- `tasks.py`、`compose_service.py` 等结构性 thinning 仍应作为独立工程治理 PR
+
 ## PR-Preview Player Binding Audit / Fix
 
 日期：2026-04-17
