@@ -473,6 +473,22 @@ class TestReadyGateFinalFreshSignal:
         result = self._run_gate(self._base_task(), state)
         assert result["compose_ready"] is False
 
+    def test_gate_audio_ready_false_when_only_legacy_audio_key_exists(self):
+        """Raw mm_audio_key existence must not satisfy current TTS dub truth."""
+        task = {
+            **self._base_task(),
+            "dub_status": "done",
+            "mm_audio_key": "deliver/tasks/t1/bgm/user_bgm.mp3",
+        }
+        state = {
+            "final": {"exists": True, "fresh": True, "stale_reason": None},
+            "audio": {"status": "done", "tts_voice": "my-MM-ThihaNeural"},
+        }
+        result = self._run_gate(task, state)
+        assert result["audio_ready"] is False
+        assert result["compose_ready"] is False
+        assert "audio_not_ready" in result["blocking"]
+
 
 # ---------------------------------------------------------------------------
 # G. Full state-transition: Save Subtitle → Re-dub → Re-compose

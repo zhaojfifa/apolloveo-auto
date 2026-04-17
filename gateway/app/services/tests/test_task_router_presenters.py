@@ -225,7 +225,7 @@ def test_build_tasks_page_rows_preserves_board_payload_shape(monkeypatch):
     ]
 
 
-def test_build_task_summaries_page_projects_ready_from_final_facts_before_unknown_status():
+def test_build_task_summaries_page_does_not_project_hot_follow_ready_from_final_key_only():
     summaries, total = build_task_summaries_page(
         [
             {
@@ -256,7 +256,7 @@ def test_build_task_summaries_page_projects_ready_from_final_facts_before_unknow
     )
 
     assert total == 1
-    assert summaries[0].status == "ready"
+    assert summaries[0].status == "processing"
 
 
 def test_build_tasks_page_rows_bind_hot_follow_board_to_computed_ready_gate(monkeypatch):
@@ -354,7 +354,7 @@ def test_build_task_summaries_page_bind_hot_follow_status_to_computed_ready_gate
     assert summaries[0].status == "ready"
 
 
-def test_build_task_summaries_page_marks_vi_ready_when_final_exists_even_if_target_subtitle_fact_is_stale():
+def test_build_task_summaries_page_keeps_vi_processing_when_final_exists_but_target_subtitle_is_stale():
     summaries, total = build_task_summaries_page(
         [
             {
@@ -388,10 +388,10 @@ def test_build_task_summaries_page_marks_vi_ready_when_final_exists_even_if_targ
     )
 
     assert total == 1
-    assert summaries[0].status == "ready"
+    assert summaries[0].status == "processing"
 
 
-def test_build_tasks_page_rows_carry_fact_fields_needed_for_board_ready_projection():
+def test_build_tasks_page_rows_keep_hot_follow_processing_without_ready_gate():
     rows = build_tasks_page_rows(
         [
             {
@@ -414,8 +414,8 @@ def test_build_tasks_page_rows_carry_fact_fields_needed_for_board_ready_projecti
 
     semantics = derive_task_semantics(rows[0])
 
-    assert semantics["db_status"] == "ready"
-    assert semantics["filter_status"] == "done"
+    assert semantics["db_status"] == "processing"
+    assert semantics["filter_status"] == "processing"
 
 
 def test_build_tasks_page_rows_do_not_require_publish_hub_payload_like_storage_probe(monkeypatch):
@@ -460,7 +460,7 @@ def test_build_tasks_page_rows_do_not_require_publish_hub_payload_like_storage_p
     assert rows[0]["final_video_key"] == "deliver/tasks/hf-board/final.mp4"
 
 
-def test_build_tasks_page_rows_project_hot_follow_done_from_publishable_main_deliverable():
+def test_build_tasks_page_rows_do_not_project_hot_follow_done_from_publishable_main_deliverable():
     rows = build_tasks_page_rows(
         [
             {
@@ -485,8 +485,8 @@ def test_build_tasks_page_rows_project_hot_follow_done_from_publishable_main_del
 
     semantics = derive_task_semantics(rows[0])
 
-    assert semantics["db_status"] == "ready"
-    assert semantics["filter_status"] == "done"
+    assert semantics["db_status"] == "processing"
+    assert semantics["filter_status"] == "processing"
     assert semantics["show_pack_badge"] is False
 
 
@@ -504,7 +504,7 @@ def test_derive_task_semantics_enables_download_when_final_exists_without_pack()
     assert semantics["download_class"]
 
 
-def test_build_tasks_page_rows_project_ready_for_vi_when_final_exists_even_if_target_subtitle_is_stale():
+def test_build_tasks_page_rows_keep_vi_processing_when_final_exists_but_target_subtitle_is_stale():
     rows = build_tasks_page_rows(
         [
             {
@@ -530,8 +530,8 @@ def test_build_tasks_page_rows_project_ready_for_vi_when_final_exists_even_if_ta
 
     semantics = derive_task_semantics(rows[0])
 
-    assert semantics["db_status"] == "ready"
-    assert semantics["filter_status"] == "done"
+    assert semantics["db_status"] == "processing"
+    assert semantics["filter_status"] == "processing"
 
 
 def test_build_tasks_page_rows_keep_vi_processing_when_target_subtitle_is_stale_and_final_is_missing():
@@ -642,7 +642,7 @@ def test_derive_task_semantics_does_not_let_optional_pack_hide_hot_follow_failur
     assert semantics["show_pack_badge"] is True
 
 
-def test_derive_task_semantics_keeps_pack_secondary_for_hot_follow_completed_state():
+def test_derive_task_semantics_does_not_use_publish_key_as_hot_follow_ready_truth():
     semantics = derive_task_semantics(
         {
             "task_id": "hf-done-no-pack",
@@ -654,8 +654,8 @@ def test_derive_task_semantics_keeps_pack_secondary_for_hot_follow_completed_sta
         }
     )
 
-    assert semantics["db_status"] == "ready"
-    assert semantics["filter_status"] == "done"
+    assert semantics["db_status"] == "processing"
+    assert semantics["filter_status"] == "processing"
     assert semantics["show_pack_badge"] is False
 
 

@@ -2,7 +2,7 @@
 
 ## Current Stage
 
-Hot Follow Preview Player Binding Alignment
+Hot Follow Status Truth Binding Alignment
 
 ## Current Main Line
 
@@ -20,6 +20,7 @@ Hot Follow Preview Player Binding Alignment
 - compose input selection now preserves source audio by using raw video as the carrier when `source_audio_policy=preserve`
 - source-audio policy now persists across pipeline config storage, task config, workbench BGM upload, and backend BGM upload defaults
 - workbench preview/player binding now uses explicit TTS preview fields instead of legacy voiceover aliases
+- Hot Follow board/summary readiness now follows computed ready gate truth instead of raw final/audio/publish compatibility artifacts
 - current business flow remains stable and non-blocking
 
 ## Remaining Structural Risks
@@ -29,7 +30,7 @@ Hot Follow Preview Player Binding Alignment
 - some scenario-aware façade logic still remains
 - historical `mm_*` compatibility naming still exists and is intentionally out of scope for this fix
 - source-audio preserve still needs real-material business sampling for mix quality and operator-facing mix review
-- status truth binding remains a separate follow-up audit
+- Hot Follow source-audio asset-flow fix sequence is complete through status truth binding; compatibility naming cleanup remains separate
 - remaining Avatar / baseline router-space behavior is separately tracked, not part of Hot Follow closure
 
 ## Recommended Next Direction

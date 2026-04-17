@@ -86,14 +86,12 @@ def _extract_audio_done(task: dict, state: dict) -> bool:
 
 
 def _extract_voiceover_exists(task: dict, state: dict) -> bool:
-    """Voiceover artifact exists in any known location."""
+    """Current TTS voiceover URL exists on the audio truth surface."""
     audio = _d(state.get("audio"))
-    media = _d(state.get("media"))
     return bool(
-        audio.get("voiceover_url")
-        or media.get("voiceover_url")
-        or task.get("mm_audio_key")
-        or task.get("mm_audio_path")
+        audio.get("dub_preview_url")
+        or audio.get("tts_voiceover_url")
+        or audio.get("voiceover_url")
     )
 
 
@@ -105,17 +103,17 @@ def _extract_tts_voice_valid(task: dict, state: dict) -> bool:
 
 
 def _extract_audio_ready(task: dict, state: dict) -> bool:
-    """Audio readiness: hint override OR (audio_done AND voiceover_exists AND tts_voice_valid).
+    """Audio readiness: explicit voice-state hint or current TTS voiceover fact.
 
-    Preserves the hint-priority pattern from original L167-171.
+    Raw compatibility artifact keys are intentionally ignored here. Source audio,
+    uploaded BGM, or stale generic audio references must not satisfy dub truth.
     """
     audio = _d(state.get("audio"))
     hint = audio.get("audio_ready")
     if hint is not None:
         return bool(hint)
-    # Fall through to composite check
     return (
-        _extract_audio_done(task, state)
+        bool(audio.get("dub_current"))
         and _extract_voiceover_exists(task, state)
         and _extract_tts_voice_valid(task, state)
     )
