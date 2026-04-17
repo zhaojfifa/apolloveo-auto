@@ -18,8 +18,9 @@ def source_audio_policy_from_task(task: dict | None) -> str:
     bgm = dict(config.get("bgm") or {})
     pipeline_config = parse_pipeline_config(task_obj.get("pipeline_config"))
     return normalize_source_audio_policy(
-        bgm.get("strategy")
+        config.get("source_audio_policy")
         or pipeline_config.get("source_audio_policy")
+        or bgm.get("strategy")
         or pipeline_config.get("bgm_strategy")
         or pipeline_config.get("audio_strategy")
     )

@@ -18,6 +18,8 @@ _EXTRA_KEYS = {
     "clean_video_generated",
     "subtitle_codecs",
     "audio_codecs",
+    "audio_strategy",
+    "bgm_strategy",
     "has_audio",
     "has_hard_subtitles",
     "no_subtitles",
@@ -25,6 +27,7 @@ _EXTRA_KEYS = {
     "no_dub",
     "dub_skip_reason",
     "subtitle_track_kind",
+    "source_audio_policy",
 }
 
 
