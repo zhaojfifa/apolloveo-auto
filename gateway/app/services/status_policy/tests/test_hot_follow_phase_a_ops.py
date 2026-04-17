@@ -19,6 +19,7 @@ except Exception:
 
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.services import voice_state as voice_state_service
 from gateway.app.steps import subtitles as subtitles_step
 
 
@@ -84,12 +85,15 @@ def test_artifact_first_audio_ready_keeps_current_matching_audio(monkeypatch):
     monkeypatch.setattr(tasks_router, "object_exists", lambda _key: True)
     monkeypatch.setattr(tasks_router, "object_head", lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"})
     monkeypatch.setattr(tasks_router, "media_meta_from_head", lambda _meta: (4096, "audio/mpeg"))
+    monkeypatch.setattr(voice_state_service, "object_exists", lambda _key: True)
+    monkeypatch.setattr(voice_state_service, "object_head", lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"})
+    monkeypatch.setattr(voice_state_service, "media_meta_from_head", lambda _meta: (4096, "audio/mpeg"))
     task = {
         "task_id": "hf-a3",
         "kind": "hot_follow",
         "target_lang": "mm",
         "dub_status": "done",
-        "mm_audio_key": "deliver/tasks/hf-a3/audio_mm.mp3",
+        "mm_audio_key": "deliver/tasks/hf-a3/voiceover/audio_mm.dry.mp3",
         "mm_audio_provider": "azure-speech",
         "mm_audio_voice_id": "my-MM-ThihaNeural",
         "config": {
@@ -98,6 +102,7 @@ def test_artifact_first_audio_ready_keeps_current_matching_audio(monkeypatch):
             "tts_provider": "azure-speech",
             "tts_request_token": "newer",
             "tts_completed_token": "older",
+            "tts_voiceover_key": "deliver/tasks/hf-a3/voiceover/audio_mm.dry.mp3",
         },
     }
     state = tasks_router._collect_voice_execution_state(task, _settings())

@@ -107,6 +107,7 @@ from gateway.app.services.voice_state import (
     build_hot_follow_voice_options as _build_hot_follow_voice_options,
     collect_voice_execution_state as _collect_voice_execution_state,
     hf_audio_matches_expected as _hf_audio_matches_expected,
+    hf_current_voiceover_asset as _hf_current_voiceover_asset,
     hf_persisted_audio_state as _hf_persisted_audio_state,
     hot_follow_expected_provider as _hot_follow_expected_provider,
     resolve_hot_follow_provider_voice as _resolve_hot_follow_provider_voice,
@@ -1102,13 +1103,8 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
     raw_key = _task_key(task, "raw_path")
     origin_key = _task_key(task, "origin_srt_path")
     mm_key = _task_key(task, "mm_srt_path")
-    voice_state = _collect_voice_execution_state(task, get_settings())
-    raw_audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-    audio_key = (
-        str(raw_audio_key).strip()
-        if raw_audio_key and bool(voice_state.get("dub_current")) and str(voice_state.get("voiceover_url") or "").strip()
-        else None
-    )
+    audio_asset = _hf_current_voiceover_asset(task_id, task, get_settings())
+    audio_key = str(audio_asset.get("key") or "").strip() or None
     pack_key = _task_key(task, "pack_key") or _task_key(task, "pack_path")
     scenes_key = _task_key(task, "scenes_key")
     final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
@@ -1172,7 +1168,7 @@ def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             audio_key,
             _task_endpoint(task_id, "audio") if audio_key and object_exists(str(audio_key)) else None,
             _signed_op_url(task_id, "mm_audio") if audio_key and object_exists(str(audio_key)) else None,
-            "done" if audio_key and object_exists(str(audio_key)) else _hf_deliverable_state(task, None, "dub_status"),
+            "done" if audio_key and bool(audio_asset.get("exists")) else _hf_deliverable_state(task, None, "dub_status"),
         ),
         _entry(
             "bgm",

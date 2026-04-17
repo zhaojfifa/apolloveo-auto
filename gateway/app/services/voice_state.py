@@ -28,6 +28,7 @@ from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 DRY_TTS_CONFIG_KEY = "tts_voiceover_key"
 DRY_TTS_ROLE = "dry_tts_voiceover"
+DRY_TTS_KEY_SUFFIX = "/voiceover/audio_mm.dry.mp3"
 
 
 # ── Helpers (alphabetical by call-chain depth) ───────────────────────────────
@@ -52,6 +53,11 @@ def hf_current_audio_fit_max_speed(task: dict) -> str:
         speed = 1.25
     speed = max(1.0, min(1.6, speed))
     return f"{speed:.2f}"
+
+
+def is_dry_tts_voiceover_key(value: str | None) -> bool:
+    key = str(value or "").strip().replace("\\", "/")
+    return bool(key and key.endswith(DRY_TTS_KEY_SUFFIX))
 
 
 def hf_dub_matches_current_audio_config(task: dict) -> tuple[bool, str]:
@@ -202,8 +208,10 @@ def hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
     from gateway.app.services.task_view_helpers import task_key
 
     config = dict(task.get("config") or {})
-    dry_audio_key = str(config.get(DRY_TTS_CONFIG_KEY) or "").strip() or None
-    audio_key = dry_audio_key or task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
+    configured_dry_audio_key = str(config.get(DRY_TTS_CONFIG_KEY) or "").strip() or None
+    dry_audio_key = configured_dry_audio_key if is_dry_tts_voiceover_key(configured_dry_audio_key) else None
+    legacy_audio_key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
+    audio_key = dry_audio_key
     bgm_key = str((dict(config.get("bgm") or {})).get("bgm_key") or "").strip() or None
     source_audio_keys = {
         str(value).strip()
@@ -216,11 +224,20 @@ def hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
         )
         if str(value or "").strip()
     }
-    artifact_role = (
-        "tts_voiceover"
-        if dry_audio_key
-        else "source_audio" if audio_key and str(audio_key).strip() in source_audio_keys else "tts_voiceover"
-    )
+    artifact_role = None
+    ignored_audio_key = None
+    if dry_audio_key:
+        artifact_role = "tts_voiceover"
+    elif configured_dry_audio_key:
+        artifact_role = "non_dry_tts_voiceover"
+        ignored_audio_key = configured_dry_audio_key
+    elif legacy_audio_key:
+        ignored_audio_key = str(legacy_audio_key)
+        artifact_role = (
+            "source_audio"
+            if str(legacy_audio_key).strip() in source_audio_keys
+            else "legacy_audio_ignored"
+        )
     exists = False
     size_bytes = 0
     if audio_key and artifact_role == "tts_voiceover" and object_exists(str(audio_key)):
@@ -229,8 +246,9 @@ def hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
         exists = int(size_bytes or 0) >= MIN_AUDIO_BYTES
     return {
         "audio_key": str(audio_key) if audio_key else None,
-        "audio_key_source": DRY_TTS_CONFIG_KEY if dry_audio_key else "mm_audio",
-        "audio_artifact_role": artifact_role if audio_key else None,
+        "ignored_audio_key": ignored_audio_key,
+        "audio_key_source": DRY_TTS_CONFIG_KEY if dry_audio_key else None,
+        "audio_artifact_role": artifact_role,
         "exists": bool(exists),
         "size_bytes": int(size_bytes or 0),
         "voiceover_url": f"/v1/tasks/{task_id}/audio_mm"

@@ -1,5 +1,54 @@
 # VeoSop05 启动进度文档
 
+## PR-Strict Dry TTS Isolation From BGM/Source-Audio
+
+日期：2026-04-17
+
+PR goal：
+
+- Enforce strict dry-TTS-only semantics for Hot Follow dubbing lane while keeping mute, preserve source-audio/BGM, and final TTS + preserved source-audio compose behavior intact
+
+Exact leakage point fixed：
+
+- `hf_persisted_audio_state()` still treated legacy `mm_audio_key/mm_audio_path` as a TTS voiceover when `config.tts_voiceover_key` was absent, unless the key exactly matched known source/BGM keys
+- Router-local Hot Follow deliverables in `hot_follow_api.py` selected raw `mm_audio_key` after `dub_current`, which could expose the source/BGM key when a dry key existed separately
+- `steps_v1.run_dub_step()` reused `config.tts_voiceover_key` without validating that the key had the dry voiceover object shape
+
+Scope：
+
+- Require strict dry TTS object shape: `deliver/tasks/{task_id}/voiceover/audio_mm.dry.mp3`
+- Treat legacy `mm_audio_key/mm_audio_path` as compatibility metadata only; they no longer satisfy Hot Follow dub truth by themselves
+- Keep `/audio_mm`, preview/download, and deliverable projection backed by `hf_current_voiceover_asset()`
+- Keep compose behavior unchanged; final compose can still mix dry TTS with preserved source audio/BGM
+
+Intentionally not done：
+
+- 不修改 `compose_service.py`
+- 不重写 compose ownership / publish ownership
+- 不改 source-audio policy persistence
+- 不改 parse/subtitle source lane
+- 不清理 `mm_*` / `/audio_mm` compatibility naming
+- 不新增外部 API，不做 UI redesign
+
+Verification results：
+
+- Interpreter: `/opt/homebrew/bin/python3.11` (`python3.11`, Python 3.11). The documented `./venv/bin/python` is not present in this checkout (`venv/bin/` has no `python` executable).
+- `python3.11 -m py_compile gateway/app/services/voice_state.py gateway/app/services/steps_v1.py gateway/app/services/task_view.py gateway/app/services/task_view_helpers.py gateway/app/routers/tasks.py gateway/app/routers/hot_follow_api.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_phase_a_ops.py` -> passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -q` -> 34 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_phase_a_ops.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_app_import_smoke.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_source_audio_policy_persistence.py -q` -> 119 passed
+- Runtime/asset-path evidence covered by tests:
+  - dry TTS key `deliver/tasks/{task_id}/voiceover/audio_mm.dry.mp3` is the only key returned by dub download and Hot Follow deliverables
+  - legacy `deliver/tasks/{task_id}/audio_mm.mp3` without `config.tts_voiceover_key` is rejected as `legacy_audio_ignored`
+  - BGM/source-audio keys are rejected for `dub_current`, `audio_ready`, preview, and download
+  - when dry TTS is missing, `/audio_mm` returns `voiceover_not_ready` instead of exposing a fake dub file
+  - compose mute and preserve source-audio regressions remain covered by `test_compose_video_master_duration.py`
+
+Remaining risks：
+
+- Existing Hot Follow tasks without `config.tts_voiceover_key` now need re-dub before dub preview/download/currentness can be exposed
+- Real-material business sampling is still required for subjective source-audio preserve mix quality and operator playback confirmation
+- `tasks.py`, `hot_follow_api.py`, and `compose_service.py` remain structurally large; this PR intentionally does not thin them
+
 ## PR-Dry TTS Lane Isolation From Final BGM/Source-Audio Compose Lane
 
 日期：2026-04-17
