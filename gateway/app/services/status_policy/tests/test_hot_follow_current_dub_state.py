@@ -248,6 +248,55 @@ def test_dub_download_route_uses_current_tts_voiceover_key(monkeypatch):
     assert content_type == "audio/mpeg"
 
 
+def test_dub_download_route_prefers_dry_tts_key_over_source_audio_lane(monkeypatch):
+    task_id = "hf-dry-tts-download"
+    dry_key = f"deliver/tasks/{task_id}/voiceover/audio_mm.dry.mp3"
+    source_key = f"deliver/tasks/{task_id}/bgm/source_audio.mp3"
+    task = {
+        "task_id": task_id,
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "dub_status": "done",
+        "mm_audio_key": source_key,
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "my-MM-NilarNeural",
+        "mm_audio_mime": "audio/mpeg",
+        "config": {
+            "source_audio_policy": "preserve",
+            "tts_requested_voice": "mm_female_1",
+            "tts_resolved_voice": "my-MM-NilarNeural",
+            "tts_provider": "azure-speech",
+            "tts_voiceover_key": dry_key,
+            "bgm": {"strategy": "keep", "bgm_key": source_key},
+        },
+    }
+
+    class _Repo:
+        def get(self, requested_id):
+            assert requested_id == task_id
+            return task
+
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    monkeypatch.setattr(tasks_router, "object_exists", lambda key: str(key) == dry_key)
+    monkeypatch.setattr(tasks_router, "object_head", lambda _key: {"content_length": "4096", "content_type": "audio/mpeg"})
+    _patch_voice_storage(
+        monkeypatch,
+        lambda key: str(key) == dry_key,
+        lambda _key: {"content_length": "4096", "content_type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
+
+    state = tasks_router._collect_voice_execution_state(task, _settings())
+    key, size, content_type = tasks_router._resolve_audio_meta(task_id, _Repo())
+
+    assert state["audio_ready"] is True
+    assert state["dub_current"] is True
+    assert state["audio_artifact_role"] == "tts_voiceover"
+    assert key == dry_key
+    assert size == 4096
+    assert content_type == "audio/mpeg"
+
+
 def test_task_detail_audio_urls_hide_source_audio_artifact(monkeypatch):
     task_id = "hf-detail-source-audio-not-dub"
     task = {

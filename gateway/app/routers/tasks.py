@@ -252,6 +252,8 @@ from gateway.app.services.task_router_presenters import (  # noqa: E402
     build_task_workbench_view as _build_task_workbench_view,
 )
 from gateway.app.services.voice_state import (  # noqa: E402
+    DRY_TTS_CONFIG_KEY as _DRY_TTS_CONFIG_KEY,
+    DRY_TTS_ROLE as _DRY_TTS_ROLE,
     build_hot_follow_voice_options as _build_hot_follow_voice_options,
     collect_voice_execution_state as _collect_voice_execution_state,
     hf_audio_matches_expected as _hf_audio_matches_expected,
@@ -2739,6 +2741,8 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
     config["tts_provider"] = provider
     config["tts_request_token"] = request_token
     config["tts_completed_token"] = None
+    config[_DRY_TTS_CONFIG_KEY] = None
+    config["tts_voiceover_asset_role"] = None
     for stale_path in (
         workspace.mm_audio_primary_path,
         workspace.mm_audio_mp3_path,
@@ -2864,92 +2868,47 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 "DUB3_SKIP",
                 extra={"task_id": task_id, "reason": "no_dub_mode"},
             )
-            audio_key = task_after.get("mm_audio_key") or task_after.get("mm_audio_path")
-            audio_sha256 = None
-            if not audio_key:
-                audio_path = (
-                    workspace.mm_audio_mp3_path
-                    if workspace.mm_audio_mp3_path.exists()
-                    else workspace.mm_audio_path
-                )
-                if audio_path.exists():
-                    try:
-                        local_size, local_duration = assert_local_audio_ok(audio_path)
-                    except ValueError:
-                        local_size, local_duration = 0, 0.0
-                    audio_key = deliver_key(task_id, "audio_mm.mp3")
-                    storage = get_storage_service()
-                    if local_size > 0:
-                        storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
-                        audio_sha256 = _sha256_file(audio_path)
-                        logger.info(
-                            "DUB3_UPLOAD_DONE",
-                            extra={
-                                "task_id": task_id,
-                                "step": "dub",
-                                "stage": "DUB3_UPLOAD_DONE",
-                                "output_size": local_size,
-                                "duration_sec": local_duration,
-                                "uploaded_key": audio_key,
-                            },
-                        )
-                    else:
-                        audio_key = None
             logger.info(
                 "DUB3_OUTPUT_CHECK",
                 extra={
                     "task_id": task_id,
                     "decision": "skipped",
-                    "key": audio_key or existing_audio_key,
-                    "path": str(workspace.mm_audio_mp3_path if workspace.mm_audio_mp3_path.exists() else workspace.mm_audio_path),
-                    "exists": bool(audio_key or existing_audio_exists),
-                    "size": int(local_size if 'local_size' in locals() else existing_audio_size),
+                    "key": None,
+                    "path": None,
+                    "exists": False,
+                    "size": 0,
+                    "reason": "no_real_dry_tts",
                 },
             )
-            if not audio_key:
-                _policy_upsert(
-                    repo,
-                    task_id,
-                    {
-                        "dub_provider": provider,
-                        "last_step": "dub",
-                        "voice_id": selected_voice_id,
-                        "dub_status": "failed",
-                        "dub_error": "output_missing",
-                        "dub_generated_at": datetime.now(timezone.utc).isoformat(),
-                    },
-                )
-                stored = _repo_refresh_task(repo, task_id)
-                detail = _task_to_detail(stored)
-                return DubResponse(
-                    **detail.dict(exclude={"mm_audio_key"}),
-                    resolved_voice_id=final_voice_id,
-                    resolved_edge_voice=edge_voice,
-                    audio_sha256=None,
-                    mm_audio_key=None,
-                )
             _policy_upsert(repo, 
                 task_id,
                 {
-                    "mm_audio_path": audio_key,
-                    "mm_audio_key": audio_key,
+                    "mm_audio_path": None,
+                    "mm_audio_key": None,
                     "mm_audio_provider": provider,
                     "mm_audio_voice_id": final_voice_id,
-                    "mm_audio_bytes": local_size if 'local_size' in locals() else None,
-                    "mm_audio_duration_ms": int(local_duration * 1000) if 'local_duration' in locals() else None,
-                    "mm_audio_mime": "audio/mpeg" if audio_key else None,
+                    "mm_audio_bytes": None,
+                    "mm_audio_duration_ms": None,
+                    "mm_audio_mime": None,
                     "dub_provider": provider,
                     "last_step": "dubbing",
                     "voice_id": selected_voice_id,
                     "dub_status": "skipped",
                     "dub_error": None,
-                    "audio_sha256": audio_sha256,
-                    "dub_generated_at": datetime.now(timezone.utc).isoformat(),
+                    "audio_sha256": None,
+                    "dub_generated_at": None,
                     "compose_status": "pending",
                     "compose_error": None,
                     "compose_error_reason": None,
-                    **dub_subtitle_snapshot,
-                    "config": {**config, "tts_completed_token": request_token},
+                    "dub_source_subtitles_content_hash": None,
+                    "dub_source_subtitle_updated_at": None,
+                    "dub_source_audio_fit_max_speed": None,
+                    "config": {
+                        **config,
+                        "tts_completed_token": None,
+                        _DRY_TTS_CONFIG_KEY: None,
+                        "tts_voiceover_asset_role": None,
+                    },
                 },
             )
             stored = _repo_refresh_task(repo, task_id)
@@ -2960,15 +2919,15 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                     "task_id": task_id,
                     "step": "dub",
                     "stage": "DUB3_DONE",
-                    "uploaded_key": audio_key,
+                    "uploaded_key": None,
                 },
             )
             return DubResponse(
                 **detail.dict(exclude={"mm_audio_key"}),
                 resolved_voice_id=final_voice_id,
                 resolved_edge_voice=edge_voice,
-                audio_sha256=audio_sha256,
-                mm_audio_key=audio_key,
+                audio_sha256=None,
+                mm_audio_key=None,
             )
 
         audio_path = (
@@ -3029,7 +2988,12 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                         "compose_error": None,
                         "compose_error_reason": None,
                         **dub_subtitle_snapshot,
-                        "config": {**config, "tts_completed_token": request_token},
+                        "config": {
+                            **dict(task_after.get("config") or config),
+                            "tts_completed_token": request_token,
+                            _DRY_TTS_CONFIG_KEY: audio_key,
+                            "tts_voiceover_asset_role": _DRY_TTS_ROLE,
+                        },
                     },
                 )
                 stored = _repo_refresh_task(repo, task_id)
@@ -3138,7 +3102,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
                 audio_sha256=task_after.get("audio_sha256"),
                 mm_audio_key=task_after.get("mm_audio_key") or task_after.get("mm_audio_path"),
             )
-        audio_key = deliver_key(task_id, "audio_mm.mp3")
+        audio_key = deliver_key(task_id, "voiceover/audio_mm.dry.mp3")
         storage = get_storage_service()
         storage.upload_file(str(audio_path), audio_key, content_type="audio/mpeg")
         audio_sha256 = _sha256_file(audio_path)
@@ -3224,7 +3188,12 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
             "compose_error": None,
             "compose_error_reason": None,
             **dub_subtitle_snapshot,
-            "config": {**config, "tts_completed_token": request_token},
+            "config": {
+                **config,
+                "tts_completed_token": request_token,
+                _DRY_TTS_CONFIG_KEY: audio_key,
+                "tts_voiceover_asset_role": _DRY_TTS_ROLE,
+            },
         },
     )
 

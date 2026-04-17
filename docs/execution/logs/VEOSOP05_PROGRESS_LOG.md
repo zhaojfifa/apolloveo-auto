@@ -1,5 +1,52 @@
 # VeoSop05 启动进度文档
 
+## PR-Dry TTS Lane Isolation From Final BGM/Source-Audio Compose Lane
+
+日期：2026-04-17
+
+PR goal：
+
+- 将 Hot Follow dubbing lane 收紧为 dry TTS only，保持 final compose lane 继续支持 mute、preserve original source audio/BGM、TTS + preserve final mix
+
+确认 lane leakage point：
+
+- `run_dub_step()` 会在未强制重配音时按约定 key `deliver/tasks/{task_id}/audio_mm.mp3` 复用既有对象；该 key 不是 dry TTS 专属证据，历史 final mix / source-audio 污染对象可能被当作 TTS dubbing asset
+- `no_dub` 分支会把既有本地/远端 audio 写回 `mm_audio_key`，导致没有真实 dry TTS 时仍可能暴露 dub file
+- compose validation 仍直接读取 `mm_audio_key/mm_audio_path` 作为 voice input，未优先绑定独立 dry TTS key
+
+本次 scope：
+
+- 新增 dry TTS authoritative key 语义：新生成 TTS 写入 `config.tts_voiceover_key = deliver/tasks/{task_id}/voiceover/audio_mm.dry.mp3`
+- preview/download/current dub truth 优先使用 `config.tts_voiceover_key`，legacy `mm_audio_key` 仅保留 compatibility fallback 且 source/BGM key 仍被拒绝
+- final compose voice input 改为从 dry/current voiceover key 解析；source audio/BGM 只作为 final compose lane 输入
+- `no_dub` 不再上传或暴露任何 dub file，不让 BGM/source audio 满足 `dub_current` / `audio_ready`
+
+本次明确不做：
+
+- 不重写 compose ownership / publish ownership
+- 不新增外部 API
+- 不清理 `mm_*` / `/audio_mm` compatibility naming
+- 不改 subtitle truth chain、translation bridge、layout、operator UI redesign
+
+本节点验证：
+
+- Interpreter: `Python 3.11.15` via `python3.11`
+- `python3.11 -m py_compile gateway/app/services/voice_state.py gateway/app/services/steps_v1.py gateway/app/services/compose_service.py gateway/app/routers/tasks.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_compose_video_master_duration.py` -> passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_compose_video_master_duration.py -q` -> 42 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q` -> 49 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_source_audio_policy_persistence.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q` -> 43 passed
+- `node --check gateway/app/static/js/hot_follow_workbench.js` -> passed
+- runtime selection evidence covered by tests:
+  - dub download returns `deliver/tasks/{task_id}/voiceover/audio_mm.dry.mp3` when `mm_audio_key` points at source/BGM lane
+  - compose voice input uses `config.tts_voiceover_key` while preserve source audio remains on raw-video final compose lane
+  - source/BGM key cannot satisfy `audio_ready` / `dub_current`
+
+剩余风险：
+
+- Existing tasks without `config.tts_voiceover_key` retain legacy fallback for compatibility; a fresh re-dub is the clean migration path to the new dry key
+- Real-material business sampling is still needed for subjective final mix quality and operator playback confirmation
+- requested review docs `HOT_FOLLOW_ASSET_FLOW_AND_AUDIO_POLICY_REVIEW_20260417.md` and `HOT_FOLLOW_STATE_PROBE_AND_FIX_PLAN_20260416.md` remain absent in this checkout
+
 ## PR-Lane Separation Hardening For Source Audio, Voiceover, And Parse Truth
 
 日期：2026-04-17

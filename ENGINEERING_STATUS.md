@@ -18,6 +18,7 @@ Hot Follow Status Truth Binding Alignment
 - `preserve original BGM/source audio` is bound into compose without being treated as current TTS dub
 - workbench diagnostics and preview binding now distinguish preserved source audio from current TTS voiceover
 - Hot Follow dub preview/download/file surfaces now bind to current true TTS voiceover instead of raw audio artifact presence
+- Hot Follow dry TTS voiceover now has a dedicated authoritative key for dubbing preview/download/currentness, separated from final BGM/source-audio compose inputs
 - Hot Follow parse/source helper text is now separated from authoritative target subtitle and dub-input truth
 - compose input selection now preserves source audio by using raw video as the carrier when `source_audio_policy=preserve`
 - source-audio policy now persists across pipeline config storage, task config, workbench BGM upload, and backend BGM upload defaults
@@ -33,6 +34,7 @@ Hot Follow Status Truth Binding Alignment
 - some scenario-aware façade logic still remains
 - historical `mm_*` compatibility naming still exists and is intentionally out of scope for this fix
 - source-audio preserve still needs real-material business sampling for mix quality and operator-facing mix review
+- legacy Hot Follow tasks without the dedicated dry TTS key still rely on compatibility fallback until re-dubbed
 - Hot Follow source-audio asset-flow fix sequence is complete through status truth binding; compatibility naming cleanup remains separate
 - remaining Avatar / baseline router-space behavior is separately tracked, not part of Hot Follow closure
 

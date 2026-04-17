@@ -207,6 +207,7 @@ def _patch_validate_input_deps(monkeypatch):
         "collect_voice_execution_state",
         lambda *_args, **_kwargs: {"audio_ready": True, "audio_ready_reason": "ready"},
     )
+    monkeypatch.setattr(compose_module, "object_exists", lambda _key: True)
     monkeypatch.setattr(compose_module, "assert_artifact_ready", lambda **_kwargs: None)
     monkeypatch.setattr(compose_module.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
 
@@ -233,6 +234,37 @@ def test_preserve_source_audio_policy_uses_raw_video_instead_of_mute_video(monke
     assert inputs.video_key == "deliver/tasks/hf-preserve-raw-input/raw.mp4"
     assert inputs.source_audio_policy == "preserve"
     assert inputs.source_audio_available is True
+
+
+def test_compose_voice_input_uses_dry_tts_key_not_legacy_audio_lane(monkeypatch):
+    _patch_validate_input_deps(monkeypatch)
+    service = CompositionService(storage=object(), settings=object())
+
+    task_id = "hf-dry-compose-input"
+    inputs = service._validate_inputs(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "raw_path": f"deliver/tasks/{task_id}/raw.mp4",
+            "mute_video_key": f"deliver/tasks/{task_id}/mute.mp4",
+            "mm_audio_key": f"deliver/tasks/{task_id}/bgm/source_audio.mp3",
+            "config": {
+                "bgm": {
+                    "strategy": "keep",
+                    "bgm_key": f"deliver/tasks/{task_id}/bgm/source_audio.mp3",
+                },
+                "tts_voiceover_key": f"deliver/tasks/{task_id}/voiceover/audio_mm.dry.mp3",
+            },
+            "pipeline_config": {"has_audio": "true"},
+            "compose_plan": {},
+        },
+        lambda *_args, **_kwargs: False,
+    )
+
+    assert inputs.audio_key == f"deliver/tasks/{task_id}/voiceover/audio_mm.dry.mp3"
+    assert inputs.video_key == f"deliver/tasks/{task_id}/raw.mp4"
+    assert inputs.source_audio_policy == "preserve"
 
 
 def test_mute_source_audio_policy_keeps_mute_video_input(monkeypatch):

@@ -26,6 +26,9 @@ from gateway.app.services.artifact_storage import object_exists, object_head
 from gateway.app.services.media_validation import MIN_AUDIO_BYTES, media_meta_from_head
 from gateway.app.utils.pipeline_config import parse_pipeline_config
 
+DRY_TTS_CONFIG_KEY = "tts_voiceover_key"
+DRY_TTS_ROLE = "dry_tts_voiceover"
+
 
 # ── Helpers (alphabetical by call-chain depth) ───────────────────────────────
 
@@ -198,8 +201,9 @@ def resolve_hot_follow_provider_voice(
 def hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
     from gateway.app.services.task_view_helpers import task_key
 
-    audio_key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
     config = dict(task.get("config") or {})
+    dry_audio_key = str(config.get(DRY_TTS_CONFIG_KEY) or "").strip() or None
+    audio_key = dry_audio_key or task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
     bgm_key = str((dict(config.get("bgm") or {})).get("bgm_key") or "").strip() or None
     source_audio_keys = {
         str(value).strip()
@@ -212,7 +216,11 @@ def hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
         )
         if str(value or "").strip()
     }
-    artifact_role = "source_audio" if audio_key and str(audio_key).strip() in source_audio_keys else "tts_voiceover"
+    artifact_role = (
+        "tts_voiceover"
+        if dry_audio_key
+        else "source_audio" if audio_key and str(audio_key).strip() in source_audio_keys else "tts_voiceover"
+    )
     exists = False
     size_bytes = 0
     if audio_key and artifact_role == "tts_voiceover" and object_exists(str(audio_key)):
@@ -221,6 +229,7 @@ def hf_persisted_audio_state(task_id: str, task: dict) -> dict[str, Any]:
         exists = int(size_bytes or 0) >= MIN_AUDIO_BYTES
     return {
         "audio_key": str(audio_key) if audio_key else None,
+        "audio_key_source": DRY_TTS_CONFIG_KEY if dry_audio_key else "mm_audio",
         "audio_artifact_role": artifact_role if audio_key else None,
         "exists": bool(exists),
         "size_bytes": int(size_bytes or 0),

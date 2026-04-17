@@ -38,7 +38,7 @@ from gateway.app.services.media_validation import (
     media_meta_from_head,
 )
 from gateway.app.services.source_audio_policy import source_audio_policy_from_task
-from gateway.app.services.voice_state import collect_voice_execution_state
+from gateway.app.services.voice_state import DRY_TTS_CONFIG_KEY, collect_voice_execution_state
 from gateway.app.services.worker_gateway import WorkerExecutionMode, WorkerRequest
 from gateway.app.services.worker_gateway_registry import get_worker_gateway
 from gateway.app.services.task_view_helpers import task_endpoint, task_key
@@ -444,6 +444,31 @@ def _resolve_compose_video_key(task: dict, source_audio_policy: str) -> tuple[st
     if raw_key:
         return str(raw_key), str(source_audio_policy or "").strip().lower() == "preserve"
     return None, False
+
+
+def _resolve_compose_voiceover_key(task: dict, voice_state: dict[str, Any]) -> str | None:
+    if not bool(voice_state.get("audio_ready")):
+        return None
+    config = dict(task.get("config") or {})
+    dry_audio_key = str(config.get(DRY_TTS_CONFIG_KEY) or "").strip() or None
+    if dry_audio_key:
+        return dry_audio_key
+    legacy_audio_key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
+    if not legacy_audio_key:
+        return None
+    bgm_key = str((dict(config.get("bgm") or {})).get("bgm_key") or "").strip() or None
+    source_audio_keys = {
+        str(value).strip()
+        for value in (
+            bgm_key,
+            task_key(task, "raw_path"),
+            task_key(task, "raw_video_key"),
+            task_key(task, "mute_video_key"),
+            task_key(task, "mute_video_path"),
+        )
+        if str(value or "").strip()
+    }
+    return None if str(legacy_audio_key).strip() in source_audio_keys else str(legacy_audio_key)
 
 
 def _source_audio_bed_volume(value: float | None) -> float:
@@ -877,7 +902,7 @@ class CompositionService:
         # Resolve artifact keys
         source_audio_policy = source_audio_policy_from_task(live_task)
         video_key, video_has_source_audio = _resolve_compose_video_key(live_task, source_audio_policy)
-        audio_key = task_key(live_task, "mm_audio_key") or task_key(live_task, "mm_audio_path")
+        audio_key = _resolve_compose_voiceover_key(live_task, voice_state)
 
         if not video_key:
             compose_fail("missing_raw", "missing video source for compose")

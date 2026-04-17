@@ -39,7 +39,6 @@ from gateway.app.services.publish_service import publish_task_pack
 from gateway.app.services.scene_split import run_scenes_build
 from gateway.app.services.hot_follow_language_profiles import (
     get_hot_follow_language_profile,
-    hot_follow_audio_filename,
     hot_follow_subtitle_filename,
     hot_follow_subtitle_txt_filename,
 )
@@ -48,6 +47,7 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
 )
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, resolve_tts_voice
+from gateway.app.services.voice_state import DRY_TTS_CONFIG_KEY, DRY_TTS_ROLE
 from gateway.app.deps import get_task_repository
 from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
@@ -924,7 +924,6 @@ async def run_dub_step(req: DubRequest):
     req.voice_id = resolved_voice_id
     workspace = Workspace(req.task_id, target_lang=req.target_lang)
     subtitle_txt_artifact = f"subs/{hot_follow_subtitle_txt_filename(req.target_lang)}"
-    dubbed_audio_artifact = hot_follow_audio_filename(req.target_lang)
     origin_exists = workspace.origin_srt_path.exists()
     mm_exists = workspace.mm_srt_exists()
 
@@ -961,9 +960,19 @@ async def run_dub_step(req: DubRequest):
     if pipeline_config.get("no_subtitles") == "true":
         _fail_dub(req, "NO_SUBTITLES", provider)
 
-    existing_key = _get_task_mm_audio_key(req.task_id) or deliver_key(req.task_id, dubbed_audio_artifact)
+    current_task = get_task_repository().get(req.task_id) or {}
+    current_config = dict(current_task.get("config") or {}) if isinstance(current_task, dict) else {}
+    existing_key = str(current_config.get(DRY_TTS_CONFIG_KEY) or "").strip() or None
+    existing_provider = normalize_provider(
+        current_task.get("mm_audio_provider") if isinstance(current_task, dict) else None
+    )
+    existing_voice = str(
+        current_task.get("mm_audio_voice_id") if isinstance(current_task, dict) else ""
+    ).strip()
     if not req.force and existing_key:
         try:
+            if existing_provider != provider or existing_voice != str(req.voice_id or "").strip():
+                raise ValueError("existing dry TTS voice/provider mismatch")
             size, _ = assert_artifact_ready(
                 kind="audio",
                 key=existing_key,
@@ -990,6 +999,11 @@ async def run_dub_step(req: DubRequest):
                 last_step="dub",
                 dub_status="ready",
                 dub_error=None,
+                config={
+                    **current_config,
+                    DRY_TTS_CONFIG_KEY: existing_key,
+                    "tts_voiceover_asset_role": DRY_TTS_ROLE,
+                },
             )
             return {
                 "task_id": req.task_id,
@@ -1205,7 +1219,7 @@ async def run_dub_step(req: DubRequest):
                     target_lang=req.target_lang,
                     voice_id=req.voice_id,
                     provider=provider,
-                    force=req.force,
+                    force=True,
                     mm_srt_text=mm_text,
                     workspace=workspace,
                 ),
@@ -1263,7 +1277,7 @@ async def run_dub_step(req: DubRequest):
                 output_size, output_duration = assert_local_audio_ok(mp3_path)
             except ValueError:
                 _fail_dub(req, "EMPTY_OR_INVALID_AUDIO", provider)
-            out_key = deliver_key(req.task_id, dubbed_audio_artifact)
+            out_key = deliver_key(req.task_id, "voiceover/audio_mm.dry.mp3")
             storage = get_storage_service()
             uploaded_key = storage.upload_file(
                 str(mp3_path),
@@ -1305,6 +1319,11 @@ async def run_dub_step(req: DubRequest):
         last_step="dub",
         dub_status="ready",
         dub_error=None,
+        config={
+            **current_config,
+            DRY_TTS_CONFIG_KEY: audio_key,
+            "tts_voiceover_asset_role": DRY_TTS_ROLE,
+        },
     )
 
     edited_text = workspace.read_mm_edited_text()
