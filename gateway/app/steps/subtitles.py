@@ -107,6 +107,9 @@ _HOT_FOLLOW_PROTECTED_TERMS: tuple[str, ...] = (
     "free shipping",
 )
 
+PARSE_SOURCE_RAW_VIDEO_AUDIO = "raw_video_audio"
+PARSE_SOURCE_PRESERVED_AUDIO_HELPER = "preserved_source_audio_helper"
+
 
 def _env_int(name: str, default: int) -> int:
     value = os.getenv(name)
@@ -529,6 +532,7 @@ async def generate_subtitles(
     force: bool = False,
     translate_enabled: bool = True,
     use_ffmpeg_extract: bool = True,
+    parse_source_mode: str | None = None,
 ) -> dict:
     """Unified subtitles entry point used by the FastAPI route."""
 
@@ -537,6 +541,8 @@ async def generate_subtitles(
     backend = (settings.subtitles_backend or "").lower()
     asr_backend = settings.asr_backend
     asr_lang_hint = (os.getenv("SUBTITLES_ASR_LANG_HINT") or "").strip() or None
+    parse_source_mode = str(parse_source_mode or PARSE_SOURCE_RAW_VIDEO_AUDIO).strip() or PARSE_SOURCE_RAW_VIDEO_AUDIO
+    helper_only_parse_source = parse_source_mode == PARSE_SOURCE_PRESERVED_AUDIO_HELPER
 
     def log_stage(stage: str, **fields) -> None:
         logger.info(
@@ -553,6 +559,11 @@ async def generate_subtitles(
         )
 
     log_stage("SUB2_START")
+    log_stage(
+        "SUB2_PARSE_SOURCE_SELECTED",
+        parse_source_mode=parse_source_mode,
+        parse_source_authoritative_for_target=not helper_only_parse_source,
+    )
     logger.info(
         "Subtitles request started",
         extra={
@@ -725,6 +736,13 @@ async def generate_subtitles(
                 )
 
             if translate_enabled_local:
+                if helper_only_parse_source:
+                    translate_enabled_local = False
+                    log_stage(
+                        "SUB2_TR_SKIPPED_HELPER_ONLY_SOURCE",
+                        parse_source_mode=parse_source_mode,
+                    )
+            if translate_enabled_local:
                 tr_timeout_sec = _env_int("SUBTITLES_TR_TIMEOUT_SEC", 120)
                 tr_retries = _env_int("SUBTITLES_TR_RETRIES", 1)
                 for attempt in range(tr_retries + 1):
@@ -793,7 +811,7 @@ async def generate_subtitles(
 
             missing_indexes = (
                 _collect_missing_translation_indexes(segments, translations)
-                if translate_enabled_local
+                if translate_enabled_local or helper_only_parse_source
                 else []
             )
             if translate_enabled_local and missing_indexes:
@@ -840,7 +858,7 @@ async def generate_subtitles(
 
             missing_indexes = (
                 _collect_missing_translation_indexes(segments, translations)
-                if translate_enabled_local
+                if translate_enabled_local or helper_only_parse_source
                 else []
             )
             translated_count = len(segments) - len(missing_indexes)
@@ -866,14 +884,16 @@ async def generate_subtitles(
             for seg in segments:
                 idx = int(seg.get("index", 0))
                 translated_text = (translations.get(idx) or "").strip() if translations else ""
-                if translate_enabled_local:
+                if helper_only_parse_source:
+                    seg["mm"] = ""
+                elif translate_enabled_local:
                     seg["mm"] = translated_text
                 else:
                     seg["mm"] = str(seg.get("origin") or "")
 
-            mm_text = segments_to_srt(segments, "mm")
+            mm_text = "" if helper_only_parse_source else segments_to_srt(segments, "mm")
             if not mm_text.strip() and not translate_enabled_local:
-                mm_text = origin_text
+                mm_text = "" if helper_only_parse_source else origin_text
 
             scenes_payload = {
                 "version": "1.8",
@@ -944,6 +964,14 @@ async def generate_subtitles(
                 "translation_qa_path": relative_to_workspace(translation_qa_path),
                 "translation_qa": translation_qa_payload,
                 "translation_incomplete": not bool(translation_qa_payload["complete"]),
+                "parse_source_mode": parse_source_mode,
+                "parse_source_role": (
+                    "preserved_source_audio_helper"
+                    if helper_only_parse_source
+                    else "subtitle_source_helper"
+                ),
+                "parse_source_authoritative_for_target": not helper_only_parse_source,
+                "target_subtitle_authoritative": not helper_only_parse_source,
             }
         except Exception as exc:
             log_stage("SUB2_FAIL", error=str(exc))
@@ -969,15 +997,28 @@ async def generate_subtitles(
         try:
             from gateway.app.services import subtitles_openai
 
+            if helper_only_parse_source:
+                log_stage(
+                    "SUB2_TR_SKIPPED_HELPER_ONLY_SOURCE",
+                    parse_source_mode=parse_source_mode,
+                )
             result = await subtitles_openai.generate_with_openai(
                 task_id=task_id,
                 target_lang=target_lang,
                 force=force,
-                translate_enabled=translate_enabled,
+                translate_enabled=translate_enabled and not helper_only_parse_source,
                 use_ffmpeg_extract=use_ffmpeg_extract,
             )
             result["stream_probe"] = probe_result
             result["clean_video_generated"] = clean_generated
+            result["parse_source_mode"] = parse_source_mode
+            result["parse_source_role"] = (
+                "preserved_source_audio_helper"
+                if helper_only_parse_source
+                else "subtitle_source_helper"
+            )
+            result["parse_source_authoritative_for_target"] = not helper_only_parse_source
+            result["target_subtitle_authoritative"] = not helper_only_parse_source
             return result
         except subtitles_openai.SubtitleError as exc:
             return _write_no_subtitles_placeholders(

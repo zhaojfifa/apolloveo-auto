@@ -373,6 +373,7 @@ def hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text:
 
 
 def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     raw_source_text = hf_load_origin_subtitles_text(task)
     normalized_source_text = hf_load_normalized_source_text(task_id, task)
     edited_text = hf_load_subtitles_text(task_id, task)
@@ -402,12 +403,22 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
     )
     dub_input_text = edited_text if subtitle_ready else ""
     helper_source_text = normalized_source_text or raw_source_text
+    parse_source_role = (
+        str(pipeline_config.get("parse_source_role") or "").strip()
+        or ("subtitle_source_helper" if str(helper_source_text or "").strip() else "none")
+    )
+    parse_source_authoritative_for_target = (
+        str(pipeline_config.get("parse_source_authoritative_for_target") or "")
+        .strip()
+        .lower()
+        == "true"
+    )
     return {
         "raw_source_text": raw_source_text or "",
         "normalized_source_text": normalized_source_text or "",
         "parse_source_text": helper_source_text or "",
-        "parse_source_role": "subtitle_source_helper" if str(helper_source_text or "").strip() else "none",
-        "parse_source_authoritative_for_target": False,
+        "parse_source_role": parse_source_role if str(helper_source_text or "").strip() else "none",
+        "parse_source_authoritative_for_target": parse_source_authoritative_for_target,
         "edited_text": edited_text or "",
         "srt_text": srt_text or "",
         "primary_editable_text": edited_text or "",
