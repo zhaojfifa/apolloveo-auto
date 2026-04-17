@@ -27,3 +27,12 @@ def test_hot_follow_workbench_template_renders_advisory_as_secondary_guidance():
     assert "function renderAdvisory()" in script
     assert 'const advisory = (currentHub && currentHub.advisory) || null;' in script
     assert 'advisoryCardEl.classList.toggle("hidden", !hasAdvisory);' in script
+
+
+def test_hot_follow_workbench_preview_player_uses_tts_preview_truth_only():
+    script = Path("gateway/app/static/js/hot_follow_workbench.js").read_text(encoding="utf-8-sig")
+
+    assert "function resolveTtsPreviewUrl(audio)" in script
+    assert "return audioPayload.dub_preview_url || audioPayload.tts_voiceover_url || null;" in script
+    assert "media.voiceover_url" not in script
+    assert "audio.voiceover_url" not in script
