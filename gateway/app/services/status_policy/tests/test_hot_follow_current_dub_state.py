@@ -22,6 +22,7 @@ except Exception:
 
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.services import task_view_helpers
 from gateway.app.services import voice_state as voice_state_service
 from gateway.app.utils.pipeline_config import parse_pipeline_config
 
@@ -162,6 +163,126 @@ def test_preserved_bgm_artifact_does_not_count_as_current_tts_dub(monkeypatch):
     assert state["dub_current"] is False
     assert state["voiceover_url"] is None
     assert state["audio_artifact_role"] == "source_audio"
+
+
+def test_dub_download_route_rejects_preserved_bgm_audio_key(monkeypatch):
+    task_id = "hf-source-audio-download-not-dub"
+    task = {
+        "task_id": task_id,
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "dub_status": "done",
+        "mm_audio_key": f"deliver/tasks/{task_id}/bgm/user_bgm.mp3",
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "my-MM-NilarNeural",
+        "config": {
+            "source_audio_policy": "preserve",
+            "tts_requested_voice": "mm_female_1",
+            "tts_resolved_voice": "my-MM-NilarNeural",
+            "tts_provider": "azure-speech",
+            "bgm": {
+                "strategy": "keep",
+                "bgm_key": f"deliver/tasks/{task_id}/bgm/user_bgm.mp3",
+            },
+        },
+    }
+
+    class _Repo:
+        def get(self, requested_id):
+            assert requested_id == task_id
+            return task
+
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    monkeypatch.setattr(tasks_router, "object_exists", lambda _key: True)
+    monkeypatch.setattr(tasks_router, "object_head", lambda _key: {"content_length": "4096", "content_type": "audio/mpeg"})
+    _patch_voice_storage(
+        monkeypatch,
+        lambda _key: True,
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
+
+    with pytest.raises(Exception) as exc:
+        tasks_router._resolve_audio_meta(task_id, _Repo())
+
+    assert getattr(exc.value, "status_code", None) == 404
+
+
+def test_dub_download_route_uses_current_tts_voiceover_key(monkeypatch):
+    task_id = "hf-tts-download"
+    task = {
+        "task_id": task_id,
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "dub_status": "done",
+        "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "my-MM-NilarNeural",
+        "mm_audio_mime": "audio/mpeg",
+        "config": {
+            "tts_requested_voice": "mm_female_1",
+            "tts_resolved_voice": "my-MM-NilarNeural",
+            "tts_provider": "azure-speech",
+        },
+    }
+
+    class _Repo:
+        def get(self, requested_id):
+            assert requested_id == task_id
+            return task
+
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    monkeypatch.setattr(tasks_router, "object_exists", lambda key: str(key).endswith("audio_mm.mp3"))
+    monkeypatch.setattr(tasks_router, "object_head", lambda _key: {"content_length": "4096", "content_type": "audio/mpeg"})
+    _patch_voice_storage(
+        monkeypatch,
+        lambda key: str(key).endswith("audio_mm.mp3"),
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
+
+    key, size, content_type = tasks_router._resolve_audio_meta(task_id, _Repo())
+
+    assert key == f"deliver/tasks/{task_id}/audio_mm.mp3"
+    assert size == 4096
+    assert content_type == "audio/mpeg"
+
+
+def test_task_detail_audio_urls_hide_source_audio_artifact(monkeypatch):
+    task_id = "hf-detail-source-audio-not-dub"
+    task = {
+        "task_id": task_id,
+        "kind": "hot_follow",
+        "target_lang": "mm",
+        "dub_status": "done",
+        "mm_audio_key": f"deliver/tasks/{task_id}/bgm/user_bgm.mp3",
+        "mm_audio_path": f"deliver/tasks/{task_id}/bgm/user_bgm.mp3",
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "my-MM-NilarNeural",
+        "config": {
+            "source_audio_policy": "preserve",
+            "tts_requested_voice": "mm_female_1",
+            "tts_resolved_voice": "my-MM-NilarNeural",
+            "tts_provider": "azure-speech",
+            "bgm": {
+                "strategy": "keep",
+                "bgm_key": f"deliver/tasks/{task_id}/bgm/user_bgm.mp3",
+            },
+        },
+    }
+    monkeypatch.setattr(task_view_helpers, "get_settings", _settings)
+    monkeypatch.setattr(task_view_helpers, "object_exists", lambda _key: True)
+    _patch_voice_storage(
+        monkeypatch,
+        lambda _key: True,
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
+
+    paths = task_view_helpers.resolve_download_urls(task)
+
+    assert paths["mm_audio_path"] is None
+    assert paths["mm_audio_download_url"] is None
 
 
 def test_audio_config_marks_preserved_source_audio_as_not_tts_preview(monkeypatch):

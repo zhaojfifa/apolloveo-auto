@@ -255,6 +255,7 @@ from gateway.app.services.voice_state import (  # noqa: E402
     build_hot_follow_voice_options as _build_hot_follow_voice_options,
     collect_voice_execution_state as _collect_voice_execution_state,
     hf_audio_matches_expected as _hf_audio_matches_expected,
+    hf_current_voiceover_asset as _hf_current_voiceover_asset,
     hf_persisted_audio_state as _hf_persisted_audio_state,
     hot_follow_expected_provider as _hot_follow_expected_provider,
     resolve_hot_follow_provider_voice as _resolve_hot_follow_provider_voice,
@@ -634,33 +635,35 @@ def _resolve_audio_meta(task_id: str, repo) -> tuple[str, int, str]:
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="dubbed audio not found")
-    preferred = _task_value(task, "mm_audio_key") or _task_value(task, "mm_audio_path")
-    candidates = [str(k) for k in [preferred] if k]
-    seen = set()
-    chosen_key = None
-    chosen_size = 0
-    chosen_type = None
-    dub_status = str(_task_value(task, "dub_status") or "")
-    for key in candidates:
-        if key in seen:
-            continue
-        seen.add(key)
+    if str(_task_value(task, "kind") or "").strip().lower() == "hot_follow":
+        asset = _hf_current_voiceover_asset(task_id, task, get_settings())
+        chosen_key = str(asset.get("key") or "").strip() or None
+        if not chosen_key:
+            raise HTTPException(status_code=404, detail="voiceover_not_ready")
         try:
-            size, ctype = assert_artifact_ready(
+            chosen_size, chosen_type = assert_artifact_ready(
                 kind="audio",
-                key=key,
+                key=chosen_key,
                 exists_fn=object_exists,
                 head_fn=object_head,
             )
-            chosen_key = key
-            chosen_size = size
-            chosen_type = ctype
-            break
         except Exception:
-            continue
-    if not chosen_key:
-        raise HTTPException(status_code=404, detail="voiceover_not_ready")
-    content_type = str(chosen_type or _task_value(task, "mm_audio_mime") or "audio/mpeg")
+            raise HTTPException(status_code=404, detail="voiceover_not_ready")
+        content_type = str(chosen_type or asset.get("content_type") or _task_value(task, "mm_audio_mime") or "audio/mpeg")
+    else:
+        chosen_key = _task_value(task, "mm_audio_key") or _task_value(task, "mm_audio_path")
+        if not chosen_key:
+            raise HTTPException(status_code=404, detail="voiceover_not_ready")
+        try:
+            chosen_size, chosen_type = assert_artifact_ready(
+                kind="audio",
+                key=str(chosen_key),
+                exists_fn=object_exists,
+                head_fn=object_head,
+            )
+        except Exception:
+            raise HTTPException(status_code=404, detail="voiceover_not_ready")
+        content_type = str(chosen_type or _task_value(task, "mm_audio_mime") or "audio/mpeg")
     return chosen_key, int(chosen_size), content_type
 
 
@@ -1254,7 +1257,11 @@ def _deliverable_download_redirect(task_id: str, task: dict, kind: str) -> Redir
         filename = hot_follow_subtitle_txt_filename(target_lang)
         content_type = "text/plain"
     elif kind == "mm_audio":
-        key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
+        if str(task.get("kind") or "").strip().lower() == "hot_follow":
+            asset = _hf_current_voiceover_asset(task_id, task, get_settings())
+            key = str(asset.get("key") or "").strip() or None
+        else:
+            key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
         filename = hot_follow_audio_filename(target_lang)
         content_type = "audio/mpeg"
     elif kind == "publish_bundle":

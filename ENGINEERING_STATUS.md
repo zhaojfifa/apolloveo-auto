@@ -17,6 +17,7 @@ Hot Follow Status Truth Binding Alignment
 - Myanmar target subtitles now use the same source-copy / translation-incomplete currentness discipline as Vietnamese
 - `preserve original BGM/source audio` is bound into compose without being treated as current TTS dub
 - workbench diagnostics and preview binding now distinguish preserved source audio from current TTS voiceover
+- Hot Follow dub preview/download/file surfaces now bind to current true TTS voiceover instead of raw audio artifact presence
 - compose input selection now preserves source audio by using raw video as the carrier when `source_audio_policy=preserve`
 - source-audio policy now persists across pipeline config storage, task config, workbench BGM upload, and backend BGM upload defaults
 - workbench preview/player binding now uses explicit TTS preview fields instead of legacy voiceover aliases

@@ -342,8 +342,14 @@ def deliverable_url(task_id: str, task: dict, kind: str) -> Optional[str]:
         txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
         return signed_op_url(task_id, "mm_txt") if object_exists(txt_key) else None
     if kind == "mm_audio":
-        key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
-        return signed_op_url(task_id, "mm_audio") if key and object_exists(key) else None
+        if str(task.get("kind") or "").strip().lower() == "hot_follow":
+            from gateway.app.services.voice_state import hf_current_voiceover_asset
+
+            asset = hf_current_voiceover_asset(task_id, task, get_settings())
+            key = asset.get("key")
+        else:
+            key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
+        return signed_op_url(task_id, "mm_audio") if key and object_exists(str(key)) else None
     if kind == "edit_bundle_zip":
         return signed_op_url(task_id, "publish_bundle")
     return None
@@ -375,7 +381,13 @@ def deliverable_open_url(task_id: str, task: dict, kind: str) -> Optional[str]:
         txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
         return task_endpoint(task_id, "mm_txt") if object_exists(txt_key) else None
     if kind == "mm_audio":
-        key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
+        if str(task.get("kind") or "").strip().lower() == "hot_follow":
+            from gateway.app.services.voice_state import hf_current_voiceover_asset
+
+            asset = hf_current_voiceover_asset(task_id, task, get_settings())
+            key = asset.get("key")
+        else:
+            key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
         return task_endpoint(task_id, "audio") if key and object_exists(str(key)) else None
     if kind == "raw_video":
         key = task_key(task, "raw_path")
@@ -497,9 +509,12 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     )
     raw_key = task_key(task, "raw_path")
     raw_exists = bool(raw_key and object_exists(str(raw_key)))
-    voice_key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
-    voice_exists = bool(voice_key and object_exists(str(voice_key)))
     voice_state = collect_voice_execution_state(task, get_settings())
+    if str(task.get("kind") or "").strip().lower() == "hot_follow":
+        voice_exists = bool(voice_state.get("dub_current") and voice_state.get("voiceover_url"))
+    else:
+        voice_key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
+        voice_exists = bool(voice_key and object_exists(str(voice_key)))
     compose_status = str(task.get("compose_status") or "").lower()
     compose_last_status = str(
         task.get("compose_last_status") or compose_status
@@ -919,11 +934,7 @@ def resolve_download_urls(task: dict) -> dict[str, Optional[str]]:
         task_endpoint(task_id, "origin") if task.get("origin_srt_path") else None
     )
     mm_url = task_endpoint(task_id, "mm") if task.get("mm_srt_path") else None
-    audio_url = (
-        task_endpoint(task_id, "audio")
-        if task.get("mm_audio_key") or task.get("mm_audio_path")
-        else None
-    )
+    audio_url = deliverable_open_url(task_id, task, "mm_audio")
     mm_txt_url = task_endpoint(task_id, "mm_txt") if mm_url else None
     pack_key = task.get("pack_key")
     pack_type = task.get("pack_type")
@@ -1001,7 +1012,7 @@ def task_to_detail(task: dict) -> TaskDetail:
         "origin_srt_path": paths.get("origin_srt_path"),
         "mm_srt_path": paths.get("mm_srt_path"),
         "mm_audio_path": paths.get("mm_audio_path"),
-        "mm_audio_key": task.get("mm_audio_key"),
+        "mm_audio_key": task.get("mm_audio_key") if paths.get("mm_audio_path") else None,
         "pack_path": paths.get("pack_path"),
         "scenes_path": paths.get("scenes_path"),
         "scenes_status": scenes_status_from_ssot(task),
