@@ -1,5 +1,35 @@
 # VeoSop05 启动进度文档
 
+## PR-Hot Follow Asset Flow And Audio Policy Review Freeze
+
+日期：2026-04-17
+
+本节点完成：
+
+- 冻结 Hot Follow 当前 asset-flow / audio-policy review，不改 runtime 逻辑
+- 明确 source video、source audio、target subtitle、TTS voiceover、uploaded BGM、preview audio、final video 的 ownership 与 truth-source 边界
+- 明确 preserved source audio / BGM 只能作为 compose input lane，不能作为 dubbing truth
+- 明确当前 `mm_audio_key`、`/audio_mm`、`audio_url`、`mm_srt_path` 等属于兼容命名残留或兼容别名，不在本 PR 清理
+- 给出后续最小修复顺序：compose input binding sampling、source-audio policy persistence audit、preview/player binding audit、status truth binding audit、naming cleanup、deferred platformization
+
+本次收口说明：
+
+- 只新增 review 文档并更新执行日志
+- 不改 parse / subtitle / dub / compose / publish runtime
+- 不新增外部 API、不做 UI redesign、不启动 naming cleanup、不扩成 asset registry/platformization
+
+本节点验证：
+
+- 文档阅读与代码路径检查完成
+- `git status --short --branch` -> docs-only working tree
+- `git diff --stat` -> only `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md` plus new review doc
+
+剩余风险：
+
+- `docs/reviews/HOT_FOLLOW_STATE_PROBE_AND_FIX_PLAN_20260416.md` 不在当前 `main`，本次按用户要求从本地 review stash 读取作为输入；后续可单独补交该历史 review 文档
+- source-audio preserve 的真实混音观感仍需按 Hot Follow business regression 用真实素材抽样确认
+- `mm_*` compatibility naming 仍会带来理解成本，必须保持独立 migration PR
+
 ## PR-Source Audio Semantics Alignment / Operator Flow
 
 日期：2026-04-16
