@@ -1,5 +1,49 @@
 # VeoSop05 启动进度文档
 
+## PR-Compose Input Binding Audit / Source-Audio Bed Volume Fix
+
+日期：2026-04-17
+
+本节点完成：
+
+- 确认 preserve-original-BGM/source-audio 当前已选择 `raw_path` 作为 compose video carrier，mute 仍选择 `mute_video_key / mute_video_path`
+- 确认实际 ffmpeg compose command 在 preserve 分支已包含 `[0:a]` source-audio lane，但该 lane 复用了 `bgm_mix`
+- 修正 preserved source-audio bed 音量绑定：当 `bgm_mix=0`（例如 subtitle-only preset 写入）时，source-audio preserve 不再被渲染成 effectively muted
+- 保持 uploaded BGM mix、TTS voiceover truth、dub_current/audio_ready、preview/player 语义不变
+- 增加 compose command 回归，覆盖 TTS+mute、TTS+preserve、subtitle-only+preserve、preserve+uploaded-BGM 等分支
+
+确认根因：
+
+- compose input carrier selection 不是当前根因；preserve 模式已使用 raw video source
+- 根因在 ffmpeg/render binding：`_source_audio_filter_expr()` 将 preserved source audio 的 volume 绑定到 `bgm_mix`
+- 当 workbench/compose preset 将 `bgm_mix` 写为 `0` 时，preserve 分支虽然带入了 source-audio lane，但实际输出音轨被 `volume=0` 静音，表现与 mute 相同
+
+本次收口说明：
+
+- 只做 Hot Follow final compose audio input binding 的窄修复
+- 不做 UI wording、不清理 `mm_*` / `/audio_mm` / `audio_url` 命名
+- 不重写 compose ownership、不新增 pipeline、不改翻译桥、不改 subtitle/layout
+- preserved source audio / BGM 仍不满足 TTS dubbing truth、`audio_ready` 或 `dub_current`
+
+本节点验证：
+
+- Interpreter: `Python 3.11.15` via `python3.11`
+- FFmpeg: `imageio-ffmpeg 0.6.0` bundled binary `/opt/homebrew/lib/python3.11/site-packages/imageio_ffmpeg/binaries/ffmpeg-macos-aarch64-v7.1`（system `ffmpeg` / `ffprobe` 不存在）
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/tests/test_compose_video_master_duration.py` -> passed
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py -q` -> 9 passed
+- synthetic real-media compose verification:
+  - preserve/no-TTS final decoded audio RMS `0.0324`（not muted）
+  - mute/no-TTS final had no extractable audio stream
+  - TTS+preserve final contained source 440 Hz amplitude `553.4` and voice 880 Hz amplitude `1497.0`
+  - TTS+mute final contained voice 880 Hz amplitude `2996.9` and negligible 440 Hz leakage `0.0078`
+  - preserve command included `[0:a]`; mute command used `-an`; TTS+preserve command used `amix=inputs=2`
+
+剩余风险：
+
+- system `ffprobe` 不存在，本节点用 bundled ffmpeg decode/FFT/RMS 作为实际音频证据
+- 真实业务素材仍需按 Hot Follow business regression 抽样试听 source-audio bed 主观混音质量
+- `compose_service.py` 仍超过 service oversized threshold；本 PR 不做 thinning
+
 ## PR-Status Truth Binding Audit / Fix
 
 日期：2026-04-17

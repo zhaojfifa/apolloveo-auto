@@ -52,6 +52,7 @@ _MYANMAR_CHAR_RE = re.compile(r"[\u1000-\u109F\uAA60-\uAA7F\uA9E0-\uA9FF]")
 _SRT_TIME_RE = re.compile(
     r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
 )
+_SOURCE_AUDIO_BED_VOLUME_FLOOR = 0.35
 
 # ---------------------------------------------------------------------------
 # Module-level pure helpers (extracted from nested functions)
@@ -443,6 +444,16 @@ def _resolve_compose_video_key(task: dict, source_audio_policy: str) -> tuple[st
     if raw_key:
         return str(raw_key), str(source_audio_policy or "").strip().lower() == "preserve"
     return None, False
+
+
+def _source_audio_bed_volume(value: float | None) -> float:
+    try:
+        mix = float(value if value is not None else _SOURCE_AUDIO_BED_VOLUME_FLOOR)
+    except Exception:
+        mix = _SOURCE_AUDIO_BED_VOLUME_FLOOR
+    if mix <= 0:
+        return _SOURCE_AUDIO_BED_VOLUME_FLOOR
+    return max(0.0, min(1.0, mix))
 
 
 # ---------------------------------------------------------------------------
@@ -937,6 +948,9 @@ class CompositionService:
                 "audio_key": str(audio_key),
                 "bgm_key": str(bgm_key) if bgm_key else None,
                 "mix": bgm_mix,
+                "source_audio_input_key": str(video_key) if source_audio_available else None,
+                "source_audio_mix": _source_audio_bed_volume(bgm_mix) if source_audio_available else None,
+                "video_has_source_audio": bool(video_has_source_audio),
                 "source_audio_policy": source_audio_policy,
                 "source_audio_available": source_audio_available,
                 "overlay_subtitles": overlay_subtitles,
@@ -1205,8 +1219,11 @@ class CompositionService:
             base += f",apad,atrim=0:{video_duration:.3f}"
         return base + ",alimiter=limit=0.95[mix]"
 
-    def _source_audio_filter_expr(self, bgm_mix: float, compose_policy: str, video_duration: float) -> str:
-        base = f"[0:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume={bgm_mix}"
+    def _source_audio_filter_expr(self, source_audio_mix: float, compose_policy: str, video_duration: float) -> str:
+        base = (
+            "[0:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,"
+            f"volume={_source_audio_bed_volume(source_audio_mix):.3f}"
+        )
         if compose_policy == "match_video":
             base += f",apad,atrim=0:{video_duration:.3f}"
         return base

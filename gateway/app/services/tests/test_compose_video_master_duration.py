@@ -118,6 +118,7 @@ def test_preserve_source_audio_policy_mixes_voice_with_source_audio_bed(tmp_path
     inputs = _make_inputs()
     inputs.source_audio_policy = "preserve"
     inputs.source_audio_available = True
+    inputs.bgm_mix = 0.0
     captured: list[str] = []
 
     def _fake_run_ffmpeg(cmd, task_id, purpose, *, timeout=None):
@@ -131,6 +132,7 @@ def test_preserve_source_audio_policy_mixes_voice_with_source_audio_bed(tmp_path
 
     cmd_text = " ".join(captured)
     assert "[0:a]aformat" in cmd_text
+    assert "volume=0.350" in cmd_text
     assert "[1:a]aformat" in cmd_text
     assert "amix=inputs=2" in cmd_text
     assert "-an" not in captured
@@ -145,6 +147,7 @@ def test_preserve_source_audio_policy_carries_source_audio_for_subtitle_only_com
     inputs.subtitle_only_compose = True
     inputs.source_audio_policy = "preserve"
     inputs.source_audio_available = True
+    inputs.bgm_mix = 0.0
     captured: list[str] = []
 
     def _fake_run_ffmpeg(cmd, task_id, purpose, *, timeout=None):
@@ -158,7 +161,38 @@ def test_preserve_source_audio_policy_carries_source_audio_for_subtitle_only_com
 
     cmd_text = " ".join(captured)
     assert "[0:a]aformat" in cmd_text
+    assert "volume=0.350" in cmd_text
     assert "-map [mix]" in cmd_text
+    assert "-an" not in captured
+
+
+def test_preserve_source_audio_policy_keeps_source_bed_audible_when_uploaded_bgm_muted(tmp_path, monkeypatch):
+    service = CompositionService(storage=object(), settings=object())
+    ws = _make_workspace(tmp_path, video_duration=8.0, voice_duration=2.4)
+    bgm_path = tmp_path / "bgm.mp3"
+    bgm_path.write_bytes(b"bgm")
+    ws.bgm_path = bgm_path
+    inputs = _make_inputs()
+    inputs.source_audio_policy = "preserve"
+    inputs.source_audio_available = True
+    inputs.bgm_key = "deliver/tasks/hf/bgm/user_bgm.mp3"
+    inputs.bgm_mix = 0.0
+    captured: list[str] = []
+
+    def _fake_run_ffmpeg(cmd, task_id, purpose, *, timeout=None):
+        captured.extend(cmd)
+        ws.final_path.write_bytes(b"final")
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(service, "_run_ffmpeg", _fake_run_ffmpeg)
+
+    service._compose_voice_source_audio_bgm(ws, inputs)
+
+    cmd_text = " ".join(captured)
+    assert "[0:a]aformat" in cmd_text
+    assert "volume=0.350" in cmd_text
+    assert "[2:a]aformat=sample_fmts=fltp:sample_rates=48000:channel_layouts=stereo,volume=0.0" in cmd_text
+    assert "amix=inputs=3" in cmd_text
     assert "-an" not in captured
 
 

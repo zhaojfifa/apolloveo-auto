@@ -22,6 +22,7 @@ Hot Follow Status Truth Binding Alignment
 - workbench preview/player binding now uses explicit TTS preview fields instead of legacy voiceover aliases
 - Hot Follow board/summary readiness now follows computed ready gate truth instead of raw final/audio/publish compatibility artifacts
 - current business flow remains stable and non-blocking
+- preserved source-audio bed in final compose no longer inherits a zero BGM mix value as effective mute
 
 ## Remaining Structural Risks
 
