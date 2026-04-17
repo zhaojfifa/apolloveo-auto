@@ -187,10 +187,36 @@ def test_subtitle_lane_keeps_target_editor_empty_when_only_origin_exists(monkeyp
     )
 
     assert lane["raw_source_text"]
+    assert lane["parse_source_text"] == lane["raw_source_text"]
+    assert lane["parse_source_role"] == "subtitle_source_helper"
+    assert lane["parse_source_authoritative_for_target"] is False
     assert lane["edited_text"] == ""
     assert lane["primary_editable_text"] == ""
     assert lane["srt_text"] == ""
+    assert lane["dub_input_text"] == ""
+    assert lane["dub_input_source"] is None
     assert lane["subtitle_ready"] is False
+
+
+def test_myanmar_dub_input_does_not_fallback_to_source_when_target_missing(monkeypatch):
+    store = {
+        "deliver/tasks/hf-mm-dub/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\n\xe5\x8e\x9f\xe5\xa7\x8b\xe6\x96\x87\xe6\xa1\x88\n",
+    }
+
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+
+    dub_text = hf_router._hf_dub_input_text(
+        "hf-mm-dub",
+        {
+            "task_id": "hf-mm-dub",
+            "target_lang": "mm",
+            "origin_srt_path": "deliver/tasks/hf-mm-dub/origin.srt",
+        },
+    )
+
+    assert dub_text == ""
 
 
 def test_vi_dub_input_does_not_fallback_to_source_when_target_missing(monkeypatch):
