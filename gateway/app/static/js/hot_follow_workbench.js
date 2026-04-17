@@ -1440,6 +1440,8 @@
     const fd = new FormData();
     fd.append("file", file);
     fd.append("mix_ratio", bgmMixEl ? (bgmMixEl.value || "0.3") : "0.3");
+    const policy = String(((currentHub && currentHub.audio) || {}).source_audio_policy || (currentHub && currentHub.source_audio_policy) || "mute").trim().toLowerCase();
+    fd.append("strategy", policy === "preserve" ? "keep" : "replace");
     const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/bgm`, {
       method: "POST",
       body: fd,

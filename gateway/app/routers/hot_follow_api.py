@@ -1601,6 +1601,13 @@ def _build_hot_follow_create_data(data: dict[str, Any]) -> dict[str, Any]:
 
     settings = get_settings()
     config = dict(prepared.get("config") or {})
+    pipeline_config = parse_pipeline_config(prepared.get("pipeline_config"))
+    config["source_audio_policy"] = normalize_source_audio_policy(
+        config.get("source_audio_policy")
+        or pipeline_config.get("source_audio_policy")
+        or pipeline_config.get("bgm_strategy")
+        or pipeline_config.get("audio_strategy")
+    )
     profile = get_hot_follow_language_profile(target_lang)
     requested_voice = resolve_hot_follow_voice_id(
         target_lang,

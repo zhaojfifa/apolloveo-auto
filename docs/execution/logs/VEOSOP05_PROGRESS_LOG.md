@@ -1,5 +1,38 @@
 # VeoSop05 启动进度文档
 
+## PR-Source Audio Policy Persistence Audit / Fix
+
+日期：2026-04-17
+
+本节点完成：
+
+- 修正 `pipeline_config_to_storage()` 的 allowlist，使 `source_audio_policy`、`bgm_strategy`、`audio_strategy` 不再在落库时丢失
+- 将 Hot Follow create path 的 `source_audio_policy` 同步写入 `config.source_audio_policy`，避免只依赖 pipeline config 或 BGM strategy 推断
+- 修正 workbench BGM 上传：请求会携带当前 `source_audio_policy` 对应的 `strategy`
+- 修正 BGM 上传后端缺省策略：未显式传 `strategy` 时继承任务当前 source-audio policy，而不是默认 `replace`
+- 补充策略持久化回归，覆盖 preserve 任务上传 BGM 不被覆盖，以及显式 replace 可切回 mute
+
+本次收口说明：
+
+- 只做 PR-2 source-audio policy persistence audit/fix
+- 不做 compose input binding 新改动、不做 preview/player binding、不改 status truth projection
+- 不做 UI 语义重排、不清理 `mm_*` / `/audio_mm` / `audio_url` 兼容命名
+
+本节点验证：
+
+- Interpreter: `Python 3.11.15` via `python3.11`
+- `python3.11 -m py_compile gateway/app/utils/pipeline_config.py gateway/app/services/source_audio_policy.py gateway/app/services/media_helpers.py gateway/app/routers/hot_follow_api.py gateway/app/services/tests/test_source_audio_policy_persistence.py`
+- `node --check gateway/app/static/js/hot_follow_workbench.js`
+- `python3.11 -m pytest gateway/app/services/tests/test_source_audio_policy_persistence.py -q` -> 2 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_new_page_routes.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/tests/test_hf_compose_freshness.py -q` -> 77 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q` -> 14 passed
+
+剩余风险：
+
+- PR-3 preview/player binding audit/fix 仍需独立确认所有播放器只按冻结资产语义取源
+- PR-4 status truth binding audit/fix 仍需独立确认 task board、workbench、publish hub 不绕过 voice state / ready gate
+- compatibility naming cleanup 继续后置，不能与线路修复混在一起
+
 ## PR-Compose Input Binding Audit / Source-Audio Preserve Fix
 
 日期：2026-04-17
