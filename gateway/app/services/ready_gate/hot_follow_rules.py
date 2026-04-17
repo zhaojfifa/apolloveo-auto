@@ -120,15 +120,18 @@ def _extract_audio_ready(task: dict, state: dict) -> bool:
 
 
 def _extract_subtitle_artifact_exists(task: dict, state: dict) -> bool:
-    """Subtitle artifact exists in any known location."""
+    """Current target subtitle artifact exists.
+
+    Parse/source subtitles are helper evidence only. They must not satisfy
+    target-subtitle readiness when explicit subtitle truth is absent.
+    """
     subs = _d(state.get("subtitles"))
+    actual_source = str(subs.get("actual_burn_subtitle_source") or "").strip().lower()
+    target_source = bool(actual_source and actual_source not in {"origin.srt", "source.srt"})
     return bool(
-        subs.get("subtitle_artifact_exists")
-        or subs.get("actual_burn_subtitle_source")
-        or subs.get("edited_text")
-        or subs.get("srt_text")
+        (subs.get("subtitle_artifact_exists") and target_source)
+        or target_source
         or task.get("mm_srt_path")
-        or task.get("origin_srt_path")
     )
 
 

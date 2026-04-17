@@ -302,16 +302,10 @@ def hf_load_normalized_source_text(task_id: str, task: dict) -> str:
 
 
 def hf_dub_input_text(task_id: str, task: dict) -> str:
-    target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     edited = hf_load_subtitles_text(task_id, task)
     if str(edited or "").strip():
         return edited
-    if target_lang == "vi":
-        return ""
-    normalized = hf_load_normalized_source_text(task_id, task)
-    if str(normalized or "").strip():
-        return normalized
-    return hf_load_origin_subtitles_text(task)
+    return ""
 
 
 def hf_target_subtitle_currentness_state(
@@ -383,7 +377,6 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
     normalized_source_text = hf_load_normalized_source_text(task_id, task)
     edited_text = hf_load_subtitles_text(task_id, task)
     srt_text = edited_text or ""
-    dub_input_text = hf_dub_input_text(task_id, task) or ""
     target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     expected_key = hf_task_target_subtitle_key(task, target_lang) or task_key(task, "mm_srt_path")
     composed_key = str(task.get("final_source_subtitle_storage_key") or "").strip() or None
@@ -407,15 +400,21 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         target_currentness.get("target_subtitle_current_reason")
         or ("ready" if subtitle_ready else "subtitle_missing")
     )
+    dub_input_text = edited_text if subtitle_ready else ""
+    helper_source_text = normalized_source_text or raw_source_text
     return {
         "raw_source_text": raw_source_text or "",
         "normalized_source_text": normalized_source_text or "",
+        "parse_source_text": helper_source_text or "",
+        "parse_source_role": "subtitle_source_helper" if str(helper_source_text or "").strip() else "none",
+        "parse_source_authoritative_for_target": False,
         "edited_text": edited_text or "",
         "srt_text": srt_text or "",
         "primary_editable_text": edited_text or "",
         "primary_editable_format": "srt",
         "dub_input_text": dub_input_text,
         "dub_input_format": "srt" if hf_is_srt_text(dub_input_text) else "plain_text",
+        "dub_input_source": "target_subtitle" if dub_input_text else None,
         "actual_burn_subtitle_source": actual_burn_subtitle_source,
         "subtitle_artifact_exists": bool(subtitle_artifact_exists),
         "subtitle_ready": bool(subtitle_ready),

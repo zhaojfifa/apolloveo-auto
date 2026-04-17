@@ -204,6 +204,33 @@ def test_hot_follow_ready_gate_ignores_no_dub_when_audio_artifact_is_ready():
     assert "no_speech_detected" not in (gate.get("blocking") or [])
 
 
+def test_ready_gate_does_not_treat_origin_subtitle_as_target_ready():
+    state = compute_hot_follow_state(
+        {"task_id": "hf-origin-only", "origin_srt_path": "deliver/tasks/hf-origin-only/origin.srt"},
+        {
+            "task_id": "hf-origin-only",
+            "final": {"exists": False},
+            "audio": {
+                "status": "skipped",
+                "no_dub": True,
+                "no_dub_reason": "no_speech_detected",
+            },
+            "subtitles": {
+                "subtitle_artifact_exists": True,
+                "actual_burn_subtitle_source": "origin.srt",
+                "parse_source_text": "1\n00:00:00,000 --> 00:00:02,000\nsource lyric\n",
+                "parse_source_authoritative_for_target": False,
+                "edited_text": "",
+                "srt_text": "",
+            },
+        },
+    )
+
+    gate = state.get("ready_gate") or {}
+    assert gate.get("subtitle_ready") is False
+    assert "subtitle_not_ready" in (gate.get("blocking") or [])
+
+
 def test_resolve_mm_txt_text_prefers_target_subtitle_artifact_over_edited_text():
     resolved, used_fallback, fallback_source = _resolve_mm_txt_text(
         mm_txt_text="no subtitles",

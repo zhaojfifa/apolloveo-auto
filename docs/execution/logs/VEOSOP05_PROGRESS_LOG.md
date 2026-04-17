@@ -1,5 +1,51 @@
 # VeoSop05 启动进度文档
 
+## PR-Lane Separation Hardening For Source Audio, Voiceover, And Parse Truth
+
+日期：2026-04-17
+
+本节点完成：
+
+- 加固 Hot Follow 三条 lane 的 runtime 分界：preserved source audio/BGM、TTS voiceover、parse/subtitle source
+- `dub_input_text` 不再从 `origin.srt` / `origin_normalized.srt` fallback；只有当前 authoritative target subtitle 可进入 dub input
+- subtitle lane 显式投影 `parse_source_text`、`parse_source_role`、`parse_source_authoritative_for_target=false`，把 parse/source text 固定为 helper-only
+- ready gate 的 subtitle artifact fallback 不再让 `origin.srt` / source subtitle 或 loose edited text 满足 target subtitle readiness
+- 保留已修复的 voiceover preview/download 与 compose mute/preserve/TTS 行为
+
+确认 leakage points：
+
+- 非 Vietnamese 路径中 `_hf_dub_input_text()` / `hf_dub_input_text()` 仍会在无 target subtitle 时回退到 normalized/source subtitle text
+- ready gate fallback `_extract_subtitle_artifact_exists()` 仍把 `origin_srt_path`、loose `edited_text` / `srt_text` 当作 subtitle artifact evidence
+- 这两处会让 parse/source helper text 在 projection/gate 层显得接近 dub/subtitle truth，虽然 authoritative target subtitle currentness 已能拒绝 source-copy
+
+本次收口说明：
+
+- 只做 Hot Follow lane separation hardening
+- 不做 compose ownership、publish ownership、translation bridge、subtitle layout、platformization 或 broad naming cleanup
+- 不移除 `mm_*` / `/audio_mm` compatibility names
+- 不改变 source audio/BGM final compose bed 行为，也不改变真实 TTS voiceover truth-source
+
+本节点验证：
+
+- Interpreter: `Python 3.11.15` via `python3.11`
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/subtitle_helpers.py gateway/app/services/task_view.py gateway/app/services/ready_gate/hot_follow_rules.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py` -> passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q` -> 49 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q` -> 33 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_source_audio_policy_persistence.py -q` -> 50 passed
+- `node --check gateway/app/static/js/hot_follow_workbench.js` -> passed
+- targeted runtime assertions now cover:
+  - origin-only source subtitle remains helper-only and does not create dub input
+  - Myanmar and Vietnamese dub input do not fallback to source text when target subtitle is missing
+  - ready gate does not treat `origin.srt` as target subtitle ready
+  - preserved source audio/BGM still cannot satisfy current dub or fake voiceover download
+
+剩余风险：
+
+- requested review docs `HOT_FOLLOW_ASSET_FLOW_AND_AUDIO_POLICY_REVIEW_20260417.md` and `HOT_FOLLOW_STATE_PROBE_AND_FIX_PLAN_20260416.md` are not present in this checkout
+- parse/source classification is now explicit helper-only metadata, but deeper ASR/OCR/music/lyric semantic classification remains future scoped work
+- compatibility names remain historically ambiguous by design; naming cleanup stays separate
+- real-material business sampling is still needed for operator-facing subjective playback/mix review
+
 ## PR-Voiceover Asset Binding Fix After Compose Input Repair
 
 日期：2026-04-17
