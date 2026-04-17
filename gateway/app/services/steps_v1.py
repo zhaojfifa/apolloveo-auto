@@ -47,7 +47,11 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
 )
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, resolve_tts_voice
-from gateway.app.services.voice_state import DRY_TTS_CONFIG_KEY, DRY_TTS_ROLE
+from gateway.app.services.voice_state import (
+    DRY_TTS_CONFIG_KEY,
+    DRY_TTS_ROLE,
+    is_dry_tts_voiceover_key,
+)
 from gateway.app.deps import get_task_repository
 from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 from gateway.app.schemas import DubRequest, PackRequest, ParseRequest, SubtitlesRequest
@@ -962,7 +966,8 @@ async def run_dub_step(req: DubRequest):
 
     current_task = get_task_repository().get(req.task_id) or {}
     current_config = dict(current_task.get("config") or {}) if isinstance(current_task, dict) else {}
-    existing_key = str(current_config.get(DRY_TTS_CONFIG_KEY) or "").strip() or None
+    existing_key_raw = str(current_config.get(DRY_TTS_CONFIG_KEY) or "").strip() or None
+    existing_key = existing_key_raw if is_dry_tts_voiceover_key(existing_key_raw) else None
     existing_provider = normalize_provider(
         current_task.get("mm_audio_provider") if isinstance(current_task, dict) else None
     )
