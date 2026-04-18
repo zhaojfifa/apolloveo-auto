@@ -34,6 +34,9 @@ class _MutableFakeRepo(_FakeRepo):
         self.task.update(updates)
         return dict(self.task)
 
+    def upsert(self, _task_id: str, updates: dict) -> dict:
+        return self.update(_task_id, updates)
+
 
 def test_run_subtitles_step_consumes_result_contract_for_myanmar(monkeypatch, tmp_path):
     updates: list[dict] = []
@@ -58,7 +61,11 @@ def test_run_subtitles_step_consumes_result_contract_for_myanmar(monkeypatch, tm
     monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
     monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: updates.append(dict(kwargs)))
     monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda _task_id, payload: pipeline_updates.append(dict(payload)))
-    monkeypatch.setattr(steps_v1, "_upload_artifact", lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}")
+    monkeypatch.setattr(
+        steps_v1,
+        "_upload_artifact",
+        lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}",
+    )
     monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
     monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
     monkeypatch.setattr(steps_v1, "get_task_repository", lambda: _FakeRepo())
@@ -410,6 +417,130 @@ def test_run_dub_step_skips_empty_target_subtitle_instead_of_failing(monkeypatch
     assert pipeline["no_dub"] == "true"
     assert pipeline["dub_skip_reason"] == "target_subtitle_empty"
     assert (tmp_path / "hf-empty-dub" / "dub" / "no_dub.txt").exists()
+
+
+def test_run_dub_step_recovers_from_stale_no_dub_with_real_dry_tts_asset(monkeypatch, tmp_path):
+    updates: list[dict] = []
+    uploaded: dict[str, bytes] = {}
+    repo = _MutableFakeRepo(
+        {
+            "task_id": "hf-redub-real-asset",
+            "kind": "hot_follow",
+            "pipeline_config": {
+                "no_dub": "true",
+                "dub_skip_reason": "target_subtitle_empty",
+                "source_audio_policy": "preserve",
+            },
+            "config": {"tts_voiceover_key": None},
+        }
+    )
+
+    class _DubWorkspace:
+        def __init__(self, task_id: str, target_lang: str | None = None):
+            self.base_dir = tmp_path / task_id
+            self.subtitles_dir = self.base_dir / "subs"
+            self.audio_dir = self.base_dir / "audio"
+            self.subtitles_dir.mkdir(parents=True, exist_ok=True)
+            self.audio_dir.mkdir(parents=True, exist_ok=True)
+            suffix = "vi.srt" if str(target_lang or "").strip().lower() == "vi" else "mm.srt"
+            self.mm_txt_path = self.subtitles_dir / suffix.replace(".srt", ".txt")
+            self.mm_srt_path = self.subtitles_dir / suffix
+            self.origin_srt_path = self.subtitles_dir / "origin.srt"
+            self.mm_audio_path = self.audio_dir / "audio.wav"
+            self.mm_audio_mp3_path = self.audio_dir / "audio.mp3"
+            self.mm_srt_path.write_text("1\n00:00:00,000 --> 00:00:02,000\nမင်္ဂလာပါ\n", encoding="utf-8")
+
+        def mm_srt_exists(self) -> bool:
+            return self.mm_srt_path.exists()
+
+        def read_mm_edited_text(self) -> str:
+            return ""
+
+    class _DummyDb:
+        def query(self, *_args, **_kwargs):
+            return self
+
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def first(self):
+            return SimpleNamespace(pipeline_config=repo.task.get("pipeline_config"))
+
+        def close(self):
+            return None
+
+    class _Storage:
+        def upload_file(self, local_path, key, **_kwargs):
+            data = Path(local_path).read_bytes()
+            uploaded[str(key)] = data
+            return str(key)
+
+    async def _synthesize_voice(**kwargs):
+        workspace = kwargs["workspace"]
+        workspace.mm_audio_path.write_bytes(b"dry-tts-audio-bytes")
+        return {"audio_path": str(workspace.mm_audio_path), "provider": kwargs["provider"]}
+
+    def _update_task(_task_id, **kwargs):
+        updates.append(dict(kwargs))
+        repo.update(_task_id, kwargs)
+
+    def _assert_local_audio_ok(path):
+        size = Path(path).stat().st_size
+        if size <= 0:
+            raise ValueError("empty audio")
+        return size, 1.25
+
+    note_path = tmp_path / "hf-redub-real-asset" / "dub" / "no_dub.txt"
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+    note_path.write_text("reason=target_subtitle_empty\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        steps_v1.config,
+        "get_settings",
+        lambda: SimpleNamespace(
+            edge_tts_voice_map={"mm_female_1": "my-MM-NilarNeural"},
+            azure_tts_voice_map={},
+        ),
+    )
+    monkeypatch.setattr(steps_v1, "Workspace", _DubWorkspace)
+    monkeypatch.setattr(steps_v1, "SessionLocal", lambda: _DummyDb())
+    monkeypatch.setattr(steps_v1, "task_base_dir", lambda task_id: tmp_path / task_id)
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+    monkeypatch.setattr(steps_v1, "_append_event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(steps_v1, "_update_task", _update_task)
+    monkeypatch.setattr(steps_v1, "_upload_artifact", lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}")
+    monkeypatch.setattr(steps_v1, "get_storage_service", lambda: _Storage())
+    monkeypatch.setattr(steps_v1, "synthesize_voice", _synthesize_voice)
+    monkeypatch.setattr(steps_v1, "_truthy_env", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(steps_v1, "_ensure_mp3_audio", lambda path, mp3_path: Path(path))
+    monkeypatch.setattr(steps_v1, "assert_local_audio_ok", _assert_local_audio_ok)
+
+    result = asyncio.run(
+        steps_v1.run_dub_step(
+            DubRequest(
+                task_id="hf-redub-real-asset",
+                target_lang="my",
+                provider="edge-tts",
+                voice_id="mm_female_1",
+                force=True,
+            )
+        )
+    )
+
+    dry_key = "deliver/tasks/hf-redub-real-asset/voiceover/audio_mm.dry.mp3"
+    assert result["audio_mm_url"].endswith("/v1/tasks/hf-redub-real-asset/audio_mm")
+    assert uploaded[dry_key] == b"dry-tts-audio-bytes"
+    assert repo.task["mm_audio_key"] == dry_key
+    assert repo.task["mm_audio_bytes"] == len(b"dry-tts-audio-bytes")
+    assert repo.task["config"]["tts_voiceover_key"] == dry_key
+    assert repo.task["config"]["tts_voiceover_asset_role"] == "dry_tts_voiceover"
+    assert repo.task["dub_status"] == "ready"
+    assert repo.task["dub_error"] is None
+    assert note_path.exists() is False
+    pipeline = steps_v1.parse_pipeline_config(repo.task.get("pipeline_config"))
+    assert "no_dub" not in pipeline
+    assert "dub_skip_reason" not in pipeline
+    assert pipeline["source_audio_policy"] == "preserve"
 
 
 def test_subtitles_pipeline_state_distinguishes_no_subtitles_and_translation_incomplete():

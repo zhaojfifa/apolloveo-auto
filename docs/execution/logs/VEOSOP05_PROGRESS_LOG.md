@@ -1780,3 +1780,43 @@ Remaining risks:
 
 - Actual subtitle visibility still needs final confirmation in an FFmpeg-equipped environment because this local machine cannot render burned frames.
 - If operators still want tighter line height later, it should be handled only after renderer-safe visual evidence, not by reintroducing `ScaleY` in this path.
+
+## Hot Follow Dubbing Recovery Baseline Evidence
+
+日期：2026-04-19
+
+Recovery baseline:
+
+- Used `e970193` (`fix(dub): clear stale no-dub state after subtitle save`) as the last known-good dubbing baseline because it is the commit that restored the empty-subtitle skip -> valid subtitle save -> rerun dub transition.
+- Strict diff review from `e970193` to current `main` found no source delta in the requested dubbing/truth files: `hot_follow_api.py`, `steps_v1.py`, `voice_state.py`, `task_view.py`, `task_view_helpers.py`, `ready_gate/hot_follow_rules.py`, and `tasks.py`.
+- The current mainline commit `7a10f9a` is patch-equivalent to `e970193` for the dubbing recovery files; the later material source deltas are subtitle render-size changes in `compose_service.py` and related subtitle binding tests.
+
+Post-baseline break review:
+
+- No post-`e970193` change in the Hot Follow dubbing/audio truth files was found to roll back.
+- The later subtitle-size commits were intentionally not changed in this PR because this recovery scope forbids subtitle visual tuning.
+- Dubbing recovery was strengthened by adding focused regression evidence that valid target subtitle rerun clears stale no_dub state and uploads a non-empty dry TTS asset under the authoritative dry TTS key.
+
+What was corrected:
+
+- Added a regression test for the exact recovery path: stale `no_dub` pipeline state and marker, valid target subtitle, rerun dubbing, non-empty dry TTS upload, `config.tts_voiceover_key` persistence, `dub_status=ready`, and preserved source-audio policy coexistence.
+- Added fake-repository `upsert` support in the focused test helper so pipeline-config policy writes are exercised through the same service path.
+
+What was intentionally not changed:
+
+- Did not touch subtitle size tuning, subtitle render defaults, cleanup/mask behavior, or subtitle layout.
+- Did not redesign compose, publish, route ownership, dry TTS key naming, or lane policy.
+- Did not push new business logic into `tasks.py` or router projection.
+
+Verification results:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/steps_v1.py gateway/app/services/voice_state.py gateway/app/services/task_view.py gateway/app/services/task_view_helpers.py gateway/app/services/ready_gate/hot_follow_rules.py gateway/app/services/tests/test_steps_v1_subtitles_step.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_dub_step_recovers_from_stale_no_dub_with_real_dry_tts_asset -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_source_audio_policy_persistence.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+- Runtime-style asset evidence in the new focused test confirms uploaded dry TTS bytes are non-empty, stored at `deliver/tasks/<task_id>/voiceover/audio_mm.dry.mp3`, and bound through `config.tts_voiceover_key` with `tts_voiceover_asset_role=dry_tts_voiceover`.
+
+Remaining risks:
+
+- This local environment has no usable `./venv/bin/python`; verification used `python3.11` (`Python 3.11.15`) instead.
+- The new runtime-style asset evidence uses a mocked TTS provider/storage path and validates non-empty dry TTS handoff through the service contract; full live-provider/business-media sampling should still be run before merge if provider credentials and media fixtures are available.
