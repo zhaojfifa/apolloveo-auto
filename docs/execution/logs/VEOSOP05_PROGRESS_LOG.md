@@ -1745,3 +1745,38 @@ Remaining risks:
 
 - Actual rendered-frame visibility still needs confirmation in an FFmpeg-equipped environment because this local machine cannot render the burn output.
 - `ScaleY=96` remains a minimal style retune for line-height; if operator validation still reports renderer sensitivity, the next PR should remove line-height scaling entirely rather than changing burn/source or layout policy.
+
+## Hot Follow Subtitle Rollback And Safe Retune
+
+日期：2026-04-18
+
+Rollback target:
+
+- Rolled back the remaining risky subtitle render-layer change from the prior retune sequence by removing `ScaleY=96` from the Hot Follow subtitle layout profile, render signature, and FFmpeg `force_style`.
+- Returned the render parameter shape to the last known subtitle-visible baseline: no `ScaleY`, `MarginV=18`, `Alignment=2`, and `WrapStyle=1`.
+- Kept burn source selection, cleanup/mask behavior, container/block layout, wrap behavior, parse logic, dub logic, and compose ownership unchanged.
+
+Exact minimal retune values:
+
+- Myanmar/default and Chinese-style profiles keep only the safe font-size reduction: `FontSize=14.7`, about `0.92x` of the last visible `16` baseline.
+- Vietnamese/English profiles keep only the safe font-size reduction: `FontSize=13.8`, exactly `0.92x` of the last visible `15` baseline.
+- No line-height retune was applied because the only available runtime hook in this path was `ScaleY`, and the new PR boundary forbids changing it.
+
+What was intentionally not changed:
+
+- Did not change `MarginV`, `ScaleY`, `Alignment`, `WrapStyle`, subtitle block height, bottom offset, cleanup/mask behavior, operator controls, or config surface.
+- Did not change parse/source, dry TTS, no-dub compose behavior, final compose ownership, or Hot Follow lane policy.
+
+Verification results:
+
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+- Generated filter inspection confirms `FontSize=14.7`, `MarginV=18`, `Alignment=2`, `WrapStyle=1`, and no `ScaleY` for Myanmar defaults.
+- Repository scan confirms no runtime `ScaleY`, `MarginV=13`, `FontSize=13.4`, or `FontSize=12.6` remains under `gateway/app`; only focused negative test assertions mention `ScaleY`.
+- `which ffmpeg` failed because local `ffmpeg` is not installed; actual burned-frame visual verification could not be completed in this environment.
+
+Remaining risks:
+
+- Actual subtitle visibility still needs final confirmation in an FFmpeg-equipped environment because this local machine cannot render burned frames.
+- If operators still want tighter line height later, it should be handled only after renderer-safe visual evidence, not by reintroducing `ScaleY` in this path.

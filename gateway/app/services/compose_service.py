@@ -217,12 +217,12 @@ def _normalize_layout_lang(target_lang: str | None) -> str:
 def _subtitle_layout_profile(target_lang: str | None) -> dict[str, float | str]:
     lang = _normalize_layout_lang(target_lang)
     if lang == "zh":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 14.7, "margin_v": 18, "line_width": 11.5, "scale_y": 96}
+        return {"font_name": "Noto Sans Myanmar", "font_size": 14.7, "margin_v": 18, "line_width": 11.5}
     if lang == "en":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 13.8, "margin_v": 18, "line_width": 24.0, "scale_y": 96}
+        return {"font_name": "Noto Sans Myanmar", "font_size": 13.8, "margin_v": 18, "line_width": 24.0}
     if lang == "vi":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 13.8, "margin_v": 18, "line_width": 22.0, "scale_y": 96}
-    return {"font_name": "Noto Sans Myanmar", "font_size": 14.7, "margin_v": 18, "line_width": 13.0, "scale_y": 96}
+        return {"font_name": "Noto Sans Myanmar", "font_size": 13.8, "margin_v": 18, "line_width": 22.0}
+    return {"font_name": "Noto Sans Myanmar", "font_size": 14.7, "margin_v": 18, "line_width": 13.0}
 
 
 def subtitle_render_signature(*, target_lang: str | None, cleanup_mode: str | None) -> str:
@@ -236,7 +236,6 @@ def subtitle_render_signature(*, target_lang: str | None, cleanup_mode: str | No
             f"font={profile['font_name']}",
             f"size={float(profile['font_size']):.1f}",
             f"margin_v={int(profile['margin_v'])}",
-            f"scale_y={int(profile['scale_y'])}",
             f"line_width={float(profile['line_width']):.2f}",
             "align=2",
             "wrap=1",
@@ -409,7 +408,6 @@ def compose_subtitle_vf(
         f"FontSize={float(profile['font_size']):.1f},"
         "Outline=2,"
         "Shadow=1,"
-        f"ScaleY={int(profile['scale_y'])},"
         "Alignment=2,"
         f"MarginV={int(profile['margin_v'])},"
         "WrapStyle=1'"
