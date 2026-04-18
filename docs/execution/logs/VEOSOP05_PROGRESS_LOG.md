@@ -1540,3 +1540,45 @@ Remaining risks:
 
 - Legacy tasks that already stored source-derived target subtitle artifacts before this fix may need re-run or operator correction; this PR prevents new helper-only parse output from becoming target truth.
 - Route-level compatibility projection still exists for old callers, but it now only carries parse-lane role metadata and does not own parse policy.
+
+## Hot Follow Empty-Dub Compatibility
+
+日期：2026-04-18
+
+PR goal:
+
+- Treat empty target subtitle / empty dub input as a valid no-dub path instead of a TTS failure.
+- Keep dry TTS truth false when no TTS exists while allowing compose to proceed when the actual compose inputs are valid.
+
+Exact empty-dub semantic correction:
+
+- `MM_TXT_MISSING`, `MM_TXT_EMPTY`, `NO_SUBTITLES_MARKER`, and cleaned empty dub text no longer force a failed dub attempt for Hot Follow.
+- Empty target subtitle now records `dub_status=skipped`, `pipeline_config.no_dub=true`, and `dub_skip_reason=target_subtitle_empty`.
+- Empty cleaned dub input now records `dub_status=skipped`, `pipeline_config.no_dub=true`, and `dub_skip_reason=dub_input_empty`.
+- The skipped path clears dry-TTS artifact bindings, writes the no-dub marker, and exposes no fake dub preview/download/file.
+
+Scope completed:
+
+- Updated `run_dub_step()` empty-input handling to skip instead of fail before any TTS provider call.
+- Allowed no-dub compose paths to proceed without voiceover when the explicit skip reason is `target_subtitle_empty` or `dub_input_empty`.
+- Allowed subtitle-only/no-dub compose to skip subtitle overlay when no target subtitle key exists.
+- Updated workbench projection to display explicit empty-dub no_dub reasons instead of inferring failure.
+
+Intentionally not done:
+
+- Did not change source-audio preserve/mute lane semantics.
+- Did not change dry TTS artifact truth: no TTS still means `dub_current=false` and `audio_ready=false` for dubbing.
+- Did not redesign compose, publish, translation, subtitle layout, or compatibility naming.
+- Did not add new feature modes or external APIs.
+
+Verification results:
+
+- `python3.11 -m py_compile gateway/app/services/steps_v1.py gateway/app/services/subtitle_helpers.py gateway/app/services/compose_service.py gateway/app/services/task_view.py gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_source_audio_policy_persistence.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+- Focused regression evidence covers skipped empty dub without TTS invocation, no fake audio key, mute compose without TTS, preserve-source compose without TTS, missing subtitle overlay skip, and workbench no_dub projection.
+
+Remaining risks:
+
+- Existing tasks already marked `dub_status=failed` from older empty-dub runs may need a re-run to receive the new skipped/no_dub state.
+- This PR only admits empty-dub compose through existing supported compose inputs; it does not add new BGM/source-audio modes.

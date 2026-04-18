@@ -212,6 +212,26 @@ def _patch_validate_input_deps(monkeypatch):
     monkeypatch.setattr(compose_module.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
 
 
+def _patch_validate_input_deps_no_voice(monkeypatch):
+    monkeypatch.setattr(
+        compose_module,
+        "_with_live_hot_follow_subtitle_currentness",
+        lambda _task_id, task: dict(task),
+    )
+    monkeypatch.setattr(
+        compose_module,
+        "collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": False,
+            "audio_ready_reason": "dub_not_done",
+            "dub_current": False,
+        },
+    )
+    monkeypatch.setattr(compose_module, "object_exists", lambda _key: True)
+    monkeypatch.setattr(compose_module, "assert_artifact_ready", lambda **_kwargs: None)
+    monkeypatch.setattr(compose_module.shutil, "which", lambda _name: "/usr/bin/ffmpeg")
+
+
 def test_preserve_source_audio_policy_uses_raw_video_instead_of_mute_video(monkeypatch):
     _patch_validate_input_deps(monkeypatch)
     service = CompositionService(storage=object(), settings=object())
@@ -289,6 +309,94 @@ def test_mute_source_audio_policy_keeps_mute_video_input(monkeypatch):
     assert inputs.video_key == "deliver/tasks/hf-mute-input/mute.mp4"
     assert inputs.source_audio_policy == "mute"
     assert inputs.source_audio_available is False
+
+
+def test_no_dub_mute_compose_allows_missing_tts(monkeypatch):
+    _patch_validate_input_deps_no_voice(monkeypatch)
+    service = CompositionService(storage=object(), settings=object())
+
+    inputs = service._validate_inputs(
+        "hf-empty-dub-mute",
+        {
+            "task_id": "hf-empty-dub-mute",
+            "kind": "hot_follow",
+            "raw_path": "deliver/tasks/hf-empty-dub-mute/raw.mp4",
+            "mute_video_key": "deliver/tasks/hf-empty-dub-mute/mute.mp4",
+            "config": {"source_audio_policy": "mute"},
+            "pipeline_config": {
+                "no_dub": "true",
+                "dub_skip_reason": "target_subtitle_empty",
+                "source_audio_policy": "mute",
+            },
+            "compose_plan": {},
+        },
+        lambda *_args, **_kwargs: True,
+    )
+
+    assert inputs.audio_key is None
+    assert inputs.subtitle_only_compose is True
+    assert inputs.video_key == "deliver/tasks/hf-empty-dub-mute/mute.mp4"
+    assert inputs.source_audio_policy == "mute"
+
+
+def test_no_dub_preserve_compose_allows_missing_tts_with_source_audio(monkeypatch):
+    _patch_validate_input_deps_no_voice(monkeypatch)
+    service = CompositionService(storage=object(), settings=object())
+
+    inputs = service._validate_inputs(
+        "hf-empty-dub-preserve",
+        {
+            "task_id": "hf-empty-dub-preserve",
+            "kind": "hot_follow",
+            "raw_path": "deliver/tasks/hf-empty-dub-preserve/raw.mp4",
+            "mute_video_key": "deliver/tasks/hf-empty-dub-preserve/mute.mp4",
+            "config": {"source_audio_policy": "preserve"},
+            "pipeline_config": {
+                "has_audio": "true",
+                "no_dub": "true",
+                "dub_skip_reason": "target_subtitle_empty",
+                "source_audio_policy": "preserve",
+            },
+            "compose_plan": {},
+        },
+        lambda *_args, **_kwargs: True,
+    )
+
+    assert inputs.audio_key is None
+    assert inputs.subtitle_only_compose is True
+    assert inputs.video_key == "deliver/tasks/hf-empty-dub-preserve/raw.mp4"
+    assert inputs.source_audio_policy == "preserve"
+    assert inputs.source_audio_available is True
+
+
+def test_no_dub_compose_skips_missing_subtitle_overlay(monkeypatch, tmp_path):
+    class _Storage:
+        def download_file(self, key: str, destination_path: str) -> None:
+            assert key == "deliver/tasks/hf-empty-dub/raw.mp4"
+            Path(destination_path).write_bytes(b"video")
+
+    monkeypatch.setattr(compose_module, "assert_local_video_ok", lambda _path: (1200, 6.0))
+    monkeypatch.setattr(compose_module, "object_head", lambda _key: {})
+
+    service = CompositionService(storage=_Storage(), settings=object())
+    inputs = _make_inputs()
+    inputs.video_key = "deliver/tasks/hf-empty-dub/raw.mp4"
+    inputs.audio_key = None
+    inputs.subtitle_only_compose = True
+    inputs.overlay_subtitles = True
+
+    ws = service._prepare_workspace(
+        "hf-empty-dub",
+        {"task_id": "hf-empty-dub", "kind": "hot_follow"},
+        inputs,
+        tmp_path,
+        subtitle_resolver=lambda *_args, **_kwargs: None,
+    )
+
+    assert ws.voice_path is None
+    assert ws.subtitle_path is None
+    assert ws.overlay_subtitles is False
+    assert ws.compose_warning == "subtitle_overlay_skipped_empty_no_dub"
 
 
 def test_preserve_source_audio_policy_disables_source_lane_when_probe_says_no_audio(monkeypatch):

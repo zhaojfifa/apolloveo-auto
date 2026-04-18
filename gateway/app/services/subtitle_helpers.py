@@ -515,6 +515,7 @@ def hot_follow_dub_route_state(
 
 
 def hot_follow_no_dub_updates(route_state: dict[str, Any]) -> dict[str, Any]:
+    reason = str(route_state.get("dub_skip_reason") or "").strip()
     return {
         "last_step": "dub",
         "dub_status": "skipped",
@@ -522,7 +523,7 @@ def hot_follow_no_dub_updates(route_state: dict[str, Any]) -> dict[str, Any]:
         "compose_status": "pending",
         "pipeline_config_updates": {
             "no_dub": "true",
-            "dub_skip_reason": (
+            "dub_skip_reason": reason or (
                 "subtitle_led"
                 if route_state.get("content_mode") == "subtitle_led"
                 else "no_speech_detected"
@@ -538,6 +539,11 @@ def hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
     route_state = hf_dual_channel_state(task_id, task, subtitle_lane)
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     no_dub = pipeline_config.get("no_dub") == "true"
+    no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
+    ).strip().lower()
+    if no_dub and no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
+        return True
     no_dub = no_dub or bool(
         str(route_state.get("content_mode") or "").strip().lower() == "silent_candidate"
         and not str(subtitle_lane.get("dub_input_text") or "").strip()
