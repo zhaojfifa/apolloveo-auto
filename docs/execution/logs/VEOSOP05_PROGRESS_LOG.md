@@ -1582,3 +1582,47 @@ Remaining risks:
 
 - Existing tasks already marked `dub_status=failed` from older empty-dub runs may need a re-run to receive the new skipped/no_dub state.
 - This PR only admits empty-dub compose through existing supported compose inputs; it does not add new BGM/source-audio modes.
+
+## Hot Follow No-Dub Compose Allowance
+
+日期：2026-04-18
+
+PR goal:
+
+- Allow Hot Follow final compose without TTS when explicit no-dub semantics are active and the actual final compose inputs are valid.
+- Keep dubbing truth false for no-TTS cases while preventing workbench/status projection from treating absent TTS as an automatic compose blocker.
+
+Exact semantic separation fixed:
+
+- Ready-gate evaluation now has an explicit `no_dub_compose_allowed` signal for `target_subtitle_empty` and `dub_input_empty`.
+- Empty no-dub compose allowance bypasses subtitle/no-dub blocking reasons, but does not set `audio_ready`, `dub_current`, or `compose_ready` without a current final.
+- Workbench hub projection now exposes `compose_allowed=true` / `compose_allowed_reason=no_dub_inputs_ready` when raw or mute video inputs exist and no-dub compose is explicitly allowed.
+- Composed-state projection no longer reports `missing_voiceover` for explicit empty no-dub cases; it reports the real remaining compose state such as `final_missing`.
+- Quick compose UI can enable compose for explicit no-dub allowance while still displaying dubbing as skipped/not ready.
+
+Scope completed:
+
+- Updated ready-gate rules, evaluator output, and Hot Follow workbench hub projection.
+- Updated composed-state reason selection to separate no-dub compose allowance from dry TTS readiness.
+- Updated workbench JS compose gating/display for the no-dub allowed path.
+- Added focused regression coverage for empty no-dub ready-gate behavior, non-empty no-dub blocking behavior, composed-state reason selection, and workbench hub projection.
+
+Intentionally not done:
+
+- Did not change dry TTS generation, preview/download binding, or dub truth ownership.
+- Did not change source-audio preserve/mute lane semantics.
+- Did not change parse/subtitle source lane policy.
+- Did not redesign compose, publish, task router ownership, or compatibility naming.
+
+Verification results:
+
+- `python3.11 -m py_compile gateway/app/services/ready_gate/hot_follow_rules.py gateway/app/services/ready_gate/engine.py gateway/app/services/status_policy/hot_follow_state.py gateway/app/services/task_view.py gateway/app/services/task_view_helpers.py gateway/app/services/compose_service.py gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_source_audio_policy_persistence.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+- `node --check gateway/app/static/js/hot_follow_workbench.js`
+- Focused regression evidence covers empty no-dub ready-gate bypass without dubbing truth, non-empty no-dub reasons still blocking when subtitle truth is missing, composed-state `final_missing` instead of `missing_voiceover`, and workbench hub `compose_allowed=true` while `audio_ready=false`.
+
+Remaining risks:
+
+- Existing historical tasks may still need re-run if they were persisted with older failed/blocked empty-dub state.
+- This PR only updates compose allowance/projection for already-supported final input paths; it does not add new source-audio or BGM compose modes.

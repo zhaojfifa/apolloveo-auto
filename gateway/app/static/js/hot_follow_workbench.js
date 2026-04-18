@@ -344,12 +344,17 @@
     const hasVoiceover = Boolean(resolveTtsPreviewUrl(audio));
     const deliverableDone = Boolean(audio.deliverable_audio_done);
     const audioReady = Boolean(audio.audio_ready);
+    const noDub = Boolean((currentHub && currentHub.no_dub) || audio.no_dub);
+    const noDubReason = String((currentHub && currentHub.no_dub_reason) || audio.no_dub_reason || "").trim();
 
     if (["running", "processing", "queued"].includes(status) || reason === "dub_running") {
       return { status: "running", message: "Dubbing running..." };
     }
     if (status === "failed") {
       return { status: "failed", message: audio.error ? `Audio error: ${audio.error}` : "Audio failed." };
+    }
+    if (noDub) {
+      return { status: "skipped", message: noDubReason ? `Dubbing skipped: ${noDubReason}` : "Dubbing skipped." };
     }
     if (status === "done" && audioReady && deliverableDone && hasVoiceover) {
       return { status: "done", message: "Current voiceover ready." };
@@ -757,6 +762,9 @@
     const noDubReason = String((currentHub && currentHub.no_dub_reason) || "").trim().toLowerCase();
     const subtitleReady = Boolean(currentHub && currentHub.subtitle_ready);
     const speechDetected = Boolean(currentHub && currentHub.speech_detected);
+    const composeAllowed = Boolean(currentHub && currentHub.compose_allowed);
+    const noDubComposeAllowed = Boolean(currentHub && currentHub.ready_gate && currentHub.ready_gate.no_dub_compose_allowed);
+    if (noDub && (composeAllowed || noDubComposeAllowed) && ["target_subtitle_empty", "dub_input_empty"].includes(noDubReason)) return true;
     return Boolean(
       subtitleReady
       && (contentMode === "silent_candidate" || noDub)
@@ -1117,6 +1125,7 @@
     const subReady = Boolean(readyGate.subtitle_ready);
     const audioReady = Boolean(readyGate.audio_ready);
     const noDub = Boolean((currentHub && currentHub.audio || {}).no_dub);
+    const noDubComposeAllowed = Boolean((currentHub && currentHub.ready_gate && currentHub.ready_gate.no_dub_compose_allowed) || (currentHub && currentHub.compose_allowed && currentHub.no_dub));
     const composeReady = Boolean(readyGate.compose_ready);
     bar.classList.remove("hidden");
     const subIcon = document.getElementById("hf_cq_subtitle_icon");
@@ -1134,13 +1143,14 @@
     }
     if (statusText) {
       if (composeReady) statusText.textContent = "已合成完成";
+      else if (noDubComposeAllowed) statusText.textContent = "可以合成（无需配音）";
       else if (subReady && (audioReady || noDub)) statusText.textContent = "可以合成";
       else if (subReady) statusText.textContent = "等待配音就绪...";
       else if (noDub) statusText.textContent = "等待字幕（可手工输入）...";
       else statusText.textContent = "等待字幕就绪...";
     }
     if (composeBtn) {
-      const canCompose = subReady && (audioReady || noDub) && !composeReady;
+      const canCompose = ((subReady && (audioReady || noDub)) || noDubComposeAllowed) && !composeReady;
       composeBtn.disabled = !canCompose;
       if (composeReady) composeBtn.textContent = "已合成";
     }

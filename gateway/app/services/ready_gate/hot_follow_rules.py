@@ -153,6 +153,13 @@ def _extract_no_dub(task: dict, state: dict) -> bool:
     return bool(audio.get("no_dub"))
 
 
+def _extract_no_dub_compose_allowed(task: dict, state: dict) -> bool:
+    """No-dub mode may bypass subtitle/audio blockers for final compose input checks."""
+    audio = _d(state.get("audio"))
+    reason = str(audio.get("no_dub_reason") or "").strip().lower()
+    return bool(audio.get("no_dub")) and reason in {"target_subtitle_empty", "dub_input_empty"}
+
+
 # ---------------------------------------------------------------------------
 # Reason extract functions
 # ---------------------------------------------------------------------------
@@ -189,6 +196,7 @@ _SIGNAL_EXTRACTORS = {
     "subtitle_artifact_exists": _extract_subtitle_artifact_exists,
     "subtitle_ready": _extract_subtitle_ready,
     "no_dub": _extract_no_dub,
+    "no_dub_compose_allowed": _extract_no_dub_compose_allowed,
 }
 
 _REASON_EXTRACTORS = {
