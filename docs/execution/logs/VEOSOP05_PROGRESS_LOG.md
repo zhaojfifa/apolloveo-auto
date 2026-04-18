@@ -1780,3 +1780,35 @@ Remaining risks:
 
 - Actual subtitle visibility still needs final confirmation in an FFmpeg-equipped environment because this local machine cannot render burned frames.
 - If operators still want tighter line height later, it should be handled only after renderer-safe visual evidence, not by reintroducing `ScaleY` in this path.
+
+## Hot Follow Forced Dubbing Runtime Rollback To e970193
+
+日期：2026-04-19
+
+Rollback action:
+
+- Created `fix/hf-force-rollback-to-e970193` from latest `main`.
+- Forced the Hot Follow dubbing runtime files back to `e970193` using `git restore --source=e970193`.
+- Restored runtime scope: `gateway/app/routers/hot_follow_api.py`, `gateway/app/services/steps_v1.py`, `gateway/app/services/voice_state.py`, `gateway/app/services/task_view.py`, `gateway/app/services/task_view_helpers.py`, `gateway/app/services/ready_gate/hot_follow_rules.py`, and `gateway/app/routers/tasks.py`.
+- The restored runtime files were already byte-identical to current `main`, so the PR records the forced rollback action and verification evidence without changing subtitle visual tuning or unrelated runtime code.
+
+Preserved behavior:
+
+- Empty target subtitle remains an explicit skipped/no_dub path.
+- Saving valid authoritative/current target subtitle clears stale skipped/no_dub state.
+- Rerun dubbing after subtitle save keeps the dry TTS path bound to `voiceover/audio_mm.dry.mp3`.
+- Preserve source audio remains final-compose lane state, not dub truth.
+- no_dub compose allowance remains intact.
+
+Verification results:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/steps_v1.py gateway/app/services/voice_state.py gateway/app/services/task_view.py gateway/app/services/task_view_helpers.py gateway/app/services/ready_gate/hot_follow_rules.py gateway/app/services/tests/test_steps_v1_subtitles_step.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_dub_step_skips_empty_target_subtitle_instead_of_failing gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_clear_no_dub_pipeline_flags_removes_stale_skip_marker gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py::test_hot_follow_rerun_forces_redub_even_when_voice_is_unchanged gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py::test_successful_redub_persists_current_subtitle_snapshot gateway/app/services/tests/test_compose_video_master_duration.py::test_compose_voice_input_uses_dry_tts_key_not_legacy_audio_lane -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py -q`
+- Runtime-style asset evidence from the existing redub snapshot test confirms rerun dubbing records non-zero audio evidence (`audio_sha256=SHA_DUB`) after a stale `dub/no_dub.txt` marker, and dry TTS compose selection remains bound to `config.tts_voiceover_key`.
+
+Remaining risks:
+
+- Local validation used `python3.11` (`Python 3.11.15`) because this checkout has no usable `./venv/bin/python` / `venv/bin/python`.
+- Live-provider validation should still be run in an environment with provider credentials and representative media fixtures.
