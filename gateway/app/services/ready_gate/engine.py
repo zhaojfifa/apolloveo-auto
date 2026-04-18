@@ -160,6 +160,7 @@ def evaluate_ready_gate(
     elif (
         signals.get("no_dub", False)
         and not signals.get("subtitle_ready", False)
+        and not signals.get("no_dub_compose_allowed", False)
         and reasons.get("no_dub_reason")
     ):
         compose_reason = reasons["no_dub_reason"]
@@ -182,6 +183,9 @@ def evaluate_ready_gate(
             "audio_ready_reason",
             str(audio.get("audio_ready_reason") or ("ready" if audio_ready else "audio_not_ready")),
         ),
+        "no_dub": signals.get("no_dub", False),
+        "no_dub_reason": reasons.get("no_dub_reason", ""),
+        "no_dub_compose_allowed": signals.get("no_dub_compose_allowed", False),
         "compose_ready": compose_ready,
         "publish_ready": gates.get("publish_ready", compose_ready),
         "compose_reason": compose_reason,

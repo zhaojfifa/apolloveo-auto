@@ -696,6 +696,28 @@ def build_hot_follow_workbench_hub(
     route_state = dual_channel_state_loader(task_id, task_runtime, subtitle_lane, subtitles_step_done=_sub_step_done)
     audio_cfg = audio_config_loader(task_runtime)
     voice_state = voice_execution_state_loader(task_runtime, settings_obj)
+    stored_no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task_runtime.get("dub_skip_reason") or ""
+    ).strip()
+    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
+        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
+        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    )
+    if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
+        no_dub = False
+    if stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
+        no_dub_reason = stored_no_dub_reason
+    elif route_state.get("content_mode") == "subtitle_led":
+        no_dub_reason = "subtitle_led"
+    elif route_state.get("content_mode") == "silent_candidate":
+        no_dub_reason = "no_speech_detected"
+    else:
+        no_dub_reason = None
+    if not no_dub:
+        no_dub_reason = None
+    no_dub_compose_allowed = bool(
+        no_dub and str(no_dub_reason or "").strip().lower() in {"target_subtitle_empty", "dub_input_empty"}
+    )
     persisted_audio = persisted_audio_state_loader(task_id, task_runtime)
     target_lang_internal = normalize_target_lang(task_runtime.get("target_lang") or task_runtime.get("content_lang") or "mm")
     text_guard = clean_and_analyze_dub_text(subtitles_text or "", target_lang_internal)
@@ -822,11 +844,9 @@ def build_hot_follow_workbench_hub(
             "dub_current_reason": voice_state.get("dub_current_reason"),
             "dub_source_audio_fit_max_speed": voice_state.get("dub_source_audio_fit_max_speed"),
             "current_audio_fit_max_speed": voice_state.get("current_audio_fit_max_speed"),
-            "no_dub": bool(route_state.get("content_mode") in {"silent_candidate", "subtitle_led_candidate"} and not str(subtitle_lane.get("dub_input_text") or "").strip()),
-            "no_dub_reason": (
-                "subtitle_led" if route_state.get("content_mode") == "subtitle_led"
-                else ("no_speech_detected" if route_state.get("content_mode") == "silent_candidate" else None)
-            ),
+            "no_dub": bool(no_dub),
+            "no_dub_reason": no_dub_reason,
+            "no_dub_compose_allowed": no_dub_compose_allowed,
         },
         "scenes": {
             "status": scenes_status,
@@ -948,6 +968,32 @@ def build_hot_follow_workbench_hub(
         "compose": {"status": compose_state, "summary": compose_summary, "updated_at": task.get("updated_at")},
     }
     payload = state_computer(task_runtime, payload)
+    final_input_video_ready = bool(raw_url or mute_url)
+    subtitle_ready_for_compose = bool(subtitle_lane.get("subtitle_ready"))
+    compose_allowed = bool(
+        final_input_video_ready
+        and (
+            bool(no_dub_compose_allowed)
+            or (bool(voice_state.get("audio_ready")) and subtitle_ready_for_compose)
+        )
+    )
+    if compose_allowed:
+        compose_allowed_reason = "no_dub_inputs_ready" if no_dub_compose_allowed else "voiceover_ready"
+    elif not final_input_video_ready:
+        compose_allowed_reason = "missing_raw"
+    elif not subtitle_ready_for_compose and not no_dub_compose_allowed:
+        compose_allowed_reason = "subtitle_not_ready"
+    elif no_dub and not no_dub_compose_allowed:
+        compose_allowed_reason = str(no_dub_reason or "no_dub_not_allowed")
+    else:
+        compose_allowed_reason = str(voice_state.get("audio_ready_reason") or "audio_not_ready")
+    payload["compose_allowed"] = compose_allowed
+    payload["compose_allowed_reason"] = compose_allowed_reason
+    ready_gate = payload.get("ready_gate")
+    if isinstance(ready_gate, dict):
+        ready_gate["compose_allowed"] = compose_allowed
+        ready_gate["compose_allowed_reason"] = compose_allowed_reason
+        ready_gate["no_dub_compose_allowed"] = bool(no_dub_compose_allowed)
     if backfill_compose_done(repo, task_id, task, bool(payload.get("composed_ready"))):
         latest = repo.get(task_id) or task
         latest_runtime = dict(latest)
@@ -955,6 +1001,13 @@ def build_hot_follow_workbench_hub(
         latest_runtime["target_subtitle_current"] = bool(latest_lane.get("target_subtitle_current"))
         latest_runtime["target_subtitle_current_reason"] = latest_lane.get("target_subtitle_current_reason")
         payload = state_computer(latest_runtime, payload)
+        payload["compose_allowed"] = compose_allowed
+        payload["compose_allowed_reason"] = compose_allowed_reason
+        ready_gate = payload.get("ready_gate")
+        if isinstance(ready_gate, dict):
+            ready_gate["compose_allowed"] = compose_allowed
+            ready_gate["compose_allowed_reason"] = compose_allowed_reason
+            ready_gate["no_dub_compose_allowed"] = bool(no_dub_compose_allowed)
         task = latest
 
     final_url = str(

@@ -21,6 +21,7 @@ Hot Follow Status Truth Binding Alignment
 - Hot Follow dry TTS voiceover now has a dedicated authoritative key for dubbing preview/download/currentness, separated from final BGM/source-audio compose inputs
 - Hot Follow dubbing truth now requires the strict dry TTS object shape under `config.tts_voiceover_key`; legacy `mm_audio_key` alone no longer satisfies dub semantics
 - Hot Follow empty target subtitle / empty dub input now resolves to explicit `no_dub` skipped semantics instead of a failed TTS attempt
+- Hot Follow final compose allowance now permits explicit empty-target/empty-input `no_dub` paths when final compose inputs are valid, without marking dub truth ready
 - Hot Follow parse/source helper text is now separated from authoritative target subtitle and dub-input truth
 - compose input selection now preserves source audio by using raw video as the carrier when `source_audio_policy=preserve`
 - source-audio policy now persists across pipeline config storage, task config, workbench BGM upload, and backend BGM upload defaults

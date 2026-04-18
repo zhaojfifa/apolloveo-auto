@@ -515,6 +515,12 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     else:
         voice_key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
         voice_exists = bool(voice_key and object_exists(str(voice_key)))
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    no_dub = pipeline_config.get("no_dub") == "true"
+    no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
+    ).strip().lower()
+    no_dub_compose_allowed = no_dub and no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}
     compose_status = str(task.get("compose_status") or "").lower()
     compose_last_status = str(
         task.get("compose_last_status") or compose_status
@@ -528,7 +534,7 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     composed_ready = bool(
         final_fresh
         and compose_error_reason is None
-        and bool(voice_state.get("audio_ready"))
+        and (bool(voice_state.get("audio_ready")) or no_dub_compose_allowed)
     )
     if composed_ready:
         composed_reason = "ready"
@@ -536,9 +542,9 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         composed_reason = final_stale_reason
     elif not raw_exists:
         composed_reason = "missing_raw"
-    elif not voice_exists:
+    elif not voice_exists and not no_dub_compose_allowed:
         composed_reason = "missing_voiceover"
-    elif not voice_state.get("audio_ready"):
+    elif not voice_state.get("audio_ready") and not no_dub_compose_allowed:
         composed_reason = str(
             voice_state.get("audio_ready_reason") or "audio_not_ready"
         )
