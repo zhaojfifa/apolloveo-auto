@@ -1710,3 +1710,38 @@ Remaining risks:
 
 - Local environment does not have `ffmpeg`, so actual burned-video before/after frame rendering must be confirmed in an environment with FFmpeg installed.
 - This is a default visual tune; some edge-case videos may still need a future per-task style system, which is intentionally out of scope here.
+
+## Hot Follow Subtitle Rollback And Minimal Retune
+
+日期：2026-04-18
+
+Rollback target:
+
+- Rolled back the risky parts of `3c2e301` / PR #30 that changed Hot Follow burned-subtitle defaults beyond size-only tuning.
+- Restored the last subtitle-visible baseline bottom placement by reverting `MarginV` from `13` back to `18`.
+- Kept burn source selection, cleanup/mask behavior, line-width wrapping, block layout, and workbench configuration unchanged.
+
+Exact minimal retune values:
+
+- Myanmar/default and Chinese-style profiles now use ASS `FontSize=14.7`, which is about `0.92x` of the last visible `16` baseline.
+- Vietnamese/English profiles now use ASS `FontSize=13.8`, which is `0.92x` of the last visible `15` baseline.
+- Subtitle vertical glyph scale now uses `ScaleY=96`, replacing the previous aggressive `ScaleY=92` with the requested minimal `0.96x` line-height retune.
+
+What was intentionally not changed:
+
+- Did not change subtitle visibility logic, burn source selection, cleanup/mask system, block/container height, bottom offset, line breaking rules, workbench config, or operator controls.
+- Did not touch parse/source, dub, compose ownership, mute/preserve logic, or Hot Follow lane policy.
+
+Verification results:
+
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+- Generated filter inspection confirms `FontSize=14.7`, `ScaleY=96`, `MarginV=18`, `Alignment=2`, and `WrapStyle=1` for Myanmar defaults.
+- Repository scan found no new subtitle size control, typography control, config surface, or leftover runtime `ScaleY=92` / `MarginV=13` defaults outside the historical progress-log entry.
+- `which ffmpeg` failed because local `ffmpeg` is not installed; actual burned-frame visual verification could not be completed in this environment.
+
+Remaining risks:
+
+- Actual rendered-frame visibility still needs confirmation in an FFmpeg-equipped environment because this local machine cannot render the burn output.
+- `ScaleY=96` remains a minimal style retune for line-height; if operator validation still reports renderer sensitivity, the next PR should remove line-height scaling entirely rather than changing burn/source or layout policy.
