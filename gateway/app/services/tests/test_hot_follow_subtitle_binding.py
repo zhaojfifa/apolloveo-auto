@@ -198,6 +198,40 @@ def test_subtitle_lane_keeps_target_editor_empty_when_only_origin_exists(monkeyp
     assert lane["subtitle_ready"] is False
 
 
+def test_subtitle_lane_marks_preserved_source_audio_parse_as_helper_only(monkeypatch):
+    store = {
+        "deliver/tasks/hf-preserve-source/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\nlyric source line\n",
+    }
+
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+
+    lane = hf_router._hf_subtitle_lane_state(
+        "hf-preserve-source",
+        {
+            "task_id": "hf-preserve-source",
+            "target_lang": "vi",
+            "origin_srt_path": "deliver/tasks/hf-preserve-source/origin.srt",
+            "pipeline_config": {
+                "parse_source_mode": "preserved_source_audio_helper",
+                "parse_source_role": "preserved_source_audio_helper",
+                "parse_source_authoritative_for_target": "false",
+                "target_subtitle_authoritative": "false",
+            },
+        },
+    )
+
+    assert lane["raw_source_text"]
+    assert lane["parse_source_text"] == lane["raw_source_text"]
+    assert lane["parse_source_role"] == "preserved_source_audio_helper"
+    assert lane["parse_source_authoritative_for_target"] is False
+    assert lane["edited_text"] == ""
+    assert lane["primary_editable_text"] == ""
+    assert lane["dub_input_text"] == ""
+    assert lane["subtitle_ready"] is False
+
+
 def test_myanmar_dub_input_does_not_fallback_to_source_when_target_missing(monkeypatch):
     store = {
         "deliver/tasks/hf-mm-dub/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\n\xe5\x8e\x9f\xe5\xa7\x8b\xe6\x96\x87\xe6\xa1\x88\n",

@@ -1498,3 +1498,45 @@ PR goal：
 - YAML 目前只驱动 Hot Follow 一条线，signal extractor 库仍是 Python 映射，不是完全通用 DSL
 - optional artifact / richer operator confirmation hooks 仍未扩展为通用 evaluator input model
 - worker gateway / skills runtime / broader line-driven orchestration 继续留给下一阶段
+
+## Hot Follow Parse/Subtitle Source Lane Separation
+
+日期：2026-04-18
+
+PR goal:
+
+- Separate Hot Follow parse/subtitle source handling from the preserved BGM/source-audio compose lane.
+- Preserve the source-audio/BGM lane for final compose while preventing preserved source audio from becoming authoritative target subtitle truth.
+
+Confirmed parse-lane leakage point:
+
+- `run_subtitles_step()` always called subtitle generation against raw video audio without source-audio policy context.
+- When `source_audio_policy=preserve`, ASR from raw video audio could be translated, uploaded as `mm_srt_path` / target subtitle artifact, and treated as target subtitle currentness even when that text came from preserved source audio or music/lyrics.
+
+Scope completed:
+
+- Added explicit parse-source mode selection at the subtitles service boundary:
+  - `raw_video_audio` remains the normal authoritative subtitle path.
+  - `preserved_source_audio_helper` keeps ASR output as helper/source text only.
+- Gemini and OpenAI subtitle backends now mark preserved-source parsing as non-authoritative for target subtitles and skip translation in that mode.
+- Target subtitle upload/copy/currentness now requires `target_subtitle_authoritative=true`; helper-only parse output uploads origin/helper text but does not publish target subtitle artifacts.
+- Projection keeps parse-source role/currentness metadata as display state only and does not let helper/source text drive `dub_input_text` or `subtitle_ready`.
+- `pipeline_config` normalization now preserves parse-lane metadata keys needed by projection.
+
+Intentionally not done:
+
+- Did not change dry TTS dubbing preview/download/currentness.
+- Did not change final compose mute/preserve behavior or source-audio policy persistence.
+- Did not redesign translation, publish, compose ownership, or workbench layout.
+- Did not rename legacy `mm_*` compatibility fields.
+
+Verification results:
+
+- `python3.11 -m py_compile gateway/app/steps/subtitles.py gateway/app/services/steps_v1.py gateway/app/services/subtitle_helpers.py gateway/app/utils/pipeline_config.py gateway/app/services/ready_gate/hot_follow_rules.py gateway/app/services/task_view.py gateway/app/services/task_view_helpers.py gateway/app/routers/tasks.py gateway/app/routers/hot_follow_api.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- Focused regression evidence covers preserved-source helper-only ASR, no target subtitle upload for preserved source audio, no translation call in helper-only mode, `mm_srt_path=None`, `subtitle_ready=false`, and no `dub_input_text` from source/helper text.
+
+Remaining risks:
+
+- Legacy tasks that already stored source-derived target subtitle artifacts before this fix may need re-run or operator correction; this PR prevents new helper-only parse output from becoming target truth.
+- Route-level compatibility projection still exists for old callers, but it now only carries parse-lane role metadata and does not own parse policy.

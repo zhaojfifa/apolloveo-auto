@@ -46,6 +46,7 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
     compute_hot_follow_target_subtitle_currentness,
 )
 from gateway.app.services.subtitles import generate_subtitles
+from gateway.app.services.source_audio_policy import source_audio_policy_from_task
 from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, resolve_tts_voice
 from gateway.app.services.voice_state import (
     DRY_TTS_CONFIG_KEY,
@@ -736,6 +737,14 @@ async def run_subtitles_step(req: SubtitlesRequest):
     )
     try:
         _update_task(req.task_id, subtitles_status="running", subtitles_error=None)
+        repo = get_task_repository()
+        task_before = repo.get(req.task_id) or {}
+        source_audio_policy = source_audio_policy_from_task(task_before)
+        parse_source_mode = (
+            "preserved_source_audio_helper"
+            if source_audio_policy == "preserve"
+            else "raw_video_audio"
+        )
         # Fast-path: skip Whisper when pipeline already recorded no_subtitles from a
         # previous run AND the caller did not explicitly force re-extraction.
         if not req.force:
@@ -764,6 +773,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
                     force=req.force,
                     translate_enabled=req.translate,
                     use_ffmpeg_extract=True,
+                    parse_source_mode=parse_source_mode,
                 ),
                 timeout=step_timeout_sec,
             )
@@ -776,6 +786,19 @@ async def run_subtitles_step(req: SubtitlesRequest):
             updates["no_subtitles"] = "true"
         if isinstance(result, dict) and "translation_incomplete" in result:
             updates["translation_incomplete"] = "true" if translation_incomplete else "false"
+        if isinstance(result, dict):
+            if result.get("parse_source_mode"):
+                updates["parse_source_mode"] = str(result.get("parse_source_mode"))
+            if result.get("parse_source_role"):
+                updates["parse_source_role"] = str(result.get("parse_source_role"))
+            if "parse_source_authoritative_for_target" in result:
+                updates["parse_source_authoritative_for_target"] = (
+                    "true" if bool(result.get("parse_source_authoritative_for_target")) else "false"
+                )
+            if "target_subtitle_authoritative" in result:
+                updates["target_subtitle_authoritative"] = (
+                    "true" if bool(result.get("target_subtitle_authoritative")) else "false"
+                )
         if isinstance(probe, dict):
             has_audio = probe.get("has_audio")
             if has_audio is True:
@@ -797,6 +820,10 @@ async def run_subtitles_step(req: SubtitlesRequest):
             updates["clean_video_generated"] = "true"
         _update_pipeline_config(req.task_id, updates)
         origin_text, normalized_origin_text, mm_text, translation_qa_payload = _subtitle_result_contract(result)
+        target_subtitle_authoritative = bool(
+            not isinstance(result, dict)
+            or result.get("target_subtitle_authoritative", True)
+        )
 
         workspace = Workspace(req.task_id, target_lang=req.target_lang)
         subtitle_filename = hot_follow_subtitle_filename(req.target_lang)
@@ -810,7 +837,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
         if workspace.origin_srt_path.exists():
             origin_key = _upload_artifact(req.task_id, workspace.origin_srt_path, ORIGIN_SRT_ARTIFACT)
 
-        if workspace.mm_srt_path.exists():
+        if target_subtitle_authoritative and workspace.mm_srt_path.exists():
             mm_key = _upload_artifact(req.task_id, workspace.mm_srt_path, f"subs/{subtitle_filename}")
 
             mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
@@ -824,7 +851,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
         subtitles_dir.mkdir(parents=True, exist_ok=True)
         if workspace.origin_srt_path.exists():
             shutil.copy2(workspace.origin_srt_path, subtitles_dir / "origin.srt")
-        if workspace.mm_srt_path.exists():
+        if target_subtitle_authoritative and workspace.mm_srt_path.exists():
             shutil.copy2(workspace.mm_srt_path, subtitles_dir / subtitle_filename)
         if translation_qa_path.exists():
             shutil.copy2(translation_qa_path, subtitles_dir / "translation_qa.json")

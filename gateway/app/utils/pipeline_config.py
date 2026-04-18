@@ -28,6 +28,10 @@ _EXTRA_KEYS = {
     "dub_skip_reason",
     "subtitle_track_kind",
     "source_audio_policy",
+    "parse_source_mode",
+    "parse_source_role",
+    "parse_source_authoritative_for_target",
+    "target_subtitle_authoritative",
 }
 
 
