@@ -1626,3 +1626,46 @@ Remaining risks:
 
 - Existing historical tasks may still need re-run if they were persisted with older failed/blocked empty-dub state.
 - This PR only updates compose allowance/projection for already-supported final input paths; it does not add new source-audio or BGM compose modes.
+
+## Hot Follow Skipped-Dub Recovery After Subtitle Save
+
+日期：2026-04-18
+
+PR goal:
+
+- Review and repair the operator transition from empty target subtitle skipped/no_dub into a valid saved target subtitle followed by rerun dubbing.
+- Keep the initial empty-subtitle skipped/no_dub behavior intact while preventing stale empty-subtitle skip state from remaining current after an authoritative target subtitle is saved.
+
+Where the transition broke:
+
+- Layer 1 was corrected by subtitle save: the canonical target subtitle artifact and currentness could become valid/current.
+- Layer 2 could still inherit old empty-dub runtime facts because `pipeline_config.no_dub`, `dub_skip_reason`, and `dub/no_dub.txt` survived the save/rerun transition.
+- Layer 3 then treated the stale skipped-empty-subtitle reason as current no_dub truth even though `subtitle_ready` had become true.
+- Layer 4 could continue projecting skipped/no_dub after save, and route-level dub rerun handling could interpret an old no-dub note as a fresh skipped attempt.
+
+Scope completed:
+
+- Saving a non-empty authoritative/current target subtitle now clears only stale empty-dub skip reasons (`target_subtitle_empty`, `dub_input_empty`), resets skipped dub status to pending, and removes the old no-dub marker file.
+- `run_dub_step()` clears stale no_dub pipeline flags and marker files once cleaned dub input is runnable.
+- Route-level dub completion no longer treats an orphaned `dub/no_dub.txt` file as truth unless current pipeline config still explicitly says `no_dub=true`.
+- Added focused regression coverage for subtitle save recovery, stale marker cleanup, and successful rerun with an orphaned no-dub marker.
+
+Intentionally not done:
+
+- Did not change mute/preserve compose behavior.
+- Did not change dry TTS asset isolation or preview/download binding.
+- Did not change parse/subtitle source lane policy.
+- Did not add naming cleanup or redesign compose/publish ownership.
+
+Verification results:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/steps_v1.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py::test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py::test_successful_redub_persists_current_subtitle_snapshot gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_clear_no_dub_pipeline_flags_removes_stale_skip_marker -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_source_audio_policy_persistence.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+- Focused regression evidence covers authoritative target subtitle save clearing stale empty no_dub state, stale marker cleanup preserving source-audio policy config, and successful dub rerun despite an orphaned no-dub marker file.
+
+Remaining risks:
+
+- Existing tasks with stale empty-dub skip state require saving a valid target subtitle or rerunning dubbing to clear the old state.
+- This PR only clears stale empty-dub skip reasons; other no_dub reasons such as no-speech/subtitle-led remain governed by their existing semantics.

@@ -29,6 +29,12 @@ class _FakeRepo:
         return dict(self.task)
 
 
+class _MutableFakeRepo(_FakeRepo):
+    def update(self, _task_id: str, updates: dict) -> dict:
+        self.task.update(updates)
+        return dict(self.task)
+
+
 def test_run_subtitles_step_consumes_result_contract_for_myanmar(monkeypatch, tmp_path):
     updates: list[dict] = []
     pipeline_updates: list[dict] = []
@@ -70,6 +76,38 @@ def test_run_subtitles_step_consumes_result_contract_for_myanmar(monkeypatch, tm
     assert pipeline_updates[-1]["translation_incomplete"] == "false"
     assert pipeline_updates[-1]["parse_source_authoritative_for_target"] == "true"
     assert pipeline_updates[-1]["target_subtitle_authoritative"] == "true"
+
+
+def test_clear_no_dub_pipeline_flags_removes_stale_skip_marker(monkeypatch, tmp_path):
+    repo = _MutableFakeRepo(
+        {
+            "task_id": "hf-clear-no-dub",
+            "kind": "hot_follow",
+            "pipeline_config": {
+                "no_dub": "true",
+                "dub_skip_reason": "target_subtitle_empty",
+                "source_audio_policy": "mute",
+            },
+        }
+    )
+    note_path = tmp_path / "hf-clear-no-dub" / "dub" / "no_dub.txt"
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+    note_path.write_text("reason=target_subtitle_empty\n", encoding="utf-8")
+
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+    monkeypatch.setattr(steps_v1, "task_base_dir", lambda task_id: tmp_path / task_id)
+
+    cleared = steps_v1._clear_no_dub_pipeline_flags("hf-clear-no-dub", repo.task)
+
+    assert "no_dub" not in cleared
+    assert "dub_skip_reason" not in cleared
+    assert cleared["source_audio_policy"] == "mute"
+    stored = steps_v1.parse_pipeline_config(repo.task.get("pipeline_config"))
+    assert "no_dub" not in stored
+    assert "dub_skip_reason" not in stored
+    assert stored["source_audio_policy"] == "mute"
+    assert repo.task["dub_skip_reason"] is None
+    assert note_path.exists() is False
 
 
 def test_run_subtitles_step_marks_vi_translation_incomplete_without_step_error(monkeypatch, tmp_path):

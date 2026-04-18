@@ -655,6 +655,36 @@ def _hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text
     return str(synced_key) if synced_key else (str(current_key) if current_key else None)
 
 
+def _hf_remove_no_dub_note(task_id: str) -> None:
+    try:
+        note_path = task_base_dir(task_id) / "dub" / "no_dub.txt"
+        if note_path.exists():
+            note_path.unlink()
+    except Exception:
+        logger.warning("HF_NO_DUB_NOTE_CLEAR_FAIL task=%s", task_id)
+
+
+def _hf_empty_dub_recovery_updates(task_id: str, task: dict, text: str, target_currentness: dict[str, Any]) -> dict[str, Any]:
+    if not str(text or "").strip() or not bool(target_currentness.get("target_subtitle_current")):
+        return {}
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    reason = str(
+        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
+    ).strip().lower()
+    if reason not in {"target_subtitle_empty", "dub_input_empty"}:
+        return {}
+    pipeline_config.pop("no_dub", None)
+    pipeline_config.pop("dub_skip_reason", None)
+    updates: dict[str, Any] = {
+        "pipeline_config": pipeline_config_to_storage(pipeline_config),
+        "dub_skip_reason": None,
+    }
+    if str(task.get("dub_status") or "").strip().lower() == "skipped":
+        updates["dub_status"] = "pending"
+    _hf_remove_no_dub_note(task_id)
+    return updates
+
+
 def _hf_load_subtitles_text(task_id: str, task: dict) -> str:
     override_path = _hf_subtitles_override_path(task_id)
     if override_path.exists():
@@ -2048,24 +2078,26 @@ def patch_hot_follow_subtitles(
         translation_incomplete=False,
         has_saved_revision=bool(text.strip()),
     )
+    updates = {
+        "subtitles_status": "ready" if text else task.get("subtitles_status"),
+        "last_step": "subtitles" if text else task.get("last_step"),
+        "mm_srt_path": synced_mm_key or task.get("mm_srt_path"),
+        "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
+        "subtitles_override_mode": text_mode,
+        "subtitles_content_hash": _subtitle_content_hash,
+        "compose_status": "pending",
+        "compose_error": None,
+        "compose_error_reason": None,
+        "error_message": None,
+        "error_reason": None,
+        "target_subtitle_current": bool(target_currentness.get("target_subtitle_current")),
+        "target_subtitle_current_reason": target_currentness.get("target_subtitle_current_reason"),
+    }
+    updates.update(_hf_empty_dub_recovery_updates(task_id, task, text, target_currentness))
     _policy_upsert(
         repo,
         task_id,
-        {
-            "subtitles_status": "ready" if text else task.get("subtitles_status"),
-            "last_step": "subtitles" if text else task.get("last_step"),
-            "mm_srt_path": synced_mm_key or task.get("mm_srt_path"),
-            "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
-            "subtitles_override_mode": text_mode,
-            "subtitles_content_hash": _subtitle_content_hash,
-            "compose_status": "pending",
-            "compose_error": None,
-            "compose_error_reason": None,
-            "error_message": None,
-            "error_reason": None,
-            "target_subtitle_current": bool(target_currentness.get("target_subtitle_current")),
-            "target_subtitle_current_reason": target_currentness.get("target_subtitle_current_reason"),
-        },
+        updates,
     )
     return {
         "task_id": task_id,
