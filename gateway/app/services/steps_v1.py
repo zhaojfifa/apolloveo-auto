@@ -555,6 +555,33 @@ def _write_no_dub_note(task_id: str, reason: str) -> Path:
     return note_path
 
 
+def _remove_no_dub_note(task_id: str) -> None:
+    note_path = task_base_dir(task_id) / "dub" / "no_dub.txt"
+    try:
+        if note_path.exists():
+            note_path.unlink()
+    except Exception:
+        logger.warning("DUB3_NO_DUB_NOTE_CLEAR_FAIL task=%s path=%s", task_id, note_path)
+
+
+def _clear_no_dub_pipeline_flags(task_id: str, current_task: dict | None = None) -> dict[str, str]:
+    repo = get_task_repository()
+    task_obj = current_task if isinstance(current_task, dict) else (repo.get(task_id) or {})
+    pipeline_config = parse_pipeline_config(task_obj.get("pipeline_config") if isinstance(task_obj, dict) else None)
+    if "no_dub" not in pipeline_config and "dub_skip_reason" not in pipeline_config:
+        _remove_no_dub_note(task_id)
+        return pipeline_config
+    pipeline_config.pop("no_dub", None)
+    pipeline_config.pop("dub_skip_reason", None)
+    _update_task(
+        task_id,
+        pipeline_config=pipeline_config_to_storage(pipeline_config),
+        dub_skip_reason=None,
+    )
+    _remove_no_dub_note(task_id)
+    return pipeline_config
+
+
 def _ensure_silent_wav(path: Path) -> None:
     if path.exists() and path.stat().st_size > 0:
         return
@@ -1190,6 +1217,7 @@ async def run_dub_step(req: DubRequest):
     )
     if not mm_text.strip() or not _clean_text_for_dub(mm_text):
         return _skip_empty_dub(req, "dub_input_empty", provider, current_task)
+    _clear_no_dub_pipeline_flags(req.task_id, current_task)
 
     alignment_enabled = _truthy_env("DUB_SEGMENT_ALIGNMENT_ENABLED", "1")
     cues: list[dict] = []

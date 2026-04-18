@@ -1112,7 +1112,16 @@ def test_sync_saved_target_subtitle_artifact_writes_canonical_mm_srt(monkeypatch
 def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeypatch, tmp_path):
     class _Repo:
         def __init__(self):
-            self.task = {"task_id": "hf-save", "kind": "hot_follow", "subtitles_status": "pending"}
+            self.task = {
+                "task_id": "hf-save",
+                "kind": "hot_follow",
+                "subtitles_status": "pending",
+                "dub_status": "skipped",
+                "pipeline_config": {
+                    "no_dub": "true",
+                    "dub_skip_reason": "target_subtitle_empty",
+                },
+            }
 
         def get(self, task_id):
             assert task_id == "hf-save"
@@ -1132,11 +1141,15 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
             self.mm_srt_path = base / "mm.srt"
 
     monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda task_id: tmp_path / task_id)
     monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda task_id: tmp_path / task_id / "override.srt")
     monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda _task_id, task: Path(tmp_path / "hf-save" / "override.srt").read_text(encoding="utf-8"))
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
     monkeypatch.setattr(hf_router, "_policy_upsert", lambda _repo, _task_id, updates, **_kwargs: repo.task.update(updates))
     monkeypatch.setattr(hf_router, "upload_task_artifact", lambda _task, _local_path, artifact_name, task_id=None, **_kwargs: f"deliver/tasks/{task_id}/{artifact_name}")
+    note_path = tmp_path / "hf-save" / "dub" / "no_dub.txt"
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+    note_path.write_text("reason=target_subtitle_empty\n", encoding="utf-8")
 
     payload = hf_router.HotFollowSubtitlesRequest(
         srt_text="1\n00:00:00,000 --> 00:00:02,000\nမင်္ဂလာပါ\n"
@@ -1144,6 +1157,13 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
     result = hf_router.patch_hot_follow_subtitles("hf-save", payload, repo=repo)
 
     assert repo.task["mm_srt_path"] == "deliver/tasks/hf-save/mm.srt"
+    pipeline = parse_pipeline_config(repo.task.get("pipeline_config"))
+    assert "no_dub" not in pipeline
+    assert "dub_skip_reason" not in pipeline
+    assert repo.task["dub_status"] == "pending"
+    assert repo.task["dub_skip_reason"] is None
+    assert note_path.exists() is False
+    assert repo.task["target_subtitle_current"] is True
     assert repo.task["compose_status"] == "pending"
     assert result["subtitles"]["srt_text"].strip().endswith("မင်္ဂလာပါ")
 
@@ -1377,6 +1397,9 @@ def test_successful_redub_persists_current_subtitle_snapshot(monkeypatch, tmp_pa
             return dict(self.task)
 
     repo = _Repo()
+    stale_note = tmp_path / "hf-redub-snapshot" / "dub" / "no_dub.txt"
+    stale_note.parent.mkdir(parents=True, exist_ok=True)
+    stale_note.write_text("reason=target_subtitle_empty\n", encoding="utf-8")
     payload = tasks_router.DubProviderRequest(
         provider="azure-speech",
         voice_id="mm_female_1",

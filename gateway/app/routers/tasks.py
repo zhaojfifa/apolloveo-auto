@@ -2854,7 +2854,7 @@ async def _run_dub_job(task_id: str, payload: DubProviderRequest, repo: ITaskRep
         )
         pipeline_config = parse_pipeline_config(task_after.get("pipeline_config"))
         no_dub_flag = pipeline_config.get("no_dub") == "true"
-        no_dub_note = (task_base_dir(task_id) / "dub" / "no_dub.txt").exists()
+        no_dub_note = no_dub_flag and (task_base_dir(task_id) / "dub" / "no_dub.txt").exists()
         logger.info(
             "DUB3_DECISION",
             extra={
