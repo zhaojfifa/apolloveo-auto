@@ -1669,3 +1669,44 @@ Remaining risks:
 
 - Existing tasks with stale empty-dub skip state require saving a valid target subtitle or rerunning dubbing to clear the old state.
 - This PR only clears stale empty-dub skip reasons; other no_dub reasons such as no-speech/subtitle-led remain governed by their existing semantics.
+
+## Hot Follow Subtitle Default Size Micro-Tune
+
+日期：2026-04-18
+
+PR goal:
+
+- Micro-tune the default Hot Follow burned-subtitle presentation so subtitles render smaller, lower, and with a tighter vertical profile.
+- Keep this as a default style adjustment only, without introducing operator controls or per-task style configuration.
+
+Exact default subtitle parameter change:
+
+- Default ASS `FontSize` changed from `16` to `13.4` for Myanmar/Chinese-style profiles, matching about `0.84x`.
+- Default ASS `FontSize` changed from `15` to `12.6` for Vietnamese/English profiles, matching `0.84x`.
+- Default ASS `MarginV` changed from `18` to `13`, moving the bottom-aligned subtitle block slightly lower.
+- Default ASS `ScaleY=92` was added to tighten the vertical line profile to about `0.92x`.
+- Existing wrapping widths, outline, shadow, bottom alignment, and cleanup masks were left unchanged.
+
+Scope completed:
+
+- Updated only Hot Follow compose subtitle style defaults and render signature.
+- Updated focused subtitle binding tests to lock the new generated FFmpeg subtitle filter.
+
+Intentionally not done:
+
+- Did not add subtitle size controls, typography controls, new config keys, or per-task style editing.
+- Did not redesign subtitle layout, cleanup/mask behavior, segmentation, parse/source, dub, compose ownership, or workbench UI.
+
+Verification results:
+
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+- Generated filter inspection confirms `FontSize=13.4`, `ScaleY=92`, `MarginV=13`, `Alignment=2`, and `WrapStyle=1` for Myanmar defaults.
+- Repository scan found no subtitle size selector/control/config surface added.
+- `which ffmpeg && ffmpeg -version | head -n 1` failed because local `ffmpeg` is not installed; actual burned-frame visual verification was not possible in this environment.
+
+Remaining risks:
+
+- Local environment does not have `ffmpeg`, so actual burned-video before/after frame rendering must be confirmed in an environment with FFmpeg installed.
+- This is a default visual tune; some edge-case videos may still need a future per-task style system, which is intentionally out of scope here.

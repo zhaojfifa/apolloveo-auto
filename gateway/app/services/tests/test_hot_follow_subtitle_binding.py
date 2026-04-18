@@ -334,9 +334,18 @@ def test_compose_subtitle_vf_uses_bottom_safe_zone_defaults_for_hot_follow(tmp_p
     vf = compose_subtitle_vf(subtitle_path, tmp_path, "none", "my")
 
     assert "Alignment=2" in vf
-    assert "FontSize=16" in vf
-    assert "MarginV=18" in vf
+    assert "FontSize=13.4" in vf
+    assert "ScaleY=92" in vf
+    assert "MarginV=13" in vf
     assert "WrapStyle=1" in vf
+
+
+def test_subtitle_render_signature_tracks_micro_tuned_defaults():
+    signature = compose_module.subtitle_render_signature(target_lang="vi", cleanup_mode="none")
+
+    assert "size=12.6" in signature
+    assert "margin_v=13" in signature
+    assert "scale_y=92" in signature
 
 
 def test_prepare_workspace_rewrites_local_burn_subtitles_for_layout(monkeypatch, tmp_path):
