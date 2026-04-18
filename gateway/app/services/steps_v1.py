@@ -622,6 +622,70 @@ def _fail_dub(req: DubRequest, reason: str, provider: str | None, *, status_code
     raise HTTPException(status_code=status_code, detail=reason)
 
 
+def _skip_empty_dub(req: DubRequest, reason: str, provider: str | None, current_task: dict | None = None) -> dict:
+    repo = get_task_repository()
+    task_obj = current_task if isinstance(current_task, dict) else (repo.get(req.task_id) or {})
+    pipeline_config = parse_pipeline_config(task_obj.get("pipeline_config"))
+    pipeline_config.update({"no_dub": "true", "dub_skip_reason": reason})
+    current_config = dict(task_obj.get("config") or {})
+    try:
+        _write_no_dub_note(req.task_id, reason)
+    except Exception:
+        logger.exception("DUB3_NO_DUB_NOTE_FAIL", extra={"task_id": req.task_id, "reason": reason})
+    try:
+        _append_event(
+            repo,
+            req.task_id,
+            channel="pipeline",
+            code="post.dub.skip",
+            message=reason,
+            extra={"reason": reason, "provider": provider, "voice_id": req.voice_id},
+        )
+    except Exception:
+        logger.exception("post.dub.skip event append failed", extra={"task_id": req.task_id})
+    _update_task(
+        req.task_id,
+        last_step="dub",
+        dub_status="skipped",
+        dub_error=None,
+        error_reason=None,
+        compose_status="pending",
+        mm_audio_key=None,
+        mm_audio_path=None,
+        mm_audio_bytes=None,
+        mm_audio_duration_ms=None,
+        mm_audio_mime=None,
+        audio_sha256=None,
+        pipeline_config=pipeline_config_to_storage(pipeline_config),
+        config={
+            **current_config,
+            DRY_TTS_CONFIG_KEY: None,
+            "tts_completed_token": None,
+            "tts_voiceover_asset_role": None,
+        },
+    )
+    logger.info(
+        "DUB3_SKIP",
+        extra={
+            "task_id": req.task_id,
+            "step": "dub",
+            "stage": "DUB3_SKIP",
+            "dub_provider": provider,
+            "voice_id": req.voice_id,
+            "reason": reason,
+        },
+    )
+    return {
+        "task_id": req.task_id,
+        "voice_id": req.voice_id,
+        "audio_mm_url": None,
+        "duration_sec": None,
+        "audio_path": None,
+        "dub_status": "skipped",
+        "dub_skip_reason": reason,
+    }
+
+
 def _maybe_fill_missing_for_pack(*, raw_path: Path, audio_path: Path, subs_path: Path) -> None:
     """Allow pack to proceed by generating silence audio if DUB_SKIP=1."""
 
@@ -1099,11 +1163,9 @@ async def run_dub_step(req: DubRequest):
         )
     mm_txt_text = mm_txt_resolved
     if str(mm_txt_text or "").strip().lower() == "no subtitles":
-        _fail_dub(req, "NO_SUBTITLES_MARKER", provider)
+        return _skip_empty_dub(req, "target_subtitle_empty", provider, current_task)
     if not mm_txt_text.strip():
-        if not mm_txt_exists:
-            _fail_dub(req, "MM_TXT_MISSING", provider)
-        _fail_dub(req, "MM_TXT_EMPTY", provider, status_code=400)
+        return _skip_empty_dub(req, "target_subtitle_empty", provider, current_task)
 
     override_text = (req.mm_text or "").strip()
     mm_text = override_text or mm_txt_text
@@ -1127,7 +1189,7 @@ async def run_dub_step(req: DubRequest):
         },
     )
     if not mm_text.strip() or not _clean_text_for_dub(mm_text):
-        _fail_dub(req, "MM_TEXT_EMPTY", provider, status_code=400)
+        return _skip_empty_dub(req, "dub_input_empty", provider, current_task)
 
     alignment_enabled = _truthy_env("DUB_SEGMENT_ALIGNMENT_ENABLED", "1")
     cues: list[dict] = []

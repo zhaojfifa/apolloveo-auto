@@ -1069,25 +1069,30 @@ class CompositionService:
         bundled_fonts_dir = Path(__file__).resolve().parents[1] / "assets" / "fonts"
         bundled_myanmar_ttf = bundled_fonts_dir / "NotoSansMyanmar-Regular.ttf"
         overlay_subtitles = inputs.overlay_subtitles
+        requested_overlay_subtitles = overlay_subtitles
         subtitle_key_used: str | None = None
         subtitle_object_etag: str | None = None
         subtitle_content_hash: str | None = None
         subtitle_sha256: str | None = None
 
         if overlay_subtitles:
-            if not bundled_myanmar_ttf.exists() or bundled_myanmar_ttf.stat().st_size == 0:
-                compose_fail("font_missing", f"bundled Myanmar font missing: {bundled_myanmar_ttf}")
             subtitle_key = subtitle_resolver(task, task_id, inputs.target_lang)
             if not subtitle_key:
-                compose_fail("subtitles_missing", "overlay_subtitles enabled but target subtitle key is missing")
-            subtitle_key_used = str(subtitle_key)
+                if inputs.subtitle_only_compose:
+                    overlay_subtitles = False
+                else:
+                    compose_fail("subtitles_missing", "overlay_subtitles enabled but target subtitle key is missing")
+            if overlay_subtitles and (not bundled_myanmar_ttf.exists() or bundled_myanmar_ttf.stat().st_size == 0):
+                compose_fail("font_missing", f"bundled Myanmar font missing: {bundled_myanmar_ttf}")
+            subtitle_key_used = str(subtitle_key) if subtitle_key else None
+        if overlay_subtitles and subtitle_key_used:
             subtitle_meta = object_head(subtitle_key_used)
             subtitle_object_etag = (
                 str(subtitle_meta.get("etag") or "").strip() or None
                 if isinstance(subtitle_meta, dict)
                 else None
             )
-            self._storage.download_file(str(subtitle_key), str(subtitle_path))
+            self._storage.download_file(subtitle_key_used, str(subtitle_path))
             if not subtitle_path.exists() or subtitle_path.stat().st_size == 0:
                 if inputs.subtitle_only_compose:
                     # Historical fix (267744a): no-speech task with empty subtitle —
@@ -1130,6 +1135,9 @@ class CompositionService:
         if inputs.bgm_key:
             bgm_path = tmp / "bgm_input.mp3"
             self._storage.download_file(str(inputs.bgm_key), str(bgm_path))
+
+        if requested_overlay_subtitles and not overlay_subtitles and not compose_warning:
+            compose_warning = "subtitle_overlay_skipped_empty_no_dub"
 
         return _WorkspaceFiles(
             task_id=task_id,

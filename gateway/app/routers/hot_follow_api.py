@@ -1013,6 +1013,11 @@ def _hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
     route_state = _hf_dual_channel_state(task_id, task, subtitle_lane)
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     no_dub = pipeline_config.get("no_dub") == "true"
+    no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
+    ).strip().lower()
+    if no_dub and no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
+        return True
     no_dub = no_dub or bool(
         str(route_state.get("content_mode") or "").strip().lower() == "silent_candidate"
         and not str(subtitle_lane.get("dub_input_text") or "").strip()
@@ -1358,10 +1363,23 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     final_exists = bool(final_key and object_exists(str(final_key)))
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
-    no_dub = route_state.get("content_mode") in {"silent_candidate", "subtitle_led"} and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    stored_no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
+    ).strip()
+    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
+        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
+        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    )
     if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
         no_dub = False
-    if route_state.get("content_mode") == "subtitle_led":
+    if stored_no_dub_reason == "target_subtitle_empty":
+        no_dub_reason = "target_subtitle_empty"
+        no_dub_message = "Target subtitle is empty; dubbing is skipped."
+    elif stored_no_dub_reason == "dub_input_empty":
+        no_dub_reason = "dub_input_empty"
+        no_dub_message = "Dub input is empty; dubbing is skipped."
+    elif route_state.get("content_mode") == "subtitle_led":
         no_dub_reason = "subtitle_led"
         no_dub_message = "No reliable speech detected. Review subtitles or provide text before dubbing."
     elif route_state.get("content_mode") == "silent_candidate":
