@@ -150,14 +150,30 @@ def _extract_subtitle_ready(task: dict, state: dict) -> bool:
 def _extract_no_dub(task: dict, state: dict) -> bool:
     """Raw no_dub flag (before override application)."""
     audio = _d(state.get("audio"))
-    return bool(audio.get("no_dub"))
+    return bool(audio.get("no_dub")) or _extract_no_tts_compose_allowed(task, state)
+
+
+def _extract_compose_blocked(task: dict, state: dict) -> bool:
+    artifact_facts = _d(state.get("artifact_facts"))
+    compose_input = _d(artifact_facts.get("compose_input"))
+    return bool(artifact_facts.get("compose_input_blocked") or compose_input.get("blocked"))
+
+
+def _extract_no_tts_compose_allowed(task: dict, state: dict) -> bool:
+    artifact_facts = _d(state.get("artifact_facts"))
+    audio_lane = _d(artifact_facts.get("audio_lane"))
+    mode = str(artifact_facts.get("audio_lane_mode") or audio_lane.get("mode") or "").strip().lower()
+    no_tts = bool(audio_lane.get("no_tts") or artifact_facts.get("tts_voiceover_exists") is False)
+    source_audio_preserved = bool(audio_lane.get("source_audio_preserved"))
+    bgm_configured = bool(audio_lane.get("bgm_configured"))
+    return bool(no_tts and (source_audio_preserved or bgm_configured or mode == "source_audio_preserved_no_tts"))
 
 
 def _extract_no_dub_compose_allowed(task: dict, state: dict) -> bool:
     """No-dub mode may bypass subtitle/audio blockers for final compose input checks."""
     audio = _d(state.get("audio"))
     reason = str(audio.get("no_dub_reason") or "").strip().lower()
-    return bool(audio.get("no_dub")) and reason in {"target_subtitle_empty", "dub_input_empty"}
+    return (bool(audio.get("no_dub")) and reason in {"target_subtitle_empty", "dub_input_empty"}) or _extract_no_tts_compose_allowed(task, state)
 
 
 # ---------------------------------------------------------------------------
@@ -183,7 +199,25 @@ def _reason_audio_ready(task: dict, state: dict) -> str:
 
 def _reason_no_dub(task: dict, state: dict) -> str:
     audio = _d(state.get("audio"))
-    return str(audio.get("no_dub_reason") or "").strip() or ""
+    explicit = str(audio.get("no_dub_reason") or "").strip()
+    if explicit:
+        return explicit
+    artifact_facts = _d(state.get("artifact_facts"))
+    audio_lane = _d(artifact_facts.get("audio_lane"))
+    mode = str(artifact_facts.get("audio_lane_mode") or audio_lane.get("mode") or "").strip().lower()
+    if _extract_no_tts_compose_allowed(task, state):
+        return "source_audio_preserved_no_tts" if mode == "source_audio_preserved_no_tts" else "bgm_only_no_tts"
+    return ""
+
+
+def _reason_compose_blocked(task: dict, state: dict) -> str:
+    artifact_facts = _d(state.get("artifact_facts"))
+    compose_input = _d(artifact_facts.get("compose_input"))
+    return str(
+        artifact_facts.get("compose_input_reason")
+        or compose_input.get("reason")
+        or "compose_input_blocked"
+    ).strip()
 
 
 _SIGNAL_EXTRACTORS = {
@@ -197,12 +231,15 @@ _SIGNAL_EXTRACTORS = {
     "subtitle_ready": _extract_subtitle_ready,
     "no_dub": _extract_no_dub,
     "no_dub_compose_allowed": _extract_no_dub_compose_allowed,
+    "compose_blocked": _extract_compose_blocked,
+    "no_tts_compose_allowed": _extract_no_tts_compose_allowed,
 }
 
 _REASON_EXTRACTORS = {
     "subtitle_ready_reason": _reason_subtitle_ready,
     "audio_ready_reason": _reason_audio_ready,
     "no_dub_reason": _reason_no_dub,
+    "compose_blocked_reason": _reason_compose_blocked,
 }
 
 

@@ -155,7 +155,12 @@ def evaluate_ready_gate(
 
     # ── Post-process: compose_reason ──────────────────────────────────────
     compose_ready = gates.get("compose_ready", False)
-    if compose_ready:
+    compose_blocked = signals.get("compose_blocked", False)
+    compose_blocked_reason = reasons.get("compose_blocked_reason", "compose_input_blocked")
+    if compose_blocked:
+        compose_reason = compose_blocked_reason
+        blocking = [compose_blocked_reason] if compose_blocked_reason else ["compose_input_blocked"]
+    elif compose_ready:
         compose_reason = "ready"
     elif (
         signals.get("no_dub", False)
@@ -186,6 +191,9 @@ def evaluate_ready_gate(
         "no_dub": signals.get("no_dub", False),
         "no_dub_reason": reasons.get("no_dub_reason", ""),
         "no_dub_compose_allowed": signals.get("no_dub_compose_allowed", False),
+        "no_tts_compose_allowed": signals.get("no_tts_compose_allowed", False),
+        "compose_blocked": compose_blocked,
+        "compose_blocked_reason": compose_blocked_reason if compose_blocked else "",
         "compose_ready": compose_ready,
         "publish_ready": gates.get("publish_ready", compose_ready),
         "compose_reason": compose_reason,

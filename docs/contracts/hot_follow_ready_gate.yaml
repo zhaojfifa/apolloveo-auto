@@ -39,12 +39,21 @@ runtime_rules:
       reason_source: no_dub_reason
     no_dub_compose_allowed:
       source: no_dub_compose_allowed
+    no_tts_compose_allowed:
+      source: no_tts_compose_allowed
+    compose_blocked:
+      source: compose_blocked
+      reason_key: compose_blocked_reason
+      reason_source: compose_blocked_reason
   overrides:
     - evidence_signal: voiceover_exists
       target_signal: no_dub
       force_value: false
     - evidence_signal: audio_ready
       target_signal: no_dub
+      force_value: false
+    - evidence_signal: compose_blocked
+      target_signal: final_fresh
       force_value: false
   gates:
     - name: compose_ready
@@ -58,6 +67,11 @@ runtime_rules:
       requires:
         - compose_ready
   blocking_rules:
+    - reason_from: compose_blocked_reason
+      when_missing: __always__
+      extra_requires:
+        - compose_blocked
+      parent_gate: compose_ready
     - reason: compose_not_done
       when_missing: __always__
       parent_gate: compose_ready
@@ -106,6 +120,8 @@ signal_families:
     - "subtitles.subtitle_ready"
     - "audio.audio_ready"
     - "audio.no_dub"
+    - "artifact_facts.audio_lane"
+    - "artifact_facts.compose_input"
   currentness_facts:
     - "final.fresh"
     - "target subtitle authoritative/current"
