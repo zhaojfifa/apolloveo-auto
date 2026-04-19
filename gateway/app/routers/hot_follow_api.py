@@ -257,6 +257,16 @@ def _execute_hot_follow_compose_contract(
     current = repo.get(task_id) or task
     line_binding = get_line_runtime_binding(current)
     svc.validate_expected_revision(current, request, revision_snapshot=revision_snapshot)
+    task_lock = _task_compose_lock(task_id)
+    recovery_updates = svc.recover_stale_running_compose(
+        task_id,
+        current,
+        lock_active=task_lock.locked(),
+        object_exists_fn=object_exists,
+    )
+    if recovery_updates:
+        _policy_upsert(repo, task_id, recovery_updates)
+        current = repo.get(task_id) or {**current, **recovery_updates}
     if svc.compose_lock_active(current):
         _policy_upsert(repo, task_id, svc.build_compose_lock_updates(current))
         return HotFollowComposeResponseContract(
@@ -264,7 +274,7 @@ def _execute_hot_follow_compose_contract(
             body=svc.build_compose_lock_body(task_id),
         )
 
-    lock = _task_compose_lock(task_id)
+    lock = task_lock
     if not lock.acquire(blocking=False):
         current = repo.get(task_id) or current
         _policy_upsert(repo, task_id, svc.build_compose_lock_updates(current))
@@ -1575,8 +1585,12 @@ def _hf_safe_presentation_aggregates(
             final_stale_reason=final_stale_reason,
             artifact_facts=artifact_facts,
             no_dub=no_dub,
-            no_dub_compose_allowed=bool((artifact_facts.get("audio_lane") or {}).get("no_tts"))
-            if isinstance(artifact_facts.get("audio_lane"), dict)
+            no_dub_compose_allowed=bool((artifact_facts.get("selected_compose_route") or {}).get("name") in {
+                "preserve_source_route",
+                "bgm_only_route",
+                "no_tts_compose_route",
+            })
+            if isinstance(artifact_facts.get("selected_compose_route"), dict)
             else False,
         )
         operator_summary = _hf_operator_summary(

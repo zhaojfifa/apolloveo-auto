@@ -232,6 +232,57 @@ def test_subtitle_lane_marks_preserved_source_audio_parse_as_helper_only(monkeyp
     assert lane["subtitle_ready"] is False
 
 
+def test_subtitle_parse_lane_does_not_read_from_bgm_lane(monkeypatch):
+    store = {
+        "deliver/tasks/hf-bgm-parse/bgm.mp3": b"not subtitle text",
+    }
+
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+
+    lane = hf_router._hf_subtitle_lane_state(
+        "hf-bgm-parse",
+        {
+            "task_id": "hf-bgm-parse",
+            "target_lang": "mm",
+            "config": {"bgm": {"bgm_key": "deliver/tasks/hf-bgm-parse/bgm.mp3"}},
+        },
+    )
+
+    assert lane["raw_source_text"] == ""
+    assert lane["normalized_source_text"] == ""
+    assert lane["parse_source_text"] == ""
+    assert lane["parse_source_role"] == "none"
+
+
+def test_subtitle_parse_lane_does_not_read_from_preserved_source_audio_lane(monkeypatch):
+    store = {
+        "deliver/tasks/hf-preserve-parse/source_audio.mp3": b"not subtitle text",
+    }
+
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+
+    lane = hf_router._hf_subtitle_lane_state(
+        "hf-preserve-parse",
+        {
+            "task_id": "hf-preserve-parse",
+            "target_lang": "mm",
+            "config": {
+                "source_audio_policy": "preserve",
+                "source_audio_key": "deliver/tasks/hf-preserve-parse/source_audio.mp3",
+            },
+        },
+    )
+
+    assert lane["raw_source_text"] == ""
+    assert lane["normalized_source_text"] == ""
+    assert lane["parse_source_text"] == ""
+    assert lane["parse_source_role"] == "none"
+
+
 def test_myanmar_dub_input_does_not_fallback_to_source_when_target_missing(monkeypatch):
     store = {
         "deliver/tasks/hf-mm-dub/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\n\xe5\x8e\x9f\xe5\xa7\x8b\xe6\x96\x87\xe6\xa1\x88\n",

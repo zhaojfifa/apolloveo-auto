@@ -7,6 +7,45 @@ stage_order:
   - quality
   - recovery
 advisories:
+  compose_blocked:
+    id: hf_advisory_compose_blocked
+    kind: operator_guidance
+    level: warning
+    recommended_next_action: resolve_compose_input
+    operator_hint: compose input blocked
+    explanation: "当前合成输入已被线路策略阻断：{compose_blocked_reason}。请调整素材后再尝试合成。"
+    evidence_fields:
+      - compose_blocked
+      - compose_blocked_reason
+      - compose_status
+      - blocking
+  compose_input_unready:
+    id: hf_advisory_compose_input_unready
+    kind: operator_guidance
+    level: warning
+    recommended_next_action: retry_after_compose_input_fix
+    operator_hint: compose input requires attention
+    explanation: "当前合成线路可用，但合成输入未就绪：{compose_blocked_reason}。请先修复合成输入后再重试。"
+    evidence_fields:
+      - compose_route_allowed
+      - compose_input_ready
+      - compose_execute_allowed
+      - compose_input_mode
+      - compose_input_reason
+      - compose_input_derive_failed_terminal
+      - blocking
+  no_dub_route_terminal:
+    id: hf_advisory_no_dub_route_terminal
+    kind: operator_guidance
+    level: info
+    recommended_next_action: compose_no_tts
+    operator_hint: no TTS compose route
+    explanation: "当前素材已进入无 TTS 合成路径：{no_dub_reason}。可继续合成保留原音或背景音版本。"
+    evidence_fields:
+      - no_dub_route_terminal
+      - subtitle_terminal_state
+      - no_dub_compose_allowed
+      - no_dub_reason
   subtitle_source_mismatch:
     id: hf_advisory_subtitle_source_mismatch
     kind: operator_guidance
@@ -31,30 +70,6 @@ advisories:
       - compose_status
       - final_stale_reason
       - blocking
-  compose_blocked:
-    id: hf_advisory_compose_blocked
-    kind: operator_guidance
-    level: warning
-    recommended_next_action: resolve_compose_input
-    operator_hint: compose input blocked
-    explanation: "当前合成输入已被线路策略阻断：{compose_blocked_reason}。请调整素材后再尝试合成。"
-    evidence_fields:
-      - compose_blocked
-      - compose_blocked_reason
-      - compose_status
-      - blocking
-  no_dub_route_terminal:
-    id: hf_advisory_no_dub_route_terminal
-    kind: operator_guidance
-    level: info
-    recommended_next_action: compose_no_tts
-    operator_hint: no TTS compose route
-    explanation: "当前素材已进入无 TTS 合成路径：{no_dub_reason}。可继续合成保留原音或背景音版本。"
-    evidence_fields:
-      - no_dub_route_terminal
-      - subtitle_terminal_state
-      - no_dub_compose_allowed
-      - no_dub_reason
   compose_missing_final:
     id: hf_advisory_compose_missing_final
     kind: operator_guidance
