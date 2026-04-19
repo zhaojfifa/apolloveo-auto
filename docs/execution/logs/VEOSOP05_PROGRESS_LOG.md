@@ -2083,3 +2083,29 @@ Verification results:
 Remaining risks:
 
 - Attempts can still remain fake running until PR-3 terminalizes blocked/empty/no-dub route outcomes.
+
+## Hot Follow Four-Layer Repair PR-3 Attempt / Runtime Terminal
+
+日期：2026-04-19
+
+Scope:
+
+- Attempt / Runtime Terminal Layer only.
+- Consumes artifact facts and line-policy truth exported by PR-1/PR-2.
+- No presenter/advisory wording changes.
+
+Changes:
+
+- Current attempt now marks blocked compose as `compose_blocked_terminal`.
+- Current attempt suppresses recompose requirements when compose is terminal-blocked.
+- Legal no-TTS empty subtitle routes are marked as `no_dub_route_terminal`.
+- Running/pending dub attempts on legal no-dub/no-TTS routes are projected as terminal skipped at the attempt layer instead of fake running.
+
+Verification results:
+
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m py_compile gateway/app/services/hot_follow_workbench_presenter.py gateway/app/services/task_view.py gateway/app/routers/hot_follow_api.py gateway/app/services/tests/test_hot_follow_artifact_facts.py` -> passed.
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m pytest gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q` -> 48 passed.
+
+Remaining risks:
+
+- Presenter/advisory still need PR-4 to become pure projection of these terminal fields.

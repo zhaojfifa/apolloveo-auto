@@ -520,6 +520,9 @@ def hf_current_attempt_summary(
     compose_status: str,
     composed_reason: str,
     final_stale_reason: str | None = None,
+    artifact_facts: dict[str, Any] | None = None,
+    no_dub: bool = False,
+    no_dub_compose_allowed: bool = False,
 ) -> dict[str, Any]:
     return build_hot_follow_current_attempt_summary(
         voice_state=voice_state,
@@ -528,6 +531,9 @@ def hf_current_attempt_summary(
         compose_status=compose_status,
         composed_reason=composed_reason,
         final_stale_reason=final_stale_reason,
+        artifact_facts=artifact_facts,
+        no_dub=no_dub,
+        no_dub_compose_allowed=no_dub_compose_allowed,
     )
 
 
@@ -579,6 +585,11 @@ def hf_safe_presentation_aggregates(
             compose_status=compose_status,
             composed_reason=composed_reason,
             final_stale_reason=final_stale_reason,
+            artifact_facts=artifact_facts,
+            no_dub=no_dub,
+            no_dub_compose_allowed=bool((artifact_facts.get("audio_lane") or {}).get("no_tts"))
+            if isinstance(artifact_facts.get("audio_lane"), dict)
+            else False,
         )
         operator_summary = hf_operator_summary(
             artifact_facts=artifact_facts,

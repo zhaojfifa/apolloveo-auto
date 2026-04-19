@@ -127,9 +127,32 @@ def build_hot_follow_current_attempt_summary(
     compose_status: str,
     composed_reason: str,
     final_stale_reason: str | None = None,
+    artifact_facts: dict[str, Any] | None = None,
+    no_dub: bool = False,
+    no_dub_compose_allowed: bool = False,
 ) -> dict[str, Any]:
+    artifacts = artifact_facts or {}
     compose_status_norm = str(compose_status or "").strip().lower() or "never"
     compose_reason_norm = str(composed_reason or "").strip().lower() or "unknown"
+    dub_status_norm = str(dub_status or "").strip().lower() or "never"
+    compose_blocked = bool(artifacts.get("compose_input_blocked"))
+    audio_lane = artifacts.get("audio_lane") if isinstance(artifacts.get("audio_lane"), dict) else {}
+    no_tts_legal_line = bool(
+        audio_lane.get("no_tts")
+        and (audio_lane.get("source_audio_preserved") or audio_lane.get("bgm_configured"))
+    )
+    subtitle_empty = bool(
+        not subtitle_lane.get("subtitle_artifact_exists")
+        and not str(subtitle_lane.get("edited_text") or subtitle_lane.get("srt_text") or "").strip()
+        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    )
+    no_dub_route_terminal = bool((no_dub or no_dub_compose_allowed or no_tts_legal_line) and subtitle_empty)
+    subtitle_empty_terminal = bool(subtitle_empty and not no_dub_route_terminal)
+    if compose_blocked:
+        compose_status_norm = "blocked"
+        compose_reason_norm = str(artifacts.get("compose_input_reason") or "compose_input_blocked").strip()
+    if no_dub_route_terminal and dub_status_norm in {"running", "processing", "pending", "never"}:
+        dub_status_norm = "skipped"
     audio_ready = bool(voice_state.get("audio_ready"))
     requires_redub = bool(
         subtitle_lane.get("subtitle_ready")
@@ -138,11 +161,13 @@ def build_hot_follow_current_attempt_summary(
         not in {"dub_running", "dub_not_done", "audio_missing", "unknown"}
     )
     requires_recompose = bool(
-        audio_ready
+        not compose_blocked
+        and not no_dub_route_terminal
+        and audio_ready
         and (final_stale_reason or compose_reason_norm != "ready")
     )
     return {
-        "dub_status": str(dub_status or "").strip().lower() or "never",
+        "dub_status": dub_status_norm,
         "audio_ready": audio_ready,
         "audio_ready_reason": str(voice_state.get("audio_ready_reason") or "").strip() or "unknown",
         "dub_current": bool(voice_state.get("dub_current")),
@@ -153,6 +178,15 @@ def build_hot_follow_current_attempt_summary(
         "compose_status": compose_status_norm,
         "compose_reason": compose_reason_norm,
         "final_stale_reason": final_stale_reason or None,
+        "compose_blocked_terminal": compose_blocked,
+        "compose_terminal_state": "compose_blocked_terminal" if compose_blocked else None,
+        "subtitle_empty_terminal": subtitle_empty_terminal,
+        "no_dub_route_terminal": no_dub_route_terminal,
+        "subtitle_terminal_state": (
+            "no_dub_route_terminal"
+            if no_dub_route_terminal
+            else ("subtitle_empty_terminal" if subtitle_empty_terminal else None)
+        ),
         "requires_redub": requires_redub,
         "requires_recompose": requires_recompose,
         "current_subtitle_source": str(subtitle_lane.get("actual_burn_subtitle_source") or "").strip() or None,
