@@ -284,11 +284,6 @@ from gateway.app.services.hot_follow_runtime_bridge import (  # noqa: E402
     compat_resolve_target_srt_key as _compat_resolve_target_srt_key,
 )
 from gateway.app.services.line_binding_service import get_line_runtime_binding  # noqa: E402
-from gateway.app.services.compose_input_policy import (  # noqa: E402
-    build_compose_input_block_updates,
-    evaluate_compose_input_policy,
-    stale_compose_input_policy_updates,
-)
 from gateway.app.services.compose_service import (  # noqa: E402
     CompositionService,
     HotFollowComposeRequestContract,
@@ -2268,55 +2263,9 @@ def _execute_compose_task_contract(
             body=svc.build_compose_lock_body(task_id),
         )
 
-    current_for_plan, request_updates, compose_plan = svc.prepare_hot_follow_compose_task(current, request)
-    if request_updates:
-        _policy_upsert(repo, task_id, request_updates)
-        current_for_plan = repo.get(task_id) or current_for_plan
-
-    fresh_final_key = svc.resolve_fresh_final_key(
-        task_id,
-        current_for_plan,
-        request=request,
-        revision_snapshot=revision_snapshot,
-    )
-    if fresh_final_key:
-        latest = repo.get(task_id) or current_for_plan
-        return svc.build_hot_follow_compose_response(
-            task_id,
-            final_key=fresh_final_key,
-            compose_status=latest.get("compose_status"),
-            hub=hub_loader(task_id, repo),
-            line=line_binding.to_payload(),
-        )
-
-    input_decision = evaluate_compose_input_policy(current_for_plan)
-    if input_decision.blocked:
-        updates = build_compose_input_block_updates(input_decision)
-        _policy_upsert(repo, task_id, updates)
-        latest = repo.get(task_id) or {**current_for_plan, **updates}
-        return HotFollowComposeResponseContract(
-            status_code=200,
-            body={
-                "ok": False,
-                "task_id": task_id,
-                "compose_status": "blocked",
-                "compose_allowed": False,
-                "compose_allowed_reason": input_decision.reason,
-                "compose_input_policy": input_decision.to_dict(),
-                "hub": hub_loader(task_id, repo),
-                "line": line_binding.to_payload(),
-                "task": latest,
-            },
-        )
-
-    direct_updates = stale_compose_input_policy_updates(current_for_plan)
-    if direct_updates:
-        _policy_upsert(repo, task_id, direct_updates)
-        current_for_plan = repo.get(task_id) or current_for_plan
-
     lock = _task_compose_lock(task_id)
     if not lock.acquire(blocking=False):
-        current = repo.get(task_id) or current_for_plan
+        current = repo.get(task_id) or current
         _policy_upsert(repo, task_id, svc.build_compose_lock_updates(current))
         return HotFollowComposeResponseContract(
             status_code=409,
@@ -2324,6 +2273,27 @@ def _execute_compose_task_contract(
         )
 
     try:
+        current_for_plan, request_updates, compose_plan = svc.prepare_hot_follow_compose_task(current, request)
+        if request_updates:
+            _policy_upsert(repo, task_id, request_updates)
+            current_for_plan = repo.get(task_id) or current_for_plan
+
+        fresh_final_key = svc.resolve_fresh_final_key(
+            task_id,
+            current_for_plan,
+            request=request,
+            revision_snapshot=revision_snapshot,
+        )
+        if fresh_final_key:
+            latest = repo.get(task_id) or current_for_plan
+            return svc.build_hot_follow_compose_response(
+                task_id,
+                final_key=fresh_final_key,
+                compose_status=latest.get("compose_status"),
+                hub=hub_loader(task_id, repo),
+                line=line_binding.to_payload(),
+            )
+
         _policy_upsert(
             repo,
             task_id,
