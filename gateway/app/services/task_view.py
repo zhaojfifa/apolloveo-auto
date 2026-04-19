@@ -12,6 +12,10 @@ from typing import Any
 
 from gateway.app.config import get_settings
 from gateway.app.services.artifact_storage import get_download_url, object_exists
+from gateway.app.services.compose_input_policy import (
+    ComposeInputPolicyDecision,
+    evaluate_compose_input_policy,
+)
 from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
 from gateway.app.services.hot_follow_language_profiles import get_hot_follow_language_profile
 from gateway.app.services.hot_follow_skills_advisory import (
@@ -64,6 +68,85 @@ from gateway.app.services.voice_state import (
 from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 logger = logging.getLogger(__name__)
+
+
+def _apply_compose_input_block_presentation(
+    payload: dict[str, Any],
+    decision: ComposeInputPolicyDecision,
+) -> None:
+    if not decision.blocked:
+        return
+    reason = decision.reason or "compose_input_blocked"
+    message = f"compose input blocked before compose execution: {reason}"
+    payload["compose_allowed"] = False
+    payload["compose_allowed_reason"] = reason
+    payload["compose_input_policy"] = decision.to_dict()
+    payload["composed_ready"] = False
+    payload["composed_reason"] = reason
+
+    ready_gate = payload.get("ready_gate")
+    if isinstance(ready_gate, dict):
+        blocking = [str(item) for item in (ready_gate.get("blocking") or [])]
+        blocking = [item for item in blocking if item not in {"compose_not_done", "final_stale"}]
+        if reason not in blocking:
+            blocking.append(reason)
+        ready_gate.update(
+            {
+                "compose_ready": False,
+                "publish_ready": False,
+                "compose_allowed": False,
+                "compose_allowed_reason": reason,
+                "compose_blocked": True,
+                "compose_blocked_reason": reason,
+                "blocking": blocking,
+            }
+        )
+
+    current_attempt = payload.get("current_attempt")
+    if isinstance(current_attempt, dict):
+        current_attempt.update(
+            {
+                "compose_status": "blocked",
+                "compose_reason": reason,
+                "compose_blocked": True,
+                "compose_blocked_reason": reason,
+                "requires_recompose": False,
+                "final_stale_reason": None,
+            }
+        )
+
+    operator_summary = payload.get("operator_summary")
+    if isinstance(operator_summary, dict):
+        operator_summary["recommended_next_action"] = "resolve_compose_input"
+        operator_summary["recommended_next_action_reason"] = reason
+        operator_summary["compose_blocked"] = True
+        operator_summary["compose_blocked_reason"] = reason
+
+    for item in payload.get("pipeline") or []:
+        if isinstance(item, dict) and str(item.get("key") or "").strip().lower() == "compose":
+            item["status"] = "blocked"
+            item["state"] = "blocked"
+            item["error"] = {"reason": reason, "message": message}
+            item["message"] = message
+
+    pipeline_legacy = payload.get("pipeline_legacy")
+    if isinstance(pipeline_legacy, dict):
+        compose_legacy = pipeline_legacy.get("compose")
+        if isinstance(compose_legacy, dict):
+            compose_legacy["status"] = "blocked"
+            compose_legacy["state"] = "blocked"
+            compose_legacy["summary"] = message
+
+    compose = payload.get("compose")
+    if isinstance(compose, dict):
+        last = compose.get("last")
+        if isinstance(last, dict):
+            last["status"] = "blocked"
+            last["error"] = {"reason": reason, "message": message}
+
+    errors = payload.get("errors")
+    if isinstance(errors, dict):
+        errors["compose"] = {"reason": reason, "message": message}
 
 
 def hot_follow_operational_defaults() -> dict[str, Any]:
@@ -970,6 +1053,7 @@ def build_hot_follow_workbench_hub(
     payload = state_computer(task_runtime, payload)
     final_input_video_ready = bool(raw_url or mute_url)
     subtitle_ready_for_compose = bool(subtitle_lane.get("subtitle_ready"))
+    compose_input_decision = evaluate_compose_input_policy(task_runtime)
     compose_allowed = bool(
         final_input_video_ready
         and (
@@ -987,6 +1071,9 @@ def build_hot_follow_workbench_hub(
         compose_allowed_reason = str(no_dub_reason or "no_dub_not_allowed")
     else:
         compose_allowed_reason = str(voice_state.get("audio_ready_reason") or "audio_not_ready")
+    if compose_input_decision.blocked:
+        compose_allowed = False
+        compose_allowed_reason = compose_input_decision.reason or "compose_input_blocked"
     payload["compose_allowed"] = compose_allowed
     payload["compose_allowed_reason"] = compose_allowed_reason
     ready_gate = payload.get("ready_gate")
@@ -1095,6 +1182,7 @@ def build_hot_follow_workbench_hub(
                     item["url"] = None
                     item["open_url"] = None
                     break
+    _apply_compose_input_block_presentation(payload, compose_input_decision)
     payload["line"] = line_binding_loader(task).to_payload()
     advisory = maybe_build_hot_follow_advisory(task, payload)
     if advisory is not None:

@@ -220,6 +220,56 @@ def test_hot_follow_advisory_v0_recommends_continue_qa_when_final_is_ready():
     }
 
 
+def test_hot_follow_advisory_v0_prefers_compose_blocked_over_recompose():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-skills-v0-compose-blocked", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": True,
+                "compose_ready": False,
+                "compose_allowed": False,
+                "compose_allowed_reason": "input_requires_hardening",
+                "compose_blocked": True,
+                "compose_blocked_reason": "input_requires_hardening",
+                "publish_ready": False,
+                "blocking": ["input_requires_hardening"],
+            },
+            artifact_facts={
+                "final_exists": True,
+                "audio_exists": True,
+                "subtitle_exists": True,
+            },
+            current_attempt={
+                "audio_ready": True,
+                "compose_status": "blocked",
+                "compose_blocked": True,
+                "compose_blocked_reason": "input_requires_hardening",
+                "requires_recompose": True,
+                "final_stale_reason": "final_stale_after_dub",
+                "current_subtitle_source": "mm.srt",
+            },
+            operator_summary={"last_successful_output_available": True},
+        ),
+    )
+
+    assert advisory == {
+        "id": "hf_advisory_compose_blocked",
+        "kind": "operator_guidance",
+        "level": "warning",
+        "recommended_next_action": "resolve_compose_input",
+        "operator_hint": "compose input blocked",
+        "explanation": "当前素材暂不满足合成条件：input_requires_hardening。请调整素材后再尝试合成。",
+        "evidence": {
+            "compose_allowed": False,
+            "compose_blocked": True,
+            "compose_blocked_reason": "input_requires_hardening",
+            "compose_status": "blocked",
+            "blocking": ["input_requires_hardening"],
+        },
+    }
+
+
 def test_hot_follow_advisory_v0_noops_for_non_hot_follow_kind():
     advisory = skills_advisory.maybe_build_hot_follow_advisory(
         {"task_id": "skills-noop-non-hf", "kind": "avatar"},
@@ -380,3 +430,65 @@ def test_hot_follow_advisory_result_attaches_to_workbench_payload(monkeypatch):
         "explanation": "read only",
         "evidence": {"source": "test"},
     }
+
+
+def test_workbench_payload_aligns_compose_blocked_truth(monkeypatch):
+    task_id = "hf-skills-compose-blocked-workbench"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "pending",
+            "target_lang": "mm",
+            "title": "compose blocked",
+            "raw_video_url": "/media/raw.mp4",
+            "compose_input_probe": {
+                "width": 1920,
+                "height": 1080,
+                "file_size_bytes": 300 * 1024 * 1024,
+                "duration_sec": 30,
+                "video_bitrate": 2_000_000,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "final_missing",
+            "final": {"exists": False, "fresh": False, "url": None},
+            "historical_final": {"exists": False, "url": None},
+            "final_fresh": False,
+            "final_stale_reason": "final_stale_after_dub",
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": True,
+        },
+    )
+    _patch_workbench_dependencies(monkeypatch)
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    assert data["compose_allowed"] is False
+    assert data["compose_allowed_reason"] == "input_too_large"
+    assert data["composed_reason"] == "input_too_large"
+    assert data["ready_gate"]["compose_blocked"] is True
+    assert data["ready_gate"]["compose_blocked_reason"] == "input_too_large"
+    assert data["current_attempt"]["compose_status"] == "blocked"
+    assert data["current_attempt"]["requires_recompose"] is False
+    compose_step = next(item for item in data["pipeline"] if item["key"] == "compose")
+    assert compose_step["status"] == "blocked"
+    assert data["advisory"]["id"] == "hf_advisory_compose_blocked"

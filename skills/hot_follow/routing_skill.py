@@ -19,6 +19,9 @@ def run(
     if current_subtitle_source and current_subtitle_source != expected_subtitle_source:
         return {"decision_key": "subtitle_source_mismatch"}
 
+    if facts.get("compose_blocked"):
+        return {"decision_key": "compose_blocked"}
+
     if facts.get("requires_recompose"):
         return {"decision_key": "recompose_required"}
 
