@@ -24,15 +24,6 @@ def run(
     subtitle_ready = bool(ready_gate.get("subtitle_ready"))
     audio_ready = bool(current_attempt.get("audio_ready") or ready_gate.get("audio_ready"))
     compose_ready = bool(ready_gate.get("compose_ready"))
-    compose_allowed = ready_gate.get("compose_allowed")
-    compose_allowed = None if compose_allowed is None else bool(compose_allowed)
-    compose_blocked = bool(current_attempt.get("compose_blocked") or ready_gate.get("compose_blocked"))
-    compose_blocked_reason = str(
-        current_attempt.get("compose_blocked_reason")
-        or ready_gate.get("compose_blocked_reason")
-        or ready_gate.get("compose_allowed_reason")
-        or ""
-    ).strip() or None
     publish_ready = bool(ready_gate.get("publish_ready"))
     blocking = list(ready_gate.get("blocking") or [])
     return {
@@ -47,9 +38,6 @@ def run(
         ).strip()
         or None,
         "compose_ready": compose_ready,
-        "compose_allowed": compose_allowed,
-        "compose_blocked": compose_blocked,
-        "compose_blocked_reason": compose_blocked_reason,
         "publish_ready": publish_ready,
         "blocking": blocking,
         "final_exists": bool(artifact_facts.get("final_exists")),
