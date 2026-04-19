@@ -743,6 +743,49 @@ def test_hot_follow_workbench_parse_uses_raw_artifacts_over_failed_legacy_status
     assert ((data.get("pipeline_legacy") or {}).get("parse") or {}).get("status") == "done"
 
 
+def test_hot_follow_workbench_pack_error_does_not_pollute_parse_pipeline(monkeypatch):
+    task_id = "hf-workbench-pack-error-isolation-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "failed",
+            "last_step": "pack",
+            "parse_status": "done",
+            "pack_status": "failed",
+            "pack_error": "request model invalid",
+            "error_message": "request model invalid",
+            "raw_path": f"deliver/tasks/{task_id}/raw/raw.mp4",
+        },
+    )
+
+    monkeypatch.setattr(hf_router, "_compute_composed_state", lambda *_args, **_kwargs: {"composed_ready": False, "composed_reason": "not_ready", "final": {"exists": False}, "compose_error_reason": None, "compose_error_message": None})
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key).endswith("raw.mp4"))
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    parse_step = next((x for x in (data.get("pipeline") or []) if x.get("key") == "parse"), {})
+    pack_step = next((x for x in (data.get("pipeline") or []) if x.get("key") == "pack"), {})
+    assert parse_step.get("status") == "done"
+    assert parse_step.get("error") is None
+    assert pack_step.get("status") == "failed"
+    assert pack_step.get("error") == "request model invalid"
+
+
 def test_hot_follow_workbench_subtitles_keep_srt_as_primary_editable_object(monkeypatch):
     task_id = "hf-workbench-subtitles-srt-01"
     repo = _Repo()
@@ -930,3 +973,133 @@ def test_hot_follow_compose_route_applies_service_updates_outside_compose_servic
     saved = repo.get(task_id) or {}
     assert saved["compose_status"] == "done"
     assert saved["final_video_key"] == f"deliver/tasks/{task_id}/final.mp4"
+
+
+def test_hot_follow_compose_failure_finalizes_releases_lock_and_allows_retry(monkeypatch):
+    task_id = "hf-compose-heavy-timeout-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "ready",
+            "target_lang": "my",
+            "content_lang": "my",
+            "compose_plan": {"overlay_subtitles": True},
+        },
+    )
+    calls = {"compose": 0}
+
+    def _compose_once_then_success(self, _task_id, _task, **_kwargs):
+        calls["compose"] += 1
+        if calls["compose"] == 1:
+            raise hf_router.HTTPException(
+                status_code=409,
+                detail={"reason": "compose_timeout", "message": "heavy compose timed out"},
+            )
+        return ComposeResult(
+            updates={
+                "compose_status": "done",
+                "compose_last_status": "done",
+                "final_video_key": f"deliver/tasks/{task_id}/final.mp4",
+                "final_video_path": f"deliver/tasks/{task_id}/final.mp4",
+                "status": "ready",
+                "last_step": "compose",
+            },
+            final_key=f"deliver/tasks/{task_id}/final.mp4",
+            final_url=f"/v1/tasks/{task_id}/final",
+            compose_status="done",
+        )
+
+    monkeypatch.setattr(hf_router, "get_storage_service", lambda: object())
+    monkeypatch.setattr(hf_router.CompositionService, "resolve_fresh_final_key", lambda *args, **kwargs: None)
+    monkeypatch.setattr(hf_router.CompositionService, "compose", _compose_once_then_success)
+    monkeypatch.setattr(
+        hf_router,
+        "_service_build_hot_follow_workbench_hub",
+        lambda current_task_id, repo=None: {"task_id": current_task_id, "compose_status": (repo.get(current_task_id) or {}).get("compose_status")},
+    )
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        failed = client.post(f"/api/hot_follow/tasks/{task_id}/compose", json={})
+        assert failed.status_code == 409
+        saved_after_failure = repo.get(task_id) or {}
+        assert saved_after_failure["compose_status"] == "failed"
+        assert saved_after_failure["compose_last_status"] == "failed"
+        assert saved_after_failure["compose_error_reason"] == "compose_timeout"
+        assert saved_after_failure.get("compose_lock_until") is None
+        assert hf_router._task_compose_lock(task_id).locked() is False
+
+        retried = client.post(f"/api/hot_follow/tasks/{task_id}/compose", json={})
+        assert retried.status_code == 200
+
+    saved_after_retry = repo.get(task_id) or {}
+    assert calls["compose"] == 2
+    assert saved_after_retry["compose_status"] == "done"
+    assert saved_after_retry["final_video_key"] == f"deliver/tasks/{task_id}/final.mp4"
+
+
+def test_hot_follow_compose_recovers_stale_running_before_false_409(monkeypatch):
+    task_id = "hf-compose-stale-running-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "target_lang": "my",
+            "content_lang": "my",
+            "compose_status": "running",
+            "compose_last_status": "running",
+            "compose_last_started_at": "2026-04-19T00:00:00+00:00",
+            "compose_lock_until": "2099-01-01T00:00:00+00:00",
+            "compose_plan": {"overlay_subtitles": True},
+        },
+    )
+
+    monkeypatch.setenv("HF_COMPOSE_STALE_RUNNING_SEC", "0")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "get_storage_service", lambda: object())
+    monkeypatch.setattr(hf_router.CompositionService, "resolve_fresh_final_key", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        hf_router.CompositionService,
+        "compose",
+        lambda self, _task_id, _task, **_kwargs: ComposeResult(
+            updates={
+                "compose_status": "done",
+                "compose_last_status": "done",
+                "final_video_key": f"deliver/tasks/{task_id}/final.mp4",
+                "final_video_path": f"deliver/tasks/{task_id}/final.mp4",
+                "status": "ready",
+                "last_step": "compose",
+            },
+            final_key=f"deliver/tasks/{task_id}/final.mp4",
+            final_url=f"/v1/tasks/{task_id}/final",
+            compose_status="done",
+        ),
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_service_build_hot_follow_workbench_hub",
+        lambda current_task_id, repo=None: {"task_id": current_task_id, "compose_status": (repo.get(current_task_id) or {}).get("compose_status")},
+    )
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.post(f"/api/hot_follow/tasks/{task_id}/compose", json={})
+
+    assert res.status_code == 200
+    saved = repo.get(task_id) or {}
+    assert saved["compose_status"] == "done"
+    assert saved.get("compose_lock_until") is None
