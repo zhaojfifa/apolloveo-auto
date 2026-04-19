@@ -297,6 +297,40 @@ def compose_error_parts(task: dict) -> tuple[str | None, str | None]:
     return (str(reason_field) if reason_field else "compose_failed", text)
 
 
+def compose_runtime_guard_state(task: dict) -> dict[str, Any]:
+    status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip().lower()
+    failure_code = str(task.get("compose_failure_code") or task.get("compose_error_reason") or "").strip() or None
+    failure_message = str(task.get("compose_failure_message") or task.get("compose_last_error") or "").strip() or None
+    preflight_status = str(task.get("compose_preflight_status") or "").strip() or None
+    lock_until_raw = task.get("compose_lock_until")
+    stale_running = False
+    if status in {"running", "processing", "queued"}:
+        if not lock_until_raw:
+            stale_running = True
+        else:
+            try:
+                lock_dt = datetime.fromisoformat(str(lock_until_raw))
+                if lock_dt.tzinfo is None:
+                    lock_dt = lock_dt.replace(tzinfo=timezone.utc)
+                stale_running = lock_dt <= datetime.now(timezone.utc)
+            except Exception:
+                stale_running = True
+    if stale_running:
+        status = "failed"
+        failure_code = failure_code or "compose_runtime_stale"
+        failure_message = failure_message or "Compose was left running without an active lock."
+    return {
+        "compose_status": status or "never",
+        "compose_preflight_status": preflight_status,
+        "compose_preflight_reason": task.get("compose_preflight_reason"),
+        "compose_input_profile": task.get("compose_input_profile"),
+        "compose_input_probe": task.get("compose_input_probe"),
+        "compose_failure_code": failure_code,
+        "compose_failure_message": failure_message,
+        "compose_running_stale": stale_running,
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Deliverable URLs
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -521,6 +555,7 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
     ).strip().lower()
     no_dub_compose_allowed = no_dub and no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}
+    guard_state = compose_runtime_guard_state(task)
     compose_status = str(task.get("compose_status") or "").lower()
     compose_last_status = str(
         task.get("compose_last_status") or compose_status
@@ -542,6 +577,14 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         composed_reason = final_stale_reason
     elif not raw_exists:
         composed_reason = "missing_raw"
+    elif guard_state.get("compose_running_stale"):
+        composed_reason = "compose_runtime_stale"
+    elif guard_state.get("compose_preflight_status") in {"blocked", "failed"}:
+        composed_reason = str(
+            guard_state.get("compose_preflight_reason")
+            or guard_state.get("compose_failure_code")
+            or "compose_failed"
+        )
     elif not voice_exists and not no_dub_compose_allowed:
         composed_reason = "missing_voiceover"
     elif not voice_state.get("audio_ready") and not no_dub_compose_allowed:
@@ -600,6 +643,7 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         "final_fresh": final_fresh,
         "compose_error_reason": compose_error_reason,
         "compose_error_message": compose_error_message,
+        **guard_state,
         "raw_exists": raw_exists,
         "voice_exists": voice_exists,
         "audio_ready": bool(voice_state.get("audio_ready")),
