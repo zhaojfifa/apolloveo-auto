@@ -303,6 +303,21 @@ def test_hot_follow_advisory_noop_preserves_workbench_payload(monkeypatch):
         "subtitle_url": None,
         "pack_exists": False,
         "pack_url": None,
+        "compose_input": {"mode": "unknown", "blocked": False, "reason": None, "profile": {}, "source": "none"},
+        "compose_input_mode": "unknown",
+        "compose_input_blocked": False,
+        "compose_input_reason": None,
+        "audio_lane": {
+            "mode": "muted_no_tts",
+            "tts_voiceover_exists": False,
+            "source_audio_policy": "mute",
+            "source_audio_preserved": False,
+            "bgm_key": None,
+            "bgm_configured": False,
+            "no_tts": True,
+        },
+        "audio_lane_mode": "muted_no_tts",
+        "tts_voiceover_exists": False,
     }
 
 

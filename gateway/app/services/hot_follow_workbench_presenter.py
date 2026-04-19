@@ -3,8 +3,78 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable
 
+from gateway.app.services.source_audio_policy import source_audio_policy_from_task
+
 
 logger = logging.getLogger(__name__)
+
+
+def _first_mapping(*values: Any) -> dict[str, Any]:
+    for value in values:
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def _compose_input_facts(task: dict) -> dict[str, Any]:
+    compose = task.get("compose") if isinstance(task.get("compose"), dict) else {}
+    policy = task.get("compose_input_policy") if isinstance(task.get("compose_input_policy"), dict) else {}
+    profile = _first_mapping(
+        policy.get("profile"),
+        task.get("compose_input_probe"),
+        compose.get("input_probe"),
+        task.get("source_video_profile"),
+        task.get("video_profile"),
+    )
+    mode = str(policy.get("mode") or "").strip().lower()
+    reason = str(policy.get("reason") or "").strip() or None
+    preflight_status = str(compose.get("preflight_status") or task.get("compose_preflight_status") or "").strip().lower()
+    preflight_reason = str(compose.get("preflight_reason") or task.get("compose_preflight_reason") or "").strip() or None
+    if not mode:
+        if preflight_status == "blocked":
+            mode = "blocked"
+        elif task.get("compose_input_key") or task.get("compose_input_path"):
+            mode = "derived"
+        elif profile:
+            mode = "direct"
+        else:
+            mode = "unknown"
+    if reason is None:
+        reason = preflight_reason
+    return {
+        "mode": mode,
+        "blocked": mode == "blocked",
+        "reason": reason,
+        "profile": dict(profile or {}),
+        "source": "compose_input_policy" if policy else ("compose_probe" if profile else "none"),
+    }
+
+
+def _audio_lane_facts(task: dict, persisted_audio: dict[str, Any] | None) -> dict[str, Any]:
+    audio = persisted_audio or {}
+    source_audio_policy = source_audio_policy_from_task(task)
+    tts_voiceover_exists = bool(audio.get("exists") and str(audio.get("voiceover_url") or "").strip())
+    source_audio_preserved = source_audio_policy == "preserve"
+    config = task.get("config") if isinstance(task.get("config"), dict) else {}
+    bgm = config.get("bgm") if isinstance(config.get("bgm"), dict) else {}
+    bgm_key = str(bgm.get("bgm_key") or "").strip() or None
+    if tts_voiceover_exists and source_audio_preserved:
+        mode = "tts_voiceover_plus_source_audio"
+    elif tts_voiceover_exists:
+        mode = "tts_voiceover_only"
+    elif source_audio_preserved:
+        mode = "source_audio_preserved_no_tts"
+    else:
+        mode = "muted_no_tts"
+    return {
+        "mode": mode,
+        "tts_voiceover_exists": tts_voiceover_exists,
+        "source_audio_policy": source_audio_policy,
+        "source_audio_preserved": source_audio_preserved,
+        "bgm_key": bgm_key,
+        "bgm_configured": bool(bgm_key),
+        "no_tts": not tts_voiceover_exists,
+    }
 
 
 def build_hot_follow_artifact_facts(
@@ -26,6 +96,8 @@ def build_hot_follow_artifact_facts(
     pack_payload = scene_pack or {}
     subtitle_url = deliverable_url(task_id, task, "mm_srt")
     pack_url = deliverable_url(task_id, task, "pack_zip") or pack_payload.get("download_url")
+    compose_input = _compose_input_facts(task)
+    audio_lane = _audio_lane_facts(task, audio_payload)
     return {
         "final_exists": bool(current_final_payload.get("exists") or historical_payload.get("exists")),
         "final_url": str(final_payload.get("url") or "").strip() or None,
@@ -37,6 +109,13 @@ def build_hot_follow_artifact_facts(
         "subtitle_url": str(subtitle_url or "").strip() or None,
         "pack_exists": bool(pack_url),
         "pack_url": str(pack_url or "").strip() or None,
+        "compose_input": compose_input,
+        "compose_input_mode": compose_input["mode"],
+        "compose_input_blocked": bool(compose_input["blocked"]),
+        "compose_input_reason": compose_input["reason"],
+        "audio_lane": audio_lane,
+        "audio_lane_mode": audio_lane["mode"],
+        "tts_voiceover_exists": bool(audio_lane["tts_voiceover_exists"]),
     }
 
 
