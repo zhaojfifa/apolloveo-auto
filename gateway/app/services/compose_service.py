@@ -13,7 +13,6 @@ Historical bug-fix preservation:
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import os
 import re
@@ -54,15 +53,6 @@ _SRT_TIME_RE = re.compile(
     r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
 )
 _SOURCE_AUDIO_BED_VOLUME_FLOOR = 0.35
-SOFT_MAX_BYTES = 80 * 1024 * 1024
-ADAPT_MAX_BYTES = 250 * 1024 * 1024
-MAX_DURATION_SEC = 300
-MAX_HEIGHT = 1080
-MAX_VIDEO_BITRATE = 8_000_000
-MIN_FREE_DISK_BYTES = 2 * 1024 * 1024 * 1024
-ADAPTED_COMPOSE_HEIGHT = 720
-ADAPTED_COMPOSE_VIDEO_BITRATE = "2500k"
-ADAPTED_COMPOSE_VIDEO_BITRATE_NUM = 2_500_000
 
 # ---------------------------------------------------------------------------
 # Module-level pure helpers (extracted from nested functions)
@@ -178,12 +168,9 @@ def compose_fail(
     *,
     ffmpeg_cmd: str | None = None,
     stderr_tail: str | None = None,
-    extra: dict[str, Any] | None = None,
 ) -> None:
     """Raise HTTPException with structured compose error detail."""
     detail: dict[str, Any] = {"reason": reason, "message": message}
-    if extra:
-        detail.update(extra)
     if ffmpeg_cmd:
         detail["ffmpeg_cmd"] = ffmpeg_cmd
     if stderr_tail:
@@ -494,30 +481,6 @@ def _source_audio_bed_volume(value: float | None) -> float:
     return max(0.0, min(1.0, mix))
 
 
-def _estimate_working_set_bytes(file_size: int, width: int | None, height: int | None) -> int:
-    pixels = int(width or 0) * int(height or 0)
-    frame_buffer = pixels * 4 * 3 if pixels > 0 else 0
-    return int(max(file_size * 3, file_size + frame_buffer + 256 * 1024 * 1024))
-
-
-def _safe_int(value: Any) -> int | None:
-    try:
-        if value is None or str(value).upper() == "N/A":
-            return None
-        return int(float(value))
-    except Exception:
-        return None
-
-
-def _safe_float(value: Any) -> float | None:
-    try:
-        if value is None or str(value).upper() == "N/A":
-            return None
-        return float(value)
-    except Exception:
-        return None
-
-
 # ---------------------------------------------------------------------------
 # Internal dataclasses
 # ---------------------------------------------------------------------------
@@ -531,7 +494,6 @@ class ComposeTimeouts:
     compose: int = 600
     probe: int = 30
     clamp: int = 120
-    adapt: int = 300
 
 
 @dataclass(frozen=True)
@@ -582,49 +544,6 @@ class ComposeResult:
     compose_status: str
 
 
-@dataclass(frozen=True)
-class ComposeInputProfile:
-    file_size_bytes: int
-    duration_sec: float
-    width: int | None
-    height: int | None
-    video_bitrate: int | None
-    audio_stream_count: int
-    video_codec: str | None
-    audio_codec: str | None
-    estimated_working_set_bytes: int
-    free_disk_bytes: int | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "file_size_bytes": self.file_size_bytes,
-            "duration_sec": self.duration_sec,
-            "width": self.width,
-            "height": self.height,
-            "video_bitrate": self.video_bitrate,
-            "audio_stream_count": self.audio_stream_count,
-            "video_codec": self.video_codec,
-            "audio_codec": self.audio_codec,
-            "estimated_working_set_bytes": self.estimated_working_set_bytes,
-            "free_disk_bytes": self.free_disk_bytes,
-        }
-
-
-@dataclass(frozen=True)
-class ComposePreflightDecision:
-    mode: str
-    reason: str | None
-    profile: ComposeInputProfile
-
-    @property
-    def status(self) -> str:
-        if self.mode == "direct":
-            return "pass"
-        if self.mode == "adapt":
-            return "adapted"
-        return "blocked"
-
-
 @dataclass
 class _ComposeInputs:
     """Validated inputs extracted from task dict."""
@@ -645,7 +564,6 @@ class _ComposeInputs:
     freeze_tail_cap_sec: float
     compose_policy: str
     ffmpeg: str
-    ffprobe: str | None = None
 
 
 @dataclass
@@ -671,11 +589,6 @@ class _WorkspaceFiles:
     compose_warning: str | None = None
     ffmpeg_cmd_used: str | None = None
     overlay_subtitles: bool = True
-    compose_preflight_status: str = "pass"
-    compose_preflight_reason: str | None = None
-    compose_input_profile: str = "direct"
-    compose_input_probe: dict[str, Any] | None = None
-    adapted_input_path: Path | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -844,12 +757,6 @@ class CompositionService:
             "compose_last_finished_at": None,
             "compose_last_error": None,
             "compose_warning": None,
-            "compose_failure_code": None,
-            "compose_failure_message": None,
-            "compose_preflight_status": None,
-            "compose_preflight_reason": None,
-            "compose_input_profile": None,
-            "compose_input_probe": None,
             "compose_plan": compose_plan.to_dict(),
             "scene_outputs": task.get("scene_outputs") or [],
         }
@@ -908,35 +815,18 @@ class CompositionService:
 
     @staticmethod
     def build_compose_failure_updates(detail: dict[str, Any]) -> dict[str, Any]:
-        reason = detail.get("reason")
-        failure_code = detail.get("compose_failure_code") or reason or "compose_failed"
-        message = detail.get("message") or str(detail)
-        preflight_status = detail.get("compose_preflight_status")
-        preflight_reason = detail.get("compose_preflight_reason")
-        input_profile = detail.get("compose_input_profile")
-        updates: dict[str, Any] = {
-            "compose_status": "blocked" if preflight_status == "blocked" else "failed",
+        return {
+            "compose_status": "failed",
             "compose_error": detail,
-            "compose_error_reason": reason,
-            "compose_last_status": "blocked" if preflight_status == "blocked" else "failed",
+            "compose_error_reason": detail.get("reason"),
+            "compose_last_status": "failed",
             "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-            "compose_last_error": message,
-            "compose_failure_code": failure_code,
-            "compose_failure_message": message,
+            "compose_last_error": detail.get("message"),
             "status": "failed",
             "last_step": "compose",
             "final_video_key": None,
             "final_video_path": None,
         }
-        if preflight_status:
-            updates["compose_preflight_status"] = preflight_status
-        if preflight_reason:
-            updates["compose_preflight_reason"] = preflight_reason
-        if input_profile:
-            updates["compose_input_profile"] = input_profile
-        if detail.get("compose_input_probe") is not None:
-            updates["compose_input_probe"] = detail.get("compose_input_probe")
-        return updates
 
     @staticmethod
     def merge_compose_warning(
@@ -1038,18 +928,6 @@ class CompositionService:
         ffmpeg = shutil.which("ffmpeg")
         if not ffmpeg:
             compose_fail("compose_failed", "ffmpeg not found in PATH")
-        ffprobe = shutil.which("ffprobe")
-        if not ffprobe:
-            compose_fail(
-                "probe_failed",
-                "ffprobe not found in PATH",
-                extra={
-                    "compose_failure_code": "probe_failed",
-                    "compose_preflight_status": "failed",
-                    "compose_preflight_reason": "probe_failed",
-                    "compose_input_profile": "blocked",
-                },
-            )
 
         # Extract compose plan config
         config = dict(live_task.get("config") or {})
@@ -1126,7 +1004,6 @@ class CompositionService:
             freeze_tail_cap_sec=freeze_tail_cap_sec,
             compose_policy=compose_policy,
             ffmpeg=str(ffmpeg),
-            ffprobe=str(ffprobe),
         )
 
     # ── Phase 2: Workspace preparation ────────────────────────────────────
@@ -1157,10 +1034,36 @@ class CompositionService:
                 compose_fail("missing_voiceover", "voiceover audio invalid")
 
         video_input_path = video_path
-        adapted_input_path: Path | None = None
-        preflight: ComposePreflightDecision | None = None
         compose_policy = inputs.compose_policy
         compose_warning: str | None = None
+
+        # ── Freeze-tail ──
+        hold_sec = 0.0
+        if inputs.freeze_tail_enabled and voice_duration > video_duration:
+            required_hold = max(0.0, voice_duration - video_duration)
+            if required_hold <= inputs.freeze_tail_cap_sec:
+                hold_sec = required_hold
+            else:
+                compose_policy = "match_video"
+                compose_warning = (
+                    f"freeze tail required {required_hold:.2f}s > cap {inputs.freeze_tail_cap_sec:.2f}s; "
+                    "fallback to match_video"
+                )
+        else:
+            compose_policy = "match_video" if not inputs.freeze_tail_enabled else compose_policy
+
+        if hold_sec > 0:
+            result_path = self._apply_freeze_tail(task_id, inputs.ffmpeg, video_path, tmp, hold_sec)
+            if result_path:
+                video_input_path = result_path
+                try:
+                    _, video_duration = assert_local_video_ok(result_path)
+                except ValueError:
+                    video_duration = video_duration + hold_sec
+                compose_policy = "freeze_tail"
+            else:
+                compose_policy = "match_video"
+                compose_warning = "freeze tail render failed; fallback to match_video"
 
         # ── Subtitle download & validation ──
         bundled_fonts_dir = Path(__file__).resolve().parents[1] / "assets" / "fonts"
@@ -1236,56 +1139,6 @@ class CompositionService:
         if requested_overlay_subtitles and not overlay_subtitles and not compose_warning:
             compose_warning = "subtitle_overlay_skipped_empty_no_dub"
 
-        # ── Compose input preflight/adaptation ──
-        preflight = self._preflight_compose_input(
-            task_id,
-            video_path,
-            inputs,
-            fallback_size=video_size,
-            fallback_duration=video_duration,
-        )
-        if preflight.mode == "blocked":
-            self._raise_preflight_blocked(preflight)
-        if preflight.mode == "adapt":
-            adapted_input_path = self._adapt_compose_input(task_id, inputs.ffmpeg, video_path, tmp, preflight)
-            video_input_path = adapted_input_path
-            try:
-                video_size, video_duration = assert_local_video_ok(adapted_input_path)
-            except ValueError:
-                compose_fail(
-                    "compose_input_invalid",
-                    "adapted compose input is invalid",
-                    extra=self._preflight_detail(preflight, failure_code="compose_input_invalid"),
-                )
-
-        # ── Freeze-tail ──
-        hold_sec = 0.0
-        if inputs.freeze_tail_enabled and voice_duration > video_duration:
-            required_hold = max(0.0, voice_duration - video_duration)
-            if required_hold <= inputs.freeze_tail_cap_sec:
-                hold_sec = required_hold
-            else:
-                compose_policy = "match_video"
-                compose_warning = (
-                    f"freeze tail required {required_hold:.2f}s > cap {inputs.freeze_tail_cap_sec:.2f}s; "
-                    "fallback to match_video"
-                )
-        else:
-            compose_policy = "match_video" if not inputs.freeze_tail_enabled else compose_policy
-
-        if hold_sec > 0:
-            result_path = self._apply_freeze_tail(task_id, inputs.ffmpeg, video_input_path, tmp, hold_sec)
-            if result_path:
-                video_input_path = result_path
-                try:
-                    _, video_duration = assert_local_video_ok(result_path)
-                except ValueError:
-                    video_duration = video_duration + hold_sec
-                compose_policy = "freeze_tail"
-            else:
-                compose_policy = "match_video"
-                compose_warning = "freeze tail render failed; fallback to match_video"
-
         return _WorkspaceFiles(
             task_id=task_id,
             tmp=tmp,
@@ -1305,220 +1158,7 @@ class CompositionService:
             subtitle_sha256=subtitle_sha256,
             compose_warning=compose_warning,
             overlay_subtitles=overlay_subtitles,
-            compose_preflight_status=preflight.status,
-            compose_preflight_reason=preflight.reason,
-            compose_input_profile="adapted_720p" if preflight.mode == "adapt" else "direct",
-            compose_input_probe=preflight.profile.to_dict(),
-            adapted_input_path=adapted_input_path,
         )
-
-    def _probe_video_profile(
-        self,
-        task_id: str,
-        video_path: Path,
-        inputs: _ComposeInputs,
-        *,
-        fallback_size: int,
-        fallback_duration: float,
-    ) -> ComposeInputProfile:
-        width: int | None = None
-        height: int | None = None
-        video_bitrate: int | None = None
-        audio_stream_count = 0
-        video_codec: str | None = None
-        audio_codec: str | None = None
-        duration = float(fallback_duration or 0.0)
-        file_size = int(fallback_size or video_path.stat().st_size)
-        if not inputs.ffprobe:
-            return ComposeInputProfile(
-                file_size_bytes=file_size,
-                duration_sec=duration,
-                width=None,
-                height=None,
-                video_bitrate=None,
-                audio_stream_count=0,
-                video_codec=None,
-                audio_codec=None,
-                estimated_working_set_bytes=_estimate_working_set_bytes(file_size, None, None),
-                free_disk_bytes=int(shutil.disk_usage(str(video_path.parent)).free),
-            )
-        cmd = [
-            inputs.ffprobe,
-            "-v",
-            "error",
-            "-print_format",
-            "json",
-            "-show_format",
-            "-show_streams",
-            str(video_path),
-        ]
-        try:
-            proc = self._run_ffmpeg(cmd, task_id, "compose_preflight_probe", timeout=self._timeouts.probe)
-        except HTTPException as exc:
-            detail = exc.detail if isinstance(exc.detail, dict) else {}
-            compose_fail(
-                "probe_failed",
-                "compose input probe failed",
-                extra={
-                    "compose_failure_code": "probe_failed",
-                    "compose_preflight_status": "failed",
-                    "compose_preflight_reason": "probe_failed",
-                    "compose_input_profile": "blocked",
-                    "probe_error": detail,
-                },
-            )
-        if proc.returncode != 0:
-            compose_fail(
-                "probe_failed",
-                "compose input probe failed",
-                stderr_tail=(proc.stderr or "")[-800:],
-                extra={
-                    "compose_failure_code": "probe_failed",
-                    "compose_preflight_status": "failed",
-                    "compose_preflight_reason": "probe_failed",
-                    "compose_input_profile": "blocked",
-                },
-            )
-        try:
-            payload = json.loads(proc.stdout or "{}")
-        except Exception:
-            payload = {}
-        fmt = dict(payload.get("format") or {})
-        duration = _safe_float(fmt.get("duration")) or duration
-        file_size = _safe_int(fmt.get("size")) or file_size
-        for stream in list(payload.get("streams") or []):
-            if not isinstance(stream, dict):
-                continue
-            codec_type = str(stream.get("codec_type") or "").strip().lower()
-            if codec_type == "video" and video_codec is None:
-                width = _safe_int(stream.get("width")) or width
-                height = _safe_int(stream.get("height")) or height
-                video_bitrate = _safe_int(stream.get("bit_rate")) or video_bitrate
-                video_codec = str(stream.get("codec_name") or "").strip() or None
-            elif codec_type == "audio":
-                audio_stream_count += 1
-                if audio_codec is None:
-                    audio_codec = str(stream.get("codec_name") or "").strip() or None
-        free_disk = shutil.disk_usage(str(video_path.parent)).free
-        return ComposeInputProfile(
-            file_size_bytes=file_size,
-            duration_sec=duration,
-            width=width,
-            height=height,
-            video_bitrate=video_bitrate,
-            audio_stream_count=audio_stream_count,
-            video_codec=video_codec,
-            audio_codec=audio_codec,
-            estimated_working_set_bytes=_estimate_working_set_bytes(file_size, width, height),
-            free_disk_bytes=int(free_disk),
-        )
-
-    def _preflight_compose_input(
-        self,
-        task_id: str,
-        video_path: Path,
-        inputs: _ComposeInputs,
-        *,
-        fallback_size: int,
-        fallback_duration: float,
-    ) -> ComposePreflightDecision:
-        profile = self._probe_video_profile(
-            task_id,
-            video_path,
-            inputs,
-            fallback_size=fallback_size,
-            fallback_duration=fallback_duration,
-        )
-        if profile.free_disk_bytes is not None and profile.free_disk_bytes < MIN_FREE_DISK_BYTES:
-            return ComposePreflightDecision("blocked", "disk_insufficient", profile)
-        if profile.file_size_bytes > ADAPT_MAX_BYTES:
-            return ComposePreflightDecision("blocked", "input_too_large", profile)
-        if profile.duration_sec > MAX_DURATION_SEC:
-            return ComposePreflightDecision("blocked", "duration_too_long", profile)
-        if profile.height and profile.height > MAX_HEIGHT:
-            return ComposePreflightDecision("blocked", "resolution_too_high", profile)
-        if profile.video_bitrate and profile.video_bitrate > MAX_VIDEO_BITRATE:
-            return ComposePreflightDecision("blocked", "bitrate_too_high", profile)
-        adapt = bool(
-            profile.file_size_bytes > SOFT_MAX_BYTES
-            or (profile.height and profile.height > ADAPTED_COMPOSE_HEIGHT)
-            or (profile.video_bitrate and profile.video_bitrate > ADAPTED_COMPOSE_VIDEO_BITRATE_NUM)
-        )
-        return ComposePreflightDecision("adapt" if adapt else "direct", "input_requires_adaptation" if adapt else None, profile)
-
-    @staticmethod
-    def _preflight_detail(
-        decision: ComposePreflightDecision,
-        *,
-        failure_code: str | None = None,
-    ) -> dict[str, Any]:
-        return {
-            "compose_preflight_status": decision.status,
-            "compose_preflight_reason": decision.reason,
-            "compose_input_profile": "adapted_720p" if decision.mode == "adapt" else ("blocked" if decision.mode == "blocked" else "direct"),
-            "compose_input_probe": decision.profile.to_dict(),
-            "compose_failure_code": failure_code or decision.reason,
-        }
-
-    def _raise_preflight_blocked(self, decision: ComposePreflightDecision) -> None:
-        reason = decision.reason or "probe_failed"
-        compose_fail(
-            reason,
-            f"compose input blocked by preflight: {reason}",
-            extra=self._preflight_detail(decision, failure_code=reason),
-        )
-
-    def _adapt_compose_input(
-        self,
-        task_id: str,
-        ffmpeg: str,
-        video_path: Path,
-        tmp: Path,
-        decision: ComposePreflightDecision,
-    ) -> Path:
-        adapted_path = tmp / "video_input_adapted_720p.mp4"
-        cmd = [
-            ffmpeg,
-            "-y",
-            "-i",
-            str(video_path),
-            "-map",
-            "0:v:0",
-            "-map",
-            "0:a?",
-            "-vf",
-            f"scale=-2:min({ADAPTED_COMPOSE_HEIGHT}\\,ih)",
-            "-c:v",
-            "libx264",
-            "-preset",
-            "veryfast",
-            "-b:v",
-            ADAPTED_COMPOSE_VIDEO_BITRATE,
-            "-maxrate",
-            ADAPTED_COMPOSE_VIDEO_BITRATE,
-            "-bufsize",
-            "5000k",
-            "-pix_fmt",
-            "yuv420p",
-            "-c:a",
-            "aac",
-            "-b:a",
-            "128k",
-            "-movflags",
-            "+faststart",
-            "-sn",
-            str(adapted_path),
-        ]
-        proc = self._run_ffmpeg(cmd, task_id, "compose_input_adapt", timeout=self._timeouts.adapt)
-        if proc.returncode != 0 or not adapted_path.exists() or adapted_path.stat().st_size == 0:
-            compose_fail(
-                "adaptation_failed",
-                "compose input adaptation failed",
-                ffmpeg_cmd=" ".join(cmd),
-                stderr_tail=(proc.stderr or "")[-800:],
-                extra=self._preflight_detail(decision, failure_code="adaptation_failed"),
-            )
-        return adapted_path
 
     def _apply_freeze_tail(
         self,
@@ -1583,11 +1223,10 @@ class CompositionService:
         if result.result == "timeout":
             stderr_tail = str((result.raw_output or {}).get("stderr") or "")[-800:]
             compose_fail(
-                "ffmpeg_timeout",
+                "compose_timeout",
                 f"{purpose} timed out after {effective_timeout}s",
                 ffmpeg_cmd=" ".join(cmd),
                 stderr_tail=stderr_tail,
-                extra={"compose_failure_code": "ffmpeg_timeout"},
             )
         returncode = (result.output_facts or {}).get("returncode")
         if returncode is None:
@@ -1963,7 +1602,6 @@ class CompositionService:
                     "compose ffmpeg failed",
                     ffmpeg_cmd=ws.ffmpeg_cmd_used,
                     stderr_tail=(proc2.stderr or "")[-800:],
-                    extra=self._workspace_failure_detail(ws, "backend_unavailable"),
                 )
 
     def _execute_compose_cmd(self, cmd: list[str], ws: _WorkspaceFiles, inputs: _ComposeInputs) -> None:
@@ -1978,18 +1616,7 @@ class CompositionService:
                 "compose ffmpeg failed",
                 ffmpeg_cmd=ws.ffmpeg_cmd_used,
                 stderr_tail=(proc.stderr or "")[-800:],
-                extra=self._workspace_failure_detail(ws, "backend_unavailable"),
             )
-
-    @staticmethod
-    def _workspace_failure_detail(ws: _WorkspaceFiles, failure_code: str) -> dict[str, Any]:
-        return {
-            "compose_failure_code": failure_code,
-            "compose_preflight_status": ws.compose_preflight_status,
-            "compose_preflight_reason": ws.compose_preflight_reason,
-            "compose_input_profile": ws.compose_input_profile,
-            "compose_input_probe": ws.compose_input_probe,
-        }
 
     # ── Phase 4: Post-process ─────────────────────────────────────────────
 
@@ -2003,11 +1630,7 @@ class CompositionService:
         try:
             final_size, final_duration = assert_local_video_ok(ws.final_path)
         except ValueError:
-            compose_fail(
-                "compose_input_invalid",
-                "compose output invalid",
-                extra=self._workspace_failure_detail(ws, "compose_input_invalid"),
-            )
+            compose_fail("compose_failed", "compose output invalid")
             # compose_fail always raises; this is unreachable but helps type checker
             raise  # pragma: no cover
 
@@ -2160,12 +1783,6 @@ class CompositionService:
             "freeze_tail_enabled": bool(compose_policy == "freeze_tail"),
             "freeze_tail_cap_sec": int(freeze_tail_cap_sec),
             "compose_warning": compose_warning,
-            "compose_preflight_status": ws.compose_preflight_status,
-            "compose_preflight_reason": ws.compose_preflight_reason,
-            "compose_input_profile": ws.compose_input_profile,
-            "compose_input_probe": ws.compose_input_probe,
-            "compose_failure_code": None,
-            "compose_failure_message": None,
             "last_step": "compose",
             "status": "ready",
             "error_message": None,

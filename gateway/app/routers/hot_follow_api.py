@@ -90,7 +90,6 @@ from gateway.app.services.task_view_helpers import (
     build_translation_qa_summary as _build_translation_qa_summary,
     build_workbench_debug_payload as _build_workbench_debug_payload,
     compose_error_parts as _compose_error_parts,
-    compose_runtime_guard_state as _compose_runtime_guard_state,
     compute_composed_state as _compute_composed_state,
     count_srt_cues as _count_srt_cues,
     deliverable_url as _deliverable_url,
@@ -1392,8 +1391,7 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     voice_state = _collect_voice_execution_state(task_runtime, settings)
     final_key = _task_key(task_runtime, "final_video_key") or _task_key(task_runtime, "final_video_path")
     final_exists = bool(final_key and object_exists(str(final_key)))
-    compose_guard = _compose_runtime_guard_state(task)
-    compose_status = str(compose_guard.get("compose_status") or "").strip() or "never"
+    compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     stored_no_dub_reason = str(
@@ -1433,12 +1431,6 @@ def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
         "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
         "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),
         "compose_status": compose_status,
-        "compose_preflight_status": compose_guard.get("compose_preflight_status"),
-        "compose_preflight_reason": compose_guard.get("compose_preflight_reason"),
-        "compose_input_profile": compose_guard.get("compose_input_profile"),
-        "compose_failure_code": compose_guard.get("compose_failure_code"),
-        "compose_failure_message": compose_guard.get("compose_failure_message"),
-        "compose_running_stale": bool(compose_guard.get("compose_running_stale")),
         "final_exists": final_exists,
         "actual_burn_subtitle_source": subtitle_lane.get("actual_burn_subtitle_source"),
         "no_dub": bool(no_dub),
