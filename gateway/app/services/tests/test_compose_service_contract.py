@@ -11,7 +11,9 @@ from gateway.app.services.compose_service import (
     ComposeResult,
     CompositionService,
     HotFollowComposeRequestContract,
+    _WorkspaceFiles,
 )
+from gateway.app.services.task_view_helpers import compose_error_parts
 from gateway.app.services.worker_gateway import WorkerExecutionMode, WorkerResult
 
 
@@ -101,7 +103,7 @@ def test_run_ffmpeg_timeout_raises_structured_http_exception(monkeypatch):
         svc._run_ffmpeg(["ffmpeg", "-i", "in.mp4", "out.mp4"], "hf-timeout", "compose", timeout=3)
 
     detail = exc.value.detail
-    assert detail["reason"] == "compose_timeout"
+    assert detail["reason"] == "ffmpeg_timeout"
     assert "timed out after 3s" in detail["message"]
     assert "ffmpeg -i in.mp4 out.mp4" in detail["ffmpeg_cmd"]
     assert "timeout stderr" in detail["stderr_tail"]
@@ -149,3 +151,46 @@ def test_compose_result_keeps_updates_and_final_reference():
     assert result.final_key.endswith("/final.mp4")
     assert result.final_url == "/v1/tasks/hf/final"
     assert result.compose_status == "done"
+
+
+def test_build_compose_failure_updates_persists_stable_failure_code_and_clears_lock():
+    updates = CompositionService.build_compose_failure_updates(
+        {"reason": "timeout", "message": "worker timed out"}
+    )
+
+    assert updates["compose_status"] == "failed"
+    assert updates["compose_error_reason"] == "ffmpeg_timeout"
+    assert updates["compose_failure_code"] == "ffmpeg_timeout"
+    assert updates["compose_failure_message"] == "worker timed out"
+    assert updates["compose_lock_until"] is None
+    assert compose_error_parts(updates) == ("ffmpeg_timeout", "worker timed out")
+
+
+def test_compose_resource_guard_blocks_insufficient_workspace_disk(tmp_path, monkeypatch):
+    svc = CompositionService(storage=object(), settings=object())
+    video = tmp_path / "video_input.mp4"
+    video.write_bytes(b"0" * 1024)
+    ws = _WorkspaceFiles(
+        task_id="hf-resource-guard",
+        tmp=tmp_path,
+        video_input_path=video,
+        voice_path=None,
+        final_path=tmp_path / "final.mp4",
+        subtitle_path=None,
+        bgm_path=None,
+        fontsdir=tmp_path,
+        ffmpeg="ffmpeg",
+        video_duration=1.0,
+        voice_duration=1.0,
+        compose_policy="match_video",
+    )
+
+    class _Usage:
+        free = 128 * 1024 * 1024
+
+    monkeypatch.setattr("gateway.app.services.compose_service.shutil.disk_usage", lambda _path: _Usage())
+
+    with pytest.raises(HTTPException) as exc:
+        svc._guard_workspace_resources("hf-resource-guard", {}, ws)
+
+    assert exc.value.detail["reason"] == "disk_insufficient"

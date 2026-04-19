@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+from fastapi import HTTPException
+
 from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.services.compose_input_policy import evaluate_compose_input_policy
@@ -166,3 +169,57 @@ def test_tasks_compose_keeps_real_concurrent_compose_as_409(monkeypatch):
 
     assert result.status_code == 409
     assert result.body["error"] == "compose_in_progress"
+
+
+def test_heavy_compose_failure_releases_lock_and_retry_is_not_false_409(monkeypatch):
+    task_id = "hf-compose-heavy-failsafe"
+    repo = _Repo(
+        {
+            task_id: {
+                "task_id": task_id,
+                "kind": "hot_follow",
+                "content_lang": "mm",
+                "target_lang": "mm",
+                "config": {},
+                "compose_input_probe": {
+                    "width": 720,
+                    "height": 1280,
+                    "file_size_bytes": 196 * 1024 * 1024,
+                    "duration_sec": 120,
+                    "video_bitrate": 6_000_000,
+                },
+            }
+        }
+    )
+    calls = {"compose": 0}
+
+    def _compose_fails(self, *args, **kwargs):
+        calls["compose"] += 1
+        raise HTTPException(
+            status_code=507,
+            detail={"reason": "resource_exhausted", "message": "ffmpeg exhausted compose resources"},
+        )
+
+    monkeypatch.setattr(hf_router, "get_storage_service", lambda: object())
+    monkeypatch.setattr(
+        "gateway.app.services.compose_service.CompositionService.resolve_fresh_final_key",
+        lambda self, *args, **kwargs: None,
+    )
+    monkeypatch.setattr("gateway.app.services.compose_service.CompositionService.compose", _compose_fails)
+
+    for _ in range(2):
+        with pytest.raises(HTTPException) as exc:
+            hf_router._execute_hot_follow_compose_contract(
+                task_id,
+                repo.get(task_id),
+                _compose_request(),
+                **_compose_kwargs(repo),
+            )
+        assert exc.value.status_code == 507
+        assert exc.value.detail["reason"] == "resource_exhausted"
+
+    saved = repo.get(task_id)
+    assert saved["compose_status"] == "failed"
+    assert saved["compose_failure_code"] == "resource_exhausted"
+    assert saved["compose_lock_until"] is None
+    assert calls["compose"] == 2

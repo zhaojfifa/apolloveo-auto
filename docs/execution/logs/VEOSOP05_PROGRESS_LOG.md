@@ -1955,3 +1955,42 @@ Remaining risks:
 
 - Post-fix live validation on task `fc45e93f83c3` remains pending until PR-A is deployed.
 - Heavy-input `502` containment is not in PR-A by design and must be handled in PR-B.
+
+## Hot Follow Compose PR-B Heavy-Input Failsafe
+
+日期：2026-04-19
+
+Scope:
+
+- PR-B contains heavy-input compose execution failures so they become task-level failed states instead of instance-level outages.
+- This PR does not re-open broad adaptation, subtitle visuals, dubbing behavior, or PR #39/#40 height-based blocking.
+
+Production evidence:
+
+- Latest production evidence indicates large/heavy compose can escalate to Render `502 Bad Gateway` instance unavailability.
+- Follow-up `409`/running/workbench polling symptoms are treated as secondary effects after heavy compose failure, not as the root incident.
+
+Changes:
+
+- Added a local compose workspace resource guard with free-disk and estimated working-set checks before ffmpeg execution.
+- Kept every compose ffmpeg/ffprobe call on the worker gateway with explicit timeouts and mapped timeout/resource/backend failures to stable codes.
+- Persisted `compose_failure_code` and `compose_failure_message` on failure, and clear `compose_lock_until` in failure updates.
+- Added stale-running read recovery so expired or missing compose locks are not projected as active compose-in-progress.
+
+Failure codes introduced or normalized:
+
+- `ffmpeg_timeout`
+- `disk_insufficient`
+- `resource_exhausted`
+- `backend_unavailable`
+- `compose_input_invalid`
+
+Verification results:
+
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/task_view_helpers.py gateway/app/services/task_view.py gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/tests/test_compose_input_policy.py` -> passed.
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m pytest gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/tests/test_compose_input_policy.py gateway/app/services/tests/test_hot_follow_skills_advisory.py -q` -> 23 passed.
+
+Remaining risks:
+
+- This is containment, not transcoding/adaptation. Large inputs can still fail task-level compose, but they should no longer leave a stale running lock or false `409` retry loop.
+- Post-deploy validation should confirm workbench/task detail remain readable after a real heavy-input failure.

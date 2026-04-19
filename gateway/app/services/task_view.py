@@ -41,6 +41,7 @@ from gateway.app.services.subtitle_helpers import (
 )
 from gateway.app.services.task_view_helpers import (
     backfill_compose_done_if_final_ready,
+    compose_running_is_stale,
     compute_composed_state,
     deliverable_url,
     publish_hub_payload,
@@ -349,9 +350,11 @@ def hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None 
             status = "done"
         if status == "done" and target_lang in {"my", "vi"} and not bool(composed_state.get("composed_ready")):
             status = "pending"
+        if compose_running_is_stale(task):
+            status = "failed"
         if status == "pending" and task_status == "processing" and last_step in {"compose", "final"}:
             status = "running"
-        summary = "final video merge"
+        summary = str(task.get("compose_failure_message") or task.get("compose_last_error") or "final video merge")
         return status, summary
     return "pending", ""
 
@@ -1155,20 +1158,26 @@ def build_hot_follow_workbench_hub(
                 if not isinstance(step, dict):
                     continue
                 if str(step.get("key") or "").strip().lower() == "compose":
-                    step["status"] = "pending"
-                    step["state"] = "pending"
+                    current_step_status = str(step.get("status") or "").strip().lower()
+                    if current_step_status not in {"failed", "error", "blocked"}:
+                        step["status"] = "pending"
+                        step["state"] = "pending"
 
         pipeline_legacy = payload.get("pipeline_legacy")
         if isinstance(pipeline_legacy, dict):
             compose_legacy = pipeline_legacy.get("compose")
             if isinstance(compose_legacy, dict):
-                compose_legacy["status"] = "pending"
+                current_legacy_status = str(compose_legacy.get("status") or "").strip().lower()
+                if current_legacy_status not in {"failed", "error", "blocked"}:
+                    compose_legacy["status"] = "pending"
 
         compose = payload.get("compose")
         if isinstance(compose, dict):
             last = compose.get("last")
             if isinstance(last, dict):
-                last["status"] = "pending"
+                current_last_status = str(last.get("status") or "").strip().lower()
+                if current_last_status not in {"failed", "error", "blocked"}:
+                    last["status"] = "pending"
 
         deliverables = payload.get("deliverables")
         if isinstance(deliverables, list):

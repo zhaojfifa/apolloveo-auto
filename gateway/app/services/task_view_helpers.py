@@ -279,22 +279,46 @@ def _compose_done_like(status: Any) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def compose_error_parts(task: dict) -> tuple[str | None, str | None]:
-    reason_field = task.get("compose_error_reason")
+    reason_field = task.get("compose_failure_code") or task.get("compose_error_reason")
+    failure_message = task.get("compose_failure_message")
     raw = task.get("compose_error")
-    if not reason_field and not raw:
+    if not reason_field and not raw and not failure_message:
         return (None, None)
     if isinstance(raw, dict):
         reason = raw.get("reason")
         message = raw.get("message")
         resolved_reason = (
-            str(reason) if reason else (str(reason_field) if reason_field else None)
+            str(reason_field) if reason_field else (str(reason) if reason else None)
         )
-        resolved_message = str(message) if message else None
+        resolved_message = str(message or failure_message) if (message or failure_message) else None
         return (resolved_reason, resolved_message)
     text = str(raw).strip() if raw is not None else ""
+    if not text and failure_message is not None:
+        text = str(failure_message).strip()
     if not text:
         return (None, None)
     return (str(reason_field) if reason_field else "compose_failed", text)
+
+
+def compose_running_is_stale(task: dict) -> bool:
+    compose_status = str(task.get("compose_status") or "").strip().lower()
+    compose_last_status = str(task.get("compose_last_status") or "").strip().lower()
+    if compose_status not in {"running", "processing", "queued"} and compose_last_status not in {
+        "running",
+        "processing",
+        "queued",
+    }:
+        return False
+    lock_until = task.get("compose_lock_until")
+    if not lock_until:
+        return True
+    try:
+        lock_dt = datetime.fromisoformat(str(lock_until)) if isinstance(lock_until, str) else lock_until
+        if lock_dt.tzinfo is None:
+            lock_dt = lock_dt.replace(tzinfo=timezone.utc)
+        return lock_dt <= datetime.now(timezone.utc)
+    except Exception:
+        return True
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -527,6 +551,7 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
     ).lower()
     compose_done = compose_last_status in {"done", "ready", "success", "completed"}
     compose_error_reason, compose_error_message = compose_error_parts(task)
+    stale_running = compose_running_is_stale(task)
 
     final_stale_reason = compute_final_staleness(task, final_exists, compose_done)
     final_fresh = final_exists and compose_done and final_stale_reason is None
@@ -548,6 +573,8 @@ def compute_composed_state(task: dict, task_id: str) -> dict[str, Any]:
         composed_reason = str(
             voice_state.get("audio_ready_reason") or "audio_not_ready"
         )
+    elif stale_running:
+        composed_reason = compose_error_reason or "stale_compose_running"
     elif compose_status in {"running", "processing", "queued"}:
         composed_reason = "compose_in_progress"
     elif compose_error_reason in {"subtitles_missing", "font_missing"}:
