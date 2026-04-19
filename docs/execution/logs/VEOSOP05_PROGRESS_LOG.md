@@ -1923,3 +1923,35 @@ Still pending after Phase 1:
 - Post-fix recovery validation.
 - Confirmation that repaired logic restores compose success for the baseline-safe portrait task.
 - Confirmation that true heavy inputs are adapted or blocked without reintroducing the original resource-risk path.
+
+## Hot Follow Compose PR-A Baseline / SSOT Repair
+
+日期：2026-04-19
+
+Scope:
+
+- PR-A restores baseline-safe production behavior only.
+- Heavy-input runtime containment remains intentionally deferred to PR-B.
+
+Changes:
+
+- Added an orientation-aware / pixel-budget-aware compose input policy.
+- `720x1280` portrait shortvideo remains direct-allowed; it is no longer blocked by portrait height alone.
+- Blocked compose policy is evaluated before the in-process compose lock, so blocked retries do not produce false `409` conflicts.
+- Ready-gate, current attempt, operator summary, pipeline, and advisory now project the same blocked compose truth.
+
+Production evidence and PR split rationale:
+
+- Existing live task `fc45e93f83c3` proved a baseline-safe `720x1280`, ~2.7MB, ~23.85s input was incorrectly blocked as `resolution_too_high`.
+- Latest production reports show large/heavy compose can escalate to Render `502` instance unavailability; later `409`/running/workbench polling symptoms are secondary effects after heavy failure.
+- PR-A fixes the baseline regression and SSOT divergence. PR-B will separately contain heavy-input execution failures without merging the two scopes.
+
+Verification results:
+
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m py_compile gateway/app/services/compose_input_policy.py gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/task_view.py skills/hot_follow/input_skill.py skills/hot_follow/routing_skill.py skills/hot_follow/quality_skill.py` -> passed.
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m pytest gateway/app/services/tests/test_compose_input_policy.py gateway/app/services/tests/test_hot_follow_skills_advisory.py -q` -> 14 passed.
+
+Remaining risks:
+
+- Post-fix live validation on task `fc45e93f83c3` remains pending until PR-A is deployed.
+- Heavy-input `502` containment is not in PR-A by design and must be handled in PR-B.

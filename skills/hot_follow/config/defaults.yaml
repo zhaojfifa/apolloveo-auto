@@ -31,6 +31,19 @@ advisories:
       - compose_status
       - final_stale_reason
       - blocking
+  compose_blocked:
+    id: hf_advisory_compose_blocked
+    kind: operator_guidance
+    level: warning
+    recommended_next_action: resolve_compose_input
+    operator_hint: compose input blocked
+    explanation: "当前素材暂不满足合成条件：{compose_blocked_reason}。请调整素材后再尝试合成。"
+    evidence_fields:
+      - compose_allowed
+      - compose_blocked
+      - compose_blocked_reason
+      - compose_status
+      - blocking
   compose_missing_final:
     id: hf_advisory_compose_missing_final
     kind: operator_guidance
