@@ -22,6 +22,14 @@ def run(
     if facts.get("compose_blocked"):
         return {"decision_key": "compose_blocked"}
 
+    compose_input_mode = str(facts.get("compose_input_mode") or "").strip().lower()
+    if facts.get("compose_input_derive_failed_terminal") or (
+        facts.get("compose_route_allowed")
+        and not facts.get("compose_input_ready")
+        and compose_input_mode not in {"", "unknown"}
+    ):
+        return {"decision_key": "compose_input_unready"}
+
     if facts.get("no_dub_route_terminal") or (
         facts.get("compose_allowed")
         and facts.get("no_tts_compose_allowed")

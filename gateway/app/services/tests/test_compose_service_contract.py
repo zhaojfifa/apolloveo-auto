@@ -101,6 +101,18 @@ def test_large_local_compose_input_derives_safe_video_before_merge(tmp_path, mon
 
     monkeypatch.setattr(svc, "_run_ffmpeg", _fake_run)
     monkeypatch.setattr("gateway.app.services.compose_service.assert_local_video_ok", lambda path: (Path(path).stat().st_size, 8.0))
+    monkeypatch.setattr(
+        svc,
+        "_probe_video_profile",
+        lambda _task_id, path, size, duration: ComposeInputProfile(
+            size_bytes=size,
+            duration_sec=duration,
+            width=1080,
+            height=1920,
+            bit_rate=1_000_000,
+            pix_fmt="yuv420p",
+        ),
+    )
     monkeypatch.setenv("HF_COMPOSE_DERIVE_MIN_BYTES", "64")
     monkeypatch.setenv("HF_COMPOSE_DERIVE_MIN_BITRATE", "1")
     monkeypatch.setenv("HF_COMPOSE_DERIVE_MIN_PIXELS", "1")
@@ -135,6 +147,8 @@ def test_large_local_compose_input_derives_safe_video_before_merge(tmp_path, mon
     assert safe_profile.size_bytes == len(b"safe-video")
     assert warning == "large local input derived for stable compose"
     assert commands[0][1] == "derive_compose_input"
+    assert "-map" in commands[0][0]
+    assert "force_divisible_by=2" in commands[0][0][commands[0][0].index("-vf") + 1]
 
 
 def test_workdir_space_guard_blocks_before_heavy_compose(monkeypatch, tmp_path):
@@ -153,6 +167,29 @@ def test_workdir_space_guard_blocks_before_heavy_compose(monkeypatch, tmp_path):
         )
 
     assert exc.value.detail["reason"] == "compose_insufficient_disk"
+
+
+def test_derive_failure_updates_persist_compose_input_terminal_policy():
+    updates = CompositionService.build_compose_failure_updates(
+        {
+            "reason": "compose_input_derive_failed",
+            "message": "derived compose input is not encoder-safe",
+            "failure_code": "derive_not_encoder_safe",
+            "compose_input_profile": {"width": 1081, "height": 1921, "pix_fmt": "yuv422p"},
+            "safe_key": "video_input_safe.mp4",
+        }
+    )
+
+    policy = updates["compose_input_policy"]
+    assert updates["compose_status"] == "failed"
+    assert policy == {
+        "mode": "derive_failed",
+        "source": "derived_safe",
+        "profile": {"width": 1081, "height": 1921, "pix_fmt": "yuv422p"},
+        "safe_key": "video_input_safe.mp4",
+        "reason": "derived compose input is not encoder-safe",
+        "failure_code": "derive_not_encoder_safe",
+    }
 
 
 def test_build_hot_follow_compose_response_preserves_success_shape():

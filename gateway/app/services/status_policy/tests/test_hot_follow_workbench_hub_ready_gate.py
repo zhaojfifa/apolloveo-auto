@@ -1045,6 +1045,99 @@ def test_hot_follow_compose_failure_finalizes_releases_lock_and_allows_retry(mon
     assert saved_after_retry["final_video_key"] == f"deliver/tasks/{task_id}/final.mp4"
 
 
+def test_hot_follow_compose_derive_failure_persists_compose_input_truth_and_allows_retry(monkeypatch):
+    task_id = "hf-compose-derive-failed-retry-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "ready",
+            "target_lang": "my",
+            "content_lang": "my",
+            "compose_plan": {"overlay_subtitles": True},
+        },
+    )
+    calls = {"compose": 0}
+
+    def _compose_once_then_success(self, _task_id, _task, **_kwargs):
+        calls["compose"] += 1
+        if calls["compose"] == 1:
+            raise hf_router.HTTPException(
+                status_code=409,
+                detail={
+                    "reason": "compose_input_derive_failed",
+                    "message": "derived compose input is not encoder-safe",
+                    "failure_code": "derive_not_encoder_safe",
+                    "compose_input_profile": {"width": 1081, "height": 1921, "pix_fmt": "yuv422p"},
+                    "safe_key": "video_input_safe.mp4",
+                },
+            )
+        return ComposeResult(
+            updates={
+                "compose_status": "done",
+                "compose_last_status": "done",
+                "compose_input_policy": {
+                    "mode": "derived_ready",
+                    "source": "derived_safe",
+                    "profile": {"width": 1080, "height": 1920, "pix_fmt": "yuv420p"},
+                    "safe_key": "video_input_safe.mp4",
+                    "reason": "large_local_input_derived",
+                    "failure_code": None,
+                },
+                "final_video_key": f"deliver/tasks/{task_id}/final.mp4",
+                "final_video_path": f"deliver/tasks/{task_id}/final.mp4",
+                "status": "ready",
+                "last_step": "compose",
+            },
+            final_key=f"deliver/tasks/{task_id}/final.mp4",
+            final_url=f"/v1/tasks/{task_id}/final",
+            compose_status="done",
+        )
+
+    monkeypatch.setattr(hf_router, "get_storage_service", lambda: object())
+    monkeypatch.setattr(hf_router.CompositionService, "resolve_fresh_final_key", lambda *args, **kwargs: None)
+    monkeypatch.setattr(hf_router.CompositionService, "compose", _compose_once_then_success)
+    monkeypatch.setattr(
+        hf_router,
+        "_service_build_hot_follow_workbench_hub",
+        lambda current_task_id, repo=None: {
+            "task_id": current_task_id,
+            "compose_status": (repo.get(current_task_id) or {}).get("compose_status"),
+            "artifact_facts": {
+                "compose_input": (repo.get(current_task_id) or {}).get("compose_input_policy") or {}
+            },
+        },
+    )
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        failed = client.post(f"/api/hot_follow/tasks/{task_id}/compose", json={})
+        assert failed.status_code == 409
+        saved_after_failure = repo.get(task_id) or {}
+        assert saved_after_failure["compose_status"] == "failed"
+        assert saved_after_failure["compose_error_reason"] == "compose_input_derive_failed"
+        assert saved_after_failure.get("compose_lock_until") is None
+        assert hf_router._task_compose_lock(task_id).locked() is False
+        failed_policy = saved_after_failure.get("compose_input_policy") or {}
+        assert failed_policy["mode"] == "derive_failed"
+        assert failed_policy["source"] == "derived_safe"
+        assert failed_policy["failure_code"] == "derive_not_encoder_safe"
+
+        retried = client.post(f"/api/hot_follow/tasks/{task_id}/compose", json={})
+        assert retried.status_code == 200
+
+    saved_after_retry = repo.get(task_id) or {}
+    assert calls["compose"] == 2
+    assert saved_after_retry["compose_status"] == "done"
+    assert saved_after_retry["compose_input_policy"]["mode"] == "derived_ready"
+
+
 def test_hot_follow_compose_recovers_stale_running_before_false_409(monkeypatch):
     task_id = "hf-compose-stale-running-01"
     repo = _Repo()

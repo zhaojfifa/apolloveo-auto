@@ -31,8 +31,39 @@ def test_artifact_facts_formalize_blocked_compose_input_without_policy_decision(
 
     assert facts["compose_input_mode"] == "blocked"
     assert facts["compose_input_blocked"] is True
+    assert facts["compose_input_ready"] is False
     assert facts["compose_input_reason"] == "bitrate_too_high"
     assert facts["compose_input"]["profile"]["video_bitrate"] == 9_000_000
+
+
+def test_artifact_facts_formalize_derive_failed_compose_input():
+    facts = build_hot_follow_artifact_facts(
+        "hf-derive-failed",
+        {
+            "task_id": "hf-derive-failed",
+            "compose_input_policy": {
+                "mode": "derive_failed",
+                "source": "derived_safe",
+                "profile": {"width": 1081, "height": 1921, "pix_fmt": "yuv422p"},
+                "safe_key": "video_input_safe.mp4",
+                "reason": "derived compose input is not encoder-safe",
+                "failure_code": "derive_not_encoder_safe",
+            },
+        },
+        final_info={"exists": False},
+        historical_final=None,
+        persisted_audio={"exists": False, "voiceover_url": None},
+        subtitle_lane={"subtitle_artifact_exists": True},
+        scene_pack=None,
+        deliverable_url=_deliverable_url,
+    )
+
+    assert facts["compose_input_mode"] == "derive_failed"
+    assert facts["compose_input_ready"] is False
+    assert facts["compose_input_derive_failed"] is True
+    assert facts["compose_input_failure_code"] == "derive_not_encoder_safe"
+    assert facts["compose_input"]["safe_key"] == "video_input_safe.mp4"
+    assert facts["compose_input"]["source"] == "derived_safe"
 
 
 def test_artifact_facts_formalize_muted_no_tts_audio_lane():
@@ -80,6 +111,42 @@ def test_current_attempt_marks_blocked_compose_as_terminal():
     assert current_attempt["compose_reason"] == "bitrate_too_high"
     assert current_attempt["compose_blocked_terminal"] is True
     assert current_attempt["compose_terminal_state"] == "compose_blocked_terminal"
+    assert current_attempt["requires_recompose"] is False
+
+
+def test_current_attempt_marks_derive_failed_compose_input_as_terminal():
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": False,
+            "audio_ready_reason": "audio_missing",
+            "dub_current": False,
+        },
+        subtitle_lane={"subtitle_ready": True},
+        dub_status="pending",
+        compose_status="failed",
+        composed_reason="compose_input_derive_failed",
+        artifact_facts={
+            "compose_input": {
+                "mode": "derive_failed",
+                "ready": False,
+                "derive_failed": True,
+                "reason": "derived compose input is not encoder-safe",
+                "failure_code": "derive_not_encoder_safe",
+                "profile": {},
+                "source": "derived_safe",
+            },
+            "audio_lane": {"no_tts": True, "bgm_configured": False, "source_audio_preserved": False},
+            "selected_compose_route": {"name": "no_tts_compose_route"},
+        },
+        no_dub_compose_allowed=True,
+    )
+
+    assert current_attempt["compose_status"] == "failed"
+    assert current_attempt["compose_route_allowed"] is True
+    assert current_attempt["compose_input_ready"] is False
+    assert current_attempt["compose_execute_allowed"] is False
+    assert current_attempt["compose_input_derive_failed_terminal"] is True
+    assert current_attempt["compose_terminal_state"] == "compose_input_derive_failed_terminal"
     assert current_attempt["requires_recompose"] is False
 
 
@@ -143,6 +210,45 @@ def test_route_local_no_tts_compose_allowed_without_voiceover():
     assert state["ready_gate"]["no_tts_compose_allowed"] is True
     assert state["ready_gate"]["audio_ready"] is False
     assert "audio_missing" not in state["ready_gate"]["blocking"]
+
+
+def test_ready_gate_distinguishes_route_allowed_from_compose_execute_allowed():
+    artifact_facts = build_hot_follow_artifact_facts(
+        "hf-derive-failed-gate",
+        {
+            "task_id": "hf-derive-failed-gate",
+            "compose_input_policy": {
+                "mode": "derive_failed",
+                "source": "derived_safe",
+                "reason": "derived compose input is not encoder-safe",
+                "failure_code": "derive_not_encoder_safe",
+            },
+        },
+        final_info={"exists": False},
+        historical_final=None,
+        persisted_audio={"exists": False, "voiceover_url": None},
+        subtitle_lane={"subtitle_artifact_exists": True, "subtitle_ready": True},
+        scene_pack=None,
+        deliverable_url=_deliverable_url,
+    )
+    state = compute_hot_follow_state(
+        {"task_id": "hf-derive-failed-gate", "kind": "hot_follow"},
+        {
+            "task_id": "hf-derive-failed-gate",
+            "final": {"exists": False},
+            "subtitles": {"subtitle_ready": True, "subtitle_artifact_exists": True},
+            "audio": {"status": "absent", "audio_ready": False, "audio_ready_reason": "audio_missing"},
+            "artifact_facts": artifact_facts,
+        },
+    )
+
+    gate = state["ready_gate"]
+    assert gate["selected_compose_route"] == "no_tts_compose_route"
+    assert gate["compose_route_allowed"] is True
+    assert gate["compose_input_ready"] is False
+    assert gate["compose_execute_allowed"] is False
+    assert gate["compose_reason"] == "compose_input_derive_failed"
+    assert gate["blocking"] == ["compose_input_derive_failed"]
 
 
 def test_preserve_source_route_allowed_without_tts_voiceover():
