@@ -1994,3 +1994,38 @@ Remaining risks:
 
 - This is containment, not transcoding/adaptation. Large inputs can still fail task-level compose, but they should no longer leave a stale running lock or false `409` retry loop.
 - Post-deploy validation should confirm workbench/task detail remain readable after a real heavy-input failure.
+
+## Hot Follow Rollback And Four-Layer Line Review
+
+日期：2026-04-19
+
+Rollback:
+
+- Runtime rollback PR: `revert(compose): restore hot follow pre-pr-a-b runtime`.
+- Rollback target: pre-PR-A/PR-B runtime baseline at `46dede8`.
+- Runtime files only were restored; review docs and execution logs were retained.
+
+Live evidence that triggered rollback-and-repair:
+
+- Task `ffe9083de6ee`: compose is blocked by `bitrate_too_high`, `compose_allowed=false`, `compose_input_policy.mode=blocked`, but the task card still shows compose-ready / compose-not-done style messaging.
+- Task `c3a11f7852e2`: raw video exists, subtitles remain running with empty subtitle artifacts/text, `audio_flow_mode=muted_no_tts`, `no_dub=false`, and `no_dub_compose_allowed=false`.
+
+Review output:
+
+- Added `docs/reviews/HOT_FOLLOW_LINE_FOUR_STATE_REVIEW.md`.
+- The review covers only the Hot Follow production line and separates:
+  - Artifact Facts Layer
+  - Line Policy / Ready Gate Layer
+  - Attempt / Runtime Terminal Layer
+  - Presenter / Advisory Layer
+
+Repair split:
+
+- PR-1: Artifact Facts Repair.
+- PR-2: Line Policy / Ready Gate Repair.
+- PR-3: Attempt / Runtime Terminal Repair.
+- PR-4: Presenter / Advisory Repair.
+
+Remaining risks:
+
+- The review uses provided production observations as source evidence; post-repair validation must confirm both live task patterns no longer diverge.
