@@ -24,6 +24,12 @@ def run(
     subtitle_ready = bool(ready_gate.get("subtitle_ready"))
     audio_ready = bool(current_attempt.get("audio_ready") or ready_gate.get("audio_ready"))
     compose_ready = bool(ready_gate.get("compose_ready"))
+    compose_blocked = bool(current_attempt.get("compose_blocked_terminal") or ready_gate.get("compose_blocked"))
+    compose_blocked_reason = str(
+        ready_gate.get("compose_blocked_reason")
+        or current_attempt.get("compose_reason")
+        or ""
+    ).strip() or None
     publish_ready = bool(ready_gate.get("publish_ready"))
     blocking = list(ready_gate.get("blocking") or [])
     return {
@@ -38,12 +44,19 @@ def run(
         ).strip()
         or None,
         "compose_ready": compose_ready,
+        "compose_blocked": compose_blocked,
+        "compose_blocked_reason": compose_blocked_reason,
         "publish_ready": publish_ready,
         "blocking": blocking,
         "final_exists": bool(artifact_facts.get("final_exists")),
         "subtitle_exists": bool(artifact_facts.get("subtitle_exists")),
         "audio_exists": bool(artifact_facts.get("audio_exists")),
         "requires_recompose": bool(current_attempt.get("requires_recompose")),
+        "no_dub_route_terminal": bool(current_attempt.get("no_dub_route_terminal")),
+        "subtitle_empty_terminal": bool(current_attempt.get("subtitle_empty_terminal")),
+        "subtitle_terminal_state": str(current_attempt.get("subtitle_terminal_state") or "").strip() or None,
+        "no_dub_compose_allowed": bool(ready_gate.get("no_dub_compose_allowed")),
+        "no_dub_reason": str(ready_gate.get("no_dub_reason") or "").strip() or None,
         "compose_status": str(current_attempt.get("compose_status") or "").strip().lower() or None,
         "final_stale_reason": str(current_attempt.get("final_stale_reason") or "").strip() or None,
         "current_subtitle_source": str(current_attempt.get("current_subtitle_source") or "").strip() or None,

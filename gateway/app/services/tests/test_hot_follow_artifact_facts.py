@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from gateway.app.services.hot_follow_workbench_presenter import build_hot_follow_artifact_facts
 from gateway.app.services.hot_follow_workbench_presenter import build_hot_follow_current_attempt_summary
+from gateway.app.services.hot_follow_workbench_presenter import build_hot_follow_operator_summary
 
 
 def _deliverable_url(_task_id: str, _task: dict, _kind: str) -> str | None:
@@ -110,3 +111,28 @@ def test_current_attempt_marks_legal_no_tts_empty_route_as_terminal_not_running(
     assert current_attempt["no_dub_route_terminal"] is True
     assert current_attempt["subtitle_terminal_state"] == "no_dub_route_terminal"
     assert current_attempt["requires_recompose"] is False
+
+
+def test_operator_summary_projects_terminal_blocked_and_no_dub_attempts():
+    blocked = build_hot_follow_operator_summary(
+        artifact_facts={"final_exists": False},
+        current_attempt={
+            "compose_status": "blocked",
+            "compose_blocked_terminal": True,
+            "compose_reason": "bitrate_too_high",
+        },
+        no_dub=False,
+        subtitle_ready=True,
+    )
+    no_dub = build_hot_follow_operator_summary(
+        artifact_facts={"final_exists": False},
+        current_attempt={
+            "dub_status": "skipped",
+            "no_dub_route_terminal": True,
+        },
+        no_dub=True,
+        subtitle_ready=False,
+    )
+
+    assert "bitrate_too_high" in blocked["recommended_next_action"]
+    assert "无 TTS 合成路径" in no_dub["recommended_next_action"]
