@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from gateway.app.services.hot_follow_route_state import selected_route_from_state
 from gateway.app.services.ready_gate import evaluate_ready_gate
 from gateway.app.services.status_policy.registry import get_status_runtime_binding
 
@@ -171,6 +172,7 @@ def _resolve_artifacts(task_id: str, task: Dict[str, Any], state: Dict[str, Any]
 
 def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any]) -> None:
     compose_ready = bool(gate_result["compose_ready"])
+    compose_blocked = bool(gate_result.get("compose_blocked"))
     historical_exists = bool((_as_dict(state.get("historical_final"))).get("exists"))
 
     compose = dict(_as_dict(state.get("compose")))
@@ -179,6 +181,10 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
         last["status"] = "done"
         last["error"] = None
         state["compose_status"] = "done"
+    elif compose_blocked:
+        last["status"] = "blocked"
+        last["error"] = gate_result.get("compose_blocked_reason") or gate_result.get("compose_reason")
+        state["compose_status"] = "blocked"
     else:
         if last:
             last["status"] = "pending"
@@ -193,11 +199,13 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
             continue
         if str(step.get("key") or "").strip().lower() != "compose":
             continue
-        step["status"] = "done" if compose_ready else "pending"
-        step["state"] = "done" if compose_ready else "pending"
+        step["status"] = "done" if compose_ready else ("blocked" if compose_blocked else "pending")
+        step["state"] = "done" if compose_ready else ("blocked" if compose_blocked else "pending")
         if compose_ready:
             step["error"] = None
             step["message"] = step.get("message") or "final video merge"
+        elif compose_blocked:
+            step["error"] = gate_result.get("compose_blocked_reason") or gate_result.get("compose_reason")
     state["pipeline"] = pipeline
 
     if isinstance(state.get("deliverables"), list):
@@ -206,12 +214,45 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
                 continue
             if str(item.get("kind") or "").strip().lower() != "final":
                 continue
-            item["status"] = "done" if compose_ready else "pending"
-            item["state"] = "done" if compose_ready else "pending"
+            item["status"] = "done" if compose_ready else ("blocked" if compose_blocked else "pending")
+            item["state"] = "done" if compose_ready else ("blocked" if compose_blocked else "pending")
             item["historical"] = bool(historical_exists and not compose_ready)
             if not compose_ready:
                 item["url"] = None
             break
+
+
+def _apply_route_truth(task: Dict[str, Any], state: Dict[str, Any], gate_result: Dict[str, Any]) -> None:
+    route = selected_route_from_state(task, state)
+    route_name = str(route.get("name") or "").strip()
+    compose_allowed = bool(route.get("compose_allowed"))
+    blocked_reason = str(route.get("blocked_reason") or "").strip()
+
+    gate_result["selected_compose_route"] = route_name
+    gate_result["compose_allowed"] = compose_allowed
+    gate_result["no_tts_compose_allowed"] = bool(route.get("no_tts_compose_allowed"))
+    gate_result["no_dub_compose_allowed"] = bool(route.get("no_dub_compose_allowed"))
+    if gate_result["no_tts_compose_allowed"]:
+        gate_result["no_dub"] = True
+
+    if blocked_reason == "compose_input_blocked" or bool(gate_result.get("compose_blocked")):
+        reason = str(gate_result.get("compose_blocked_reason") or blocked_reason or "compose_input_blocked").strip()
+        gate_result["compose_blocked"] = True
+        gate_result["compose_blocked_reason"] = reason
+        gate_result["compose_allowed"] = False
+        gate_result["compose_reason"] = reason
+        gate_result["blocking"] = [reason]
+    elif not compose_allowed and blocked_reason and not str(gate_result.get("no_dub_reason") or "").strip():
+        gate_result["compose_reason"] = blocked_reason
+    elif compose_allowed and gate_result.get("compose_reason") == "route_not_allowed":
+        gate_result["compose_reason"] = "compose_not_done"
+    elif gate_result["no_tts_compose_allowed"] and not str(gate_result.get("no_dub_reason") or "").strip():
+        if route_name == "preserve_source_route":
+            gate_result["no_dub_reason"] = "source_audio_preserved_no_tts"
+        elif route_name == "bgm_only_route":
+            gate_result["no_dub_reason"] = "bgm_only_no_tts"
+        elif route_name == "no_tts_compose_route":
+            gate_result["no_dub_reason"] = "compose_no_tts"
 
 
 def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | None = None) -> Dict[str, Any]:
@@ -232,6 +273,7 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         )
 
     gate_result = evaluate_ready_gate(binding.ready_gate_spec, task, state)
+    _apply_route_truth(task, state, gate_result)
     _apply_gate_side_effects(state, gate_result)
 
     composed_ready = bool(gate_result["compose_ready"])

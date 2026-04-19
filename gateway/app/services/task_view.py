@@ -587,8 +587,12 @@ def hf_safe_presentation_aggregates(
             final_stale_reason=final_stale_reason,
             artifact_facts=artifact_facts,
             no_dub=no_dub,
-            no_dub_compose_allowed=bool((artifact_facts.get("audio_lane") or {}).get("no_tts"))
-            if isinstance(artifact_facts.get("audio_lane"), dict)
+            no_dub_compose_allowed=bool((artifact_facts.get("selected_compose_route") or {}).get("name") in {
+                "preserve_source_route",
+                "bgm_only_route",
+                "no_tts_compose_route",
+            })
+            if isinstance(artifact_facts.get("selected_compose_route"), dict)
             else False,
         )
         operator_summary = hf_operator_summary(

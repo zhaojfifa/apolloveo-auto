@@ -23,6 +23,8 @@ from gateway.app.lines.base import LineRegistry
 from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.services import hot_follow_skills_advisory as skills_advisory
+from gateway.app.services.hot_follow_route_state import build_hot_follow_current_attempt_summary
+from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 
 
 class _Repo:
@@ -269,6 +271,94 @@ def test_hot_follow_advisory_v0_projects_no_dub_terminal_not_review_subtitles():
     }
 
 
+def test_hot_follow_live_muted_no_tts_route_recommends_compose_no_tts():
+    artifact_facts = {
+        "final_exists": False,
+        "audio_exists": False,
+        "subtitle_exists": False,
+        "audio_lane_mode": "muted_no_tts",
+        "tts_voiceover_exists": False,
+        "audio_lane": {
+            "mode": "muted_no_tts",
+            "tts_voiceover_exists": False,
+            "source_audio_policy": "mute",
+            "source_audio_preserved": False,
+            "bgm_key": None,
+            "bgm_configured": False,
+            "no_tts": True,
+        },
+        "compose_input": {
+            "mode": "unknown",
+            "blocked": False,
+            "reason": None,
+            "profile": {},
+            "source": "none",
+        },
+        "selected_compose_route": {
+            "name": "no_tts_compose_route",
+            "required_artifacts": ["compose_input"],
+            "optional_artifacts": ["target_subtitle", "scene_pack"],
+            "irrelevant_artifacts": ["tts_voiceover", "bgm", "source_audio_preserved"],
+            "allow_conditions": ["compose_input_ready", "no_tts_compose_selected"],
+            "blocked_conditions": ["compose_input_blocked", "no_tts_not_selected"],
+        },
+    }
+    state = compute_hot_follow_state(
+        {"task_id": "hf-live-muted-no-tts", "kind": "hot_follow"},
+        {
+            "task_id": "hf-live-muted-no-tts",
+            "final": {"exists": False},
+            "subtitles": {
+                "subtitle_ready": False,
+                "subtitle_ready_reason": "subtitle_missing",
+                "subtitle_artifact_exists": False,
+            },
+            "audio": {
+                "status": "pending",
+                "audio_ready": False,
+                "audio_ready_reason": "dub_not_done",
+                "dub_current": False,
+                "no_dub": False,
+            },
+            "artifact_facts": artifact_facts,
+        },
+    )
+    ready_gate = state["ready_gate"]
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state=state["audio"],
+        subtitle_lane={
+            "subtitle_ready": False,
+            "subtitle_artifact_exists": False,
+            "edited_text": "",
+            "srt_text": "",
+            "dub_input_text": "",
+        },
+        dub_status="running",
+        compose_status="pending",
+        composed_reason=ready_gate["compose_reason"],
+        artifact_facts=artifact_facts,
+    )
+
+    assert artifact_facts["audio_lane"]["mode"] == "muted_no_tts"
+    assert current_attempt["no_dub_route_terminal"] is True
+    assert ready_gate["selected_compose_route"] == "no_tts_compose_route"
+    assert ready_gate["compose_allowed"] is True
+    assert ready_gate["no_tts_compose_allowed"] is True
+    assert "subtitle_not_ready" not in ready_gate["blocking"]
+    assert "voiceover_missing" not in ready_gate["blocking"]
+
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-live-muted-no-tts", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate=ready_gate,
+            artifact_facts=artifact_facts,
+            current_attempt=current_attempt,
+        ),
+    )
+
+    assert advisory["recommended_next_action"] == "compose_no_tts"
+
+
 def test_hot_follow_advisory_v0_recommends_continue_qa_when_final_is_ready():
     advisory = skills_advisory.maybe_build_hot_follow_advisory(
         {"task_id": "hf-skills-v0-final-ready", "kind": "hot_follow"},
@@ -383,7 +473,8 @@ def test_hot_follow_advisory_noop_preserves_workbench_payload(monkeypatch):
         data = res.json()
 
     assert "advisory" not in data
-    assert data.get("artifact_facts") == {
+    artifact_facts = data.get("artifact_facts") or {}
+    assert artifact_facts == {
         "final_exists": False,
         "final_url": None,
         "final_updated_at": None,
@@ -409,6 +500,14 @@ def test_hot_follow_advisory_noop_preserves_workbench_payload(monkeypatch):
         },
         "audio_lane_mode": "muted_no_tts",
         "tts_voiceover_exists": False,
+        "selected_compose_route": {
+            "name": "no_tts_compose_route",
+            "required_artifacts": ["compose_input"],
+            "optional_artifacts": ["target_subtitle", "scene_pack"],
+            "irrelevant_artifacts": ["tts_voiceover", "bgm", "source_audio_preserved"],
+            "allow_conditions": ["compose_input_ready", "no_tts_compose_selected"],
+            "blocked_conditions": ["compose_input_blocked", "no_tts_not_selected"],
+        },
     }
 
 

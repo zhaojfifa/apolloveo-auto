@@ -7,30 +7,6 @@ stage_order:
   - quality
   - recovery
 advisories:
-  subtitle_source_mismatch:
-    id: hf_advisory_subtitle_source_mismatch
-    kind: operator_guidance
-    level: warning
-    recommended_next_action: review_subtitles
-    operator_hint: subtitle review recommended
-    explanation: "当前烧录字幕来源不是主可编辑字幕 {expected_subtitle_source}，建议先确认主字幕对象再继续当前链路。"
-    evidence_fields:
-      - current_subtitle_source
-      - expected_subtitle_source
-      - subtitle_exists
-      - subtitle_ready
-  recompose_required:
-    id: hf_advisory_recompose_required
-    kind: operator_guidance
-    level: warning
-    recommended_next_action: recompose_final
-    operator_hint: recompose recommended
-    explanation: "当前字幕或配音已更新，建议重新合成最终视频以生成最新版本。"
-    evidence_fields:
-      - final_exists
-      - compose_status
-      - final_stale_reason
-      - blocking
   compose_blocked:
     id: hf_advisory_compose_blocked
     kind: operator_guidance
@@ -55,6 +31,30 @@ advisories:
       - subtitle_terminal_state
       - no_dub_compose_allowed
       - no_dub_reason
+  subtitle_source_mismatch:
+    id: hf_advisory_subtitle_source_mismatch
+    kind: operator_guidance
+    level: warning
+    recommended_next_action: review_subtitles
+    operator_hint: subtitle review recommended
+    explanation: "当前烧录字幕来源不是主可编辑字幕 {expected_subtitle_source}，建议先确认主字幕对象再继续当前链路。"
+    evidence_fields:
+      - current_subtitle_source
+      - expected_subtitle_source
+      - subtitle_exists
+      - subtitle_ready
+  recompose_required:
+    id: hf_advisory_recompose_required
+    kind: operator_guidance
+    level: warning
+    recommended_next_action: recompose_final
+    operator_hint: recompose recommended
+    explanation: "当前字幕或配音已更新，建议重新合成最终视频以生成最新版本。"
+    evidence_fields:
+      - final_exists
+      - compose_status
+      - final_stale_reason
+      - blocking
   compose_missing_final:
     id: hf_advisory_compose_missing_final
     kind: operator_guidance

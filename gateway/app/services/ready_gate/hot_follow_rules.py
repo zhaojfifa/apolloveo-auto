@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import Any, Dict
 import yaml
 
+from gateway.app.services.hot_follow_route_state import selected_route_from_state
+
 from .engine import (
     BlockingRule,
     GateRule,
@@ -154,26 +156,21 @@ def _extract_no_dub(task: dict, state: dict) -> bool:
 
 
 def _extract_compose_blocked(task: dict, state: dict) -> bool:
-    artifact_facts = _d(state.get("artifact_facts"))
-    compose_input = _d(artifact_facts.get("compose_input"))
-    return bool(artifact_facts.get("compose_input_blocked") or compose_input.get("blocked"))
+    route = selected_route_from_state(task, state)
+    return bool(route.get("blocked_reason")) and route.get("blocked_reason") == _reason_compose_blocked(task, state)
+
+
+def _extract_compose_allowed(task: dict, state: dict) -> bool:
+    return bool(selected_route_from_state(task, state).get("compose_allowed"))
 
 
 def _extract_no_tts_compose_allowed(task: dict, state: dict) -> bool:
-    artifact_facts = _d(state.get("artifact_facts"))
-    audio_lane = _d(artifact_facts.get("audio_lane"))
-    mode = str(artifact_facts.get("audio_lane_mode") or audio_lane.get("mode") or "").strip().lower()
-    no_tts = bool(audio_lane.get("no_tts") or artifact_facts.get("tts_voiceover_exists") is False)
-    source_audio_preserved = bool(audio_lane.get("source_audio_preserved"))
-    bgm_configured = bool(audio_lane.get("bgm_configured"))
-    return bool(no_tts and (source_audio_preserved or bgm_configured or mode == "source_audio_preserved_no_tts"))
+    return bool(selected_route_from_state(task, state).get("no_tts_compose_allowed"))
 
 
 def _extract_no_dub_compose_allowed(task: dict, state: dict) -> bool:
     """No-dub mode may bypass subtitle/audio blockers for final compose input checks."""
-    audio = _d(state.get("audio"))
-    reason = str(audio.get("no_dub_reason") or "").strip().lower()
-    return (bool(audio.get("no_dub")) and reason in {"target_subtitle_empty", "dub_input_empty"}) or _extract_no_tts_compose_allowed(task, state)
+    return bool(selected_route_from_state(task, state).get("no_dub_compose_allowed"))
 
 
 # ---------------------------------------------------------------------------
@@ -202,11 +199,13 @@ def _reason_no_dub(task: dict, state: dict) -> str:
     explicit = str(audio.get("no_dub_reason") or "").strip()
     if explicit:
         return explicit
-    artifact_facts = _d(state.get("artifact_facts"))
-    audio_lane = _d(artifact_facts.get("audio_lane"))
-    mode = str(artifact_facts.get("audio_lane_mode") or audio_lane.get("mode") or "").strip().lower()
-    if _extract_no_tts_compose_allowed(task, state):
-        return "source_audio_preserved_no_tts" if mode == "source_audio_preserved_no_tts" else "bgm_only_no_tts"
+    route_name = str(selected_route_from_state(task, state).get("name") or "").strip()
+    if route_name == "preserve_source_route":
+        return "source_audio_preserved_no_tts"
+    if route_name == "bgm_only_route":
+        return "bgm_only_no_tts"
+    if route_name == "no_tts_compose_route":
+        return "compose_no_tts"
     return ""
 
 
@@ -220,6 +219,15 @@ def _reason_compose_blocked(task: dict, state: dict) -> str:
     ).strip()
 
 
+def _reason_compose_allowed(task: dict, state: dict) -> str:
+    route = selected_route_from_state(task, state)
+    return str(route.get("blocked_reason") or "route_not_allowed").strip()
+
+
+def _reason_selected_route(task: dict, state: dict) -> str:
+    return str(selected_route_from_state(task, state).get("name") or "tts_replace_route").strip()
+
+
 _SIGNAL_EXTRACTORS = {
     "final_exists": _extract_final_exists,
     "final_fresh": _extract_final_fresh,
@@ -231,8 +239,9 @@ _SIGNAL_EXTRACTORS = {
     "subtitle_ready": _extract_subtitle_ready,
     "no_dub": _extract_no_dub,
     "no_dub_compose_allowed": _extract_no_dub_compose_allowed,
-    "compose_blocked": _extract_compose_blocked,
     "no_tts_compose_allowed": _extract_no_tts_compose_allowed,
+    "compose_allowed": _extract_compose_allowed,
+    "compose_blocked": _extract_compose_blocked,
 }
 
 _REASON_EXTRACTORS = {
@@ -240,6 +249,8 @@ _REASON_EXTRACTORS = {
     "audio_ready_reason": _reason_audio_ready,
     "no_dub_reason": _reason_no_dub,
     "compose_blocked_reason": _reason_compose_blocked,
+    "compose_allowed_reason": _reason_compose_allowed,
+    "selected_compose_route": _reason_selected_route,
 }
 
 

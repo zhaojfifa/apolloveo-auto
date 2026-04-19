@@ -24,7 +24,7 @@ def run(
         explanation = explanation.format(
             expected_subtitle_source=facts.get("expected_subtitle_source") or "mm.srt",
             compose_blocked_reason=facts.get("compose_blocked_reason") or "compose_input_blocked",
-            no_dub_reason=facts.get("no_dub_reason") or "no_tts_route",
+            no_dub_reason=facts.get("no_dub_reason") or "compose_no_tts",
         )
     return {
         "id": str(spec.get("id") or "").strip() or None,

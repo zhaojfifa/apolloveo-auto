@@ -31,6 +31,7 @@ def test_ready_gate_compose_blocked_overrides_compose_not_done():
     assert gate["compose_reason"] == "bitrate_too_high"
     assert gate["blocking"] == ["bitrate_too_high"]
     assert "compose_not_done" not in gate["blocking"]
+    assert gate["compose_allowed"] is False
 
 
 def test_ready_gate_models_bgm_only_no_tts_as_legal_no_dub_line_state():
@@ -69,6 +70,8 @@ def test_ready_gate_models_bgm_only_no_tts_as_legal_no_dub_line_state():
     assert gate["no_dub"] is True
     assert gate["no_dub_compose_allowed"] is True
     assert gate["no_tts_compose_allowed"] is True
+    assert gate["selected_compose_route"] == "bgm_only_route"
+    assert gate["compose_allowed"] is True
     assert gate["no_dub_reason"] == "bgm_only_no_tts"
     assert "subtitle_not_ready" not in gate["blocking"]
     assert "audio_not_done" not in gate["blocking"]
@@ -100,4 +103,6 @@ def test_ready_gate_models_preserved_source_audio_no_tts_as_legal_line_state():
     assert gate["no_dub"] is True
     assert gate["no_dub_compose_allowed"] is True
     assert gate["no_tts_compose_allowed"] is True
+    assert gate["selected_compose_route"] == "preserve_source_route"
+    assert gate["compose_allowed"] is True
     assert gate["no_dub_reason"] == "source_audio_preserved_no_tts"
