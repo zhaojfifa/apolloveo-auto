@@ -399,6 +399,48 @@ def test_hot_follow_advisory_legal_no_tts_route_beats_refresh_dub():
     assert advisory["recommended_next_action"] == "compose_no_tts"
 
 
+def test_hot_follow_advisory_prefers_compose_input_fix_over_recompose():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-compose-input-fix", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": True,
+                "compose_ready": False,
+                "publish_ready": False,
+                "compose_allowed": True,
+                "compose_route_allowed": True,
+                "compose_input_ready": False,
+                "compose_execute_allowed": False,
+                "compose_input_mode": "derive_failed",
+                "compose_input_reason": "derive_not_encoder_safe",
+                "compose_input_derive_failed_terminal": True,
+                "compose_reason": "compose_input_derive_failed",
+                "blocking": ["compose_input_derive_failed"],
+            },
+            artifact_facts={
+                "final_exists": True,
+                "audio_exists": True,
+                "subtitle_exists": True,
+                "compose_input_mode": "derive_failed",
+            },
+            current_attempt={
+                "audio_ready": True,
+                "compose_status": "failed",
+                "compose_route_allowed": True,
+                "compose_input_ready": False,
+                "compose_execute_allowed": False,
+                "compose_input_derive_failed_terminal": True,
+                "requires_recompose": True,
+                "current_subtitle_source": "mm.srt",
+            },
+        ),
+    )
+
+    assert advisory["recommended_next_action"] == "retry_after_compose_input_fix"
+    assert advisory["id"] == "hf_advisory_compose_input_unready"
+
+
 def test_hot_follow_advisory_v0_recommends_continue_qa_when_final_is_ready():
     advisory = skills_advisory.maybe_build_hot_follow_advisory(
         {"task_id": "hf-skills-v0-final-ready", "kind": "hot_follow"},
@@ -525,10 +567,24 @@ def test_hot_follow_advisory_noop_preserves_workbench_payload(monkeypatch):
         "subtitle_url": None,
         "pack_exists": False,
         "pack_url": None,
-        "compose_input": {"mode": "unknown", "blocked": False, "reason": None, "profile": {}, "source": "none"},
+        "compose_input": {
+            "mode": "unknown",
+            "blocked": False,
+            "ready": False,
+            "derive_failed": False,
+            "reason": None,
+            "failure_code": None,
+            "profile": {},
+            "safe_key": None,
+            "source": "none",
+        },
         "compose_input_mode": "unknown",
         "compose_input_blocked": False,
+        "compose_input_ready": False,
+        "compose_input_derive_failed": False,
         "compose_input_reason": None,
+        "compose_input_failure_code": None,
+        "compose_input_safe_key": None,
         "audio_lane": {
             "mode": "muted_no_tts",
             "tts_voiceover_exists": False,

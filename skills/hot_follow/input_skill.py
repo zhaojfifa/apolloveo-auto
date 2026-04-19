@@ -39,6 +39,17 @@ def run(
         or None,
         "compose_ready": compose_ready,
         "compose_allowed": bool(ready_gate.get("compose_allowed") or current_attempt.get("compose_allowed")),
+        "compose_route_allowed": bool(
+            ready_gate.get("compose_route_allowed") or current_attempt.get("compose_route_allowed")
+        ),
+        "compose_input_ready": bool(
+            ready_gate.get("compose_input_ready") or current_attempt.get("compose_input_ready")
+        ),
+        "compose_execute_allowed": bool(
+            ready_gate.get("compose_execute_allowed") or current_attempt.get("compose_execute_allowed")
+        ),
+        "compose_input_mode": str(ready_gate.get("compose_input_mode") or "").strip() or None,
+        "compose_input_reason": str(ready_gate.get("compose_input_reason") or "").strip() or None,
         "publish_ready": publish_ready,
         "blocking": blocking,
         "compose_blocked": bool(ready_gate.get("compose_blocked") or current_attempt.get("compose_blocked_terminal")),
@@ -46,6 +57,18 @@ def run(
             ready_gate.get("compose_blocked_reason") or current_attempt.get("compose_reason") or ""
         ).strip()
         or None,
+        "compose_input_derive_failed_terminal": bool(
+            ready_gate.get("compose_input_derive_failed_terminal")
+            or current_attempt.get("compose_input_derive_failed_terminal")
+        ),
+        "compose_input_blocked_terminal": bool(
+            ready_gate.get("compose_input_blocked_terminal")
+            or current_attempt.get("compose_input_blocked_terminal")
+        ),
+        "compose_exec_failed_terminal": bool(
+            ready_gate.get("compose_exec_failed_terminal")
+            or current_attempt.get("compose_exec_failed_terminal")
+        ),
         "no_dub_compose_allowed": bool(ready_gate.get("no_dub_compose_allowed")),
         "no_tts_compose_allowed": bool(ready_gate.get("no_tts_compose_allowed") or current_attempt.get("no_tts_compose_allowed")),
         "no_dub_reason": str(ready_gate.get("no_dub_reason") or "").strip() or None,

@@ -13,6 +13,7 @@ Historical bug-fix preservation:
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import re
@@ -168,6 +169,7 @@ def compose_fail(
     *,
     ffmpeg_cmd: str | None = None,
     stderr_tail: str | None = None,
+    extra: dict[str, Any] | None = None,
 ) -> None:
     """Raise HTTPException with structured compose error detail."""
     detail: dict[str, Any] = {"reason": reason, "message": message}
@@ -175,6 +177,8 @@ def compose_fail(
         detail["ffmpeg_cmd"] = ffmpeg_cmd
     if stderr_tail:
         detail["stderr_tail"] = stderr_tail
+    if extra:
+        detail.update(extra)
     raise HTTPException(status_code=status_code, detail=detail)
 
 
@@ -494,6 +498,34 @@ class ComposeTimeouts:
     compose: int = 600
     probe: int = 30
     clamp: int = 120
+    derive: int = 600
+
+
+@dataclass(frozen=True)
+class ComposeInputProfile:
+    size_bytes: int
+    duration_sec: float
+    width: int | None = None
+    height: int | None = None
+    bit_rate: int | None = None
+    pix_fmt: str | None = None
+
+    @property
+    def pixels(self) -> int | None:
+        if not self.width or not self.height:
+            return None
+        return int(self.width) * int(self.height)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "size_bytes": self.size_bytes,
+            "duration_sec": self.duration_sec,
+            "width": self.width,
+            "height": self.height,
+            "bit_rate": self.bit_rate,
+            "pix_fmt": self.pix_fmt,
+            "pixels": self.pixels,
+        }
 
 
 @dataclass(frozen=True)
@@ -589,6 +621,7 @@ class _WorkspaceFiles:
     compose_warning: str | None = None
     ffmpeg_cmd_used: str | None = None
     overlay_subtitles: bool = True
+    compose_input_policy: dict[str, Any] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -814,8 +847,59 @@ class CompositionService:
         return None
 
     @staticmethod
+    def recover_stale_running_compose(
+        task_id: str,
+        task: dict,
+        *,
+        lock_active: bool,
+        object_exists_fn: Callable[[str], bool] = object_exists,
+        now: datetime | None = None,
+        stale_after_sec: int | None = None,
+    ) -> dict[str, Any] | None:
+        status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip().lower()
+        if status not in {"running", "processing", "queued"}:
+            return None
+        if lock_active:
+            return None
+        final_key = (
+            task_key(task, "final_video_key")
+            or task_key(task, "final_video_path")
+            or deliver_key(task_id, "final.mp4")
+        )
+        if final_key and object_exists_fn(str(final_key)):
+            return None
+        started_raw = str(task.get("compose_last_started_at") or "").strip()
+        if not started_raw:
+            return None
+        try:
+            started_at = datetime.fromisoformat(started_raw)
+        except ValueError:
+            started_at = None
+        if started_at is None:
+            return None
+        if started_at.tzinfo is None:
+            started_at = started_at.replace(tzinfo=timezone.utc)
+        current_time = now or datetime.now(timezone.utc)
+        threshold = stale_after_sec
+        if threshold is None:
+            try:
+                threshold = int(os.getenv("HF_COMPOSE_STALE_RUNNING_SEC", "120"))
+            except Exception:
+                threshold = 120
+        if (current_time - started_at).total_seconds() < max(0, int(threshold)):
+            return None
+        detail = {
+            "reason": "compose_stale_running_recovered",
+            "message": "Previous compose attempt was running without a live worker or final artifact.",
+        }
+        updates = CompositionService.build_compose_failure_updates(detail)
+        updates["compose_lock_until"] = None
+        return updates
+
+    @staticmethod
     def build_compose_failure_updates(detail: dict[str, Any]) -> dict[str, Any]:
-        return {
+        reason = str(detail.get("reason") or "").strip()
+        updates = {
             "compose_status": "failed",
             "compose_error": detail,
             "compose_error_reason": detail.get("reason"),
@@ -827,6 +911,26 @@ class CompositionService:
             "final_video_key": None,
             "final_video_path": None,
         }
+        if reason == "compose_input_derive_failed":
+            failure_code = str(detail.get("failure_code") or reason).strip() or reason
+            updates["compose_input_policy"] = {
+                "mode": "derive_failed",
+                "source": "derived_safe",
+                "profile": dict(detail.get("compose_input_profile") or {}),
+                "safe_key": detail.get("safe_key"),
+                "reason": str(detail.get("message") or reason).strip() or reason,
+                "failure_code": failure_code,
+            }
+        elif reason == "compose_input_blocked":
+            updates["compose_input_policy"] = {
+                "mode": "blocked",
+                "source": "raw",
+                "profile": dict(detail.get("compose_input_profile") or {}),
+                "safe_key": detail.get("safe_key"),
+                "reason": str(detail.get("message") or reason).strip() or reason,
+                "failure_code": str(detail.get("failure_code") or reason).strip() or reason,
+            }
+        return updates
 
     @staticmethod
     def merge_compose_warning(
@@ -1026,6 +1130,17 @@ class CompositionService:
             self._storage.download_file(inputs.audio_key, str(voice_path))
 
         video_size, video_duration = assert_local_video_ok(video_path)
+        input_profile = self._probe_video_profile(task_id, video_path, video_size, video_duration)
+        self._guard_workdir_space(task_id, tmp, input_profile)
+        video_path, input_profile, derive_warning = self._derive_safe_compose_input(
+            task_id,
+            task,
+            inputs,
+            video_path,
+            tmp,
+            input_profile,
+        )
+        video_size, video_duration = assert_local_video_ok(video_path)
         voice_duration = 0.0
         if inputs.audio_key and not inputs.subtitle_only_compose:
             try:
@@ -1035,7 +1150,7 @@ class CompositionService:
 
         video_input_path = video_path
         compose_policy = inputs.compose_policy
-        compose_warning: str | None = None
+        compose_warning: str | None = derive_warning
 
         # ── Freeze-tail ──
         hold_sec = 0.0
@@ -1136,6 +1251,30 @@ class CompositionService:
             bgm_path = tmp / "bgm_input.mp3"
             self._storage.download_file(str(inputs.bgm_key), str(bgm_path))
 
+        compose_input_policy = dict(task.get("compose_input_policy") or {})
+        if derive_warning:
+            compose_input_policy.update(
+                {
+                    "mode": "derived_ready",
+                    "source": "derived_safe",
+                    "profile": input_profile.to_dict(),
+                    "safe_key": video_path.name,
+                    "reason": "large_local_input_derived",
+                    "failure_code": None,
+                }
+            )
+        elif str(compose_input_policy.get("mode") or "").strip().lower() not in {"blocked", "derive_failed"}:
+            compose_input_policy.update(
+                {
+                    "mode": "direct",
+                    "source": compose_input_policy.get("source") or "raw",
+                    "profile": input_profile.to_dict(),
+                    "safe_key": video_path.name,
+                    "reason": compose_input_policy.get("reason"),
+                    "failure_code": None,
+                }
+            )
+
         if requested_overlay_subtitles and not overlay_subtitles and not compose_warning:
             compose_warning = "subtitle_overlay_skipped_empty_no_dub"
 
@@ -1158,6 +1297,7 @@ class CompositionService:
             subtitle_sha256=subtitle_sha256,
             compose_warning=compose_warning,
             overlay_subtitles=overlay_subtitles,
+            compose_input_policy=compose_input_policy,
         )
 
     def _apply_freeze_tail(
@@ -1237,6 +1377,206 @@ class CompositionService:
             str((result.raw_output or {}).get("stdout") or ""),
             str((result.raw_output or {}).get("stderr") or ""),
         )
+
+    def _probe_video_profile(self, task_id: str, video_path: Path, fallback_size: int, fallback_duration: float) -> ComposeInputProfile:
+        profile = ComposeInputProfile(size_bytes=int(fallback_size or 0), duration_sec=float(fallback_duration or 0.0))
+        ffprobe = shutil.which("ffprobe")
+        if not ffprobe:
+            return profile
+        cmd = [
+            ffprobe,
+            "-v",
+            "error",
+            "-select_streams",
+            "v:0",
+            "-show_entries",
+            "stream=width,height,bit_rate,pix_fmt:format=duration,bit_rate",
+            "-of",
+            "json",
+            str(video_path),
+        ]
+        try:
+            proc = self._run_ffmpeg(cmd, task_id, "compose_input_probe", timeout=self._timeouts.probe)
+        except HTTPException:
+            return profile
+        if proc.returncode != 0:
+            return profile
+        try:
+            data = json.loads(proc.stdout or "{}")
+        except Exception:
+            return profile
+        streams = data.get("streams") if isinstance(data, dict) else None
+        stream = streams[0] if isinstance(streams, list) and streams and isinstance(streams[0], dict) else {}
+        fmt = data.get("format") if isinstance(data, dict) and isinstance(data.get("format"), dict) else {}
+
+        def _int(value: Any) -> int | None:
+            try:
+                parsed = int(float(str(value)))
+            except Exception:
+                return None
+            return parsed if parsed > 0 else None
+
+        def _float(value: Any) -> float | None:
+            try:
+                parsed = float(str(value))
+            except Exception:
+                return None
+            return parsed if parsed > 0 else None
+
+        return ComposeInputProfile(
+            size_bytes=int(fallback_size or 0),
+            duration_sec=_float(fmt.get("duration")) or float(fallback_duration or 0.0),
+            width=_int(stream.get("width")),
+            height=_int(stream.get("height")),
+            bit_rate=_int(stream.get("bit_rate")) or _int(fmt.get("bit_rate")),
+            pix_fmt=str(stream.get("pix_fmt") or "").strip() or None,
+        )
+
+    @staticmethod
+    def _large_input_limits() -> dict[str, int]:
+        def _env_int(name: str, default: int) -> int:
+            try:
+                return int(os.getenv(name, str(default)))
+            except Exception:
+                return default
+
+        return {
+            "bytes": _env_int("HF_COMPOSE_DERIVE_MIN_BYTES", 250 * 1024 * 1024),
+            "bitrate": _env_int("HF_COMPOSE_DERIVE_MIN_BITRATE", 12_000_000),
+            "pixels": _env_int("HF_COMPOSE_DERIVE_MIN_PIXELS", 1920 * 1080),
+            "max_width": _env_int("HF_COMPOSE_DERIVE_MAX_WIDTH", 1080),
+            "max_height": _env_int("HF_COMPOSE_DERIVE_MAX_HEIGHT", 1920),
+            "crf": _env_int("HF_COMPOSE_DERIVE_CRF", 23),
+        }
+
+    @staticmethod
+    def _should_derive_safe_compose_input(task: dict, profile: ComposeInputProfile) -> bool:
+        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+        local_upload = str(pipeline_config.get("ingest_mode") or "").strip().lower() == "local"
+        if not local_upload and str(task.get("source_url") or "").strip():
+            return False
+        limits = CompositionService._large_input_limits()
+        return bool(
+            int(profile.size_bytes or 0) >= limits["bytes"]
+            or int(profile.bit_rate or 0) >= limits["bitrate"]
+            or int(profile.pixels or 0) >= limits["pixels"]
+        )
+
+    def _guard_workdir_space(self, task_id: str, tmp: Path, profile: ComposeInputProfile, *, multiplier: float = 3.0) -> None:
+        usage = shutil.disk_usage(tmp)
+        required = max(
+            512 * 1024 * 1024,
+            int((profile.size_bytes or 0) * multiplier),
+            int((profile.bit_rate or 0) * max(profile.duration_sec or 0.0, 1.0) / 8 * 1.5),
+        )
+        if usage.free < required:
+            compose_fail(
+                "compose_insufficient_disk",
+                f"compose workspace has {usage.free} bytes free, requires at least {required} bytes",
+                status_code=507,
+            )
+        logger.info(
+            "COMPOSE_WORKDIR_GUARD",
+            extra={"task_id": task_id, "free_bytes": usage.free, "required_bytes": required},
+        )
+
+    def _derive_safe_compose_input(
+        self,
+        task_id: str,
+        task: dict,
+        inputs: _ComposeInputs,
+        video_path: Path,
+        tmp: Path,
+        profile: ComposeInputProfile,
+    ) -> tuple[Path, ComposeInputProfile, str | None]:
+        self._guard_workdir_space(task_id, tmp, profile, multiplier=4.0)
+        if not self._should_derive_safe_compose_input(task, profile):
+            return video_path, profile, None
+
+        limits = self._large_input_limits()
+        safe_path = tmp / "video_input_safe.mp4"
+        scale_expr = (
+            f"scale='min(iw,{limits['max_width']})':'min(ih,{limits['max_height']})':"
+            "force_original_aspect_ratio=decrease:force_divisible_by=2"
+        )
+        cmd = [
+            inputs.ffmpeg,
+            "-y",
+            "-i",
+            str(video_path),
+            "-map",
+            "0:v:0",
+            "-map",
+            "0:a?",
+            "-vf",
+            scale_expr,
+            "-c:v",
+            "libx264",
+            "-preset",
+            "veryfast",
+            "-crf",
+            str(limits["crf"]),
+            "-pix_fmt",
+            "yuv420p",
+            "-c:a",
+            "aac",
+            "-b:a",
+            "128k",
+            "-map_metadata",
+            "-1",
+            "-movflags",
+            "+faststart",
+            *(["-sn"] if inputs.strip_subtitle_streams else []),
+            str(safe_path),
+        ]
+        proc = self._run_ffmpeg(cmd, task_id, "derive_compose_input", timeout=self._timeouts.derive)
+        if proc.returncode != 0 or not safe_path.exists() or safe_path.stat().st_size == 0:
+            compose_fail(
+                "compose_input_derive_failed",
+                "failed to derive safe compose input",
+                ffmpeg_cmd=" ".join(cmd),
+                stderr_tail=(proc.stderr or "")[-800:],
+                extra={
+                    "failure_code": "derive_ffmpeg_failed",
+                    "compose_input_profile": profile.to_dict(),
+                    "safe_key": safe_path.name,
+                },
+            )
+        safe_size, safe_duration = assert_local_video_ok(safe_path)
+        safe_profile = self._probe_video_profile(task_id, safe_path, safe_size, safe_duration)
+        derived_width = int(safe_profile.width or 0)
+        derived_height = int(safe_profile.height or 0)
+        if (
+            derived_width <= 0
+            or derived_height <= 0
+            or derived_width % 2
+            or derived_height % 2
+            or str(safe_profile.pix_fmt or "").strip().lower() != "yuv420p"
+        ):
+            compose_fail(
+                "compose_input_derive_failed",
+                "derived compose input is not encoder-safe",
+                ffmpeg_cmd=" ".join(cmd),
+                extra={
+                    "failure_code": "derive_not_encoder_safe",
+                    "compose_input_profile": profile.to_dict(),
+                    "derived_compose_input_profile": safe_profile.to_dict(),
+                    "safe_key": safe_path.name,
+                },
+            )
+        logger.info(
+            "COMPOSE_INPUT_DERIVED",
+            extra={
+                "task_id": task_id,
+                "source_size": profile.size_bytes,
+                "source_bitrate": profile.bit_rate,
+                "source_pixels": profile.pixels,
+                "derived_size": safe_profile.size_bytes,
+                "derived_bitrate": safe_profile.bit_rate,
+                "derived_pixels": safe_profile.pixels,
+            },
+        )
+        return safe_path, safe_profile, "large local input derived for stable compose"
 
     # ── Filter expression helpers (ex-nested, now methods) ────────────────
 
@@ -1783,6 +2123,7 @@ class CompositionService:
             "freeze_tail_enabled": bool(compose_policy == "freeze_tail"),
             "freeze_tail_cap_sec": int(freeze_tail_cap_sec),
             "compose_warning": compose_warning,
+            "compose_input_policy": dict(ws.compose_input_policy or {}),
             "last_step": "compose",
             "status": "ready",
             "error_message": None,

@@ -71,25 +71,37 @@ def _compose_input_facts(task: dict) -> dict[str, Any]:
     )
     mode = str(policy.get("mode") or "").strip().lower()
     reason = str(policy.get("reason") or "").strip() or None
+    failure_code = str(policy.get("failure_code") or "").strip() or None
+    safe_key = str(policy.get("safe_key") or task.get("compose_input_key") or task.get("compose_input_path") or "").strip() or None
     preflight_status = str(compose.get("preflight_status") or task.get("compose_preflight_status") or "").strip().lower()
     preflight_reason = str(compose.get("preflight_reason") or task.get("compose_preflight_reason") or "").strip() or None
     if not mode:
         if preflight_status == "blocked":
             mode = "blocked"
         elif task.get("compose_input_key") or task.get("compose_input_path"):
-            mode = "derived"
+            mode = "derived_ready"
         elif profile:
             mode = "direct"
         else:
             mode = "unknown"
+    if mode == "derived":
+        mode = "derived_ready"
     if reason is None:
         reason = preflight_reason
+    blocked = mode == "blocked"
+    derive_failed = mode == "derive_failed"
+    ready = mode in {"direct", "derived_ready"}
     return {
         "mode": mode,
-        "blocked": mode == "blocked",
+        "blocked": blocked,
+        "ready": ready,
+        "derive_failed": derive_failed,
         "reason": reason,
+        "failure_code": failure_code,
         "profile": dict(profile or {}),
-        "source": "compose_input_policy" if policy else ("compose_probe" if profile else "none"),
+        "safe_key": safe_key,
+        "source": str(policy.get("source") or "").strip()
+        or ("raw" if policy or profile else "none"),
     }
 
 
@@ -228,7 +240,11 @@ def build_hot_follow_artifact_facts(
         "compose_input": compose_input,
         "compose_input_mode": compose_input["mode"],
         "compose_input_blocked": bool(compose_input["blocked"]),
+        "compose_input_ready": bool(compose_input["ready"]),
+        "compose_input_derive_failed": bool(compose_input["derive_failed"]),
         "compose_input_reason": compose_input["reason"],
+        "compose_input_failure_code": compose_input["failure_code"],
+        "compose_input_safe_key": compose_input["safe_key"],
         "audio_lane": audio_lane,
         "audio_lane_mode": audio_lane["mode"],
         "tts_voiceover_exists": bool(audio_lane["tts_voiceover_exists"]),
@@ -272,9 +288,20 @@ def selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
         voice_state=audio,
         no_dub_compose_allowed=no_dub_compose_allowed,
     )
+    compose_input_mode = str(compose_input.get("mode") or "").strip().lower()
+    compose_input_ready = bool(compose_input.get("ready") or compose_input_mode in {"direct", "derived_ready"})
+    compose_input_terminal_reason = str(
+        compose_input.get("failure_code") or compose_input.get("reason") or compose_input_mode or "compose_input_not_ready"
+    ).strip()
+    compose_execute_allowed = bool(allowed and compose_input_ready)
     return {
         "name": route_name,
         "compose_allowed": allowed,
+        "compose_route_allowed": allowed,
+        "compose_input_ready": compose_input_ready,
+        "compose_input_mode": compose_input_mode,
+        "compose_input_reason": compose_input_terminal_reason,
+        "compose_execute_allowed": compose_execute_allowed,
         "blocked_reason": "" if allowed else reason,
         "no_tts_compose_allowed": route_name in {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"} and allowed,
         "no_dub_compose_allowed": route_name in {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"} and allowed,
@@ -316,9 +343,32 @@ def build_hot_follow_current_attempt_summary(
         no_dub_compose_allowed=no_dub_compose_allowed,
     )
     compose_blocked = bool(artifacts.get("compose_input_blocked"))
+    compose_input = artifacts.get("compose_input") if isinstance(artifacts.get("compose_input"), dict) else {}
+    compose_input_mode = str(compose_input.get("mode") or artifacts.get("compose_input_mode") or "").strip().lower()
+    compose_input_ready = bool(
+        compose_input.get("ready")
+        or artifacts.get("compose_input_ready")
+        or compose_input_mode in {"direct", "derived_ready"}
+    )
+    compose_input_derive_failed = bool(
+        compose_input.get("derive_failed")
+        or artifacts.get("compose_input_derive_failed")
+        or compose_input_mode == "derive_failed"
+    )
+    compose_input_reason = str(
+        compose_input.get("failure_code")
+        or artifacts.get("compose_input_failure_code")
+        or compose_input.get("reason")
+        or artifacts.get("compose_input_reason")
+        or compose_input_mode
+        or "compose_input_not_ready"
+    ).strip()
     if compose_blocked:
         compose_status_norm = "blocked"
         compose_reason_norm = str(artifacts.get("compose_input_reason") or "compose_input_blocked").strip()
+    elif compose_input_derive_failed:
+        compose_status_norm = "failed"
+        compose_reason_norm = compose_input_reason or "compose_input_derive_failed"
     audio_ready = bool(voice_state.get("audio_ready"))
     no_tts_route = selected_route in {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"}
     subtitle_empty = bool(
@@ -345,11 +395,13 @@ def build_hot_follow_current_attempt_summary(
     )
     requires_recompose = bool(
         not compose_blocked
+        and not compose_input_derive_failed
         and route_allowed
         and not no_dub_route_terminal
         and (audio_ready or no_tts_route)
         and (final_stale_reason or compose_reason_norm != "ready")
     )
+    compose_execute_allowed = bool(route_allowed and compose_input_ready)
     return {
         "dub_status": dub_status_norm,
         "audio_ready": audio_ready,
@@ -364,10 +416,28 @@ def build_hot_follow_current_attempt_summary(
         "final_stale_reason": final_stale_reason or None,
         "selected_compose_route": selected_route,
         "compose_allowed": route_allowed,
+        "compose_route_allowed": route_allowed,
+        "compose_input_ready": compose_input_ready,
+        "compose_execute_allowed": compose_execute_allowed,
         "no_tts_compose_allowed": bool(no_tts_route and route_allowed),
         "no_dub_compose_allowed": bool(no_tts_route and route_allowed),
         "compose_blocked_terminal": compose_blocked,
-        "compose_terminal_state": "compose_blocked_terminal" if compose_blocked else None,
+        "compose_input_derive_failed_terminal": compose_input_derive_failed,
+        "compose_input_blocked_terminal": compose_blocked,
+        "compose_exec_failed_terminal": bool(
+            not compose_input_derive_failed
+            and not compose_blocked
+            and compose_status_norm in {"failed", "error"}
+        ),
+        "compose_terminal_state": (
+            "compose_blocked_terminal"
+            if compose_blocked
+            else (
+                "compose_input_derive_failed_terminal"
+                if compose_input_derive_failed
+                else ("compose_exec_failed_terminal" if compose_status_norm in {"failed", "error"} else None)
+            )
+        ),
         "compose_allowed_reason": "ready" if route_allowed else route_reason,
         "subtitle_empty_terminal": subtitle_empty_terminal,
         "no_dub_route_terminal": no_dub_route_terminal,

@@ -774,12 +774,17 @@ def build_hot_follow_workbench_hub(
     composed_ready = bool(composed.get("composed_ready"))
     composed_reason = str(composed.get("composed_reason") or "final_missing")
 
+    parse_error = task.get("parse_error") if str(parse_state).strip().lower() in {"failed", "error"} else None
+    subtitles_error = task.get("subtitles_error") if str(subtitles_state).strip().lower() in {"failed", "error"} else None
+    dub_error = audio_error if str(dub_state).strip().lower() in {"failed", "error"} else None
+    pack_error = task.get("pack_error") if str(pack_state).strip().lower() in {"failed", "error"} else None
+    compose_error = task.get("compose_error") if str(compose_state).strip().lower() in {"failed", "error"} else None
     pipeline = [
-        {"key": "parse", "label": "Parse", "status": parse_state, "updated_at": task.get("updated_at"), "error": task.get("error_message"), "message": parse_summary},
-        {"key": "subtitles", "label": "Subtitles", "status": subtitles_state, "updated_at": task.get("updated_at"), "error": task.get("subtitles_error"), "message": subtitles_summary},
-        {"key": "dub", "label": "Dub", "status": dub_state, "updated_at": task.get("updated_at"), "error": audio_error, "message": dub_summary},
-        {"key": "pack", "label": "Pack", "status": pack_state, "updated_at": task.get("updated_at"), "error": task.get("pack_error"), "message": pack_summary},
-        {"key": "compose", "label": "Compose", "status": compose_state, "updated_at": task.get("updated_at"), "error": task.get("compose_error"), "message": compose_summary},
+        {"key": "parse", "label": "Parse", "status": parse_state, "updated_at": task.get("updated_at"), "error": parse_error, "message": parse_summary},
+        {"key": "subtitles", "label": "Subtitles", "status": subtitles_state, "updated_at": task.get("updated_at"), "error": subtitles_error, "message": subtitles_summary},
+        {"key": "dub", "label": "Dub", "status": dub_state, "updated_at": task.get("updated_at"), "error": dub_error, "message": dub_summary},
+        {"key": "pack", "label": "Pack", "status": pack_state, "updated_at": task.get("updated_at"), "error": pack_error, "message": pack_summary},
+        {"key": "compose", "label": "Compose", "status": compose_state, "updated_at": task.get("updated_at"), "error": compose_error, "message": compose_summary},
     ]
     for item in pipeline:
         item["state"] = item["status"]

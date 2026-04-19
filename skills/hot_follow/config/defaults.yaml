@@ -19,6 +19,21 @@ advisories:
       - compose_blocked_reason
       - compose_status
       - blocking
+  compose_input_unready:
+    id: hf_advisory_compose_input_unready
+    kind: operator_guidance
+    level: warning
+    recommended_next_action: retry_after_compose_input_fix
+    operator_hint: compose input requires attention
+    explanation: "当前合成线路可用，但合成输入未就绪：{compose_blocked_reason}。请先修复合成输入后再重试。"
+    evidence_fields:
+      - compose_route_allowed
+      - compose_input_ready
+      - compose_execute_allowed
+      - compose_input_mode
+      - compose_input_reason
+      - compose_input_derive_failed_terminal
+      - blocking
   no_dub_route_terminal:
     id: hf_advisory_no_dub_route_terminal
     kind: operator_guidance

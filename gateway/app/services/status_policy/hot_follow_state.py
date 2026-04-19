@@ -173,6 +173,8 @@ def _resolve_artifacts(task_id: str, task: Dict[str, Any], state: Dict[str, Any]
 def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any]) -> None:
     compose_ready = bool(gate_result["compose_ready"])
     compose_blocked = bool(gate_result.get("compose_blocked"))
+    compose_input_derive_failed = bool(gate_result.get("compose_input_derive_failed_terminal"))
+    compose_exec_failed = bool(gate_result.get("compose_exec_failed_terminal"))
     historical_exists = bool((_as_dict(state.get("historical_final"))).get("exists"))
 
     compose = dict(_as_dict(state.get("compose")))
@@ -185,6 +187,10 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
         last["status"] = "blocked"
         last["error"] = gate_result.get("compose_blocked_reason") or gate_result.get("compose_reason")
         state["compose_status"] = "blocked"
+    elif compose_input_derive_failed or compose_exec_failed:
+        last["status"] = "failed"
+        last["error"] = gate_result.get("compose_input_reason") or gate_result.get("compose_reason")
+        state["compose_status"] = "failed"
     else:
         if last:
             last["status"] = "pending"
@@ -199,13 +205,20 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
             continue
         if str(step.get("key") or "").strip().lower() != "compose":
             continue
-        step["status"] = "done" if compose_ready else ("blocked" if compose_blocked else "pending")
-        step["state"] = "done" if compose_ready else ("blocked" if compose_blocked else "pending")
+        step_status = (
+            "done"
+            if compose_ready
+            else ("blocked" if compose_blocked else ("failed" if (compose_input_derive_failed or compose_exec_failed) else "pending"))
+        )
+        step["status"] = step_status
+        step["state"] = step_status
         if compose_ready:
             step["error"] = None
             step["message"] = step.get("message") or "final video merge"
         elif compose_blocked:
             step["error"] = gate_result.get("compose_blocked_reason") or gate_result.get("compose_reason")
+        elif compose_input_derive_failed or compose_exec_failed:
+            step["error"] = gate_result.get("compose_input_reason") or gate_result.get("compose_reason")
     state["pipeline"] = pipeline
 
     if isinstance(state.get("deliverables"), list):
@@ -214,8 +227,13 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
                 continue
             if str(item.get("kind") or "").strip().lower() != "final":
                 continue
-            item["status"] = "done" if compose_ready else ("blocked" if compose_blocked else "pending")
-            item["state"] = "done" if compose_ready else ("blocked" if compose_blocked else "pending")
+            item_status = (
+                "done"
+                if compose_ready
+                else ("blocked" if compose_blocked else ("failed" if (compose_input_derive_failed or compose_exec_failed) else "pending"))
+            )
+            item["status"] = item_status
+            item["state"] = item_status
             item["historical"] = bool(historical_exists and not compose_ready)
             if not compose_ready:
                 item["url"] = None
@@ -226,20 +244,61 @@ def _apply_route_truth(task: Dict[str, Any], state: Dict[str, Any], gate_result:
     route = selected_route_from_state(task, state)
     route_name = str(route.get("name") or "").strip()
     compose_allowed = bool(route.get("compose_allowed"))
+    compose_route_allowed = bool(route.get("compose_route_allowed", compose_allowed))
+    compose_input_ready = bool(route.get("compose_input_ready"))
+    compose_execute_allowed = bool(route.get("compose_execute_allowed"))
+    compose_input_mode = str(route.get("compose_input_mode") or "").strip().lower()
+    compose_input_reason = str(route.get("compose_input_reason") or "").strip()
+    compose_status = str(state.get("compose_status") or task.get("compose_status") or "").strip().lower()
+    compose_error_reason = str(
+        state.get("compose_error_reason")
+        or task.get("compose_error_reason")
+        or (_as_dict(state.get("compose_error"))).get("reason")
+        or (_as_dict(task.get("compose_error"))).get("reason")
+        or ""
+    ).strip()
     blocked_reason = str(route.get("blocked_reason") or "").strip()
 
     gate_result["selected_compose_route"] = route_name
     gate_result["compose_allowed"] = compose_allowed
+    gate_result["compose_route_allowed"] = compose_route_allowed
+    gate_result["compose_input_ready"] = compose_input_ready
+    gate_result["compose_execute_allowed"] = compose_execute_allowed
+    gate_result["compose_input_mode"] = compose_input_mode
+    gate_result["compose_input_reason"] = compose_input_reason or None
     gate_result["no_tts_compose_allowed"] = bool(route.get("no_tts_compose_allowed"))
     gate_result["no_dub_compose_allowed"] = bool(route.get("no_dub_compose_allowed"))
     if gate_result["no_tts_compose_allowed"]:
         gate_result["no_dub"] = True
 
-    if blocked_reason == "compose_input_blocked" or bool(gate_result.get("compose_blocked")):
+    if compose_input_mode == "derive_failed":
+        reason = compose_input_reason or "compose_input_derive_failed"
+        gate_result["compose_input_derive_failed_terminal"] = True
+        gate_result["compose_input_blocked_terminal"] = False
+        gate_result["compose_exec_failed_terminal"] = False
+        gate_result["compose_execute_allowed"] = False
+        gate_result["compose_reason"] = "compose_input_derive_failed"
+        gate_result["compose_input_reason"] = reason
+        gate_result["blocking"] = ["compose_input_derive_failed"]
+    elif compose_input_mode == "blocked" or blocked_reason == "compose_input_blocked" or bool(gate_result.get("compose_blocked")):
         reason = str(gate_result.get("compose_blocked_reason") or blocked_reason or "compose_input_blocked").strip()
         gate_result["compose_blocked"] = True
         gate_result["compose_blocked_reason"] = reason
-        gate_result["compose_allowed"] = False
+        gate_result["compose_execute_allowed"] = False
+        gate_result["compose_reason"] = reason
+        gate_result["blocking"] = [reason]
+        gate_result["compose_input_blocked_terminal"] = True
+        gate_result["compose_input_derive_failed_terminal"] = False
+        gate_result["compose_exec_failed_terminal"] = False
+    elif compose_status in {"failed", "error"}:
+        reason = compose_error_reason or "compose_exec_failed"
+        gate_result["compose_exec_failed_terminal"] = True
+        gate_result["compose_execute_allowed"] = False
+        gate_result["compose_reason"] = reason
+        gate_result["blocking"] = ["compose_exec_failed"]
+    elif compose_route_allowed and not compose_input_ready and compose_input_mode not in {"", "unknown"}:
+        reason = compose_input_reason or "compose_input_not_ready"
+        gate_result["compose_execute_allowed"] = False
         gate_result["compose_reason"] = reason
         gate_result["blocking"] = [reason]
     elif not compose_allowed and blocked_reason and not str(gate_result.get("no_dub_reason") or "").strip():
