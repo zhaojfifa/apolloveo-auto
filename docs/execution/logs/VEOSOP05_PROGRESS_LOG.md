@@ -1812,3 +1812,39 @@ Remaining risks:
 
 - Local validation used `python3.11` (`Python 3.11.15`) because this checkout has no usable `./venv/bin/python` / `venv/bin/python`.
 - Live-provider validation should still be run in an environment with provider credentials and representative media fixtures.
+
+## Hot Follow Subtitle Font-Size-Only Micro-Tune
+
+日期：2026-04-19
+
+PR goal:
+
+- Keep the current stable/visible subtitle render baseline and make only a small default `FontSize` reduction.
+- Preserve subtitle position, wrapping, cleanup/mask, burn source selection, runtime lanes, state policy, workbench settings, and controls unchanged.
+
+Exact font-size delta:
+
+- Myanmar/default and Chinese-style profiles: `FontSize=14.7` -> `FontSize=14.0`, about `0.952x` / `-4.8%`.
+- Vietnamese/English profiles: `FontSize=13.8` -> `FontSize=13.2`, about `0.957x` / `-4.3%`.
+- No `MarginV`, `ScaleY`, `Alignment`, `WrapStyle`, `line_width`, subtitle block/container, bottom offset, or cleanup/mask value changed.
+
+What was intentionally not changed:
+
+- Did not touch parse/subtitle/dub/compose runtime logic, task state, ready gate policy, workbench controls, source selection, cleanup/mask, or subtitle positioning.
+- Did not add subtitle size controls, config surfaces, or UI changes.
+- Did not reintroduce `ScaleY`.
+
+Verification results:
+
+- Generated FFmpeg subtitle filter for Myanmar/default confirms `FontSize=14.0`, `MarginV=18`, `Alignment=2`, `WrapStyle=1`, and no `ScaleY`.
+- Generated render signature for Vietnamese confirms `size=13.2`, `margin_v=18`, `line_width=22.00`, `align=2`, and `wrap=1`.
+- Repository scan under `gateway/app` found no runtime `FontSize=14.7`, `FontSize=13.8`, `MarginV=13`, or `ScaleY=` usage after the change.
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_compose_video_master_duration.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+
+Remaining risks:
+
+- Local `ffmpeg` is unavailable, so actual burned-frame before/after visual inspection could not be run here; verification used generated filter/signature parameters and targeted regression tests.
+- Some real videos may still need business visual sampling in an FFmpeg-equipped environment before merge.
