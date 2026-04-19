@@ -2056,3 +2056,30 @@ Verification results:
 Remaining risks:
 
 - These facts are exported but not consumed by ready-gate/policy yet; that is intentionally deferred to PR-2.
+
+## Hot Follow Four-Layer Repair PR-2 Line Policy / Ready Gate
+
+日期：2026-04-19
+
+Scope:
+
+- Line Policy / Ready Gate Layer only.
+- Consumes artifact facts from PR-1.
+- No attempt terminalization changes.
+- No presenter/advisory wording changes beyond ready-gate truth export fields.
+
+Changes:
+
+- Added ready-gate signals for `compose_blocked` and `no_tts_compose_allowed`.
+- `compose_blocked` now overrides `compose_not_done` in ready-gate blocking output.
+- Legal no-TTS compose line states are exported for BGM-only and preserved-source-audio routes.
+- `no_dub`, `no_dub_reason`, and `no_dub_compose_allowed` now reflect legal no-TTS line states when artifact facts prove the route.
+
+Verification results:
+
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m py_compile gateway/app/services/ready_gate/engine.py gateway/app/services/ready_gate/hot_follow_rules.py gateway/app/services/status_policy/tests/test_hot_follow_line_policy_layer.py` -> passed.
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_line_policy_layer.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py -q` -> 27 passed.
+
+Remaining risks:
+
+- Attempts can still remain fake running until PR-3 terminalizes blocked/empty/no-dub route outcomes.
