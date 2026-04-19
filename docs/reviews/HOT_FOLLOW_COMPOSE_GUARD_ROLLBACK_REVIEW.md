@@ -97,6 +97,48 @@ The correct model is one SSOT path for compose eligibility. If input policy says
 - Presenter/advisory must not say compose-ready when `compose_allowed=false`.
 - Compose guard thresholds need a narrower, policy-owned model using orientation-aware or pixel-budget-aware logic.
 
+## Phase 1 Live Regression Validation
+
+Live validation source of truth:
+
+- Service base: `https://apolloveo.com`
+- Existing Hot Follow task: `fc45e93f83c3`
+
+Confirmed live task evidence:
+
+- `compose.preflight_status = blocked`
+- `compose.preflight_reason = resolution_too_high`
+- `compose.input_probe.width = 720`
+- `compose.input_probe.height = 1280`
+- `compose.input_probe.file_size_bytes ~= 2.7MB`
+- `compose.input_probe.duration_sec ~= 23.85`
+- `compose.input_probe.video_bitrate ~= 778928`
+- `compose.input_probe.free_disk_bytes` was sufficient
+
+Phase 1 conclusions:
+
+- The input is a baseline-safe portrait shortvideo by size, duration, bitrate, and available disk.
+- The input was incorrectly blocked solely because the reverted guard treated portrait height `1280` as over `MAX_HEIGHT=1080`.
+- The resolution rule is wrong for portrait handling; future classification must use orientation-aware or pixel-budget-aware logic and must direct-allow normal `720x1280` portrait shortvideo inputs.
+- This live evidence is sufficient to justify the narrow rework without requesting new uploadable media before planning.
+
+Confirmed live presenter / SSOT divergence:
+
+- `compose_allowed = false`
+- `compose_allowed_reason = resolution_too_high`
+- Task/presenter state still carried compose-not-done / recompose-style messaging.
+
+Presenter conclusion:
+
+- Blocked compose truth did not propagate consistently to ready-gate, advisory, task card, current attempt, and operator summary surfaces.
+- Future rework must make `compose_allowed=false` with a stable blocked reason the shared truth, so blocked compose cannot simultaneously appear as compose-ready or recompose guidance.
+
+Still pending after Phase 1:
+
+- Post-fix recovery validation.
+- Confirmation that repaired logic restores compose success for the baseline-safe portrait task.
+- Confirmation that the repaired logic handles true heavy inputs without recreating the original resource-risk path.
+
 ## Narrow Rework Plan
 
 ### A. Preflight Classification
