@@ -1882,3 +1882,44 @@ Remaining risks:
 
 - No representative local `720x1280` video fixture exists in the repo, so actual media compose recovery needs confirmation in a live/staging environment with Hot Follow fixtures.
 - The narrow rework must be done in a new PR after review, using orientation-aware or pixel-budget-aware policy and pre-lock blocked semantics.
+
+## Hot Follow Compose Phase 1 Live Regression Validation
+
+日期：2026-04-19
+
+Live validation source:
+
+- Service base: `https://apolloveo.com`
+- Existing live Hot Follow task: `fc45e93f83c3`
+
+Recorded live evidence:
+
+- `compose.preflight_status = blocked`
+- `compose.preflight_reason = resolution_too_high`
+- `compose.input_probe.width = 720`
+- `compose.input_probe.height = 1280`
+- `compose.input_probe.file_size_bytes ~= 2.7MB`
+- `compose.input_probe.duration_sec ~= 23.85`
+- `compose.input_probe.video_bitrate ~= 778928`
+- `compose.input_probe.free_disk_bytes` was sufficient
+
+Phase 1 findings:
+
+- The task is a baseline-safe portrait shortvideo by size, duration, bitrate, and disk availability.
+- The height-only resolution rule from PR #39/#40 incorrectly blocked this normal portrait input.
+- `720x1280` portrait shortvideo must be direct-allowed in the narrow rework.
+- The live task also confirms presenter/SSOT divergence: `compose_allowed=false` and `compose_allowed_reason=resolution_too_high`, while task/presenter state still carried compose-not-done / recompose-style messaging.
+- This evidence is sufficient to justify the narrow rework.
+
+Rework boundary confirmed:
+
+- Orientation-aware or pixel-budget-aware preflight.
+- Baseline-safe `720x1280` portrait direct allow.
+- Pre-lock blocked fast-fail semantics.
+- Ready-gate / presenter / advisory alignment for blocked truth.
+
+Still pending after Phase 1:
+
+- Post-fix recovery validation.
+- Confirmation that repaired logic restores compose success for the baseline-safe portrait task.
+- Confirmation that true heavy inputs are adapted or blocked without reintroducing the original resource-risk path.
