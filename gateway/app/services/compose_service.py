@@ -217,12 +217,12 @@ def _normalize_layout_lang(target_lang: str | None) -> str:
 def _subtitle_layout_profile(target_lang: str | None) -> dict[str, float | str]:
     lang = _normalize_layout_lang(target_lang)
     if lang == "zh":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 14.7, "margin_v": 18, "line_width": 11.5}
+        return {"font_name": "Noto Sans Myanmar", "font_size": 14.0, "margin_v": 18, "line_width": 11.5}
     if lang == "en":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 13.8, "margin_v": 18, "line_width": 24.0}
+        return {"font_name": "Noto Sans Myanmar", "font_size": 13.2, "margin_v": 18, "line_width": 24.0}
     if lang == "vi":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 13.8, "margin_v": 18, "line_width": 22.0}
-    return {"font_name": "Noto Sans Myanmar", "font_size": 14.7, "margin_v": 18, "line_width": 13.0}
+        return {"font_name": "Noto Sans Myanmar", "font_size": 13.2, "margin_v": 18, "line_width": 22.0}
+    return {"font_name": "Noto Sans Myanmar", "font_size": 14.0, "margin_v": 18, "line_width": 13.0}
 
 
 def subtitle_render_signature(*, target_lang: str | None, cleanup_mode: str | None) -> str:
