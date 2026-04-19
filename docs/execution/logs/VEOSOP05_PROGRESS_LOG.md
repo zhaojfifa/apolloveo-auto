@@ -1848,3 +1848,37 @@ Remaining risks:
 
 - Local `ffmpeg` is unavailable, so actual burned-frame before/after visual inspection could not be run here; verification used generated filter/signature parameters and targeted regression tests.
 - Some real videos may still need business visual sampling in an FFmpeg-equipped environment before merge.
+
+## Hot Follow Compose Guard Rollback-First Recovery
+
+日期：2026-04-19
+
+Rollback point:
+
+- Last known good compose baseline: `c730c0c`.
+- Rolled back guard commit: `0f657ae`.
+- Rollback commit: `23331c2`.
+- Review document: `docs/reviews/HOT_FOLLOW_COMPOSE_GUARD_ROLLBACK_REVIEW.md`.
+
+Why rollback happened first:
+
+- PR #39/#40 blocked a normal portrait shortvideo shape (`720x1280`, small file, short duration) as `resolution_too_high`.
+- Blocked preflight surfaced through the same `409` conflict channel used for real compose-in-progress.
+- Guard truth was only partially projected and could diverge from ready-gate/advisory/presenter compose-ready messaging.
+
+What was restored:
+
+- Hot Follow compose runtime files touched by PR #39/#40 were reverted to the `c730c0c` baseline.
+- No partial preflight, adaptation, blocked-state, or stale-running guard logic from PR #39/#40 was kept.
+- Prior subtitle font-size and dubbing rollback fixes remain intact because only `0f657ae` was reverted.
+
+Verification results:
+
+- `git diff --stat c730c0c -- gateway/app/routers/hot_follow_api.py gateway/app/services/compose_service.py gateway/app/services/task_view.py gateway/app/services/task_view_helpers.py gateway/app/services/tests/test_compose_service_contract.py` -> no diff.
+- `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/task_view_helpers.py gateway/app/services/task_view.py gateway/app/routers/hot_follow_api.py gateway/app/services/tests/test_compose_service_contract.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_hot_follow_runtime_bridge.py gateway/app/services/tests/test_task_router_presenters.py -q` -> 97 passed.
+
+Remaining risks:
+
+- No representative local `720x1280` video fixture exists in the repo, so actual media compose recovery needs confirmation in a live/staging environment with Hot Follow fixtures.
+- The narrow rework must be done in a new PR after review, using orientation-aware or pixel-budget-aware policy and pre-lock blocked semantics.
