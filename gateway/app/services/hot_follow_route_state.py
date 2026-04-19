@@ -164,6 +164,29 @@ def _route_allowance(
     return False, "unknown_route"
 
 
+def _terminal_dub_lane_state(
+    *,
+    route: str,
+    route_allowed: bool,
+    dub_status: str,
+    no_dub: bool,
+    no_dub_reason: str | None,
+) -> str:
+    status = str(dub_status or "").strip().lower() or "absent"
+    if route == "tts_replace_route":
+        return status
+    if not route_allowed:
+        return status
+    reason = str(no_dub_reason or "").strip().lower()
+    if reason in {"target_subtitle_empty", "dub_input_empty"}:
+        return "empty"
+    if no_dub or status == "skipped":
+        return "skipped"
+    if status in {"running", "processing", "pending", "queued", "never", "unknown", "absent"}:
+        return "absent"
+    return status
+
+
 def build_hot_follow_artifact_facts(
     task_id: str,
     task: dict,
@@ -229,7 +252,9 @@ def selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
     audio = state.get("audio") if isinstance(state.get("audio"), dict) else {}
     no_dub = bool(audio.get("no_dub"))
     no_dub_reason = str(audio.get("no_dub_reason") or "").strip().lower()
-    no_dub_compose_allowed = no_dub and no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}
+    no_dub_compose_allowed = bool(audio.get("no_dub_compose_allowed")) or (
+        no_dub and no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}
+    )
     if bool(audio.get("audio_ready")) or bool(audio.get("voiceover_url") or audio.get("tts_voiceover_url") or audio.get("dub_preview_url")):
         route_name = "tts_replace_route"
     if not route_name:
@@ -301,11 +326,16 @@ def build_hot_follow_current_attempt_summary(
         and not str(subtitle_lane.get("edited_text") or subtitle_lane.get("srt_text") or "").strip()
         and not str(subtitle_lane.get("dub_input_text") or "").strip()
     )
-    no_dub_route_terminal = bool(no_tts_route and route_allowed and subtitle_empty)
+    no_dub_route_terminal = bool(no_tts_route and route_allowed)
     subtitle_empty_terminal = bool(subtitle_empty and not no_dub_route_terminal)
-    dub_status_norm = str(dub_status or "").strip().lower() or "never"
-    if no_tts_route and route_allowed and dub_status_norm in {"running", "processing", "pending", "never"}:
-        dub_status_norm = "skipped"
+    no_dub_reason = str(voice_state.get("no_dub_reason") or "").strip() or None
+    dub_status_norm = _terminal_dub_lane_state(
+        route=selected_route,
+        route_allowed=route_allowed,
+        dub_status=dub_status,
+        no_dub=no_dub,
+        no_dub_reason=no_dub_reason,
+    )
     requires_redub = bool(
         selected_route == "tts_replace_route"
         and subtitle_lane.get("subtitle_ready")
@@ -334,6 +364,8 @@ def build_hot_follow_current_attempt_summary(
         "final_stale_reason": final_stale_reason or None,
         "selected_compose_route": selected_route,
         "compose_allowed": route_allowed,
+        "no_tts_compose_allowed": bool(no_tts_route and route_allowed),
+        "no_dub_compose_allowed": bool(no_tts_route and route_allowed),
         "compose_blocked_terminal": compose_blocked,
         "compose_terminal_state": "compose_blocked_terminal" if compose_blocked else None,
         "compose_allowed_reason": "ready" if route_allowed else route_reason,

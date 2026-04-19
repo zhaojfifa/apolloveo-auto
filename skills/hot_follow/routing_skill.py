@@ -22,7 +22,12 @@ def run(
     if facts.get("compose_blocked"):
         return {"decision_key": "compose_blocked"}
 
-    if facts.get("no_dub_route_terminal"):
+    if facts.get("no_dub_route_terminal") or (
+        facts.get("compose_allowed")
+        and facts.get("no_tts_compose_allowed")
+        and facts.get("selected_compose_route")
+        in {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"}
+    ):
         return {"decision_key": "no_dub_route_terminal"}
 
     if facts.get("requires_recompose"):

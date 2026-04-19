@@ -359,6 +359,46 @@ def test_hot_follow_live_muted_no_tts_route_recommends_compose_no_tts():
     assert advisory["recommended_next_action"] == "compose_no_tts"
 
 
+def test_hot_follow_advisory_legal_no_tts_route_beats_refresh_dub():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-no-tts-priority", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": False,
+                "audio_ready_reason": "audio_missing",
+                "compose_allowed": True,
+                "compose_ready": False,
+                "publish_ready": False,
+                "compose_blocked": False,
+                "no_tts_compose_allowed": True,
+                "no_dub_compose_allowed": True,
+                "selected_compose_route": "no_tts_compose_route",
+                "no_dub_reason": "compose_no_tts",
+                "blocking": ["compose_not_done"],
+            },
+            artifact_facts={
+                "final_exists": False,
+                "audio_exists": False,
+                "subtitle_exists": True,
+            },
+            current_attempt={
+                "audio_ready": False,
+                "compose_allowed": True,
+                "no_tts_compose_allowed": True,
+                "no_dub_compose_allowed": True,
+                "selected_compose_route": "no_tts_compose_route",
+                "no_dub_route_terminal": True,
+                "compose_status": "pending",
+                "requires_recompose": False,
+                "current_subtitle_source": "mm.srt",
+            },
+        ),
+    )
+
+    assert advisory["recommended_next_action"] == "compose_no_tts"
+
+
 def test_hot_follow_advisory_v0_recommends_continue_qa_when_final_is_ready():
     advisory = skills_advisory.maybe_build_hot_follow_advisory(
         {"task_id": "hf-skills-v0-final-ready", "kind": "hot_follow"},

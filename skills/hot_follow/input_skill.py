@@ -38,6 +38,7 @@ def run(
         ).strip()
         or None,
         "compose_ready": compose_ready,
+        "compose_allowed": bool(ready_gate.get("compose_allowed") or current_attempt.get("compose_allowed")),
         "publish_ready": publish_ready,
         "blocking": blocking,
         "compose_blocked": bool(ready_gate.get("compose_blocked") or current_attempt.get("compose_blocked_terminal")),
@@ -46,8 +47,13 @@ def run(
         ).strip()
         or None,
         "no_dub_compose_allowed": bool(ready_gate.get("no_dub_compose_allowed")),
+        "no_tts_compose_allowed": bool(ready_gate.get("no_tts_compose_allowed") or current_attempt.get("no_tts_compose_allowed")),
         "no_dub_reason": str(ready_gate.get("no_dub_reason") or "").strip() or None,
         "no_dub_route_terminal": bool(current_attempt.get("no_dub_route_terminal")),
+        "selected_compose_route": str(
+            ready_gate.get("selected_compose_route") or current_attempt.get("selected_compose_route") or ""
+        ).strip()
+        or None,
         "subtitle_terminal_state": str(current_attempt.get("subtitle_terminal_state") or "").strip() or None,
         "final_exists": bool(artifact_facts.get("final_exists")),
         "subtitle_exists": bool(artifact_facts.get("subtitle_exists")),
