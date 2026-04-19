@@ -27,6 +27,10 @@ from typing import Any, Callable
 from fastapi import HTTPException
 
 from gateway.app.services.artifact_storage import object_exists, object_head
+from gateway.app.services.compose_input_policy import (
+    MIN_FREE_DISK_BYTES,
+    compose_input_profile_from_task,
+)
 from gateway.app.services.line_binding_service import get_line_runtime_binding
 from gateway.app.services.media_helpers import sha256_file
 from gateway.app.services.media_validation import (
@@ -53,6 +57,17 @@ _SRT_TIME_RE = re.compile(
     r"\d{2}:\d{2}:\d{2}[,\.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,\.]\d{3}"
 )
 _SOURCE_AUDIO_BED_VOLUME_FLOOR = 0.35
+_COMPOSE_WORKING_SET_FLOOR_BYTES = 512 * 1024 * 1024
+_COMPOSE_WORKING_SET_MULTIPLIER = 4
+_RESOURCE_EXHAUSTED_PATTERNS = (
+    "cannot allocate memory",
+    "cannot allocate",
+    "resource temporarily unavailable",
+    "no space left on device",
+    "killed",
+    "out of memory",
+    "oom",
+)
 
 # ---------------------------------------------------------------------------
 # Module-level pure helpers (extracted from nested functions)
@@ -176,6 +191,26 @@ def compose_fail(
     if stderr_tail:
         detail["stderr_tail"] = stderr_tail
     raise HTTPException(status_code=status_code, detail=detail)
+
+
+def _compose_failure_code(reason: str | None) -> str:
+    raw = str(reason or "").strip().lower()
+    if raw in {"timeout", "compose_timeout", "ffmpeg_timeout"}:
+        return "ffmpeg_timeout"
+    if raw in {"worker_internal_error", "backend_unavailable"}:
+        return "backend_unavailable"
+    if raw in {"disk_insufficient", "no_space_left"}:
+        return "disk_insufficient"
+    if raw in {"resource_exhausted", "oom", "out_of_memory"}:
+        return "resource_exhausted"
+    if raw in {"compose_input_invalid", "missing_raw", "missing_voiceover"}:
+        return "compose_input_invalid"
+    return raw or "compose_failed"
+
+
+def _stderr_suggests_resource_exhaustion(stderr: str | None) -> bool:
+    text = str(stderr or "").strip().lower()
+    return any(pattern in text for pattern in _RESOURCE_EXHAUSTED_PATTERNS)
 
 
 def escape_subtitles_path(path: Path) -> str:
@@ -628,6 +663,7 @@ class CompositionService:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             ws = self._prepare_workspace(task_id, live_task, inputs, Path(tmpdir), subtitle_resolver)
+            self._guard_workspace_resources(task_id, live_task, ws)
 
             # Dispatch to the correct compose branch
             preserve_source = inputs.source_audio_policy == "preserve" and inputs.source_audio_available
@@ -752,6 +788,8 @@ class CompositionService:
             "compose_status": "running",
             "compose_error": None,
             "compose_error_reason": None,
+            "compose_failure_code": None,
+            "compose_failure_message": None,
             "compose_last_status": "running",
             "compose_last_started_at": datetime.now(timezone.utc).isoformat(),
             "compose_last_finished_at": None,
@@ -815,13 +853,18 @@ class CompositionService:
 
     @staticmethod
     def build_compose_failure_updates(detail: dict[str, Any]) -> dict[str, Any]:
+        code = _compose_failure_code(detail.get("reason") if isinstance(detail, dict) else None)
+        message = str(detail.get("message") or code) if isinstance(detail, dict) else code
         return {
             "compose_status": "failed",
             "compose_error": detail,
-            "compose_error_reason": detail.get("reason"),
+            "compose_error_reason": code,
+            "compose_failure_code": code,
+            "compose_failure_message": message,
             "compose_last_status": "failed",
             "compose_last_finished_at": datetime.now(timezone.utc).isoformat(),
-            "compose_last_error": detail.get("message"),
+            "compose_last_error": message,
+            "compose_lock_until": None,
             "status": "failed",
             "last_step": "compose",
             "final_video_key": None,
@@ -1186,6 +1229,54 @@ class CompositionService:
             return freeze_video_path
         return None
 
+    def _guard_workspace_resources(self, task_id: str, task: dict, ws: _WorkspaceFiles) -> None:
+        """Fail early when the local workspace cannot safely hold compose intermediates."""
+        profile = compose_input_profile_from_task(task)
+        input_size = 0
+        if ws.video_input_path.exists():
+            try:
+                input_size = int(ws.video_input_path.stat().st_size)
+            except OSError:
+                input_size = 0
+        if not input_size and profile and profile.file_size_bytes is not None:
+            input_size = int(profile.file_size_bytes)
+        for path in (ws.voice_path, ws.bgm_path):
+            if path and path.exists():
+                try:
+                    input_size += int(path.stat().st_size)
+                except OSError:
+                    pass
+        estimated_working_set = max(
+            _COMPOSE_WORKING_SET_FLOOR_BYTES,
+            int(input_size) * _COMPOSE_WORKING_SET_MULTIPLIER,
+        )
+        try:
+            free_disk = int(shutil.disk_usage(str(ws.tmp)).free)
+        except Exception as exc:
+            compose_fail(
+                "backend_unavailable",
+                f"compose workspace disk check failed: {exc}",
+                status_code=503,
+            )
+        if free_disk < MIN_FREE_DISK_BYTES or free_disk < estimated_working_set:
+            compose_fail(
+                "disk_insufficient",
+                (
+                    "insufficient free disk for compose workspace "
+                    f"(free={free_disk}, estimated_working_set={estimated_working_set})"
+                ),
+                status_code=507,
+            )
+        logger.info(
+            "COMPOSE_RESOURCE_GUARD_PASS",
+            extra={
+                "task_id": task_id,
+                "input_size_bytes": int(input_size),
+                "estimated_working_set_bytes": int(estimated_working_set),
+                "free_disk_bytes": int(free_disk),
+            },
+        )
+
     # ── Phase 3: FFmpeg execution ─────────────────────────────────────────
 
     def _run_ffmpeg(
@@ -1223,12 +1314,33 @@ class CompositionService:
         if result.result == "timeout":
             stderr_tail = str((result.raw_output or {}).get("stderr") or "")[-800:]
             compose_fail(
-                "compose_timeout",
+                "ffmpeg_timeout",
                 f"{purpose} timed out after {effective_timeout}s",
+                status_code=504,
                 ffmpeg_cmd=" ".join(cmd),
                 stderr_tail=stderr_tail,
             )
+        worker_reason = str(((result.error or {}).get("reason") or "")).strip().lower()
+        worker_message = str(((result.error or {}).get("message") or "")).strip()
+        stderr = str((result.raw_output or {}).get("stderr") or "")
         returncode = (result.output_facts or {}).get("returncode")
+        if result.result == "failed" and returncode is None and worker_reason == "worker_internal_error":
+            compose_fail(
+                "backend_unavailable",
+                worker_message or f"{purpose} worker failed",
+                status_code=503,
+                ffmpeg_cmd=" ".join(cmd),
+                stderr_tail=stderr[-800:] or None,
+            )
+        if result.result == "failed" and _stderr_suggests_resource_exhaustion(stderr):
+            code = "disk_insufficient" if "no space left on device" in stderr.lower() else "resource_exhausted"
+            compose_fail(
+                code,
+                f"{purpose} exhausted local compose resources",
+                status_code=507,
+                ffmpeg_cmd=" ".join(cmd),
+                stderr_tail=stderr[-800:],
+            )
         if returncode is None:
             returncode = 1
         return subprocess.CompletedProcess(
@@ -1774,6 +1886,8 @@ class CompositionService:
             "compose_status": "done",
             "compose_error": None,
             "compose_error_reason": None,
+            "compose_failure_code": None,
+            "compose_failure_message": None,
             "compose_last_status": "done",
             "compose_last_started_at": compose_started_at,
             "compose_last_finished_at": compose_finished_at,
