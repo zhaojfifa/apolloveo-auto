@@ -37,7 +37,6 @@ from gateway.app.services.subtitle_helpers import (
 )
 from gateway.app.services.task_view_helpers import (
     backfill_compose_done_if_final_ready,
-    compose_runtime_guard_state,
     compute_composed_state,
     deliverable_url,
     publish_hub_payload,
@@ -118,8 +117,7 @@ def collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     voice_state = collect_voice_execution_state(task_runtime, settings)
     final_key = task_key(task_runtime, "final_video_key") or task_key(task_runtime, "final_video_path")
     final_exists = bool(final_key and object_exists(str(final_key)))
-    compose_guard = compose_runtime_guard_state(task)
-    compose_status = str(compose_guard.get("compose_status") or "").strip() or "never"
+    compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     stored_no_dub_reason = str(
@@ -159,12 +157,6 @@ def collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
         "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
         "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),
         "compose_status": compose_status,
-        "compose_preflight_status": compose_guard.get("compose_preflight_status"),
-        "compose_preflight_reason": compose_guard.get("compose_preflight_reason"),
-        "compose_input_profile": compose_guard.get("compose_input_profile"),
-        "compose_failure_code": compose_guard.get("compose_failure_code"),
-        "compose_failure_message": compose_guard.get("compose_failure_message"),
-        "compose_running_stale": bool(compose_guard.get("compose_running_stale")),
         "final_exists": final_exists,
         "actual_burn_subtitle_source": subtitle_lane.get("actual_burn_subtitle_source"),
         "no_dub": bool(no_dub),
@@ -681,7 +673,6 @@ def build_hot_follow_workbench_hub(
     task_runtime["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
     task_runtime["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
     composed = composed_state_loader(task_runtime, task_id)
-    compose_guard = compose_runtime_guard_state(task_runtime)
     parse_state, parse_summary = pipeline_state_loader(task_runtime, "parse")
     subtitles_state, subtitles_summary = pipeline_state_loader(task_runtime, "subtitles")
     dub_state, dub_summary = pipeline_state_loader(task_runtime, "audio")
@@ -894,13 +885,6 @@ def build_hot_follow_workbench_hub(
         "compose": {
             "last": compose_last,
             "warning": task.get("compose_warning"),
-            "preflight_status": compose_guard.get("compose_preflight_status"),
-            "preflight_reason": compose_guard.get("compose_preflight_reason"),
-            "input_profile": compose_guard.get("compose_input_profile"),
-            "input_probe": compose_guard.get("compose_input_probe"),
-            "failure_code": compose_guard.get("compose_failure_code"),
-            "failure_message": compose_guard.get("compose_failure_message"),
-            "running_stale": bool(compose_guard.get("compose_running_stale")),
         },
         "errors": {
             "audio": {"reason": task.get("error_reason"), "message": task.get("dub_error") or audio_warning},
@@ -986,10 +970,8 @@ def build_hot_follow_workbench_hub(
     payload = state_computer(task_runtime, payload)
     final_input_video_ready = bool(raw_url or mute_url)
     subtitle_ready_for_compose = bool(subtitle_lane.get("subtitle_ready"))
-    compose_blocked = compose_guard.get("compose_preflight_status") in {"blocked", "failed"}
     compose_allowed = bool(
         final_input_video_ready
-        and not compose_blocked
         and (
             bool(no_dub_compose_allowed)
             or (bool(voice_state.get("audio_ready")) and subtitle_ready_for_compose)
@@ -997,12 +979,6 @@ def build_hot_follow_workbench_hub(
     )
     if compose_allowed:
         compose_allowed_reason = "no_dub_inputs_ready" if no_dub_compose_allowed else "voiceover_ready"
-    elif compose_guard.get("compose_preflight_status") in {"blocked", "failed"}:
-        compose_allowed_reason = str(
-            compose_guard.get("compose_preflight_reason")
-            or compose_guard.get("compose_failure_code")
-            or "compose_blocked"
-        )
     elif not final_input_video_ready:
         compose_allowed_reason = "missing_raw"
     elif not subtitle_ready_for_compose and not no_dub_compose_allowed:

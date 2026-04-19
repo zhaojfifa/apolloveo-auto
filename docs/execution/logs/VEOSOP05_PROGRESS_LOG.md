@@ -1849,55 +1849,36 @@ Remaining risks:
 - Local `ffmpeg` is unavailable, so actual burned-frame before/after visual inspection could not be run here; verification used generated filter/signature parameters and targeted regression tests.
 - Some real videos may still need business visual sampling in an FFmpeg-equipped environment before merge.
 
-## Hot Follow Compose Guardrail Preflight
+## Hot Follow Compose Guard Rollback-First Recovery
 
 日期：2026-04-19
 
-PR goal:
+Rollback point:
 
-- Stop large Hot Follow compose inputs from destabilizing compose, workbench hub, and task detail surfaces.
-- Add preflight classification, adapted compose input generation, structured ffmpeg/ffprobe failure handling, and stale-running projection.
-- Keep subtitle visuals and dubbing business logic unchanged.
+- Last known good compose baseline: `c730c0c`.
+- Rolled back guard commit: `0f657ae`.
+- Rollback commit: `23331c2`.
+- Review document: `docs/reviews/HOT_FOLLOW_COMPOSE_GUARD_ROLLBACK_REVIEW.md`.
 
-Thresholds introduced:
+Why rollback happened first:
 
-- `SOFT_MAX_BYTES = 80 * 1024 * 1024`
-- `ADAPT_MAX_BYTES = 250 * 1024 * 1024`
-- `MAX_DURATION_SEC = 300`
-- `MAX_HEIGHT = 1080`
-- `MAX_VIDEO_BITRATE = 8_000_000`
-- `MIN_FREE_DISK_BYTES = 2 * 1024 * 1024 * 1024`
-- Adapted compose input: H.264/AAC, 720p target height, `2500k` video bitrate, `+faststart`, minimum streams.
+- PR #39/#40 blocked a normal portrait shortvideo shape (`720x1280`, small file, short duration) as `resolution_too_high`.
+- Blocked preflight surfaced through the same `409` conflict channel used for real compose-in-progress.
+- Guard truth was only partially projected and could diverge from ready-gate/advisory/presenter compose-ready messaging.
 
-Failure/status codes introduced:
+What was restored:
 
-- Preflight blocked reasons: `input_too_large`, `duration_too_long`, `resolution_too_high`, `bitrate_too_high`, `disk_insufficient`, `probe_failed`.
-- Compose failure codes: `ffmpeg_timeout`, `adaptation_failed`, `compose_input_invalid`, `backend_unavailable`, plus the blocked reasons above.
-- State fields surfaced: `compose_preflight_status`, `compose_preflight_reason`, `compose_input_profile`, `compose_input_probe`, `compose_failure_code`, `compose_failure_message`, `compose_running_stale`.
-
-Behavior before/after:
-
-- Before: oversized inputs could enter heavy compose directly and leave `compose_status=running` even when no final output existed.
-- After: safe inputs run direct, large allowed inputs generate a derived `adapted_720p` intermediate first, unsafe/resource-insufficient inputs are blocked before heavy compose, and failed/blocked/stale states project as loadable failure truth instead of false running.
-- Workbench hub and task detail can still load after compose failure; the hub now receives minimum compose guard truth for direct/adapted/blocked/failed states.
-
-Files changed:
-
-- `gateway/app/services/compose_service.py`
-- `gateway/app/services/task_view_helpers.py`
-- `gateway/app/services/task_view.py`
-- `gateway/app/routers/hot_follow_api.py`
-- `gateway/app/services/tests/test_compose_service_contract.py`
+- Hot Follow compose runtime files touched by PR #39/#40 were reverted to the `c730c0c` baseline.
+- No partial preflight, adaptation, blocked-state, or stale-running guard logic from PR #39/#40 was kept.
+- Prior subtitle font-size and dubbing rollback fixes remain intact because only `0f657ae` was reverted.
 
 Verification results:
 
+- `git diff --stat c730c0c -- gateway/app/routers/hot_follow_api.py gateway/app/services/compose_service.py gateway/app/services/task_view.py gateway/app/services/task_view_helpers.py gateway/app/services/tests/test_compose_service_contract.py` -> no diff.
 - `python3.11 -m py_compile gateway/app/services/compose_service.py gateway/app/services/task_view_helpers.py gateway/app/services/task_view.py gateway/app/routers/hot_follow_api.py gateway/app/services/tests/test_compose_service_contract.py`
-- `python3.11 -m pytest gateway/app/services/tests/test_compose_service_contract.py -q` -> 15 passed.
-- `python3.11 -m pytest gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q` -> 39 passed.
-- `python3.11 -m pytest gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_hot_follow_runtime_bridge.py gateway/app/services/tests/test_task_router_presenters.py -q` -> 106 passed.
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_hot_follow_runtime_bridge.py gateway/app/services/tests/test_task_router_presenters.py -q` -> 97 passed.
 
 Remaining risks:
 
-- Runtime validation used mocked probe/process outputs and existing synthetic fixtures; production should still run a representative large-media compose sample, especially near the 196MB adaptation path.
-- Local validation used `/opt/homebrew/bin/python3.11`; this checkout has no usable repo-local virtualenv Python.
-- ffmpeg behavior depends on deployment codecs and disk layout, so adaptation timeout/quality may need operational tuning after real media telemetry.
+- No representative local `720x1280` video fixture exists in the repo, so actual media compose recovery needs confirmation in a live/staging environment with Hot Follow fixtures.
+- The narrow rework must be done in a new PR after review, using orientation-aware or pixel-budget-aware policy and pre-lock blocked semantics.
