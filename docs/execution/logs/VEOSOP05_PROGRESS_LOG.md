@@ -2029,3 +2029,30 @@ Repair split:
 Remaining risks:
 
 - The review uses provided production observations as source evidence; post-repair validation must confirm both live task patterns no longer diverge.
+
+## Hot Follow Four-Layer Repair PR-1 Artifact Facts
+
+日期：2026-04-19
+
+Scope:
+
+- Artifact Facts Layer only.
+- No ready-gate policy changes.
+- No attempt terminalization changes.
+- No presenter/advisory wording changes.
+
+Changes:
+
+- Formalized `artifact_facts.compose_input` with mode, blocked flag, reason, profile, and source.
+- Added flattened compose input fact fields for downstream layers: `compose_input_mode`, `compose_input_blocked`, and `compose_input_reason`.
+- Formalized `artifact_facts.audio_lane` with audio lane mode, TTS existence, source-audio policy, BGM configuration, and no-TTS fact.
+- Added flattened audio lane fact fields: `audio_lane_mode` and `tts_voiceover_exists`.
+
+Verification results:
+
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m py_compile gateway/app/services/hot_follow_workbench_presenter.py gateway/app/services/tests/test_hot_follow_artifact_facts.py` -> passed.
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m pytest gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -q` -> 44 passed.
+
+Remaining risks:
+
+- These facts are exported but not consumed by ready-gate/policy yet; that is intentionally deferred to PR-2.

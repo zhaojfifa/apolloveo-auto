@@ -900,6 +900,8 @@ def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
     assert artifact_facts["audio_exists"] is False
     assert artifact_facts["subtitle_exists"] is True
     assert artifact_facts["pack_exists"] is True
+    assert artifact_facts["compose_input_mode"] == "unknown"
+    assert artifact_facts["audio_lane_mode"] == "muted_no_tts"
     assert current_attempt["dub_status"] == "failed"
     assert current_attempt["compose_status"] == "pending"
     assert current_attempt["current_subtitle_source"] == "mm.srt"
@@ -951,6 +953,8 @@ def test_artifact_facts_and_operator_summary_preserve_voice_led_success_baseline
 
     assert artifact_facts["audio_exists"] is True
     assert artifact_facts["audio_url"] == "/v1/tasks/hf-success-presentation/audio_mm"
+    assert artifact_facts["audio_lane_mode"] == "tts_voiceover_only"
+    assert artifact_facts["tts_voiceover_exists"] is True
     assert current_attempt["requires_recompose"] is False
     assert current_attempt["compose_reason"] == "ready"
     assert operator_summary["last_successful_output_available"] is True
