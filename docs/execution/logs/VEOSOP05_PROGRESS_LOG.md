@@ -2109,3 +2109,29 @@ Verification results:
 Remaining risks:
 
 - Presenter/advisory still need PR-4 to become pure projection of these terminal fields.
+
+## Hot Follow Four-Layer Repair PR-4 Presenter / Advisory Projection
+
+日期：2026-04-19
+
+Scope:
+
+- Presenter / Advisory Layer only.
+- Consumes fields exported by lower layers.
+- No artifact fact, ready-gate policy, or attempt terminal business recomputation.
+
+Changes:
+
+- Advisory input now includes `compose_blocked`, `compose_blocked_reason`, `no_dub_route_terminal`, `subtitle_terminal_state`, and no-dub compose facts from lower layers.
+- Advisory routing projects blocked compose before recompose guidance.
+- Advisory routing projects no-dub/no-TTS terminal routes before subtitle-review guidance.
+- Operator summary projects terminal blocked and no-dub/no-TTS attempt states directly from `current_attempt`.
+
+Verification results:
+
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m py_compile skills/hot_follow/input_skill.py skills/hot_follow/routing_skill.py skills/hot_follow/quality_skill.py gateway/app/services/hot_follow_workbench_presenter.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_hot_follow_artifact_facts.py` -> passed.
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache /opt/homebrew/bin/python3.11 -m pytest gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/status_policy/tests/test_hot_follow_line_policy_layer.py -q` -> 18 passed.
+
+Remaining risks:
+
+- Live validation should confirm task `ffe9083de6ee` no longer shows compose-ready/recompose-style guidance when blocked, and task `c3a11f7852e2` no longer shows review-subtitles/running guidance for a legal no-TTS path.

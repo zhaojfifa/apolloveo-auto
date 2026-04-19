@@ -209,7 +209,11 @@ def build_hot_follow_operator_summary(
         and not bool(current_attempt.get("audio_ready"))
         and not no_dub
     )
-    if no_dub and not subtitle_ready:
+    if current_attempt.get("compose_blocked_terminal"):
+        recommended_next_action = f"当前合成输入已被线路策略阻断：{current_attempt.get('compose_reason') or 'compose_input_blocked'}。请调整素材后再尝试合成。"
+    elif current_attempt.get("no_dub_route_terminal"):
+        recommended_next_action = "当前素材已进入无 TTS 合成路径，可继续合成保留原音或背景音版本。"
+    elif no_dub and not subtitle_ready:
         recommended_next_action = "当前素材无可提取字幕，正在等待自动检测完成；也可直接在下方字幕编辑区手工输入缅语文字，保存后即可合成字幕版。"
     elif no_dub:
         recommended_next_action = "当前素材适合字幕驱动路径，可先保存字幕并直接合成字幕版。"

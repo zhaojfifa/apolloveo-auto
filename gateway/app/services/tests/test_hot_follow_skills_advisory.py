@@ -178,6 +178,97 @@ def test_hot_follow_advisory_v0_recommends_subtitle_review_when_missing():
     }
 
 
+def test_hot_follow_advisory_v0_projects_compose_blocked_before_recompose():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-skills-compose-blocked", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": True,
+                "compose_ready": False,
+                "compose_blocked": True,
+                "compose_blocked_reason": "bitrate_too_high",
+                "publish_ready": False,
+                "blocking": ["bitrate_too_high"],
+            },
+            artifact_facts={
+                "final_exists": False,
+                "audio_exists": True,
+                "subtitle_exists": True,
+            },
+            current_attempt={
+                "audio_ready": True,
+                "compose_status": "blocked",
+                "compose_reason": "bitrate_too_high",
+                "compose_blocked_terminal": True,
+                "requires_recompose": True,
+                "final_stale_reason": "final_stale_after_dub",
+                "current_subtitle_source": "mm.srt",
+            },
+        ),
+    )
+
+    assert advisory == {
+        "id": "hf_advisory_compose_blocked",
+        "kind": "operator_guidance",
+        "level": "warning",
+        "recommended_next_action": "resolve_compose_input",
+        "operator_hint": "compose input blocked",
+        "explanation": "当前合成输入已被线路策略阻断：bitrate_too_high。请调整素材后再尝试合成。",
+        "evidence": {
+            "compose_blocked": True,
+            "compose_blocked_reason": "bitrate_too_high",
+            "compose_status": "blocked",
+            "blocking": ["bitrate_too_high"],
+        },
+    }
+
+
+def test_hot_follow_advisory_v0_projects_no_dub_terminal_not_review_subtitles():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-skills-no-dub-terminal", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": False,
+                "subtitle_ready_reason": "subtitle_missing",
+                "audio_ready": False,
+                "compose_ready": False,
+                "no_dub_compose_allowed": True,
+                "no_dub_reason": "bgm_only_no_tts",
+                "publish_ready": False,
+                "blocking": ["compose_not_done"],
+            },
+            artifact_facts={
+                "final_exists": False,
+                "audio_exists": False,
+                "subtitle_exists": False,
+            },
+            current_attempt={
+                "audio_ready": False,
+                "compose_status": "pending",
+                "requires_recompose": False,
+                "no_dub_route_terminal": True,
+                "subtitle_terminal_state": "no_dub_route_terminal",
+            },
+        ),
+    )
+
+    assert advisory == {
+        "id": "hf_advisory_no_dub_route_terminal",
+        "kind": "operator_guidance",
+        "level": "info",
+        "recommended_next_action": "compose_no_tts",
+        "operator_hint": "no TTS compose route",
+        "explanation": "当前素材已进入无 TTS 合成路径：bgm_only_no_tts。可继续合成保留原音或背景音版本。",
+        "evidence": {
+            "no_dub_route_terminal": True,
+            "subtitle_terminal_state": "no_dub_route_terminal",
+            "no_dub_compose_allowed": True,
+            "no_dub_reason": "bgm_only_no_tts",
+        },
+    }
+
+
 def test_hot_follow_advisory_v0_recommends_continue_qa_when_final_is_ready():
     advisory = skills_advisory.maybe_build_hot_follow_advisory(
         {"task_id": "hf-skills-v0-final-ready", "kind": "hot_follow"},
