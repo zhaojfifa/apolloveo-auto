@@ -495,6 +495,9 @@
   function renderSubtitles() {
     const subtitles = (currentHub && currentHub.subtitles) || {};
     const qa = (currentHub && currentHub.translation_qa) || {};
+    const helperTranslation = subtitles.helper_translation && typeof subtitles.helper_translation === "object"
+      ? subtitles.helper_translation
+      : {};
     const origin = subtitles.origin_text || "";
     const normalized = subtitles.normalized_source_text || origin || "";
     const primarySrt = subtitles.primary_editable_text || subtitles.srt_text || subtitles.edited_text || "";
@@ -536,6 +539,9 @@
       }
     }
     hydrateAssistedInputDraft();
+    if (assistedInputMsgEl && helperTranslation.failed && helperTranslation.message) {
+      assistedInputMsgEl.textContent = String(helperTranslation.message);
+    }
     if (subtitlesOriginEl) subtitlesOriginEl.textContent = origin || sourcePlaceholder;
     if (subtitlesNormalizedEl) subtitlesNormalizedEl.textContent = normalized || sourcePlaceholder;
     if (subtitlesEditedPreviewEl) subtitlesEditedPreviewEl.textContent = primarySrt || targetPlaceholder;
@@ -1416,14 +1422,59 @@
     return res.json();
   }
 
+  async function readApiResponseBody(res) {
+    const contentType = String(res.headers.get("content-type") || "").toLowerCase();
+    if (contentType.includes("application/json")) {
+      try {
+        return await res.json();
+      } catch (_) {
+        return null;
+      }
+    }
+    try {
+      return await res.text();
+    } catch (_) {
+      return "";
+    }
+  }
+
+  function readableApiError(payload, fallback) {
+    if (payload && typeof payload === "object") {
+      const detail = payload.detail;
+      if (detail && typeof detail === "object") {
+        return String(detail.message || detail.reason || fallback || "").trim() || fallback;
+      }
+      if (typeof detail === "string") return detail.trim() || fallback;
+      return String(payload.message || payload.error || fallback || "").trim() || fallback;
+    }
+    return String(payload || fallback || "").trim() || fallback;
+  }
+
+  function isRecoverableHelperTranslateFailure(payload) {
+    const detail = payload && typeof payload === "object" ? payload.detail : null;
+    const reason = String((detail && typeof detail === "object" ? detail.reason : "") || "").trim().toLowerCase();
+    return reason === "helper_translate_failed" || reason === "helper_translate_provider_exhausted";
+  }
+
+  function readableErrorMessage(err, fallback) {
+    if (err && err.payload) return readableApiError(err.payload, fallback);
+    return String((err && err.message) || fallback || "").trim() || fallback;
+  }
+
   async function translateCurrentSubtitles(text) {
     const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/translate_subtitles`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text: text || "", target_lang: currentTargetProfile().targetLang }),
     });
-    if (!res.ok) throw new Error((await res.text()) || "translate subtitles failed");
-    return res.json();
+    const payload = await readApiResponseBody(res);
+    if (!res.ok) {
+      const err = new Error(readableApiError(payload, "translate subtitles failed"));
+      err.payload = payload;
+      err.recoverableHelperFailure = isRecoverableHelperTranslateFailure(payload);
+      throw err;
+    }
+    return payload || {};
   }
 
   async function patchComposePlan(payload) {
@@ -1908,7 +1959,10 @@
             : "翻译结果已回写当前编辑区，请检查后保存字幕。",
         );
       } catch (err) {
-        if (subtitlesMsgEl) subtitlesMsgEl.textContent = err.message || "translate failed";
+        const message = readableErrorMessage(err, "translate failed");
+        if (subtitlesMsgEl) subtitlesMsgEl.textContent = message;
+        if (assistedInputMsgEl && err && err.recoverableHelperFailure) assistedInputMsgEl.textContent = message;
+        if (err && err.recoverableHelperFailure) await loadHub().catch(() => {});
       } finally {
         translateMmBtn.disabled = false;
       }
@@ -1933,7 +1987,9 @@
         applyTranslatedTextToTargetEditor(String(data.translated_text || ""), "辅助输入已翻译并写入目标字幕区，请检查后保存字幕。");
         if (assistedInputMsgEl) assistedInputMsgEl.textContent = "辅助输入翻译完成。";
       } catch (err) {
-        if (assistedInputMsgEl) assistedInputMsgEl.textContent = err.message || "translate failed";
+        const message = readableErrorMessage(err, "translate failed");
+        if (assistedInputMsgEl) assistedInputMsgEl.textContent = message;
+        if (err && err.recoverableHelperFailure) await loadHub().catch(() => {});
       } finally {
         assistedTranslateBtn.disabled = false;
       }

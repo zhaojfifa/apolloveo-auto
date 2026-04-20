@@ -298,18 +298,30 @@ def selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
             helper_translate_failed_voice_led=bool(artifact_facts.get("helper_translate_failed_voice_led")),
         )
     subtitles = state.get("subtitles") if isinstance(state.get("subtitles"), dict) else {}
+    subtitle_ready = bool(subtitles.get("subtitle_ready"))
+    audio_ready = bool(audio.get("audio_ready"))
     helper_translate_failed_voice_led = bool(
-        artifact_facts.get("helper_translate_failed_voice_led")
-        or (
-            artifact_facts.get("helper_translate_failed")
-            and (
-                str(subtitles.get("parse_source_text") or "").strip()
-                or str(subtitles.get("raw_source_text") or "").strip()
-                or str(subtitles.get("normalized_source_text") or "").strip()
+        not subtitle_ready
+        and (
+            artifact_facts.get("helper_translate_failed_voice_led")
+            or (
+                artifact_facts.get("helper_translate_failed")
+                and (
+                    str(subtitles.get("parse_source_text") or "").strip()
+                    or str(subtitles.get("raw_source_text") or "").strip()
+                    or str(subtitles.get("normalized_source_text") or "").strip()
+                )
             )
         )
     )
-    if helper_translate_failed_voice_led and not bool(audio.get("audio_ready")):
+    helper_failure_with_authoritative_subtitle = bool(
+        subtitle_ready
+        and artifact_facts.get("helper_translate_failed")
+        and not audio_ready
+    )
+    if helper_failure_with_authoritative_subtitle:
+        route_name = "tts_replace_route"
+    elif helper_translate_failed_voice_led and not audio_ready:
         route_name = "tts_replace_route"
     allowed, reason = _route_allowance(
         route=route_name,
@@ -357,6 +369,10 @@ def build_hot_follow_current_attempt_summary(
     audio_lane = artifacts.get("audio_lane") if isinstance(artifacts.get("audio_lane"), dict) else {}
     selected = artifacts.get("selected_compose_route") if isinstance(artifacts.get("selected_compose_route"), dict) else {}
     selected_route = str(selected.get("name") or "").strip()
+    subtitle_ready = bool(subtitle_lane.get("subtitle_ready"))
+    audio_ready = bool(voice_state.get("audio_ready"))
+    helper_translate_failed = bool(artifacts.get("helper_translate_failed") and not subtitle_ready)
+    helper_translate_failed_voice_led = bool(artifacts.get("helper_translate_failed_voice_led") and helper_translate_failed)
     if bool(voice_state.get("audio_ready")) or bool(audio_lane.get("tts_voiceover_exists")):
         selected_route = "tts_replace_route"
     if not selected_route:
@@ -364,9 +380,11 @@ def build_hot_follow_current_attempt_summary(
             audio_lane=audio_lane,
             no_dub=no_dub,
             no_dub_compose_allowed=no_dub_compose_allowed,
-            helper_translate_failed_voice_led=bool(artifacts.get("helper_translate_failed_voice_led")),
+            helper_translate_failed_voice_led=helper_translate_failed_voice_led,
         )
-    if bool(artifacts.get("helper_translate_failed_voice_led")) and not bool(voice_state.get("audio_ready")):
+    if bool(artifacts.get("helper_translate_failed") and subtitle_ready and not audio_ready):
+        selected_route = "tts_replace_route"
+    elif helper_translate_failed_voice_led and not audio_ready:
         selected_route = "tts_replace_route"
     route_allowed, route_reason = _route_allowance(
         route=selected_route,
@@ -403,7 +421,6 @@ def build_hot_follow_current_attempt_summary(
     elif compose_input_derive_failed:
         compose_status_norm = "failed"
         compose_reason_norm = compose_input_reason or "compose_input_derive_failed"
-    audio_ready = bool(voice_state.get("audio_ready"))
     no_tts_route = selected_route in {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"}
     subtitle_empty = bool(
         not subtitle_lane.get("subtitle_artifact_exists")
@@ -436,8 +453,6 @@ def build_hot_follow_current_attempt_summary(
         and (final_stale_reason or compose_reason_norm != "ready")
     )
     compose_execute_allowed = bool(route_allowed and compose_input_ready)
-    helper_translate_failed = bool(artifacts.get("helper_translate_failed"))
-    helper_translate_failed_voice_led = bool(artifacts.get("helper_translate_failed_voice_led"))
     return {
         "dub_status": dub_status_norm,
         "audio_ready": audio_ready,

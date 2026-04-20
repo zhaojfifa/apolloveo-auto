@@ -36,3 +36,14 @@ def test_hot_follow_workbench_preview_player_uses_tts_preview_truth_only():
     assert "return audioPayload.dub_preview_url || audioPayload.tts_voiceover_url || null;" in script
     assert "media.voiceover_url" not in script
     assert "audio.voiceover_url" not in script
+
+
+def test_hot_follow_workbench_translate_errors_render_readable_helper_message_only():
+    script = Path("gateway/app/static/js/hot_follow_workbench.js").read_text(encoding="utf-8-sig")
+
+    assert "function readableApiError(payload, fallback)" in script
+    assert "detail.message || detail.reason" in script
+    assert "err.recoverableHelperFailure = isRecoverableHelperTranslateFailure(payload);" in script
+    assert 'if (!res.ok) throw new Error((await res.text()) || "translate subtitles failed");' not in script
+    assert "assistedInputMsgEl.textContent = message" in script
+    assert "helperTranslation.failed && helperTranslation.message" in script

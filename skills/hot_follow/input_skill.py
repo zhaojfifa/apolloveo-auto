@@ -73,14 +73,8 @@ def run(
         "no_tts_compose_allowed": bool(ready_gate.get("no_tts_compose_allowed") or current_attempt.get("no_tts_compose_allowed")),
         "no_dub_reason": str(ready_gate.get("no_dub_reason") or "").strip() or None,
         "no_dub_route_terminal": bool(current_attempt.get("no_dub_route_terminal")),
-        "helper_translate_failed": bool(
-            current_attempt.get("helper_translate_failed")
-            or artifact_facts.get("helper_translate_failed")
-        ),
-        "helper_translate_failed_voice_led": bool(
-            current_attempt.get("helper_translate_failed_voice_led")
-            or artifact_facts.get("helper_translate_failed_voice_led")
-        ),
+        "helper_translate_failed": bool(current_attempt.get("helper_translate_failed")),
+        "helper_translate_failed_voice_led": bool(current_attempt.get("helper_translate_failed_voice_led")),
         "helper_translate_error_reason": str(
             current_attempt.get("helper_translate_error_reason")
             or artifact_facts.get("helper_translate_error_reason")
