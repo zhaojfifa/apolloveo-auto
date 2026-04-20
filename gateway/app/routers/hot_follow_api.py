@@ -13,7 +13,7 @@ import os
 import re
 import shutil
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
@@ -75,7 +75,6 @@ from gateway.app.services.compose_helpers import (
     build_atempo_chain as _build_atempo_chain,
     compute_audio_fit_speeds as _compute_audio_fit_speeds,
     resolve_audio_fit_max_speed as _resolve_audio_fit_max_speed,
-    task_compose_lock as _task_compose_lock,
 )
 from gateway.app.services.media_helpers import (
     merge_probe_into_pipeline_config as _merge_probe_into_pipeline_config,
@@ -146,7 +145,6 @@ from gateway.app.services.hot_follow_workbench_presenter import (
     build_hot_follow_current_attempt_summary as _build_hot_follow_current_attempt_summary,
     build_hot_follow_operator_summary as _build_hot_follow_operator_summary,
 )
-from gateway.app.services.line_binding_service import get_line_runtime_binding
 from gateway.app.services.task_view import (
     build_hot_follow_publish_hub as _build_hot_follow_publish_hub,
     build_hot_follow_workbench_hub as _build_hot_follow_workbench_hub,
@@ -251,103 +249,17 @@ def _execute_hot_follow_compose_contract(
     lipsync_runner=None,
 ) -> HotFollowComposeResponseContract:
     svc = CompositionService(storage=get_storage_service(), settings=get_settings())
-    revision_snapshot = revision_snapshot or (lambda current_task: {})
-    lipsync_runner = lipsync_runner or (lambda _task_id, _enabled: None)
-
-    current = repo.get(task_id) or task
-    line_binding = get_line_runtime_binding(current)
-    svc.validate_expected_revision(current, request, revision_snapshot=revision_snapshot)
-    task_lock = _task_compose_lock(task_id)
-    recovery_updates = svc.recover_stale_running_compose(
+    return svc.execute_hot_follow_compose_contract(
         task_id,
-        current,
-        lock_active=task_lock.locked(),
-        object_exists_fn=object_exists,
+        task,
+        request,
+        repo=repo,
+        hub_loader=hub_loader,
+        subtitle_resolver=subtitle_resolver,
+        subtitle_only_check=subtitle_only_check,
+        revision_snapshot=revision_snapshot,
+        lipsync_runner=lipsync_runner,
     )
-    if recovery_updates:
-        _policy_upsert(repo, task_id, recovery_updates)
-        current = repo.get(task_id) or {**current, **recovery_updates}
-    if svc.compose_lock_active(current):
-        _policy_upsert(repo, task_id, svc.build_compose_lock_updates(current))
-        return HotFollowComposeResponseContract(
-            status_code=409,
-            body=svc.build_compose_lock_body(task_id),
-        )
-
-    lock = task_lock
-    if not lock.acquire(blocking=False):
-        current = repo.get(task_id) or current
-        _policy_upsert(repo, task_id, svc.build_compose_lock_updates(current))
-        return HotFollowComposeResponseContract(
-            status_code=409,
-            body=svc.build_compose_lock_body(task_id),
-        )
-
-    try:
-        current_for_plan, request_updates, compose_plan = svc.prepare_hot_follow_compose_task(current, request)
-        if request_updates:
-            _policy_upsert(repo, task_id, request_updates)
-            current_for_plan = repo.get(task_id) or current_for_plan
-
-        fresh_final_key = svc.resolve_fresh_final_key(
-            task_id,
-            current_for_plan,
-            request=request,
-            revision_snapshot=revision_snapshot,
-        )
-        if fresh_final_key:
-            latest = repo.get(task_id) or current_for_plan
-            return svc.build_hot_follow_compose_response(
-                task_id,
-                final_key=fresh_final_key,
-                compose_status=latest.get("compose_status"),
-                hub=hub_loader(task_id, repo),
-                line=line_binding.to_payload(),
-            )
-
-        _policy_upsert(
-            repo,
-            task_id,
-            {"compose_lock_until": (datetime.now(timezone.utc) + timedelta(seconds=300)).isoformat()},
-        )
-        running_updates = svc.build_compose_running_updates(current_for_plan, compose_plan)
-        _policy_upsert(repo, task_id, running_updates)
-        current_for_compose = repo.get(task_id) or {**current_for_plan, **running_updates}
-
-        env_lipsync_enabled = str(os.getenv("HF_LIPSYNC_ENABLED", "0")).strip().lower() in ("1", "true", "yes")
-        lipsync_warning = lipsync_runner(task_id, env_lipsync_enabled)
-        if lipsync_warning:
-            _policy_upsert(repo, task_id, {"compose_warning": lipsync_warning})
-
-        compose_result = svc.compose(
-            task_id,
-            current_for_compose,
-            subtitle_resolver=subtitle_resolver,
-            subtitle_only_check=subtitle_only_check,
-        )
-        success_updates = svc.merge_compose_warning(compose_result.updates, lipsync_warning)
-        _policy_upsert(repo, task_id, success_updates)
-        latest = repo.get(task_id) or {**current_for_compose, **success_updates}
-        return svc.build_hot_follow_compose_response(
-            task_id,
-            final_key=compose_result.final_key,
-            compose_status=latest.get("compose_status"),
-            hub=hub_loader(task_id, repo),
-            line=line_binding.to_payload(),
-        )
-    except HTTPException as exc:
-        detail = exc.detail if isinstance(exc.detail, dict) else {"reason": "compose_failed", "message": str(exc.detail)}
-        _policy_upsert(repo, task_id, svc.build_compose_failure_updates(detail))
-        raise
-    except Exception as exc:
-        detail = {"reason": "compose_failed", "message": str(exc)}
-        _policy_upsert(repo, task_id, svc.build_compose_failure_updates(detail))
-        raise HTTPException(status_code=409, detail=detail) from exc
-    finally:
-        try:
-            _policy_upsert(repo, task_id, {"compose_lock_until": None})
-        finally:
-            lock.release()
 
 
 

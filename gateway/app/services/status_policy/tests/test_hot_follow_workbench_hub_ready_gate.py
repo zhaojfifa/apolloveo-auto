@@ -21,6 +21,7 @@ except Exception:
 from gateway.app.deps import get_task_repository
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.services.compose_helpers import task_compose_lock
 from gateway.app.services.compose_service import ComposeResult
 from gateway.app.utils.pipeline_config import parse_pipeline_config
 
@@ -1034,7 +1035,7 @@ def test_hot_follow_compose_failure_finalizes_releases_lock_and_allows_retry(mon
         assert saved_after_failure["compose_last_status"] == "failed"
         assert saved_after_failure["compose_error_reason"] == "compose_timeout"
         assert saved_after_failure.get("compose_lock_until") is None
-        assert hf_router._task_compose_lock(task_id).locked() is False
+        assert task_compose_lock(task_id).locked() is False
 
         retried = client.post(f"/api/hot_follow/tasks/{task_id}/compose", json={})
         assert retried.status_code == 200
@@ -1123,7 +1124,7 @@ def test_hot_follow_compose_derive_failure_persists_compose_input_truth_and_allo
         assert saved_after_failure["compose_status"] == "failed"
         assert saved_after_failure["compose_error_reason"] == "compose_input_derive_failed"
         assert saved_after_failure.get("compose_lock_until") is None
-        assert hf_router._task_compose_lock(task_id).locked() is False
+        assert task_compose_lock(task_id).locked() is False
         failed_policy = saved_after_failure.get("compose_input_policy") or {}
         assert failed_policy["mode"] == "derive_failed"
         assert failed_policy["source"] == "derived_safe"
@@ -1158,7 +1159,7 @@ def test_hot_follow_compose_recovers_stale_running_before_false_409(monkeypatch)
     )
 
     monkeypatch.setenv("HF_COMPOSE_STALE_RUNNING_SEC", "0")
-    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr("gateway.app.services.compose_service.object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "get_storage_service", lambda: object())
     monkeypatch.setattr(hf_router.CompositionService, "resolve_fresh_final_key", lambda *args, **kwargs: None)
     monkeypatch.setattr(

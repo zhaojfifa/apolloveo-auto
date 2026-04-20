@@ -44,6 +44,8 @@ from gateway.app.services.worker_gateway import WorkerExecutionMode, WorkerReque
 from gateway.app.services.worker_gateway_registry import get_worker_gateway
 from gateway.app.services.task_view_helpers import task_endpoint, task_key
 from gateway.app.core.constants import COMPOSE_RETRY_AFTER_MS
+from gateway.app.services.compose_helpers import task_compose_lock
+from gateway.app.services.status_policy.service import policy_upsert
 from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 logger = logging.getLogger(__name__)
@@ -709,6 +711,215 @@ class CompositionService:
                 final_url=task_endpoint(task_id, "final"),
                 compose_status=str(updates.get("compose_status") or "done"),
             )
+
+    def execute_hot_follow_compose_contract(
+        self,
+        task_id: str,
+        task: dict,
+        request: HotFollowComposeRequestContract,
+        *,
+        repo,
+        hub_loader: Callable[[str, Any], dict[str, Any]],
+        subtitle_resolver: Callable[[dict, str, str], str | None],
+        subtitle_only_check: Callable[[str, dict], bool],
+        revision_snapshot: Callable[[dict], dict[str, str | None]] | None = None,
+        lipsync_runner: Callable[[str, bool], str | None] | None = None,
+        object_exists_fn: Callable[[str], bool] | None = None,
+    ) -> HotFollowComposeResponseContract:
+        """Own Hot Follow compose startup, state writes, locking, and finalize.
+
+        Routers call this method as the compose action port. Compose-related
+        state transitions must remain behind _write_compose_state() so start,
+        success, failure, stale recovery, and lock release have one owner.
+        """
+        revision_snapshot = revision_snapshot or (lambda current_task: {})
+        lipsync_runner = lipsync_runner or (lambda _task_id, _enabled: None)
+
+        current = repo.get(task_id) or task
+        line_binding = get_line_runtime_binding(current)
+        self.validate_expected_revision(current, request, revision_snapshot=revision_snapshot)
+
+        lock = task_compose_lock(task_id)
+        object_exists_for_recovery = object_exists_fn or object_exists
+        recovery_updates = self.recover_stale_running_compose(
+            task_id,
+            current,
+            lock_active=lock.locked(),
+            object_exists_fn=object_exists_for_recovery,
+        )
+        if recovery_updates:
+            self._write_compose_state(
+                repo,
+                task_id,
+                recovery_updates,
+                task=current,
+                transition="stale_running_recovered",
+                force=True,
+            )
+            current = repo.get(task_id) or {**current, **recovery_updates}
+
+        if self.compose_lock_active(current):
+            self._write_compose_state(
+                repo,
+                task_id,
+                self.build_compose_lock_updates(current),
+                task=current,
+                transition="lock_conflict",
+            )
+            return HotFollowComposeResponseContract(
+                status_code=409,
+                body=self.build_compose_lock_body(task_id),
+            )
+
+        if not lock.acquire(blocking=False):
+            current = repo.get(task_id) or current
+            self._write_compose_state(
+                repo,
+                task_id,
+                self.build_compose_lock_updates(current),
+                task=current,
+                transition="mutex_conflict",
+            )
+            return HotFollowComposeResponseContract(
+                status_code=409,
+                body=self.build_compose_lock_body(task_id),
+            )
+
+        lock_acquired = True
+        try:
+            current_for_plan, request_updates, compose_plan = self.prepare_hot_follow_compose_task(current, request)
+            if request_updates:
+                self._write_compose_state(
+                    repo,
+                    task_id,
+                    request_updates,
+                    task=current,
+                    transition="request_prepared",
+                )
+                current_for_plan = repo.get(task_id) or current_for_plan
+
+            fresh_final_key = self.resolve_fresh_final_key(
+                task_id,
+                current_for_plan,
+                request=request,
+                revision_snapshot=revision_snapshot,
+            )
+            if fresh_final_key:
+                latest = repo.get(task_id) or current_for_plan
+                return self.build_hot_follow_compose_response(
+                    task_id,
+                    final_key=fresh_final_key,
+                    compose_status=latest.get("compose_status"),
+                    hub=hub_loader(task_id, repo),
+                    line=line_binding.to_payload(),
+                )
+
+            lock_until = (datetime.now(timezone.utc) + timedelta(seconds=300)).isoformat()
+            self._write_compose_state(
+                repo,
+                task_id,
+                {"compose_lock_until": lock_until},
+                task=current_for_plan,
+                transition="lock_acquired",
+            )
+            running_updates = self.build_compose_running_updates(current_for_plan, compose_plan)
+            self._write_compose_state(
+                repo,
+                task_id,
+                running_updates,
+                task=current_for_plan,
+                transition="running",
+            )
+            current_for_compose = repo.get(task_id) or {**current_for_plan, **running_updates}
+
+            env_lipsync_enabled = str(os.getenv("HF_LIPSYNC_ENABLED", "0")).strip().lower() in ("1", "true", "yes")
+            lipsync_warning = lipsync_runner(task_id, env_lipsync_enabled)
+            if lipsync_warning:
+                self._write_compose_state(
+                    repo,
+                    task_id,
+                    {"compose_warning": lipsync_warning},
+                    task=current_for_compose,
+                    transition="lipsync_warning",
+                )
+
+            compose_result = self.compose(
+                task_id,
+                current_for_compose,
+                subtitle_resolver=subtitle_resolver,
+                subtitle_only_check=subtitle_only_check,
+            )
+            success_updates = self.merge_compose_warning(compose_result.updates, lipsync_warning)
+            self._write_compose_state(
+                repo,
+                task_id,
+                success_updates,
+                task=current_for_compose,
+                transition="done",
+                force=True,
+            )
+            latest = repo.get(task_id) or {**current_for_compose, **success_updates}
+            return self.build_hot_follow_compose_response(
+                task_id,
+                final_key=compose_result.final_key,
+                compose_status=latest.get("compose_status"),
+                hub=hub_loader(task_id, repo),
+                line=line_binding.to_payload(),
+            )
+        except HTTPException as exc:
+            detail = exc.detail if isinstance(exc.detail, dict) else {"reason": "compose_failed", "message": str(exc.detail)}
+            self._write_compose_state(
+                repo,
+                task_id,
+                self.build_compose_failure_updates(detail),
+                task=repo.get(task_id) or current,
+                transition=str(detail.get("reason") or "failed"),
+                force=True,
+            )
+            raise
+        except Exception as exc:
+            detail = {"reason": "compose_failed", "message": str(exc)}
+            self._write_compose_state(
+                repo,
+                task_id,
+                self.build_compose_failure_updates(detail),
+                task=repo.get(task_id) or current,
+                transition="failed",
+                force=True,
+            )
+            raise HTTPException(status_code=409, detail=detail) from exc
+        finally:
+            try:
+                self._write_compose_state(
+                    repo,
+                    task_id,
+                    {"compose_lock_until": None},
+                    task=repo.get(task_id) or current,
+                    transition="lock_released",
+                    force=True,
+                )
+            finally:
+                if lock_acquired:
+                    lock.release()
+
+    @staticmethod
+    def _write_compose_state(
+        repo,
+        task_id: str,
+        updates: dict[str, Any],
+        *,
+        task: dict | None = None,
+        transition: str,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        return policy_upsert(
+            repo,
+            task_id,
+            task,
+            updates,
+            step=f"compose.owner.{transition}",
+            force=force,
+        )
 
     def prepare_hot_follow_compose_task(
         self,

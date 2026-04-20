@@ -211,6 +211,83 @@ def test_build_hot_follow_compose_response_preserves_success_shape():
     assert result.body["line"]["line_id"] == "hot_follow_line"
 
 
+def test_execute_hot_follow_compose_contract_writes_state_through_compose_owner(monkeypatch):
+    task_id = "hf-compose-owned-path"
+
+    class _Repo:
+        def __init__(self):
+            self.rows = {
+                task_id: {
+                    "task_id": task_id,
+                    "kind": "hot_follow",
+                    "status": "ready",
+                    "target_lang": "mm",
+                    "content_lang": "mm",
+                    "compose_plan": {"overlay_subtitles": True},
+                }
+            }
+
+        def get(self, current_task_id):
+            row = self.rows.get(current_task_id)
+            return dict(row) if isinstance(row, dict) else None
+
+        def upsert(self, current_task_id, updates):
+            current = dict(self.rows.get(current_task_id) or {})
+            current.update(updates or {})
+            self.rows[current_task_id] = current
+            return dict(current)
+
+    repo = _Repo()
+    captured_steps: list[str] = []
+
+    def _capture_policy_upsert(repo_arg, current_task_id, _task, updates, *, step, force=False):
+        captured_steps.append(step)
+        return repo_arg.upsert(current_task_id, updates)
+
+    def _compose(self, current_task_id, task, **_kwargs):
+        assert task["compose_status"] == "running"
+        return ComposeResult(
+            updates={
+                "compose_status": "done",
+                "compose_last_status": "done",
+                "final_video_key": f"deliver/tasks/{current_task_id}/final.mp4",
+                "final_video_path": f"deliver/tasks/{current_task_id}/final.mp4",
+                "status": "ready",
+                "last_step": "compose",
+            },
+            final_key=f"deliver/tasks/{current_task_id}/final.mp4",
+            final_url=f"/v1/tasks/{current_task_id}/final",
+            compose_status="done",
+        )
+
+    monkeypatch.setattr("gateway.app.services.compose_service.policy_upsert", _capture_policy_upsert)
+    monkeypatch.setattr(CompositionService, "resolve_fresh_final_key", lambda *args, **kwargs: None)
+    monkeypatch.setattr(CompositionService, "compose", _compose)
+
+    svc = CompositionService(storage=object(), settings=object())
+    response = svc.execute_hot_follow_compose_contract(
+        task_id,
+        repo.get(task_id),
+        HotFollowComposeRequestContract(),
+        repo=repo,
+        hub_loader=lambda current_task_id, current_repo: {
+            "task_id": current_task_id,
+            "compose_status": current_repo.get(current_task_id).get("compose_status"),
+        },
+        subtitle_resolver=lambda *_args: "deliver/tasks/hf/mm.srt",
+        subtitle_only_check=lambda *_args: False,
+        revision_snapshot=lambda _task: {},
+    )
+
+    assert response.status_code == 200
+    assert response.body["compose_status"] == "done"
+    assert repo.get(task_id)["compose_status"] == "done"
+    assert all(step.startswith("compose.owner.") for step in captured_steps)
+    assert "compose.owner.running" in captured_steps
+    assert "compose.owner.done" in captured_steps
+    assert captured_steps[-1] == "compose.owner.lock_released"
+
+
 def test_run_ffmpeg_timeout_raises_structured_http_exception(monkeypatch):
     svc = CompositionService(storage=object(), settings=object())
 
