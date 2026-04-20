@@ -17,7 +17,8 @@
 - Hot Follow 是当前唯一已经完成一轮真实业务验证的主线
 - Hot Follow 现在也是当前唯一完成 Skills MVP v0 closure 的业务样本
 - `TASK-1.3`、`TASK-2.0`、`TASK-2.3`、verification baseline、PR-5、PR-6 的收口结果已进入当前 baseline
-- `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md` 是 `docs/reviews/ALIGNMENT_BASELINE_20260318.md` 的后续代码验证版，作为新产线前置准入文档和后续 PR gate 依据
+- `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md` 是 `docs/reviews/ALIGNMENT_BASELINE_20260318.md` 的后续代码验证版、post-2026-03-18 code validation baseline、新产线前置准入文档、后续 PR required gate reference
+- root rules 已同步到该 gate：`ENGINEERING_RULES.md`、`PROJECT_RULES.md`、`ENGINEERING_STATUS.md`
 
 ## Partial
 
@@ -64,3 +65,9 @@
 - 四层 state model / ready gate / deliverables SSOT 改动
 - Skills / Worker Gateway / line contract runtime 扩展
 - publish / workbench response contract 改动
+
+## Synchronized Root Rule Surfaces
+
+- `ENGINEERING_RULES.md`
+- `PROJECT_RULES.md`
+- `ENGINEERING_STATUS.md`

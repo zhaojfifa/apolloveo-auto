@@ -63,13 +63,23 @@ Router must not own:
 - legacy status must not override fact-based truth
 - no UI patching to hide source-of-truth problems
 
-## 9. Validation Rules
+## 9. Factory Alignment Gate Rules
+
+- No second/new production line work may enter `main` until the active factory alignment review prerequisites are cleared.
+- `tasks.py` must not receive new line-specific logic, scenario-specific orchestration, state semantics, or production-line onboarding logic.
+- `hot_follow_api.py` must not grow new business orchestration or new line-extension logic.
+- Do not add new mixed L1/L2/L3/L4 state projection logic into `task_view.py` or workbench builders.
+- Line contract, deliverable profile, asset sink profile, worker profile, SOP profile, and confirmation policy must not be presented as runtime-bound if they remain metadata-only or ceremonial.
+- Any PR touching workbench or publish payload shape must update the related contract/docs in the same PR.
+- Any PR touching new-line onboarding, router restructuring, four-layer state, ready gate, deliverables SSOT, Skills, Worker Gateway, line runtime binding, or publish/workbench contracts must cite `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md` and the relevant appendices.
+
+## 10. Validation Rules
 
 - no merge without required regression
 - interpreter / environment must be stated
 - distinguish code regressions from environment limitations
 
-## 10. Scope Control Rules
+## 11. Scope Control Rules
 
 Every PR must state:
 
