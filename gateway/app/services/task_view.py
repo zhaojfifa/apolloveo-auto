@@ -141,9 +141,12 @@ def collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     )
     helper_translate_failed_voice_led = bool(
         subtitle_lane.get("helper_translate_failed")
+        and not bool(subtitle_lane.get("subtitle_ready"))
         and str(route_state.get("content_mode") or "").strip().lower() == "voice_led"
     )
     if helper_translate_failed_voice_led:
+        no_dub = False
+    if bool(subtitle_lane.get("subtitle_ready")) and stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
         no_dub = False
     if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
         no_dub = False

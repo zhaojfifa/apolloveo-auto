@@ -429,6 +429,77 @@ def test_helper_translate_failure_voice_led_does_not_recommend_no_tts_compose():
     assert advisory["recommended_next_action"] != "compose_no_tts"
 
 
+def test_helper_translate_failure_with_saved_target_subtitle_stays_helper_scoped():
+    artifact_facts = {
+        "final_exists": False,
+        "audio_exists": False,
+        "subtitle_exists": True,
+        "helper_translate_failed": True,
+        "helper_translate_failed_voice_led": True,
+        "helper_translate_error_reason": "helper_translate_provider_exhausted",
+        "helper_translate_error_message": "翻译服务当前额度不足或请求过多，请稍后重试；也可以手动编辑目标字幕并保存后继续配音。",
+        "audio_lane": {
+            "mode": "muted_no_tts",
+            "tts_voiceover_exists": False,
+            "source_audio_policy": "mute",
+            "source_audio_preserved": False,
+            "bgm_configured": False,
+            "no_tts": True,
+        },
+        "compose_input": {"mode": "direct", "ready": True, "blocked": False},
+        "selected_compose_route": {"name": "no_tts_compose_route"},
+    }
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": False,
+            "audio_ready_reason": "audio_missing",
+            "no_dub_reason": "target_subtitle_empty",
+        },
+        subtitle_lane={
+            "subtitle_ready": True,
+            "subtitle_artifact_exists": True,
+            "edited_text": "1\n00:00:00,000 --> 00:00:01,000\nမင်္ဂလာပါ\n",
+            "srt_text": "1\n00:00:00,000 --> 00:00:01,000\nမင်္ဂလာပါ\n",
+            "dub_input_text": "မင်္ဂလာပါ",
+            "parse_source_text": "voice-led source transcript",
+        },
+        dub_status="skipped",
+        compose_status="pending",
+        composed_reason="compose_not_done",
+        artifact_facts=artifact_facts,
+        no_dub=False,
+    )
+
+    assert current_attempt["helper_translate_failed"] is False
+    assert current_attempt["helper_translate_failed_voice_led"] is False
+    assert current_attempt["selected_compose_route"] == "tts_replace_route"
+    assert current_attempt["no_dub_route_terminal"] is False
+    assert current_attempt["subtitle_terminal_state"] is None
+
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-helper-failure-saved-subtitle", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": False,
+                "audio_ready_reason": "audio_missing",
+                "compose_allowed": False,
+                "compose_ready": False,
+                "no_tts_compose_allowed": False,
+                "no_dub_compose_allowed": False,
+                "selected_compose_route": "tts_replace_route",
+                "blocking": ["voiceover_missing"],
+            },
+            artifact_facts=artifact_facts,
+            current_attempt=current_attempt,
+        ),
+    )
+
+    assert advisory["recommended_next_action"] == "refresh_dub"
+    assert advisory["recommended_next_action"] != "compose_no_tts"
+    assert advisory["id"] != "hf_advisory_helper_translate_failed"
+
+
 def test_hot_follow_advisory_legal_no_tts_route_beats_refresh_dub():
     advisory = skills_advisory.maybe_build_hot_follow_advisory(
         {"task_id": "hf-no-tts-priority", "kind": "hot_follow"},
