@@ -76,7 +76,9 @@ def build_hot_follow_operator_summary(
         and not bool(current_attempt.get("audio_ready"))
         and not no_dub
     )
-    if current_attempt.get("compose_input_derive_failed_terminal"):
+    if current_attempt.get("helper_translate_failed"):
+        recommended_next_action = current_attempt.get("helper_translate_error_message") or "翻译助手暂时失败，请稍后重试；也可以手动编辑目标字幕并保存后继续配音。"
+    elif current_attempt.get("compose_input_derive_failed_terminal"):
         recommended_next_action = f"当前合成输入派生失败：{current_attempt.get('compose_reason') or 'compose_input_derive_failed'}。请先修复素材或转码配置后再重试合成。"
     elif current_attempt.get("compose_blocked_terminal") or current_attempt.get("compose_input_blocked_terminal"):
         recommended_next_action = f"当前合成输入已被线路策略阻断：{current_attempt.get('compose_reason') or 'compose_input_blocked'}。请调整素材后再尝试合成。"

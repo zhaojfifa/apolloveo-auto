@@ -136,6 +136,12 @@ from gateway.app.services.hot_follow_language_profiles import (
 from gateway.app.services.hot_follow_subtitle_currentness import (
     compute_hot_follow_target_subtitle_currentness,
 )
+from gateway.app.services.hot_follow_helper_translation import (
+    helper_translate_failure_updates,
+    helper_translate_resolved_updates,
+    helper_translate_success_updates,
+    sanitize_helper_translate_error,
+)
 from gateway.app.services.hot_follow_skills_advisory import (
     maybe_build_hot_follow_advisory as _maybe_build_hot_follow_advisory,
 )
@@ -587,7 +593,8 @@ def _hf_remove_no_dub_note(task_id: str) -> None:
 
 
 def _hf_empty_dub_recovery_updates(task_id: str, task: dict, text: str, target_currentness: dict[str, Any]) -> dict[str, Any]:
-    if not str(text or "").strip() or not bool(target_currentness.get("target_subtitle_current")):
+    _ = target_currentness
+    if not str(text or "").strip():
         return {}
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     reason = str(
@@ -2030,6 +2037,8 @@ def patch_hot_follow_subtitles(
         "target_subtitle_current": bool(target_currentness.get("target_subtitle_current")),
         "target_subtitle_current_reason": target_currentness.get("target_subtitle_current_reason"),
     }
+    if text:
+        updates.update(helper_translate_resolved_updates())
     updates.update(_hf_empty_dub_recovery_updates(task_id, task, text, target_currentness))
     _policy_upsert(
         repo,
@@ -2073,7 +2082,10 @@ def translate_hot_follow_subtitles(
         else:
             translated_text = _hf_translate_plain_lines(source_text, target_lang=target_lang)
     except GeminiSubtitlesError as exc:
-        raise HTTPException(status_code=409, detail={"reason": "translate_failed", "message": str(exc)}) from exc
+        detail = sanitize_helper_translate_error(exc)
+        _policy_upsert(repo, task_id, helper_translate_failure_updates(detail))
+        raise HTTPException(status_code=409, detail=detail) from exc
+    _policy_upsert(repo, task_id, helper_translate_success_updates())
     return {
         "task_id": task_id,
         "target_lang": public_target_lang(target_lang),

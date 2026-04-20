@@ -27,6 +27,8 @@ def run(
             or facts.get("compose_input_reason")
             or "compose_input_blocked",
             no_dub_reason=facts.get("no_dub_reason") or "compose_no_tts",
+            helper_translate_error_message=facts.get("helper_translate_error_message")
+            or "翻译助手暂时失败，请稍后重试；也可以手动编辑目标字幕并保存后继续配音。",
         )
     return {
         "id": str(spec.get("id") or "").strip() or None,
