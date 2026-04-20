@@ -219,7 +219,8 @@ def build_hot_follow_artifact_facts(
     audio_payload = persisted_audio or {}
     subtitle_payload = subtitle_lane or {}
     pack_payload = scene_pack or {}
-    subtitle_url = deliverable_url(task_id, task, "mm_srt")
+    subtitle_exists = bool(subtitle_payload.get("subtitle_artifact_exists"))
+    subtitle_url = deliverable_url(task_id, task, "mm_srt") if subtitle_exists else None
     pack_url = deliverable_url(task_id, task, "pack_zip") or pack_payload.get("download_url")
     compose_input = _compose_input_facts(task)
     audio_lane = _audio_lane_facts(task, audio_payload)
@@ -246,7 +247,7 @@ def build_hot_follow_artifact_facts(
         "final_asset_version": str(final_payload.get("asset_version") or "").strip() or None,
         "audio_exists": bool(audio_payload.get("exists")),
         "audio_url": str(audio_payload.get("voiceover_url") or "").strip() or None,
-        "subtitle_exists": bool(subtitle_payload.get("subtitle_artifact_exists")),
+        "subtitle_exists": subtitle_exists,
         "subtitle_url": str(subtitle_url or "").strip() or None,
         "helper_translate_failed": helper_translate_failed,
         "helper_translate_failed_voice_led": helper_translate_failed_voice_led,

@@ -390,7 +390,9 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         else (hf_expected_subtitle_filename(target_lang) if expected_key else None)
     )
     subtitle_artifact_physical_exists = bool(expected_key and object_exists(str(expected_key)))
-    subtitle_artifact_exists = bool(subtitle_artifact_physical_exists and has_semantic_target_subtitle_text(edited_text))
+    target_text_has_semantics = has_semantic_target_subtitle_text(edited_text)
+    subtitle_artifact_exists = bool(subtitle_artifact_physical_exists and target_text_has_semantics)
+    primary_editable_text = edited_text if target_text_has_semantics else ""
     target_currentness = hf_target_subtitle_currentness_state(
         task,
         target_lang=target_lang,
@@ -423,9 +425,9 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "parse_source_text": helper_source_text or "",
         "parse_source_role": parse_source_role if str(helper_source_text or "").strip() else "none",
         "parse_source_authoritative_for_target": parse_source_authoritative_for_target,
-        "edited_text": edited_text or "",
-        "srt_text": srt_text or "",
-        "primary_editable_text": edited_text or "",
+        "edited_text": primary_editable_text,
+        "srt_text": primary_editable_text,
+        "primary_editable_text": primary_editable_text,
         "primary_editable_format": "srt",
         "dub_input_text": dub_input_text,
         "dub_input_format": "srt" if hf_is_srt_text(dub_input_text) else "plain_text",

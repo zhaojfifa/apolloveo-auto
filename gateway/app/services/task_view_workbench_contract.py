@@ -240,6 +240,8 @@ def _subtitles_section(
     subtitles_text: str | None,
     normalized_source_text: str | None,
 ) -> dict[str, Any]:
+    primary_text = str(subtitle_lane.get("primary_editable_text") or "")
+    srt_text = primary_text if str(subtitle_lane.get("primary_editable_format") or "srt").strip().lower() == "srt" else ""
     return {
         "origin_text": origin_text or "",
         "raw_source_text": subtitle_lane.get("raw_source_text") or origin_text or "",
@@ -254,9 +256,9 @@ def _subtitles_section(
             "message": subtitle_lane.get("helper_translate_error_message"),
             "provider": subtitle_lane.get("helper_translate_provider"),
         },
-        "edited_text": subtitles_text or "",
-        "srt_text": subtitles_text or "",
-        "primary_editable_text": subtitle_lane.get("primary_editable_text") or subtitles_text or "",
+        "edited_text": primary_text,
+        "srt_text": srt_text,
+        "primary_editable_text": primary_text,
         "primary_editable_format": subtitle_lane.get("primary_editable_format") or "srt",
         "dub_input_text": subtitle_lane.get("dub_input_text") or "",
         "dub_input_format": subtitle_lane.get("dub_input_format") or "plain_text",

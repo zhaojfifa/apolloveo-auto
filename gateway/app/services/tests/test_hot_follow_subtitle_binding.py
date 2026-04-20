@@ -216,7 +216,8 @@ def test_subtitle_lane_does_not_treat_timing_only_target_artifact_as_existing_tr
         },
     )
 
-    assert lane["srt_text"].strip().startswith("1")
+    assert lane["srt_text"] == ""
+    assert lane["primary_editable_text"] == ""
     assert lane["subtitle_artifact_exists"] is False
     assert lane["subtitle_ready"] is False
     assert lane["target_subtitle_current"] is False
