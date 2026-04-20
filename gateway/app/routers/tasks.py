@@ -251,6 +251,14 @@ from gateway.app.services.task_router_presenters import (  # noqa: E402
     build_task_workbench_task_json as _build_task_workbench_task_json,
     build_task_workbench_view as _build_task_workbench_view,
 )
+from gateway.app.services.op_auth import (  # noqa: E402
+    op_key_valid_request as _op_key_valid_request,
+    op_key_valid_value as _service_op_key_valid_value,
+)
+from gateway.app.services.task_router_actions import (  # noqa: E402
+    TaskRouterActionPorts,
+    register_task_router_action_ports,
+)
 from gateway.app.services.voice_state import (  # noqa: E402
     DRY_TTS_CONFIG_KEY as _DRY_TTS_CONFIG_KEY,
     DRY_TTS_ROLE as _DRY_TTS_ROLE,
@@ -1089,19 +1097,10 @@ def task_status(task_id: str, repo=Depends(get_task_repository)):
 
 
 def _op_key_valid(request: Request) -> bool:
-    secret = _get_op_access_key()
-    if not secret:
-        return True
-    header_val = (request.headers.get(OP_HEADER_KEY) or "").strip()
-    return hmac.compare_digest(header_val, secret)
+    return _op_key_valid_request(request)
 
 def _op_key_valid_value(op_key: str | None) -> bool:
-    secret = _get_op_access_key()
-    if not secret:
-        return True
-    if not op_key:
-        return False
-    return hmac.compare_digest(op_key, secret)
+    return _service_op_key_valid_value(op_key)
 
 
 def _require_op_key(request: Request) -> None:
@@ -3476,5 +3475,28 @@ def delete_task(
 
 
 router = api_router
+
+
+register_task_router_action_ports(
+    TaskRouterActionPorts(
+        create_task=lambda payload, background_tasks, repo: create_task(
+            payload,
+            background_tasks=background_tasks,
+            repo=repo,
+        ),
+        run_task_pipeline=lambda task_id, background_tasks, repo: run_task_pipeline(
+            task_id,
+            background_tasks=background_tasks,
+            repo=repo,
+        ),
+        rerun_dub=lambda task_id, payload, background_tasks, repo: rerun_dub(
+            task_id,
+            payload=payload,
+            background_tasks=background_tasks,
+            repo=repo,
+        ),
+    )
+)
+
 
 __all__ = ["api_router", "pages_router", "router"]

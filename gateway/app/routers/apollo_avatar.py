@@ -19,7 +19,8 @@ from gateway.app.services.status_policy.service import policy_upsert
 from gateway.app.services.task_events import append_task_event as _append_task_event
 from gateway.app.task_repo_utils import normalize_task_payload
 from gateway.app.utils.pipeline_config import pipeline_config_to_storage
-from gateway.app.routers.tasks import api_key_header, _op_key_valid_value
+from gateway.app.core.constants import api_key_header
+from gateway.app.services.op_auth import op_key_valid_value
 from gateway.app.scenes.apollo_avatar.publish_hub import build_apollo_avatar_publish_hub
 
 router = APIRouter(prefix="/api/apollo/avatar", tags=["apollo-avatar"])
@@ -230,10 +231,9 @@ def apollo_avatar_publish_hub(
     repo=Depends(get_task_repository),
     op_key: str | None = Security(api_key_header),
 ):
-    if not _op_key_valid_value(op_key):
+    if not op_key_valid_value(op_key):
         raise HTTPException(status_code=401, detail="OP key required")
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return build_apollo_avatar_publish_hub(task)
-
