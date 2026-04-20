@@ -1197,3 +1197,92 @@ def test_hot_follow_compose_recovers_stale_running_before_false_409(monkeypatch)
     saved = repo.get(task_id) or {}
     assert saved["compose_status"] == "done"
     assert saved.get("compose_lock_until") is None
+
+
+def test_hot_follow_helper_translate_429_persists_sanitized_helper_failure(monkeypatch):
+    task_id = "hf-helper-translate-429"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "ready",
+            "target_lang": "my",
+            "content_lang": "my",
+        },
+    )
+
+    def _raise_resource_exhausted(*_args, **_kwargs):
+        raise hf_router.GeminiSubtitlesError(
+            'Gemini HTTP 429: {"error":{"status":"RESOURCE_EXHAUSTED","message":"quota exhausted"}}'
+        )
+
+    monkeypatch.setattr(hf_router, "translate_segments_with_gemini", _raise_resource_exhausted)
+
+    app = FastAPI()
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.post(
+            f"/api/hot_follow/tasks/{task_id}/translate_subtitles",
+            json={"text": "1\n00:00:00,000 --> 00:00:01,000\nhello\n", "target_lang": "my"},
+        )
+
+    assert res.status_code == 409
+    detail = res.json()["detail"]
+    assert detail["reason"] == "helper_translate_provider_exhausted"
+    assert detail["provider"] == "gemini"
+    assert "RESOURCE_EXHAUSTED" not in detail["message"]
+    assert "{" not in detail["message"]
+
+    saved = repo.get(task_id) or {}
+    assert saved["subtitle_helper_status"] == "failed"
+    assert saved["subtitle_helper_error_reason"] == "helper_translate_provider_exhausted"
+    assert "{" not in saved["subtitle_helper_error_message"]
+    assert not saved.get("mm_srt_path")
+
+
+def test_manual_subtitle_save_clears_helper_translate_failure(monkeypatch, tmp_path):
+    task_id = "hf-helper-manual-save"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "ready",
+            "target_lang": "my",
+            "content_lang": "my",
+            "mm_srt_path": f"deliver/tasks/{task_id}/my.srt",
+            "subtitle_helper_status": "failed",
+            "subtitle_helper_error_reason": "helper_translate_provider_exhausted",
+            "subtitle_helper_error_message": "翻译服务当前额度不足或请求过多，请稍后重试。",
+            "pipeline_config": {"no_dub": "true", "dub_skip_reason": "target_subtitle_empty"},
+            "dub_status": "skipped",
+        },
+    )
+
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: tmp_path / _task_id)
+    monkeypatch.setattr(hf_router, "_hf_sync_saved_target_subtitle_artifact", lambda *_args, **_kwargs: f"deliver/tasks/{task_id}/my.srt")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+
+    app = FastAPI()
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.patch(
+            f"/api/hot_follow/tasks/{task_id}/subtitles",
+            json={"srt_text": "1\n00:00:00,000 --> 00:00:01,000\nမင်္ဂလာပါ\n"},
+        )
+
+    assert res.status_code == 200
+    saved = repo.get(task_id) or {}
+    assert saved["subtitle_helper_status"] == "resolved"
+    assert saved.get("subtitle_helper_error_reason") is None
+    assert saved.get("subtitle_helper_error_message") is None
+    assert saved["dub_status"] == "pending"
+    assert "no_dub" not in saved["pipeline_config"]
+    assert "dub_skip_reason" not in saved["pipeline_config"]

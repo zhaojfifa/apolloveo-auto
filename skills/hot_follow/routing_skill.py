@@ -30,6 +30,9 @@ def run(
     ):
         return {"decision_key": "compose_input_unready"}
 
+    if facts.get("helper_translate_failed"):
+        return {"decision_key": "helper_translate_failed"}
+
     if facts.get("no_dub_route_terminal") or (
         facts.get("compose_allowed")
         and facts.get("no_tts_compose_allowed")

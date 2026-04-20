@@ -434,6 +434,11 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "target_subtitle_current_reason": str(target_currentness.get("target_subtitle_current_reason") or subtitle_ready_reason),
         "target_subtitle_authoritative_source": bool(target_currentness.get("target_subtitle_authoritative_source")),
         "target_subtitle_source_copy": bool(target_currentness.get("target_subtitle_source_copy")),
+        "helper_translate_status": str(task.get("subtitle_helper_status") or "").strip() or None,
+        "helper_translate_failed": str(task.get("subtitle_helper_status") or "").strip().lower() == "failed",
+        "helper_translate_error_reason": str(task.get("subtitle_helper_error_reason") or "").strip() or None,
+        "helper_translate_error_message": str(task.get("subtitle_helper_error_message") or "").strip() or None,
+        "helper_translate_provider": str(task.get("subtitle_helper_provider") or "").strip() or None,
     }
 
 

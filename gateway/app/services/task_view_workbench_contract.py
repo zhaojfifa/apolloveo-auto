@@ -247,6 +247,13 @@ def _subtitles_section(
         "parse_source_text": subtitle_lane.get("parse_source_text") or "",
         "parse_source_role": subtitle_lane.get("parse_source_role") or "none",
         "parse_source_authoritative_for_target": bool(subtitle_lane.get("parse_source_authoritative_for_target")),
+        "helper_translation": {
+            "status": subtitle_lane.get("helper_translate_status"),
+            "failed": bool(subtitle_lane.get("helper_translate_failed")),
+            "reason": subtitle_lane.get("helper_translate_error_reason"),
+            "message": subtitle_lane.get("helper_translate_error_message"),
+            "provider": subtitle_lane.get("helper_translate_provider"),
+        },
         "edited_text": subtitles_text or "",
         "srt_text": subtitles_text or "",
         "primary_editable_text": subtitle_lane.get("primary_editable_text") or subtitles_text or "",

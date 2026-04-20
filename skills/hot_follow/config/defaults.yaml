@@ -46,6 +46,19 @@ advisories:
       - subtitle_terminal_state
       - no_dub_compose_allowed
       - no_dub_reason
+  helper_translate_failed:
+    id: hf_advisory_helper_translate_failed
+    kind: operator_guidance
+    level: warning
+    recommended_next_action: retry_translate_or_edit_subtitle
+    operator_hint: helper translation failed
+    explanation: "{helper_translate_error_message}"
+    evidence_fields:
+      - helper_translate_failed
+      - helper_translate_failed_voice_led
+      - helper_translate_error_reason
+      - subtitle_ready
+      - subtitle_ready_reason
   subtitle_source_mismatch:
     id: hf_advisory_subtitle_source_mismatch
     kind: operator_guidance
