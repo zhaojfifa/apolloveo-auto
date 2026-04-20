@@ -47,6 +47,18 @@ from gateway.app.services.task_view_helpers import (
     task_endpoint,
     task_key,
 )
+from gateway.app.services.task_view_workbench_contract import (
+    apply_ready_gate_composed_projection,
+    apply_ready_gate_compose_projection,
+    attach_final_url,
+    attach_task_aliases,
+    build_hot_follow_compose_plan,
+    build_hot_follow_workbench_payload,
+    build_pipeline_legacy,
+    build_pipeline_rows,
+    normalize_compose_last,
+    sync_final_deliverable_projection,
+)
 from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, public_target_lang
 from gateway.app.services.voice_service import (
     hf_audio_config,
@@ -665,21 +677,7 @@ def build_hot_follow_workbench_hub(
     logger.info("hot_follow_hub_hit task=%s kind=%s", task_id, task.get("kind"))
     settings_obj = settings or get_settings()
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-    compose_plan = dict(task.get("compose_plan") or {})
-    if not compose_plan:
-        compose_plan = {
-            "mute": True,
-            "overlay_subtitles": True,
-            "strip_subtitle_streams": True,
-            "cleanup_mode": "none",
-            "target_lang": task.get("target_lang") or task.get("content_lang") or "mm",
-            "freeze_tail_enabled": False,
-            "freeze_tail_cap_sec": 8,
-            "compose_policy": "match_video",
-        }
-    compose_plan.setdefault("freeze_tail_enabled", False)
-    compose_plan.setdefault("freeze_tail_cap_sec", 8)
-    compose_plan["compose_policy"] = "freeze_tail" if bool(compose_plan.get("freeze_tail_enabled")) else "match_video"
+    compose_plan = build_hot_follow_compose_plan(task, pipeline_config)
     scene_outputs = task.get("scene_outputs")
     if not isinstance(scene_outputs, list):
         scene_outputs = []
@@ -749,28 +747,7 @@ def build_hot_follow_workbench_hub(
     audio_error = hf_audio_display_error(str(dub_state), task.get("dub_error"), voice_state)
     deliverables = deliverables_loader(task_id, task_runtime)
     target_profile = get_hot_follow_language_profile(target_lang_internal)
-    compose_last_status_raw = str(
-        task.get("compose_last_status")
-        or task.get("compose_status")
-        or ""
-    ).strip().lower()
-    if compose_last_status_raw in {"", "none", "null"}:
-        compose_last_status = "never"
-    elif compose_last_status_raw in {"running", "processing", "queued"}:
-        compose_last_status = "running"
-    elif compose_last_status_raw in {"done", "ready", "success", "completed"}:
-        compose_last_status = "done"
-    elif compose_last_status_raw in {"failed", "error"}:
-        compose_last_status = "failed"
-    else:
-        compose_last_status = "never"
-    compose_last = {
-        "status": compose_last_status,
-        "started_at": task.get("compose_last_started_at"),
-        "finished_at": task.get("compose_last_finished_at"),
-        "ffmpeg_cmd": task.get("compose_last_ffmpeg_cmd"),
-        "error": task.get("compose_last_error") or task.get("compose_error"),
-    }
+    compose_last = normalize_compose_last(task)
     composed_ready = bool(composed.get("composed_ready"))
     composed_reason = str(composed.get("composed_reason") or "final_missing")
 
@@ -779,139 +756,76 @@ def build_hot_follow_workbench_hub(
     dub_error = audio_error if str(dub_state).strip().lower() in {"failed", "error"} else None
     pack_error = task.get("pack_error") if str(pack_state).strip().lower() in {"failed", "error"} else None
     compose_error = task.get("compose_error") if str(compose_state).strip().lower() in {"failed", "error"} else None
-    pipeline = [
-        {"key": "parse", "label": "Parse", "status": parse_state, "updated_at": task.get("updated_at"), "error": parse_error, "message": parse_summary},
-        {"key": "subtitles", "label": "Subtitles", "status": subtitles_state, "updated_at": task.get("updated_at"), "error": subtitles_error, "message": subtitles_summary},
-        {"key": "dub", "label": "Dub", "status": dub_state, "updated_at": task.get("updated_at"), "error": dub_error, "message": dub_summary},
-        {"key": "pack", "label": "Pack", "status": pack_state, "updated_at": task.get("updated_at"), "error": pack_error, "message": pack_summary},
-        {"key": "compose", "label": "Compose", "status": compose_state, "updated_at": task.get("updated_at"), "error": compose_error, "message": compose_summary},
-    ]
-    for item in pipeline:
-        item["state"] = item["status"]
-
-    payload = {
-        "task_id": task_id,
-        "kind": task.get("kind") or "hot_follow",
-        "ui_locale": task.get("ui_lang") or "zh",
-        "input": {
-            "platform": task.get("platform") or "",
-            "source_url": task.get("source_url") or "",
-            "title": task.get("title") or "",
-            "target_lang": public_target_lang(target_lang_internal),
-            "subtitles_mode": pipeline_config.get("subtitles_mode") or "whisper+gemini",
-        },
-        "media": {
-            "raw_url": raw_url,
-            "source_video_url": raw_url,
-            "mute_video_url": mute_url,
-            "voiceover_url": audio_cfg.get("tts_voiceover_url") or audio_cfg.get("voiceover_url") or audio_cfg.get("audio_url"),
-            "bgm_url": audio_cfg.get("bgm_url"),
-            "final_url": None,
-            "final_video_url": None,
-        },
-        "pipeline": pipeline,
-        "subtitles": {
-            "origin_text": origin_text or "",
-            "raw_source_text": subtitle_lane.get("raw_source_text") or origin_text or "",
-            "normalized_source_text": subtitle_lane.get("normalized_source_text") or normalized_source_text or "",
-            "parse_source_text": subtitle_lane.get("parse_source_text") or "",
-            "parse_source_role": subtitle_lane.get("parse_source_role") or "none",
-            "parse_source_authoritative_for_target": bool(subtitle_lane.get("parse_source_authoritative_for_target")),
-            "edited_text": subtitles_text or "",
-            "srt_text": subtitles_text or "",
-            "primary_editable_text": subtitle_lane.get("primary_editable_text") or subtitles_text or "",
-            "primary_editable_format": subtitle_lane.get("primary_editable_format") or "srt",
-            "dub_input_text": subtitle_lane.get("dub_input_text") or "",
-            "dub_input_format": subtitle_lane.get("dub_input_format") or "plain_text",
-            "dub_input_source": subtitle_lane.get("dub_input_source"),
-            "status": subtitles_state,
-            "error": task.get("subtitles_error"),
-            "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
-            "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),
-            "target_subtitle_current": bool(subtitle_lane.get("target_subtitle_current")),
-            "target_subtitle_current_reason": subtitle_lane.get("target_subtitle_current_reason"),
-            "target_subtitle_authoritative_source": bool(subtitle_lane.get("target_subtitle_authoritative_source")),
-            "target_subtitle_source_copy": bool(subtitle_lane.get("target_subtitle_source_copy")),
-            "editable": True,
-            "updated_at": task.get("subtitles_override_updated_at") or task.get("updated_at"),
-        },
-        "audio": {
-            "tts_engine": audio_cfg.get("tts_engine"),
-            "tts_voice": audio_cfg.get("tts_voice"),
-            "audio_fit_max_speed": audio_cfg.get("audio_fit_max_speed"),
-            "voiceover_url": audio_cfg.get("tts_voiceover_url") or audio_cfg.get("voiceover_url") or audio_cfg.get("audio_url"),
-            "tts_voiceover_url": audio_cfg.get("tts_voiceover_url"),
-            "dub_preview_url": audio_cfg.get("dub_preview_url"),
-            "bgm_url": audio_cfg.get("bgm_url"),
-            "bgm_mix": audio_cfg.get("bgm_mix"),
-            "source_audio_policy": audio_cfg.get("source_audio_policy"),
-            "source_audio_preserved": bool(audio_cfg.get("source_audio_preserved")),
-            "tts_voiceover_ready": bool(audio_cfg.get("tts_voiceover_ready")),
-            "audio_flow_mode": audio_cfg.get("audio_flow_mode"),
-            "audio_flow_label": audio_cfg.get("audio_flow_label"),
-            "audio_flow_reason": audio_cfg.get("audio_flow_reason"),
-            "status": dub_state,
-            "error": audio_error,
-            "warning": audio_warning,
-            "sha256": task.get("audio_sha256"),
-            "audio_ready": bool(voice_state.get("audio_ready")),
-            "audio_ready_reason": voice_state.get("audio_ready_reason"),
-            "requested_voice": voice_state.get("requested_voice"),
-            "actual_provider": voice_state.get("actual_provider"),
-            "resolved_voice": voice_state.get("resolved_voice"),
-            "deliverable_audio_done": bool(voice_state.get("deliverable_audio_done")),
-            "dub_current": bool(voice_state.get("dub_current")),
-            "dub_current_reason": voice_state.get("dub_current_reason"),
-            "dub_source_audio_fit_max_speed": voice_state.get("dub_source_audio_fit_max_speed"),
-            "current_audio_fit_max_speed": voice_state.get("current_audio_fit_max_speed"),
-            "no_dub": bool(no_dub),
-            "no_dub_reason": no_dub_reason,
-            "no_dub_compose_allowed": no_dub_compose_allowed,
-        },
-        "scenes": {
-            "status": scenes_status,
-            "scenes_key": scenes_key,
-            "download_url": scenes_url,
-        },
-        "scene_pack": {
-            "status": scenes_status,
-            "exists": bool(scenes_key),
-            "key": scenes_key,
-            "asset_version": scene_pack.get("asset_version"),
-            "error": task.get("scenes_error"),
-            "error_reason": None,
-            "download_url": scenes_url,
-            "scenes_url": scenes_url,
-            "deprecated": True,
-        },
-        "deliverables": deliverables if isinstance(deliverables, list) else [],
-        "target_lang_profile": {
-            "target_lang": target_profile.public_lang,
-            "internal_lang": target_profile.internal_lang,
-            "display_name": target_profile.display_name,
-            "subtitle_filename": target_profile.subtitle_filename,
-            "subtitle_txt_filename": target_profile.subtitle_txt_filename,
-            "dub_filename": target_profile.dub_filename,
-            "allowed_voice_options": list(target_profile.allowed_voice_options),
-            "default_voice_by_provider": dict(target_profile.default_voice_by_provider),
-        },
-        "events": task.get("events") or [],
-        "compose_plan": compose_plan,
-        "scene_outputs": scene_outputs,
-        "composed_ready": composed_ready,
-        "composed_reason": composed_reason,
-        "final": final_info,
-        "historical_final": historical_final,
-        "compose": {
-            "last": compose_last,
-            "warning": task.get("compose_warning"),
-        },
-        "errors": {
-            "audio": {"reason": task.get("error_reason"), "message": task.get("dub_error") or audio_warning},
-            "pack": {"reason": task.get("error_reason"), "message": task.get("pack_error")},
-            "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
-        },
-    }
+    pipeline = build_pipeline_rows(
+        task,
+        parse_state=parse_state,
+        parse_summary=parse_summary,
+        subtitles_state=subtitles_state,
+        subtitles_summary=subtitles_summary,
+        dub_state=dub_state,
+        dub_summary=dub_summary,
+        pack_state=pack_state,
+        pack_summary=pack_summary,
+        compose_state=compose_state,
+        compose_summary=compose_summary,
+        parse_error=parse_error,
+        subtitles_error=subtitles_error,
+        dub_error=dub_error,
+        pack_error=pack_error,
+        compose_error=compose_error,
+    )
+    pipeline_legacy = build_pipeline_legacy(
+        task,
+        parse_state=parse_state,
+        parse_summary=parse_summary,
+        subtitles_state=subtitles_state,
+        subtitles_summary=subtitles_summary,
+        dub_state=dub_state,
+        dub_summary=dub_summary,
+        pack_state=pack_state,
+        pack_summary=pack_summary,
+        compose_state=compose_state,
+        compose_summary=compose_summary,
+    )
+    payload = build_hot_follow_workbench_payload(
+        task_id=task_id,
+        task=task,
+        pipeline_config=pipeline_config,
+        compose_plan=compose_plan,
+        scene_outputs=scene_outputs,
+        subtitle_lane=subtitle_lane,
+        target_lang_public=public_target_lang(target_lang_internal),
+        raw_url=raw_url,
+        mute_url=mute_url,
+        audio_cfg=audio_cfg,
+        voice_state=voice_state,
+        subtitles_state=subtitles_state,
+        dub_state=dub_state,
+        pack_state=pack_state,
+        compose_state=compose_state,
+        pipeline=pipeline,
+        pipeline_legacy=pipeline_legacy,
+        scenes_status=scenes_status,
+        scenes_key=scenes_key,
+        scenes_url=scenes_url,
+        scene_pack=scene_pack,
+        deliverables=deliverables,
+        target_profile=target_profile,
+        origin_text=origin_text,
+        subtitles_text=subtitles_text,
+        normalized_source_text=normalized_source_text,
+        text_audio_warning=audio_warning,
+        audio_error=audio_error,
+        no_dub=no_dub,
+        no_dub_reason=no_dub_reason,
+        no_dub_compose_allowed=no_dub_compose_allowed,
+        composed_ready=composed_ready,
+        composed_reason=composed_reason,
+        final_info=final_info,
+        historical_final=historical_final,
+        compose_last=compose_last,
+        composed=composed,
+    )
     final_stale_reason = composed.get("final_stale_reason") or None
     payload["final_stale_reason"] = final_stale_reason
     payload["final_fresh"] = bool(composed.get("final_fresh"))
@@ -941,69 +855,19 @@ def build_hot_follow_workbench_hub(
         dub_state,
     )
     final_url = resolve_final_url_loader(task_id, payload)
-    if final_url:
-        payload["media"]["final_url"] = final_url
-        payload["media"]["final_video_url"] = final_url
-    payload["final_url"] = final_url
-    payload["final_video_url"] = final_url
+    attach_final_url(payload, final_url)
     composed_ready = bool(composed_ready)
     payload["composed_ready"] = composed_ready
     payload["composed_reason"] = "ready" if composed_ready else "not_ready"
-    if isinstance(payload.get("deliverables"), list):
-        for item in payload["deliverables"]:
-            if not isinstance(item, dict):
-                continue
-            if str(item.get("kind") or "").strip().lower() == "final":
-                item["url"] = final_url
-                item["open_url"] = final_url
-                if composed_ready:
-                    item["status"] = "done"
-                    item["state"] = "done"
-                    item["historical"] = False
-                else:
-                    item["status"] = "pending"
-                    item["state"] = "pending"
-                    item["historical"] = bool((historical_final or {}).get("exists"))
-                break
-
-    payload["task"] = {
-        "id": task_id,
-        "kind": payload["kind"],
-        "title": payload["input"]["title"],
-        "platform": payload["input"]["platform"],
-        "source_url": payload["input"]["source_url"],
-    }
-    payload["source_video"] = {
-        "url": payload["media"]["source_video_url"],
-        "poster": task.get("cover_url") or task.get("cover") or task.get("thumb_url"),
-    }
-    payload["audio_config"] = payload["audio"]
-    payload["title"] = payload["input"]["title"]
-    payload["platform"] = payload["input"]["platform"]
-    payload["pipeline_legacy"] = {
-        "parse": {"status": parse_state, "summary": parse_summary, "updated_at": task.get("updated_at")},
-        "subtitles": {"status": subtitles_state, "summary": subtitles_summary, "updated_at": task.get("updated_at")},
-        "audio": {"status": dub_state, "summary": dub_summary, "updated_at": task.get("updated_at")},
-        "synthesis": {"status": pack_state, "summary": pack_summary, "updated_at": task.get("updated_at")},
-        "compose": {"status": compose_state, "summary": compose_summary, "updated_at": task.get("updated_at")},
-    }
+    sync_final_deliverable_projection(
+        payload,
+        composed_ready=composed_ready,
+        final_url=final_url,
+        historical_final=historical_final,
+    )
+    attach_task_aliases(payload, task, task_id)
     payload = state_computer(task_runtime, payload)
-    ready_gate = payload.get("ready_gate") if isinstance(payload.get("ready_gate"), dict) else {}
-    compose_allowed = bool(ready_gate.get("compose_allowed"))
-    if compose_allowed:
-        compose_allowed_reason = "no_dub_inputs_ready" if bool(ready_gate.get("no_dub_compose_allowed")) else "voiceover_ready"
-    else:
-        compose_allowed_reason = str(
-            ready_gate.get("compose_allowed_reason")
-            or ready_gate.get("compose_reason")
-            or "route_not_allowed"
-        )
-    payload["compose_allowed"] = compose_allowed
-    payload["compose_allowed_reason"] = compose_allowed_reason
-    ready_gate = payload.get("ready_gate")
-    if isinstance(ready_gate, dict):
-        ready_gate["compose_allowed"] = compose_allowed
-        ready_gate["compose_allowed_reason"] = compose_allowed_reason
+    apply_ready_gate_compose_projection(payload)
     if backfill_compose_done(repo, task_id, task, bool(payload.get("composed_ready"))):
         latest = repo.get(task_id) or task
         latest_runtime = dict(latest)
@@ -1011,22 +875,7 @@ def build_hot_follow_workbench_hub(
         latest_runtime["target_subtitle_current"] = bool(latest_lane.get("target_subtitle_current"))
         latest_runtime["target_subtitle_current_reason"] = latest_lane.get("target_subtitle_current_reason")
         payload = state_computer(latest_runtime, payload)
-        ready_gate = payload.get("ready_gate") if isinstance(payload.get("ready_gate"), dict) else {}
-        compose_allowed = bool(ready_gate.get("compose_allowed"))
-        if compose_allowed:
-            compose_allowed_reason = "no_dub_inputs_ready" if bool(ready_gate.get("no_dub_compose_allowed")) else "voiceover_ready"
-        else:
-            compose_allowed_reason = str(
-                ready_gate.get("compose_allowed_reason")
-                or ready_gate.get("compose_reason")
-                or "route_not_allowed"
-            )
-        payload["compose_allowed"] = compose_allowed
-        payload["compose_allowed_reason"] = compose_allowed_reason
-        ready_gate = payload.get("ready_gate")
-        if isinstance(ready_gate, dict):
-            ready_gate["compose_allowed"] = compose_allowed
-            ready_gate["compose_allowed_reason"] = compose_allowed_reason
+        apply_ready_gate_compose_projection(payload)
         task = latest
 
     final_url = str(
@@ -1034,86 +883,7 @@ def build_hot_follow_workbench_hub(
         or (payload.get("media", {}) or {}).get("final_url")
         or ""
     ).strip()
-    composed_ready = bool((payload.get("ready_gate") or {}).get("compose_ready"))
-    if composed_ready:
-        pipeline = payload.get("pipeline")
-        if isinstance(pipeline, list):
-            for step in pipeline:
-                if not isinstance(step, dict):
-                    continue
-                if str(step.get("key") or "").strip().lower() == "compose":
-                    step["status"] = "done"
-                    step["state"] = "done"
-                    step["error"] = None
-                    step["message"] = step.get("message") or "final video merge"
-
-        pipeline_legacy = payload.get("pipeline_legacy")
-        if isinstance(pipeline_legacy, dict):
-            compose_legacy = pipeline_legacy.get("compose")
-            if isinstance(compose_legacy, dict):
-                compose_legacy["status"] = "done"
-
-        compose = payload.get("compose")
-        if isinstance(compose, dict):
-            last = compose.get("last")
-            if isinstance(last, dict):
-                last["status"] = "done"
-
-        deliverables = payload.get("deliverables")
-        if isinstance(deliverables, list):
-            for item in deliverables:
-                if not isinstance(item, dict):
-                    continue
-                if str(item.get("kind") or "").strip().lower() == "final":
-                    item["status"] = "done"
-                    item["state"] = "done"
-                    item["historical"] = False
-                    if final_url:
-                        item["url"] = final_url
-                        item["open_url"] = final_url
-                    break
-
-        media = payload.get("media")
-        if isinstance(media, dict) and final_url:
-            media["final_url"] = final_url
-            media["final_video_url"] = final_url
-
-        payload["composed_ready"] = True
-        payload["composed_reason"] = "ready"
-    else:
-        pipeline = payload.get("pipeline")
-        if isinstance(pipeline, list):
-            for step in pipeline:
-                if not isinstance(step, dict):
-                    continue
-                if str(step.get("key") or "").strip().lower() == "compose":
-                    step["status"] = "pending"
-                    step["state"] = "pending"
-
-        pipeline_legacy = payload.get("pipeline_legacy")
-        if isinstance(pipeline_legacy, dict):
-            compose_legacy = pipeline_legacy.get("compose")
-            if isinstance(compose_legacy, dict):
-                compose_legacy["status"] = "pending"
-
-        compose = payload.get("compose")
-        if isinstance(compose, dict):
-            last = compose.get("last")
-            if isinstance(last, dict):
-                last["status"] = "pending"
-
-        deliverables = payload.get("deliverables")
-        if isinstance(deliverables, list):
-            for item in deliverables:
-                if not isinstance(item, dict):
-                    continue
-                if str(item.get("kind") or "").strip().lower() == "final":
-                    item["status"] = "pending"
-                    item["state"] = "pending"
-                    item["historical"] = bool((payload.get("historical_final") or {}).get("exists"))
-                    item["url"] = None
-                    item["open_url"] = None
-                    break
+    apply_ready_gate_composed_projection(payload, final_url=final_url)
     payload["line"] = line_binding_loader(task).to_payload()
     advisory = maybe_build_hot_follow_advisory(task, payload)
     if advisory is not None:
