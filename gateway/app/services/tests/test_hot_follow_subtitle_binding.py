@@ -198,6 +198,52 @@ def test_subtitle_lane_keeps_target_editor_empty_when_only_origin_exists(monkeyp
     assert lane["subtitle_ready"] is False
 
 
+def test_subtitle_lane_does_not_treat_timing_only_target_artifact_as_existing_truth(monkeypatch):
+    store = {
+        "deliver/tasks/hf-empty-target/mm.srt": b"1\n00:00:00,000 --> 00:00:02,000\n\n",
+    }
+
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+
+    lane = hf_router._hf_subtitle_lane_state(
+        "hf-empty-target",
+        {
+            "task_id": "hf-empty-target",
+            "target_lang": "my",
+            "mm_srt_path": "deliver/tasks/hf-empty-target/mm.srt",
+        },
+    )
+
+    assert lane["srt_text"].strip().startswith("1")
+    assert lane["subtitle_artifact_exists"] is False
+    assert lane["subtitle_ready"] is False
+    assert lane["target_subtitle_current"] is False
+    assert lane["target_subtitle_current_reason"] == "subtitle_missing"
+    assert lane["dub_input_text"] == ""
+
+
+def test_sync_saved_target_subtitle_artifact_refuses_semantically_empty_srt(monkeypatch):
+    monkeypatch.setattr(hf_router, "upload_task_artifact", lambda *_args, **_kwargs: pytest.fail("empty target subtitle must not upload"))
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+
+    task = {
+        "task_id": "hf-empty-sync",
+        "kind": "hot_follow",
+        "mm_srt_path": "deliver/tasks/hf-empty-sync/mm.srt",
+    }
+
+    key = hf_router._hf_sync_saved_target_subtitle_artifact(
+        "hf-empty-sync",
+        task,
+        "1\n00:00:00,000 --> 00:00:02,000\n\n",
+    )
+
+    assert key is None
+    assert task["mm_srt_path"] == "deliver/tasks/hf-empty-sync/mm.srt"
+
+
 def test_subtitle_lane_marks_preserved_source_audio_parse_as_helper_only(monkeypatch):
     store = {
         "deliver/tasks/hf-preserve-source/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\nlyric source line\n",

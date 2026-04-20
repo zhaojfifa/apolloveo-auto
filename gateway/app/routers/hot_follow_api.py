@@ -135,6 +135,7 @@ from gateway.app.services.hot_follow_language_profiles import (
 )
 from gateway.app.services.hot_follow_subtitle_currentness import (
     compute_hot_follow_target_subtitle_currentness,
+    has_semantic_target_subtitle_text,
 )
 from gateway.app.services.hot_follow_helper_translation import (
     helper_translate_failure_updates,
@@ -547,6 +548,8 @@ def _hf_subtitle_content_hash(text: str | None) -> str | None:
 
 def _hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text: str | None = None) -> str | None:
     text = str(saved_text if saved_text is not None else _hf_load_subtitles_text(task_id, task) or "")
+    if not has_semantic_target_subtitle_text(text):
+        return None
     desired_hash = _hf_subtitle_content_hash(text)
     target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     current_key = _hf_task_target_subtitle_key(task, target_lang) or _task_key(task, "mm_srt_path")
@@ -688,7 +691,7 @@ def _hf_load_normalized_source_text(task_id: str, task: dict) -> str:
 
 def _hf_dub_input_text(task_id: str, task: dict) -> str:
     edited = _hf_load_subtitles_text(task_id, task)
-    if str(edited or "").strip():
+    if has_semantic_target_subtitle_text(edited):
         return edited
     return ""
 
@@ -707,7 +710,8 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         if composed_key
         else (_hf_expected_subtitle_filename(target_lang) if expected_key else None)
     )
-    subtitle_artifact_exists = bool(expected_key and object_exists(str(expected_key)))
+    subtitle_artifact_physical_exists = bool(expected_key and object_exists(str(expected_key)))
+    subtitle_artifact_exists = bool(subtitle_artifact_physical_exists and has_semantic_target_subtitle_text(edited_text))
     target_currentness = _hf_target_subtitle_currentness_state(
         task,
         target_lang=target_lang,
@@ -2002,6 +2006,14 @@ def patch_hot_follow_subtitles(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     text, text_mode = _hf_normalize_subtitles_save_text(task, payload.srt_text or "")
+    if not has_semantic_target_subtitle_text(text):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "reason": "target_subtitle_semantically_empty",
+                "message": "目标字幕内容为空或只有时间轴，未保存为权威目标字幕。请填写目标语言字幕正文后再保存。",
+            },
+        )
     # Phase 0.2: compute content hash for revision consistency
     _subtitle_content_hash = _hf_subtitle_content_hash(text)
     override_path = _hf_subtitles_override_path(task_id)

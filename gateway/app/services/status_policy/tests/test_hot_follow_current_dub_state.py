@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from datetime import datetime, timezone
 
 import pytest
+from fastapi import HTTPException
 from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[5]))
@@ -1170,6 +1171,45 @@ def test_patch_hot_follow_subtitles_syncs_saved_text_to_canonical_mm_srt(monkeyp
     assert repo.task["target_subtitle_current"] is True
     assert repo.task["compose_status"] == "pending"
     assert result["subtitles"]["srt_text"].strip().endswith("မင်္ဂလာပါ")
+
+
+def test_patch_hot_follow_subtitles_rejects_semantically_empty_srt_without_replacing_truth(monkeypatch, tmp_path):
+    class _Repo:
+        def __init__(self):
+            self.task = {
+                "task_id": "hf-empty-save",
+                "kind": "hot_follow",
+                "target_lang": "my",
+                "mm_srt_path": "deliver/tasks/hf-empty-save/mm.srt",
+                "target_subtitle_current": True,
+                "target_subtitle_current_reason": "ready",
+                "subtitle_helper_status": "failed",
+                "subtitle_helper_error_reason": "helper_translate_provider_exhausted",
+            }
+
+        def get(self, task_id):
+            assert task_id == "hf-empty-save"
+            return dict(self.task)
+
+    repo = _Repo()
+    override_path = tmp_path / "hf-empty-save" / "override.srt"
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: override_path)
+    monkeypatch.setattr(hf_router, "_policy_upsert", lambda *_args, **_kwargs: pytest.fail("invalid subtitle save must not write task truth"))
+    monkeypatch.setattr(hf_router, "upload_task_artifact", lambda *_args, **_kwargs: pytest.fail("invalid subtitle save must not upload artifact truth"))
+
+    payload = hf_router.HotFollowSubtitlesRequest(
+        srt_text="1\n00:00:00,000 --> 00:00:02,000\n\n"
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        hf_router.patch_hot_follow_subtitles("hf-empty-save", payload, repo=repo)
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail["reason"] == "target_subtitle_semantically_empty"
+    assert override_path.exists() is False
+    assert repo.task["mm_srt_path"] == "deliver/tasks/hf-empty-save/mm.srt"
+    assert repo.task["target_subtitle_current"] is True
+    assert repo.task["subtitle_helper_status"] == "failed"
 
 
 def test_patch_hot_follow_source_url_updates_workbench_metadata(monkeypatch):

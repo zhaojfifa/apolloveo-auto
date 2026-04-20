@@ -1,5 +1,6 @@
 from gateway.app.services.hot_follow_subtitle_currentness import (
     compute_hot_follow_target_subtitle_currentness,
+    has_semantic_target_subtitle_text,
 )
 
 
@@ -44,6 +45,17 @@ def test_myanmar_valid_authoritative_target_subtitle_is_current():
     assert state["target_subtitle_current"] is True
     assert state["target_subtitle_current_reason"] == "ready"
     assert state["target_subtitle_authoritative_source"] is True
+
+
+def test_timing_only_srt_has_no_semantic_target_subtitle_text():
+    timing_only = "1\n00:00:00,000 --> 00:00:02,000\n\n"
+
+    assert has_semantic_target_subtitle_text(timing_only) is False
+
+    state = _currentness("my", timing_only)
+
+    assert state["target_subtitle_current"] is False
+    assert state["target_subtitle_current_reason"] == "target_subtitle_empty"
 
 
 def test_vietnamese_currentness_stays_strict_and_valid_target_still_passes():
