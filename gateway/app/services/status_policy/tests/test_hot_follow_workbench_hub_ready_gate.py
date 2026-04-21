@@ -1691,3 +1691,180 @@ def test_manual_subtitle_save_clears_helper_translate_failure(monkeypatch, tmp_p
     assert saved["dub_status"] == "pending"
     assert "no_dub" not in saved["pipeline_config"]
     assert "dub_skip_reason" not in saved["pipeline_config"]
+
+
+def test_workbench_hub_projects_raw_parse_translation_as_subtitle_ready_with_pending_dub(monkeypatch):
+    task_id = "hf-workbench-raw-parse-translate-01"
+    repo = _Repo()
+    origin_key = f"deliver/tasks/{task_id}/origin.srt"
+    target_key = f"deliver/tasks/{task_id}/vi.srt"
+    store = {
+        origin_key: b"1\n00:00:00,000 --> 00:00:02,000\n\xe4\xbd\xa0\xe5\xa5\xbd\n",
+        target_key: b"1\n00:00:00,000 --> 00:00:02,000\nXin chao\n",
+    }
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "target_lang": "vi",
+            "content_lang": "vi",
+            "origin_srt_path": origin_key,
+            "mm_srt_path": target_key,
+            "subtitles_status": "ready",
+            "target_subtitle_current": True,
+            "target_subtitle_current_reason": "ready",
+            "dub_status": "pending",
+            "compose_status": "pending",
+            "pipeline_config": {
+                "parse_source_mode": "raw_video_audio",
+                "parse_source_role": "subtitle_source_helper",
+                "parse_source_authoritative_for_target": "true",
+                "target_subtitle_authoritative": "true",
+                "translation_incomplete": "false",
+            },
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "compose_not_done",
+            "final": {"exists": False},
+            "historical_final": {"exists": False},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": False,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": False,
+            "audio_ready_reason": "dub_not_done",
+            "dub_current": False,
+            "dub_current_reason": "dub_not_done",
+            "resolved_voice": "vi-VN-HoaiMyNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "vi_female_1",
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda current_task_id: Path("/tmp") / current_task_id / "override.srt")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    subtitles = data.get("subtitles") or {}
+    assert subtitles.get("target_subtitle_current") is True
+    assert subtitles.get("target_subtitle_current_reason") == "ready"
+    assert subtitles.get("subtitle_ready") is True
+
+    ready_gate = data.get("ready_gate") or {}
+    assert ready_gate.get("subtitle_ready") is True
+    assert ready_gate.get("publish_ready") is False
+
+    dub_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "dub"), {})
+    assert dub_step.get("status") == "pending"
+    assert ((data.get("current_attempt") or {}).get("audio_ready")) is False
+    assert ((data.get("current_attempt") or {}).get("subtitle_ready")) is True
+
+
+def test_workbench_hub_projects_helper_saved_target_subtitle_as_ready_and_recovers_dub(monkeypatch):
+    task_id = "hf-workbench-helper-save-recovery-01"
+    repo = _Repo()
+    target_key = f"deliver/tasks/{task_id}/vi.srt"
+    store = {
+        target_key: b"1\n00:00:00,000 --> 00:00:02,000\nXin chao\n",
+    }
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "target_lang": "vi",
+            "content_lang": "vi",
+            "mm_srt_path": target_key,
+            "subtitles_status": "ready",
+            "target_subtitle_current": True,
+            "target_subtitle_current_reason": "ready",
+            "subtitle_helper_status": "resolved",
+            "dub_status": "pending",
+            "compose_status": "pending",
+            "pipeline_config": {},
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "compose_not_done",
+            "final": {"exists": False},
+            "historical_final": {"exists": False},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": False,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": False,
+            "audio_ready_reason": "dub_not_done",
+            "dub_current": False,
+            "dub_current_reason": "dub_not_done",
+            "resolved_voice": "vi-VN-HoaiMyNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "vi_female_1",
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda current_task_id: Path("/tmp") / current_task_id / "override.srt")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    subtitles = data.get("subtitles") or {}
+    assert subtitles.get("target_subtitle_current") is True
+    assert subtitles.get("subtitle_ready") is True
+
+    ready_gate = data.get("ready_gate") or {}
+    assert ready_gate.get("subtitle_ready") is True
+
+    dub_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "dub"), {})
+    assert dub_step.get("status") == "pending"
+    assert ((data.get("operator_summary") or {}).get("recommended_next_action")) != ""
