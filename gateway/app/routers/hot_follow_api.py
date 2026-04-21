@@ -437,7 +437,9 @@ def _hf_save_authoritative_target_subtitle(
 
 
 def _hf_translate_source_subtitle_lane(task_id: str, task: dict, *, target_lang: str, repo) -> tuple[str, dict]:
-    source_text = _hf_load_origin_subtitles_text(task).strip()
+    normalized_source_text = _hf_load_normalized_source_text(task_id, task).strip()
+    origin_source_text = _hf_load_origin_subtitles_text(task).strip()
+    source_text = normalized_source_text if "-->" in normalized_source_text else origin_source_text
     if not source_text:
         raise HTTPException(
             status_code=400,
