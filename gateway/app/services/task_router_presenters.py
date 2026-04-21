@@ -89,6 +89,18 @@ def _bind_hot_follow_projection(task: dict[str, Any]) -> dict[str, Any]:
         return {}
 
 
+def _project_hot_follow_compose_status(record: dict[str, Any], payload: dict[str, Any]) -> None:
+    compose_status = str(payload.get("compose_status") or "").strip().lower()
+    if not compose_status and bool(payload.get("composed_ready")):
+        compose_status = "done"
+    if compose_status:
+        record["compose_status"] = compose_status
+    compose_last = _as_dict(_as_dict(payload.get("compose")).get("last"))
+    compose_last_status = str(compose_last.get("status") or compose_status or "").strip().lower()
+    if compose_last_status:
+        record["compose_last_status"] = compose_last_status
+
+
 def filter_tasks_for_kind(items: list[dict[str, Any]], kind_norm: str) -> list[dict[str, Any]]:
     kind_value = str(kind_norm or "").strip().lower()
     if not kind_value:
@@ -166,8 +178,7 @@ def build_tasks_page_rows(
             row["final_url"] = payload.get("final_url") or row["final_url"] or final_payload.get("url")
             row["final_video_url"] = payload.get("final_video_url") or row["final_video_url"] or final_payload.get("url")
             row["final_video_key"] = row["final_video_key"] or final_payload.get("key")
-            if bool(payload.get("composed_ready")) and not str(row["compose_status"] or "").strip():
-                row["compose_status"] = "done"
+            _project_hot_follow_compose_status(row, payload)
         rows.append(row)
     return rows
 
@@ -259,8 +270,7 @@ def build_task_summaries_page(
             bound_task["final_url"] = payload.get("final_url") or bound_task.get("final_url") or final_payload.get("url")
             bound_task["final_video_url"] = payload.get("final_video_url") or bound_task.get("final_video_url") or final_payload.get("url")
             bound_task["final_video_key"] = bound_task.get("final_video_key") or final_payload.get("key")
-            if bool(payload.get("composed_ready")) and not str(bound_task.get("compose_status") or "").strip():
-                bound_task["compose_status"] = "done"
+            _project_hot_follow_compose_status(bound_task, payload)
         download_paths = resolve_download_urls(bound_task)
         pack_path = download_paths.get("pack_path")
         scenes_path = download_paths.get("scenes_path")

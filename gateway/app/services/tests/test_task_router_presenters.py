@@ -354,6 +354,88 @@ def test_build_task_summaries_page_bind_hot_follow_status_to_computed_ready_gate
     assert summaries[0].status == "ready"
 
 
+def test_build_tasks_page_rows_bind_hot_follow_blocked_compose_projection(monkeypatch):
+    monkeypatch.setattr(
+        presenters,
+        "compute_hot_follow_state",
+        lambda _task, base_state: {
+            **dict(base_state or {}),
+            "ready_gate": {"compose_ready": False, "compose_blocked": True},
+            "compose_status": "blocked",
+            "compose": {"last": {"status": "blocked"}},
+            "composed_ready": False,
+            "final": {"exists": False, "url": None},
+        },
+    )
+
+    rows = build_tasks_page_rows(
+        [
+            {
+                "task_id": "hf-blocked-board",
+                "kind": "hot_follow",
+                "platform": "hot_follow",
+                "category_key": "hot_follow",
+                "content_lang": "vi",
+                "status": "processing",
+                "compose_status": "pending",
+                "compose_last_status": "pending",
+                "created_at": "2026-03-31T00:00:00+00:00",
+            }
+        ],
+        kind_norm="hot_follow",
+        pack_path_for_list=lambda _task: None,
+        normalize_selected_tool_ids=lambda value: list(value or []),
+    )
+
+    assert rows[0]["compose_status"] == "blocked"
+    assert rows[0]["compose_last_status"] == "blocked"
+
+
+def test_build_task_summaries_page_bind_hot_follow_failed_compose_projection(monkeypatch):
+    monkeypatch.setattr(
+        presenters,
+        "compute_hot_follow_state",
+        lambda _task, base_state: {
+            **dict(base_state or {}),
+            "ready_gate": {"compose_ready": False, "compose_exec_failed_terminal": True},
+            "compose_status": "failed",
+            "compose": {"last": {"status": "failed"}},
+            "composed_ready": False,
+            "final": {"exists": False, "url": None},
+        },
+    )
+
+    summaries, total = build_task_summaries_page(
+        [
+            {
+                "task_id": "hf-summary-failed",
+                "title": "task",
+                "kind": "hot_follow",
+                "platform": "hot_follow",
+                "category_key": "hot_follow",
+                "content_lang": "vi",
+                "status": "processing",
+                "compose_status": "pending",
+                "compose_last_status": "pending",
+                "created_at": "2026-03-31T00:00:00+00:00",
+            }
+        ],
+        kind_norm="hot_follow",
+        page=1,
+        page_size=20,
+        resolve_download_urls=lambda _task: {"pack_path": None, "scenes_path": None},
+        derive_status=derive_status,
+        extract_first_http_url=lambda text: "https://example.com/source" if text else None,
+        coerce_datetime=lambda value: datetime.fromisoformat(str(value).replace("Z", "+00:00")) if value else None,
+        parse_pipeline_config=lambda value: dict(value or {}),
+        normalize_selected_tool_ids=lambda value: list(value or []),
+        task_summary_cls=_Detail,
+    )
+
+    assert total == 1
+    assert summaries[0].status == "failed"
+
+
 def test_build_task_summaries_page_keeps_vi_processing_when_final_exists_but_target_subtitle_is_stale():
     summaries, total = build_task_summaries_page(
         [
