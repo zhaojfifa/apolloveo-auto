@@ -457,8 +457,10 @@ def build_hot_follow_current_attempt_summary(
     return {
         "dub_status": dub_status_norm,
         "subtitle_ready": subtitle_ready,
+        "subtitle_exists": bool(artifacts.get("subtitle_exists")),
         "audio_ready": audio_ready,
         "audio_ready_reason": str(voice_state.get("audio_ready_reason") or "").strip() or "unknown",
+        "audio_exists": bool(artifacts.get("audio_exists")),
         "dub_current": bool(voice_state.get("dub_current")),
         "dub_current_reason": str(voice_state.get("dub_current_reason") or "").strip() or "unknown",
         "requested_voice": str(voice_state.get("requested_voice") or "").strip() or None,

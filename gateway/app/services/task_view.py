@@ -575,6 +575,21 @@ def hf_operator_summary(
     )
 
 
+def _sync_hot_follow_advisory_projection(payload: dict[str, Any]) -> None:
+    ready_gate = payload.get("ready_gate") if isinstance(payload.get("ready_gate"), dict) else {}
+    artifact_facts = payload.get("artifact_facts") if isinstance(payload.get("artifact_facts"), dict) else {}
+    current_attempt = payload.get("current_attempt") if isinstance(payload.get("current_attempt"), dict) else None
+    operator_summary = payload.get("operator_summary") if isinstance(payload.get("operator_summary"), dict) else None
+
+    if current_attempt:
+        current_attempt["blocking"] = list(ready_gate.get("blocking") or [])
+        current_attempt["subtitle_exists"] = bool(artifact_facts.get("subtitle_exists"))
+        current_attempt["audio_exists"] = bool(artifact_facts.get("audio_exists"))
+
+    if operator_summary:
+        operator_summary["publish_ready"] = bool(ready_gate.get("publish_ready"))
+
+
 def hf_safe_presentation_aggregates(
     task_id: str,
     task: dict,
@@ -895,6 +910,7 @@ def build_hot_follow_workbench_hub(
         or ""
     ).strip()
     apply_ready_gate_composed_projection(payload, final_url=final_url)
+    _sync_hot_follow_advisory_projection(payload)
     payload["line"] = line_binding_loader(task).to_payload()
     advisory = maybe_build_hot_follow_advisory(task, payload)
     if advisory is not None:

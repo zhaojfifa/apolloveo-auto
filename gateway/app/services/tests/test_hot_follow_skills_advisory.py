@@ -850,6 +850,10 @@ def test_hot_follow_advisory_result_attaches_to_workbench_payload(monkeypatch):
     assert "artifact_facts" in captured
     assert "current_attempt" in captured
     assert "operator_summary" in captured
+    assert captured["current_attempt"]["blocking"] == ["compose_not_done"]
+    assert captured["current_attempt"]["audio_exists"] is False
+    assert captured["current_attempt"]["subtitle_exists"] is False
+    assert captured["operator_summary"]["publish_ready"] is False
     assert data.get("advisory") == {
         "id": "hf_advisory_v0",
         "kind": "operator_guidance",

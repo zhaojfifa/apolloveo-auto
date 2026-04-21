@@ -513,7 +513,7 @@ def _set_compose_pipeline_status(
                 if status == "done":
                     step["error"] = None
                     step["message"] = step.get("message") or "final video merge"
-                elif error:
+                else:
                     step["error"] = error
 
     pipeline_legacy = payload.get("pipeline_legacy")
@@ -523,7 +523,7 @@ def _set_compose_pipeline_status(
             compose_legacy["status"] = status
             if status == "done":
                 compose_legacy["error"] = None
-            elif error:
+            else:
                 compose_legacy["error"] = error
 
     compose = payload.get("compose")
@@ -533,7 +533,7 @@ def _set_compose_pipeline_status(
             last["status"] = status
             if status == "done":
                 last["error"] = None
-            elif error:
+            else:
                 last["error"] = error
 
     deliverables = payload.get("deliverables")
