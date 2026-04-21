@@ -540,6 +540,51 @@ def test_hot_follow_advisory_legal_no_tts_route_beats_refresh_dub():
     assert advisory["recommended_next_action"] == "compose_no_tts"
 
 
+def test_hot_follow_advisory_prefers_current_attempt_route_over_ready_gate_route():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-attempt-route-priority", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": False,
+                "audio_ready_reason": "audio_missing",
+                "compose_allowed": True,
+                "compose_ready": False,
+                "publish_ready": False,
+                "no_tts_compose_allowed": True,
+                "no_dub_compose_allowed": True,
+                "selected_compose_route": "no_tts_compose_route",
+                "no_dub_reason": "compose_no_tts",
+                "blocking": ["compose_not_done"],
+            },
+            artifact_facts={
+                "final_exists": False,
+                "audio_exists": False,
+                "subtitle_exists": True,
+            },
+            current_attempt={
+                "subtitle_ready": True,
+                "audio_ready": False,
+                "audio_ready_reason": "audio_missing",
+                "compose_allowed": False,
+                "compose_route_allowed": False,
+                "compose_input_ready": True,
+                "compose_execute_allowed": False,
+                "selected_compose_route": "tts_replace_route",
+                "no_tts_compose_allowed": False,
+                "no_dub_compose_allowed": False,
+                "no_dub_route_terminal": False,
+                "compose_status": "pending",
+                "requires_recompose": False,
+                "current_subtitle_source": "mm.srt",
+            },
+        ),
+    )
+
+    assert advisory["id"] == "hf_advisory_refresh_dub"
+    assert advisory["recommended_next_action"] == "refresh_dub"
+
+
 def test_hot_follow_advisory_prefers_compose_input_fix_over_recompose():
     advisory = skills_advisory.maybe_build_hot_follow_advisory(
         {"task_id": "hf-compose-input-fix", "kind": "hot_follow"},
@@ -579,6 +624,50 @@ def test_hot_follow_advisory_prefers_compose_input_fix_over_recompose():
     )
 
     assert advisory["recommended_next_action"] == "retry_after_compose_input_fix"
+
+
+def test_hot_follow_advisory_uses_current_attempt_compose_input_details_before_ready_gate_copy():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-compose-input-attempt-priority", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": True,
+                "compose_ready": False,
+                "publish_ready": False,
+                "compose_allowed": True,
+                "compose_route_allowed": True,
+                "compose_input_ready": True,
+                "compose_execute_allowed": True,
+                "compose_input_mode": "direct",
+                "compose_input_reason": "ready",
+                "blocking": ["compose_not_done"],
+            },
+            artifact_facts={
+                "final_exists": False,
+                "audio_exists": True,
+                "subtitle_exists": True,
+            },
+            current_attempt={
+                "subtitle_ready": True,
+                "audio_ready": True,
+                "compose_status": "failed",
+                "compose_allowed": True,
+                "compose_route_allowed": True,
+                "compose_input_ready": False,
+                "compose_input_mode": "derive_failed",
+                "compose_input_reason": "derive_not_encoder_safe",
+                "compose_execute_allowed": False,
+                "compose_input_derive_failed_terminal": True,
+                "compose_reason": "derive_not_encoder_safe",
+                "requires_recompose": False,
+            },
+        ),
+    )
+
+    assert advisory["id"] == "hf_advisory_compose_input_unready"
+    assert advisory["recommended_next_action"] == "retry_after_compose_input_fix"
+    assert advisory["explanation"] == "当前合成线路可用，但合成输入未就绪：derive_not_encoder_safe。请先修复合成输入后再重试。"
     assert advisory["id"] == "hf_advisory_compose_input_unready"
 
 

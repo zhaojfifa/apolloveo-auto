@@ -472,6 +472,8 @@ def build_hot_follow_current_attempt_summary(
         "compose_allowed": route_allowed,
         "compose_route_allowed": route_allowed,
         "compose_input_ready": compose_input_ready,
+        "compose_input_mode": compose_input_mode or None,
+        "compose_input_reason": compose_input_reason or None,
         "compose_execute_allowed": compose_execute_allowed,
         "no_tts_compose_allowed": bool(no_tts_route and route_allowed),
         "no_dub_compose_allowed": bool(no_tts_route and route_allowed),
