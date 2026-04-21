@@ -472,11 +472,21 @@ def apply_ready_gate_composed_projection(payload: dict[str, Any], *, final_url: 
         payload["composed_ready"] = False
         payload["composed_reason"] = reason
         return
-    if bool(ready_gate.get("compose_input_derive_failed_terminal")) or bool(ready_gate.get("compose_exec_failed_terminal")):
+    if bool(ready_gate.get("compose_input_derive_failed_terminal")):
         reason = str(
             ready_gate.get("compose_input_reason")
             or ready_gate.get("compose_reason")
-            or "compose_failed"
+            or "compose_input_derive_failed"
+        ).strip()
+        _set_compose_pipeline_status(payload, "failed", final_url=None, error=reason)
+        payload["composed_ready"] = False
+        payload["composed_reason"] = reason
+        return
+    if bool(ready_gate.get("compose_exec_failed_terminal")):
+        reason = str(
+            ready_gate.get("compose_reason")
+            or ready_gate.get("compose_input_reason")
+            or "compose_exec_failed"
         ).strip()
         _set_compose_pipeline_status(payload, "failed", final_url=None, error=reason)
         payload["composed_ready"] = False

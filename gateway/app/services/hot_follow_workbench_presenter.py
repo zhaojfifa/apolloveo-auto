@@ -71,10 +71,12 @@ def build_hot_follow_operator_summary(
     dub_status = str(current_attempt.get("dub_status") or "").strip().lower()
     compose_status = str(current_attempt.get("compose_status") or "").strip().lower()
     current_attempt_failed = dub_status in {"failed", "error"} or compose_status in {"failed", "error"}
+    no_tts_terminal = bool(current_attempt.get("no_dub_route_terminal"))
     show_previous_final_as_primary = bool(
         last_successful_output_available
         and not bool(current_attempt.get("audio_ready"))
-        and not no_dub
+        and not no_tts_terminal
+        and not bool(current_attempt.get("no_tts_compose_allowed"))
     )
     if current_attempt.get("helper_translate_failed"):
         recommended_next_action = current_attempt.get("helper_translate_error_message") or "翻译助手暂时失败，请稍后重试；也可以手动编辑目标字幕并保存后继续配音。"
@@ -82,12 +84,10 @@ def build_hot_follow_operator_summary(
         recommended_next_action = f"当前合成输入派生失败：{current_attempt.get('compose_reason') or 'compose_input_derive_failed'}。请先修复素材或转码配置后再重试合成。"
     elif current_attempt.get("compose_blocked_terminal") or current_attempt.get("compose_input_blocked_terminal"):
         recommended_next_action = f"当前合成输入已被线路策略阻断：{current_attempt.get('compose_reason') or 'compose_input_blocked'}。请调整素材后再尝试合成。"
-    elif current_attempt.get("no_dub_route_terminal"):
+    elif no_tts_terminal:
         recommended_next_action = "当前素材已进入无 TTS 合成路径，可继续合成保留原音或背景音版本。"
-    elif no_dub and not subtitle_ready:
+    elif current_attempt.get("subtitle_empty_terminal") or current_attempt.get("subtitle_terminal_state") == "subtitle_empty_terminal":
         recommended_next_action = "当前素材无可提取字幕，正在等待自动检测完成；也可直接在下方字幕编辑区手工输入缅语文字，保存后即可合成字幕版。"
-    elif no_dub:
-        recommended_next_action = "当前素材适合字幕驱动路径，可先保存字幕并直接合成字幕版。"
     elif current_attempt.get("requires_redub"):
         recommended_next_action = "当前目标字幕已更新，需重新配音后才能继续合成最新成片。"
     elif current_attempt.get("requires_recompose"):

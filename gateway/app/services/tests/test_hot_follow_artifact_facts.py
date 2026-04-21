@@ -389,3 +389,20 @@ def test_operator_summary_projects_terminal_blocked_and_no_dub_attempts():
 
     assert "bitrate_too_high" in blocked["recommended_next_action"]
     assert "无 TTS 合成路径" in no_dub["recommended_next_action"]
+
+
+def test_operator_summary_does_not_recompute_no_dub_from_raw_flags():
+    summary = build_hot_follow_operator_summary(
+        artifact_facts={"final_exists": False},
+        current_attempt={
+            "dub_status": "pending",
+            "compose_status": "pending",
+            "audio_ready": False,
+        },
+        no_dub=True,
+        subtitle_ready=False,
+    )
+
+    assert "无 TTS 合成路径" not in summary["recommended_next_action"]
+    assert "无可提取字幕" not in summary["recommended_next_action"]
+    assert summary["recommended_next_action"] == "当前尚无可用成片，请先确保字幕和配音链路完成后再合成。"
