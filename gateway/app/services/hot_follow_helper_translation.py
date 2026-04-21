@@ -37,22 +37,41 @@ def sanitize_helper_translate_error(exc: BaseException | str) -> dict[str, Any]:
     }
 
 
-def helper_translate_failure_updates(error: dict[str, Any]) -> dict[str, Any]:
-    return {
+def helper_translate_failure_updates(
+    error: dict[str, Any],
+    *,
+    input_text: str | None = None,
+    target_lang: str | None = None,
+) -> dict[str, Any]:
+    updates = {
         "subtitle_helper_status": "failed",
         "subtitle_helper_error_reason": error.get("reason") or "helper_translate_failed",
         "subtitle_helper_error_message": error.get("message") or "翻译助手暂时失败，请稍后重试。",
         "subtitle_helper_provider": error.get("provider") or "gemini",
         "subtitle_helper_failed_at": datetime.now(timezone.utc).isoformat(),
     }
+    if input_text is not None:
+        updates["subtitle_helper_input_text"] = str(input_text or "")
+    if target_lang is not None:
+        updates["subtitle_helper_target_lang"] = str(target_lang or "")
+    return updates
 
 
-def helper_translate_success_updates() -> dict[str, Any]:
+def helper_translate_success_updates(
+    *,
+    input_text: str | None = None,
+    translated_text: str | None = None,
+    target_lang: str | None = None,
+) -> dict[str, Any]:
     return {
         "subtitle_helper_status": "ready",
         "subtitle_helper_error_reason": None,
         "subtitle_helper_error_message": None,
         "subtitle_helper_provider": "gemini",
+        "subtitle_helper_input_text": str(input_text or ""),
+        "subtitle_helper_translated_text": str(translated_text or ""),
+        "subtitle_helper_target_lang": str(target_lang or ""),
+        "subtitle_helper_updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 

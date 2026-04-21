@@ -2184,9 +2184,25 @@ def translate_hot_follow_subtitles(
             translated_text = _hf_translate_plain_lines(source_text, target_lang=target_lang)
     except GeminiSubtitlesError as exc:
         detail = sanitize_helper_translate_error(exc)
-        _policy_upsert(repo, task_id, helper_translate_failure_updates(detail))
+        _policy_upsert(
+            repo,
+            task_id,
+            helper_translate_failure_updates(
+                detail,
+                input_text=source_text,
+                target_lang=target_lang,
+            ),
+        )
         raise HTTPException(status_code=409, detail=detail) from exc
-    _policy_upsert(repo, task_id, helper_translate_success_updates())
+    _policy_upsert(
+        repo,
+        task_id,
+        helper_translate_success_updates(
+            input_text=source_text,
+            translated_text=translated_text,
+            target_lang=target_lang,
+        ),
+    )
     return {
         "task_id": task_id,
         "target_lang": public_target_lang(target_lang),
