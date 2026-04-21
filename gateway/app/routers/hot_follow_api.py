@@ -436,10 +436,24 @@ def _hf_save_authoritative_target_subtitle(
     return repo.get(task_id) or task
 
 
-def _hf_translate_source_subtitle_lane(task_id: str, task: dict, *, target_lang: str, repo) -> tuple[str, dict]:
+def _hf_translate_source_subtitle_lane(
+    task_id: str,
+    task: dict,
+    *,
+    target_lang: str,
+    repo,
+    source_text_hint: str | None = None,
+) -> tuple[str, dict]:
     normalized_source_text = _hf_load_normalized_source_text(task_id, task).strip()
     origin_source_text = _hf_load_origin_subtitles_text(task).strip()
-    source_text = normalized_source_text if "-->" in normalized_source_text else origin_source_text
+    hinted_source_text = str(source_text_hint or "").strip()
+    source_text = ""
+    for candidate in (normalized_source_text, origin_source_text, hinted_source_text):
+        if "-->" in candidate:
+            source_text = candidate
+            break
+    if not source_text:
+        source_text = normalized_source_text or origin_source_text or hinted_source_text
     if not source_text:
         raise HTTPException(
             status_code=400,
@@ -448,28 +462,24 @@ def _hf_translate_source_subtitle_lane(task_id: str, task: dict, *, target_lang:
                 "message": "来源字幕为空，无法执行完整字幕翻译。",
             },
         )
-    if "-->" not in source_text:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "reason": "source_subtitle_lane_not_srt",
-                "message": "来源字幕不是 SRT，无法保留时间轴执行完整字幕翻译。",
-            },
-        )
-    segments = _parse_srt_to_segments(source_text)
-    if not segments:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "reason": "source_subtitle_lane_invalid_srt",
-                "message": "来源字幕 SRT 无法解析，未写入目标字幕。",
-            },
-        )
-    translations = translate_segments_with_gemini(segments=segments, target_lang=target_lang)
-    for seg in segments:
-        idx = int(seg.get("index") or 0)
-        seg[target_lang] = str(translations.get(idx) or seg.get("origin") or "").strip()
-    translated_text = segments_to_srt(segments, target_lang)
+    if "-->" in source_text:
+        segments = _parse_srt_to_segments(source_text)
+        if not segments:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "reason": "source_subtitle_lane_invalid_srt",
+                    "message": "来源字幕 SRT 无法解析，未写入目标字幕。",
+                },
+            )
+        translations = translate_segments_with_gemini(segments=segments, target_lang=target_lang)
+        for seg in segments:
+            idx = int(seg.get("index") or 0)
+            seg[target_lang] = str(translations.get(idx) or seg.get("origin") or "").strip()
+        translated_text = segments_to_srt(segments, target_lang)
+    else:
+        translated_plain_text = _hf_translate_plain_lines(source_text, target_lang=target_lang)
+        translated_text, _ = _hf_normalize_subtitles_save_text(task, translated_plain_text)
     saved_task = _hf_save_authoritative_target_subtitle(
         task_id,
         task,
@@ -2150,6 +2160,7 @@ def translate_hot_follow_subtitles(
                 task,
                 target_lang=target_lang,
                 repo=repo,
+                source_text_hint=payload.text,
             )
         except GeminiSubtitlesError as exc:
             detail = sanitize_helper_translate_error(exc)

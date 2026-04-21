@@ -1957,7 +1957,7 @@
         if (!sourceText) throw new Error("当前没有可用的来源字幕，请先完成解析或检查来源字幕。");
         translateMmBtn.disabled = true;
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = `正在翻译为${currentTargetProfile().displayName}...`;
-        const data = await translateCurrentSubtitles({ input_source: "source_subtitle_lane" });
+        const data = await translateCurrentSubtitles({ text: sourceText, input_source: "source_subtitle_lane" });
         applyTranslatedTextToTargetEditor(
           String(data.translated_text || ""),
           "来源字幕已翻译并写入目标字幕主对象。",
