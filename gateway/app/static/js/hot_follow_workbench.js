@@ -1461,11 +1461,16 @@
     return String((err && err.message) || fallback || "").trim() || fallback;
   }
 
-  async function translateCurrentSubtitles(text) {
+  async function translateCurrentSubtitles(options) {
+    const source = options && typeof options === "object" ? options : { text: options || "" };
     const res = await fetch(`/api/hot_follow/tasks/${encodeURIComponent(taskId)}/translate_subtitles`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text || "", target_lang: currentTargetProfile().targetLang }),
+      body: JSON.stringify({
+        text: source.text || "",
+        target_lang: currentTargetProfile().targetLang,
+        input_source: source.input_source || "helper_only_text",
+      }),
     });
     const payload = await readApiResponseBody(res);
     if (!res.ok) {
@@ -1945,19 +1950,20 @@
     translateMmBtn.addEventListener("click", async (e) => {
       e.preventDefault();
       try {
-        const assistedText = assistedInputTextEl ? String(assistedInputTextEl.value || "").trim() : "";
-        const targetText = subtitlesTextEl ? String(subtitlesTextEl.value || "").trim() : "";
-        const text = assistedText || targetText;
-        if (!text) throw new Error("请先在辅助输入区或当前编辑区输入中文文本。");
+        const subtitles = (currentHub && currentHub.subtitles) || {};
+        const sourceText = String(
+          subtitles.normalized_source_text || subtitles.raw_source_text || subtitles.origin_text || subtitles.parse_source_text || ""
+        ).trim();
+        if (!sourceText) throw new Error("当前没有可用的来源字幕，请先完成解析或检查来源字幕。");
         translateMmBtn.disabled = true;
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = `正在翻译为${currentTargetProfile().displayName}...`;
-        const data = await translateCurrentSubtitles(text);
+        const data = await translateCurrentSubtitles({ input_source: "source_subtitle_lane" });
         applyTranslatedTextToTargetEditor(
           String(data.translated_text || ""),
-          assistedText
-            ? "辅助输入已翻译并写入目标字幕区，请检查后保存字幕。"
-            : "翻译结果已回写当前编辑区，请检查后保存字幕。",
+          "来源字幕已翻译并写入目标字幕主对象。",
         );
+        subtitleDirty = false;
+        await loadHub();
       } catch (err) {
         const message = readableErrorMessage(err, "translate failed");
         if (subtitlesMsgEl) subtitlesMsgEl.textContent = message;
@@ -1983,7 +1989,7 @@
         if (!text) throw new Error("请先在辅助输入区填写原文或候选文本。");
         assistedTranslateBtn.disabled = true;
         if (assistedInputMsgEl) assistedInputMsgEl.textContent = "正在翻译并写入目标字幕区...";
-        const data = await translateCurrentSubtitles(text);
+        const data = await translateCurrentSubtitles({ text, input_source: "helper_only_text" });
         applyTranslatedTextToTargetEditor(String(data.translated_text || ""), "辅助输入已翻译并写入目标字幕区，请检查后保存字幕。");
         if (assistedInputMsgEl) assistedInputMsgEl.textContent = "辅助输入翻译完成。";
       } catch (err) {

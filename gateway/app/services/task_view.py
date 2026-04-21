@@ -307,6 +307,8 @@ def hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
     raw_key = task_key(task, "raw_path")
     origin_key = task_key(task, "origin_srt_path")
     mm_key = task_key(task, "mm_srt_path")
+    subtitle_lane = hf_subtitle_lane_state(task_id, task)
+    target_subtitle_exists = bool(subtitle_lane.get("subtitle_artifact_exists"))
     audio_asset = hf_current_voiceover_asset(task_id, task, get_settings())
     audio_key = str(audio_asset.get("key") or "").strip() or None
     pack_key = task_key(task, "pack_key") or task_key(task, "pack_path")
@@ -362,9 +364,9 @@ def hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             "subtitle",
             profile.subtitle_filename,
             mm_key,
-            task_endpoint(task_id, "mm") if mm_key and object_exists(mm_key) else None,
-            signed_op_url(task_id, "mm_srt") if mm_key and object_exists(mm_key) else None,
-            hf_deliverable_state(task, mm_key, "subtitles_status"),
+            task_endpoint(task_id, "mm") if target_subtitle_exists and mm_key and object_exists(mm_key) else None,
+            signed_op_url(task_id, "mm_srt") if target_subtitle_exists and mm_key and object_exists(mm_key) else None,
+            "done" if target_subtitle_exists else hf_deliverable_state(task, None, "subtitles_status"),
         ),
         _entry(
             "audio",

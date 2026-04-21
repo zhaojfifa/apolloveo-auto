@@ -4,7 +4,7 @@ import re
 from typing import Iterable
 
 
-def _normalize_subtitle_compare_text(text: str | None) -> str:
+def normalize_subtitle_semantic_text(text: str | None) -> str:
     source = str(text or "")
     if not source:
         return ""
@@ -23,12 +23,16 @@ def _normalize_subtitle_compare_text(text: str | None) -> str:
     return "\n".join(lines).strip().lower()
 
 
+def has_semantic_target_subtitle_text(text: str | None) -> bool:
+    return bool(normalize_subtitle_semantic_text(text))
+
+
 def _matches_any_source(target_text: str | None, source_texts: Iterable[str | None]) -> bool:
-    normalized_target = _normalize_subtitle_compare_text(target_text)
+    normalized_target = normalize_subtitle_semantic_text(target_text)
     if not normalized_target:
         return False
     for source_text in source_texts:
-        normalized_source = _normalize_subtitle_compare_text(source_text)
+        normalized_source = normalize_subtitle_semantic_text(source_text)
         if normalized_source and normalized_source == normalized_target:
             return True
     return False
@@ -45,7 +49,7 @@ def compute_hot_follow_target_subtitle_currentness(
     translation_incomplete: bool = False,
     has_saved_revision: bool = False,
 ) -> dict[str, object]:
-    target_exists = bool(_normalize_subtitle_compare_text(target_text))
+    target_exists = has_semantic_target_subtitle_text(target_text)
     authoritative_source = bool(
         subtitle_artifact_exists
         and expected_subtitle_source

@@ -66,6 +66,21 @@ class _FakeStorage:
         return key
 
 
+class _Repo:
+    def __init__(self, row: dict):
+        self.row = dict(row)
+
+    def get(self, task_id):
+        if task_id != self.row.get("task_id"):
+            return None
+        return dict(self.row)
+
+    def upsert(self, task_id, fields):
+        assert task_id == self.row.get("task_id")
+        self.row.update(fields or {})
+        return dict(self.row)
+
+
 def test_sync_saved_target_subtitle_reuploads_when_existing_mm_srt_differs(monkeypatch, tmp_path):
     uploads: list[tuple[str, str]] = []
 
@@ -196,6 +211,207 @@ def test_subtitle_lane_keeps_target_editor_empty_when_only_origin_exists(monkeyp
     assert lane["dub_input_text"] == ""
     assert lane["dub_input_source"] is None
     assert lane["subtitle_ready"] is False
+
+
+def test_subtitle_lane_does_not_treat_timing_only_target_artifact_as_existing_truth(monkeypatch):
+    store = {
+        "deliver/tasks/hf-empty-target/mm.srt": b"1\n00:00:00,000 --> 00:00:02,000\n\n",
+    }
+
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+
+    lane = hf_router._hf_subtitle_lane_state(
+        "hf-empty-target",
+        {
+            "task_id": "hf-empty-target",
+            "target_lang": "my",
+            "mm_srt_path": "deliver/tasks/hf-empty-target/mm.srt",
+        },
+    )
+
+    assert lane["srt_text"] == ""
+    assert lane["primary_editable_text"] == ""
+    assert lane["subtitle_artifact_exists"] is False
+    assert lane["subtitle_ready"] is False
+    assert lane["target_subtitle_current"] is False
+    assert lane["target_subtitle_current_reason"] == "subtitle_missing"
+    assert lane["dub_input_text"] == ""
+
+
+def test_sync_saved_target_subtitle_artifact_refuses_semantically_empty_srt(monkeypatch):
+    monkeypatch.setattr(hf_router, "upload_task_artifact", lambda *_args, **_kwargs: pytest.fail("empty target subtitle must not upload"))
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+
+    task = {
+        "task_id": "hf-empty-sync",
+        "kind": "hot_follow",
+        "mm_srt_path": "deliver/tasks/hf-empty-sync/mm.srt",
+    }
+
+    key = hf_router._hf_sync_saved_target_subtitle_artifact(
+        "hf-empty-sync",
+        task,
+        "1\n00:00:00,000 --> 00:00:02,000\n\n",
+    )
+
+    assert key is None
+    assert task["mm_srt_path"] == "deliver/tasks/hf-empty-sync/mm.srt"
+
+
+def test_translate_subtitles_helper_only_does_not_persist_target_subtitle(monkeypatch):
+    task_id = "hf-helper-translate-only"
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "origin_srt_path": f"deliver/tasks/{task_id}/origin.srt",
+        }
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "translate_segments_with_gemini",
+        lambda segments, target_lang: {1: "cai nay"},
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_hf_sync_saved_target_subtitle_artifact",
+        lambda *_args, **_kwargs: pytest.fail("helper-only translation must not persist target subtitle"),
+    )
+
+    data = hf_router.translate_hot_follow_subtitles(
+        task_id,
+        hf_router.HotFollowTranslateRequest(text="this", target_lang="vi", input_source="helper_only_text"),
+        repo=repo,
+    )
+
+    assert data["input_source"] == "helper_only_text"
+    assert data["persisted"] is False
+    assert data["translated_text"] == "cai nay"
+    saved = repo.get(task_id) or {}
+    assert saved.get("mm_srt_path") is None
+
+
+def test_translate_subtitles_source_lane_persists_full_target_srt(monkeypatch, tmp_path):
+    task_id = "hf-source-lane-translate"
+    source_srt = (
+        "1\n00:00:00,000 --> 00:00:02,000\n你好\n\n"
+        "2\n00:00:02,000 --> 00:00:04,000\n再见\n"
+    )
+    uploads: list[tuple[str, str]] = []
+
+    class _Workspace:
+        def __init__(self, _task_id: str, target_lang: str | None = None):
+            assert _task_id == task_id
+            assert target_lang == "vi"
+            self.mm_srt_path = tmp_path / "subtitles" / "vi.srt"
+
+    def _fake_upload(_task, local_path, artifact_name, task_id=None, **_kwargs):
+        uploads.append((artifact_name, Path(local_path).read_text(encoding="utf-8")))
+        return f"deliver/tasks/{task_id}/{artifact_name}"
+
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "origin_srt_path": f"deliver/tasks/{task_id}/origin.srt",
+            "dub_status": "skipped",
+            "dub_skip_reason": "target_subtitle_empty",
+            "pipeline_config": {"no_dub": "true", "dub_skip_reason": "target_subtitle_empty"},
+        }
+    )
+
+    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: tmp_path / "override.srt")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_srt_to_txt", lambda text: "Xin chao\nTam biet")
+    monkeypatch.setattr(hf_router, "upload_task_artifact", _fake_upload)
+    monkeypatch.setattr(
+        hf_router,
+        "translate_segments_with_gemini",
+        lambda segments, target_lang: {1: "Xin chao", 2: "Tam biet"},
+    )
+
+    data = hf_router.translate_hot_follow_subtitles(
+        task_id,
+        hf_router.HotFollowTranslateRequest(target_lang="vi", input_source="source_subtitle_lane"),
+        repo=repo,
+    )
+
+    assert data["input_source"] == "source_subtitle_lane"
+    assert data["persisted"] is True
+    assert "00:00:00,000 --> 00:00:02,000" in data["translated_text"]
+    assert "Xin chao" in data["translated_text"]
+    assert "Tam biet" in data["translated_text"]
+    assert uploads[0][0] == "vi.srt"
+    assert "Xin chao" in uploads[0][1]
+    saved = repo.get(task_id) or {}
+    assert saved["mm_srt_path"] == f"deliver/tasks/{task_id}/vi.srt"
+    assert saved["target_subtitle_current"] is True
+    assert saved["target_subtitle_current_reason"] == "ready"
+    assert saved["dub_status"] == "pending"
+    assert saved.get("dub_skip_reason") is None
+
+
+def test_translate_subtitles_source_lane_uses_normalized_source_srt_when_origin_key_empty(monkeypatch, tmp_path):
+    task_id = "hf-source-lane-normalized"
+    normalized_srt = (
+        "1\n00:00:00,000 --> 00:00:02,000\n完整中文来源\n\n"
+        "2\n00:00:02,000 --> 00:00:04,000\n第二句\n"
+    )
+    uploads: list[tuple[str, str]] = []
+
+    class _Workspace:
+        def __init__(self, _task_id: str, target_lang: str | None = None):
+            assert _task_id == task_id
+            assert target_lang == "vi"
+            self.mm_srt_path = tmp_path / "subtitles" / "vi.srt"
+
+    def _fake_upload(_task, local_path, artifact_name, task_id=None, **_kwargs):
+        uploads.append((artifact_name, Path(local_path).read_text(encoding="utf-8")))
+        return f"deliver/tasks/{task_id}/{artifact_name}"
+
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+        }
+    )
+
+    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: tmp_path / "override-normalized.srt")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: normalized_srt)
+    monkeypatch.setattr(hf_router, "_srt_to_txt", lambda text: "Day du nguon tieng Trung\nCau thu hai")
+    monkeypatch.setattr(hf_router, "upload_task_artifact", _fake_upload)
+    monkeypatch.setattr(
+        hf_router,
+        "translate_segments_with_gemini",
+        lambda segments, target_lang: {1: "Day du nguon tieng Trung", 2: "Cau thu hai"},
+    )
+
+    data = hf_router.translate_hot_follow_subtitles(
+        task_id,
+        hf_router.HotFollowTranslateRequest(target_lang="vi", input_source="source_subtitle_lane"),
+        repo=repo,
+    )
+
+    assert data["input_source"] == "source_subtitle_lane"
+    assert data["persisted"] is True
+    assert "00:00:00,000 --> 00:00:02,000" in data["translated_text"]
+    assert "Day du nguon tieng Trung" in data["translated_text"]
+    assert uploads[0][0] == "vi.srt"
+    saved = repo.get(task_id) or {}
+    assert saved["mm_srt_path"] == f"deliver/tasks/{task_id}/vi.srt"
+    assert saved["target_subtitle_current"] is True
 
 
 def test_subtitle_lane_marks_preserved_source_audio_parse_as_helper_only(monkeypatch):

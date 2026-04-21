@@ -27,6 +27,7 @@ from gateway.app.services.hot_follow_language_profiles import (
 )
 from gateway.app.services.hot_follow_subtitle_currentness import (
     compute_hot_follow_target_subtitle_currentness,
+    has_semantic_target_subtitle_text,
 )
 from gateway.app.services.media_validation import media_meta_from_head, deliver_key
 from gateway.app.services.task_view_helpers import task_key
@@ -303,7 +304,7 @@ def hf_load_normalized_source_text(task_id: str, task: dict) -> str:
 
 def hf_dub_input_text(task_id: str, task: dict) -> str:
     edited = hf_load_subtitles_text(task_id, task)
-    if str(edited or "").strip():
+    if has_semantic_target_subtitle_text(edited):
         return edited
     return ""
 
@@ -336,6 +337,8 @@ def hf_target_subtitle_currentness_state(
 
 def hf_sync_saved_target_subtitle_artifact(task_id: str, task: dict, saved_text: str | None = None) -> str | None:
     text = str(saved_text if saved_text is not None else hf_load_subtitles_text(task_id, task) or "")
+    if not has_semantic_target_subtitle_text(text):
+        return None
     desired_hash = hf_subtitle_content_hash(text)
     target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
     current_key = hf_task_target_subtitle_key(task, target_lang) or task_key(task, "mm_srt_path")
@@ -386,7 +389,10 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         if composed_key
         else (hf_expected_subtitle_filename(target_lang) if expected_key else None)
     )
-    subtitle_artifact_exists = bool(expected_key and object_exists(str(expected_key)))
+    subtitle_artifact_physical_exists = bool(expected_key and object_exists(str(expected_key)))
+    target_text_has_semantics = has_semantic_target_subtitle_text(edited_text)
+    subtitle_artifact_exists = bool(subtitle_artifact_physical_exists and target_text_has_semantics)
+    primary_editable_text = edited_text if target_text_has_semantics else ""
     target_currentness = hf_target_subtitle_currentness_state(
         task,
         target_lang=target_lang,
@@ -419,9 +425,9 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "parse_source_text": helper_source_text or "",
         "parse_source_role": parse_source_role if str(helper_source_text or "").strip() else "none",
         "parse_source_authoritative_for_target": parse_source_authoritative_for_target,
-        "edited_text": edited_text or "",
-        "srt_text": srt_text or "",
-        "primary_editable_text": edited_text or "",
+        "edited_text": primary_editable_text,
+        "srt_text": primary_editable_text,
+        "primary_editable_text": primary_editable_text,
         "primary_editable_format": "srt",
         "dub_input_text": dub_input_text,
         "dub_input_format": "srt" if hf_is_srt_text(dub_input_text) else "plain_text",

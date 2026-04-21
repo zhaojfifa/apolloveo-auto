@@ -829,6 +829,81 @@ def test_hot_follow_workbench_subtitles_keep_srt_as_primary_editable_object(monk
     assert subtitles.get("dub_input_format") == "srt"
 
 
+def test_hot_follow_workbench_does_not_hydrate_timing_only_target_artifact(monkeypatch):
+    task_id = "hf-workbench-empty-target"
+    repo = _Repo()
+    target_key = f"deliver/tasks/{task_id}/mm.srt"
+    origin_key = f"deliver/tasks/{task_id}/origin.srt"
+    timing_only_srt = "1\n00:00:00,000 --> 00:00:02,000\n\n"
+    store = {
+        target_key: timing_only_srt.encode("utf-8"),
+        origin_key: "1\n00:00:00,000 --> 00:00:02,000\nvoice led source\n".encode("utf-8"),
+    }
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "target_lang": "my",
+            "subtitles_status": "done",
+            "origin_srt_path": origin_key,
+            "mm_srt_path": target_key,
+            "compose_status": "pending",
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "not_ready",
+            "final": {"exists": False},
+            "historical_final": {"exists": False},
+            "compose_error_reason": None,
+            "compose_error_message": None,
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda task_id: Path("/tmp") / task_id / "override.srt")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    subtitles = data.get("subtitles") or {}
+    assert subtitles.get("primary_editable_text") == ""
+    assert subtitles.get("srt_text") == ""
+    assert subtitles.get("edited_text") == ""
+    assert subtitles.get("dub_input_text") == ""
+    assert subtitles.get("subtitle_ready") is False
+    assert subtitles.get("target_subtitle_current") is False
+    assert subtitles.get("target_subtitle_current_reason") == "subtitle_missing"
+
+    subtitle_deliverable = next(item for item in data.get("deliverables") or [] if item.get("kind") == "subtitle")
+    assert subtitle_deliverable.get("status") == "pending"
+    assert subtitle_deliverable.get("state") == "pending"
+    assert subtitle_deliverable.get("url") is None
+    assert subtitle_deliverable.get("open_url") is None
+    assert subtitle_deliverable.get("download_url") is None
+
+    artifact_facts = data.get("artifact_facts") or {}
+    assert artifact_facts.get("subtitle_exists") is False
+    assert artifact_facts.get("subtitle_url") is None
+    assert (data.get("ready_gate") or {}).get("subtitle_ready") is False
+    assert data.get("no_dub") is False
+
+
 def test_hot_follow_workbench_hub_survives_optional_presentation_aggregation_failure(monkeypatch):
     task_id = "hf-workbench-presentation-safe-01"
     repo = _Repo()
