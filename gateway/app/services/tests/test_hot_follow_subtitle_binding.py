@@ -414,6 +414,75 @@ def test_translate_subtitles_source_lane_uses_normalized_source_srt_when_origin_
     assert saved["target_subtitle_current"] is True
 
 
+def test_translate_subtitles_source_lane_persists_target_srt_from_helper_parsed_source(monkeypatch, tmp_path):
+    task_id = "hf-source-lane-helper-parse"
+    normalized_srt = (
+        "1\n00:00:00,000 --> 00:00:02,000\n辅助解析来源\n\n"
+        "2\n00:00:02,000 --> 00:00:04,000\n第二句\n"
+    )
+    uploads: list[tuple[str, str]] = []
+
+    class _Workspace:
+        def __init__(self, _task_id: str, target_lang: str | None = None):
+            assert _task_id == task_id
+            assert target_lang == "vi"
+            self.mm_srt_path = tmp_path / "subtitles" / "vi.srt"
+
+    def _fake_upload(_task, local_path, artifact_name, task_id=None, **_kwargs):
+        uploads.append((artifact_name, Path(local_path).read_text(encoding="utf-8")))
+        return f"deliver/tasks/{task_id}/{artifact_name}"
+
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "dub_status": "skipped",
+            "dub_skip_reason": "target_subtitle_empty",
+            "pipeline_config": {
+                "parse_source_mode": "preserved_source_audio_helper",
+                "parse_source_role": "preserved_source_audio_helper",
+                "parse_source_authoritative_for_target": "false",
+                "target_subtitle_authoritative": "false",
+                "no_dub": "true",
+                "dub_skip_reason": "target_subtitle_empty",
+            },
+        }
+    )
+
+    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: tmp_path / "override-helper-parse.srt")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: normalized_srt)
+    monkeypatch.setattr(hf_router, "_srt_to_txt", lambda text: "Phu de tu phan tich am thanh\nCau thu hai")
+    monkeypatch.setattr(hf_router, "upload_task_artifact", _fake_upload)
+    monkeypatch.setattr(
+        hf_router,
+        "translate_segments_with_gemini",
+        lambda segments, target_lang: {1: "Phu de tu phan tich am thanh", 2: "Cau thu hai"},
+    )
+
+    data = hf_router.translate_hot_follow_subtitles(
+        task_id,
+        hf_router.HotFollowTranslateRequest(target_lang="vi", input_source="source_subtitle_lane"),
+        repo=repo,
+    )
+
+    assert data["input_source"] == "source_subtitle_lane"
+    assert data["persisted"] is True
+    assert "00:00:00,000 --> 00:00:02,000" in data["translated_text"]
+    assert "Phu de tu phan tich am thanh" in data["translated_text"]
+    assert uploads[0][0] == "vi.srt"
+    assert "Phu de tu phan tich am thanh" in uploads[0][1]
+    saved = repo.get(task_id) or {}
+    assert saved["mm_srt_path"] == f"deliver/tasks/{task_id}/vi.srt"
+    assert saved["target_subtitle_current"] is True
+    assert saved["target_subtitle_current_reason"] == "ready"
+    assert saved["dub_status"] == "pending"
+    assert saved.get("dub_skip_reason") is None
+
+
 def test_subtitle_lane_marks_preserved_source_audio_parse_as_helper_only(monkeypatch):
     store = {
         "deliver/tasks/hf-preserve-source/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\nlyric source line\n",
