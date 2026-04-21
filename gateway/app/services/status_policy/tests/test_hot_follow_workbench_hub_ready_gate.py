@@ -572,6 +572,159 @@ def test_hot_follow_workbench_mm_stale_dub_downgrades_audio_step(monkeypatch):
     assert data.get("audio", {}).get("audio_ready_reason") == "dub_stale_after_subtitles"
 
 
+def test_hot_follow_workbench_projects_compose_blocked_terminal_not_pending(monkeypatch):
+    task_id = "hf-workbench-compose-blocked-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "pending",
+            "compose_last_status": "pending",
+            "compose_input_policy": {
+                "mode": "blocked",
+                "reason": "bitrate_too_high",
+                "profile": {"video_bitrate": 9_000_000},
+            },
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "compose_input_blocked",
+            "final": {"exists": False, "fresh": False, "url": None, "size_bytes": None},
+            "historical_final": {"exists": False, "url": None, "size_bytes": None},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": False,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": False,
+            "audio_ready_reason": "audio_missing",
+            "dub_current": False,
+            "dub_current_reason": "audio_missing",
+            "resolved_voice": None,
+            "actual_provider": None,
+            "requested_voice": None,
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    compose_step = next((x for x in (data.get("pipeline") or []) if x.get("key") == "compose"), {})
+    final_row = next((x for x in (data.get("deliverables") or []) if x.get("kind") == "final"), {})
+
+    assert (data.get("ready_gate") or {}).get("compose_blocked") is True
+    assert compose_step.get("status") == "blocked"
+    assert ((data.get("compose") or {}).get("last") or {}).get("status") == "blocked"
+    assert ((data.get("pipeline_legacy") or {}).get("compose") or {}).get("status") == "blocked"
+    assert final_row.get("status") == "blocked"
+    assert final_row.get("url") is None
+
+
+def test_hot_follow_workbench_projects_compose_derive_failed_terminal_not_pending(monkeypatch):
+    task_id = "hf-workbench-compose-derive-failed-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "failed",
+            "compose_last_status": "failed",
+            "compose_error_reason": "compose_exec_failed",
+            "compose_input_policy": {
+                "mode": "derive_failed",
+                "source": "derived_safe",
+                "reason": "derived compose input is not encoder-safe",
+                "failure_code": "derive_not_encoder_safe",
+                "profile": {"pix_fmt": "yuv422p"},
+            },
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "compose_input_derive_failed",
+            "final": {"exists": False, "fresh": False, "url": None, "size_bytes": None},
+            "historical_final": {"exists": False, "url": None, "size_bytes": None},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": "compose_exec_failed",
+            "compose_error_message": "ffmpeg rejected current input profile",
+            "raw_exists": True,
+            "voice_exists": False,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": False,
+            "audio_ready_reason": "audio_missing",
+            "dub_current": False,
+            "dub_current_reason": "audio_missing",
+            "resolved_voice": None,
+            "actual_provider": None,
+            "requested_voice": None,
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    compose_step = next((x for x in (data.get("pipeline") or []) if x.get("key") == "compose"), {})
+    final_row = next((x for x in (data.get("deliverables") or []) if x.get("kind") == "final"), {})
+
+    assert (data.get("ready_gate") or {}).get("compose_input_derive_failed_terminal") is True
+    assert compose_step.get("status") == "failed"
+    assert ((data.get("compose") or {}).get("last") or {}).get("status") == "failed"
+    assert ((data.get("pipeline_legacy") or {}).get("compose") or {}).get("status") == "failed"
+    assert final_row.get("status") == "failed"
+    assert final_row.get("url") is None
+
+
 def test_patch_hot_follow_audio_config_persists_speed_and_backfills_old_dub_speed_snapshot(monkeypatch):
     class _Repo:
         def __init__(self):

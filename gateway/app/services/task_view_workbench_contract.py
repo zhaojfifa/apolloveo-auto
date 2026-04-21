@@ -455,13 +455,26 @@ def apply_ready_gate_compose_projection(payload: dict[str, Any]) -> None:
 
 
 def apply_ready_gate_composed_projection(payload: dict[str, Any], *, final_url: str | None) -> None:
-    composed_ready = bool((payload.get("ready_gate") or {}).get("compose_ready"))
-    if composed_ready:
+    ready_gate = payload.get("ready_gate") if isinstance(payload.get("ready_gate"), dict) else {}
+    compose_status = _ready_gate_compose_projection_status(ready_gate)
+    if compose_status == "done":
         _set_compose_pipeline_status(payload, "done", final_url=final_url)
         payload["composed_ready"] = True
         payload["composed_reason"] = "ready"
         return
-    _set_compose_pipeline_status(payload, "pending", final_url=None)
+    _set_compose_pipeline_status(payload, compose_status, final_url=None)
+
+
+def _ready_gate_compose_projection_status(ready_gate: dict[str, Any]) -> str:
+    if bool(ready_gate.get("compose_ready")):
+        return "done"
+    if bool(ready_gate.get("compose_blocked")):
+        return "blocked"
+    if bool(ready_gate.get("compose_input_derive_failed_terminal")) or bool(
+        ready_gate.get("compose_exec_failed_terminal")
+    ):
+        return "failed"
+    return "pending"
 
 
 def _set_compose_pipeline_status(payload: dict[str, Any], status: str, *, final_url: str | None) -> None:
