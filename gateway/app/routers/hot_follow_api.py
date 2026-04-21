@@ -192,6 +192,7 @@ class HotFollowSubtitlesRequest(BaseModel):
 class HotFollowTranslateRequest(BaseModel):
     text: str = ""
     target_lang: str = "my"
+    input_source: str = "helper_only_text"
 
 
 
@@ -376,6 +377,105 @@ def _hf_translate_plain_lines(text: str, *, target_lang: str) -> str:
         else:
             out.append(str(translations.get(idx) or line or "").strip())
     return "\n".join(out)
+
+
+def _hf_save_authoritative_target_subtitle(
+    task_id: str,
+    task: dict,
+    *,
+    text: str,
+    text_mode: str,
+    repo,
+) -> dict:
+    if not has_semantic_target_subtitle_text(text):
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "reason": "target_subtitle_semantically_empty",
+                "message": "目标字幕内容为空或只有时间轴，未保存为权威目标字幕。请填写目标语言字幕正文后再保存。",
+            },
+        )
+    _subtitle_content_hash = _hf_subtitle_content_hash(text)
+    override_path = _hf_subtitles_override_path(task_id)
+    override_path.parent.mkdir(parents=True, exist_ok=True)
+    override_path.write_text(text, encoding="utf-8")
+    synced_mm_key = _hf_sync_saved_target_subtitle_artifact(task_id, task, text)
+    target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    target_currentness = compute_hot_follow_target_subtitle_currentness(
+        target_lang=target_lang,
+        target_text=text,
+        source_texts=(
+            _hf_load_normalized_source_text(task_id, task),
+            _hf_load_origin_subtitles_text(task),
+        ),
+        subtitle_artifact_exists=bool(synced_mm_key),
+        expected_subtitle_source=_hf_expected_subtitle_filename(target_lang),
+        actual_subtitle_source=(Path(str(synced_mm_key)).name if synced_mm_key else None),
+        translation_incomplete=False,
+        has_saved_revision=bool(text.strip()),
+    )
+    updates = {
+        "subtitles_status": "ready" if text else task.get("subtitles_status"),
+        "last_step": "subtitles" if text else task.get("last_step"),
+        "mm_srt_path": synced_mm_key or task.get("mm_srt_path"),
+        "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
+        "subtitles_override_mode": text_mode,
+        "subtitles_content_hash": _subtitle_content_hash,
+        "compose_status": "pending",
+        "compose_error": None,
+        "compose_error_reason": None,
+        "error_message": None,
+        "error_reason": None,
+        "target_subtitle_current": bool(target_currentness.get("target_subtitle_current")),
+        "target_subtitle_current_reason": target_currentness.get("target_subtitle_current_reason"),
+    }
+    if text:
+        updates.update(helper_translate_resolved_updates())
+    updates.update(_hf_empty_dub_recovery_updates(task_id, task, text, target_currentness))
+    _policy_upsert(repo, task_id, updates)
+    return repo.get(task_id) or task
+
+
+def _hf_translate_source_subtitle_lane(task_id: str, task: dict, *, target_lang: str, repo) -> tuple[str, dict]:
+    source_text = _hf_load_origin_subtitles_text(task).strip()
+    if not source_text:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "reason": "source_subtitle_lane_empty",
+                "message": "来源字幕为空，无法执行完整字幕翻译。",
+            },
+        )
+    if "-->" not in source_text:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "reason": "source_subtitle_lane_not_srt",
+                "message": "来源字幕不是 SRT，无法保留时间轴执行完整字幕翻译。",
+            },
+        )
+    segments = _parse_srt_to_segments(source_text)
+    if not segments:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "reason": "source_subtitle_lane_invalid_srt",
+                "message": "来源字幕 SRT 无法解析，未写入目标字幕。",
+            },
+        )
+    translations = translate_segments_with_gemini(segments=segments, target_lang=target_lang)
+    for seg in segments:
+        idx = int(seg.get("index") or 0)
+        seg[target_lang] = str(translations.get(idx) or seg.get("origin") or "").strip()
+    translated_text = segments_to_srt(segments, target_lang)
+    saved_task = _hf_save_authoritative_target_subtitle(
+        task_id,
+        task,
+        text=translated_text,
+        text_mode="source_subtitle_lane_translation",
+        repo=repo,
+    )
+    return translated_text, saved_task
 
 
 
@@ -2010,57 +2110,7 @@ def patch_hot_follow_subtitles(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     text, text_mode = _hf_normalize_subtitles_save_text(task, payload.srt_text or "")
-    if not has_semantic_target_subtitle_text(text):
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "reason": "target_subtitle_semantically_empty",
-                "message": "目标字幕内容为空或只有时间轴，未保存为权威目标字幕。请填写目标语言字幕正文后再保存。",
-            },
-        )
-    # Phase 0.2: compute content hash for revision consistency
-    _subtitle_content_hash = _hf_subtitle_content_hash(text)
-    override_path = _hf_subtitles_override_path(task_id)
-    override_path.parent.mkdir(parents=True, exist_ok=True)
-    override_path.write_text(text, encoding="utf-8")
-    synced_mm_key = _hf_sync_saved_target_subtitle_artifact(task_id, task, text)
-    target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
-    target_currentness = compute_hot_follow_target_subtitle_currentness(
-        target_lang=target_lang,
-        target_text=text,
-        source_texts=(
-            _hf_load_normalized_source_text(task_id, task),
-            _hf_load_origin_subtitles_text(task),
-        ),
-        subtitle_artifact_exists=bool(synced_mm_key),
-        expected_subtitle_source=_hf_expected_subtitle_filename(target_lang),
-        actual_subtitle_source=(Path(str(synced_mm_key)).name if synced_mm_key else None),
-        translation_incomplete=False,
-        has_saved_revision=bool(text.strip()),
-    )
-    updates = {
-        "subtitles_status": "ready" if text else task.get("subtitles_status"),
-        "last_step": "subtitles" if text else task.get("last_step"),
-        "mm_srt_path": synced_mm_key or task.get("mm_srt_path"),
-        "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
-        "subtitles_override_mode": text_mode,
-        "subtitles_content_hash": _subtitle_content_hash,
-        "compose_status": "pending",
-        "compose_error": None,
-        "compose_error_reason": None,
-        "error_message": None,
-        "error_reason": None,
-        "target_subtitle_current": bool(target_currentness.get("target_subtitle_current")),
-        "target_subtitle_current_reason": target_currentness.get("target_subtitle_current_reason"),
-    }
-    if text:
-        updates.update(helper_translate_resolved_updates())
-    updates.update(_hf_empty_dub_recovery_updates(task_id, task, text, target_currentness))
-    _policy_upsert(
-        repo,
-        task_id,
-        updates,
-    )
+    _hf_save_authoritative_target_subtitle(task_id, task, text=text, text_mode=text_mode, repo=repo)
     return {
         "task_id": task_id,
         "subtitles": {
@@ -2081,11 +2131,44 @@ def translate_hot_follow_subtitles(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    source_text = str(payload.text or "").strip()
-    if not source_text:
-        raise HTTPException(status_code=400, detail="text is empty")
     target_lang = normalize_target_lang(payload.target_lang or task.get("target_lang") or task.get("content_lang") or "mm")
+    input_source = str(payload.input_source or "helper_only_text").strip().lower()
+    if input_source not in {"helper_only_text", "source_subtitle_lane"}:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "reason": "unsupported_translation_input_source",
+                "message": "Unsupported translation input source.",
+            },
+        )
+    if input_source == "source_subtitle_lane":
+        try:
+            translated_text, saved_task = _hf_translate_source_subtitle_lane(
+                task_id,
+                task,
+                target_lang=target_lang,
+                repo=repo,
+            )
+        except GeminiSubtitlesError as exc:
+            detail = sanitize_helper_translate_error(exc)
+            raise HTTPException(status_code=409, detail=detail) from exc
+        return {
+            "task_id": task_id,
+            "target_lang": public_target_lang(target_lang),
+            "input_source": "source_subtitle_lane",
+            "persisted": True,
+            "translated_text": translated_text,
+            "subtitles": {
+                "srt_text": _hf_load_subtitles_text(task_id, saved_task),
+                "origin_text": _hf_load_origin_subtitles_text(saved_task),
+                "edited_text": _hf_load_subtitles_text(task_id, saved_task),
+                "editable": True,
+            },
+        }
     try:
+        source_text = str(payload.text or "").strip()
+        if not source_text:
+            raise HTTPException(status_code=400, detail="text is empty")
         if "-->" in source_text:
             segments = _parse_srt_to_segments(source_text)
             if not segments:
@@ -2105,6 +2188,8 @@ def translate_hot_follow_subtitles(
     return {
         "task_id": task_id,
         "target_lang": public_target_lang(target_lang),
+        "input_source": "helper_only_text",
+        "persisted": False,
         "translated_text": translated_text,
     }
 
