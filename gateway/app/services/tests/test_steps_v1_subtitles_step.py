@@ -78,6 +78,74 @@ def test_run_subtitles_step_consumes_result_contract_for_myanmar(monkeypatch, tm
     assert pipeline_updates[-1]["target_subtitle_authoritative"] == "true"
 
 
+def test_validation_dubbed_flow_runs_raw_parse_translate_and_marks_target_current(monkeypatch, tmp_path):
+    updates: list[dict] = []
+    pipeline_updates: list[dict] = []
+    generate_kwargs: list[dict] = []
+
+    class _RawWorkspace(_FakeWorkspace):
+        def __init__(self, base: Path, task_id: str, target_lang: str | None = None):
+            super().__init__(base, task_id, target_lang)
+            self.raw_video_path = self.base_dir / "raw.mp4"
+            self.raw_video_path.write_bytes(b"raw-video-with-dubbed-flow")
+
+        def raw_video_exists(self) -> bool:
+            return True
+
+    async def _generate_subtitles(**kwargs):
+        generate_kwargs.append(dict(kwargs))
+        return _fake_generate_subtitles(
+            tmp_path,
+            kwargs["task_id"],
+            kwargs["target_lang"],
+            complete=True,
+            parse_source_mode=kwargs["parse_source_mode"],
+        )
+
+    monkeypatch.setattr(
+        steps_v1,
+        "Workspace",
+        lambda task_id, target_lang=None: _RawWorkspace(tmp_path, task_id, target_lang),
+    )
+    monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: updates.append(dict(kwargs)))
+    monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda _task_id, payload: pipeline_updates.append(dict(payload)))
+    monkeypatch.setattr(steps_v1, "_upload_artifact", lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}")
+    monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
+    monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
+    monkeypatch.setattr(
+        steps_v1,
+        "get_task_repository",
+        lambda: _FakeRepo(
+            {
+                "task_id": "hf-validate-dubbed-flow",
+                "kind": "hot_follow",
+                "target_lang": "vi",
+                "dub_status": "done",
+                "config": {"source_audio_policy": "preserve"},
+                "pipeline_config": {"source_audio_policy": "preserve"},
+            }
+        ),
+    )
+
+    req = SubtitlesRequest(task_id="hf-validate-dubbed-flow", target_lang="vi", force=True, translate=True)
+    result = asyncio.run(steps_v1.run_subtitles_step(req))
+
+    assert generate_kwargs[-1]["parse_source_mode"] == "raw_video_audio"
+    assert result["origin_srt"]
+    assert result["mm_srt"]
+    assert result["translation_incomplete"] is False
+    final_update = updates[-1]
+    assert final_update["subtitles_status"] == "ready"
+    assert final_update["target_subtitle_current"] is True
+    assert final_update["target_subtitle_current_reason"] == "ready"
+    final_pipeline = pipeline_updates[-1]
+    assert final_pipeline["parse_source_mode"] == "raw_video_audio"
+    assert final_pipeline["translation_incomplete"] == "false"
+    assert final_pipeline["parse_source_authoritative_for_target"] == "true"
+    assert final_pipeline["target_subtitle_authoritative"] == "true"
+
+
 def test_clear_no_dub_pipeline_flags_removes_stale_skip_marker(monkeypatch, tmp_path):
     repo = _MutableFakeRepo(
         {

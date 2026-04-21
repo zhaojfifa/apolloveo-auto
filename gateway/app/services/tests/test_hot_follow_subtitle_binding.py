@@ -17,6 +17,7 @@ from gateway.app.services.compose_service import (
     compose_subtitle_vf,
     optimize_hot_follow_subtitle_layout_srt,
 )
+from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 
 def _hash16(text: str) -> str:
@@ -293,6 +294,89 @@ def test_translate_subtitles_helper_only_does_not_persist_target_subtitle(monkey
     assert data["translated_text"] == "cai nay"
     saved = repo.get(task_id) or {}
     assert saved.get("mm_srt_path") is None
+
+
+def test_validation_helper_translation_then_save_restores_dub_flow(monkeypatch, tmp_path):
+    task_id = "hf-helper-save-dub-flow"
+
+    class _Repo:
+        def __init__(self):
+            self.task = {
+                "task_id": task_id,
+                "kind": "hot_follow",
+                "target_lang": "vi",
+                "subtitles_status": "pending",
+                "dub_status": "skipped",
+                "pipeline_config": {
+                    "no_dub": "true",
+                    "dub_skip_reason": "target_subtitle_empty",
+                },
+            }
+
+        def get(self, current_task_id):
+            assert current_task_id == task_id
+            return dict(self.task)
+
+    repo = _Repo()
+
+    class _Workspace:
+        def __init__(self, _task_id: str, target_lang: str | None = None):
+            assert _task_id == task_id
+            assert target_lang == "vi"
+            base = tmp_path / _task_id
+            base.mkdir(parents=True, exist_ok=True)
+            self.mm_srt_path = base / "vi.srt"
+
+    override_path = tmp_path / task_id / "override.srt"
+    note_path = tmp_path / task_id / "dub" / "no_dub.txt"
+    note_path.parent.mkdir(parents=True, exist_ok=True)
+    note_path.write_text("reason=target_subtitle_empty\n", encoding="utf-8")
+
+    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: tmp_path / _task_id)
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: override_path)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda _task_id, _task: override_path.read_text(encoding="utf-8"))
+    monkeypatch.setattr(hf_router, "_policy_upsert", lambda _repo, _task_id, updates, **_kwargs: repo.task.update(updates))
+    monkeypatch.setattr(hf_router, "upload_task_artifact", lambda _task, _local_path, artifact_name, task_id=None, **_kwargs: f"deliver/tasks/{task_id}/{artifact_name}")
+    monkeypatch.setattr(
+        hf_router,
+        "translate_segments_with_gemini",
+        lambda segments, target_lang: {1: "Xin chao", 2: "Tam biet"},
+    )
+
+    translated = hf_router.translate_hot_follow_subtitles(
+        task_id,
+        hf_router.HotFollowTranslateRequest(
+            text="1\n00:00:00,000 --> 00:00:02,000\n你好\n\n2\n00:00:02,000 --> 00:00:04,000\n再见\n",
+            target_lang="vi",
+            input_source="helper_only_text",
+        ),
+        repo=repo,
+    )
+
+    assert translated["input_source"] == "helper_only_text"
+    assert translated["persisted"] is False
+    assert "Xin chao" in translated["translated_text"]
+    assert repo.task.get("mm_srt_path") is None
+    assert repo.task["dub_status"] == "skipped"
+
+    saved = hf_router.patch_hot_follow_subtitles(
+        task_id,
+        hf_router.HotFollowSubtitlesRequest(srt_text=translated["translated_text"]),
+        repo=repo,
+    )
+
+    assert repo.task["mm_srt_path"] == f"deliver/tasks/{task_id}/vi.srt"
+    assert repo.task["target_subtitle_current"] is True
+    assert repo.task["target_subtitle_current_reason"] == "ready"
+    assert repo.task["dub_status"] == "pending"
+    assert repo.task["dub_skip_reason"] is None
+    assert "no_dub" not in parse_pipeline_config(repo.task.get("pipeline_config"))
+    assert "dub_skip_reason" not in parse_pipeline_config(repo.task.get("pipeline_config"))
+    assert note_path.exists() is False
+    assert saved["subtitles"]["srt_text"].strip().endswith("Tam biet")
 
 
 def test_translate_subtitles_source_lane_persists_full_target_srt(monkeypatch, tmp_path):
