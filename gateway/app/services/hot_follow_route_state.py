@@ -463,6 +463,8 @@ def build_hot_follow_current_attempt_summary(
         "requested_voice": str(voice_state.get("requested_voice") or "").strip() or None,
         "resolved_voice": str(voice_state.get("resolved_voice") or "").strip() or None,
         "actual_provider": str(voice_state.get("actual_provider") or "").strip() or None,
+        "subtitle_ready": subtitle_ready,
+        "subtitle_ready_reason": str(subtitle_lane.get("subtitle_ready_reason") or "").strip() or None,
         "compose_status": compose_status_norm,
         "compose_reason": compose_reason_norm,
         "final_stale_reason": final_stale_reason or None,
@@ -497,6 +499,8 @@ def build_hot_follow_current_attempt_summary(
         "helper_translate_failed_voice_led": helper_translate_failed_voice_led,
         "helper_translate_error_reason": artifacts.get("helper_translate_error_reason"),
         "helper_translate_error_message": artifacts.get("helper_translate_error_message"),
+        "no_dub": bool(no_dub or no_dub_route_terminal),
+        "no_dub_reason": no_dub_reason,
         "subtitle_terminal_state": (
             "helper_translate_failed_terminal"
             if helper_translate_failed

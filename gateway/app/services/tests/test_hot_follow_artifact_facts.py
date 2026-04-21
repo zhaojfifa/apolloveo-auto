@@ -373,18 +373,17 @@ def test_operator_summary_projects_terminal_blocked_and_no_dub_attempts():
             "compose_status": "blocked",
             "compose_blocked_terminal": True,
             "compose_reason": "bitrate_too_high",
+            "subtitle_ready": True,
         },
-        no_dub=False,
-        subtitle_ready=True,
     )
     no_dub = build_hot_follow_operator_summary(
         artifact_facts={"final_exists": False},
         current_attempt={
             "dub_status": "skipped",
             "no_dub_route_terminal": True,
+            "no_dub": True,
+            "subtitle_ready": False,
         },
-        no_dub=True,
-        subtitle_ready=False,
     )
 
     assert "bitrate_too_high" in blocked["recommended_next_action"]

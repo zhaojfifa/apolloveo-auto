@@ -64,12 +64,12 @@ def build_hot_follow_operator_summary(
     *,
     artifact_facts: dict[str, Any],
     current_attempt: dict[str, Any],
-    no_dub: bool,
-    subtitle_ready: bool = False,
 ) -> dict[str, Any]:
     last_successful_output_available = bool(artifact_facts.get("final_exists"))
     dub_status = str(current_attempt.get("dub_status") or "").strip().lower()
     compose_status = str(current_attempt.get("compose_status") or "").strip().lower()
+    no_dub = bool(current_attempt.get("no_dub") or current_attempt.get("no_dub_route_terminal"))
+    subtitle_ready = bool(current_attempt.get("subtitle_ready"))
     current_attempt_failed = dub_status in {"failed", "error"} or compose_status in {"failed", "error"}
     show_previous_final_as_primary = bool(
         last_successful_output_available

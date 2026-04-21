@@ -362,6 +362,7 @@ def test_hot_follow_api_deliverables_use_dry_key_not_source_audio_key(monkeypatc
     monkeypatch.setattr(hf_router, "get_settings", _settings)
     monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in {dry_key, source_key})
     monkeypatch.setattr(hf_router, "get_download_url", lambda key: f"/download/{key}")
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
     _patch_voice_storage(
         monkeypatch,
         lambda key: str(key) == dry_key,
@@ -893,7 +894,6 @@ def test_artifact_facts_and_operator_summary_keep_previous_final_visible():
     operator_summary = hf_router._hf_operator_summary(
         artifact_facts=artifact_facts,
         current_attempt=current_attempt,
-        no_dub=False,
     )
 
     assert artifact_facts["final_exists"] is True
@@ -949,7 +949,6 @@ def test_artifact_facts_and_operator_summary_preserve_voice_led_success_baseline
     operator_summary = hf_router._hf_operator_summary(
         artifact_facts=artifact_facts,
         current_attempt=current_attempt,
-        no_dub=False,
     )
 
     assert artifact_facts["audio_exists"] is True
@@ -985,8 +984,6 @@ def test_operator_summary_requires_redub_when_subtitles_changed():
     operator_summary = hf_router._hf_operator_summary(
         artifact_facts={"final_exists": False},
         current_attempt=current_attempt,
-        no_dub=False,
-        subtitle_ready=True,
     )
 
     assert current_attempt["requires_redub"] is True

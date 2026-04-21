@@ -1568,14 +1568,10 @@ def _hf_operator_summary(
     *,
     artifact_facts: dict[str, Any],
     current_attempt: dict[str, Any],
-    no_dub: bool,
-    subtitle_ready: bool = False,
 ) -> dict[str, Any]:
     return _build_hot_follow_operator_summary(
         artifact_facts=artifact_facts,
         current_attempt=current_attempt,
-        no_dub=no_dub,
-        subtitle_ready=subtitle_ready,
     )
 
 
@@ -1625,8 +1621,6 @@ def _hf_safe_presentation_aggregates(
         operator_summary = _hf_operator_summary(
             artifact_facts=artifact_facts,
             current_attempt=current_attempt,
-            no_dub=no_dub,
-            subtitle_ready=bool((subtitle_lane or {}).get("subtitle_ready")),
         )
         return artifact_facts, current_attempt, operator_summary
     except Exception:
