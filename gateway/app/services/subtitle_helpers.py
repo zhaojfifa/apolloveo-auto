@@ -445,6 +445,9 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "helper_translate_error_reason": str(task.get("subtitle_helper_error_reason") or "").strip() or None,
         "helper_translate_error_message": str(task.get("subtitle_helper_error_message") or "").strip() or None,
         "helper_translate_provider": str(task.get("subtitle_helper_provider") or "").strip() or None,
+        "helper_translate_input_text": str(task.get("subtitle_helper_input_text") or "").strip() or None,
+        "helper_translate_translated_text": str(task.get("subtitle_helper_translated_text") or "").strip() or None,
+        "helper_translate_target_lang": str(task.get("subtitle_helper_target_lang") or "").strip() or None,
     }
 
 

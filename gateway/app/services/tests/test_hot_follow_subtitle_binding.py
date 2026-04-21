@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.services import task_view_workbench_contract
 from gateway.app.services import compose_service as compose_module
 from gateway.app.services.compose_service import (
     ComposeResult,
@@ -293,6 +294,110 @@ def test_translate_subtitles_helper_only_does_not_persist_target_subtitle(monkey
     assert data["translated_text"] == "cai nay"
     saved = repo.get(task_id) or {}
     assert saved.get("mm_srt_path") is None
+    assert saved["subtitle_helper_status"] == "ready"
+    assert saved["subtitle_helper_input_text"] == "this"
+    assert saved["subtitle_helper_translated_text"] == "cai nay"
+    assert saved["subtitle_helper_target_lang"] == "vi"
+    assert saved.get("subtitle_helper_error_reason") is None
+
+
+def test_translate_subtitles_helper_failure_preserves_authoritative_outputs(monkeypatch):
+    task_id = "hf-helper-failure-mainline-safe"
+    target_srt = "deliver/tasks/hf-helper-failure-mainline-safe/vi.srt"
+    audio_key = "deliver/tasks/hf-helper-failure-mainline-safe/audio_vi.mp3"
+    final_key = "deliver/tasks/hf-helper-failure-mainline-safe/final.mp4"
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "mm_srt_path": target_srt,
+            "mm_audio_key": audio_key,
+            "final_video_key": final_key,
+            "subtitles_status": "ready",
+            "dub_status": "ready",
+            "compose_status": "ready",
+            "target_subtitle_current": True,
+            "target_subtitle_current_reason": "ready",
+            "dub_current": True,
+            "compose_ready": True,
+            "publish_ready": True,
+        }
+    )
+
+    def _raise_resource_exhausted(*_args, **_kwargs):
+        raise hf_router.GeminiSubtitlesError(
+            'Gemini HTTP 429: {"error":{"status":"RESOURCE_EXHAUSTED","message":"quota exhausted"}}'
+        )
+
+    monkeypatch.setattr(hf_router, "translate_segments_with_gemini", _raise_resource_exhausted)
+    monkeypatch.setattr(
+        hf_router,
+        "_hf_sync_saved_target_subtitle_artifact",
+        lambda *_args, **_kwargs: pytest.fail("helper failure must not sync target subtitle artifacts"),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        hf_router.translate_hot_follow_subtitles(
+            task_id,
+            hf_router.HotFollowTranslateRequest(text="helper candidate", target_lang="vi", input_source="helper_only_text"),
+            repo=repo,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["reason"] == "helper_translate_provider_exhausted"
+    saved = repo.get(task_id) or {}
+    assert saved["subtitle_helper_status"] == "failed"
+    assert saved["subtitle_helper_error_reason"] == "helper_translate_provider_exhausted"
+    assert saved["subtitle_helper_input_text"] == "helper candidate"
+    assert saved["subtitle_helper_target_lang"] == "vi"
+    assert saved["mm_srt_path"] == target_srt
+    assert saved["mm_audio_key"] == audio_key
+    assert saved["final_video_key"] == final_key
+    assert saved["subtitles_status"] == "ready"
+    assert saved["dub_status"] == "ready"
+    assert saved["compose_status"] == "ready"
+    assert saved["target_subtitle_current"] is True
+    assert saved["dub_current"] is True
+    assert saved["compose_ready"] is True
+    assert saved["publish_ready"] is True
+
+
+def test_helper_translation_projection_stays_helper_layer_only():
+    section = task_view_workbench_contract._subtitles_section(
+        task={"task_id": "hf-helper-projection", "subtitles_error": None},
+        subtitle_lane={
+            "helper_translate_status": "ready",
+            "helper_translate_failed": False,
+            "helper_translate_provider": "gemini",
+            "helper_translate_input_text": "helper candidate",
+            "helper_translate_translated_text": "ung vien ho tro",
+            "helper_translate_target_lang": "vi",
+            "primary_editable_text": "1\n00:00:00,000 --> 00:00:01,000\nmain subtitle\n",
+            "primary_editable_format": "srt",
+            "dub_input_text": "main subtitle",
+            "dub_input_source": "target_subtitle",
+            "subtitle_ready": True,
+            "target_subtitle_current": True,
+        },
+        subtitles_state="ready",
+        origin_text="source subtitle",
+        subtitles_text="target subtitle",
+        normalized_source_text="normalized source",
+    )
+
+    assert section["helper_translation"] == {
+        "status": "ready",
+        "failed": False,
+        "reason": None,
+        "message": None,
+        "provider": "gemini",
+        "input_text": "helper candidate",
+        "translated_text": "ung vien ho tro",
+        "target_lang": "vi",
+    }
+    assert "main subtitle" in section["primary_editable_text"]
+    assert section["dub_input_source"] == "target_subtitle"
 
 
 def test_translate_subtitles_source_lane_persists_full_target_srt(monkeypatch, tmp_path):
