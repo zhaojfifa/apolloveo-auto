@@ -413,6 +413,336 @@ def test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states(monke
     assert compose_step.get("status") == "pending"
 
 
+def test_hot_follow_workbench_projects_compose_blocked_terminal(monkeypatch):
+    task_id = "hf-workbench-compose-blocked-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "pending",
+            "compose_last_status": "pending",
+            "compose_input_policy": {
+                "mode": "blocked",
+                "reason": "bitrate_too_high",
+                "failure_code": "bitrate_too_high",
+            },
+            "voice_id": "mm_female_1",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "compose_not_done",
+            "final": {"exists": False, "fresh": False, "url": None},
+            "historical_final": {"exists": False, "url": None},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": True,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "mm_female_1",
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    ready_gate = data.get("ready_gate") or {}
+    assert ready_gate.get("compose_ready") is False
+    assert ready_gate.get("compose_blocked") is True
+    assert ready_gate.get("compose_blocked_reason") == "bitrate_too_high"
+    assert ready_gate.get("blocking") == ["bitrate_too_high"]
+
+    compose_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "compose"), {})
+    assert compose_step.get("status") == "blocked"
+    assert compose_step.get("state") == "blocked"
+    assert compose_step.get("error") == "bitrate_too_high"
+    assert ((data.get("compose") or {}).get("last") or {}).get("status") == "blocked"
+    assert ((data.get("pipeline_legacy") or {}).get("compose") or {}).get("status") == "blocked"
+
+    final_row = next(
+        (row for row in (data.get("deliverables") or []) if str(row.get("kind") or "").lower() == "final"),
+        {},
+    )
+    assert final_row.get("status") == "blocked"
+    assert final_row.get("state") == "blocked"
+    assert ((data.get("current_attempt") or {}).get("compose_blocked_terminal")) is True
+
+
+def test_hot_follow_workbench_projects_compose_derive_failed_terminal(monkeypatch):
+    task_id = "hf-workbench-compose-derive-failed-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "pending",
+            "compose_last_status": "pending",
+            "compose_input_policy": {
+                "mode": "derive_failed",
+                "reason": "compose_input_derive_failed",
+                "failure_code": "derive_not_encoder_safe",
+            },
+            "voice_id": "mm_female_1",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "compose_not_done",
+            "final": {"exists": False, "fresh": False, "url": None},
+            "historical_final": {"exists": False, "url": None},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": True,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "mm_female_1",
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    ready_gate = data.get("ready_gate") or {}
+    assert ready_gate.get("compose_ready") is False
+    assert ready_gate.get("compose_input_derive_failed_terminal") is True
+    assert ready_gate.get("compose_input_reason") == "derive_not_encoder_safe"
+
+    compose_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "compose"), {})
+    assert compose_step.get("status") == "failed"
+    assert compose_step.get("state") == "failed"
+    assert compose_step.get("error") == "derive_not_encoder_safe"
+    assert ((data.get("compose") or {}).get("last") or {}).get("status") == "failed"
+    assert ((data.get("pipeline_legacy") or {}).get("compose") or {}).get("status") == "failed"
+
+    final_row = next(
+        (row for row in (data.get("deliverables") or []) if str(row.get("kind") or "").lower() == "final"),
+        {},
+    )
+    assert final_row.get("status") == "failed"
+    assert final_row.get("state") == "failed"
+    assert ((data.get("current_attempt") or {}).get("compose_input_derive_failed_terminal")) is True
+
+
+def test_hot_follow_workbench_projects_compose_exec_failed_terminal(monkeypatch):
+    task_id = "hf-workbench-compose-exec-failed-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "failed",
+            "compose_last_status": "failed",
+            "compose_error_reason": "compose_timeout",
+            "voice_id": "mm_female_1",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_mm.mp3",
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "compose_timeout",
+            "final": {"exists": False, "fresh": False, "url": None},
+            "historical_final": {"exists": False, "url": None},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": "compose_timeout",
+            "compose_error_message": "heavy compose timed out",
+            "raw_exists": True,
+            "voice_exists": True,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "mm_female_1",
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    ready_gate = data.get("ready_gate") or {}
+    assert ready_gate.get("compose_ready") is False
+    assert ready_gate.get("compose_exec_failed_terminal") is True
+    assert ready_gate.get("compose_reason") == "compose_timeout"
+
+    compose_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "compose"), {})
+    assert compose_step.get("status") == "failed"
+    assert compose_step.get("state") == "failed"
+    assert compose_step.get("error") == "compose_timeout"
+    assert ((data.get("compose") or {}).get("last") or {}).get("status") == "failed"
+    assert ((data.get("pipeline_legacy") or {}).get("compose") or {}).get("status") == "failed"
+
+    final_row = next(
+        (row for row in (data.get("deliverables") or []) if str(row.get("kind") or "").lower() == "final"),
+        {},
+    )
+    assert final_row.get("status") == "failed"
+    assert final_row.get("state") == "failed"
+    assert ((data.get("current_attempt") or {}).get("compose_exec_failed_terminal")) is True
+
+
+def test_hot_follow_workbench_pending_compose_projection_clears_stale_error(monkeypatch):
+    task_id = "hf-workbench-compose-pending-clears-error-01"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "compose_status": "pending",
+            "compose_last_status": "failed",
+            "compose_error_reason": "compose_timeout",
+            "compose_error": "heavy compose timed out",
+            "voice_id": "mm_female_1",
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "compose_not_done",
+            "final": {"exists": False, "fresh": False, "url": None},
+            "historical_final": {"exists": False, "url": None},
+            "final_fresh": False,
+            "final_stale_reason": None,
+            "compose_error_reason": None,
+            "compose_error_message": None,
+            "raw_exists": True,
+            "voice_exists": True,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": False,
+            "audio_ready_reason": "dub_not_done",
+            "dub_current": False,
+            "dub_current_reason": "dub_not_done",
+            "resolved_voice": "my-MM-NilarNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "mm_female_1",
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    compose_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "compose"), {})
+    assert compose_step.get("status") == "pending"
+    assert compose_step.get("state") == "pending"
+    assert compose_step.get("error") is None
+    assert ((data.get("compose") or {}).get("last") or {}).get("status") == "pending"
+    assert ((data.get("compose") or {}).get("last") or {}).get("error") is None
+    assert ((data.get("pipeline_legacy") or {}).get("compose") or {}).get("status") == "pending"
+    assert ((data.get("pipeline_legacy") or {}).get("compose") or {}).get("error") is None
+
+
 def test_hot_follow_workbench_stale_final_is_historical_only_after_redub(monkeypatch):
     task_id = "hf-workbench-stale-final-01"
     repo = _Repo()

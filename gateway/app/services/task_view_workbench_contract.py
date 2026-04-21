@@ -455,16 +455,53 @@ def apply_ready_gate_compose_projection(payload: dict[str, Any]) -> None:
 
 
 def apply_ready_gate_composed_projection(payload: dict[str, Any], *, final_url: str | None) -> None:
-    composed_ready = bool((payload.get("ready_gate") or {}).get("compose_ready"))
+    ready_gate = payload.get("ready_gate") if isinstance(payload.get("ready_gate"), dict) else {}
+    composed_ready = bool(ready_gate.get("compose_ready"))
     if composed_ready:
         _set_compose_pipeline_status(payload, "done", final_url=final_url)
         payload["composed_ready"] = True
         payload["composed_reason"] = "ready"
         return
+    if bool(ready_gate.get("compose_blocked")) or bool(ready_gate.get("compose_input_blocked_terminal")):
+        reason = str(
+            ready_gate.get("compose_blocked_reason")
+            or ready_gate.get("compose_reason")
+            or "compose_input_blocked"
+        ).strip()
+        _set_compose_pipeline_status(payload, "blocked", final_url=None, error=reason)
+        payload["composed_ready"] = False
+        payload["composed_reason"] = reason
+        return
+    if bool(ready_gate.get("compose_input_derive_failed_terminal")):
+        reason = str(
+            ready_gate.get("compose_input_reason")
+            or ready_gate.get("compose_reason")
+            or "compose_input_derive_failed"
+        ).strip()
+        _set_compose_pipeline_status(payload, "failed", final_url=None, error=reason)
+        payload["composed_ready"] = False
+        payload["composed_reason"] = reason
+        return
+    if bool(ready_gate.get("compose_exec_failed_terminal")):
+        reason = str(
+            ready_gate.get("compose_reason")
+            or ready_gate.get("compose_input_reason")
+            or "compose_exec_failed"
+        ).strip()
+        _set_compose_pipeline_status(payload, "failed", final_url=None, error=reason)
+        payload["composed_ready"] = False
+        payload["composed_reason"] = reason
+        return
     _set_compose_pipeline_status(payload, "pending", final_url=None)
 
 
-def _set_compose_pipeline_status(payload: dict[str, Any], status: str, *, final_url: str | None) -> None:
+def _set_compose_pipeline_status(
+    payload: dict[str, Any],
+    status: str,
+    *,
+    final_url: str | None,
+    error: str | None = None,
+) -> None:
     pipeline = payload.get("pipeline")
     if isinstance(pipeline, list):
         for step in pipeline:
@@ -476,18 +513,28 @@ def _set_compose_pipeline_status(payload: dict[str, Any], status: str, *, final_
                 if status == "done":
                     step["error"] = None
                     step["message"] = step.get("message") or "final video merge"
+                else:
+                    step["error"] = error
 
     pipeline_legacy = payload.get("pipeline_legacy")
     if isinstance(pipeline_legacy, dict):
         compose_legacy = pipeline_legacy.get("compose")
         if isinstance(compose_legacy, dict):
             compose_legacy["status"] = status
+            if status == "done":
+                compose_legacy["error"] = None
+            else:
+                compose_legacy["error"] = error
 
     compose = payload.get("compose")
     if isinstance(compose, dict):
         last = compose.get("last")
         if isinstance(last, dict):
             last["status"] = status
+            if status == "done":
+                last["error"] = None
+            else:
+                last["error"] = error
 
     deliverables = payload.get("deliverables")
     if isinstance(deliverables, list):

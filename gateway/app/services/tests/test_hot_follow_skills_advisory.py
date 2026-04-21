@@ -118,6 +118,7 @@ def test_hot_follow_advisory_v0_recommends_recompose_for_stale_final():
                 "compose_status": "pending",
                 "requires_recompose": True,
                 "final_stale_reason": "final_stale_after_dub",
+                "blocking": ["compose_not_done", "final_stale"],
                 "current_subtitle_source": "mm.srt",
             },
             operator_summary={"last_successful_output_available": True},
@@ -158,6 +159,9 @@ def test_hot_follow_advisory_v0_recommends_subtitle_review_when_missing():
                 "subtitle_exists": False,
             },
             current_attempt={
+                "subtitle_ready": False,
+                "subtitle_ready_reason": "subtitle_missing",
+                "subtitle_exists": False,
                 "audio_ready": False,
                 "compose_status": "never",
                 "requires_recompose": False,
@@ -205,6 +209,7 @@ def test_hot_follow_advisory_v0_projects_compose_blocked_before_recompose():
                 "compose_blocked_terminal": True,
                 "requires_recompose": True,
                 "final_stale_reason": "final_stale_after_dub",
+                "blocking": ["bitrate_too_high"],
                 "current_subtitle_source": "mm.srt",
             },
         ),
@@ -249,6 +254,8 @@ def test_hot_follow_advisory_v0_projects_no_dub_terminal_not_review_subtitles():
                 "audio_ready": False,
                 "compose_status": "pending",
                 "requires_recompose": False,
+                "no_dub_compose_allowed": True,
+                "no_dub_reason": "bgm_only_no_tts",
                 "no_dub_route_terminal": True,
                 "subtitle_terminal_state": "no_dub_route_terminal",
             },
@@ -604,7 +611,7 @@ def test_hot_follow_advisory_v0_recommends_continue_qa_when_final_is_ready():
                 "requires_recompose": False,
                 "current_subtitle_source": "mm.srt",
             },
-            operator_summary={"last_successful_output_available": True},
+            operator_summary={"last_successful_output_available": True, "publish_ready": True},
         ),
     )
 
@@ -622,6 +629,32 @@ def test_hot_follow_advisory_v0_recommends_continue_qa_when_final_is_ready():
             "last_successful_output_available": True,
         },
     }
+
+
+def test_hot_follow_advisory_ignores_raw_ready_gate_without_attempt_projection():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-skills-raw-gate-ignored", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": False,
+                "no_dub_compose_allowed": True,
+                "no_dub_reason": "bgm_only_no_tts",
+                "compose_allowed": True,
+                "selected_compose_route": "no_tts_compose_route",
+            },
+            artifact_facts={
+                "final_exists": False,
+                "audio_exists": False,
+                "subtitle_exists": False,
+            },
+            current_attempt={
+                "audio_ready": False,
+                "compose_status": "pending",
+            },
+        ),
+    )
+
+    assert advisory is None
 
 
 def test_hot_follow_advisory_v0_noops_for_non_hot_follow_kind():
@@ -817,6 +850,10 @@ def test_hot_follow_advisory_result_attaches_to_workbench_payload(monkeypatch):
     assert "artifact_facts" in captured
     assert "current_attempt" in captured
     assert "operator_summary" in captured
+    assert captured["current_attempt"]["blocking"] == ["compose_not_done"]
+    assert captured["current_attempt"]["audio_exists"] is False
+    assert captured["current_attempt"]["subtitle_exists"] is False
+    assert captured["operator_summary"]["publish_ready"] is False
     assert data.get("advisory") == {
         "id": "hf_advisory_v0",
         "kind": "operator_guidance",

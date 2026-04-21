@@ -831,10 +831,15 @@ async def run_subtitles_step(req: SubtitlesRequest):
         repo = get_task_repository()
         task_before = repo.get(req.task_id) or {}
         source_audio_policy = source_audio_policy_from_task(task_before)
+        try:
+            workspace_probe = Workspace(req.task_id, target_lang=req.target_lang)
+            raw_available = bool(workspace_probe.raw_video_exists())
+        except Exception:
+            raw_available = False
         parse_source_mode = (
-            "preserved_source_audio_helper"
-            if source_audio_policy == "preserve"
-            else "raw_video_audio"
+            "raw_video_audio"
+            if raw_available
+            else ("preserved_source_audio_helper" if source_audio_policy == "preserve" else "raw_video_audio")
         )
         # Fast-path: skip Whisper when pipeline already recorded no_subtitles from a
         # previous run AND the caller did not explicitly force re-extraction.

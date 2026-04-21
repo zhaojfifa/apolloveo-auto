@@ -12,8 +12,6 @@ def run(
     stage_results: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     _ = defaults, stage_results
-    ready_gate = dict(payload.get("ready_gate") or {})
-    artifact_facts = dict(payload.get("artifact_facts") or {})
     current_attempt = dict(payload.get("current_attempt") or {})
     operator_summary = dict(payload.get("operator_summary") or {})
     task = dict(payload.get("task") or {})
@@ -21,82 +19,51 @@ def run(
     target_lang = task.get("target_lang") or task.get("content_lang") or "mm"
     expected_subtitle_source = hot_follow_subtitle_filename(target_lang)
 
-    subtitle_ready = bool(ready_gate.get("subtitle_ready"))
-    audio_ready = bool(current_attempt.get("audio_ready") or ready_gate.get("audio_ready"))
-    compose_ready = bool(ready_gate.get("compose_ready"))
-    publish_ready = bool(ready_gate.get("publish_ready"))
-    blocking = list(ready_gate.get("blocking") or [])
+    subtitle_ready = current_attempt.get("subtitle_ready") if "subtitle_ready" in current_attempt else None
+    audio_ready = bool(current_attempt.get("audio_ready"))
+    compose_status = str(current_attempt.get("compose_status") or "").strip().lower()
+    compose_ready = compose_status == "done"
+    final_exists = bool(operator_summary.get("last_successful_output_available"))
+    publish_ready = bool(operator_summary.get("publish_ready"))
+    blocking = list(current_attempt.get("blocking") or [])
     return {
         "task_id": str(task.get("task_id") or task.get("id") or "").strip() or None,
         "target_lang": str(target_lang).strip().lower() or "mm",
         "expected_subtitle_source": expected_subtitle_source,
         "subtitle_ready": subtitle_ready,
-        "subtitle_ready_reason": str(ready_gate.get("subtitle_ready_reason") or "").strip() or None,
+        "subtitle_ready_reason": str(current_attempt.get("subtitle_ready_reason") or "").strip() or None,
         "audio_ready": audio_ready,
-        "audio_ready_reason": str(
-            current_attempt.get("audio_ready_reason") or ready_gate.get("audio_ready_reason") or ""
-        ).strip()
-        or None,
+        "audio_ready_reason": str(current_attempt.get("audio_ready_reason") or "").strip() or None,
         "compose_ready": compose_ready,
-        "compose_allowed": bool(ready_gate.get("compose_allowed") or current_attempt.get("compose_allowed")),
-        "compose_route_allowed": bool(
-            ready_gate.get("compose_route_allowed") or current_attempt.get("compose_route_allowed")
-        ),
-        "compose_input_ready": bool(
-            ready_gate.get("compose_input_ready") or current_attempt.get("compose_input_ready")
-        ),
-        "compose_execute_allowed": bool(
-            ready_gate.get("compose_execute_allowed") or current_attempt.get("compose_execute_allowed")
-        ),
-        "compose_input_mode": str(ready_gate.get("compose_input_mode") or "").strip() or None,
-        "compose_input_reason": str(ready_gate.get("compose_input_reason") or "").strip() or None,
+        "compose_allowed": bool(current_attempt.get("compose_allowed")),
+        "compose_route_allowed": bool(current_attempt.get("compose_route_allowed")),
+        "compose_input_ready": bool(current_attempt.get("compose_input_ready")),
+        "compose_execute_allowed": bool(current_attempt.get("compose_execute_allowed")),
+        "compose_input_mode": str(current_attempt.get("compose_input_mode") or "").strip() or None,
+        "compose_input_reason": str(current_attempt.get("compose_input_reason") or "").strip() or None,
         "publish_ready": publish_ready,
         "blocking": blocking,
-        "compose_blocked": bool(ready_gate.get("compose_blocked") or current_attempt.get("compose_blocked_terminal")),
-        "compose_blocked_reason": str(
-            ready_gate.get("compose_blocked_reason") or current_attempt.get("compose_reason") or ""
-        ).strip()
-        or None,
-        "compose_input_derive_failed_terminal": bool(
-            ready_gate.get("compose_input_derive_failed_terminal")
-            or current_attempt.get("compose_input_derive_failed_terminal")
-        ),
-        "compose_input_blocked_terminal": bool(
-            ready_gate.get("compose_input_blocked_terminal")
-            or current_attempt.get("compose_input_blocked_terminal")
-        ),
-        "compose_exec_failed_terminal": bool(
-            ready_gate.get("compose_exec_failed_terminal")
-            or current_attempt.get("compose_exec_failed_terminal")
-        ),
-        "no_dub_compose_allowed": bool(ready_gate.get("no_dub_compose_allowed")),
-        "no_tts_compose_allowed": bool(ready_gate.get("no_tts_compose_allowed") or current_attempt.get("no_tts_compose_allowed")),
-        "no_dub_reason": str(ready_gate.get("no_dub_reason") or "").strip() or None,
+        "compose_blocked": bool(current_attempt.get("compose_blocked_terminal")),
+        "compose_blocked_reason": str(current_attempt.get("compose_reason") or "").strip() or None,
+        "compose_input_derive_failed_terminal": bool(current_attempt.get("compose_input_derive_failed_terminal")),
+        "compose_input_blocked_terminal": bool(current_attempt.get("compose_input_blocked_terminal")),
+        "compose_exec_failed_terminal": bool(current_attempt.get("compose_exec_failed_terminal")),
+        "no_dub_compose_allowed": bool(current_attempt.get("no_dub_compose_allowed")),
+        "no_tts_compose_allowed": bool(current_attempt.get("no_tts_compose_allowed")),
+        "no_dub_reason": str(current_attempt.get("no_dub_reason") or "").strip() or None,
         "no_dub_route_terminal": bool(current_attempt.get("no_dub_route_terminal")),
         "helper_translate_failed": bool(current_attempt.get("helper_translate_failed")),
         "helper_translate_failed_voice_led": bool(current_attempt.get("helper_translate_failed_voice_led")),
-        "helper_translate_error_reason": str(
-            current_attempt.get("helper_translate_error_reason")
-            or artifact_facts.get("helper_translate_error_reason")
-            or ""
-        ).strip()
-        or None,
-        "helper_translate_error_message": str(
-            current_attempt.get("helper_translate_error_message")
-            or artifact_facts.get("helper_translate_error_message")
-            or ""
-        ).strip()
-        or None,
-        "selected_compose_route": str(
-            ready_gate.get("selected_compose_route") or current_attempt.get("selected_compose_route") or ""
-        ).strip()
-        or None,
+        "helper_translate_error_reason": str(current_attempt.get("helper_translate_error_reason") or "").strip() or None,
+        "helper_translate_error_message": str(current_attempt.get("helper_translate_error_message") or "").strip() or None,
+        "selected_compose_route": str(current_attempt.get("selected_compose_route") or "").strip() or None,
         "subtitle_terminal_state": str(current_attempt.get("subtitle_terminal_state") or "").strip() or None,
-        "final_exists": bool(artifact_facts.get("final_exists")),
-        "subtitle_exists": bool(artifact_facts.get("subtitle_exists")),
-        "audio_exists": bool(artifact_facts.get("audio_exists")),
+        "final_exists": final_exists,
+        "subtitle_exists": bool(current_attempt.get("subtitle_exists")),
+        "audio_exists": bool(current_attempt.get("audio_exists")),
         "requires_recompose": bool(current_attempt.get("requires_recompose")),
-        "compose_status": str(current_attempt.get("compose_status") or "").strip().lower() or None,
+        "requires_redub": bool(current_attempt.get("requires_redub")),
+        "compose_status": compose_status or None,
         "final_stale_reason": str(current_attempt.get("final_stale_reason") or "").strip() or None,
         "current_subtitle_source": str(current_attempt.get("current_subtitle_source") or "").strip() or None,
         "last_successful_output_available": operator_summary.get("last_successful_output_available"),
