@@ -34,8 +34,7 @@ def run(
         return {"decision_key": "helper_translate_failed"}
 
     if facts.get("no_dub_route_terminal") or (
-        facts.get("compose_allowed")
-        and facts.get("no_tts_compose_allowed")
+        facts.get("no_tts_compose_allowed")
         and facts.get("selected_compose_route")
         in {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"}
     ):
@@ -44,16 +43,22 @@ def run(
     if facts.get("requires_recompose"):
         return {"decision_key": "recompose_required"}
 
-    if facts.get("subtitle_ready") and facts.get("audio_ready") and not facts.get("final_exists"):
-        return {"decision_key": "compose_missing_final"}
-
-    if facts.get("subtitle_ready") and not facts.get("audio_ready"):
+    if facts.get("requires_redub") or (
+        facts.get("subtitle_ready") is True
+        and not facts.get("audio_ready")
+        and facts.get("selected_compose_route") == "tts_replace_route"
+    ):
         return {"decision_key": "refresh_dub"}
 
-    if not facts.get("subtitle_ready"):
+    if facts.get("subtitle_ready") is True and facts.get("audio_ready") and not facts.get("final_exists"):
+        return {"decision_key": "compose_missing_final"}
+
+    if facts.get("subtitle_terminal_state") == "subtitle_empty_terminal" or facts.get("subtitle_ready") is False:
         return {"decision_key": "review_subtitles"}
 
-    if facts.get("publish_ready") and facts.get("compose_ready") and facts.get("final_exists"):
+    if (facts.get("publish_ready") and facts.get("compose_ready") and facts.get("final_exists")) or (
+        facts.get("compose_status") == "done" and facts.get("final_exists")
+    ):
         return {"decision_key": "final_ready"}
 
     return None

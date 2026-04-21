@@ -456,6 +456,7 @@ def build_hot_follow_current_attempt_summary(
     compose_execute_allowed = bool(route_allowed and compose_input_ready)
     return {
         "dub_status": dub_status_norm,
+        "subtitle_ready": subtitle_ready,
         "audio_ready": audio_ready,
         "audio_ready_reason": str(voice_state.get("audio_ready_reason") or "").strip() or "unknown",
         "dub_current": bool(voice_state.get("dub_current")),
@@ -470,9 +471,12 @@ def build_hot_follow_current_attempt_summary(
         "compose_allowed": route_allowed,
         "compose_route_allowed": route_allowed,
         "compose_input_ready": compose_input_ready,
+        "compose_input_mode": compose_input_mode,
+        "compose_input_reason": compose_input_reason,
         "compose_execute_allowed": compose_execute_allowed,
         "no_tts_compose_allowed": bool(no_tts_route and route_allowed),
         "no_dub_compose_allowed": bool(no_tts_route and route_allowed),
+        "no_dub_reason": no_dub_reason,
         "compose_blocked_terminal": compose_blocked,
         "compose_input_derive_failed_terminal": compose_input_derive_failed,
         "compose_input_blocked_terminal": compose_blocked,
