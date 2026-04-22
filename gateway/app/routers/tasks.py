@@ -280,6 +280,18 @@ from gateway.app.services.task_download_views import (  # noqa: E402
     require_storage_key as _require_storage_key,
     text_or_redirect as _text_or_redirect,
 )
+from gateway.app.services.task_stream_views import (  # noqa: E402
+    build_stream_download_response as _build_stream_download_response,
+    build_stream_head_response as _build_stream_head_response,
+    parse_http_range as _svc_parse_http_range,
+    resolve_audio_meta as _svc_resolve_audio_meta,
+    resolve_final_meta as _svc_resolve_final_meta,
+)
+from gateway.app.services.task_subtitle_detection import (  # noqa: E402
+    detect_subtitle_streams as _svc_detect_subtitle_streams,
+    get_subtitle_detection as _svc_get_subtitle_detection,
+    subtitle_cache_path as _svc_subtitle_cache_path,
+)
 from gateway.app.services.hot_follow_runtime_bridge import (  # noqa: E402
     compat_allow_subtitle_only_compose as _compat_allow_subtitle_only_compose,
     compat_hot_follow_compose_runtime as _compat_hot_follow_compose_runtime,
@@ -642,287 +654,96 @@ def download_mm_txt(
 
 
 def _resolve_audio_meta(task_id: str, repo) -> tuple[str, int, str]:
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="dubbed audio not found")
-    if str(_task_value(task, "kind") or "").strip().lower() == "hot_follow":
-        asset = _hf_current_voiceover_asset(task_id, task, get_settings())
-        chosen_key = str(asset.get("key") or "").strip() or None
-        if not chosen_key:
-            raise HTTPException(status_code=404, detail="voiceover_not_ready")
-        try:
-            chosen_size, chosen_type = assert_artifact_ready(
-                kind="audio",
-                key=chosen_key,
-                exists_fn=object_exists,
-                head_fn=object_head,
-            )
-        except Exception:
-            raise HTTPException(status_code=404, detail="voiceover_not_ready")
-        content_type = str(chosen_type or asset.get("content_type") or _task_value(task, "mm_audio_mime") or "audio/mpeg")
-    else:
-        chosen_key = _task_value(task, "mm_audio_key") or _task_value(task, "mm_audio_path")
-        if not chosen_key:
-            raise HTTPException(status_code=404, detail="voiceover_not_ready")
-        try:
-            chosen_size, chosen_type = assert_artifact_ready(
-                kind="audio",
-                key=str(chosen_key),
-                exists_fn=object_exists,
-                head_fn=object_head,
-            )
-        except Exception:
-            raise HTTPException(status_code=404, detail="voiceover_not_ready")
-        content_type = str(chosen_type or _task_value(task, "mm_audio_mime") or "audio/mpeg")
-    return chosen_key, int(chosen_size), content_type
+    return _svc_resolve_audio_meta(
+        task_id,
+        repo,
+        task_value=_task_value,
+        current_voiceover_asset_loader=_hf_current_voiceover_asset,
+        settings_loader=get_settings,
+        artifact_ready_assert=assert_artifact_ready,
+        object_exists_fn=object_exists,
+        object_head_fn=object_head,
+    )
 
 
 @pages_router.head("/v1/tasks/{task_id}/audio_mm")
 def head_audio_mm(task_id: str, repo=Depends(get_task_repository)):
-    try:
-        _, total, content_type = _resolve_audio_meta(task_id, repo)
-    except HTTPException as exc:
-        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc.detail)})
-    except Exception as exc:
-        logger.exception("audio_head_failed", extra={"task_id": task_id, "error": str(exc)})
-        return JSONResponse(status_code=500, content={"detail": "audio head failed"})
-    headers = {
-        "Accept-Ranges": "bytes",
-        "Content-Type": content_type or "audio/mpeg",
-        "Content-Length": str(total),
-    }
-    logger.info(
-        "AUDIO_STREAM",
-        extra={
-            "task_id": task_id,
-            "has_range": False,
-            "start": 0,
-            "end": total - 1,
-            "total": total,
-            "status": 200,
-            "content_type": headers["Content-Type"],
-        },
+    return _build_stream_head_response(
+        task_id,
+        repo,
+        resolve_meta=_resolve_audio_meta,
+        logger=logger,
+        event_name="AUDIO_STREAM",
+        failure_log="audio_head_failed",
+        failure_detail="audio head failed",
+        default_content_type="audio/mpeg",
     )
-    return Response(status_code=200, headers=headers)
 
 
 @pages_router.get("/v1/tasks/{task_id}/audio_mm")
 def download_audio_mm(task_id: str, request: Request, repo=Depends(get_task_repository)):
-    try:
-        key, total, content_type = _resolve_audio_meta(task_id, repo)
-    except HTTPException as exc:
-        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc.detail)})
-    except Exception as exc:
-        logger.exception("audio_get_failed", extra={"task_id": task_id, "error": str(exc)})
-        return JSONResponse(status_code=500, content={"detail": "audio get failed"})
-
-    range_header = request.headers.get("range")
-    start = 0
-    end = total - 1
-    status_code = 200
-    if range_header:
-        try:
-            start, end = _parse_http_range(range_header, total)
-        except Exception:
-            logger.info(
-                "AUDIO_STREAM",
-                extra={
-                    "task_id": task_id,
-                    "has_range": True,
-                    "range_in": range_header,
-                    "start": None,
-                    "end": None,
-                    "total": total,
-                    "status": 416,
-                    "content_type": content_type,
-                },
-            )
-            return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
-        status_code = 206
-    try:
-        stream, length = stream_object_range(str(key), start=start, end=end)
-    except ValueError:
-        logger.info(
-            "AUDIO_STREAM",
-            extra={
-                "task_id": task_id,
-                "has_range": bool(range_header),
-                "range_in": range_header,
-                "start": start,
-                "end": end,
-                "total": total,
-                "status": 416,
-                "content_type": content_type,
-            },
-        )
-        return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
-    except Exception as exc:
-        logger.exception("audio_stream_failed", extra={"task_id": task_id, "error": str(exc)})
-        return JSONResponse(status_code=500, content={"detail": "audio stream failed"})
-    headers = {
-        "Accept-Ranges": "bytes",
-        "Content-Type": content_type,
-        "Content-Length": str(length),
-    }
-    if status_code == 206:
-        headers["Content-Range"] = f"bytes {start}-{end}/{total}"
-    logger.info(
-        "AUDIO_STREAM",
-        extra={
-            "task_id": task_id,
-            "has_range": bool(range_header),
-            "range_in": range_header,
-            "start": start,
-            "end": end,
-            "total": total,
-            "status": status_code,
-            "content_type": content_type,
-        },
+    return _build_stream_download_response(
+        task_id,
+        request,
+        repo,
+        resolve_meta=_resolve_audio_meta,
+        parse_range=_parse_http_range,
+        stream_object_range_loader=lambda key, start, end: stream_object_range(str(key), start=start, end=end),
+        logger=logger,
+        event_name="AUDIO_STREAM",
+        resolve_failure_log="audio_get_failed",
+        resolve_failure_detail="audio get failed",
+        stream_failure_log="audio_stream_failed",
+        stream_failure_detail="audio stream failed",
     )
-    return StreamingResponse(stream, status_code=status_code, headers=headers, media_type=content_type)
 
 
 def _resolve_final_meta(task_id: str, repo) -> tuple[str, int, str]:
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="final video not found")
-    key = _task_value(task, "final_video_key") or _task_value(task, "final_video_path") or deliver_key(task_id, "final.mp4")
-    if not key or not object_exists(str(key)):
-        raise HTTPException(status_code=404, detail="final video not found")
-    head = object_head(str(key))
-    total, ctype = media_meta_from_head(head)
-    if total <= 0:
-        raise HTTPException(status_code=404, detail="final video not found")
-    content_type = str(_task_value(task, "final_mime") or ctype or "video/mp4")
-    return str(key), int(total), content_type
+    return _svc_resolve_final_meta(
+        task_id,
+        repo,
+        task_value=_task_value,
+        deliver_key_builder=deliver_key,
+        object_exists_fn=object_exists,
+        object_head_fn=object_head,
+        media_meta_from_head_fn=media_meta_from_head,
+    )
 
 
 def _parse_http_range(range_header: str, total: int) -> tuple[int, int]:
-    m = re.match(r"bytes=(\d*)-(\d*)", (range_header or "").strip())
-    if not m:
-        raise ValueError("invalid_range")
-    start_raw, end_raw = m.group(1), m.group(2)
-    if start_raw == "" and end_raw == "":
-        raise ValueError("invalid_range")
-    if start_raw == "":
-        suffix = int(end_raw)
-        if suffix <= 0:
-            raise ValueError("invalid_range")
-        start = max(total - suffix, 0)
-        end = total - 1
-    else:
-        start = int(start_raw)
-        end = int(end_raw) if end_raw else total - 1
-    if start >= total or start < 0 or end < start:
-        raise ValueError("range_not_satisfiable")
-    end = min(end, total - 1)
-    return start, end
+    return _svc_parse_http_range(range_header, total)
 
 
 @pages_router.head("/v1/tasks/{task_id}/final")
 def head_final_video(task_id: str, repo=Depends(get_task_repository)):
-    try:
-        _, total, content_type = _resolve_final_meta(task_id, repo)
-    except HTTPException as exc:
-        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc.detail)})
-    except Exception as exc:
-        logger.exception("final_head_failed", extra={"task_id": task_id, "error": str(exc)})
-        return JSONResponse(status_code=500, content={"detail": "final head failed"})
-    headers = {
-        "Accept-Ranges": "bytes",
-        "Content-Type": content_type or "video/mp4",
-        "Content-Length": str(total),
-    }
-    logger.info(
-        "FINAL_STREAM",
-        extra={
-            "task_id": task_id,
-            "has_range": False,
-            "range_in": None,
-            "start": 0,
-            "end": total - 1,
-            "total": total,
-            "status": 200,
-            "content_type": headers["Content-Type"],
-        },
+    return _build_stream_head_response(
+        task_id,
+        repo,
+        resolve_meta=_resolve_final_meta,
+        logger=logger,
+        event_name="FINAL_STREAM",
+        failure_log="final_head_failed",
+        failure_detail="final head failed",
+        default_content_type="video/mp4",
     )
-    return Response(status_code=200, headers=headers)
 
 
 @pages_router.get("/v1/tasks/{task_id}/final")
 def download_final_video(task_id: str, request: Request, repo=Depends(get_task_repository)):
-    try:
-        key, total, content_type = _resolve_final_meta(task_id, repo)
-    except HTTPException as exc:
-        return JSONResponse(status_code=exc.status_code, content={"detail": str(exc.detail)})
-    except Exception as exc:
-        logger.exception("final_get_failed", extra={"task_id": task_id, "error": str(exc)})
-        return JSONResponse(status_code=500, content={"detail": "final get failed"})
-
-    range_header = request.headers.get("range")
-    start = 0
-    end = total - 1
-    status_code = 200
-    if range_header:
-        try:
-            start, end = _parse_http_range(range_header, total)
-        except Exception:
-            logger.info(
-                "FINAL_STREAM",
-                extra={
-                    "task_id": task_id,
-                    "has_range": True,
-                    "range_in": range_header,
-                    "start": None,
-                    "end": None,
-                    "total": total,
-                    "status": 416,
-                    "content_type": content_type,
-                },
-            )
-            return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
-        status_code = 206
-    try:
-        stream, length = stream_object_range(str(key), start=start, end=end)
-    except ValueError:
-        logger.info(
-            "FINAL_STREAM",
-            extra={
-                "task_id": task_id,
-                "has_range": bool(range_header),
-                "range_in": range_header,
-                "start": start,
-                "end": end,
-                "total": total,
-                "status": 416,
-                "content_type": content_type,
-            },
-        )
-        return Response(status_code=416, headers={"Content-Range": f"bytes */{total}"})
-    except Exception as exc:
-        logger.exception("final_stream_failed", extra={"task_id": task_id, "error": str(exc)})
-        return JSONResponse(status_code=500, content={"detail": "final stream failed"})
-    headers = {
-        "Accept-Ranges": "bytes",
-        "Content-Type": content_type,
-        "Content-Length": str(length),
-    }
-    if status_code == 206:
-        headers["Content-Range"] = f"bytes {start}-{end}/{total}"
-    logger.info(
-        "FINAL_STREAM",
-        extra={
-            "task_id": task_id,
-            "has_range": bool(range_header),
-            "range_in": range_header,
-            "start": start,
-            "end": end,
-            "total": total,
-            "status": status_code,
-            "content_type": content_type,
-        },
+    return _build_stream_download_response(
+        task_id,
+        request,
+        repo,
+        resolve_meta=_resolve_final_meta,
+        parse_range=_parse_http_range,
+        stream_object_range_loader=lambda key, start, end: stream_object_range(str(key), start=start, end=end),
+        logger=logger,
+        event_name="FINAL_STREAM",
+        resolve_failure_log="final_get_failed",
+        resolve_failure_detail="final get failed",
+        stream_failure_log="final_stream_failed",
+        stream_failure_detail="final stream failed",
     )
-    return StreamingResponse(stream, status_code=status_code, headers=headers, media_type=content_type)
 
 
 @pages_router.get("/v1/tasks/{task_id}/pack")
@@ -1177,68 +998,25 @@ def _ensure_mp3_audio(src_path: Path, dst_path: Path) -> Path:
 
 
 def _subtitle_cache_path(task_id: str) -> Path:
-    return task_base_dir(task_id) / "subtitle_streams.json"
+    return _svc_subtitle_cache_path(task_id, task_base_dir_loader=task_base_dir)
 
 
 def _detect_subtitle_streams(raw_file: Path) -> dict[str, Any]:
-    if not raw_file.exists():
-        return {"status": "unknown", "reason": "raw_missing"}
-
-    ffprobe = shutil.which("ffprobe")
-    if not ffprobe:
-        return {"status": "unknown", "reason": "ffprobe_missing"}
-
-    cmd = [
-        ffprobe,
-        "-v",
-        "error",
-        "-print_format",
-        "json",
-        "-show_streams",
-        str(raw_file),
-    ]
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    if proc.returncode != 0:
-        return {"status": "unknown", "reason": "ffprobe_failed"}
-
-    try:
-        payload = json.loads(proc.stdout or "{}")
-    except json.JSONDecodeError:
-        return {"status": "unknown", "reason": "ffprobe_bad_json"}
-
-    streams = payload.get("streams", []) or []
-    subtitle_streams = [s for s in streams if s.get("codec_type") == "subtitle"]
-    minimal_streams = [
-        {
-            "index": s.get("index"),
-            "codec_name": s.get("codec_name"),
-            "codec_type": s.get("codec_type"),
-            "tags": s.get("tags") or {},
-        }
-        for s in subtitle_streams
-    ]
-    return {
-        "status": "ok",
-        "has_subtitle_stream": bool(subtitle_streams),
-        "subtitle_streams": minimal_streams,
-    }
+    return _svc_detect_subtitle_streams(
+        raw_file,
+        which=shutil.which,
+        run=subprocess.run,
+        json_loads=json.loads,
+    )
 
 
 def _get_subtitle_detection(task_id: str) -> dict[str, Any]:
-    cache_path = _subtitle_cache_path(task_id)
-    if cache_path.exists():
-        try:
-            return json.loads(cache_path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-
-    raw_file = raw_path(task_id)
-    result = _detect_subtitle_streams(raw_file)
-    try:
-        cache_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    except Exception:
-        pass
-    return result
+    return _svc_get_subtitle_detection(
+        task_id,
+        cache_path_loader=_subtitle_cache_path,
+        raw_path_loader=raw_path,
+        detect_subtitle_streams_loader=_detect_subtitle_streams,
+    )
 
 
 # _resolve_download_urls: moved to services/task_view_helpers.py (Phase 1.3)

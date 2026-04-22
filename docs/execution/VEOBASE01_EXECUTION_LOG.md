@@ -701,3 +701,51 @@ Acceptance:
 - `origin/VeoBase01` was intentionally replaced with the approved refreshed local integration baseline
 - rollback target was recorded before the switch in `docs/execution/VEOBASE01_REMOTE_SWITCH_AND_PHASE25_PLAN.md`
 - no code changes were mixed into the remote-switch step; only handoff documentation was added
+
+## PR-10 Tasks.py Shell Reduction Follow-up
+
+Branch: `VeoBase01-pr10-tasks-shell-reduction`
+
+Why:
+
+- `tasks.py` still owned reusable stream/range helper logic and subtitle-detection cache helpers that were not route-specific.
+
+Scope:
+
+- move generic audio/final stream meta and range-handling logic into `gateway/app/services/task_stream_views.py`
+- move subtitle-stream detection/cache helpers into `gateway/app/services/task_subtitle_detection.py`
+- keep compatibility wrapper names in `tasks.py` so existing tests and callers remain stable
+- keep endpoint behavior unchanged
+
+Files changed:
+
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- `docs/execution/VEOBASE01_PR10_TASKS_SHELL_REDUCTION.md`
+- `gateway/app/routers/tasks.py`
+- `gateway/app/services/task_stream_views.py`
+- `gateway/app/services/task_subtitle_detection.py`
+- `gateway/app/services/tests/test_task_stream_views.py`
+- `gateway/app/services/tests/test_task_subtitle_detection.py`
+
+Validation:
+
+- `git diff --check`: passed
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m py_compile gateway/app/routers/tasks.py gateway/app/services/task_stream_views.py gateway/app/services/task_subtitle_detection.py gateway/app/services/tests/test_task_stream_views.py gateway/app/services/tests/test_task_subtitle_detection.py`: passed
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/tests/test_task_stream_views.py gateway/app/services/tests/test_task_subtitle_detection.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_task_router_presenters.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`: `89 passed`
+
+Regression sample evidence:
+
+- final-ready `9c755859d049` synthetic surface probe remained aligned:
+  - publish: `final_exists=true`, `composed_ready=true`, `publish_ready=true`, `audio_ready=true`, compose `done`
+  - workbench: `artifact_facts.final_exists=true`, `composed_ready=true`, `ready_gate.publish_ready=true`, `audio.audio_ready=true`, compose `done`
+- compose-running `9280fcb9f0b1` synthetic surface probe remained in progress:
+  - publish: `final_exists=false`, `composed_ready=false`, `publish_ready=false`, `audio_ready=true`, compose `pending`
+  - workbench: `artifact_facts.final_exists=false`, `composed_ready=false`, `ready_gate.publish_ready=false`, `audio.audio_ready=true`, compose `pending`
+  - persisted task state remained `compose_status=running`
+
+Acceptance:
+
+- additional reusable non-route stream/detection helper logic moved out of `tasks.py`
+- `tasks.py` line count reduced from `3296` to `3074`
+- compatibility wrappers preserved endpoint/test behavior
+- Hot Follow business behavior intentionally unchanged
