@@ -80,6 +80,10 @@ Every state field must have a single write owner or a documented derived owner.
 
 Multiple write owners for the same business truth are forbidden unless an explicit contract names the owner split and validation coverage exists.
 
+Rules-first foundation work must freeze architecture/state/runtime rules before
+scenario onboarding. Scenario concepts must not enter runtime code before the
+rule baseline is explicit in contracts/architecture docs.
+
 ## PR Slicing Rules
 
 Each PR slice must be small enough to review for ownership and behavior.

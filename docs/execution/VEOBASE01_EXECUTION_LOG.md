@@ -214,6 +214,67 @@ Authority refresh acceptance:
 - `status_ownership_matrix.md` remains the ownership/write-path companion
   authority
 
+## 2026-04-23 Authority Baseline Tag And Rule-Freeze Start
+
+- Tag name: `VeoBase01-AuthorityBaseline-PreRuleFreeze`
+- Tag target SHA: `7687ba9aaeaae3ac5f55d37c3d511aff37cabc9f`
+- Tag type: annotated
+
+Reason:
+
+- mark the authority-aligned, publish-regression-fixed VeoBase01 baseline as a
+  rollback-safe point before the rules-first foundation pass
+
+Tag push:
+
+- pushed to `origin`
+
+## 2026-04-23 Main / VeoBase01 Alignment
+
+- Pre-alignment main SHA: `6a2caa764245cd722a6519320a93c9f04573cb14`
+- Pre-alignment VeoBase01 SHA: `7687ba9aaeaae3ac5f55d37c3d511aff37cabc9f`
+- Alignment method: fast-forward `main` to `VeoBase01`
+
+Why:
+
+- `main` was an ancestor of `VeoBase01`
+- the accepted VeoBase01 lineage already contained the stable authority/hotfix
+  baseline
+- fast-forward preserved lineage without rewriting or weakening the accepted
+  branch history
+
+Post-alignment SHAs:
+
+- `main`: `7687ba9aaeaae3ac5f55d37c3d511aff37cabc9f`
+- `VeoBase01`: `7687ba9aaeaae3ac5f55d37c3d511aff37cabc9f`
+
+Remote update:
+
+- `origin/main` fast-forwarded to `7687ba9aaeaae3ac5f55d37c3d511aff37cabc9f`
+
+## 2026-04-23 Rules-First Foundation Pass
+
+Created baseline documents:
+
+- `docs/architecture/factory_four_layer_architecture_baseline_v1.md`
+- `docs/contracts/contract_driven_four_layer_state_baseline_v1.md`
+- `docs/contracts/production_line_runtime_assembly_rules_v1.md`
+- `docs/execution/VEOBASE01_CODE_DEPOWERING_PLAN_V1.md`
+
+Purpose:
+
+- freeze factory architecture layers
+- freeze contract-driven four-layer state precedence
+- freeze runtime assembly rules for production lines
+- define how oversized files lose rule power without starting the refactor here
+
+Scope preserved:
+
+- no new scenario runtime work
+- no new line implementation
+- no multi-role harness
+- no UI/editor implementation
+
 From PR-4 onward, both entry files are mandatory reading before every VeoBase01 engineering PR:
 
 - `ENGINEERING_CONSTRAINTS_INDEX.md`: root-level engineering constraint file and authority for how engineering work must be done.

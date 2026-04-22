@@ -41,10 +41,13 @@ or active architecture decisions.
 | Project baseline | `docs/baseline/PROJECT_BASELINE_INDEX.md` |
 | VeoBase01 reconstruction | `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md` |
 | Architecture/state baseline | `apolloveo_current_architecture_and_state_baseline.md` |
+| Factory four-layer architecture | `docs/architecture/factory_four_layer_architecture_baseline_v1.md` |
 | Line contract | `docs/contracts/line_contract.schema.json` |
 | Unified glossary | `docs/contracts/veobase01_glossary.md` |
 | Four-layer state | `docs/contracts/four_layer_state_contract.md` |
+| Contract-driven state baseline | `docs/contracts/contract_driven_four_layer_state_baseline_v1.md` |
 | Workbench response | `docs/contracts/workbench_hub_response.contract.md` |
+| Runtime assembly rules | `docs/contracts/production_line_runtime_assembly_rules_v1.md` |
 | Status ownership | `docs/contracts/status_ownership_matrix.md` |
 | Runtime execution log | `docs/execution/VEOBASE01_EXECUTION_LOG.md` |
 | VeoBase01 ADR | `docs/adr/ADR-VEOBASE01-LINE-STATE-CONTRACT.md` |
@@ -63,6 +66,7 @@ compose, and final availability.
 ### Four-Layer State Changes
 
 Read `docs/contracts/four_layer_state_contract.md`,
+`docs/contracts/contract_driven_four_layer_state_baseline_v1.md`,
 `docs/contracts/status_ownership_matrix.md`, and
 `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`. Use
 `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md` only as a drafting
@@ -84,6 +88,7 @@ consume L2/L3 outputs and must not redefine artifact truth or attempt truth.
 
 Read this index, `ENGINEERING_CONSTRAINTS_INDEX.md`,
 `docs/contracts/status_ownership_matrix.md`, and
+`docs/contracts/production_line_runtime_assembly_rules_v1.md`, and
 `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`. Routers may validate
 HTTP inputs, call services, and shape HTTP responses. Services own reusable
 state, view, policy, and artifact-fact evaluation. Router extraction must not
@@ -123,9 +128,13 @@ Before any VeoBase01 engineering PR, read:
 - `apolloveo_current_architecture_and_state_baseline.md`
 - `docs/execution/VEOBASE01_EXECUTION_LOG.md`
 - `docs/contracts/four_layer_state_contract.md`
+- `docs/contracts/contract_driven_four_layer_state_baseline_v1.md`
 - `docs/contracts/workbench_hub_response.contract.md`
+- `docs/contracts/production_line_runtime_assembly_rules_v1.md`
 - `docs/contracts/status_ownership_matrix.md`
 - `docs/contracts/line_contract.schema.json`
+- `docs/architecture/factory_four_layer_architecture_baseline_v1.md`
+- `docs/execution/VEOBASE01_CODE_DEPOWERING_PLAN_V1.md`
 - `docs/baseline/PROJECT_BASELINE_INDEX.md`
 - Active review gate docs named by the task, including current Hot Follow recovery or alignment notes when applicable
 
