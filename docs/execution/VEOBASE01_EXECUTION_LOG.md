@@ -841,3 +841,48 @@ Acceptance:
 - `compose_service.py` line count reduced from `2348` to `2111`
 - pure subtitle-render helper logic now lives in a dedicated module rather than the main compose orchestrator
 - no FFmpeg behavior or runtime policy was intentionally changed
+
+## PR-13 Steps V1 Compatibility Reduction Audit
+
+Branch: `VeoBase01-pr13-steps-v1-compatibility-reduction`
+
+Why:
+
+- `steps_v1.py` still carried a neutral SRT/text compatibility helper cluster that did not belong inside the main step-orchestration file.
+
+Scope:
+
+- extract stateless SRT/text helpers into `gateway/app/services/steps_text_support.py`
+- keep legacy helper names in `steps_v1.py` as thin wrappers for import stability
+- add direct tests for the extracted support module
+
+Files changed:
+
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- `docs/execution/VEOBASE01_PR13_STEPS_V1_COMPATIBILITY_REDUCTION.md`
+- `gateway/app/services/steps_v1.py`
+- `gateway/app/services/steps_text_support.py`
+- `gateway/app/services/tests/test_steps_text_support.py`
+
+Validation:
+
+- `git diff --check`: passed
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m py_compile gateway/app/services/steps_v1.py gateway/app/services/steps_text_support.py gateway/app/services/tests/test_steps_text_support.py`: passed
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/tests/test_steps_text_support.py gateway/app/services/status_policy/tests/test_dub_voice_and_text_guard.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/tests/test_hf_compose_freshness.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py -q`: `96 passed`
+
+Regression sample evidence:
+
+- final-ready `9c755859d049` synthetic surface probe remained aligned:
+  - publish: `final_exists=true`, `composed_ready=true`, `publish_ready=true`, `audio_ready=true`, compose `done`
+  - workbench: `artifact_facts.final_exists=true`, `composed_ready=true`, `ready_gate.publish_ready=true`, `audio.audio_ready=true`, compose `done`
+  - persisted state: `compose_status=done`
+- compose-running `9280fcb9f0b1` synthetic surface probe remained in progress:
+  - publish: `final_exists=false`, `composed_ready=false`, `publish_ready=false`, `audio_ready=true`, compose `pending`
+  - workbench: `artifact_facts.final_exists=false`, `composed_ready=false`, `ready_gate.publish_ready=false`, `audio.audio_ready=true`, compose `running`
+  - persisted task state remained `compose_status=running`
+
+Acceptance:
+
+- `steps_v1.py` line count reduced from `2413` to `2349`
+- neutral SRT/text compatibility helpers moved into a dedicated support module
+- step execution semantics were intentionally preserved
