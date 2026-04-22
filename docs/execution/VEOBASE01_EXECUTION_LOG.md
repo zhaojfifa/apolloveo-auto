@@ -70,6 +70,17 @@ Non-scope:
 - no broad router rewrite
 - no business feature redesign
 
+## PR-1 Started
+
+Branch: `VeoBase01-pr1-contract-freeze-runtime-binding`
+
+Initial implementation scope:
+
+- add VeoBase01 contract conformance tests for Hot Follow line contract schema, YAML contract, runtime line registry, status runtime binding, and line runtime payload
+- add workbench hub section conformance assertions against the existing Hot Follow workbench route
+- keep runtime behavior unchanged
+- keep Hot Follow translation, dub, compose, ready gate semantics unchanged
+
 ## Business Validation Plan
 
 Required validation before any future main alignment:
