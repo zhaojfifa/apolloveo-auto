@@ -10,6 +10,7 @@ Before any future PR slice, read both:
 
 - `ENGINEERING_CONSTRAINTS_INDEX.md`
 - `docs/ENGINEERING_INDEX.md`
+- `docs/contracts/engineering_reading_contract_v1.md`
 
 ## Document Priority
 
@@ -112,6 +113,7 @@ Before any VeoBase01 engineering PR, read:
 
 - Root governance: `PROJECT_RULES.md`, `ENGINEERING_RULES.md`, `CURRENT_ENGINEERING_FOCUS.md`, `ENGINEERING_STATUS.md`
 - `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/contracts/engineering_reading_contract_v1.md`
 - `docs/README.md`
 - `docs/ENGINEERING_INDEX.md`
 - `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
@@ -139,13 +141,14 @@ Before starting an engineering PR:
 
 1. Read root governance.
 2. Read `ENGINEERING_CONSTRAINTS_INDEX.md`.
-3. Read `docs/README.md` when adding, moving, or classifying docs.
-4. Read this docs-level engineering index.
-5. Read the baseline/gate docs for the task.
-6. Read the relevant contracts and architecture docs from the task-oriented map.
-7. Confirm the branch base requested by the task.
-8. Confirm forbidden scope before editing code.
-9. Identify required tests and business guardrails before implementation.
+3. Read `docs/contracts/engineering_reading_contract_v1.md`.
+4. Read `docs/README.md` when adding, moving, or classifying docs.
+5. Read this docs-level engineering index.
+6. Read the baseline/gate docs for the task.
+7. Read the relevant contracts and architecture docs from the task-oriented map.
+8. Confirm the branch base requested by the task.
+9. Confirm forbidden scope before editing code.
+10. Identify required tests and business guardrails before implementation.
 
 ## PR Write-Back Checklist
 

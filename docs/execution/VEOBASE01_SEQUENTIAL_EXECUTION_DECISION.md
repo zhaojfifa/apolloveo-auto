@@ -6,6 +6,11 @@ Date: 2026-04-22
 
 VeoBase01 execution is now explicitly sequential across the next three phases.
 
+Engineering reading is a frozen precondition for that sequence. Before any
+state, projection, runtime, or contract change starts, read
+`docs/contracts/engineering_reading_contract_v1.md` and record its Reading
+Declaration in the execution note for the slice.
+
 The frozen phase order is:
 
 1. architecture closure first

@@ -29,7 +29,8 @@ ApolloVeo 当前是一个以成片交付为目标的 AI 内容生产工厂代码
 1. `ENGINEERING_RULES.md`
 2. `CURRENT_ENGINEERING_FOCUS.md`
 3. `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md`
-4. relevant execution / contract / runbook docs
+4. `docs/contracts/engineering_reading_contract_v1.md`
+5. relevant execution / contract / runbook docs selected through that reading contract
 
 ## Repo Map
 

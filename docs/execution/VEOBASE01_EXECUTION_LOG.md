@@ -9,6 +9,44 @@
 
 VeoBase01 must not be merged back to `main` until reconstruction baseline validation is complete.
 
+## 2026-04-22 Reading Contract Freeze And Publish Hotfix Start
+
+- Branch: `VeoBase01-reading-contract-publish-hotfix`
+- Base branch: `VeoBase01`
+- Base SHA: `6931530953933cd4720cae804e48f91c9f628449`
+- Execution note: `docs/execution/VEOBASE01_READING_CONTRACT_AND_HOTFIX_PLAN.md`
+
+Purpose:
+
+- freeze authority-file reading as a mandatory engineering precondition
+- repair the Hot Follow publish final-ready regression through the authoritative
+  projection path
+- document flow/state/projection contract drafts after the regression fix is
+  clear
+
+Stage 0 acceptance:
+
+- `docs/contracts/engineering_reading_contract_v1.md` added
+- `README.md`, `ENGINEERING_CONSTRAINTS_INDEX.md`,
+  `docs/ENGINEERING_INDEX.md`, and
+  `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md` wired to it
+- execution note includes a Reading Declaration and authority conflict record
+
+Authority-path mismatch frozen for this slice:
+
+- requested but missing: `docs/contracts/four_layer_state_contract.md`
+- requested but missing: `docs/contracts/workbench_hub_response.contract.md`
+- requested but missing: `apolloveo_current_architecture_and_state_baseline.md`
+
+Active fallback references actually read:
+
+- `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
+- `docs/contracts/status_ownership_matrix.md`
+- `docs/contracts/hot_follow_line_contract.md`
+- `docs/contracts/hot_follow_ready_gate.yaml`
+- `docs/architecture/line_contracts/hot_follow_line.yaml`
+- `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md`
+
 From PR-4 onward, both entry files are mandatory reading before every VeoBase01 engineering PR:
 
 - `ENGINEERING_CONSTRAINTS_INDEX.md`: root-level engineering constraint file and authority for how engineering work must be done.
