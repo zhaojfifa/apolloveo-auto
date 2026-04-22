@@ -33,14 +33,11 @@ from gateway.app.services.task_view_projection import (
     hf_pipeline_state,
 )
 from gateway.app.services.task_view_workbench_contract import (
-    apply_ready_gate_composed_projection,
     apply_ready_gate_compose_projection,
-    attach_final_url,
     attach_task_aliases,
     build_hot_follow_workbench_payload,
     build_pipeline_legacy,
     build_pipeline_rows,
-    sync_final_deliverable_projection,
 )
 from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, public_target_lang
 from gateway.app.services.subtitle_helpers import (
@@ -555,20 +552,7 @@ def build_hot_follow_workbench_hub(
         projection["historical_final"],
         projection["dub_state"],
     )
-    final_url = resolve_final_url_loader(task_id, payload)
-    attach_final_url(payload, final_url)
-    composed_ready = bool(projection["composed_ready"])
-    payload["composed_ready"] = composed_ready
-    payload["composed_reason"] = "ready" if composed_ready else "not_ready"
-    sync_final_deliverable_projection(
-        payload,
-        composed_ready=composed_ready,
-        final_url=final_url,
-        historical_final=projection["historical_final"],
-    )
-    attach_task_aliases(payload, task, task_id)
     payload = state_computer(task_runtime, payload)
-    apply_ready_gate_compose_projection(payload)
     if backfill_compose_done(repo, task_id, task, bool(payload.get("composed_ready"))):
         latest = repo.get(task_id) or task
         latest_runtime = dict(latest)
@@ -576,14 +560,9 @@ def build_hot_follow_workbench_hub(
         latest_runtime["target_subtitle_current"] = bool(latest_lane.get("target_subtitle_current"))
         latest_runtime["target_subtitle_current_reason"] = latest_lane.get("target_subtitle_current_reason")
         payload = state_computer(latest_runtime, payload)
-        apply_ready_gate_compose_projection(payload)
         task = latest
-    final_url = str(
-        payload.get("final_url")
-        or (payload.get("media", {}) or {}).get("final_url")
-        or ""
-    ).strip()
-    apply_ready_gate_composed_projection(payload, final_url=final_url)
+    apply_ready_gate_compose_projection(payload)
+    attach_task_aliases(payload, task, task_id)
     payload["line"] = line_binding_loader(task).to_payload()
     advisory = maybe_build_hot_follow_advisory(task, payload)
     if advisory is not None:

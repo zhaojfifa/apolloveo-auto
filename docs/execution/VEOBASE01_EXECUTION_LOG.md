@@ -616,3 +616,53 @@ Acceptance:
 - presenter logic moved into `gateway/app/services/task_view_presenters.py`
 - import-stable callers still use `gateway/app/services/task_view.py` as a thin facade
 - Hot Follow business behavior intentionally unchanged
+
+## PR-9 Workbench Contract Hardening
+
+Branch: `VeoBase01-pr9-workbench-contract-hardening`
+
+Why:
+
+- `task_view_workbench_contract.py` still contained late payload mutation helpers that rewrote compose/final presentation state after authoritative projection had already been established by `compute_hot_follow_state()`.
+
+Scope:
+
+- remove contract-layer helpers that mutated final deliverable and compose state after ready-gate evaluation
+- keep top-level `compose_allowed` and `compose_allowed_reason` only as compatibility aliases sourced from `ready_gate`
+- preserve the patchable `task_view.py` facade needed by existing service-level tests
+- keep publish/workbench behavior unchanged
+
+Files changed:
+
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- `docs/execution/VEOBASE01_PR9_WORKBENCH_CONTRACT_HARDENING.md`
+- `gateway/app/services/task_view.py`
+- `gateway/app/services/task_view_presenters.py`
+- `gateway/app/services/task_view_workbench_contract.py`
+
+Validation:
+
+- `git diff --check`: passed
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m py_compile gateway/app/services/task_view.py gateway/app/services/task_view_workbench_contract.py gateway/app/services/task_view_presenters.py gateway/app/routers/hot_follow_api.py gateway/app/services/hot_follow_runtime_bridge.py`: passed
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/status_policy/tests/test_hot_follow_phase_a_ops.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_runtime_bridge.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_helper_translation_projection_stays_helper_layer_only gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`: `100 passed`
+
+Supplemental note:
+
+- the broader file `gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q` still reports two unrelated existing failures in `gateway/app/services/compose_service.py` subtitle-render defaults; PR-9 did not touch that file
+
+Regression sample evidence:
+
+- final-ready `9c755859d049` synthetic surface probe remained aligned:
+  - publish: `final_exists=true`, `composed_ready=true`, `publish_ready=true`, `audio_ready=true`, compose `done`
+  - workbench: `artifact_facts.final_exists=true`, `composed_ready=true`, `ready_gate.publish_ready=true`, `audio.audio_ready=true`, compose `done`
+- compose-running `9280fcb9f0b1` synthetic surface probe remained in progress:
+  - publish: `final_exists=false`, `composed_ready=false`, `publish_ready=false`, `audio_ready=true`, compose `pending`
+  - workbench: `artifact_facts.final_exists=false`, `composed_ready=false`, `ready_gate.publish_ready=false`, `audio.audio_ready=true`, compose `pending`
+  - persisted task state remained `compose_status=running`
+
+Acceptance:
+
+- contract-layer post-ready-gate mutation of final deliverable and compose state removed
+- `task_view_workbench_contract.py` now acts as schema shaping plus compatibility aliasing only
+- top-level `compose_allowed` remains available for UI compatibility, but is sourced from `ready_gate` instead of late truth rewriting
+- Hot Follow business behavior intentionally unchanged

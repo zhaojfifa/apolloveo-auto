@@ -1,8 +1,9 @@
 """Hot Follow workbench payload contract builders.
 
-This module owns presentation-only assembly for the Hot Follow workbench hub.
-It does not read storage, write task truth, or decide runtime readiness; callers
-must pass already-derived L1/L2/L3 facts and state snapshots.
+This module is limited to schema shaping and compatibility aliases for the
+Hot Follow workbench hub. It does not read storage, write task truth, or
+rewrite authoritative projection after ready-gate evaluation; callers must
+pass already-derived L1/L2/L3 facts and state snapshots.
 """
 
 from __future__ import annotations
@@ -403,42 +404,6 @@ def attach_task_aliases(payload: dict[str, Any], task: dict[str, Any], task_id: 
     payload["platform"] = payload["input"]["platform"]
 
 
-def attach_final_url(payload: dict[str, Any], final_url: str | None) -> None:
-    if final_url:
-        payload["media"]["final_url"] = final_url
-        payload["media"]["final_video_url"] = final_url
-    payload["final_url"] = final_url
-    payload["final_video_url"] = final_url
-
-
-def sync_final_deliverable_projection(
-    payload: dict[str, Any],
-    *,
-    composed_ready: bool,
-    final_url: str | None,
-    historical_final: dict[str, Any] | None,
-) -> None:
-    deliverables = payload.get("deliverables")
-    if not isinstance(deliverables, list):
-        return
-    for item in deliverables:
-        if not isinstance(item, dict):
-            continue
-        if str(item.get("kind") or "").strip().lower() != "final":
-            continue
-        item["url"] = final_url
-        item["open_url"] = final_url
-        if composed_ready:
-            item["status"] = "done"
-            item["state"] = "done"
-            item["historical"] = False
-        else:
-            item["status"] = "pending"
-            item["state"] = "pending"
-            item["historical"] = bool((historical_final or {}).get("exists"))
-        break
-
-
 def apply_ready_gate_compose_projection(payload: dict[str, Any]) -> None:
     ready_gate = payload.get("ready_gate") if isinstance(payload.get("ready_gate"), dict) else {}
     compose_allowed = bool(ready_gate.get("compose_allowed"))
@@ -455,62 +420,3 @@ def apply_ready_gate_compose_projection(payload: dict[str, Any]) -> None:
     if isinstance(payload.get("ready_gate"), dict):
         payload["ready_gate"]["compose_allowed"] = compose_allowed
         payload["ready_gate"]["compose_allowed_reason"] = compose_allowed_reason
-
-
-def apply_ready_gate_composed_projection(payload: dict[str, Any], *, final_url: str | None) -> None:
-    composed_ready = bool((payload.get("ready_gate") or {}).get("compose_ready"))
-    if composed_ready:
-        _set_compose_pipeline_status(payload, "done", final_url=final_url)
-        payload["composed_ready"] = True
-        payload["composed_reason"] = "ready"
-        return
-    _set_compose_pipeline_status(payload, "pending", final_url=None)
-
-
-def _set_compose_pipeline_status(payload: dict[str, Any], status: str, *, final_url: str | None) -> None:
-    pipeline = payload.get("pipeline")
-    if isinstance(pipeline, list):
-        for step in pipeline:
-            if not isinstance(step, dict):
-                continue
-            if str(step.get("key") or "").strip().lower() == "compose":
-                step["status"] = status
-                step["state"] = status
-                if status == "done":
-                    step["error"] = None
-                    step["message"] = step.get("message") or "final video merge"
-
-    pipeline_legacy = payload.get("pipeline_legacy")
-    if isinstance(pipeline_legacy, dict):
-        compose_legacy = pipeline_legacy.get("compose")
-        if isinstance(compose_legacy, dict):
-            compose_legacy["status"] = status
-
-    compose = payload.get("compose")
-    if isinstance(compose, dict):
-        last = compose.get("last")
-        if isinstance(last, dict):
-            last["status"] = status
-
-    deliverables = payload.get("deliverables")
-    if isinstance(deliverables, list):
-        for item in deliverables:
-            if not isinstance(item, dict):
-                continue
-            if str(item.get("kind") or "").strip().lower() != "final":
-                continue
-            item["status"] = status
-            item["state"] = status
-            item["historical"] = False if status == "done" else bool((payload.get("historical_final") or {}).get("exists"))
-            if status == "done" and final_url:
-                item["url"] = final_url
-                item["open_url"] = final_url
-            elif status != "done":
-                item["url"] = None
-                item["open_url"] = None
-            break
-
-    media = payload.get("media")
-    if isinstance(media, dict) and final_url:
-        media["final_url"] = final_url
-        media["final_video_url"] = final_url
