@@ -9,7 +9,12 @@
 
 VeoBase01 must not be merged back to `main` until reconstruction baseline validation is complete.
 
-`docs/ENGINEERING_INDEX.md` is mandatory reading before every VeoBase01 engineering PR. It is the task-oriented entry point for selecting governance, baseline, contract, architecture, ADR, and execution-log context.
+From PR-4 onward, both entry files are mandatory reading before every VeoBase01 engineering PR:
+
+- `ENGINEERING_CONSTRAINTS_INDEX.md`: root-level engineering constraint file and authority for how engineering work must be done.
+- `docs/ENGINEERING_INDEX.md`: docs-level engineering index and authority for business/runtime/contract navigation.
+
+Both are required before any future PR slice. Root governance remains the highest authority.
 
 ## Business Baseline Evidence
 
@@ -181,3 +186,17 @@ Validation to record before PR-3 close:
 - `git diff --check`: passed
 - `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_task_router_presenters.py gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`: passed, 72 tests
 - Wire response shape changed: no
+
+## PR-4 Entry Discipline Update
+
+Before PR-4 starts, VeoBase01 requires two layered entry files:
+
+- `ENGINEERING_CONSTRAINTS_INDEX.md` is mandatory. It is the root-level engineering constraint entry and defines how engineering work must be done, including big-file prevention, router/service ownership, single-writer state ownership, PR slicing, validation, and write-back constraints.
+- `docs/ENGINEERING_INDEX.md` is mandatory. It is the docs-level business/runtime/contract navigation entry and defines how line, state, contract, skills, architecture, execution, and new-line onboarding docs must be read.
+
+Both are required before any future PR slice. The files are intentionally layered:
+
+- root = engineering authority
+- docs = business/runtime/contract navigation
+
+PR-4 must not start until both files are present and cross-linked.

@@ -6,7 +6,12 @@ VeoBase01 is the reconstruction baseline branch for ApolloVeo v1.9 stabilization
 
 This branch aligns code and docs around explicit production-line, state, contract, and skill boundaries while preserving the current Hot Follow business line.
 
-`docs/ENGINEERING_INDEX.md` is the mandatory engineering entry point for every VeoBase01 PR. Root governance remains the highest authority, and this baseline document must be read through the task-oriented paths defined in the index.
+From PR-4 onward, every VeoBase01 PR must read both required entry files before implementation:
+
+- `ENGINEERING_CONSTRAINTS_INDEX.md`: root-level engineering authority for how engineering work must be done.
+- `docs/ENGINEERING_INDEX.md`: docs-level business/runtime/contract navigation for how line, state, contract, skill, and architecture work must be understood.
+
+Root governance remains the highest authority, and this baseline document must be read through the task-oriented paths defined in the docs-level index.
 
 ## Baseline Evidence
 

@@ -1,21 +1,27 @@
 # Engineering Index
 
-This file is mandatory reading before every engineering PR. Root governance
-files remain the highest authority; this index is the required navigation entry
-point for task-oriented reading and write-back discipline.
+This file is the docs-level business/runtime/contract navigation entry point for every engineering PR.
+
+Root governance files remain the highest authority. `ENGINEERING_CONSTRAINTS_INDEX.md` is the root-level engineering constraint entry and defines how engineering work must be done. This file defines how business, runtime, contract, line, skill, and architecture work must be understood and navigated.
+
+Before any future PR slice, read both:
+
+- `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/ENGINEERING_INDEX.md`
 
 ## Document Priority
 
 Read and apply documents in this order:
 
 1. Root governance: `PROJECT_RULES.md`, `ENGINEERING_RULES.md`, `CURRENT_ENGINEERING_FOCUS.md`, `ENGINEERING_STATUS.md`.
-2. Baseline and gate docs: `docs/baseline/PROJECT_BASELINE_INDEX.md`, active verification and recovery gate notes.
-3. Contracts: `docs/contracts/*`.
-4. Architecture docs: `docs/architecture/*`.
-5. ADRs: `docs/adr/*`.
-6. Execution logs: `docs/execution/*`.
-7. Reviews: active review docs only when they are named by the task.
-8. Archive: `docs/archive/*` for historical context only.
+2. Root engineering constraints: `ENGINEERING_CONSTRAINTS_INDEX.md`.
+3. Baseline and gate docs: `docs/baseline/PROJECT_BASELINE_INDEX.md`, active verification and recovery gate notes.
+4. Contracts: `docs/contracts/*`.
+5. Architecture docs: `docs/architecture/*`.
+6. ADRs: `docs/adr/*`.
+7. Execution logs: `docs/execution/*`.
+8. Reviews: active review docs only when they are named by the task.
+9. Archive: `docs/archive/*` for historical context only.
 
 When documents conflict, the higher priority document wins. Lower priority docs
 may explain history, but they do not override governance, baselines, contracts,
@@ -26,6 +32,7 @@ or active architecture decisions.
 | Concern | Authoritative Entry |
 | --- | --- |
 | Engineering rules | `ENGINEERING_RULES.md` |
+| Engineering constraints | `ENGINEERING_CONSTRAINTS_INDEX.md` |
 | Current focus | `CURRENT_ENGINEERING_FOCUS.md` |
 | Project baseline | `docs/baseline/PROJECT_BASELINE_INDEX.md` |
 | VeoBase01 reconstruction | `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md` |
@@ -41,9 +48,10 @@ or active architecture decisions.
 ### Hot Follow Business-Line Changes
 
 Read root governance, `docs/baseline/PROJECT_BASELINE_INDEX.md`,
-`docs/contracts/status_ownership_matrix.md`, and the latest active Hot Follow
-execution note. Business-line changes must include regression validation for
-normal translation, helper translation, dub, compose, and final availability.
+`ENGINEERING_CONSTRAINTS_INDEX.md`, `docs/contracts/status_ownership_matrix.md`,
+and the latest active Hot Follow execution note. Business-line changes must
+include regression validation for normal translation, helper translation, dub,
+compose, and final availability.
 
 ### Four-Layer State Changes
 
@@ -65,7 +73,8 @@ consume L2/L3 outputs and must not redefine artifact truth or attempt truth.
 
 ### Router/Service Ownership Changes
 
-Read this index, `docs/contracts/status_ownership_matrix.md`, and
+Read this index, `ENGINEERING_CONSTRAINTS_INDEX.md`,
+`docs/contracts/status_ownership_matrix.md`, and
 `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`. Routers may validate
 HTTP inputs, call services, and shape HTTP responses. Services own reusable
 state, view, policy, and artifact-fact evaluation. Router extraction must not
@@ -89,6 +98,8 @@ start until the new-line gate in this file is satisfied.
 Before any VeoBase01 engineering PR, read:
 
 - Root governance: `PROJECT_RULES.md`, `ENGINEERING_RULES.md`, `CURRENT_ENGINEERING_FOCUS.md`, `ENGINEERING_STATUS.md`
+- `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/ENGINEERING_INDEX.md`
 - `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
 - `docs/execution/VEOBASE01_EXECUTION_LOG.md`
 - `docs/contracts/four_layer_state_contract.md`
@@ -113,12 +124,13 @@ Before any VeoBase01 engineering PR, read:
 Before starting an engineering PR:
 
 1. Read root governance.
-2. Read this engineering index.
-3. Read the baseline/gate docs for the task.
-4. Read the relevant contracts and architecture docs from the task-oriented map.
-5. Confirm the branch base requested by the task.
-6. Confirm forbidden scope before editing code.
-7. Identify required tests and business guardrails before implementation.
+2. Read `ENGINEERING_CONSTRAINTS_INDEX.md`.
+3. Read this docs-level engineering index.
+4. Read the baseline/gate docs for the task.
+5. Read the relevant contracts and architecture docs from the task-oriented map.
+6. Confirm the branch base requested by the task.
+7. Confirm forbidden scope before editing code.
+8. Identify required tests and business guardrails before implementation.
 
 ## PR Write-Back Checklist
 
@@ -143,4 +155,3 @@ A new production line may not be implemented until these gates pass:
 6. Business regression validation has passed for the existing Hot Follow line.
 7. Router/service ownership boundaries are stable enough that the new line does
    not copy router orchestration drift.
-
