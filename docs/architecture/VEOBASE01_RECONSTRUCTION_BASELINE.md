@@ -11,6 +11,8 @@ From PR-4 onward, every VeoBase01 PR must read both required entry files before 
 - `ENGINEERING_CONSTRAINTS_INDEX.md`: root-level engineering authority for how engineering work must be done.
 - `docs/ENGINEERING_INDEX.md`: docs-level business/runtime/contract navigation for how line, state, contract, skill, and architecture work must be understood.
 
+For documentation placement and structure, read `docs/README.md`. For shared file logic and architecture-sharing logic, read `docs/reviews/VEOBASE01_DOCS_STRUCTURE_AND_SHARED_LOGIC_REVIEW.md`.
+
 Root governance remains the highest authority, and this baseline document must be read through the task-oriented paths defined in the docs-level index.
 
 ## Baseline Evidence

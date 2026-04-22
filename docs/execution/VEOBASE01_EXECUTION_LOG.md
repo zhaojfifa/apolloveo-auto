@@ -14,7 +14,7 @@ From PR-4 onward, both entry files are mandatory reading before every VeoBase01 
 - `ENGINEERING_CONSTRAINTS_INDEX.md`: root-level engineering constraint file and authority for how engineering work must be done.
 - `docs/ENGINEERING_INDEX.md`: docs-level engineering index and authority for business/runtime/contract navigation.
 
-Both are required before any future PR slice. Root governance remains the highest authority.
+Both are required before any future PR slice. `docs/README.md` is also mandatory before adding, moving, or reclassifying docs. Root governance remains the highest authority.
 
 ## Business Baseline Evidence
 
@@ -200,3 +200,24 @@ Both are required before any future PR slice. The files are intentionally layere
 - docs = business/runtime/contract navigation
 
 PR-4 must not start until both files are present and cross-linked.
+
+## Docs Structure Normalization Pass
+
+Before the main PR-4 runtime slice, VeoBase01 re-anchors docs structure and shared reading logic.
+
+Updated files:
+
+- `docs/README.md`: docs structure and placement entry.
+- `docs/ENGINEERING_INDEX.md`: task-oriented engineering/business reading entry.
+- `docs/reviews/VEOBASE01_DOCS_STRUCTURE_AND_SHARED_LOGIC_REVIEW.md`: file-sharing logic, architecture-sharing logic, file priority matrix, forbidden doc misuse, and new-line / multi-role harness readiness review.
+- `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`: references docs structure and shared-logic review entries.
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`: records this normalization pass.
+
+Placement rule:
+
+- root = engineering constraints
+- `docs/README.md` = docs placement and structure
+- `docs/ENGINEERING_INDEX.md` = task-oriented business/runtime/contract reading
+- contracts/architecture/ADR/execution/review/archive remain distinct authority layers
+
+No runtime code changed. Translation, dub, and compose behavior were not touched. PR-4 runtime work has not started.

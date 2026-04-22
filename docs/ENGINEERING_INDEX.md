@@ -4,6 +4,8 @@ This file is the docs-level business/runtime/contract navigation entry point for
 
 Root governance files remain the highest authority. `ENGINEERING_CONSTRAINTS_INDEX.md` is the root-level engineering constraint entry and defines how engineering work must be done. This file defines how business, runtime, contract, line, skill, and architecture work must be understood and navigated.
 
+`docs/README.md` is the docs structure and placement entry. Use it before adding, moving, or reclassifying documentation.
+
 Before any future PR slice, read both:
 
 - `ENGINEERING_CONSTRAINTS_INDEX.md`
@@ -33,6 +35,7 @@ or active architecture decisions.
 | --- | --- |
 | Engineering rules | `ENGINEERING_RULES.md` |
 | Engineering constraints | `ENGINEERING_CONSTRAINTS_INDEX.md` |
+| Docs placement | `docs/README.md` |
 | Current focus | `CURRENT_ENGINEERING_FOCUS.md` |
 | Project baseline | `docs/baseline/PROJECT_BASELINE_INDEX.md` |
 | VeoBase01 reconstruction | `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md` |
@@ -42,6 +45,7 @@ or active architecture decisions.
 | Status ownership | `docs/contracts/status_ownership_matrix.md` |
 | Runtime execution log | `docs/execution/VEOBASE01_EXECUTION_LOG.md` |
 | VeoBase01 ADR | `docs/adr/ADR-VEOBASE01-LINE-STATE-CONTRACT.md` |
+| Docs shared logic review | `docs/reviews/VEOBASE01_DOCS_STRUCTURE_AND_SHARED_LOGIC_REVIEW.md` |
 
 ## Task-Oriented Reading Map
 
@@ -99,6 +103,7 @@ Before any VeoBase01 engineering PR, read:
 
 - Root governance: `PROJECT_RULES.md`, `ENGINEERING_RULES.md`, `CURRENT_ENGINEERING_FOCUS.md`, `ENGINEERING_STATUS.md`
 - `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/README.md`
 - `docs/ENGINEERING_INDEX.md`
 - `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
 - `docs/execution/VEOBASE01_EXECUTION_LOG.md`
@@ -125,12 +130,13 @@ Before starting an engineering PR:
 
 1. Read root governance.
 2. Read `ENGINEERING_CONSTRAINTS_INDEX.md`.
-3. Read this docs-level engineering index.
-4. Read the baseline/gate docs for the task.
-5. Read the relevant contracts and architecture docs from the task-oriented map.
-6. Confirm the branch base requested by the task.
-7. Confirm forbidden scope before editing code.
-8. Identify required tests and business guardrails before implementation.
+3. Read `docs/README.md` when adding, moving, or classifying docs.
+4. Read this docs-level engineering index.
+5. Read the baseline/gate docs for the task.
+6. Read the relevant contracts and architecture docs from the task-oriented map.
+7. Confirm the branch base requested by the task.
+8. Confirm forbidden scope before editing code.
+9. Identify required tests and business guardrails before implementation.
 
 ## PR Write-Back Checklist
 

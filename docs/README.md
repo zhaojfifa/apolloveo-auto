@@ -1,115 +1,194 @@
-# ApolloVeo Docs Index
+# Docs Structure And Placement
 
-## Directory Map
+This file is the docs directory structure entry point. It defines where documentation belongs and how new docs should be placed.
 
-- `docs/baseline/`
-  - 当前长期 baseline
-- `docs/execution/`
-  - 当前阶段执行文档与执行日志
-- `docs/reviews/`
-  - review、诊断、架构对齐与工程分析
-- `docs/contracts/`
-  - 当前 runtime / service contract
-- `docs/adr/`
-  - 架构决策记录（ADR）
-- `docs/architecture/`
-  - 架构说明、line contracts、结构化 YAML
-- `docs/runbooks/`
-  - verification、business regression、operator/developer runbooks
-- `docs/skills/`
-  - skills 相关规范与目录说明
-- `docs/archive/`
-  - 历史/legacy 文档
+For task-oriented engineering/business reading, use `docs/ENGINEERING_INDEX.md`.
+For root-level engineering constraints, use `ENGINEERING_CONSTRAINTS_INDEX.md`.
 
-保留目录：
+## Target Layout
 
-- `docs/scenarios/`
-  - 场景/SOP 文档，当前仍有业务语义引用
-- `docs/sop/`
-  - 历史 SOP 路径，当前 line contract / review 仍直接引用
+The normalized docs layout is:
 
-## Purpose Of Each Bucket
+```text
+docs/
+  README.md
+  ENGINEERING_INDEX.md
 
-- `baseline/`
-  - 说明当前项目到底是什么、当前现实到哪里、哪些仍是 partial
-- `execution/`
-  - 说明当前阶段在做什么、已经收口什么、下一步只允许做什么
-- `reviews/`
-  - 保留 review 诊断与架构对齐材料
-- `contracts/`
-  - 固化当前运行时与服务边界
-- `adr/`
-  - 固化已经接受的架构决策与拆解原则
-- `architecture/`
-  - 保留结构性设计、line contract 和架构规范
-- `runbooks/`
-  - 固化验证、回归、运维/开发执行手册
-- `skills/`
-  - 保留 skills 相关规范；当前不代表 skills runtime 已实现
-- `archive/`
-  - 放置 superseded / legacy material，不作为当前 source-of-truth
+  baseline/
+  reviews/
+  execution/
+  contracts/
+  architecture/
+    line_contracts/
+  runbooks/
+  skills/
+  adr/
+  archive/
+```
 
-## Current Source-Of-Truth Reading Order
+Current legacy exceptions:
 
-1. `ENGINEERING_RULES.md`
-2. `CURRENT_ENGINEERING_FOCUS.md`
-3. `docs/baseline/PROJECT_BASELINE_INDEX.md`
-4. `docs/baseline/PRODUCT_BASELINE.md`
-5. `docs/baseline/ARCHITECTURE_BASELINE.md`
-6. `docs/baseline/EXECUTION_BASELINE.md`
-7. `docs/contracts/hot_follow_line_contract.md`
-8. `docs/contracts/status_ownership_matrix.md`
-9. `docs/contracts/hot_follow_ready_gate.yaml`
-10. `docs/contracts/worker_gateway_contract.md`
-11. `docs/contracts/skills_runtime_contract.md`
-12. `docs/contracts/worker_gateway_runtime_contract.md`
-13. `docs/contracts/script_video_planning_contract.md`
-14. `docs/contracts/action_replica_planning_assets_contract.md`
-15. `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
-16. `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
-17. `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
-18. `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
-19. `docs/adr/ADR-task-router-decomposition.md`
-20. `docs/adr/ADR-phase2-skills-worker-planning.md`
-21. `docs/runbooks/hot_follow_sop.md`
-22. `docs/runbooks/phase2_execution_plan.md`
-23. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
-24. `docs/runbooks/VERIFICATION_BASELINE.md`
-25. `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
-26. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
-27. `docs/execution/HOT_FOLLOW_SKILLS_MVP_V0_CLOSURE.md`
-28. `docs/execution/SKILLS_MVP_ENTRY_REVIEW.md`
-29. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
-30. `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`
-31. `docs/execution/logs/PHASE2_PROGRESS_LOG.md`
+- `docs/scenarios/`: retained until scenario material is reclassified into `runbooks/`, `architecture/`, or `archive/`.
+- `docs/sop/`: retained until old SOP references are migrated into `runbooks/` or line contract docs.
+- `docs/hot_follow_workbench_closure.md`: root-level docs exception; future closure notes should go under `docs/execution/`.
 
-## Important Review References
+Do not add new top-level docs folders without updating this file and `docs/ENGINEERING_INDEX.md`.
 
-以下文档是重要 review/reference，但不等于日常 baseline authority：
+## Placement Rules
 
-- `docs/reviews/ALIGNMENT_BASELINE_20260318.md`
-  - 重要架构对齐文件，保留在 `reviews/`
-- `docs/reviews/ALIGNMENT_EXECUTION_REVIEW_20260321.md`
-  - 面向执行边界的后续对齐 review
-- `docs/reviews/review_jellyfish_importability_for_factory.md`
-  - 只作为中间契约/分层吸收参考，不作为 studio product 导入依据
-- `docs/reviews/REVIEW_AFTER_VEOSOP04_WITH_DEMINING_PRIORITY.md`
-- `docs/reviews/TASK_1_3_PORT_MERGE_PLAN.md`
-- `docs/reviews/TASK_2_0_COMPOSE_SURGERY.md`
-- `docs/reviews/TASK_2_3_READY_GATE_REPORT.md`
+### `baseline/`
 
-## Historical / Reference-Only Areas
+Belongs here:
 
-- `_drafts/`
-  - 历史 review source material 与 RFC 草案来源
-  - 不作为 day-to-day active source-of-truth
-- `docs/archive/`
-  - 已降级为历史参考的旧 baseline / 旧 contract / legacy docs
-- `docs/reviews/v1.9/`
-  - v1.9 review package，保留参考价值但不是当前 baseline authority
+- long-lived project/product/architecture/execution baseline
+- current gate or baseline index documents
+- durable statements of what is true now
 
-## Notes
+Does not belong here:
 
-- `_drafts/` 的结论必须被吸收到 `docs/baseline/`、`docs/execution/`、`docs/reviews/`，不能让 `_drafts/` 继续承担活文档职责。
-- 本 docs system 反映的是 post-review、post-VeoSop05 reality，而不是未来平台理想态。
-- Phase-2 contract freeze 文档进入 source-of-truth 阅读顺序，不等于 Phase-2 runtime 已实现；实现状态仍以对应 PR 和 progress log 为准。
+- one-PR execution notes
+- investigation drafts
+- future proposals not accepted as baseline
+
+### `reviews/`
+
+Belongs here:
+
+- diagnostic reviews
+- architecture review notes
+- drift maps
+- evidence and analysis used to inform baseline or contract changes
+
+Does not belong here:
+
+- runtime contracts
+- permanent rules
+- execution logs
+
+Review conclusions must be promoted into baseline, contract, architecture, ADR, or execution docs before they become active authority.
+
+### `execution/`
+
+Belongs here:
+
+- current execution plans
+- PR/phase validation notes
+- closure notes
+- recovery notes
+- validation logs and branch-specific evidence
+
+Does not belong here:
+
+- permanent architecture rules
+- reusable runtime contracts
+- historical material after it is superseded
+
+Execution logs record what happened; they do not create permanent architecture policy.
+
+### `contracts/`
+
+Belongs here:
+
+- runtime contracts
+- schema files
+- state contracts
+- response contracts
+- ownership matrices
+- ready-gate contracts
+
+Does not belong here:
+
+- exploratory review analysis
+- one-off execution notes
+- implementation plans without a contract surface
+
+Contracts are active source-of-truth for runtime boundaries until superseded by a newer contract.
+
+### `architecture/`
+
+Belongs here:
+
+- architecture baselines
+- reconstruction baselines
+- line contract examples
+- structural design docs
+- accepted object models shared across lines
+
+`architecture/line_contracts/` is for line-specific architecture contract examples and binding docs.
+
+Does not belong here:
+
+- temporary execution evidence
+- issue diagnosis that has not become architecture
+
+### `runbooks/`
+
+Belongs here:
+
+- repeatable verification procedures
+- operator/developer procedures
+- setup and regression instructions
+- business guardrail procedures
+
+Does not belong here:
+
+- architecture decisions
+- review conclusions
+- runtime schemas
+
+### `skills/`
+
+Belongs here:
+
+- skill documentation
+- skill onboarding material
+- skill-specific behavior notes
+
+Skill docs do not make skills truth-write owners. Skill runtime ownership must still follow contracts and state ownership docs.
+
+### `adr/`
+
+Belongs here:
+
+- accepted architecture decisions
+- durable decision records with context and consequences
+
+Does not belong here:
+
+- open-ended review notes
+- branch execution logs
+
+### `archive/`
+
+Belongs here:
+
+- superseded docs
+- legacy contracts
+- historical baseline packages
+- material retained only for archaeology
+
+Archive docs are reference-only. They are not active implementation sources.
+
+## File Priority Matrix
+
+Use this authority order when docs disagree:
+
+1. Root governance files: `PROJECT_RULES.md`, `ENGINEERING_RULES.md`, `CURRENT_ENGINEERING_FOCUS.md`, `ENGINEERING_STATUS.md`
+2. Root engineering constraints: `ENGINEERING_CONSTRAINTS_INDEX.md`
+3. Baseline/gate docs: `docs/baseline/PROJECT_BASELINE_INDEX.md` and active gate docs
+4. Contracts: `docs/contracts/*`
+5. Architecture docs: `docs/architecture/*`
+6. ADRs: `docs/adr/*`
+7. Execution logs: `docs/execution/*`
+8. Reviews: `docs/reviews/*`
+9. Archive: `docs/archive/*`
+
+## Write Rules
+
+Before adding or moving a doc:
+
+1. Choose the bucket by purpose, not by author or date.
+2. Check whether the doc creates a permanent rule, a runtime contract, an architecture decision, or only execution evidence.
+3. Update `docs/ENGINEERING_INDEX.md` if the doc becomes a required reading path.
+4. Update this file if a new placement category is needed.
+5. Do not let review or execution docs become hidden runtime contracts.
