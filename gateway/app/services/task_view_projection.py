@@ -1,0 +1,507 @@
+"""Authoritative Hot Follow task-view projection builders.
+
+This module assembles normalized, non-surface-specific task projection data
+that presenter layers can consume without recomputing separate truths.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from gateway.app.config import get_settings
+from gateway.app.services.artifact_storage import get_download_url, object_exists
+from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
+from gateway.app.services.hot_follow_language_profiles import get_hot_follow_language_profile
+from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
+from gateway.app.services.subtitle_helpers import (
+    hf_dual_channel_state,
+    hf_load_normalized_source_text,
+    hf_load_origin_subtitles_text,
+    hf_load_subtitles_text,
+    hf_parse_artifact_ready,
+    hf_state_from_status,
+    hf_subtitle_lane_state,
+)
+from gateway.app.services.task_view_helpers import (
+    compute_composed_state,
+    resolve_hub_final_url,
+    scene_pack_info,
+    scenes_status_from_ssot,
+    signed_op_url,
+    task_endpoint,
+    task_key,
+)
+from gateway.app.services.task_view_workbench_contract import (
+    build_hot_follow_compose_plan,
+    normalize_compose_last,
+)
+from gateway.app.services.tts_policy import normalize_target_lang
+from gateway.app.services.voice_service import (
+    hf_audio_config,
+    hf_audio_display_error,
+    hf_screen_text_candidate_summary,
+    hf_source_audio_lane_summary,
+    hf_source_audio_semantics,
+)
+from gateway.app.services.voice_state import (
+    collect_voice_execution_state,
+    hf_current_voiceover_asset,
+    hf_persisted_audio_state,
+)
+from gateway.app.utils.pipeline_config import parse_pipeline_config
+
+
+def hf_pipeline_state(
+    task: dict,
+    step: str,
+    *,
+    composed: dict[str, Any] | None = None,
+    parse_artifact_ready_loader=hf_parse_artifact_ready,
+    voice_execution_state_loader=collect_voice_execution_state,
+    audio_config_loader=hf_audio_config,
+    settings=None,
+) -> tuple[str, str]:
+    last_step = str(task.get("last_step") or "").lower()
+    task_status = str(task.get("status") or "").lower()
+    settings_obj = settings or get_settings()
+    if step == "parse":
+        status = hf_state_from_status(task.get("parse_status"))
+        raw_ready = parse_artifact_ready_loader(task)
+        if raw_ready:
+            status = "done"
+        elif status == "pending" and task_status == "processing" and last_step == "parse":
+            status = "running"
+        summary = "raw=ready" if raw_ready else "raw=none"
+        return status, summary
+    if step == "subtitles":
+        status = hf_state_from_status(task.get("subtitles_status"))
+        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+        no_subtitles = str(pipeline_config.get("no_subtitles") or "").strip().lower() == "true"
+        translation_incomplete = str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
+        current_reason = str(task.get("target_subtitle_current_reason") or "").strip()
+        summary = "origin/mm subtitles"
+        if status == "pending" and (task.get("origin_srt_path") or task.get("mm_srt_path")):
+            status = "done"
+        if status == "pending" and task_status == "processing" and last_step == "subtitles":
+            status = "running"
+        if status == "error":
+            summary = str(task.get("subtitles_error") or "subtitles_error")
+        elif no_subtitles:
+            summary = "no_subtitles"
+        elif translation_incomplete:
+            summary = "translation_incomplete"
+        elif current_reason and current_reason not in {"ready", "unknown"}:
+            summary = current_reason
+        return status, summary
+    if step == "audio":
+        status = hf_state_from_status(task.get("dub_status"))
+        voice_state = voice_execution_state_loader(task, settings_obj)
+        if status == "pending" and voice_state.get("audio_ready"):
+            status = "done"
+        if status == "done" and not voice_state.get("audio_ready"):
+            status = "pending"
+        if status == "pending" and task_status == "processing" and last_step == "dub":
+            status = "running"
+        audio_cfg = audio_config_loader(task)
+        summary = (
+            f"dub_provider={voice_state.get('actual_provider') or task.get('dub_provider') or settings_obj.dub_provider} "
+            f"voice={voice_state.get('resolved_voice') or audio_cfg.get('tts_voice') or 'missing'} "
+            f"audio_ready={'yes' if voice_state.get('audio_ready') else 'no'}"
+        )
+        return status, summary
+    if step == "pack":
+        status = hf_state_from_status(task.get("pack_status"))
+        if status == "pending" and (task.get("pack_key") or task.get("pack_path")):
+            status = "done"
+        if status == "pending" and task_status == "processing" and last_step == "pack":
+            status = "running"
+        summary = f"pack={task.get('pack_type') or '-'}"
+        return status, summary
+    if step == "compose":
+        status = hf_state_from_status(task.get("compose_status"))
+        composed_state = composed or compute_composed_state(
+            task,
+            str(task.get("task_id") or task.get("id") or ""),
+        )
+        target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+        if status == "pending" and bool(composed_state.get("composed_ready")):
+            status = "done"
+        if status == "done" and target_lang in {"my", "vi"} and not bool(composed_state.get("composed_ready")):
+            status = "pending"
+        if status == "pending" and task_status == "processing" and last_step in {"compose", "final"}:
+            status = "running"
+        summary = "final video merge"
+        return status, summary
+    return "pending", ""
+
+
+def hf_deliverable_state(
+    task: dict,
+    key: str | None,
+    fallback_status_field: str | None = None,
+    *,
+    object_exists_fn=object_exists,
+) -> str:
+    if key and object_exists_fn(str(key)):
+        return "done"
+    if fallback_status_field and hf_state_from_status(task.get(fallback_status_field)) == "failed":
+        return "failed"
+    return "pending"
+
+
+def hf_deliverables(
+    task_id: str,
+    task: dict,
+    *,
+    subtitle_lane_loader=hf_subtitle_lane_state,
+    current_voiceover_asset_loader=hf_current_voiceover_asset,
+    object_exists_fn=object_exists,
+    task_endpoint_loader=task_endpoint,
+    signed_op_url_loader=signed_op_url,
+    download_url_loader=get_download_url,
+    deliverable_state_loader=None,
+    settings=None,
+) -> list[dict[str, Any]]:
+    profile = get_hot_follow_language_profile(task.get("target_lang") or task.get("content_lang") or "mm")
+    settings_obj = settings or get_settings()
+    raw_key = task_key(task, "raw_path")
+    origin_key = task_key(task, "origin_srt_path")
+    mm_key = task_key(task, "mm_srt_path")
+    subtitle_lane = subtitle_lane_loader(task_id, task)
+    target_subtitle_exists = bool(subtitle_lane.get("subtitle_artifact_exists"))
+    audio_asset = current_voiceover_asset_loader(task_id, task, settings_obj)
+    audio_key = str(audio_asset.get("key") or "").strip() or None
+    pack_key = task_key(task, "pack_key") or task_key(task, "pack_path")
+    scenes_key = task_key(task, "scenes_key")
+    final_key = task_key(task, "final_video_key") or task_key(task, "final_video_path")
+    bgm_key = str(((task.get("config") or {}).get("bgm") or {}).get("bgm_key") or "").strip() or None
+    deliverable_state_loader = deliverable_state_loader or (
+        lambda current_task, current_key, fallback_status_field=None: hf_deliverable_state(
+            current_task,
+            current_key,
+            fallback_status_field,
+            object_exists_fn=object_exists_fn,
+        )
+    )
+
+    def _entry(
+        kind: str,
+        title: str,
+        key: str | None,
+        open_url: str | None,
+        download_url: str | None,
+        state: str,
+    ) -> dict[str, Any]:
+        sha = None
+        if kind == "audio":
+            sha = task.get("audio_sha256")
+        elif kind == "final":
+            sha = task.get("final_video_sha256")
+        return {
+            "kind": kind,
+            "title": title,
+            "label": title,
+            "key": key,
+            "url": open_url or download_url,
+            "open_url": open_url,
+            "download_url": download_url,
+            "state": state,
+            "status": state,
+            "size": None,
+            "sha256": sha,
+        }
+
+    return [
+        _entry(
+            "raw_video",
+            "Raw Video",
+            raw_key,
+            task_endpoint_loader(task_id, "raw") if raw_key and object_exists_fn(raw_key) else None,
+            signed_op_url_loader(task_id, "raw") if raw_key and object_exists_fn(raw_key) else None,
+            "done" if hf_parse_artifact_ready(task) else deliverable_state_loader(task, raw_key, "parse_status"),
+        ),
+        _entry(
+            "origin_subtitle",
+            "origin.srt",
+            origin_key,
+            task_endpoint_loader(task_id, "origin") if origin_key and object_exists_fn(origin_key) else None,
+            signed_op_url_loader(task_id, "origin_srt") if origin_key and object_exists_fn(origin_key) else None,
+            deliverable_state_loader(task, origin_key, "subtitles_status"),
+        ),
+        _entry(
+            "subtitle",
+            profile.subtitle_filename,
+            mm_key,
+            task_endpoint_loader(task_id, "mm") if target_subtitle_exists and mm_key and object_exists_fn(mm_key) else None,
+            signed_op_url_loader(task_id, "mm_srt") if target_subtitle_exists and mm_key and object_exists_fn(mm_key) else None,
+            "done" if target_subtitle_exists else deliverable_state_loader(task, None, "subtitles_status"),
+        ),
+        _entry(
+            "audio",
+            profile.dub_filename,
+            audio_key,
+            task_endpoint_loader(task_id, "audio") if audio_key and object_exists_fn(str(audio_key)) else None,
+            signed_op_url_loader(task_id, "mm_audio") if audio_key and object_exists_fn(str(audio_key)) else None,
+            "done" if audio_key and bool(audio_asset.get("exists")) else deliverable_state_loader(task, None, "dub_status"),
+        ),
+        _entry(
+            "bgm",
+            "BGM",
+            bgm_key,
+            download_url_loader(str(bgm_key)) if bgm_key and object_exists_fn(str(bgm_key)) else None,
+            download_url_loader(str(bgm_key)) if bgm_key and object_exists_fn(str(bgm_key)) else None,
+            "done" if bgm_key and object_exists_fn(str(bgm_key)) else "pending",
+        ),
+        _entry(
+            "pack",
+            "Pack ZIP",
+            pack_key,
+            None,
+            signed_op_url_loader(task_id, "pack") if pack_key and object_exists_fn(pack_key) else None,
+            deliverable_state_loader(task, pack_key, "pack_status"),
+        ),
+        _entry(
+            "scenes",
+            "Scenes ZIP",
+            scenes_key,
+            None,
+            signed_op_url_loader(task_id, "scenes") if scenes_key and object_exists_fn(scenes_key) else None,
+            "done" if scenes_key else deliverable_state_loader(task, scenes_key, "scenes_status"),
+        ),
+        _entry(
+            "final",
+            "Final Video",
+            final_key,
+            task_endpoint_loader(task_id, "final") if final_key and object_exists_fn(str(final_key)) else None,
+            signed_op_url_loader(task_id, "final_mp4") if final_key and object_exists_fn(str(final_key)) else None,
+            deliverable_state_loader(task, final_key, "compose_status"),
+        ),
+    ]
+
+
+def hf_shape_from_events(task: dict) -> dict[str, str]:
+    events = task.get("events") or []
+    if not isinstance(events, list):
+        return {"step": "", "phase": "", "provider": ""}
+    for event in reversed(events):
+        if not isinstance(event, dict):
+            continue
+        extra = event.get("extra") or {}
+        if not isinstance(extra, dict):
+            extra = {}
+        step = str(extra.get("step") or event.get("step") or "").strip().lower()
+        phase = str(extra.get("phase") or event.get("phase") or "").strip().lower()
+        provider = str(extra.get("provider") or event.get("provider") or "").strip()
+        if step in {"dubbing", "audio"}:
+            step = "dub"
+        if step or phase or provider:
+            return {"step": step, "phase": phase, "provider": provider}
+    return {"step": "", "phase": "", "provider": ""}
+
+
+def hf_task_status_shape(task: dict, *, pipeline_state_loader=hf_pipeline_state) -> dict[str, str]:
+    shape = hf_shape_from_events(task)
+    step = shape.get("step") or ""
+    phase = shape.get("phase") or ""
+    provider = shape.get("provider") or ""
+
+    if not step:
+        last_step = str(task.get("last_step") or "").strip().lower()
+        step_map = {"dubbing": "dub", "audio": "dub", "final": "compose"}
+        step = step_map.get(last_step, last_step)
+    if not step:
+        for candidate in ("compose", "pack", "scenes", "dub", "subtitles", "parse"):
+            status, _ = pipeline_state_loader(task, candidate)
+            if status in {"running", "failed"}:
+                step = candidate
+                break
+    if not step:
+        for candidate in ("compose", "pack", "scenes", "dub", "subtitles", "parse"):
+            status, _ = pipeline_state_loader(task, candidate)
+            if status == "done":
+                step = candidate
+                break
+
+    if not phase:
+        if step:
+            status, _ = pipeline_state_loader(task, step)
+            phase = status
+        else:
+            phase = hf_state_from_status(task.get("status")) or "pending"
+
+    if not provider:
+        provider_map = {
+            "parse": "parse_provider",
+            "subtitles": "subtitles_provider",
+            "dub": "dub_provider",
+            "pack": "pack_provider",
+            "compose": "compose_provider",
+        }
+        provider_field = provider_map.get(step)
+        if provider_field:
+            provider = str(task.get(provider_field) or "").strip()
+
+    return {
+        "step": step or "-",
+        "phase": phase or "-",
+        "provider": provider or "-",
+    }
+
+
+def build_hot_follow_workbench_projection(
+    task_id: str,
+    repo,
+    *,
+    settings=None,
+    object_exists_fn=object_exists,
+    task_endpoint_loader=task_endpoint,
+    subtitle_lane_loader=hf_subtitle_lane_state,
+    composed_state_loader=compute_composed_state,
+    pipeline_state_loader=hf_pipeline_state,
+    scene_pack_info_loader=scene_pack_info,
+    subtitles_text_loader=hf_load_subtitles_text,
+    origin_subtitles_text_loader=hf_load_origin_subtitles_text,
+    normalized_source_text_loader=hf_load_normalized_source_text,
+    dual_channel_state_loader=hf_dual_channel_state,
+    audio_config_loader=hf_audio_config,
+    voice_execution_state_loader=collect_voice_execution_state,
+    persisted_audio_state_loader=hf_persisted_audio_state,
+    deliverables_loader=hf_deliverables,
+    resolve_final_url_loader=resolve_hub_final_url,
+) -> dict[str, Any]:
+    task = repo.get(task_id)
+    if not task:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Task not found")
+    settings_obj = settings or get_settings()
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    compose_plan = build_hot_follow_compose_plan(task, pipeline_config)
+    scene_outputs = task.get("scene_outputs")
+    if not isinstance(scene_outputs, list):
+        scene_outputs = []
+    subtitle_lane = subtitle_lane_loader(task_id, task)
+    task_runtime = dict(task)
+    task_runtime["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
+    task_runtime["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
+    composed = composed_state_loader(task_runtime, task_id)
+    parse_state, parse_summary = pipeline_state_loader(task_runtime, "parse")
+    subtitles_state, subtitles_summary = pipeline_state_loader(task_runtime, "subtitles")
+    dub_state, dub_summary = pipeline_state_loader(task_runtime, "audio")
+    pack_state, pack_summary = pipeline_state_loader(task_runtime, "pack")
+    compose_state, compose_summary = pipeline_state_loader(task_runtime, "compose", composed=composed)
+
+    raw_key = task_key(task_runtime, "raw_path")
+    raw_url = task_endpoint_loader(task_id, "raw") if raw_key and object_exists_fn(raw_key) else None
+    mute_key = task_key(task_runtime, "mute_video_key") or task_key(task_runtime, "mute_video_path")
+    mute_url = task_endpoint_loader(task_id, "raw") if mute_key and object_exists_fn(str(mute_key)) else raw_url
+    final_info = composed.get("final") or {}
+    historical_final = composed.get("historical_final") or {}
+    scene_pack = scene_pack_info_loader(task_runtime, task_id)
+    scenes_key = task_key(task_runtime, "scenes_key")
+    scenes_status = scenes_status_from_ssot(task_runtime)
+    scenes_url = signed_op_url(task_id, "scenes") if scenes_key else None
+    subtitles_text = subtitles_text_loader(task_id, task_runtime)
+    origin_text = origin_subtitles_text_loader(task_runtime)
+    normalized_source_text = normalized_source_text_loader(task_id, task_runtime)
+    subtitles_step_done = str(subtitles_state).strip().lower() in {"done", "ready", "success", "completed", "failed", "error"}
+    route_state = dual_channel_state_loader(task_id, task_runtime, subtitle_lane, subtitles_step_done=subtitles_step_done)
+    audio_cfg = audio_config_loader(task_runtime)
+    voice_state = voice_execution_state_loader(task_runtime, settings_obj)
+    stored_no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task_runtime.get("dub_skip_reason") or ""
+    ).strip()
+    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
+        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
+        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    )
+    if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
+        no_dub = False
+    if stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
+        no_dub_reason = stored_no_dub_reason
+    elif route_state.get("content_mode") == "subtitle_led":
+        no_dub_reason = "subtitle_led"
+    elif route_state.get("content_mode") == "silent_candidate":
+        no_dub_reason = "no_speech_detected"
+    else:
+        no_dub_reason = None
+    if not no_dub:
+        no_dub_reason = None
+    no_dub_compose_allowed = bool(
+        no_dub and str(no_dub_reason or "").strip().lower() in {"target_subtitle_empty", "dub_input_empty"}
+    )
+    persisted_audio = persisted_audio_state_loader(task_id, task_runtime)
+    target_lang_internal = normalize_target_lang(task_runtime.get("target_lang") or task_runtime.get("content_lang") or "mm")
+    text_guard = clean_and_analyze_dub_text(subtitles_text or "", target_lang_internal)
+    audio_warning = str(text_guard.get("warning") or "").strip() or None
+    if (
+        not (audio_cfg.get("voiceover_url") or "").strip()
+        and (task_runtime.get("mm_audio_key") or task_runtime.get("mm_audio_path"))
+        and str(dub_state).strip().lower() not in {"running", "processing", "queued"}
+        and str(voice_state.get("dub_current_reason") or "").strip().lower() not in {"dub_running", "dub_not_done"}
+    ):
+        dub_state = "failed"
+        if not dub_summary:
+            dub_summary = "voiceover artifact invalid"
+    audio_error = hf_audio_display_error(str(dub_state), task.get("dub_error"), voice_state)
+    deliverables = deliverables_loader(task_id, task_runtime)
+    target_profile = get_hot_follow_language_profile(target_lang_internal)
+    compose_last = normalize_compose_last(task)
+    composed_ready = bool(composed.get("composed_ready"))
+    composed_reason = str(composed.get("composed_reason") or "final_missing")
+    final_stale_reason = composed.get("final_stale_reason") or None
+
+    return {
+        "task_id": task_id,
+        "task": task,
+        "task_runtime": task_runtime,
+        "settings": settings_obj,
+        "pipeline_config": pipeline_config,
+        "compose_plan": compose_plan,
+        "scene_outputs": scene_outputs,
+        "subtitle_lane": subtitle_lane,
+        "composed": composed,
+        "parse_state": parse_state,
+        "parse_summary": parse_summary,
+        "subtitles_state": subtitles_state,
+        "subtitles_summary": subtitles_summary,
+        "dub_state": dub_state,
+        "dub_summary": dub_summary,
+        "pack_state": pack_state,
+        "pack_summary": pack_summary,
+        "compose_state": compose_state,
+        "compose_summary": compose_summary,
+        "raw_url": raw_url,
+        "mute_url": mute_url,
+        "final_info": final_info,
+        "historical_final": historical_final,
+        "scene_pack": scene_pack,
+        "scenes_key": scenes_key,
+        "scenes_status": scenes_status,
+        "scenes_url": scenes_url,
+        "subtitles_text": subtitles_text,
+        "origin_text": origin_text,
+        "normalized_source_text": normalized_source_text,
+        "route_state": route_state,
+        "audio_cfg": audio_cfg,
+        "voice_state": voice_state,
+        "no_dub": no_dub,
+        "no_dub_reason": no_dub_reason,
+        "no_dub_compose_allowed": no_dub_compose_allowed,
+        "persisted_audio": persisted_audio,
+        "audio_warning": audio_warning,
+        "audio_error": audio_error,
+        "deliverables": deliverables,
+        "target_profile": target_profile,
+        "compose_last": compose_last,
+        "composed_ready": composed_ready,
+        "composed_reason": composed_reason,
+        "final_stale_reason": final_stale_reason,
+        "parse_error": task.get("parse_error") if str(parse_state).strip().lower() in {"failed", "error"} else None,
+        "subtitles_error": task.get("subtitles_error") if str(subtitles_state).strip().lower() in {"failed", "error"} else None,
+        "dub_error": audio_error if str(dub_state).strip().lower() in {"failed", "error"} else None,
+        "pack_error": task.get("pack_error") if str(pack_state).strip().lower() in {"failed", "error"} else None,
+        "compose_error": task.get("compose_error") if str(compose_state).strip().lower() in {"failed", "error"} else None,
+        "target_lang_internal": target_lang_internal,
+        "resolve_final_url_loader": resolve_final_url_loader,
+    }

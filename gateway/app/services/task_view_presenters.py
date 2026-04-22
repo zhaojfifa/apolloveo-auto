@@ -1,0 +1,593 @@
+"""Hot Follow task-view presenters.
+
+Presenter layers consume authoritative projection data and shape surface
+payloads without recomputing separate business truths.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+from typing import Any
+
+from gateway.app.config import get_settings
+from gateway.app.services.artifact_storage import object_exists
+from gateway.app.services.hot_follow_skills_advisory import (
+    maybe_build_hot_follow_advisory,
+)
+from gateway.app.services.hot_follow_workbench_presenter import (
+    build_hot_follow_artifact_facts,
+    build_hot_follow_current_attempt_summary,
+    build_hot_follow_operator_summary,
+)
+from gateway.app.services.line_binding_service import get_line_runtime_binding
+from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
+from gateway.app.services.task_view_helpers import (
+    backfill_compose_done_if_final_ready,
+    deliverable_url,
+    publish_hub_payload,
+)
+from gateway.app.services.task_view_projection import (
+    build_hot_follow_workbench_projection,
+    hf_deliverables,
+    hf_pipeline_state,
+)
+from gateway.app.services.task_view_workbench_contract import (
+    apply_ready_gate_composed_projection,
+    apply_ready_gate_compose_projection,
+    attach_final_url,
+    attach_task_aliases,
+    build_hot_follow_workbench_payload,
+    build_pipeline_legacy,
+    build_pipeline_rows,
+    sync_final_deliverable_projection,
+)
+from gateway.app.services.tts_policy import normalize_provider, normalize_target_lang, public_target_lang
+from gateway.app.services.subtitle_helpers import (
+    hf_dual_channel_state,
+    hf_load_normalized_source_text,
+    hf_load_origin_subtitles_text,
+    hf_load_subtitles_text,
+    hf_subtitle_lane_state,
+)
+from gateway.app.services.task_view_helpers import (
+    compute_composed_state,
+    resolve_hub_final_url,
+    scene_pack_info,
+    task_endpoint,
+)
+from gateway.app.services.voice_service import (
+    hf_audio_config,
+    hf_screen_text_candidate_summary,
+    hf_source_audio_lane_summary,
+    hf_source_audio_semantics,
+)
+from gateway.app.services.voice_state import (
+    build_hot_follow_voice_options,
+    collect_voice_execution_state,
+    hf_persisted_audio_state,
+)
+from gateway.app.utils.pipeline_config import parse_pipeline_config
+
+logger = logging.getLogger(__name__)
+
+
+def hot_follow_operational_defaults() -> dict[str, Any]:
+    return {
+        "raw_source_text": "",
+        "normalized_source_text": "",
+        "parse_source_text": "",
+        "parse_source_role": "none",
+        "parse_source_authoritative_for_target": False,
+        "dub_input_text": "",
+        "dub_input_source": None,
+        "subtitle_ready": False,
+        "subtitle_ready_reason": "unknown",
+        "speech_detected": False,
+        "speech_confidence": "none",
+        "onscreen_text_detected": False,
+        "onscreen_text_density": "none",
+        "content_mode": "unknown",
+        "recommended_path": "Voice dubbing",
+        "source_audio_lane": "unknown",
+        "source_audio_lane_reason": "当前音频结构信息不足。",
+        "speech_presence": "unknown",
+        "bgm_presence": "unknown",
+        "audio_mix_mode": "unknown",
+        "screen_text_candidate": "",
+        "screen_text_candidate_source": None,
+        "screen_text_candidate_confidence": "none",
+        "screen_text_candidate_mode": "unavailable",
+        "no_dub": False,
+        "no_dub_reason": None,
+        "no_dub_message": None,
+        "actual_burn_subtitle_source": None,
+        "target_subtitle_current": False,
+        "target_subtitle_current_reason": "unknown",
+        "target_subtitle_authoritative_source": False,
+        "target_subtitle_source_copy": False,
+    }
+
+
+def collect_hot_follow_workbench_ui(
+    task: dict,
+    settings,
+    *,
+    subtitle_lane_loader=hf_subtitle_lane_state,
+    dual_channel_state_loader=hf_dual_channel_state,
+    source_audio_lane_loader=hf_source_audio_lane_summary,
+    screen_text_candidate_loader=hf_screen_text_candidate_summary,
+    voice_execution_state_loader=collect_voice_execution_state,
+    pipeline_state_loader=hf_pipeline_state,
+    object_exists_fn=object_exists,
+    source_audio_semantics_loader=hf_source_audio_semantics,
+) -> dict[str, Any]:
+    task_id = str(task.get("task_id") or task.get("id") or "")
+    subtitle_lane = subtitle_lane_loader(task_id, task)
+    task_runtime = dict(task)
+    task_runtime["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
+    task_runtime["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
+    subtitles_state, _ = pipeline_state_loader(task, "subtitles")
+    subtitles_step_done = subtitles_state in {"done", "ready", "success", "completed", "failed", "error"}
+    route_state = dual_channel_state_loader(task_id, task_runtime, subtitle_lane, subtitles_step_done=subtitles_step_done)
+    audio_lane = source_audio_lane_loader(task, route_state)
+    screen_text_candidate = screen_text_candidate_loader(subtitle_lane, route_state)
+    voice_state = voice_execution_state_loader(task_runtime, settings)
+    final_key = str(task_runtime.get("final_video_key") or task_runtime.get("final_video_path") or "").strip()
+    final_exists = bool(final_key and object_exists_fn(final_key))
+    compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
+    lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    stored_no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
+    ).strip()
+    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
+        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
+        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    )
+    helper_translate_failed_voice_led = bool(
+        subtitle_lane.get("helper_translate_failed")
+        and not bool(subtitle_lane.get("subtitle_ready"))
+        and str(route_state.get("content_mode") or "").strip().lower() == "voice_led"
+    )
+    if helper_translate_failed_voice_led:
+        no_dub = False
+    if bool(subtitle_lane.get("subtitle_ready")) and stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
+        no_dub = False
+    if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
+        no_dub = False
+    if stored_no_dub_reason == "target_subtitle_empty":
+        no_dub_reason = "target_subtitle_empty"
+        no_dub_message = "Target subtitle is empty; dubbing is skipped."
+    elif stored_no_dub_reason == "dub_input_empty":
+        no_dub_reason = "dub_input_empty"
+        no_dub_message = "Dub input is empty; dubbing is skipped."
+    elif route_state.get("content_mode") == "subtitle_led":
+        no_dub_reason = "subtitle_led"
+        no_dub_message = "No reliable speech detected. Review subtitles or provide text before dubbing."
+    elif route_state.get("content_mode") == "silent_candidate":
+        no_dub_reason = "no_speech_detected"
+        no_dub_message = "No spoken speech detected in source video; dubbing is skipped."
+    else:
+        no_dub_reason = None
+        no_dub_message = None
+    if not no_dub:
+        no_dub_reason = None
+        no_dub_message = None
+    return {
+        **subtitle_lane,
+        **route_state,
+        **audio_lane,
+        **source_audio_semantics_loader(task_runtime, voice_state),
+        **screen_text_candidate,
+        **voice_state,
+        "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
+        "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),
+        "compose_status": compose_status,
+        "final_exists": final_exists,
+        "actual_burn_subtitle_source": subtitle_lane.get("actual_burn_subtitle_source"),
+        "no_dub": bool(no_dub),
+        "no_dub_reason": no_dub_reason,
+        "no_dub_message": no_dub_message,
+        "lipsync_enabled": lipsync_enabled,
+        "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
+        "voiceover_url": voice_state.get("voiceover_url"),
+        "deliverable_audio_done": bool(voice_state.get("deliverable_audio_done")),
+        "dub_current": bool(voice_state.get("dub_current")),
+        "dub_current_reason": voice_state.get("dub_current_reason"),
+    }
+
+
+def safe_collect_hot_follow_workbench_ui(
+    task: dict,
+    settings,
+    *,
+    workbench_ui_loader=collect_hot_follow_workbench_ui,
+    voice_options_builder=build_hot_follow_voice_options,
+) -> dict[str, Any]:
+    try:
+        return workbench_ui_loader(task, settings)
+    except Exception:
+        logger.exception("HF_WORKBENCH_UI_SAFE_FALLBACK task=%s", task.get("task_id") or task.get("id"))
+        payload = hot_follow_operational_defaults()
+        payload.update(
+            {
+                "actual_provider": normalize_provider(task.get("dub_provider") or getattr(settings, "dub_provider", None)),
+                "resolved_voice": None,
+                "requested_voice": None,
+                "audio_ready": False,
+                "audio_ready_reason": "unknown",
+                "deliverable_audio_done": False,
+                "dub_current": False,
+                "dub_current_reason": "unknown",
+                "voice_options_by_provider": voice_options_builder(
+                    settings, normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+                ),
+                "compose_status": str(task.get("compose_status") or "never"),
+                "final_exists": False,
+                "lipsync_enabled": False,
+                "lipsync_status": "off",
+            }
+        )
+        return payload
+
+
+def hf_rerun_presentation_state(
+    task: dict,
+    voice_state: dict[str, Any] | None,
+    final_info: dict[str, Any] | None,
+    historical_final: dict[str, Any] | None,
+    dub_status: str | None,
+) -> dict[str, Any]:
+    voice = voice_state or {}
+    final_payload = final_info or historical_final or {}
+    final_exists = bool(final_payload.get("exists"))
+    final_url = str(final_payload.get("url") or "").strip() or None
+    final_asset_version = str(final_payload.get("asset_version") or "").strip() or None
+    final_updated_at = final_payload.get("updated_at") or task.get("final_updated_at") or task.get("updated_at")
+    return {
+        "last_successful_output": {
+            "final_exists": final_exists,
+            "final_url": final_url,
+            "final_asset_version": final_asset_version,
+            "final_updated_at": final_updated_at,
+        },
+        "current_attempt": {
+            "dub_status": str(dub_status or "").strip().lower() or "never",
+            "audio_ready": bool(voice.get("audio_ready")),
+            "audio_ready_reason": str(voice.get("audio_ready_reason") or "").strip() or "unknown",
+            "dub_current": bool(voice.get("dub_current")),
+            "dub_current_reason": str(voice.get("dub_current_reason") or "").strip() or "unknown",
+            "requested_voice": str(voice.get("requested_voice") or "").strip() or None,
+            "resolved_voice": str(voice.get("resolved_voice") or "").strip() or None,
+            "actual_provider": str(voice.get("actual_provider") or "").strip() or None,
+        },
+    }
+
+
+def hf_artifact_facts(
+    task_id: str,
+    task: dict,
+    *,
+    final_info: dict[str, Any] | None,
+    historical_final: dict[str, Any] | None,
+    persisted_audio: dict[str, Any] | None,
+    subtitle_lane: dict[str, Any] | None,
+    scene_pack: dict[str, Any] | None,
+    deliverable_url_loader=deliverable_url,
+) -> dict[str, Any]:
+    return build_hot_follow_artifact_facts(
+        task_id,
+        task,
+        final_info=final_info,
+        historical_final=historical_final,
+        persisted_audio=persisted_audio,
+        subtitle_lane=subtitle_lane,
+        scene_pack=scene_pack,
+        deliverable_url=deliverable_url_loader,
+    )
+
+
+def hf_current_attempt_summary(
+    *,
+    voice_state: dict[str, Any],
+    subtitle_lane: dict[str, Any],
+    dub_status: str,
+    compose_status: str,
+    composed_reason: str,
+    final_stale_reason: str | None = None,
+    artifact_facts: dict[str, Any] | None = None,
+    no_dub: bool = False,
+    no_dub_compose_allowed: bool = False,
+) -> dict[str, Any]:
+    return build_hot_follow_current_attempt_summary(
+        voice_state=voice_state,
+        subtitle_lane=subtitle_lane,
+        dub_status=dub_status,
+        compose_status=compose_status,
+        composed_reason=composed_reason,
+        final_stale_reason=final_stale_reason,
+        artifact_facts=artifact_facts,
+        no_dub=no_dub,
+        no_dub_compose_allowed=no_dub_compose_allowed,
+    )
+
+
+def hf_operator_summary(
+    *,
+    artifact_facts: dict[str, Any],
+    current_attempt: dict[str, Any],
+    no_dub: bool,
+    subtitle_ready: bool = False,
+) -> dict[str, Any]:
+    return build_hot_follow_operator_summary(
+        artifact_facts=artifact_facts,
+        current_attempt=current_attempt,
+        no_dub=no_dub,
+        subtitle_ready=subtitle_ready,
+    )
+
+
+def hf_safe_presentation_aggregates(
+    task_id: str,
+    task: dict,
+    *,
+    final_info: dict[str, Any] | None,
+    historical_final: dict[str, Any] | None,
+    persisted_audio: dict[str, Any] | None,
+    subtitle_lane: dict[str, Any] | None,
+    scene_pack: dict[str, Any] | None,
+    voice_state: dict[str, Any],
+    dub_status: str,
+    compose_status: str,
+    composed_reason: str,
+    final_stale_reason: str | None = None,
+    no_dub: bool,
+    artifact_facts_loader=hf_artifact_facts,
+    current_attempt_loader=hf_current_attempt_summary,
+    operator_summary_loader=hf_operator_summary,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    try:
+        artifact_facts = artifact_facts_loader(
+            task_id,
+            task,
+            final_info=final_info,
+            historical_final=historical_final,
+            persisted_audio=persisted_audio,
+            subtitle_lane=subtitle_lane,
+            scene_pack=scene_pack,
+        )
+        current_attempt = current_attempt_loader(
+            voice_state=voice_state,
+            subtitle_lane=subtitle_lane or {},
+            dub_status=dub_status,
+            compose_status=compose_status,
+            composed_reason=composed_reason,
+            final_stale_reason=final_stale_reason,
+            artifact_facts=artifact_facts,
+            no_dub=no_dub,
+            no_dub_compose_allowed=bool((artifact_facts.get("selected_compose_route") or {}).get("name") in {
+                "preserve_source_route",
+                "bgm_only_route",
+                "no_tts_compose_route",
+            })
+            if isinstance(artifact_facts.get("selected_compose_route"), dict)
+            else False,
+        )
+        operator_summary = operator_summary_loader(
+            artifact_facts=artifact_facts,
+            current_attempt=current_attempt,
+            no_dub=no_dub,
+            subtitle_ready=bool((subtitle_lane or {}).get("subtitle_ready")),
+        )
+        return artifact_facts, current_attempt, operator_summary
+    except Exception:
+        logger.exception("HF_PRESENTATION_AGGREGATES_SAFE_FALLBACK task=%s", task_id)
+        return {}, {}, {}
+
+
+def build_hot_follow_publish_hub(
+    task_id: str,
+    repo,
+    *,
+    publish_payload_builder=publish_hub_payload,
+    state_computer=compute_hot_follow_state,
+    backfill_compose_done=backfill_compose_done_if_final_ready,
+    line_binding_loader=get_line_runtime_binding,
+) -> dict[str, Any]:
+    task = repo.get(task_id)
+    if not task:
+        from fastapi import HTTPException
+
+        raise HTTPException(status_code=404, detail="Task not found")
+    payload = state_computer(task, publish_payload_builder(task))
+    if backfill_compose_done(repo, task_id, task, bool(payload.get("composed_ready"))):
+        task = repo.get(task_id) or task
+        payload = state_computer(task, publish_payload_builder(task))
+    payload["line"] = line_binding_loader(task).to_payload()
+    return payload
+
+
+def build_hot_follow_workbench_hub(
+    task_id: str,
+    repo,
+    *,
+    settings=None,
+    object_exists_fn=object_exists,
+    task_endpoint_loader=task_endpoint,
+    subtitle_lane_loader=hf_subtitle_lane_state,
+    composed_state_loader=compute_composed_state,
+    pipeline_state_loader=hf_pipeline_state,
+    scene_pack_info_loader=scene_pack_info,
+    subtitles_text_loader=hf_load_subtitles_text,
+    origin_subtitles_text_loader=hf_load_origin_subtitles_text,
+    normalized_source_text_loader=hf_load_normalized_source_text,
+    dual_channel_state_loader=hf_dual_channel_state,
+    audio_config_loader=hf_audio_config,
+    voice_execution_state_loader=collect_voice_execution_state,
+    persisted_audio_state_loader=hf_persisted_audio_state,
+    deliverables_loader=hf_deliverables,
+    presentation_aggregates_loader=hf_safe_presentation_aggregates,
+    presentation_state_loader=hf_rerun_presentation_state,
+    resolve_final_url_loader=resolve_hub_final_url,
+    operational_defaults_loader=hot_follow_operational_defaults,
+    workbench_ui_loader=safe_collect_hot_follow_workbench_ui,
+    state_computer=compute_hot_follow_state,
+    backfill_compose_done=backfill_compose_done_if_final_ready,
+    line_binding_loader=get_line_runtime_binding,
+) -> dict[str, Any]:
+    projection = build_hot_follow_workbench_projection(
+        task_id,
+        repo,
+        settings=settings,
+        object_exists_fn=object_exists_fn,
+        task_endpoint_loader=task_endpoint_loader,
+        subtitle_lane_loader=subtitle_lane_loader,
+        composed_state_loader=composed_state_loader,
+        pipeline_state_loader=pipeline_state_loader,
+        scene_pack_info_loader=scene_pack_info_loader,
+        subtitles_text_loader=subtitles_text_loader,
+        origin_subtitles_text_loader=origin_subtitles_text_loader,
+        normalized_source_text_loader=normalized_source_text_loader,
+        dual_channel_state_loader=dual_channel_state_loader,
+        audio_config_loader=audio_config_loader,
+        voice_execution_state_loader=voice_execution_state_loader,
+        persisted_audio_state_loader=persisted_audio_state_loader,
+        deliverables_loader=deliverables_loader,
+        resolve_final_url_loader=resolve_final_url_loader,
+    )
+    task = projection["task"]
+    task_runtime = projection["task_runtime"]
+    pipeline = build_pipeline_rows(
+        task,
+        parse_state=projection["parse_state"],
+        parse_summary=projection["parse_summary"],
+        subtitles_state=projection["subtitles_state"],
+        subtitles_summary=projection["subtitles_summary"],
+        dub_state=projection["dub_state"],
+        dub_summary=projection["dub_summary"],
+        pack_state=projection["pack_state"],
+        pack_summary=projection["pack_summary"],
+        compose_state=projection["compose_state"],
+        compose_summary=projection["compose_summary"],
+        parse_error=projection["parse_error"],
+        subtitles_error=projection["subtitles_error"],
+        dub_error=projection["dub_error"],
+        pack_error=projection["pack_error"],
+        compose_error=projection["compose_error"],
+    )
+    pipeline_legacy = build_pipeline_legacy(
+        task,
+        parse_state=projection["parse_state"],
+        parse_summary=projection["parse_summary"],
+        subtitles_state=projection["subtitles_state"],
+        subtitles_summary=projection["subtitles_summary"],
+        dub_state=projection["dub_state"],
+        dub_summary=projection["dub_summary"],
+        pack_state=projection["pack_state"],
+        pack_summary=projection["pack_summary"],
+        compose_state=projection["compose_state"],
+        compose_summary=projection["compose_summary"],
+    )
+    payload = build_hot_follow_workbench_payload(
+        task_id=task_id,
+        task=task,
+        pipeline_config=projection["pipeline_config"],
+        compose_plan=projection["compose_plan"],
+        scene_outputs=projection["scene_outputs"],
+        subtitle_lane=projection["subtitle_lane"],
+        target_lang_public=public_target_lang(projection["target_lang_internal"]),
+        raw_url=projection["raw_url"],
+        mute_url=projection["mute_url"],
+        audio_cfg=projection["audio_cfg"],
+        voice_state=projection["voice_state"],
+        subtitles_state=projection["subtitles_state"],
+        dub_state=projection["dub_state"],
+        pack_state=projection["pack_state"],
+        compose_state=projection["compose_state"],
+        pipeline=pipeline,
+        pipeline_legacy=pipeline_legacy,
+        scenes_status=projection["scenes_status"],
+        scenes_key=projection["scenes_key"],
+        scenes_url=projection["scenes_url"],
+        scene_pack=projection["scene_pack"],
+        deliverables=projection["deliverables"],
+        target_profile=projection["target_profile"],
+        origin_text=projection["origin_text"],
+        subtitles_text=projection["subtitles_text"],
+        normalized_source_text=projection["normalized_source_text"],
+        text_audio_warning=projection["audio_warning"],
+        audio_error=projection["audio_error"],
+        no_dub=projection["no_dub"],
+        no_dub_reason=projection["no_dub_reason"],
+        no_dub_compose_allowed=projection["no_dub_compose_allowed"],
+        composed_ready=projection["composed_ready"],
+        composed_reason=projection["composed_reason"],
+        final_info=projection["final_info"],
+        historical_final=projection["historical_final"],
+        compose_last=projection["compose_last"],
+        composed=projection["composed"],
+    )
+    payload["final_stale_reason"] = projection["final_stale_reason"]
+    payload["final_fresh"] = bool(projection["composed"].get("final_fresh"))
+    artifact_facts, current_attempt, operator_summary = presentation_aggregates_loader(
+        task_id,
+        task,
+        final_info=projection["final_info"],
+        historical_final=projection["historical_final"],
+        persisted_audio=projection["persisted_audio"],
+        subtitle_lane=projection["subtitle_lane"],
+        scene_pack=projection["scene_pack"],
+        voice_state=projection["voice_state"],
+        dub_status=str(projection["dub_state"]),
+        compose_status=projection["compose_state"],
+        composed_reason=projection["composed_reason"],
+        final_stale_reason=projection["final_stale_reason"],
+        no_dub=bool((payload.get("audio") or {}).get("no_dub")),
+    )
+    payload["artifact_facts"] = artifact_facts
+    payload["current_attempt"] = current_attempt
+    payload["operator_summary"] = operator_summary
+    payload["presentation"] = presentation_state_loader(
+        task,
+        projection["voice_state"],
+        projection["final_info"],
+        projection["historical_final"],
+        projection["dub_state"],
+    )
+    final_url = resolve_final_url_loader(task_id, payload)
+    attach_final_url(payload, final_url)
+    composed_ready = bool(projection["composed_ready"])
+    payload["composed_ready"] = composed_ready
+    payload["composed_reason"] = "ready" if composed_ready else "not_ready"
+    sync_final_deliverable_projection(
+        payload,
+        composed_ready=composed_ready,
+        final_url=final_url,
+        historical_final=projection["historical_final"],
+    )
+    attach_task_aliases(payload, task, task_id)
+    payload = state_computer(task_runtime, payload)
+    apply_ready_gate_compose_projection(payload)
+    if backfill_compose_done(repo, task_id, task, bool(payload.get("composed_ready"))):
+        latest = repo.get(task_id) or task
+        latest_runtime = dict(latest)
+        latest_lane = subtitle_lane_loader(task_id, latest)
+        latest_runtime["target_subtitle_current"] = bool(latest_lane.get("target_subtitle_current"))
+        latest_runtime["target_subtitle_current_reason"] = latest_lane.get("target_subtitle_current_reason")
+        payload = state_computer(latest_runtime, payload)
+        apply_ready_gate_compose_projection(payload)
+        task = latest
+    final_url = str(
+        payload.get("final_url")
+        or (payload.get("media", {}) or {}).get("final_url")
+        or ""
+    ).strip()
+    apply_ready_gate_composed_projection(payload, final_url=final_url)
+    payload["line"] = line_binding_loader(task).to_payload()
+    advisory = maybe_build_hot_follow_advisory(task, payload)
+    if advisory is not None:
+        payload["advisory"] = advisory
+    payload.update(operational_defaults_loader())
+    payload.update(workbench_ui_loader(task, projection["settings"]))
+    return payload

@@ -569,3 +569,50 @@ Acceptance:
 - shared workbench/presentation helper ownership moved into `gateway/app/services/task_view.py`
 - router-level wrappers remain thin collaborator-injection seams instead of payload-assembly ownership points
 - Hot Follow business behavior intentionally unchanged
+
+## PR-8 Task View Projection/Presenter Split
+
+Branch: `VeoBase01-pr8-task-view-projection-presenter-split`
+
+Why:
+
+- `task_view.py` still mixed authoritative Hot Follow projection assembly with presenter/payload shaping, which left one file owning both truth normalization and surface output concerns.
+
+Scope:
+
+- add `gateway/app/services/task_view_projection.py` for authoritative pipeline/deliverable/workbench projection assembly
+- add `gateway/app/services/task_view_presenters.py` for publish/workbench presenters and presentation aggregates
+- reduce `gateway/app/services/task_view.py` to a thin import-stable facade
+- keep publish/workbench behavior unchanged
+
+Files changed:
+
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- `docs/execution/VEOBASE01_PR8_TASK_VIEW_PROJECTION_PRESENTER_SPLIT.md`
+- `gateway/app/services/task_view.py`
+- `gateway/app/services/task_view_presenters.py`
+- `gateway/app/services/task_view_projection.py`
+
+Validation:
+
+- `git diff --check`: passed
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m py_compile gateway/app/services/task_view.py gateway/app/services/task_view_projection.py gateway/app/services/task_view_presenters.py gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/hot_follow_runtime_bridge.py`: passed
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/status_policy/tests/test_hot_follow_phase_a_ops.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_runtime_bridge.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`: `89 passed`
+
+Regression sample evidence:
+
+- final-ready `9c755859d049` synthetic surface probe remained aligned:
+  - publish: `final_exists=true`, `composed_ready=true`, `publish_ready=true`, `audio_ready=true`, compose `done`
+  - workbench: `artifact_facts.final_exists=true`, `composed_ready=true`, `ready_gate.publish_ready=true`, `audio.audio_ready=true`, compose `done`
+- compose-running `9280fcb9f0b1` synthetic surface probe remained in progress:
+  - publish: `final_exists=false`, `composed_ready=false`, `publish_ready=false`, `audio_ready=true`, compose `pending`
+  - workbench: `artifact_facts.final_exists=false`, `composed_ready=false`, `ready_gate.publish_ready=false`, `audio.audio_ready=true`, compose `pending`
+  - persisted task state remained `compose_status=running`
+
+Acceptance:
+
+- `task_view.py` line count reduced from `964` to `48`
+- authoritative projection moved into `gateway/app/services/task_view_projection.py`
+- presenter logic moved into `gateway/app/services/task_view_presenters.py`
+- import-stable callers still use `gateway/app/services/task_view.py` as a thin facade
+- Hot Follow business behavior intentionally unchanged
