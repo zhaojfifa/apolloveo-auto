@@ -666,3 +666,38 @@ Acceptance:
 - `task_view_workbench_contract.py` now acts as schema shaping plus compatibility aliasing only
 - top-level `compose_allowed` remains available for UI compatibility, but is sourced from `ready_gate` instead of late truth rewriting
 - Hot Follow business behavior intentionally unchanged
+
+## Remote VeoBase01 Switch
+
+Branch: `VeoBase01`
+
+Why:
+
+- local `VeoBase01` was the approved post-PR-9 integration baseline
+- `origin/VeoBase01` still pointed to stale pre-refresh history
+- the remote integration branch had to be intentionally replaced so later cleanup continues from the approved baseline instead of the archived line
+
+Remote replacement evidence:
+
+- old remote SHA before replacement: `ea437f1bcebdead870f91864dc34ae22d2680ae0`
+- approved local replacement SHA: `004dffcb6cde0e1ccda2c3add75d6ac255da2100`
+- exact push command used: `git push --force-with-lease origin VeoBase01:VeoBase01`
+- push result: `+ ea437f1...004dffc VeoBase01 -> VeoBase01 (forced update)`
+
+Verification:
+
+- `git fetch origin`: passed
+- `git rev-parse HEAD`: `004dffcb6cde0e1ccda2c3add75d6ac255da2100`
+- `git rev-parse origin/VeoBase01`: `004dffcb6cde0e1ccda2c3add75d6ac255da2100`
+- `git log --oneline --decorate --left-right origin/VeoBase01...VeoBase01`: no output
+- `git status --short --branch`: `## VeoBase01...origin/VeoBase01`
+
+Rollback reference:
+
+- stale remote VeoBase01 tip before replacement: `ea437f1bcebdead870f91864dc34ae22d2680ae0`
+
+Acceptance:
+
+- `origin/VeoBase01` was intentionally replaced with the approved refreshed local integration baseline
+- rollback target was recorded before the switch in `docs/execution/VEOBASE01_REMOTE_SWITCH_AND_PHASE25_PLAN.md`
+- no code changes were mixed into the remote-switch step; only handoff documentation was added
