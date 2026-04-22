@@ -92,7 +92,6 @@ from gateway.app.services.task_view_helpers import (
     compute_composed_state as _compute_composed_state,
     count_srt_cues as _count_srt_cues,
     deliverable_url as _deliverable_url,
-    publish_hub_payload as _publish_hub_payload,
     resolve_hub_final_url as _resolve_hub_final_url,
     scene_pack_info as _scene_pack_info,
     scenes_status_from_ssot as _scenes_status_from_ssot,
@@ -1469,7 +1468,6 @@ def _service_build_hot_follow_publish_hub(task_id: str, repo):
     return _svc_build_hot_follow_publish_hub(
         task_id,
         repo=repo,
-        publish_payload_builder=_publish_hub_payload,
         backfill_compose_done=_backfill_compose_done_if_final_ready,
     )
 
