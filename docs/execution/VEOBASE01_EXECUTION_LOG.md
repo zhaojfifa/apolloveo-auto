@@ -749,3 +749,50 @@ Acceptance:
 - `tasks.py` line count reduced from `3296` to `3074`
 - compatibility wrappers preserved endpoint/test behavior
 - Hot Follow business behavior intentionally unchanged
+
+## PR-11 Hot Follow API Shell Reduction Follow-up
+
+Branch: `VeoBase01-pr11-hot-follow-api-shell-reduction`
+
+Why:
+
+- `hot_follow_api.py` still carried duplicated helper implementations for router-adjacent state normalization and workbench/publish support defaults.
+
+Scope:
+
+- replace router-local implementations of lipsync stub fallback, state-status normalization, parse-artifact readiness, and operational defaults with service-backed wrappers
+- keep existing router helper names and workbench/publish injection seams stable
+- avoid business-flow changes in compose, dub, translation, or publish semantics
+
+Files changed:
+
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- `docs/execution/VEOBASE01_PR11_HOT_FOLLOW_API_SHELL_REDUCTION.md`
+- `gateway/app/routers/hot_follow_api.py`
+
+Validation:
+
+- `git diff --check`: passed
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m py_compile gateway/app/routers/hot_follow_api.py`: passed
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_hot_follow_phase_a_ops.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`: `118 passed, 2 failed`
+- the two failures were the known unrelated subtitle-render default tests:
+  - `test_compose_subtitle_vf_uses_bottom_safe_zone_defaults_for_hot_follow`
+  - `test_subtitle_render_signature_tracks_minimal_retune_defaults`
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_hot_follow_phase_a_ops.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -k "not test_compose_subtitle_vf_uses_bottom_safe_zone_defaults_for_hot_follow and not test_subtitle_render_signature_tracks_minimal_retune_defaults" -q`: `118 passed, 2 deselected`
+
+Regression sample evidence:
+
+- final-ready `9c755859d049` synthetic surface probe remained aligned:
+  - publish: `final_exists=true`, `composed_ready=true`, `publish_ready=true`, `audio_ready=true`, compose `done`
+  - workbench: `artifact_facts.final_exists=true`, `composed_ready=true`, `ready_gate.publish_ready=true`, `audio.audio_ready=true`, compose `done`
+  - persisted state: `compose_status=done`
+- compose-running `9280fcb9f0b1` synthetic surface probe remained in progress:
+  - publish: `final_exists=false`, `composed_ready=false`, `publish_ready=false`, `audio_ready=true`, compose `pending`
+  - workbench: `artifact_facts.final_exists=false`, `composed_ready=false`, `ready_gate.publish_ready=false`, `audio.audio_ready=true`, compose `running`
+  - persisted task state remained `compose_status=running`
+
+Acceptance:
+
+- `hot_follow_api.py` line count reduced from `2027` to `1858`
+- route helper names and collaborator seams stayed stable for existing tests and callers
+- no Hot Follow business-flow change was introduced

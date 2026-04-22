@@ -143,7 +143,11 @@ from gateway.app.services.hot_follow_helper_translation import (
     helper_translate_success_updates,
     sanitize_helper_translate_error,
 )
-from gateway.app.services.voice_service import hf_source_audio_semantics
+from gateway.app.services.subtitle_helpers import (
+    hf_done_like as _svc_hf_done_like,
+    hf_parse_artifact_ready as _svc_hf_parse_artifact_ready,
+    hf_state_from_status as _svc_hf_state_from_status,
+)
 from gateway.app.services.task_view import (
     build_hot_follow_publish_hub as _svc_build_hot_follow_publish_hub,
     build_hot_follow_workbench_hub as _svc_build_hot_follow_workbench_hub,
@@ -156,7 +160,12 @@ from gateway.app.services.task_view import (
     hf_rerun_presentation_state as _svc_hf_rerun_presentation_state,
     hf_safe_presentation_aggregates as _svc_hf_safe_presentation_aggregates,
     hf_task_status_shape as _svc_hf_task_status_shape,
+    hot_follow_operational_defaults as _svc_hot_follow_operational_defaults,
     safe_collect_hot_follow_workbench_ui as _svc_safe_collect_hot_follow_workbench_ui,
+)
+from gateway.app.services.voice_service import (
+    hf_source_audio_semantics,
+    maybe_run_hot_follow_lipsync_stub as _svc_maybe_run_hot_follow_lipsync_stub,
 )
 
 
@@ -233,17 +242,7 @@ def _hf_compose_revision_snapshot(task: dict) -> dict[str, str | None]:
 
 
 def _maybe_run_hot_follow_lipsync_stub(task_id: str, enabled: bool = False) -> str | None:
-    if not enabled:
-        return None
-    soft_fail = os.getenv("HF_LIPSYNC_SOFT_FAIL", "1").strip().lower() not in ("0", "false", "no")
-    message = "Lipsync stub enabled, but no provider is wired in v1.9; continuing basic compose."
-    if soft_fail:
-        logger.warning("HF_LIPSYNC_STUB_SOFT_FAIL task=%s message=%s", task_id, message)
-        return message
-    raise HTTPException(
-        status_code=409,
-        detail={"reason": "lipsync_stub_blocked", "message": message},
-    )
+    return _svc_maybe_run_hot_follow_lipsync_stub(task_id, enabled=enabled)
 
 
 def _execute_hot_follow_compose_contract(
@@ -484,85 +483,15 @@ def _hf_translate_source_subtitle_lane(task_id: str, task: dict, *, target_lang:
 
 
 def _hf_state_from_status(value: Any) -> str:
-    v = str(value or "").strip().lower()
-    if v in {"ready", "done", "success", "completed"}:
-        return "done"
-    if v in {"running", "processing", "queued"}:
-        return "running"
-    if v in {"failed", "error"}:
-        return "failed"
-    return "pending"
+    return _svc_hf_state_from_status(value)
 
 
 def _hf_done_like(value: Any) -> bool:
-    return str(value or "").strip().lower() in {"done", "ready", "success", "completed"}
+    return _svc_hf_done_like(value)
 
 
 def _hf_parse_artifact_ready(task: dict) -> bool:
-    if not isinstance(task, dict):
-        return False
-
-    if task.get("raw_url"):
-        return True
-
-    raw_key = _task_key(task, "raw_path") or _task_key(task, "raw_key")
-    if raw_key:
-        return True
-
-    source_video = task.get("source_video")
-    if isinstance(source_video, dict) and source_video.get("url"):
-        return True
-
-    media = task.get("media")
-    if isinstance(media, dict) and (media.get("raw_url") or media.get("source_video_url")):
-        return True
-
-    deliverables = task.get("deliverables")
-    if isinstance(deliverables, dict):
-        raw_deliverable = deliverables.get("raw_video") or deliverables.get("raw") or deliverables.get("source_video")
-        if isinstance(raw_deliverable, dict) and (
-            _hf_done_like(raw_deliverable.get("status") or raw_deliverable.get("state"))
-            or raw_deliverable.get("url")
-            or raw_deliverable.get("key")
-        ):
-            return True
-    elif isinstance(deliverables, list):
-        for item in deliverables:
-            if not isinstance(item, dict):
-                continue
-            kind = str(item.get("kind") or "").strip().lower()
-            if kind not in {"raw_video", "raw", "source_video"}:
-                continue
-            if _hf_done_like(item.get("status") or item.get("state")) or item.get("url") or item.get("key"):
-                return True
-
-    pipeline = task.get("pipeline")
-    parse_row = None
-    if isinstance(pipeline, dict):
-        parse_row = pipeline.get("parse")
-    elif isinstance(pipeline, list):
-        parse_row = next(
-            (
-                item
-                for item in pipeline
-                if isinstance(item, dict) and str(item.get("key") or "").strip().lower() == "parse"
-            ),
-            None,
-        )
-    if isinstance(parse_row, dict):
-        message = str(parse_row.get("message") or parse_row.get("summary") or "").strip().lower()
-        if "raw=ready" in message:
-            return True
-
-    pipeline_legacy = task.get("pipeline_legacy")
-    if isinstance(pipeline_legacy, dict):
-        parse_legacy = pipeline_legacy.get("parse")
-        if isinstance(parse_legacy, dict):
-            message = str(parse_legacy.get("message") or parse_legacy.get("summary") or "").strip().lower()
-            if "raw=ready" in message:
-                return True
-
-    return False
+    return _svc_hf_parse_artifact_ready(task)
 
 
 def _hf_engine_public(provider: str | None) -> str:
@@ -606,7 +535,9 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         audio_fit_max_speed = 1.25
     audio_fit_max_speed = max(1.0, min(1.6, audio_fit_max_speed))
     voice_state = _collect_voice_execution_state(task, settings)
-    provider = normalize_provider(voice_state.get("expected_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
+    provider = normalize_provider(
+        voice_state.get("expected_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None)
+    )
     semantics = hf_source_audio_semantics(task, voice_state)
     return {
         "tts_engine": _hf_engine_public(provider),
@@ -1000,40 +931,7 @@ def _hf_screen_text_candidate_summary(
 
 
 def _hot_follow_operational_defaults() -> dict[str, Any]:
-    return {
-        "raw_source_text": "",
-        "normalized_source_text": "",
-        "parse_source_text": "",
-        "parse_source_role": "none",
-        "parse_source_authoritative_for_target": False,
-        "dub_input_text": "",
-        "dub_input_source": None,
-        "subtitle_ready": False,
-        "subtitle_ready_reason": "unknown",
-        "speech_detected": False,
-        "speech_confidence": "none",
-        "onscreen_text_detected": False,
-        "onscreen_text_density": "none",
-        "content_mode": "unknown",
-        "recommended_path": "Voice dubbing",
-        "source_audio_lane": "unknown",
-        "source_audio_lane_reason": "当前音频结构信息不足。",
-        "speech_presence": "unknown",
-        "bgm_presence": "unknown",
-        "audio_mix_mode": "unknown",
-        "screen_text_candidate": "",
-        "screen_text_candidate_source": None,
-        "screen_text_candidate_confidence": "none",
-        "screen_text_candidate_mode": "unavailable",
-        "no_dub": False,
-        "no_dub_reason": None,
-        "no_dub_message": None,
-        "actual_burn_subtitle_source": None,
-        "target_subtitle_current": False,
-        "target_subtitle_current_reason": "unknown",
-        "target_subtitle_authoritative_source": False,
-        "target_subtitle_source_copy": False,
-    }
+    return _svc_hot_follow_operational_defaults()
 
 
 def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
@@ -1350,12 +1248,6 @@ def _resolve_target_srt_key(task_obj: dict, task_code: str, lang: str) -> str | 
 
 
 def _hf_compose_final_video(task_id: str, task: dict) -> ComposeResult:
-    """Delegate to CompositionService (TASK-2.0 extraction).
-
-    Kept as a thin wrapper for backward compatibility with any remaining callers.
-    """
-    from gateway.app.services.compose_service import CompositionService  # noqa: PLC0415
-
     svc = CompositionService(storage=get_storage_service(), settings=get_settings())
     return svc.compose(
         task_id,
