@@ -80,6 +80,13 @@ Skills Runtime loader input must include:
 - read-only derived currentness / ready-gate input facts
 - optional operator request context
 
+PR-4 freezes the Hot Follow loader as an explicit runtime boundary:
+
+- `line.skills_bundle_ref` is consumed by `gateway/app/services/skills_runtime.py::load_line_skills_bundle`
+- the loaded bundle is exposed through `line.runtime_refs.skills_bundle`
+- advisory input may receive the consumed runtime references as read-only metadata
+- the loader does not write task truth, deliverable truth, ready-gate truth, or asset-sink truth
+
 Minimal request shape:
 
 ```json
@@ -240,6 +247,7 @@ Fallback policy:
 For `hot_follow_line`, Phase-2 runtimeization is intentionally narrow:
 
 - load a real bundle path
+- expose bundle identity, hook kind, and stage order through the line runtime reference payload
 - move clearly strategy-only judgment into skills modules
 - keep truth writes outside skills
 - preserve existing behavior

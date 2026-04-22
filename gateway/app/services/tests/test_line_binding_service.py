@@ -15,6 +15,18 @@ def test_hot_follow_line_binding_exposes_runtime_contract_metadata():
     assert payload["worker_profile_ref"] == "docs/contracts/worker_gateway_runtime_contract.md"
     assert payload["ready_gate_ref"] == "docs/contracts/hot_follow_ready_gate.yaml"
     assert payload["status_policy_ref"] == "gateway/app/services/status_policy/hot_follow_state.py"
+    assert payload["runtime_refs"]["line_registry"]["consumed"] is True
+    assert payload["runtime_refs"]["skills_bundle"]["consumed"] is True
+    assert payload["runtime_refs"]["skills_bundle"]["details"]["stage_order"] == [
+        "input",
+        "routing",
+        "quality",
+        "recovery",
+    ]
+    assert payload["runtime_refs"]["worker_profile"]["consumed"] is True
+    assert payload["runtime_refs"]["deliverable_profile"]["consumed"] is True
+    assert payload["runtime_refs"]["deliverable_profile"]["details"]["primary_kind"] == "final_video"
+    assert payload["runtime_refs"]["asset_sink_profile"]["consumed"] is True
     assert payload["confirmation_policy"] == {
         "before_execute": False,
         "before_result_accept": False,

@@ -5,7 +5,10 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from gateway.app.lines.base import ProductionLine
-from gateway.app.services.line_binding_service import get_line_runtime_binding
+from gateway.app.services.line_binding_service import (
+    get_line_runtime_binding,
+    resolve_line_runtime_references,
+)
 from gateway.app.services.skills_runtime import load_line_skills_bundle, run_loaded_skills_bundle
 
 
@@ -52,6 +55,7 @@ def build_hot_follow_advisory_input(
             "line_version": line.line_version,
             "task_kind": line.task_kind,
             "skills_bundle_ref": line.skills_bundle_ref,
+            "runtime_refs": resolve_line_runtime_references(line).to_payload(),
         }
     return {
         "task": dict(task or {}),

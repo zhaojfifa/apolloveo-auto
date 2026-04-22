@@ -63,3 +63,15 @@ def test_veobase01_line_runtime_payload_matches_workbench_contract_refs():
         "status_policy_ref": "gateway/app/services/status_policy/hot_follow_state.py",
     }
     assert payload["confirmation_policy"]["before_publish"] is True
+    runtime_refs = payload["runtime_refs"]
+    assert runtime_refs["line_registry"]["consumed"] is True
+    assert runtime_refs["skills_bundle"]["ref"] == payload["skills_bundle_ref"]
+    assert runtime_refs["skills_bundle"]["consumed"] is True
+    assert runtime_refs["skills_bundle"]["details"]["bundle_id"] == "hot_follow_skills_v1"
+    assert runtime_refs["worker_profile"]["ref"] == payload["worker_profile_ref"]
+    assert runtime_refs["worker_profile"]["consumed"] is True
+    assert runtime_refs["deliverable_profile"]["ref"] == payload["deliverable_profile_ref"]
+    assert runtime_refs["deliverable_profile"]["consumed"] is True
+    assert runtime_refs["deliverable_profile"]["details"]["primary_kind"] == "final_video"
+    assert runtime_refs["asset_sink_profile"]["ref"] == payload["asset_sink_profile_ref"]
+    assert runtime_refs["asset_sink_profile"]["consumed"] is True

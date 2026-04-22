@@ -31,7 +31,7 @@ Presenter fields can rename or group values for the UI, but cannot override sour
 
 | Section | Layer | Meaning |
 | --- | --- | --- |
-| `line` | contract metadata | production line id, refs, and hook refs consumed by runtime |
+| `line` | contract metadata | production line id, refs, hook refs, and read-only `runtime_refs` consumed by runtime |
 | `subtitles` | L1/L2/L3 projection | source subtitle, target subtitle, helper translation, currentness, dub input |
 | `audio` | L1/L2/L3 projection | voiceover artifact, audio readiness, provider/voice facts |
 | `compose` | L1/L2/L3 projection | compose status, final freshness, compose route facts |
@@ -43,6 +43,16 @@ Presenter fields can rename or group values for the UI, but cannot override sour
 | `advisory` | L4 skills/presenter | optional advice from skills bundle; read-only |
 
 `advisory` is optional because not every workbench state has active advisory output, but when present it must validate as L4 read-only guidance.
+
+`line.runtime_refs` is contract metadata, not state truth. For Hot Follow it may include:
+
+- `line_registry`
+- `skills_bundle`
+- `worker_profile`
+- `deliverable_profile`
+- `asset_sink_profile`
+
+Each reference reports whether the runtime consumed the reference and whether the referenced file or bundle exists. These fields are diagnostic and contract-alignment metadata only; they must not override L2 artifact facts, L3 current attempt, or L4 ready gate state.
 
 ## Invariants
 

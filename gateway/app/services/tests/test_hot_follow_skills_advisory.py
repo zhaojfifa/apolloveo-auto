@@ -813,6 +813,10 @@ def test_hot_follow_advisory_result_attaches_to_workbench_payload(monkeypatch):
     assert captured["task"]["task_id"] == task_id
     assert captured["line"]["line_id"] == "hot_follow_line"
     assert captured["line"]["skills_bundle_ref"] == "skills/hot_follow"
+    assert captured["line"]["runtime_refs"]["skills_bundle"]["consumed"] is True
+    assert captured["line"]["runtime_refs"]["worker_profile"]["consumed"] is True
+    assert captured["line"]["runtime_refs"]["deliverable_profile"]["consumed"] is True
+    assert captured["line"]["runtime_refs"]["asset_sink_profile"]["consumed"] is True
     assert "ready_gate" in captured
     assert "artifact_facts" in captured
     assert "current_attempt" in captured

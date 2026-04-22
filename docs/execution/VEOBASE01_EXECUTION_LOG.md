@@ -221,3 +221,53 @@ Placement rule:
 - contracts/architecture/ADR/execution/review/archive remain distinct authority layers
 
 No runtime code changed. Translation, dub, and compose behavior were not touched. PR-4 runtime work has not started.
+
+## PR-4 Line Runtime Consumption And Skills Boundary
+
+Branch: `VeoBase01-pr4-line-runtime-consumption-and-skills-boundary`
+
+Mandatory pre-read completed before coding:
+
+- `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/README.md`
+- `docs/ENGINEERING_INDEX.md`
+- `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- relevant contracts under `docs/contracts/`
+- line contract files under `docs/architecture/line_contracts/`
+
+Scope:
+
+- consume Hot Follow line runtime references through `gateway/app/services/line_binding_service.py`
+- expose consumed references under `line.runtime_refs`
+- load the Hot Follow skills bundle through the explicit skills runtime loader boundary
+- keep worker, deliverable, and asset-sink references read-only and diagnostic
+- preserve existing Hot Follow translation, dub, compose, helper translation, and ready gate behavior
+
+Runtime-consumed references:
+
+- `gateway.app.lines.base.LineRegistry`
+- `skills/hot_follow`
+- `docs/contracts/worker_gateway_runtime_contract.md`
+- `docs/architecture/line_contracts/hot_follow_line.yaml`
+- `docs/contracts/status_ownership_matrix.md`
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/line_binding_service.py gateway/app/services/hot_follow_skills_advisory.py gateway/app/services/tests/test_line_binding_service.py gateway/app/services/tests/test_veobase01_contract_conformance.py gateway/app/services/tests/test_hot_follow_skills_advisory.py`: passed
+- `git diff --check`: passed
+- focused pytest for line binding, contract conformance, skills runtime, skills advisory, workbench ready gate, and workbench contract: `43 passed`
+- representative business/runtime pytest for subtitle binding, compose freshness/duration, source-audio preservation, subtitle-only compose, dub voice/text guard, current dub state, and app import smoke: `145 passed, 2 deselected`
+- URL workbench representative path remains covered by `/api/hot_follow/tasks/{task_id}/workbench_hub` ready-gate tests with `compose_ready=true` and `publish_ready=true`
+- local source-audio-preserved plus TTS path remains covered by `tts_voiceover_plus_source_audio` current dub state tests
+
+Forbidden scope remains unchanged:
+
+- no second-line implementation
+- no translation changes
+- no target subtitle save contract changes
+- no helper translation behavior changes
+- no dub changes
+- no compose changes
+- no ready gate semantic rewrite
+- no broad framework rewrite

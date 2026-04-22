@@ -63,17 +63,25 @@ Ready gate is derived state. It consumes L1/L2/L3 facts and returns readiness, b
 
 Skills consume line facts and produce advisory or routing suggestions. They do not write repository truth, deliverable truth, ready gate truth, or asset sink truth.
 
+PR-4 freezes the Hot Follow skills bundle as a runtime-consumed reference. The line binding path loads `skills/hot_follow` through the skills runtime loader and exposes the consumed bundle under `line.runtime_refs.skills_bundle`.
+
 ### Worker Profile Boundary
 
 Worker profile selects execution resources and providers. Worker execution can return artifacts and structured results, but persisted truth is accepted by the owning service/controller.
+
+PR-4 exposes `worker_profile_ref` as a runtime-bound reference so the active line payload can prove which worker profile contract is in force without changing worker execution behavior.
 
 ### Deliverable Profile Boundary
 
 Deliverable profile defines primary, secondary, and optional deliverables. For Hot Follow, final video is primary; target subtitle and audio are secondary; packs are optional.
 
+PR-4 consumes `deliverable_profile_ref` by reading the Hot Follow line contract YAML and exposing primary and secondary deliverable kinds as read-only runtime metadata.
+
 ### Asset Sink Boundary
 
 Asset sink is downstream of accepted deliverable truth. Workers and presenters must not directly promote artifacts into canonical asset truth.
+
+PR-4 exposes `asset_sink_profile_ref` and the line sink policy flag as runtime-bound metadata. This does not authorize skills, workers, or presenters to promote sink truth.
 
 ## Reconstruction Priorities
 
@@ -83,6 +91,16 @@ P0:
 - workbench response contract
 - status ownership matrix
 - line contract runtime consumption path
+
+PR-4 completes the next narrow runtime consumption step for Hot Follow by resolving and exposing:
+
+- line registry binding
+- skills bundle reference
+- worker profile reference
+- deliverable profile reference
+- asset sink profile reference
+
+These references are consumed through `gateway/app/services/line_binding_service.py` and surfaced as `line.runtime_refs`. They remain read-only contract metadata and do not change translation, dub, compose, helper translation, or ready gate semantics.
 
 PR-2 freezes the first executable typed workbench response model:
 

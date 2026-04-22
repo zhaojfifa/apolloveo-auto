@@ -220,9 +220,32 @@ This contract is frozen before the full `tasks.py` decomposition, and runtime co
 - `LineRegistry.for_kind("hot_follow")` already exists
 - ready gate already has a line-aware binding path
 - publish/workbench/compose shell paths now consume bound line metadata at runtime
+- PR-4 consumes the line registry, skills bundle, worker profile, deliverable profile, and asset sink profile references through `gateway/app/services/line_binding_service.py`
+- the runtime payload exposes these consumed references under `line.runtime_refs`
 - router/service assembly is not yet fully contract-driven
 - `tasks.py` still carries orchestration and view responsibilities that should move out in P0/P1 refactor steps
 
 That gap is intentional and documented, not hidden:
 
 - `docs/adr/ADR-task-router-decomposition.md`
+
+## 14. PR-4 Runtime Reference Freeze
+
+The following references are runtime-bound for Hot Follow and are no longer ceremonial declarations:
+
+| Runtime Reference | Consumed By | Frozen Boundary |
+| --- | --- | --- |
+| `line_registry` | `LineRegistry.for_kind("hot_follow")` through `get_line_runtime_binding(...)` | resolves the active production line for a Hot Follow task |
+| `skills_bundle_ref` | `load_line_skills_bundle(line)` | loads the read-only skills bundle declaration and stage order |
+| `worker_profile_ref` | line binding runtime reference resolver | confirms the worker profile contract file used by the line |
+| `deliverable_profile_ref` | line binding runtime reference resolver | reads the Hot Follow line contract YAML to expose primary and secondary deliverable kinds |
+| `asset_sink_profile_ref` | line binding runtime reference resolver | confirms the asset sink profile reference and exposes line sink policy flags |
+
+Runtime reference consumption is introspective and read-only. It must not:
+
+- write subtitle, dub, compose, deliverable, or sink truth
+- change ready gate semantics
+- make skills a truth owner
+- introduce a second production line
+
+The business execution path remains owned by the existing Hot Follow services and status policy.
