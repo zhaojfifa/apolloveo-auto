@@ -67,6 +67,7 @@ from ..services.steps_v1 import (
 )
 from gateway.app.services.status_policy.service import policy_upsert
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
+from gateway.app.services.task_view import build_hot_follow_publish_hub
 from gateway.app.services.parse import detect_platform
 from gateway.app.providers.xiongmao import XiongmaoError, parse_with_xiongmao
 from gateway.app.services.tts_policy import (
@@ -1038,6 +1039,8 @@ def v1_task_publish_hub(task_id: str, repo=Depends(get_task_repository)):
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    if str(task.get("kind") or "").strip().lower() == "hot_follow":
+        return build_hot_follow_publish_hub(task_id, repo=repo)
     return _publish_hub_payload(task)
 
 
@@ -2228,6 +2231,8 @@ def get_publish_hub(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    if str(task.get("kind") or "").strip().lower() == "hot_follow":
+        return build_hot_follow_publish_hub(task_id, repo=repo)
     return _publish_hub_payload(task)
 
 

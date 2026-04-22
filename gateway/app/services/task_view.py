@@ -744,6 +744,183 @@ def hf_safe_presentation_aggregates(
         return {}, {}, {}
 
 
+def _hf_publish_projection_surfaces(
+    task_id: str,
+    task: dict,
+    *,
+    settings=None,
+    subtitle_lane_loader=hf_subtitle_lane_state,
+    composed_state_loader=compute_composed_state,
+    pipeline_state_loader=hf_pipeline_state,
+    dual_channel_state_loader=hf_dual_channel_state,
+    audio_config_loader=hf_audio_config,
+    voice_execution_state_loader=collect_voice_execution_state,
+    persisted_audio_state_loader=hf_persisted_audio_state,
+    scene_pack_info_loader=scene_pack_info,
+    subtitles_text_loader=hf_load_subtitles_text,
+    presentation_aggregates_loader=hf_safe_presentation_aggregates,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    settings_obj = settings or get_settings()
+    task_runtime = dict(task)
+    subtitle_lane = subtitle_lane_loader(task_id, task)
+    task_runtime["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
+    task_runtime["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
+    composed = composed_state_loader(task_runtime, task_id)
+    subtitles_state, _ = pipeline_state_loader(task_runtime, "subtitles")
+    dub_state, _ = pipeline_state_loader(task_runtime, "audio")
+    compose_state, _ = pipeline_state_loader(task_runtime, "compose", composed=composed)
+    voice_state = voice_execution_state_loader(task_runtime, settings_obj)
+    audio_cfg = audio_config_loader(task_runtime)
+    subtitles_text = subtitles_text_loader(task_id, task_runtime)
+    target_lang_internal = normalize_target_lang(task_runtime.get("target_lang") or task_runtime.get("content_lang") or "mm")
+    text_guard = clean_and_analyze_dub_text(subtitles_text or "", target_lang_internal)
+    audio_warning = str(text_guard.get("warning") or "").strip() or None
+    if (
+        not (audio_cfg.get("voiceover_url") or "").strip()
+        and (task_runtime.get("mm_audio_key") or task_runtime.get("mm_audio_path"))
+        and str(dub_state).strip().lower() not in {"running", "processing", "queued"}
+        and str(voice_state.get("dub_current_reason") or "").strip().lower() not in {"dub_running", "dub_not_done"}
+    ):
+        dub_state = "failed"
+    pipeline_config = parse_pipeline_config(task_runtime.get("pipeline_config"))
+    subtitles_step_done = str(subtitles_state).strip().lower() in {
+        "done",
+        "ready",
+        "success",
+        "completed",
+        "failed",
+        "error",
+    }
+    route_state = dual_channel_state_loader(
+        task_id,
+        task_runtime,
+        subtitle_lane,
+        subtitles_step_done=subtitles_step_done,
+    )
+    stored_no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task_runtime.get("dub_skip_reason") or ""
+    ).strip()
+    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
+        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
+        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    )
+    if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
+        no_dub = False
+    if stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
+        no_dub_reason = stored_no_dub_reason
+    elif route_state.get("content_mode") == "subtitle_led":
+        no_dub_reason = "subtitle_led"
+    elif route_state.get("content_mode") == "silent_candidate":
+        no_dub_reason = "no_speech_detected"
+    else:
+        no_dub_reason = None
+    if not no_dub:
+        no_dub_reason = None
+    no_dub_compose_allowed = bool(
+        no_dub and str(no_dub_reason or "").strip().lower() in {"target_subtitle_empty", "dub_input_empty"}
+    )
+    persisted_audio = persisted_audio_state_loader(task_id, task_runtime)
+    scene_pack = scene_pack_info_loader(task_runtime, task_id)
+    final_info = composed.get("final") or {}
+    historical_final = composed.get("historical_final") or {}
+    final_stale_reason = composed.get("final_stale_reason") or None
+    composed_reason = str(composed.get("composed_reason") or "not_ready")
+    artifact_facts, current_attempt, operator_summary = presentation_aggregates_loader(
+        task_id,
+        task,
+        final_info=final_info,
+        historical_final=historical_final,
+        persisted_audio=persisted_audio,
+        subtitle_lane=subtitle_lane,
+        scene_pack=scene_pack,
+        voice_state=voice_state,
+        dub_status=str(dub_state),
+        compose_status=compose_state,
+        composed_reason=composed_reason,
+        final_stale_reason=final_stale_reason,
+        no_dub=no_dub,
+    )
+    primary_text = str(subtitle_lane.get("primary_editable_text") or "")
+    srt_text = primary_text if str(subtitle_lane.get("primary_editable_format") or "srt").strip().lower() == "srt" else ""
+    audio_error = hf_audio_display_error(str(dub_state), task.get("dub_error"), voice_state)
+    surfaces = {
+        "subtitles": {
+            "origin_text": "",
+            "raw_source_text": subtitle_lane.get("raw_source_text") or "",
+            "normalized_source_text": subtitle_lane.get("normalized_source_text") or "",
+            "parse_source_text": subtitle_lane.get("parse_source_text") or "",
+            "parse_source_role": subtitle_lane.get("parse_source_role") or "none",
+            "parse_source_authoritative_for_target": bool(subtitle_lane.get("parse_source_authoritative_for_target")),
+            "edited_text": primary_text,
+            "srt_text": srt_text,
+            "primary_editable_text": primary_text,
+            "primary_editable_format": subtitle_lane.get("primary_editable_format") or "srt",
+            "dub_input_text": subtitle_lane.get("dub_input_text") or "",
+            "dub_input_format": subtitle_lane.get("dub_input_format") or "plain_text",
+            "dub_input_source": subtitle_lane.get("dub_input_source"),
+            "status": subtitles_state,
+            "error": task.get("subtitles_error"),
+            "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
+            "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),
+            "subtitle_artifact_exists": bool(subtitle_lane.get("subtitle_artifact_exists")),
+            "actual_burn_subtitle_source": subtitle_lane.get("actual_burn_subtitle_source"),
+            "target_subtitle_current": bool(subtitle_lane.get("target_subtitle_current")),
+            "target_subtitle_current_reason": subtitle_lane.get("target_subtitle_current_reason"),
+            "target_subtitle_authoritative_source": bool(subtitle_lane.get("target_subtitle_authoritative_source")),
+            "target_subtitle_source_copy": bool(subtitle_lane.get("target_subtitle_source_copy")),
+            "helper_translate_failed": bool(subtitle_lane.get("helper_translate_failed")),
+            "helper_translate_error_reason": subtitle_lane.get("helper_translate_error_reason"),
+            "helper_translate_error_message": subtitle_lane.get("helper_translate_error_message"),
+            "updated_at": task.get("subtitles_override_updated_at") or task.get("updated_at"),
+        },
+        "audio": {
+            "tts_engine": audio_cfg.get("tts_engine"),
+            "tts_voice": audio_cfg.get("tts_voice"),
+            "audio_fit_max_speed": audio_cfg.get("audio_fit_max_speed"),
+            "voiceover_url": audio_cfg.get("tts_voiceover_url") or audio_cfg.get("voiceover_url") or audio_cfg.get("audio_url"),
+            "tts_voiceover_url": audio_cfg.get("tts_voiceover_url"),
+            "dub_preview_url": audio_cfg.get("dub_preview_url"),
+            "bgm_url": audio_cfg.get("bgm_url"),
+            "bgm_mix": audio_cfg.get("bgm_mix"),
+            "source_audio_policy": audio_cfg.get("source_audio_policy"),
+            "source_audio_preserved": bool(audio_cfg.get("source_audio_preserved")),
+            "tts_voiceover_ready": bool(audio_cfg.get("tts_voiceover_ready")),
+            "audio_flow_mode": audio_cfg.get("audio_flow_mode"),
+            "audio_flow_label": audio_cfg.get("audio_flow_label"),
+            "audio_flow_reason": audio_cfg.get("audio_flow_reason"),
+            "status": dub_state,
+            "error": audio_error,
+            "warning": audio_warning,
+            "audio_ready": bool(voice_state.get("audio_ready")),
+            "audio_ready_reason": voice_state.get("audio_ready_reason"),
+            "requested_voice": voice_state.get("requested_voice"),
+            "actual_provider": voice_state.get("actual_provider"),
+            "resolved_voice": voice_state.get("resolved_voice"),
+            "deliverable_audio_done": bool(voice_state.get("deliverable_audio_done")),
+            "dub_current": bool(voice_state.get("dub_current")),
+            "dub_current_reason": voice_state.get("dub_current_reason"),
+            "dub_source_audio_fit_max_speed": voice_state.get("dub_source_audio_fit_max_speed"),
+            "current_audio_fit_max_speed": voice_state.get("current_audio_fit_max_speed"),
+            "no_dub": bool(no_dub),
+            "no_dub_reason": no_dub_reason,
+            "no_dub_compose_allowed": no_dub_compose_allowed,
+        },
+        "artifact_facts": artifact_facts,
+        "current_attempt": current_attempt,
+        "operator_summary": operator_summary,
+        "scene_pack": scene_pack,
+        "compose_status": compose_state,
+        "compose_last_status": compose_state,
+        "composed_ready": bool(composed.get("composed_ready")),
+        "composed_reason": composed_reason,
+        "final": final_info,
+        "historical_final": historical_final,
+        "final_fresh": bool(composed.get("final_fresh")),
+        "final_stale_reason": final_stale_reason,
+    }
+    return task_runtime, surfaces
+
+
 def build_hot_follow_publish_hub(
     task_id: str,
     repo,
@@ -752,16 +929,92 @@ def build_hot_follow_publish_hub(
     state_computer=compute_hot_follow_state,
     backfill_compose_done=backfill_compose_done_if_final_ready,
     line_binding_loader=get_line_runtime_binding,
+    settings_loader=get_settings,
+    subtitle_lane_loader=hf_subtitle_lane_state,
+    composed_state_loader=compute_composed_state,
+    pipeline_state_loader=hf_pipeline_state,
+    dual_channel_state_loader=hf_dual_channel_state,
+    audio_config_loader=hf_audio_config,
+    voice_execution_state_loader=collect_voice_execution_state,
+    persisted_audio_state_loader=hf_persisted_audio_state,
+    scene_pack_info_loader=scene_pack_info,
+    subtitles_text_loader=hf_load_subtitles_text,
+    presentation_aggregates_loader=hf_safe_presentation_aggregates,
+    resolve_final_url_loader=resolve_hub_final_url,
 ) -> dict[str, Any]:
     task = repo.get(task_id)
     if not task:
         from fastapi import HTTPException
 
         raise HTTPException(status_code=404, detail="Task not found")
-    payload = state_computer(task, publish_payload_builder(task))
+    task_runtime, projection = _hf_publish_projection_surfaces(
+        task_id,
+        task,
+        settings=settings_loader(),
+        subtitle_lane_loader=subtitle_lane_loader,
+        composed_state_loader=composed_state_loader,
+        pipeline_state_loader=pipeline_state_loader,
+        dual_channel_state_loader=dual_channel_state_loader,
+        audio_config_loader=audio_config_loader,
+        voice_execution_state_loader=voice_execution_state_loader,
+        persisted_audio_state_loader=persisted_audio_state_loader,
+        scene_pack_info_loader=scene_pack_info_loader,
+        subtitles_text_loader=subtitles_text_loader,
+        presentation_aggregates_loader=presentation_aggregates_loader,
+    )
+    payload = publish_payload_builder(task)
+    payload.update(projection)
+    media = payload.get("media") if isinstance(payload.get("media"), dict) else {}
+    payload["media"] = {
+        **media,
+        "voiceover_url": (projection.get("audio") or {}).get("voiceover_url"),
+    }
+    final_url = resolve_final_url_loader(task_id, payload)
+    attach_final_url(payload, final_url)
+    if final_url:
+        deliverables = payload.get("deliverables") if isinstance(payload.get("deliverables"), dict) else {}
+        final_item = dict(deliverables.get("final_mp4") or {"label": "final.mp4"})
+        final_item["download_url"] = deliverable_url(task_id, task, "final_mp4")
+        final_item["open_url"] = final_url
+        final_item["url"] = final_url
+        deliverables["final_mp4"] = final_item
+        payload["deliverables"] = deliverables
+    payload = state_computer(task_runtime, payload)
     if backfill_compose_done(repo, task_id, task, bool(payload.get("composed_ready"))):
         task = repo.get(task_id) or task
-        payload = state_computer(task, publish_payload_builder(task))
+        task_runtime, projection = _hf_publish_projection_surfaces(
+            task_id,
+            task,
+            settings=settings_loader(),
+            subtitle_lane_loader=subtitle_lane_loader,
+            composed_state_loader=composed_state_loader,
+            pipeline_state_loader=pipeline_state_loader,
+            dual_channel_state_loader=dual_channel_state_loader,
+            audio_config_loader=audio_config_loader,
+            voice_execution_state_loader=voice_execution_state_loader,
+            persisted_audio_state_loader=persisted_audio_state_loader,
+            scene_pack_info_loader=scene_pack_info_loader,
+            subtitles_text_loader=subtitles_text_loader,
+            presentation_aggregates_loader=presentation_aggregates_loader,
+        )
+        payload = publish_payload_builder(task)
+        payload.update(projection)
+        media = payload.get("media") if isinstance(payload.get("media"), dict) else {}
+        payload["media"] = {
+            **media,
+            "voiceover_url": (projection.get("audio") or {}).get("voiceover_url"),
+        }
+        final_url = resolve_final_url_loader(task_id, payload)
+        attach_final_url(payload, final_url)
+        if final_url:
+            deliverables = payload.get("deliverables") if isinstance(payload.get("deliverables"), dict) else {}
+            final_item = dict(deliverables.get("final_mp4") or {"label": "final.mp4"})
+            final_item["download_url"] = deliverable_url(task_id, task, "final_mp4")
+            final_item["open_url"] = final_url
+            final_item["url"] = final_url
+            deliverables["final_mp4"] = final_item
+            payload["deliverables"] = deliverables
+        payload = state_computer(task_runtime, payload)
     payload["line"] = line_binding_loader(task).to_payload()
     return payload
 
