@@ -1,0 +1,33 @@
+profile_id: example_worker_profile
+line_id: example_new_line
+profile_version: "0.1.0"
+status: draft
+
+execution_mode: hybrid
+owner: worker_gateway
+accepted_result_owner: service_controller
+
+providers:
+  parse:
+    primary: gemini
+    fallback:
+      - gemini
+  tts:
+    primary: azure_speech
+    fallback:
+      - edge_tts
+  media:
+    primary: ffmpeg_local
+    fallback:
+      - ffmpeg_local
+
+capabilities:
+  ffmpeg_required: true
+  network_required: true
+  deterministic_fallback_required: true
+
+boundaries:
+  may_return_artifacts: true
+  may_persist_repo_truth: false
+  may_persist_deliverable_truth: false
+  may_write_ready_gate_truth: false

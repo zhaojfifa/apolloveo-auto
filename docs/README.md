@@ -95,6 +95,7 @@ Belongs here:
 - response contracts
 - ownership matrices
 - ready-gate contracts
+- terminology freeze docs when they define active shared contract vocabulary
 
 Does not belong here:
 
@@ -103,6 +104,10 @@ Does not belong here:
 - implementation plans without a contract surface
 
 Contracts are active source-of-truth for runtime boundaries until superseded by a newer contract.
+
+Shared VeoBase01 terminology is frozen in:
+
+- `docs/contracts/veobase01_glossary.md`
 
 ### `architecture/`
 

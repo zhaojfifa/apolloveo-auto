@@ -108,15 +108,91 @@ PR-2 freezes the first executable typed workbench response model:
 
 The model is Hot Follow-first. It validates the current wire payload without renaming fields so the existing business path and UI contract remain stable.
 
-P1:
+## Sequential Phase Order
+
+VeoBase01 now follows a frozen sequential strategy:
+
+1. Phase 1: architecture closure
+2. Phase 2: code-debt cleanup
+3. Phase 3: new-line loading
+
+These three phases must not run in parallel.
+
+Reference decision note:
+
+- `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+
+## Phase Plan
+
+### Phase 1 — Architecture Closure
+
+Goal:
+
+- finish VeoBase01 structural closure
+- keep business baseline stable
+- do not start new-line implementation
+
+Focus:
+
+1. line contract/runtime ref closure
+2. skills / worker / deliverable / asset sink boundary freeze
+3. four-layer state enforcement
+4. workbench contract vs implementation alignment
+5. task semantic convergence where still needed
+6. docs/index/ADR/contract alignment
+
+Acceptance:
+
+- contracts no longer drift
+- state layers are stable
+- runtime refs are real, not ceremonial
+- business baseline still passes
+
+### Phase 2 — Code-Debt Cleanup
+
+This phase may start only after Phase 1 passes.
+
+Priority order:
+
+1. `tasks.py`
+2. `hot_follow_api.py`
+3. `task_view.py`
+4. `task_view_workbench_contract.py`
+
+Goal:
+
+- router thinning
+- single-write ownership
+- remove god-file behavior
+- reduce compatibility residue
+- no business behavior change
+
+### Phase 3 — New-Line Loading
+
+This phase may start only after Phase 1 and Phase 2 are both validated.
+
+Allowed only then:
+
+- new-line design continuation
+- new-line minimum implementation
+- multi-role harness introduction
+
+P1 architecture closure slices:
 
 - service extraction for router burden reduction
 - skills boundary loader/stub
 - deliverable profile / worker profile explicit references
 
-P2:
+P2 code-debt cleanup and post-closure structural thinning:
 
-- new-line onboarding preparation only after VeoBase01 baseline is stable
+- router thinning after architecture closure passes
+- compatibility residue reduction after architecture closure passes
+
+P3 new-line loading:
+
+- new-line onboarding preparation is already frozen by PR-5
+- implementation remains blocked until architecture closure and code-debt
+  cleanup are both stable
 
 ## Non-Goals
 
@@ -125,19 +201,37 @@ P2:
 - Do not redesign business features first.
 - Do not alter working translation, dub, or compose behavior unless required for structural extraction.
 - Do not merge back to `main` until validation is complete.
+- Do not run architecture closure, code-debt cleanup, and new-line loading in parallel.
 
-## Minimal Glossary
+## Shared Preparation Freeze
 
-| Term | Frozen VeoBase01 Meaning |
-| --- | --- |
-| Production Line | A business execution line that produces a target result under an explicit line contract. |
-| Production Agent | Runtime assembly of line contract, SOP, skills, worker profile, deliverable profile, and asset sink policy for a line job. |
-| SOP Profile | The standard operating procedure for a line: ordered stages, retry rules, operator checkpoints, and publish confirmation rules. |
-| Skills Bundle | A line-scoped bundle of advisory/routing/content skills that reads facts and returns suggestions, not truth writes. |
-| Worker Profile | Execution-provider policy for model/API/local workers used by the line. |
-| Deliverable Profile | Declaration of primary, secondary, and optional outputs and their acceptance rules. |
-| Asset Sink Profile | Policy for downstream asset-library sinking after deliverables are accepted. |
-| Smart Pack | A structured package of accepted line artifacts plus metadata for reuse, review, or delivery. |
-| Job | A submitted unit of production work. |
-| Task | The persisted execution record backing a job in the current runtime. |
-| Line Job | A task interpreted through a specific production line contract. |
+PR-5 adds the minimum preparation surfaces required before any future line
+onboarding can be reviewed:
+
+- `docs/contracts/veobase01_glossary.md`
+- `docs/contracts/new_line_onboarding_template.md`
+- `docs/contracts/line_job_state_machine.md`
+- `docs/contracts/skills_bundle_boundary.md`
+- `docs/contracts/line_contract.example.yaml`
+- `docs/contracts/worker_profile.example.yaml`
+- `docs/contracts/deliverable_profile.example.yaml`
+- `docs/contracts/asset_sink_profile.example.yaml`
+
+These docs freeze vocabulary, lifecycle, and example profile shapes for future
+design work only. They do not authorize second-line runtime implementation, do
+not change workbench wire semantics, and do not rewrite ready-gate meaning.
+
+Current gate result after PR-5:
+
+- new-line design may continue
+- new-line implementation remains blocked
+- multi-role harness remains blocked
+
+## Unified Glossary
+
+The active shared terminology now lives in:
+
+- `docs/contracts/veobase01_glossary.md`
+
+That glossary supersedes the older inline glossary block here so VeoBase01 docs
+and future onboarding packets use one vocabulary source.

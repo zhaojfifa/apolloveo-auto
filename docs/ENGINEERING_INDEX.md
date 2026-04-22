@@ -40,6 +40,7 @@ or active architecture decisions.
 | Project baseline | `docs/baseline/PROJECT_BASELINE_INDEX.md` |
 | VeoBase01 reconstruction | `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md` |
 | Line contract | `docs/contracts/line_contract.schema.json` |
+| Unified glossary | `docs/contracts/veobase01_glossary.md` |
 | Four-layer state | `docs/contracts/four_layer_state_contract.md` |
 | Workbench response | `docs/contracts/workbench_hub_response.contract.md` |
 | Status ownership | `docs/contracts/status_ownership_matrix.md` |
@@ -96,6 +97,14 @@ outputs, and asset sinks are downstream of accepted deliverable truth.
 
 Read all VeoBase01 reconstruction entry docs listed below. New-line work cannot
 start until the new-line gate in this file is satisfied.
+
+Required preparation docs:
+
+- `docs/contracts/veobase01_glossary.md`
+- `docs/contracts/new_line_onboarding_template.md`
+- `docs/contracts/line_job_state_machine.md`
+- `docs/contracts/skills_bundle_boundary.md`
+- example schemas under `docs/contracts/*.example.yaml`
 
 ## VeoBase01 Reconstruction Entry
 
@@ -161,3 +170,5 @@ A new production line may not be implemented until these gates pass:
 6. Business regression validation has passed for the existing Hot Follow line.
 7. Router/service ownership boundaries are stable enough that the new line does
    not copy router orchestration drift.
+8. A new-line onboarding packet is complete, but remains blocked until a later
+   implementation PR explicitly lifts the gate.

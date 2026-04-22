@@ -1,0 +1,41 @@
+line_id: example_new_line
+line_name: "Example New Line"
+line_version: "0.1.0"
+status: draft
+
+task_kind: example_new_line
+target_result_type: final_video
+
+input_contract_ref: docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md
+sop_profile_ref: docs/contracts/new_line_onboarding_template.md
+skills_bundle_ref: skills/example_new_line
+worker_profile_ref: docs/contracts/worker_profile.example.yaml
+deliverable_profile_ref: docs/contracts/deliverable_profile.example.yaml
+asset_sink_profile_ref: docs/contracts/asset_sink_profile.example.yaml
+status_policy_ref: gateway/app/services/status_policy/hot_follow_state.py
+ready_gate_ref: docs/contracts/hot_follow_ready_gate.yaml
+
+confirmation_policy:
+  before_execute: false
+  before_result_accept: false
+  before_publish: true
+  before_retry: false
+
+deliverables:
+  primary:
+    kind: final_video
+    acceptance_owner: deliverable_service
+  secondary:
+    - kind: subtitle
+      acceptance_owner: deliverable_service
+    - kind: audio
+      acceptance_owner: deliverable_service
+  optional:
+    - kind: pack
+      acceptance_owner: deliverable_service
+
+content_modes:
+  standard:
+    description: "Default mode for the line."
+    no_dub: false
+    recommended_compose_mode: voice

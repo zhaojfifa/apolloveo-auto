@@ -1,0 +1,31 @@
+profile_id: example_deliverable_profile
+line_id: example_new_line
+profile_version: "0.1.0"
+status: draft
+
+primary_deliverables:
+  - kind: final_video
+    required: true
+    publishable: true
+    acceptance_owner: deliverable_service
+    currentness_owner: status_policy
+
+secondary_deliverables:
+  - kind: subtitle
+    required: true
+    acceptance_owner: deliverable_service
+    currentness_owner: status_policy
+  - kind: audio
+    required: false
+    acceptance_owner: deliverable_service
+    currentness_owner: status_policy
+
+optional_deliverables:
+  - kind: pack
+    required: false
+    acceptance_owner: deliverable_service
+    currentness_owner: status_policy
+
+rules:
+  optional_outputs_do_not_override_primary_completion: true
+  accepted_deliverables_gate_asset_sink: true

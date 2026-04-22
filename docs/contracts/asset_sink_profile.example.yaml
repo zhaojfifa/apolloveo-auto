@@ -1,0 +1,25 @@
+profile_id: example_asset_sink_profile
+line_id: example_new_line
+profile_version: "0.1.0"
+status: draft
+
+owner: asset_sink_service
+accepted_input_owner: deliverable_service
+
+auto_sink_enabled: false
+allowed_kinds:
+  - final_video
+  - subtitle
+  - audio
+  - pack
+
+promotion_policy:
+  canonical_promotion: manual
+  requires_accepted_deliverable_truth: true
+  allows_worker_direct_promotion: false
+  allows_skills_direct_promotion: false
+
+boundaries:
+  may_read_accepted_deliverables: true
+  may_write_ready_gate_truth: false
+  may_write_currentness_truth: false

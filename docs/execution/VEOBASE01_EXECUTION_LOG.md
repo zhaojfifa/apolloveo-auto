@@ -47,6 +47,26 @@ Hard constraints:
 4. Do not touch working translation, dub, or compose behavior unless required for structural extraction.
 5. Every structural change must preserve current Hot Follow business-line behavior.
 
+## Sequential Execution Decision
+
+VeoBase01 now follows a frozen sequential phase order:
+
+1. architecture closure first
+2. code-debt cleanup second
+3. new-line loading third
+
+No parallel execution is allowed across these three phases.
+
+Decision note:
+
+- `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+
+Current gate:
+
+- new-line design may continue
+- new-line implementation remains blocked
+- multi-role harness remains blocked
+
 ## Initial Contract Freeze
 
 Phase 1 creates the branch and freezes the docs needed for contract-first reconstruction:
@@ -258,6 +278,73 @@ Validation:
 - `git diff --check`: passed
 - focused pytest for line binding, contract conformance, skills runtime, skills advisory, workbench ready gate, and workbench contract: `43 passed`
 - representative business/runtime pytest for subtitle binding, compose freshness/duration, source-audio preservation, subtitle-only compose, dub voice/text guard, current dub state, and app import smoke: `145 passed, 2 deselected`
+
+## PR-5 New-Line Onboarding Prep And Schema Freeze
+
+Branch: `VeoBase01-pr5-new-line-onboarding-prep-and-schema-freeze`
+
+Mandatory pre-read completed before editing:
+
+- `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/README.md`
+- `docs/ENGINEERING_INDEX.md`
+- `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- `docs/reviews/VEOBASE01_DOCS_STRUCTURE_AND_SHARED_LOGIC_REVIEW.md`
+- `docs/contracts/four_layer_state_contract.md`
+- `docs/contracts/workbench_hub_response.contract.md`
+- `docs/contracts/hot_follow_line_contract.md`
+- `docs/contracts/skills_runtime_contract.md`
+
+Scope:
+
+- freeze a unified glossary for VeoBase01 preparation docs
+- add a new-line onboarding template
+- add minimal schema examples for line contract, worker profile,
+  deliverable profile, and asset sink profile
+- define a shared line-job state machine
+- define skills bundle boundary and multi-role harness preconditions
+- document the second-line onboarding gate while keeping it blocked
+
+Non-scope:
+
+- no second-line implementation
+- no translation changes
+- no dub changes
+- no compose changes
+- no ready-gate semantic rewrite
+- no workbench wire changes
+- no broad platformization rewrite
+
+Docs added:
+
+- `docs/contracts/veobase01_glossary.md`
+- `docs/contracts/new_line_onboarding_template.md`
+- `docs/contracts/line_job_state_machine.md`
+- `docs/contracts/line_contract.example.yaml`
+- `docs/contracts/worker_profile.example.yaml`
+- `docs/contracts/deliverable_profile.example.yaml`
+- `docs/contracts/asset_sink_profile.example.yaml`
+- `docs/contracts/skills_bundle_boundary.md`
+
+Docs updated:
+
+- `docs/README.md`
+- `docs/ENGINEERING_INDEX.md`
+- `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Behavior impact:
+
+- runtime/business behavior changed: no
+- workbench wire response changed: no
+- second-line onboarding gate lifted: no
+
+Validation:
+
+- `git diff --check`: passed
+- cross-link and required-section checks for new docs: passed
+- schema/example consistency checks for the new example YAML set: passed by YAML parse, required-key verification against `docs/contracts/line_contract.schema.json`, and ref existence checks
 - URL workbench representative path remains covered by `/api/hot_follow/tasks/{task_id}/workbench_hub` ready-gate tests with `compose_ready=true` and `publish_ready=true`
 - local source-audio-preserved plus TTS path remains covered by `tts_voiceover_plus_source_audio` current dub state tests
 
@@ -271,3 +358,49 @@ Forbidden scope remains unchanged:
 - no compose changes
 - no ready gate semantic rewrite
 - no broad framework rewrite
+
+## Post-PR5 Sequential Strategy Freeze
+
+After PR-5 acceptance, VeoBase01 execution order is explicitly frozen.
+
+Phase 1 — architecture closure:
+
+- finish VeoBase01 structural closure
+- keep business baseline stable
+- do not start new-line implementation
+
+Architecture-closure focus:
+
+1. line contract/runtime ref closure
+2. skills / worker / deliverable / asset sink boundary freeze
+3. four-layer state enforcement
+4. workbench contract vs implementation alignment
+5. task semantic convergence where still needed
+6. docs/index/ADR/contract alignment
+
+Phase 1 acceptance:
+
+- contracts no longer drift
+- state layers are stable
+- runtime refs are real, not ceremonial
+- business baseline still passes
+
+Phase 2 — code-debt cleanup:
+
+- start only after Phase 1 passes
+- priority order: `tasks.py`, `hot_follow_api.py`, `task_view.py`,
+  `task_view_workbench_contract.py`
+- goal: router thinning, single-write ownership, god-file reduction,
+  compatibility cleanup, and no business behavior change
+
+Phase 3 — new-line loading:
+
+- start only after Phase 1 and Phase 2 are both validated
+- only then may new-line minimum implementation or multi-role harness
+  introduction be considered
+
+Frozen rule:
+
+- do not run architecture closure and code-debt cleanup in parallel
+- do not run code-debt cleanup and new-line loading in parallel
+- do not start second-line implementation before both earlier phases stabilize
