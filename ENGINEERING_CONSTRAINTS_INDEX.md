@@ -15,6 +15,9 @@ This file defines how engineering work must be done. It does not replace the doc
 - `docs/ENGINEERING_INDEX.md`
 - `docs/contracts/engineering_reading_contract_v1.md`
 
+Authority lists in these entry files must only name docs that actually exist,
+unless the entry explicitly says one file is replaced by another.
+
 ## Engineering-Only Constraints
 
 Engineering changes must be scoped, testable, and owned by the correct module boundary.

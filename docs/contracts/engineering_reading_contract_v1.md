@@ -11,6 +11,10 @@ No state/projection/runtime change may begin until the required authority set
 has been read in order and the execution note for the work records a Reading
 Declaration.
 
+This contract now points only at canonical authority files that exist in the
+repo. Historical mismatch notes remain in execution history, but the active
+reading list below is the current canonical set.
+
 ## Mandatory Reading Order Before Code Changes
 
 ### 1. Repository Authority
@@ -62,6 +66,9 @@ that records:
 - which file defined line/runtime/ready-gate ownership
 - any authority-path mismatch discovered during the read
 
+If a file listed here is later replaced, the replacement must be explicit in
+this contract and in the root/docs engineering indexes.
+
 ## Conflict Rule
 
 If code conflicts with authority docs:
@@ -75,27 +82,35 @@ Code may not silently win over contracts for state/projection/runtime changes
 unless the conflict is first documented and the authority set is updated in the
 same slice.
 
-## Current Workspace Conflict Record
+## Canonical Authority Notes
 
-The following authority paths are named by current engineering prompts and
-indexes but are missing in this workspace as of 2026-04-22:
+State truth is defined by:
 
-- `docs/contracts/four_layer_state_contract.md`
+- primary state-layer authority: `docs/contracts/four_layer_state_contract.md`
+- ownership/write-path authority: `docs/contracts/status_ownership_matrix.md`
+- drafting/fallback template only:
+  `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
+
+Workbench/publish response authority is defined by:
+
 - `docs/contracts/workbench_hub_response.contract.md`
+
+Architecture/state baseline authority is defined by:
+
 - `apolloveo_current_architecture_and_state_baseline.md`
 
-Until those paths are restored or replaced by an explicit authority update, each
-execution note must document the active fallback sources actually read.
+Current phase is defined by:
 
-Current observed fallback sources:
+- `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+- `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
 
-- four-layer state fallback: `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
-- active publish/workbench alignment guidance: `docs/contracts/status_ownership_matrix.md`
-- active line/runtime/ready-gate guidance:
-  - `docs/contracts/hot_follow_line_contract.md`
-  - `docs/contracts/hot_follow_ready_gate.yaml`
-  - `docs/architecture/line_contracts/hot_follow_line.yaml`
-  - `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md`
+Line / runtime / ready-gate ownership is defined by:
+
+- `docs/contracts/hot_follow_line_contract.md`
+- `docs/contracts/skills_runtime_contract.md`
+- `docs/contracts/worker_gateway_runtime_contract.md`
+- `docs/contracts/hot_follow_ready_gate.yaml`
+- `docs/architecture/line_contracts/hot_follow_line.yaml`
 
 ## Why This Exists
 

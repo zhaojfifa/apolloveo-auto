@@ -40,6 +40,7 @@ or active architecture decisions.
 | Current focus | `CURRENT_ENGINEERING_FOCUS.md` |
 | Project baseline | `docs/baseline/PROJECT_BASELINE_INDEX.md` |
 | VeoBase01 reconstruction | `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md` |
+| Architecture/state baseline | `apolloveo_current_architecture_and_state_baseline.md` |
 | Line contract | `docs/contracts/line_contract.schema.json` |
 | Unified glossary | `docs/contracts/veobase01_glossary.md` |
 | Four-layer state | `docs/contracts/four_layer_state_contract.md` |
@@ -63,7 +64,9 @@ compose, and final availability.
 
 Read `docs/contracts/four_layer_state_contract.md`,
 `docs/contracts/status_ownership_matrix.md`, and
-`docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`. Changes must preserve:
+`docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`. Use
+`docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md` only as a drafting
+template, not as the primary authority. Changes must preserve:
 
 - L1 as step execution status only.
 - L2 as artifact facts only.
@@ -117,6 +120,7 @@ Before any VeoBase01 engineering PR, read:
 - `docs/README.md`
 - `docs/ENGINEERING_INDEX.md`
 - `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+- `apolloveo_current_architecture_and_state_baseline.md`
 - `docs/execution/VEOBASE01_EXECUTION_LOG.md`
 - `docs/contracts/four_layer_state_contract.md`
 - `docs/contracts/workbench_hub_response.contract.md`

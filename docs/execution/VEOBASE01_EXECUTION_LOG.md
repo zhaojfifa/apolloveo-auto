@@ -149,6 +149,71 @@ Design acceptance:
 - projection-rules draft now defines publish/workbench projection objects as
   contract surfaces instead of router-local logic
 
+## 2026-04-22 Merge Into VeoBase01
+
+- Merge branch: `VeoBase01-reading-contract-publish-hotfix`
+- Source base SHA: `6931530953933cd4720cae804e48f91c9f628449`
+- Source final SHA: `f0a0deb0b138e6785e35372d068bed7ab4c076d6`
+- Merge commit SHA: `8908df79aa5ea8013e2ae92b9575b7469ebe8341`
+- Merge style: regular merge commit
+
+Why:
+
+- preserve the reading-contract, hotfix, and Stage 2 design lineage explicitly
+  in VeoBase01 history
+
+Post-merge validation:
+
+- merged-file presence check: passed
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m py_compile gateway/app/services/task_view_presenters.py gateway/app/routers/hot_follow_api.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py`
+  - result: passed
+- `git diff --check`
+  - result: passed
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+  - result: `25 passed`
+
+Acceptance:
+
+- VeoBase01 contains the publish regression fix and Stage 0/Stage 2 documents
+- publish/workbench authoritative alignment remains intact after merge
+- no unrelated code changes were introduced in the merge step
+
+## 2026-04-22 Authority Refresh And Documentation Supplement
+
+- Execution note: `docs/execution/VEOBASE01_AUTHORITY_REFRESH_AND_DOC_SUPPLEMENT.md`
+
+Missing before refresh:
+
+- `docs/contracts/four_layer_state_contract.md`
+- `docs/contracts/workbench_hub_response.contract.md`
+- `apolloveo_current_architecture_and_state_baseline.md`
+
+Decision:
+
+- reconstructed as canonical authority docs
+
+Reconstructed files:
+
+- `docs/contracts/four_layer_state_contract.md`
+- `docs/contracts/workbench_hub_response.contract.md`
+- `apolloveo_current_architecture_and_state_baseline.md`
+
+Index / reading-contract files updated:
+
+- `README.md`
+- `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/ENGINEERING_INDEX.md`
+- `docs/contracts/engineering_reading_contract_v1.md`
+- `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+
+Authority refresh acceptance:
+
+- the active reading contract now names canonical files that exist in the repo
+- `STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md` remains an explicit drafting/fallback
+  template, not the primary state authority
+- `status_ownership_matrix.md` remains the ownership/write-path companion
+  authority
+
 From PR-4 onward, both entry files are mandatory reading before every VeoBase01 engineering PR:
 
 - `ENGINEERING_CONSTRAINTS_INDEX.md`: root-level engineering constraint file and authority for how engineering work must be done.

@@ -32,6 +32,8 @@ ApolloVeo 当前是一个以成片交付为目标的 AI 内容生产工厂代码
 4. `docs/contracts/engineering_reading_contract_v1.md`
 5. relevant execution / contract / runbook docs selected through that reading contract
 
+当前 canonical authority set 已补齐，阅读 contract/index 时不应再依赖缺失路径或隐式 fallback。
+
 ## Repo Map
 
 - `gateway/` runtime code

@@ -11,6 +11,9 @@ state, projection, runtime, or contract change starts, read
 `docs/contracts/engineering_reading_contract_v1.md` and record its Reading
 Declaration in the execution note for the slice.
 
+The reading contract must remain aligned to the real canonical authority file
+set. Missing-path fallbacks are not acceptable as a steady-state baseline.
+
 The frozen phase order is:
 
 1. architecture closure first
