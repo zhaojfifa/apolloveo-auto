@@ -112,3 +112,19 @@ This matrix freezes the intended separation before code moves:
 - service/deliverable write path owns artifact truth
 - status policy owns derived readiness/currentness
 - presenters own display-only projection
+
+## 7. VeoBase01 Reconstruction Addendum
+
+VeoBase01 keeps this matrix as a blocking contract for reconstruction work.
+
+Additional VeoBase01 rules:
+
+1. Production line contracts identify the runtime policy references, but do not by themselves write task truth.
+2. SOP profile defines operator and step order expectations, but does not decide artifact currentness.
+3. Skills bundle returns advisory/routing suggestions only; it does not write repository, deliverable, ready gate, or asset sink truth.
+4. Worker profile selects execution providers; accepted outputs are persisted only by owning services/controllers.
+5. Deliverable profile defines primary, secondary, and optional outputs; optional outputs must not override primary completion.
+6. Asset sink profile runs downstream of accepted deliverables; asset sink must not be the source of line readiness.
+7. Workbench hub contracts are presenter contracts and must consume L1/L2/L3/L4 facts rather than reconstruct them independently.
+
+Any VeoBase01 PR that moves logic out of `tasks.py` or `hot_follow_api.py` must state which ownership row is being moved and must include regression validation for that row.

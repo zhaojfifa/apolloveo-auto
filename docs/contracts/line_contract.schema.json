@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://apolloveo.local/contracts/line_contract.schema.json",
+  "title": "ApolloVeo Production Line Contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "line_id",
+    "line_name",
+    "line_version",
+    "task_kind",
+    "target_result_type",
+    "input_contract_ref",
+    "sop_profile_ref",
+    "skills_bundle_ref",
+    "worker_profile_ref",
+    "deliverable_profile_ref",
+    "asset_sink_profile_ref",
+    "status_policy_ref",
+    "ready_gate_ref"
+  ],
+  "properties": {
+    "line_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "line_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "line_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "paused", "retired"]
+    },
+    "task_kind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target_result_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_contract_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sop_profile_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skills_bundle_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "worker_profile_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "deliverable_profile_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "asset_sink_profile_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status_policy_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ready_gate_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "confirmation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "before_execute": {"type": "boolean"},
+        "before_result_accept": {"type": "boolean"},
+        "before_publish": {"type": "boolean"},
+        "before_retry": {"type": "boolean"}
+      }
+    },
+    "deliverables": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "content_modes": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}
