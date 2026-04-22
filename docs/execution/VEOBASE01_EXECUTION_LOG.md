@@ -9,6 +9,8 @@
 
 VeoBase01 must not be merged back to `main` until reconstruction baseline validation is complete.
 
+`docs/ENGINEERING_INDEX.md` is mandatory reading before every VeoBase01 engineering PR. It is the task-oriented entry point for selecting governance, baseline, contract, architecture, ADR, and execution-log context.
+
 ## Business Baseline Evidence
 
 Hot Follow URL task `c084b276e819` is the current URL-path evidence:
@@ -86,3 +88,39 @@ Required validation before any future main alignment:
 5. No split-brain appears between deliverables and ready gate.
 
 Live validation must cite the real task ids and observed state fields before VeoBase01 can be considered merge-ready.
+
+## PR-3 Router/Service Ownership Boundary
+
+Branch: `VeoBase01-pr3-router-service-ownership-boundary`
+
+Scope:
+
+- Add `docs/ENGINEERING_INDEX.md` as the mandatory engineering entry point.
+- Link the engineering index from VeoBase01 architecture and execution docs.
+- Move Hot Follow workbench presentation helper ownership out of `hot_follow_api.py` consumption and into `gateway.app.services.task_view`.
+- Preserve the existing wire response shape and Hot Follow business runtime behavior.
+
+Service-owned helpers consumed by the router:
+
+- `safe_collect_hot_follow_workbench_ui`
+- `collect_hot_follow_workbench_ui`
+- `hf_pipeline_state`
+- `hf_deliverables`
+- `hf_task_status_shape`
+
+Forbidden scope remains unchanged:
+
+- no translation input/source changes
+- no target subtitle save contract changes
+- no helper translation logic changes
+- no dub logic changes
+- no compose logic changes
+- no ready gate semantic changes
+- no second-line implementation
+
+Validation to record before PR-3 close:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/task_view.py`: passed
+- `git diff --check`: passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_task_router_presenters.py gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`: passed, 72 tests
+- Wire response shape changed: no
