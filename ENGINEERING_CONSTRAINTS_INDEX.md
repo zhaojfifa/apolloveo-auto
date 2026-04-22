@@ -13,6 +13,7 @@ This file defines how engineering work must be done. It does not replace the doc
 
 - `ENGINEERING_CONSTRAINTS_INDEX.md`
 - `docs/ENGINEERING_INDEX.md`
+- `docs/contracts/engineering_reading_contract_v1.md`
 
 ## Engineering-Only Constraints
 
@@ -137,5 +138,5 @@ From PR-4 onward, every engineering PR must begin by reading:
 1. Root governance files.
 2. `ENGINEERING_CONSTRAINTS_INDEX.md`.
 3. `docs/ENGINEERING_INDEX.md`.
-4. Task-specific contracts, architecture docs, ADRs, and execution logs selected through `docs/ENGINEERING_INDEX.md`.
-
+4. `docs/contracts/engineering_reading_contract_v1.md`.
+5. Task-specific contracts, architecture docs, ADRs, and execution logs selected through `docs/ENGINEERING_INDEX.md` and the reading contract.

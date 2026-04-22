@@ -9,6 +9,146 @@
 
 VeoBase01 must not be merged back to `main` until reconstruction baseline validation is complete.
 
+## 2026-04-22 Reading Contract Freeze And Publish Hotfix Start
+
+- Branch: `VeoBase01-reading-contract-publish-hotfix`
+- Base branch: `VeoBase01`
+- Base SHA: `6931530953933cd4720cae804e48f91c9f628449`
+- Execution note: `docs/execution/VEOBASE01_READING_CONTRACT_AND_HOTFIX_PLAN.md`
+
+Purpose:
+
+- freeze authority-file reading as a mandatory engineering precondition
+- repair the Hot Follow publish final-ready regression through the authoritative
+  projection path
+- document flow/state/projection contract drafts after the regression fix is
+  clear
+
+Stage 0 acceptance:
+
+- `docs/contracts/engineering_reading_contract_v1.md` added
+- `README.md`, `ENGINEERING_CONSTRAINTS_INDEX.md`,
+  `docs/ENGINEERING_INDEX.md`, and
+  `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md` wired to it
+- execution note includes a Reading Declaration and authority conflict record
+
+Authority-path mismatch frozen for this slice:
+
+- requested but missing: `docs/contracts/four_layer_state_contract.md`
+- requested but missing: `docs/contracts/workbench_hub_response.contract.md`
+- requested but missing: `apolloveo_current_architecture_and_state_baseline.md`
+
+Active fallback references actually read:
+
+- `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
+- `docs/contracts/status_ownership_matrix.md`
+- `docs/contracts/hot_follow_line_contract.md`
+- `docs/contracts/hot_follow_ready_gate.yaml`
+- `docs/architecture/line_contracts/hot_follow_line.yaml`
+- `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md`
+
+## 2026-04-22 Publish Final-Ready Regression Hotfix
+
+- Branch: `VeoBase01-reading-contract-publish-hotfix`
+- Base SHA: `7485464`
+- Execution note: `docs/execution/VEOBASE01_HOTFIX_PUBLISH_FINAL_READY_REGRESSION_V2.md`
+
+Root cause:
+
+- publish still evaluated final/audio/compose readiness from the old
+  `publish_hub_payload(task)` compatibility path instead of starting from the
+  authoritative workbench projection path
+
+Stale source path identified:
+
+- `gateway/app/routers/hot_follow_api.py:1467`
+- `gateway/app/services/task_view_presenters.py` previous
+  `build_hot_follow_publish_hub(...)`
+- `gateway/app/services/task_view_helpers.py:834`
+  `publish_hub_payload(task)`
+- `gateway/app/services/task_view_helpers.py:487`
+  `compute_composed_state(task, task_id)`
+
+Authoritative source path used after fix:
+
+- `gateway/app/services/task_view_projection.py:351`
+  `build_hot_follow_workbench_projection(...)`
+- `gateway/app/services/task_view_presenters.py:407`
+  `_build_hot_follow_authoritative_state(...)`
+- `gateway/app/services/status_policy/hot_follow_state.py`
+  `compute_hot_follow_state(...)`
+
+Files changed:
+
+- `gateway/app/services/task_view_presenters.py`
+- `gateway/app/routers/hot_follow_api.py`
+- `gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py`
+
+Validation:
+
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m py_compile gateway/app/services/task_view_presenters.py gateway/app/routers/hot_follow_api.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py`
+  - result: passed
+- `git diff --check`
+  - result: passed
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q`
+  - result: `24 passed`
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`
+  - result: `1 passed`
+
+Regression evidence note:
+
+- live replay for task ids `7852ffeefdf9` and `01f530caabf5` was not available
+  in this workspace
+- local in-process regression coverage now explicitly covers:
+  - local upload + preserved source audio + final done
+  - URL/reference + TTS-only + final done
+  - scene-pack pending but final publishable
+  - final absent / compose in progress
+
+Acceptance:
+
+- publish now consumes the shared authoritative projection path before
+  ready-gate evaluation
+- false publish blockers from the stale compatibility path are removed for this
+  contradiction class
+
+## 2026-04-22 Hot Follow Flow / State / Projection Design Packet
+
+- Branch: `VeoBase01-reading-contract-publish-hotfix`
+- Follows hotfix note: `docs/execution/VEOBASE01_HOTFIX_PUBLISH_FINAL_READY_REGRESSION_V2.md`
+
+Created documents:
+
+- `docs/architecture/hot_follow_business_flow_v1.md`
+- `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- `docs/contracts/hot_follow_projection_rules_v1.md`
+- `docs/architecture/contract_editor_preparation_notes_v1.md`
+
+Purpose:
+
+- make Hot Follow business flow explicit
+- freeze the first state-machine and projection-rule drafts
+- define the future contract-editor object model without starting UI or runtime
+  replacement work
+
+Non-scope preserved:
+
+- no new-line implementation
+- no multi-role harness
+- no Hot Follow business-flow change
+- no compose / dub / translation runtime rewrite
+
+Design acceptance:
+
+- business flow now explicitly covers local upload, URL/reference,
+  source-audio-preserved lanes, TTS-only lanes, authoritative subtitle truth,
+  helper-translation support, compose success, publish-ready, scene-pack
+  pending non-blocking, and current-attempt vs historical-final separation
+- state-machine draft now freezes blocking vs non-blocking distinctions and the
+  dominance rule for current fresh final truth
+- projection-rules draft now defines publish/workbench projection objects as
+  contract surfaces instead of router-local logic
+
 From PR-4 onward, both entry files are mandatory reading before every VeoBase01 engineering PR:
 
 - `ENGINEERING_CONSTRAINTS_INDEX.md`: root-level engineering constraint file and authority for how engineering work must be done.

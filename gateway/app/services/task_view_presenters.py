@@ -23,9 +23,12 @@ from gateway.app.services.hot_follow_workbench_presenter import (
 from gateway.app.services.line_binding_service import get_line_runtime_binding
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 from gateway.app.services.task_view_helpers import (
+    _build_copy_bundle,
+    _publish_sop_markdown,
     backfill_compose_done_if_final_ready,
     deliverable_url,
-    publish_hub_payload,
+    download_code,
+    op_gate_enabled,
 )
 from gateway.app.services.task_view_projection import (
     build_hot_follow_workbench_projection,
@@ -67,6 +70,24 @@ from gateway.app.services.voice_state import (
 from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 logger = logging.getLogger(__name__)
+
+_PUBLISH_DELIVERABLE_LABELS = {
+    "pack": "pack.zip",
+    "scenes": "scenes.zip",
+    "origin_subtitle": "origin.srt",
+    "subtitle": "mm.srt",
+    "audio": "mm_audio",
+    "final": "final.mp4",
+}
+
+_PUBLISH_DELIVERABLE_KEYS = {
+    "pack": "pack_zip",
+    "scenes": "scenes_zip",
+    "origin_subtitle": "origin_srt",
+    "subtitle": "mm_srt",
+    "audio": "mm_audio",
+    "final": "final_mp4",
+}
 
 
 def hot_follow_operational_defaults() -> dict[str, Any]:
@@ -383,29 +404,7 @@ def hf_safe_presentation_aggregates(
         return {}, {}, {}
 
 
-def build_hot_follow_publish_hub(
-    task_id: str,
-    repo,
-    *,
-    publish_payload_builder=publish_hub_payload,
-    state_computer=compute_hot_follow_state,
-    backfill_compose_done=backfill_compose_done_if_final_ready,
-    line_binding_loader=get_line_runtime_binding,
-) -> dict[str, Any]:
-    task = repo.get(task_id)
-    if not task:
-        from fastapi import HTTPException
-
-        raise HTTPException(status_code=404, detail="Task not found")
-    payload = state_computer(task, publish_payload_builder(task))
-    if backfill_compose_done(repo, task_id, task, bool(payload.get("composed_ready"))):
-        task = repo.get(task_id) or task
-        payload = state_computer(task, publish_payload_builder(task))
-    payload["line"] = line_binding_loader(task).to_payload()
-    return payload
-
-
-def build_hot_follow_workbench_hub(
+def _build_hot_follow_authoritative_state(
     task_id: str,
     repo,
     *,
@@ -427,13 +426,10 @@ def build_hot_follow_workbench_hub(
     presentation_aggregates_loader=hf_safe_presentation_aggregates,
     presentation_state_loader=hf_rerun_presentation_state,
     resolve_final_url_loader=resolve_hub_final_url,
-    operational_defaults_loader=hot_follow_operational_defaults,
-    workbench_ui_loader=safe_collect_hot_follow_workbench_ui,
     state_computer=compute_hot_follow_state,
-    backfill_compose_done=backfill_compose_done_if_final_ready,
-    line_binding_loader=get_line_runtime_binding,
-) -> dict[str, Any]:
-    projection = build_hot_follow_workbench_projection(
+    projection_builder=build_hot_follow_workbench_projection,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    projection = projection_builder(
         task_id,
         repo,
         settings=settings,
@@ -552,15 +548,296 @@ def build_hot_follow_workbench_hub(
         projection["historical_final"],
         projection["dub_state"],
     )
-    payload = state_computer(task_runtime, payload)
+    return task, projection, state_computer(task_runtime, payload)
+
+
+def _publish_hub_scene_pack_pending_reason(scene_pack: dict[str, Any]) -> str | None:
+    if bool(scene_pack.get("exists")):
+        return None
+    status = str(scene_pack.get("status") or "").strip().lower()
+    if status == "running":
+        return "scenes.running"
+    if status == "failed":
+        return "scenes.failed"
+    return "scenes.not_ready"
+
+
+def _publish_hub_deliverables(
+    task_id: str,
+    task: dict[str, Any],
+    authoritative_state: dict[str, Any],
+) -> dict[str, Any]:
+    deliverables: dict[str, Any] = {}
+    for row in authoritative_state.get("deliverables") or []:
+        if not isinstance(row, dict):
+            continue
+        kind = str(row.get("kind") or "").strip().lower()
+        key = _PUBLISH_DELIVERABLE_KEYS.get(kind)
+        label = _PUBLISH_DELIVERABLE_LABELS.get(kind)
+        if not key or not label:
+            continue
+        url = row.get("url") or row.get("open_url") or row.get("download_url")
+        if not url:
+            continue
+        item = {
+            "label": label,
+            "url": url,
+            "open_url": row.get("open_url") or row.get("url"),
+            "download_url": row.get("download_url"),
+        }
+        if kind == "final":
+            item["status"] = row.get("status")
+            item["state"] = row.get("state")
+        deliverables[key] = item
+
+    for key, label in (
+        ("mm_txt", "mm.txt"),
+        ("edit_bundle_zip", "scenes_bundle.zip"),
+    ):
+        download_url = deliverable_url(task_id, task, key)
+        open_url = None
+        if key == "edit_bundle_zip":
+            open_url = deliverable_url(task_id, task, key)
+        if not download_url and not open_url:
+            continue
+        item = {"label": label, "url": download_url or open_url}
+        item["download_url"] = download_url
+        item["open_url"] = open_url
+        if key == "edit_bundle_zip":
+            item["artifact"] = "scenes_bundle"
+            item["description"] = "Scenes package for re-editing / advanced workflow"
+        deliverables[key] = item
+    return deliverables
+
+
+def _build_hot_follow_publish_surface_payload(
+    task_id: str,
+    task: dict[str, Any],
+    authoritative_state: dict[str, Any],
+    *,
+    resolve_final_url_loader=resolve_hub_final_url,
+    copy_bundle_builder=_build_copy_bundle,
+    sop_markdown_builder=_publish_sop_markdown,
+    download_code_loader=download_code,
+) -> dict[str, Any]:
+    deliverables = _publish_hub_deliverables(task_id, task, authoritative_state)
+    final_preview_url = resolve_final_url_loader(task_id, authoritative_state)
+    if final_preview_url:
+        final_item = dict(deliverables.get("final_mp4") or {"label": "final.mp4"})
+        final_item["url"] = final_preview_url
+        final_item["open_url"] = final_preview_url
+        if not final_item.get("download_url"):
+            final_item["download_url"] = deliverable_url(task_id, task, "final_mp4")
+        deliverables["final_mp4"] = final_item
+
+    short_code = download_code_loader(task_id)
+    short_url = f"/d/{short_code}"
+    scene_pack = authoritative_state.get("scene_pack") if isinstance(authoritative_state.get("scene_pack"), dict) else {}
+    return {
+        "task_id": task_id,
+        "gate_enabled": op_gate_enabled(),
+        "media": {
+            "final_video_url": final_preview_url,
+            "final_url": final_preview_url,
+        },
+        "final_url": final_preview_url,
+        "final_video_url": final_preview_url,
+        "deliverables": deliverables,
+        "composed_ready": bool(authoritative_state.get("composed_ready")),
+        "composed_reason": str(
+            authoritative_state.get("composed_reason")
+            or ("ready" if authoritative_state.get("composed_ready") else "not_ready")
+        ),
+        "compose_status": authoritative_state.get("compose_status"),
+        "ready_gate": dict(authoritative_state.get("ready_gate") or {}),
+        "final": authoritative_state.get("final") or {"exists": False},
+        "historical_final": authoritative_state.get("historical_final") or {"exists": False},
+        "final_fresh": bool(authoritative_state.get("final_fresh")),
+        "final_stale_reason": authoritative_state.get("final_stale_reason"),
+        "scene_pack": scene_pack,
+        "scene_pack_pending_reason": _publish_hub_scene_pack_pending_reason(scene_pack),
+        "scene_pack_action_url": f"/tasks/{task_id}",
+        "copy_bundle": copy_bundle_builder(task),
+        "download_code": short_code,
+        "mobile": {
+            "qr_target": short_url,
+            "short_link": short_url,
+            "short_url": short_url,
+            "qr_url": short_url,
+        },
+        "sop_markdown": sop_markdown_builder(),
+        "archive": {
+            "publish_provider": task.get("publish_provider") or "-",
+            "publish_key": task.get("publish_key") or "-",
+            "publish_status": task.get("publish_status") or "-",
+            "publish_url": task.get("publish_url") or "-",
+            "published_at": task.get("published_at") or "-",
+        },
+    }
+
+
+def build_hot_follow_publish_hub(
+    task_id: str,
+    repo,
+    *,
+    settings=None,
+    object_exists_fn=object_exists,
+    task_endpoint_loader=task_endpoint,
+    subtitle_lane_loader=hf_subtitle_lane_state,
+    composed_state_loader=compute_composed_state,
+    pipeline_state_loader=hf_pipeline_state,
+    scene_pack_info_loader=scene_pack_info,
+    subtitles_text_loader=hf_load_subtitles_text,
+    origin_subtitles_text_loader=hf_load_origin_subtitles_text,
+    normalized_source_text_loader=hf_load_normalized_source_text,
+    dual_channel_state_loader=hf_dual_channel_state,
+    audio_config_loader=hf_audio_config,
+    voice_execution_state_loader=collect_voice_execution_state,
+    persisted_audio_state_loader=hf_persisted_audio_state,
+    deliverables_loader=hf_deliverables,
+    presentation_aggregates_loader=hf_safe_presentation_aggregates,
+    presentation_state_loader=hf_rerun_presentation_state,
+    resolve_final_url_loader=resolve_hub_final_url,
+    state_computer=compute_hot_follow_state,
+    backfill_compose_done=backfill_compose_done_if_final_ready,
+    line_binding_loader=get_line_runtime_binding,
+    projection_builder=build_hot_follow_workbench_projection,
+    publish_surface_builder=_build_hot_follow_publish_surface_payload,
+) -> dict[str, Any]:
+    task, _projection, authoritative_state = _build_hot_follow_authoritative_state(
+        task_id,
+        repo,
+        settings=settings,
+        object_exists_fn=object_exists_fn,
+        task_endpoint_loader=task_endpoint_loader,
+        subtitle_lane_loader=subtitle_lane_loader,
+        composed_state_loader=composed_state_loader,
+        pipeline_state_loader=pipeline_state_loader,
+        scene_pack_info_loader=scene_pack_info_loader,
+        subtitles_text_loader=subtitles_text_loader,
+        origin_subtitles_text_loader=origin_subtitles_text_loader,
+        normalized_source_text_loader=normalized_source_text_loader,
+        dual_channel_state_loader=dual_channel_state_loader,
+        audio_config_loader=audio_config_loader,
+        voice_execution_state_loader=voice_execution_state_loader,
+        persisted_audio_state_loader=persisted_audio_state_loader,
+        deliverables_loader=deliverables_loader,
+        presentation_aggregates_loader=presentation_aggregates_loader,
+        presentation_state_loader=presentation_state_loader,
+        resolve_final_url_loader=resolve_final_url_loader,
+        state_computer=state_computer,
+        projection_builder=projection_builder,
+    )
+    if backfill_compose_done(repo, task_id, task, bool(authoritative_state.get("composed_ready"))):
+        task, _projection, authoritative_state = _build_hot_follow_authoritative_state(
+            task_id,
+            repo,
+            settings=settings,
+            object_exists_fn=object_exists_fn,
+            task_endpoint_loader=task_endpoint_loader,
+            subtitle_lane_loader=subtitle_lane_loader,
+            composed_state_loader=composed_state_loader,
+            pipeline_state_loader=pipeline_state_loader,
+            scene_pack_info_loader=scene_pack_info_loader,
+            subtitles_text_loader=subtitles_text_loader,
+            origin_subtitles_text_loader=origin_subtitles_text_loader,
+            normalized_source_text_loader=normalized_source_text_loader,
+            dual_channel_state_loader=dual_channel_state_loader,
+            audio_config_loader=audio_config_loader,
+            voice_execution_state_loader=voice_execution_state_loader,
+            persisted_audio_state_loader=persisted_audio_state_loader,
+            deliverables_loader=deliverables_loader,
+            presentation_aggregates_loader=presentation_aggregates_loader,
+            presentation_state_loader=presentation_state_loader,
+            resolve_final_url_loader=resolve_final_url_loader,
+            state_computer=state_computer,
+            projection_builder=projection_builder,
+        )
+    payload = publish_surface_builder(
+        task_id,
+        task,
+        authoritative_state,
+        resolve_final_url_loader=resolve_final_url_loader,
+    )
+    payload["line"] = line_binding_loader(task).to_payload()
+    return payload
+
+
+def build_hot_follow_workbench_hub(
+    task_id: str,
+    repo,
+    *,
+    settings=None,
+    object_exists_fn=object_exists,
+    task_endpoint_loader=task_endpoint,
+    subtitle_lane_loader=hf_subtitle_lane_state,
+    composed_state_loader=compute_composed_state,
+    pipeline_state_loader=hf_pipeline_state,
+    scene_pack_info_loader=scene_pack_info,
+    subtitles_text_loader=hf_load_subtitles_text,
+    origin_subtitles_text_loader=hf_load_origin_subtitles_text,
+    normalized_source_text_loader=hf_load_normalized_source_text,
+    dual_channel_state_loader=hf_dual_channel_state,
+    audio_config_loader=hf_audio_config,
+    voice_execution_state_loader=collect_voice_execution_state,
+    persisted_audio_state_loader=hf_persisted_audio_state,
+    deliverables_loader=hf_deliverables,
+    presentation_aggregates_loader=hf_safe_presentation_aggregates,
+    presentation_state_loader=hf_rerun_presentation_state,
+    resolve_final_url_loader=resolve_hub_final_url,
+    operational_defaults_loader=hot_follow_operational_defaults,
+    workbench_ui_loader=safe_collect_hot_follow_workbench_ui,
+    state_computer=compute_hot_follow_state,
+    backfill_compose_done=backfill_compose_done_if_final_ready,
+    line_binding_loader=get_line_runtime_binding,
+) -> dict[str, Any]:
+    task, projection, payload = _build_hot_follow_authoritative_state(
+        task_id,
+        repo,
+        settings=settings,
+        object_exists_fn=object_exists_fn,
+        task_endpoint_loader=task_endpoint_loader,
+        subtitle_lane_loader=subtitle_lane_loader,
+        composed_state_loader=composed_state_loader,
+        pipeline_state_loader=pipeline_state_loader,
+        scene_pack_info_loader=scene_pack_info_loader,
+        subtitles_text_loader=subtitles_text_loader,
+        origin_subtitles_text_loader=origin_subtitles_text_loader,
+        normalized_source_text_loader=normalized_source_text_loader,
+        dual_channel_state_loader=dual_channel_state_loader,
+        audio_config_loader=audio_config_loader,
+        voice_execution_state_loader=voice_execution_state_loader,
+        persisted_audio_state_loader=persisted_audio_state_loader,
+        deliverables_loader=deliverables_loader,
+        presentation_aggregates_loader=presentation_aggregates_loader,
+        presentation_state_loader=presentation_state_loader,
+        resolve_final_url_loader=resolve_final_url_loader,
+        state_computer=state_computer,
+    )
     if backfill_compose_done(repo, task_id, task, bool(payload.get("composed_ready"))):
-        latest = repo.get(task_id) or task
-        latest_runtime = dict(latest)
-        latest_lane = subtitle_lane_loader(task_id, latest)
-        latest_runtime["target_subtitle_current"] = bool(latest_lane.get("target_subtitle_current"))
-        latest_runtime["target_subtitle_current_reason"] = latest_lane.get("target_subtitle_current_reason")
-        payload = state_computer(latest_runtime, payload)
-        task = latest
+        task, projection, payload = _build_hot_follow_authoritative_state(
+            task_id,
+            repo,
+            settings=settings,
+            object_exists_fn=object_exists_fn,
+            task_endpoint_loader=task_endpoint_loader,
+            subtitle_lane_loader=subtitle_lane_loader,
+            composed_state_loader=composed_state_loader,
+            pipeline_state_loader=pipeline_state_loader,
+            scene_pack_info_loader=scene_pack_info_loader,
+            subtitles_text_loader=subtitles_text_loader,
+            origin_subtitles_text_loader=origin_subtitles_text_loader,
+            normalized_source_text_loader=normalized_source_text_loader,
+            dual_channel_state_loader=dual_channel_state_loader,
+            audio_config_loader=audio_config_loader,
+            voice_execution_state_loader=voice_execution_state_loader,
+            persisted_audio_state_loader=persisted_audio_state_loader,
+            deliverables_loader=deliverables_loader,
+            presentation_aggregates_loader=presentation_aggregates_loader,
+            presentation_state_loader=presentation_state_loader,
+            resolve_final_url_loader=resolve_final_url_loader,
+            state_computer=state_computer,
+        )
     apply_ready_gate_compose_projection(payload)
     attach_task_aliases(payload, task, task_id)
     payload["line"] = line_binding_loader(task).to_payload()
