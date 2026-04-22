@@ -6,6 +6,16 @@ This contract freezes the typed response boundary for Hot Follow workbench hub r
 
 The workbench hub is a presenter boundary. It may aggregate state, but it must not invent business truth.
 
+Runtime typed model:
+
+- `gateway/app/services/contracts/hot_follow_workbench.py::HotFollowWorkbenchResponse`
+
+Validation rule:
+
+- the current wire payload is validated against the typed model
+- the validator returns the original dict unchanged
+- compatibility fields remain allowed during reconstruction
+
 ## Ownership Rule
 
 Workbench hub response fields must be traceable to one of the four state layers:
@@ -31,6 +41,8 @@ Presenter fields can rename or group values for the UI, but cannot override sour
 | `deliverables` | L2/L4 projection | deliverable rows derived from artifact truth and readiness |
 | `operator_summary` | L4 presenter | human-readable guidance based on derived facts |
 | `advisory` | L4 skills/presenter | optional advice from skills bundle; read-only |
+
+`advisory` is optional because not every workbench state has active advisory output, but when present it must validate as L4 read-only guidance.
 
 ## Invariants
 
@@ -61,3 +73,4 @@ Every VeoBase01 PR that changes workbench hub assembly must prove:
 - current attempt and ready gate agree
 - helper translation cannot poison subtitle/dub/compose truth
 - URL and local-upload Hot Follow paths still validate
+- `HotFollowWorkbenchResponse` accepts the runtime payload without changing the wire response shape

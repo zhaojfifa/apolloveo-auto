@@ -81,6 +81,52 @@ Initial implementation scope:
 - keep runtime behavior unchanged
 - keep Hot Follow translation, dub, compose, ready gate semantics unchanged
 
+## PR-2 Started
+
+Branch: `VeoBase01-pr2-typed-workbench-and-four-layer-state-freeze`
+
+Scope:
+
+- add a typed Hot Follow workbench response model
+- validate the current runtime workbench payload against that model
+- preserve the existing wire response shape
+- freeze L1/L2/L3/L4 state responsibility in docs
+
+Field assignment summary:
+
+- L1 `pipeline_step_status`: parse/subtitles/dub/pack/compose rows and step statuses only.
+- L2 `artifact_facts`: final/subtitle/audio/pack existence, compose input facts, audio lane facts, helper translation fact flags.
+- L3 `current_attempt`: dub currentness, audio readiness, compose status/reason, redub/recompose flags, current subtitle source.
+- L4 `ready_gate` / `operator_summary` / `advisory` / presentation: gate decisions and operator/UI guidance derived from L2/L3.
+
+Non-scope:
+
+- no translation input/source changes
+- no target subtitle save changes
+- no helper translation behavior changes
+- no dub path changes
+- no compose service behavior changes
+- no second-line work
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/contracts/hot_follow_workbench.py gateway/app/services/task_view.py gateway/app/services/tests/test_hot_follow_workbench_contract.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+  - result: passed
+- `git diff --check`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_workbench_contract.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_ready_gate_backfills_compose_when_current_final_is_fresh -q`
+  - result: `3 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_task_router_presenters.py gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`
+  - result: `72 passed`
+
+Acceptance status:
+
+- workbench response has an explicit typed contract
+- current runtime payload validates against the typed model
+- wire response shape is unchanged
+- four-layer state definitions are frozen in docs
+- no translation, dub, compose, helper translation, ready gate, or advisory behavior was intentionally changed
+
 ## Business Validation Plan
 
 Required validation before any future main alignment:

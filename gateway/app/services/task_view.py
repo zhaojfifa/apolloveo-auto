@@ -23,6 +23,9 @@ from gateway.app.services.hot_follow_workbench_presenter import (
     build_hot_follow_operator_summary,
 )
 from gateway.app.services.line_binding_service import get_line_runtime_binding
+from gateway.app.services.contracts.hot_follow_workbench import (
+    validate_hot_follow_workbench_response,
+)
 from gateway.app.services.scenes_service import build_scenes_for_task
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 from gateway.app.services.subtitle_helpers import (
@@ -901,4 +904,4 @@ def build_hot_follow_workbench_hub(
         payload["advisory"] = advisory
     payload.update(operational_defaults_loader())
     payload.update(workbench_ui_loader(task, settings_obj))
-    return payload
+    return validate_hot_follow_workbench_response(payload)
