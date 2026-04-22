@@ -523,3 +523,49 @@ Acceptance:
 - legacy task-status payload assembly moved out of the router
 - reusable download/not-ready payload helpers moved out of `tasks.py`
 - Hot Follow business behavior intentionally unchanged
+
+## PR-7 Hot Follow API Boundary Reduction
+
+Branch: `VeoBase01-pr7-hot-follow-api-boundary-reduction`
+
+Why:
+
+- `hot_follow_api.py` still carried workbench/presenter helper ownership that belonged in the shared service layer and duplicated extracted view logic.
+
+Scope:
+
+- move shared Hot Follow workbench/presentation helper ownership into `gateway/app/services/task_view.py`
+- keep `hot_follow_api.py` as thin wrappers that inject router-local collaborators into the extracted helpers
+- preserve router-local helper names so the current regression harness still validates through the router seam
+- keep publish/workbench behavior unchanged
+
+Files changed:
+
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- `docs/execution/VEOBASE01_PR7_HOT_FOLLOW_API_BOUNDARY_REDUCTION.md`
+- `gateway/app/routers/hot_follow_api.py`
+- `gateway/app/services/task_view.py`
+
+Validation:
+
+- `git diff --check`: passed
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/task_view.py`: passed
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/status_policy/tests/test_app_import_smoke.py -q`: `37 passed`
+- `WORKSPACE_ROOT=/tmp/apolloveo-workspace PYTHONPYCACHEPREFIX=/tmp/apolloveo_pycache python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_phase_a_ops.py gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_runtime_bridge.py -q`: `52 passed`
+
+Regression sample evidence:
+
+- final-ready `9c755859d049` synthetic surface probe remained aligned:
+  - publish: `final_exists=true`, `composed_ready=true`, `publish_ready=true`, `audio_ready=true`, compose `done`
+  - workbench: `artifact_facts.final_exists=true`, `composed_ready=true`, `ready_gate.publish_ready=true`, `audio.audio_ready=true`, compose `done`
+- compose-running `9280fcb9f0b1` synthetic surface probe remained in progress:
+  - publish: `final_exists=false`, `composed_ready=false`, `publish_ready=false`, `audio_ready=true`, compose `pending`
+  - workbench: `artifact_facts.final_exists=false`, `composed_ready=false`, `ready_gate.publish_ready=false`, `audio.audio_ready=true`, compose `pending`
+  - persisted task state remained `compose_status=running`
+
+Acceptance:
+
+- `hot_follow_api.py` line count reduced from `2368` to `2027`
+- shared workbench/presentation helper ownership moved into `gateway/app/services/task_view.py`
+- router-level wrappers remain thin collaborator-injection seams instead of payload-assembly ownership points
+- Hot Follow business behavior intentionally unchanged

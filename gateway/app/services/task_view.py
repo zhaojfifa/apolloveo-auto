@@ -115,20 +115,33 @@ def hot_follow_operational_defaults() -> dict[str, Any]:
     }
 
 
-def collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+def collect_hot_follow_workbench_ui(
+    task: dict,
+    settings,
+    *,
+    subtitle_lane_loader=hf_subtitle_lane_state,
+    pipeline_state_loader=None,
+    dual_channel_state_loader=hf_dual_channel_state,
+    source_audio_lane_loader=hf_source_audio_lane_summary,
+    screen_text_candidate_loader=hf_screen_text_candidate_summary,
+    voice_execution_state_loader=collect_voice_execution_state,
+    object_exists_fn=object_exists,
+    source_audio_semantics_loader=hf_source_audio_semantics,
+) -> dict[str, Any]:
     task_id = str(task.get("task_id") or task.get("id") or "")
-    subtitle_lane = hf_subtitle_lane_state(task_id, task)
+    pipeline_state_loader = pipeline_state_loader or hf_pipeline_state
+    subtitle_lane = subtitle_lane_loader(task_id, task)
     task_runtime = dict(task)
     task_runtime["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
     task_runtime["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
-    _sub_status_b, _ = hf_pipeline_state(task, "subtitles")
+    _sub_status_b, _ = pipeline_state_loader(task, "subtitles")
     _sub_done_b = _sub_status_b in ("done", "ready", "success", "completed", "failed", "error")
-    route_state = hf_dual_channel_state(task_id, task_runtime, subtitle_lane, subtitles_step_done=_sub_done_b)
-    audio_lane = hf_source_audio_lane_summary(task, route_state)
-    screen_text_candidate = hf_screen_text_candidate_summary(subtitle_lane, route_state)
-    voice_state = collect_voice_execution_state(task_runtime, settings)
+    route_state = dual_channel_state_loader(task_id, task_runtime, subtitle_lane, subtitles_step_done=_sub_done_b)
+    audio_lane = source_audio_lane_loader(task, route_state)
+    screen_text_candidate = screen_text_candidate_loader(subtitle_lane, route_state)
+    voice_state = voice_execution_state_loader(task_runtime, settings)
     final_key = task_key(task_runtime, "final_video_key") or task_key(task_runtime, "final_video_path")
-    final_exists = bool(final_key and object_exists(str(final_key)))
+    final_exists = bool(final_key and object_exists_fn(str(final_key)))
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
@@ -172,7 +185,7 @@ def collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
         **subtitle_lane,
         **route_state,
         **audio_lane,
-        **hf_source_audio_semantics(task_runtime, voice_state),
+        **source_audio_semantics_loader(task_runtime, voice_state),
         **screen_text_candidate,
         **voice_state,
         "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
@@ -192,9 +205,15 @@ def collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
     }
 
 
-def safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+def safe_collect_hot_follow_workbench_ui(
+    task: dict,
+    settings,
+    *,
+    workbench_ui_loader=collect_hot_follow_workbench_ui,
+    voice_options_builder=build_hot_follow_voice_options,
+) -> dict[str, Any]:
     try:
-        return collect_hot_follow_workbench_ui(task, settings)
+        return workbench_ui_loader(task, settings)
     except Exception:
         logger.exception("HF_WORKBENCH_UI_SAFE_FALLBACK task=%s", task.get("task_id") or task.get("id"))
         payload = hot_follow_operational_defaults()
@@ -208,7 +227,7 @@ def safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]
                 "deliverable_audio_done": False,
                 "dub_current": False,
                 "dub_current_reason": "unknown",
-                "voice_options_by_provider": build_hot_follow_voice_options(
+                "voice_options_by_provider": voice_options_builder(
                     settings, normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
                 ),
                 "compose_status": str(task.get("compose_status") or "never"),
@@ -220,12 +239,22 @@ def safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]
         return payload
 
 
-def hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None = None) -> tuple[str, str]:
+def hf_pipeline_state(
+    task: dict,
+    step: str,
+    *,
+    composed: dict[str, Any] | None = None,
+    parse_artifact_ready_loader=hf_parse_artifact_ready,
+    voice_execution_state_loader=collect_voice_execution_state,
+    audio_config_loader=hf_audio_config,
+    settings=None,
+) -> tuple[str, str]:
     last_step = str(task.get("last_step") or "").lower()
     task_status = str(task.get("status") or "").lower()
+    settings_obj = settings or get_settings()
     if step == "parse":
         status = hf_state_from_status(task.get("parse_status"))
-        raw_ready = hf_parse_artifact_ready(task)
+        raw_ready = parse_artifact_ready_loader(task)
         if raw_ready:
             status = "done"
         elif status == "pending" and task_status == "processing" and last_step == "parse":
@@ -254,16 +283,16 @@ def hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None 
         return status, summary
     if step == "audio":
         status = hf_state_from_status(task.get("dub_status"))
-        voice_state = collect_voice_execution_state(task, get_settings())
+        voice_state = voice_execution_state_loader(task, settings_obj)
         if status == "pending" and voice_state.get("audio_ready"):
             status = "done"
         if status == "done" and not voice_state.get("audio_ready"):
             status = "pending"
         if status == "pending" and task_status == "processing" and last_step == "dub":
             status = "running"
-        audio_cfg = hf_audio_config(task)
+        audio_cfg = audio_config_loader(task)
         summary = (
-            f"dub_provider={voice_state.get('actual_provider') or task.get('dub_provider') or get_settings().dub_provider} "
+            f"dub_provider={voice_state.get('actual_provider') or task.get('dub_provider') or settings_obj.dub_provider} "
             f"voice={voice_state.get('resolved_voice') or audio_cfg.get('tts_voice') or 'missing'} "
             f"audio_ready={'yes' if voice_state.get('audio_ready') else 'no'}"
         )
@@ -294,27 +323,54 @@ def hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None 
     return "pending", ""
 
 
-def hf_deliverable_state(task: dict, key: str | None, fallback_status_field: str | None = None) -> str:
-    if key and object_exists(str(key)):
+def hf_deliverable_state(
+    task: dict,
+    key: str | None,
+    fallback_status_field: str | None = None,
+    *,
+    object_exists_fn=object_exists,
+) -> str:
+    if key and object_exists_fn(str(key)):
         return "done"
     if fallback_status_field and hf_state_from_status(task.get(fallback_status_field)) == "failed":
         return "failed"
     return "pending"
 
 
-def hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
+def hf_deliverables(
+    task_id: str,
+    task: dict,
+    *,
+    subtitle_lane_loader=hf_subtitle_lane_state,
+    current_voiceover_asset_loader=hf_current_voiceover_asset,
+    object_exists_fn=object_exists,
+    task_endpoint_loader=task_endpoint,
+    signed_op_url_loader=signed_op_url,
+    download_url_loader=get_download_url,
+    deliverable_state_loader=None,
+    settings=None,
+) -> list[dict[str, Any]]:
     profile = get_hot_follow_language_profile(task.get("target_lang") or task.get("content_lang") or "mm")
+    settings_obj = settings or get_settings()
     raw_key = task_key(task, "raw_path")
     origin_key = task_key(task, "origin_srt_path")
     mm_key = task_key(task, "mm_srt_path")
-    subtitle_lane = hf_subtitle_lane_state(task_id, task)
+    subtitle_lane = subtitle_lane_loader(task_id, task)
     target_subtitle_exists = bool(subtitle_lane.get("subtitle_artifact_exists"))
-    audio_asset = hf_current_voiceover_asset(task_id, task, get_settings())
+    audio_asset = current_voiceover_asset_loader(task_id, task, settings_obj)
     audio_key = str(audio_asset.get("key") or "").strip() or None
     pack_key = task_key(task, "pack_key") or task_key(task, "pack_path")
     scenes_key = task_key(task, "scenes_key")
     final_key = task_key(task, "final_video_key") or task_key(task, "final_video_path")
     bgm_key = str(((task.get("config") or {}).get("bgm") or {}).get("bgm_key") or "").strip() or None
+    deliverable_state_loader = deliverable_state_loader or (
+        lambda current_task, key, fallback_status_field=None: hf_deliverable_state(
+            current_task,
+            key,
+            fallback_status_field,
+            object_exists_fn=object_exists_fn,
+        )
+    )
 
     def _entry(
         kind: str,
@@ -348,65 +404,65 @@ def hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
             "raw_video",
             "Raw Video",
             raw_key,
-            task_endpoint(task_id, "raw") if raw_key and object_exists(raw_key) else None,
-            signed_op_url(task_id, "raw") if raw_key and object_exists(raw_key) else None,
-            "done" if hf_parse_artifact_ready(task) else hf_deliverable_state(task, raw_key, "parse_status"),
+            task_endpoint_loader(task_id, "raw") if raw_key and object_exists_fn(raw_key) else None,
+            signed_op_url_loader(task_id, "raw") if raw_key and object_exists_fn(raw_key) else None,
+            "done" if hf_parse_artifact_ready(task) else deliverable_state_loader(task, raw_key, "parse_status"),
         ),
         _entry(
             "origin_subtitle",
             "origin.srt",
             origin_key,
-            task_endpoint(task_id, "origin") if origin_key and object_exists(origin_key) else None,
-            signed_op_url(task_id, "origin_srt") if origin_key and object_exists(origin_key) else None,
-            hf_deliverable_state(task, origin_key, "subtitles_status"),
+            task_endpoint_loader(task_id, "origin") if origin_key and object_exists_fn(origin_key) else None,
+            signed_op_url_loader(task_id, "origin_srt") if origin_key and object_exists_fn(origin_key) else None,
+            deliverable_state_loader(task, origin_key, "subtitles_status"),
         ),
         _entry(
             "subtitle",
             profile.subtitle_filename,
             mm_key,
-            task_endpoint(task_id, "mm") if target_subtitle_exists and mm_key and object_exists(mm_key) else None,
-            signed_op_url(task_id, "mm_srt") if target_subtitle_exists and mm_key and object_exists(mm_key) else None,
-            "done" if target_subtitle_exists else hf_deliverable_state(task, None, "subtitles_status"),
+            task_endpoint_loader(task_id, "mm") if target_subtitle_exists and mm_key and object_exists_fn(mm_key) else None,
+            signed_op_url_loader(task_id, "mm_srt") if target_subtitle_exists and mm_key and object_exists_fn(mm_key) else None,
+            "done" if target_subtitle_exists else deliverable_state_loader(task, None, "subtitles_status"),
         ),
         _entry(
             "audio",
             profile.dub_filename,
             audio_key,
-            task_endpoint(task_id, "audio") if audio_key and object_exists(str(audio_key)) else None,
-            signed_op_url(task_id, "mm_audio") if audio_key and object_exists(str(audio_key)) else None,
-            "done" if audio_key and bool(audio_asset.get("exists")) else hf_deliverable_state(task, None, "dub_status"),
+            task_endpoint_loader(task_id, "audio") if audio_key and object_exists_fn(str(audio_key)) else None,
+            signed_op_url_loader(task_id, "mm_audio") if audio_key and object_exists_fn(str(audio_key)) else None,
+            "done" if audio_key and bool(audio_asset.get("exists")) else deliverable_state_loader(task, None, "dub_status"),
         ),
         _entry(
             "bgm",
             "BGM",
             bgm_key,
-            get_download_url(str(bgm_key)) if bgm_key and object_exists(str(bgm_key)) else None,
-            get_download_url(str(bgm_key)) if bgm_key and object_exists(str(bgm_key)) else None,
-            "done" if bgm_key and object_exists(str(bgm_key)) else "pending",
+            download_url_loader(str(bgm_key)) if bgm_key and object_exists_fn(str(bgm_key)) else None,
+            download_url_loader(str(bgm_key)) if bgm_key and object_exists_fn(str(bgm_key)) else None,
+            "done" if bgm_key and object_exists_fn(str(bgm_key)) else "pending",
         ),
         _entry(
             "pack",
             "Pack ZIP",
             pack_key,
             None,
-            signed_op_url(task_id, "pack") if pack_key and object_exists(pack_key) else None,
-            hf_deliverable_state(task, pack_key, "pack_status"),
+            signed_op_url_loader(task_id, "pack") if pack_key and object_exists_fn(pack_key) else None,
+            deliverable_state_loader(task, pack_key, "pack_status"),
         ),
         _entry(
             "scenes",
             "Scenes ZIP",
             scenes_key,
             None,
-            signed_op_url(task_id, "scenes") if scenes_key and object_exists(scenes_key) else None,
-            "done" if scenes_key else hf_deliverable_state(task, scenes_key, "scenes_status"),
+            signed_op_url_loader(task_id, "scenes") if scenes_key and object_exists_fn(scenes_key) else None,
+            "done" if scenes_key else deliverable_state_loader(task, scenes_key, "scenes_status"),
         ),
         _entry(
             "final",
             "Final Video",
             final_key,
-            task_endpoint(task_id, "final") if final_key and object_exists(str(final_key)) else None,
-            signed_op_url(task_id, "final_mp4") if final_key and object_exists(str(final_key)) else None,
-            hf_deliverable_state(task, final_key, "compose_status"),
+            task_endpoint_loader(task_id, "final") if final_key and object_exists_fn(str(final_key)) else None,
+            signed_op_url_loader(task_id, "final_mp4") if final_key and object_exists_fn(str(final_key)) else None,
+            deliverable_state_loader(task, final_key, "compose_status"),
         ),
     ]
 
@@ -431,7 +487,7 @@ def hf_shape_from_events(task: dict) -> dict[str, str]:
     return {"step": "", "phase": "", "provider": ""}
 
 
-def hf_task_status_shape(task: dict) -> dict[str, str]:
+def hf_task_status_shape(task: dict, *, pipeline_state_loader=hf_pipeline_state) -> dict[str, str]:
     shape = hf_shape_from_events(task)
     step = shape.get("step") or ""
     phase = shape.get("phase") or ""
@@ -443,20 +499,20 @@ def hf_task_status_shape(task: dict) -> dict[str, str]:
         step = step_map.get(last_step, last_step)
     if not step:
         for candidate in ("compose", "pack", "scenes", "dub", "subtitles", "parse"):
-            status, _ = hf_pipeline_state(task, candidate)
+            status, _ = pipeline_state_loader(task, candidate)
             if status in {"running", "failed"}:
                 step = candidate
                 break
     if not step:
         for candidate in ("compose", "pack", "scenes", "dub", "subtitles", "parse"):
-            status, _ = hf_pipeline_state(task, candidate)
+            status, _ = pipeline_state_loader(task, candidate)
             if status == "done":
                 step = candidate
                 break
 
     if not phase:
         if step:
-            status, _ = hf_pipeline_state(task, step)
+            status, _ = pipeline_state_loader(task, step)
             phase = status
         else:
             phase = hf_state_from_status(task.get("status")) or "pending"
@@ -522,6 +578,7 @@ def hf_artifact_facts(
     persisted_audio: dict[str, Any] | None,
     subtitle_lane: dict[str, Any] | None,
     scene_pack: dict[str, Any] | None,
+    deliverable_url_loader=deliverable_url,
 ) -> dict[str, Any]:
     return build_hot_follow_artifact_facts(
         task_id,
@@ -531,7 +588,7 @@ def hf_artifact_facts(
         persisted_audio=persisted_audio,
         subtitle_lane=subtitle_lane,
         scene_pack=scene_pack,
-        deliverable_url=deliverable_url,
+        deliverable_url=deliverable_url_loader,
     )
 
 
@@ -590,9 +647,12 @@ def hf_safe_presentation_aggregates(
     composed_reason: str,
     final_stale_reason: str | None = None,
     no_dub: bool,
+    artifact_facts_loader=hf_artifact_facts,
+    current_attempt_loader=hf_current_attempt_summary,
+    operator_summary_loader=hf_operator_summary,
 ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     try:
-        artifact_facts = hf_artifact_facts(
+        artifact_facts = artifact_facts_loader(
             task_id,
             task,
             final_info=final_info,
@@ -601,7 +661,7 @@ def hf_safe_presentation_aggregates(
             subtitle_lane=subtitle_lane,
             scene_pack=scene_pack,
         )
-        current_attempt = hf_current_attempt_summary(
+        current_attempt = current_attempt_loader(
             voice_state=voice_state,
             subtitle_lane=subtitle_lane or {},
             dub_status=dub_status,
@@ -618,7 +678,7 @@ def hf_safe_presentation_aggregates(
             if isinstance(artifact_facts.get("selected_compose_route"), dict)
             else False,
         )
-        operator_summary = hf_operator_summary(
+        operator_summary = operator_summary_loader(
             artifact_facts=artifact_facts,
             current_attempt=current_attempt,
             no_dub=no_dub,

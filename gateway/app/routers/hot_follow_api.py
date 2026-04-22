@@ -143,18 +143,20 @@ from gateway.app.services.hot_follow_helper_translation import (
     helper_translate_success_updates,
     sanitize_helper_translate_error,
 )
-from gateway.app.services.hot_follow_skills_advisory import (
-    maybe_build_hot_follow_advisory as _maybe_build_hot_follow_advisory,
-)
 from gateway.app.services.voice_service import hf_source_audio_semantics
-from gateway.app.services.hot_follow_workbench_presenter import (
-    build_hot_follow_artifact_facts as _build_hot_follow_artifact_facts,
-    build_hot_follow_current_attempt_summary as _build_hot_follow_current_attempt_summary,
-    build_hot_follow_operator_summary as _build_hot_follow_operator_summary,
-)
 from gateway.app.services.task_view import (
-    build_hot_follow_publish_hub as _build_hot_follow_publish_hub,
-    build_hot_follow_workbench_hub as _build_hot_follow_workbench_hub,
+    build_hot_follow_publish_hub as _svc_build_hot_follow_publish_hub,
+    build_hot_follow_workbench_hub as _svc_build_hot_follow_workbench_hub,
+    collect_hot_follow_workbench_ui as _svc_collect_hot_follow_workbench_ui,
+    hf_artifact_facts as _svc_hf_artifact_facts,
+    hf_current_attempt_summary as _svc_hf_current_attempt_summary,
+    hf_deliverables as _svc_hf_deliverables,
+    hf_operator_summary as _svc_hf_operator_summary,
+    hf_pipeline_state as _svc_hf_pipeline_state,
+    hf_rerun_presentation_state as _svc_hf_rerun_presentation_state,
+    hf_safe_presentation_aggregates as _svc_hf_safe_presentation_aggregates,
+    hf_task_status_shape as _svc_hf_task_status_shape,
+    safe_collect_hot_follow_workbench_ui as _svc_safe_collect_hot_follow_workbench_ui,
 )
 
 
@@ -1034,39 +1036,177 @@ def _hot_follow_operational_defaults() -> dict[str, Any]:
     }
 
 
+def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
+    return _svc_collect_hot_follow_workbench_ui(
+        task,
+        settings,
+        subtitle_lane_loader=_hf_subtitle_lane_state,
+        pipeline_state_loader=_hf_pipeline_state,
+        dual_channel_state_loader=_hf_dual_channel_state,
+        source_audio_lane_loader=_hf_source_audio_lane_summary,
+        screen_text_candidate_loader=_hf_screen_text_candidate_summary,
+        voice_execution_state_loader=_collect_voice_execution_state,
+        object_exists_fn=object_exists,
+        source_audio_semantics_loader=hf_source_audio_semantics,
+    )
+
+
 def _safe_collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
-    """Compatibility-safe wrapper around the formal workbench UI builder.
+    return _svc_safe_collect_hot_follow_workbench_ui(
+        task,
+        settings,
+        workbench_ui_loader=_collect_hot_follow_workbench_ui,
+        voice_options_builder=_build_hot_follow_voice_options,
+    )
 
-    Keep this narrow while legacy callers still depend on a router-local helper.
-    New presentation logic should prefer service/presenter paths instead of
-    extending this fallback wrapper.
-    """
-    try:
-        return _collect_hot_follow_workbench_ui(task, settings)
-    except Exception:
-        logger.exception("HF_WORKBENCH_UI_SAFE_FALLBACK task=%s", task.get("task_id") or task.get("id"))
-        payload = _hot_follow_operational_defaults()
-        payload.update(
-            {
-                "actual_provider": normalize_provider(task.get("dub_provider") or getattr(settings, "dub_provider", None)),
-                "resolved_voice": None,
-                "requested_voice": None,
-                "audio_ready": False,
-                "audio_ready_reason": "unknown",
-                "deliverable_audio_done": False,
-                "dub_current": False,
-                "dub_current_reason": "unknown",
-                "voice_options_by_provider": _build_hot_follow_voice_options(
-                    settings, normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
-                ),
-                "compose_status": str(task.get("compose_status") or "never"),
-                "final_exists": False,
-                "lipsync_enabled": False,
-                "lipsync_status": "off",
-            }
-        )
-        return payload
 
+def _hf_pipeline_state(
+    task: dict,
+    step: str,
+    *,
+    composed: dict[str, Any] | None = None,
+) -> tuple[str, str]:
+    return _svc_hf_pipeline_state(
+        task,
+        step,
+        composed=composed,
+        parse_artifact_ready_loader=_hf_parse_artifact_ready,
+        voice_execution_state_loader=_collect_voice_execution_state,
+        audio_config_loader=_hf_audio_config,
+        settings=get_settings(),
+    )
+
+
+def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
+    return _svc_hf_deliverables(
+        task_id,
+        task,
+        subtitle_lane_loader=_hf_subtitle_lane_state,
+        current_voiceover_asset_loader=_hf_current_voiceover_asset,
+        object_exists_fn=object_exists,
+        task_endpoint_loader=_task_endpoint,
+        signed_op_url_loader=_signed_op_url,
+        download_url_loader=get_download_url,
+        settings=get_settings(),
+    )
+
+
+def _hf_task_status_shape(task: dict) -> dict[str, str]:
+    return _svc_hf_task_status_shape(task, pipeline_state_loader=_hf_pipeline_state)
+
+
+def _hf_rerun_presentation_state(
+    task: dict,
+    voice_state: dict[str, Any] | None,
+    final_info: dict[str, Any] | None,
+    historical_final: dict[str, Any] | None,
+    dub_status: str | None,
+) -> dict[str, Any]:
+    return _svc_hf_rerun_presentation_state(
+        task,
+        voice_state,
+        final_info,
+        historical_final,
+        dub_status,
+    )
+
+
+def _hf_artifact_facts(
+    task_id: str,
+    task: dict,
+    *,
+    final_info: dict[str, Any] | None,
+    historical_final: dict[str, Any] | None,
+    persisted_audio: dict[str, Any] | None,
+    subtitle_lane: dict[str, Any] | None,
+    scene_pack: dict[str, Any] | None,
+) -> dict[str, Any]:
+    return _svc_hf_artifact_facts(
+        task_id,
+        task,
+        final_info=final_info,
+        historical_final=historical_final,
+        persisted_audio=persisted_audio,
+        subtitle_lane=subtitle_lane,
+        scene_pack=scene_pack,
+        deliverable_url_loader=_deliverable_url,
+    )
+
+
+def _hf_current_attempt_summary(
+    *,
+    voice_state: dict[str, Any],
+    subtitle_lane: dict[str, Any],
+    dub_status: str,
+    compose_status: str,
+    composed_reason: str,
+    final_stale_reason: str | None = None,
+    artifact_facts: dict[str, Any] | None = None,
+    no_dub: bool = False,
+    no_dub_compose_allowed: bool = False,
+) -> dict[str, Any]:
+    return _svc_hf_current_attempt_summary(
+        voice_state=voice_state,
+        subtitle_lane=subtitle_lane,
+        dub_status=dub_status,
+        compose_status=compose_status,
+        composed_reason=composed_reason,
+        final_stale_reason=final_stale_reason,
+        artifact_facts=artifact_facts,
+        no_dub=no_dub,
+        no_dub_compose_allowed=no_dub_compose_allowed,
+    )
+
+
+def _hf_operator_summary(
+    *,
+    artifact_facts: dict[str, Any],
+    current_attempt: dict[str, Any],
+    no_dub: bool,
+    subtitle_ready: bool = False,
+) -> dict[str, Any]:
+    return _svc_hf_operator_summary(
+        artifact_facts=artifact_facts,
+        current_attempt=current_attempt,
+        no_dub=no_dub,
+        subtitle_ready=subtitle_ready,
+    )
+
+
+def _hf_safe_presentation_aggregates(
+    task_id: str,
+    task: dict,
+    *,
+    final_info: dict[str, Any] | None,
+    historical_final: dict[str, Any] | None,
+    persisted_audio: dict[str, Any] | None,
+    subtitle_lane: dict[str, Any] | None,
+    scene_pack: dict[str, Any] | None,
+    voice_state: dict[str, Any],
+    dub_status: str,
+    compose_status: str,
+    composed_reason: str,
+    final_stale_reason: str | None = None,
+    no_dub: bool,
+) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    return _svc_hf_safe_presentation_aggregates(
+        task_id,
+        task,
+        final_info=final_info,
+        historical_final=historical_final,
+        persisted_audio=persisted_audio,
+        subtitle_lane=subtitle_lane,
+        scene_pack=scene_pack,
+        voice_state=voice_state,
+        dub_status=dub_status,
+        compose_status=compose_status,
+        composed_reason=composed_reason,
+        final_stale_reason=final_stale_reason,
+        no_dub=no_dub,
+        artifact_facts_loader=_hf_artifact_facts,
+        current_attempt_loader=_hf_current_attempt_summary,
+        operator_summary_loader=_hf_operator_summary,
+    )
 
 def _hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
     """Compatibility helper for subtitle-only compose fallback decisions.
@@ -1097,268 +1237,6 @@ def _hf_allow_subtitle_only_compose(task_id: str, task: dict) -> bool:
             or str(task.get("dub_skip_reason") or "").strip().lower() == "no_speech_detected"
         )
     )
-
-
-def _hf_pipeline_state(task: dict, step: str, *, composed: dict[str, Any] | None = None) -> tuple[str, str]:
-    last_step = str(task.get("last_step") or "").lower()
-    task_status = str(task.get("status") or "").lower()
-    if step == "parse":
-        status = _hf_state_from_status(task.get("parse_status"))
-        raw_ready = _hf_parse_artifact_ready(task)
-        if raw_ready:
-            status = "done"
-        elif status == "pending" and task_status == "processing" and last_step == "parse":
-            status = "running"
-        summary = "raw=ready" if raw_ready else "raw=none"
-        return status, summary
-    if step == "subtitles":
-        status = _hf_state_from_status(task.get("subtitles_status"))
-        pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-        no_subtitles = str(pipeline_config.get("no_subtitles") or "").strip().lower() == "true"
-        translation_incomplete = str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
-        current_reason = str(task.get("target_subtitle_current_reason") or "").strip()
-        summary = "origin/mm subtitles"
-        if status == "pending" and (task.get("origin_srt_path") or task.get("mm_srt_path")):
-            status = "done"
-        if status == "pending" and task_status == "processing" and last_step == "subtitles":
-            status = "running"
-        if status == "error":
-            summary = str(task.get("subtitles_error") or "subtitles_error")
-        elif no_subtitles:
-            summary = "no_subtitles"
-        elif translation_incomplete:
-            summary = "translation_incomplete"
-        elif current_reason and current_reason not in {"ready", "unknown"}:
-            summary = current_reason
-        return status, summary
-    if step == "audio":
-        status = _hf_state_from_status(task.get("dub_status"))
-        voice_state = _collect_voice_execution_state(task, get_settings())
-        if status == "pending" and voice_state.get("audio_ready"):
-            status = "done"
-        if status == "done" and not voice_state.get("audio_ready"):
-            status = "pending"
-        if status == "pending" and task_status == "processing" and last_step == "dub":
-            status = "running"
-        audio_cfg = _hf_audio_config(task)
-        summary = (
-            f"dub_provider={voice_state.get('actual_provider') or normalize_provider(task.get('dub_provider') or get_settings().dub_provider)} "
-            f"voice={voice_state.get('resolved_voice') or audio_cfg.get('tts_voice') or 'missing'} "
-            f"audio_ready={'yes' if voice_state.get('audio_ready') else 'no'}"
-        )
-        return status, summary
-    if step == "pack":
-        status = _hf_state_from_status(task.get("pack_status"))
-        if status == "pending" and (task.get("pack_key") or task.get("pack_path")):
-            status = "done"
-        if status == "pending" and task_status == "processing" and last_step == "pack":
-            status = "running"
-        summary = f"pack={task.get('pack_type') or '-'}"
-        return status, summary
-    if step == "compose":
-        status = _hf_state_from_status(task.get("compose_status"))
-        composed_state = composed or _compute_composed_state(
-            task,
-            str(task.get("task_id") or task.get("id") or ""),
-        )
-        target_lang = normalize_target_lang(task.get("target_lang") or task.get("content_lang") or "mm")
-        if status == "pending" and bool(composed_state.get("composed_ready")):
-            status = "done"
-        if status == "done" and target_lang in {"my", "vi"} and not bool(composed_state.get("composed_ready")):
-            status = "pending"
-        if status == "pending" and task_status == "processing" and last_step in {"compose", "final"}:
-            status = "running"
-        summary = "final video merge"
-        return status, summary
-    return "pending", ""
-
-
-def _hf_deliverable_state(task: dict, key: str | None, fallback_status_field: str | None = None) -> str:
-    if key and object_exists(str(key)):
-        return "done"
-    if fallback_status_field and _hf_state_from_status(task.get(fallback_status_field)) == "failed":
-        return "failed"
-    return "pending"
-
-
-def _hf_deliverables(task_id: str, task: dict) -> list[dict[str, Any]]:
-    profile = get_hot_follow_language_profile(task.get("target_lang") or task.get("content_lang") or "mm")
-    raw_key = _task_key(task, "raw_path")
-    origin_key = _task_key(task, "origin_srt_path")
-    mm_key = _task_key(task, "mm_srt_path")
-    subtitle_lane = _hf_subtitle_lane_state(task_id, task)
-    target_subtitle_exists = bool(subtitle_lane.get("subtitle_artifact_exists"))
-    audio_asset = _hf_current_voiceover_asset(task_id, task, get_settings())
-    audio_key = str(audio_asset.get("key") or "").strip() or None
-    pack_key = _task_key(task, "pack_key") or _task_key(task, "pack_path")
-    scenes_key = _task_key(task, "scenes_key")
-    final_key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
-    bgm_key = str(((task.get("config") or {}).get("bgm") or {}).get("bgm_key") or "").strip() or None
-
-    def _entry(
-        kind: str,
-        title: str,
-        key: str | None,
-        open_url: str | None,
-        download_url: str | None,
-        state: str,
-    ) -> dict[str, Any]:
-        sha = None
-        if kind == "audio":
-            sha = task.get("audio_sha256")
-        elif kind == "final":
-            sha = task.get("final_video_sha256")
-        return {
-            "kind": kind,
-            "title": title,
-            "label": title,
-            "key": key,
-            "url": open_url or download_url,
-            "open_url": open_url,
-            "download_url": download_url,
-            "state": state,
-            "status": state,
-            "size": None,
-            "sha256": sha,
-        }
-
-    return [
-        _entry(
-            "raw_video",
-            "Raw Video",
-            raw_key,
-            _task_endpoint(task_id, "raw") if raw_key and object_exists(raw_key) else None,
-            _signed_op_url(task_id, "raw") if raw_key and object_exists(raw_key) else None,
-            "done" if _hf_parse_artifact_ready(task) else _hf_deliverable_state(task, raw_key, "parse_status"),
-        ),
-        _entry(
-            "origin_subtitle",
-            "origin.srt",
-            origin_key,
-            _task_endpoint(task_id, "origin") if origin_key and object_exists(origin_key) else None,
-            _signed_op_url(task_id, "origin_srt") if origin_key and object_exists(origin_key) else None,
-            _hf_deliverable_state(task, origin_key, "subtitles_status"),
-        ),
-        _entry(
-            "subtitle",
-            profile.subtitle_filename,
-            mm_key,
-            _task_endpoint(task_id, "mm") if target_subtitle_exists and mm_key and object_exists(mm_key) else None,
-            _signed_op_url(task_id, "mm_srt") if target_subtitle_exists and mm_key and object_exists(mm_key) else None,
-            "done" if target_subtitle_exists else _hf_deliverable_state(task, None, "subtitles_status"),
-        ),
-        _entry(
-            "audio",
-            profile.dub_filename,
-            audio_key,
-            _task_endpoint(task_id, "audio") if audio_key and object_exists(str(audio_key)) else None,
-            _signed_op_url(task_id, "mm_audio") if audio_key and object_exists(str(audio_key)) else None,
-            "done" if audio_key and bool(audio_asset.get("exists")) else _hf_deliverable_state(task, None, "dub_status"),
-        ),
-        _entry(
-            "bgm",
-            "BGM",
-            bgm_key,
-            get_download_url(str(bgm_key)) if bgm_key and object_exists(str(bgm_key)) else None,
-            get_download_url(str(bgm_key)) if bgm_key and object_exists(str(bgm_key)) else None,
-            "done" if bgm_key and object_exists(str(bgm_key)) else "pending",
-        ),
-        _entry(
-            "pack",
-            "Pack ZIP",
-            pack_key,
-            None,
-            _signed_op_url(task_id, "pack") if pack_key and object_exists(pack_key) else None,
-            _hf_deliverable_state(task, pack_key, "pack_status"),
-        ),
-        _entry(
-            "scenes",
-            "Scenes ZIP",
-            scenes_key,
-            None,
-            _signed_op_url(task_id, "scenes") if scenes_key and object_exists(scenes_key) else None,
-            "done" if scenes_key else _hf_deliverable_state(task, scenes_key, "scenes_status"),
-        ),
-        _entry(
-            "final",
-            "Final Video",
-            final_key,
-            _task_endpoint(task_id, "final") if final_key and object_exists(str(final_key)) else None,
-            _signed_op_url(task_id, "final_mp4") if final_key and object_exists(str(final_key)) else None,
-            _hf_deliverable_state(task, final_key, "compose_status"),
-        ),
-    ]
-
-
-def _hf_shape_from_events(task: dict) -> dict[str, str]:
-    events = task.get("events") or []
-    if not isinstance(events, list):
-        return {"step": "", "phase": "", "provider": ""}
-    for event in reversed(events):
-        if not isinstance(event, dict):
-            continue
-        extra = event.get("extra") or {}
-        if not isinstance(extra, dict):
-            extra = {}
-        step = str(extra.get("step") or event.get("step") or "").strip().lower()
-        phase = str(extra.get("phase") or event.get("phase") or "").strip().lower()
-        provider = str(extra.get("provider") or event.get("provider") or "").strip()
-        if step in {"dubbing", "audio"}:
-            step = "dub"
-        if step or phase or provider:
-            return {"step": step, "phase": phase, "provider": provider}
-    return {"step": "", "phase": "", "provider": ""}
-
-
-def _hf_task_status_shape(task: dict) -> dict[str, str]:
-    """Compatibility presentation helper for legacy status-shape payloads."""
-    shape = _hf_shape_from_events(task)
-    step = shape.get("step") or ""
-    phase = shape.get("phase") or ""
-    provider = shape.get("provider") or ""
-
-    if not step:
-        last_step = str(task.get("last_step") or "").strip().lower()
-        step_map = {"dubbing": "dub", "audio": "dub", "final": "compose"}
-        step = step_map.get(last_step, last_step)
-    if not step:
-        for candidate in ("compose", "pack", "scenes", "dub", "subtitles", "parse"):
-            status, _ = _hf_pipeline_state(task, candidate)
-            if status in {"running", "failed"}:
-                step = candidate
-                break
-    if not step:
-        for candidate in ("compose", "pack", "scenes", "dub", "subtitles", "parse"):
-            status, _ = _hf_pipeline_state(task, candidate)
-            if status == "done":
-                step = candidate
-                break
-
-    if not phase:
-        if step:
-            status, _ = _hf_pipeline_state(task, step)
-            phase = status
-        else:
-            phase = _hf_state_from_status(task.get("status")) or "pending"
-
-    if not provider:
-        provider_map = {
-            "parse": "parse_provider",
-            "subtitles": "subtitles_provider",
-            "dub": "dub_provider",
-            "pack": "pack_provider",
-            "compose": "compose_provider",
-        }
-        provider_field = provider_map.get(step)
-        if provider_field:
-            provider = str(task.get(provider_field) or "").strip()
-
-    return {
-        "step": step or "-",
-        "phase": phase or "-",
-        "provider": provider or "-",
-    }
-
 
 def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
     warnings: list[dict[str, str | None]] = []
@@ -1414,225 +1292,6 @@ def _build_hot_follow_dub_warnings(task: dict) -> list[dict[str, str | None]]:
         if len(warnings) >= 5:
             break
     return warnings
-
-
-def _collect_hot_follow_workbench_ui(task: dict, settings) -> dict[str, Any]:
-    task_id = str(task.get("task_id") or task.get("id") or "")
-    subtitle_lane = _hf_subtitle_lane_state(task_id, task)
-    task_runtime = dict(task)
-    task_runtime["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
-    task_runtime["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
-    _sub_status_b, _ = _hf_pipeline_state(task, "subtitles")
-    _sub_done_b = _sub_status_b in ("done", "ready", "success", "completed", "failed", "error")
-    route_state = _hf_dual_channel_state(task_id, task_runtime, subtitle_lane, subtitles_step_done=_sub_done_b)
-    audio_lane = _hf_source_audio_lane_summary(task, route_state)
-    screen_text_candidate = _hf_screen_text_candidate_summary(subtitle_lane, route_state)
-    voice_state = _collect_voice_execution_state(task_runtime, settings)
-    final_key = _task_key(task_runtime, "final_video_key") or _task_key(task_runtime, "final_video_path")
-    final_exists = bool(final_key and object_exists(str(final_key)))
-    compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
-    lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in ("1", "true", "yes")
-    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-    stored_no_dub_reason = str(
-        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
-    ).strip()
-    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
-        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
-        and not str(subtitle_lane.get("dub_input_text") or "").strip()
-    )
-    if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
-        no_dub = False
-    if stored_no_dub_reason == "target_subtitle_empty":
-        no_dub_reason = "target_subtitle_empty"
-        no_dub_message = "Target subtitle is empty; dubbing is skipped."
-    elif stored_no_dub_reason == "dub_input_empty":
-        no_dub_reason = "dub_input_empty"
-        no_dub_message = "Dub input is empty; dubbing is skipped."
-    elif route_state.get("content_mode") == "subtitle_led":
-        no_dub_reason = "subtitle_led"
-        no_dub_message = "No reliable speech detected. Review subtitles or provide text before dubbing."
-    elif route_state.get("content_mode") == "silent_candidate":
-        no_dub_reason = "no_speech_detected"
-        no_dub_message = "No spoken speech detected in source video; dubbing is skipped."
-    else:
-        no_dub_reason = None
-        no_dub_message = None
-    if not no_dub:
-        no_dub_reason = None
-        no_dub_message = None
-    return {
-        **subtitle_lane,
-        **route_state,
-        **audio_lane,
-        **hf_source_audio_semantics(task_runtime, voice_state),
-        **screen_text_candidate,
-        **voice_state,
-        "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
-        "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),
-        "compose_status": compose_status,
-        "final_exists": final_exists,
-        "actual_burn_subtitle_source": subtitle_lane.get("actual_burn_subtitle_source"),
-        "no_dub": bool(no_dub),
-        "no_dub_reason": no_dub_reason,
-        "no_dub_message": no_dub_message,
-        "lipsync_enabled": lipsync_enabled,
-        "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
-        "voiceover_url": voice_state.get("voiceover_url"),
-        "deliverable_audio_done": bool(voice_state.get("deliverable_audio_done")),
-        "dub_current": bool(voice_state.get("dub_current")),
-        "dub_current_reason": voice_state.get("dub_current_reason"),
-    }
-
-
-def _hf_rerun_presentation_state(
-    task: dict,
-    voice_state: dict[str, Any] | None,
-    final_info: dict[str, Any] | None,
-    historical_final: dict[str, Any] | None,
-    dub_status: str | None,
-) -> dict[str, Any]:
-    voice = voice_state or {}
-    final_payload = final_info or historical_final or {}
-    final_exists = bool(final_payload.get("exists"))
-    final_url = str(final_payload.get("url") or "").strip() or None
-    final_asset_version = str(final_payload.get("asset_version") or "").strip() or None
-    final_updated_at = final_payload.get("updated_at") or task.get("final_updated_at") or task.get("updated_at")
-    return {
-        "last_successful_output": {
-            "final_exists": final_exists,
-            "final_url": final_url,
-            "final_asset_version": final_asset_version,
-            "final_updated_at": final_updated_at,
-        },
-        "current_attempt": {
-            "dub_status": str(dub_status or "").strip().lower() or "never",
-            "audio_ready": bool(voice.get("audio_ready")),
-            "audio_ready_reason": str(voice.get("audio_ready_reason") or "").strip() or "unknown",
-            "dub_current": bool(voice.get("dub_current")),
-            "dub_current_reason": str(voice.get("dub_current_reason") or "").strip() or "unknown",
-            "requested_voice": str(voice.get("requested_voice") or "").strip() or None,
-            "resolved_voice": str(voice.get("resolved_voice") or "").strip() or None,
-            "actual_provider": str(voice.get("actual_provider") or "").strip() or None,
-        },
-    }
-
-
-def _hf_artifact_facts(
-    task_id: str,
-    task: dict,
-    *,
-    final_info: dict[str, Any] | None,
-    historical_final: dict[str, Any] | None,
-    persisted_audio: dict[str, Any] | None,
-    subtitle_lane: dict[str, Any] | None,
-    scene_pack: dict[str, Any] | None,
-) -> dict[str, Any]:
-    return _build_hot_follow_artifact_facts(
-        task_id,
-        task,
-        final_info=final_info,
-        historical_final=historical_final,
-        persisted_audio=persisted_audio,
-        subtitle_lane=subtitle_lane,
-        scene_pack=scene_pack,
-        deliverable_url=_deliverable_url,
-    )
-
-
-def _hf_current_attempt_summary(
-    *,
-    voice_state: dict[str, Any],
-    subtitle_lane: dict[str, Any],
-    dub_status: str,
-    compose_status: str,
-    composed_reason: str,
-    final_stale_reason: str | None = None,
-    artifact_facts: dict[str, Any] | None = None,
-    no_dub: bool = False,
-    no_dub_compose_allowed: bool = False,
-) -> dict[str, Any]:
-    return _build_hot_follow_current_attempt_summary(
-        voice_state=voice_state,
-        subtitle_lane=subtitle_lane,
-        dub_status=dub_status,
-        compose_status=compose_status,
-        composed_reason=composed_reason,
-        final_stale_reason=final_stale_reason,
-        artifact_facts=artifact_facts,
-        no_dub=no_dub,
-        no_dub_compose_allowed=no_dub_compose_allowed,
-    )
-
-
-def _hf_operator_summary(
-    *,
-    artifact_facts: dict[str, Any],
-    current_attempt: dict[str, Any],
-    no_dub: bool,
-    subtitle_ready: bool = False,
-) -> dict[str, Any]:
-    return _build_hot_follow_operator_summary(
-        artifact_facts=artifact_facts,
-        current_attempt=current_attempt,
-        no_dub=no_dub,
-        subtitle_ready=subtitle_ready,
-    )
-
-
-def _hf_safe_presentation_aggregates(
-    task_id: str,
-    task: dict,
-    *,
-    final_info: dict[str, Any] | None,
-    historical_final: dict[str, Any] | None,
-    persisted_audio: dict[str, Any] | None,
-    subtitle_lane: dict[str, Any] | None,
-    scene_pack: dict[str, Any] | None,
-    voice_state: dict[str, Any],
-    dub_status: str,
-    compose_status: str,
-    composed_reason: str,
-    final_stale_reason: str | None = None,
-    no_dub: bool,
-) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
-    try:
-        artifact_facts = _hf_artifact_facts(
-            task_id,
-            task,
-            final_info=final_info,
-            historical_final=historical_final,
-            persisted_audio=persisted_audio,
-            subtitle_lane=subtitle_lane,
-            scene_pack=scene_pack,
-        )
-        current_attempt = _hf_current_attempt_summary(
-            voice_state=voice_state,
-            subtitle_lane=subtitle_lane or {},
-            dub_status=dub_status,
-            compose_status=compose_status,
-            composed_reason=composed_reason,
-            final_stale_reason=final_stale_reason,
-            artifact_facts=artifact_facts,
-            no_dub=no_dub,
-            no_dub_compose_allowed=bool((artifact_facts.get("selected_compose_route") or {}).get("name") in {
-                "preserve_source_route",
-                "bgm_only_route",
-                "no_tts_compose_route",
-            })
-            if isinstance(artifact_facts.get("selected_compose_route"), dict)
-            else False,
-        )
-        operator_summary = _hf_operator_summary(
-            artifact_facts=artifact_facts,
-            current_attempt=current_attempt,
-            no_dub=no_dub,
-            subtitle_ready=bool((subtitle_lane or {}).get("subtitle_ready")),
-        )
-        return artifact_facts, current_attempt, operator_summary
-    except Exception:
-        logger.exception("HF_PRESENTATION_AGGREGATES_SAFE_FALLBACK task=%s", task_id)
-        return {}, {}, {}
-
 
 def _hf_audio_display_error(dub_state: str, dub_error: str | None, voice_state: dict[str, Any]) -> str | None:
     state = str(dub_state or "").strip().lower()
@@ -1915,7 +1574,7 @@ def upload_hot_follow_bgm(
 
 
 def _service_build_hot_follow_publish_hub(task_id: str, repo):
-    return _build_hot_follow_publish_hub(
+    return _svc_build_hot_follow_publish_hub(
         task_id,
         repo=repo,
         publish_payload_builder=_publish_hub_payload,
@@ -1924,7 +1583,7 @@ def _service_build_hot_follow_publish_hub(task_id: str, repo):
 
 
 def _service_build_hot_follow_workbench_hub(task_id: str, repo):
-    return _build_hot_follow_workbench_hub(
+    return _svc_build_hot_follow_workbench_hub(
         task_id,
         repo=repo,
         settings=get_settings(),
