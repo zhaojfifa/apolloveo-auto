@@ -4,14 +4,16 @@
 
 VeoBase01 freezes the ApolloVeo state model into four explicit layers. The same model applies to Hot Follow first and must be reused for later production lines only after the Hot Follow baseline remains stable.
 
-## L1: Pipeline Step Status
+## L1: `pipeline_step_status`
 
 L1 records operational step status.
 
 Examples:
 
+- `parse_status`
 - `subtitles_status`
 - `dub_status`
+- `pack_status`
 - `compose_status`
 - `publish_status`
 - `last_step`
@@ -28,18 +30,33 @@ Not owners:
 - presenters
 - workers writing directly to repository truth
 
-## L2: Artifact Facts
+Forbidden:
+
+- target subtitle currentness
+- dub currentness
+- final freshness
+- compose/publish readiness
+- operator recommendations
+
+## L2: `artifact_facts`
 
 L2 records accepted physical artifact truth.
 
 Examples:
 
+- `final_exists`
+- `subtitle_exists`
+- `audio_exists`
+- `pack_exists`
 - raw video key/path
 - origin/source subtitle key
 - target subtitle key such as `vi.srt`
 - audio key such as `audio_vi.mp3`
 - final video key/path/url
 - object existence and object metadata
+- compose input facts
+- audio lane facts
+- helper translate fact flags
 
 Owners:
 
@@ -52,7 +69,13 @@ Not owners:
 - ready gate
 - skills
 
-## L3: Current Attempt / Runtime Resolution
+Forbidden:
+
+- marking an artifact current without currentness evaluation
+- deciding compose/publish readiness
+- rewriting L1 step status
+
+## L3: `current_attempt`
 
 L3 derives whether current outputs are fresh for current authoritative inputs.
 
@@ -61,9 +84,12 @@ Examples:
 - `target_subtitle_current`
 - `dub_current`
 - `audio_ready`
+- `compose_status`
+- `compose_reason`
 - `final_fresh`
 - `requires_redub`
 - `requires_recompose`
+- `current_subtitle_source`
 - selected compose route
 - stale reason fields
 
@@ -77,7 +103,13 @@ Rule:
 
 L3 can be cached for compatibility but must remain derivable from L1/L2 and input snapshots.
 
-## L4: Ready Gate / Presenter / Advisory
+Forbidden:
+
+- writing accepted artifact truth
+- replacing target subtitle truth
+- creating operator-facing guidance directly
+
+## L4: `ready_gate` / `operator_summary` / `advisory` / presentation
 
 L4 is derived readiness and presentation.
 
@@ -100,6 +132,13 @@ Owners:
 Rule:
 
 L4 must not write L1/L2/L3 truth.
+
+Forbidden:
+
+- treating display labels as business truth
+- overriding L2 artifact facts
+- overriding L3 current attempt resolution
+- clearing or writing helper, subtitle, dub, compose, or final truth
 
 ## Cross-Layer Rules
 

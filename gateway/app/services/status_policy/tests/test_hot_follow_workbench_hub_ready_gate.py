@@ -21,6 +21,7 @@ except Exception:
 from gateway.app.deps import get_task_repository
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.services.contracts.hot_follow_workbench import HotFollowWorkbenchResponse
 from gateway.app.services.compose_helpers import task_compose_lock
 from gateway.app.services.compose_service import ComposeResult
 from gateway.app.utils.pipeline_config import parse_pipeline_config
@@ -109,6 +110,7 @@ def test_hot_follow_workbench_ready_gate_backfills_compose_when_current_final_is
 
     assert data.get("ready_gate", {}).get("compose_ready") is True
     assert data.get("ready_gate", {}).get("publish_ready") is True
+    HotFollowWorkbenchResponse.model_validate(data)
     assert (data.get("line") or {}).get("line_id") == "hot_follow_line"
     assert ((data.get("line") or {}).get("hook_refs") or {}).get("status_policy_ref") == "gateway/app/services/status_policy/hot_follow_state.py"
     assert data.get("composed_ready") is True

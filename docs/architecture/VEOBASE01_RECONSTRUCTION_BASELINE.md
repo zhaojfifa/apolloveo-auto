@@ -75,6 +75,12 @@ P0:
 - status ownership matrix
 - line contract runtime consumption path
 
+PR-2 freezes the first executable typed workbench response model:
+
+- `gateway/app/services/contracts/hot_follow_workbench.py`
+
+The model is Hot Follow-first. It validates the current wire payload without renaming fields so the existing business path and UI contract remain stable.
+
 P1:
 
 - service extraction for router burden reduction
