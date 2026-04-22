@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import logging
 from typing import Any, Callable
 
+from fastapi import HTTPException
+
 from gateway.app.services.hot_follow_runtime_bridge import (
     compat_collect_hot_follow_workbench_ui,
     compat_hot_follow_operational_defaults,
@@ -18,8 +20,12 @@ def _as_dict(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _task_identifier(task: dict[str, Any], fallback_task_id: str) -> str:
+    return str(task.get("task_id") or task.get("id") or fallback_task_id)
+
+
 def _hot_follow_board_base_state(task: dict[str, Any]) -> dict[str, Any]:
-    task_id = str(task.get("task_id") or task.get("id") or "")
+    task_id = _task_identifier(task, "")
     final_url = task.get("final_url") or task.get("final_video_url")
     final_key = task.get("final_video_key") or task.get("final_video_path")
     compose_status = task.get("compose_status")
@@ -464,3 +470,63 @@ def build_task_status_payload(
         "provider": shape.get("provider"),
     }
     return payload, log_extra
+
+
+def build_task_publish_hub(
+    task_id: str,
+    repo,
+    *,
+    hot_follow_publish_hub_builder: Callable[..., dict[str, Any]],
+    fallback_publish_payload_builder: Callable[[dict[str, Any]], dict[str, Any]],
+) -> dict[str, Any]:
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    kind_value = str(task.get("kind") or task.get("category_key") or task.get("platform") or "").strip().lower()
+    if kind_value == "hot_follow":
+        return hot_follow_publish_hub_builder(task_id, repo=repo)
+    return fallback_publish_payload_builder(task)
+
+
+def build_v1_task_status_payload(
+    task_id: str,
+    repo,
+    *,
+    task_key: Callable[[dict[str, Any], str], str | None],
+    object_exists: Callable[[str], bool],
+) -> dict[str, Any]:
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    raw_key = task_key(task, "raw_path")
+    origin_key = task_key(task, "origin_srt_path")
+    mm_key = task_key(task, "mm_srt_path")
+    mm_txt_key = None
+    if mm_key and mm_key.endswith(".srt"):
+        mm_txt_key = f"{mm_key[:-4]}.txt"
+    audio_key = task_key(task, "mm_audio_key") or task_key(task, "mm_audio_path")
+    pack_key = task_key(task, "pack_key") or task_key(task, "pack_path")
+    scenes_key = task_key(task, "scenes_pack_key") or task_key(task, "scenes_key")
+
+    return {
+        "task_id": _task_identifier(task, task_id),
+        "status": task.get("status"),
+        "last_step": task.get("last_step"),
+        "subtitles_status": task.get("subtitles_status"),
+        "subtitles_error": task.get("subtitles_error"),
+        "dub_status": task.get("dub_status"),
+        "dub_error": task.get("dub_error"),
+        "pack_status": task.get("pack_status"),
+        "pack_error": task.get("pack_error"),
+        "scenes_status": task.get("scenes_status"),
+        "scenes_error": task.get("scenes_error"),
+        "raw_exists": bool(raw_key and object_exists(raw_key)),
+        "origin_srt_exists": bool(origin_key and object_exists(origin_key)),
+        "mm_srt_exists": bool(mm_key and object_exists(mm_key)),
+        "mm_txt_exists": bool(mm_txt_key and object_exists(mm_txt_key)),
+        "mm_audio_exists": bool(audio_key and object_exists(audio_key)),
+        "pack_exists": bool(pack_key and object_exists(pack_key)),
+        "scenes_exists": bool(scenes_key and object_exists(scenes_key)),
+    }

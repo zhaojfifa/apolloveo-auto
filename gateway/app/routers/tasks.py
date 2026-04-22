@@ -75,11 +75,6 @@ from gateway.app.services.tts_policy import (
     public_target_lang,
     resolve_tts_voice,
 )
-from gateway.app.services.hot_follow_language_profiles import (
-    hot_follow_audio_filename,
-    hot_follow_subtitle_filename,
-    hot_follow_subtitle_txt_filename,
-)
 from gateway.app.services.dub_text_guard import clean_and_analyze_dub_text
 from gateway.app.steps.subtitles import _parse_srt_to_segments, segments_to_srt
 from gateway.app.providers.gemini_subtitles import GeminiSubtitlesError, translate_segments_with_gemini
@@ -155,7 +150,6 @@ def coerce_datetime_or_epoch(v: Any) -> datetime:
 from gateway.app.services.artifact_storage import (
     upload_task_artifact,
     get_download_url,
-    get_object_bytes,
     object_head,
     object_exists,
     stream_object_range,
@@ -243,8 +237,10 @@ from gateway.app.services.task_view_helpers import (  # noqa: E402
     task_value as _task_value,
 )
 from gateway.app.services.task_router_presenters import (  # noqa: E402
+    build_task_publish_hub as _build_task_publish_hub,
     build_task_summaries_page as _build_task_summaries_page,
     build_task_status_payload as _build_task_status_payload,
+    build_v1_task_status_payload as _build_v1_task_status_payload,
     build_task_workbench_page_context as _build_task_workbench_page_context,
     build_tasks_page_rows as _build_tasks_page_rows,
     build_task_workbench_task_json as _build_task_workbench_task_json,
@@ -278,6 +274,12 @@ from gateway.app.services.artifact_helpers import (  # noqa: E402
     upload_target_subtitle_artifacts as _artifact_upload_target_subtitle_artifacts,
     pack_path_for_list as _artifact_pack_path_for_list,
 )
+from gateway.app.services.task_download_views import (  # noqa: E402
+    build_deliverable_download_redirect as _build_deliverable_download_redirect,
+    build_not_ready_response as _build_not_ready_response,
+    require_storage_key as _require_storage_key,
+    text_or_redirect as _text_or_redirect,
+)
 from gateway.app.services.hot_follow_runtime_bridge import (  # noqa: E402
     compat_allow_subtitle_only_compose as _compat_allow_subtitle_only_compose,
     compat_hot_follow_compose_runtime as _compat_hot_follow_compose_runtime,
@@ -294,6 +296,9 @@ from gateway.app.services.compose_service import (  # noqa: E402
     CompositionService,
     HotFollowComposeRequestContract,
     HotFollowComposeResponseContract,
+)
+from gateway.app.services.task_view import (  # noqa: E402
+    build_hot_follow_publish_hub as _build_hot_follow_publish_hub,
 )
 
 
@@ -614,7 +619,7 @@ def download_mm_subs(
         raise HTTPException(status_code=404, detail="burmese subtitles not found")
     key = _task_key(task, "mm_srt_path")
     if not key or not object_exists(key):
-        return _not_ready_response(task, "subs_mm", ["mm_srt_path"])
+        return _build_not_ready_response(task, "subs_mm", ["mm_srt_path"])
     return _text_or_redirect(key, inline=inline)
 
 
@@ -629,10 +634,10 @@ def download_mm_txt(
         raise HTTPException(status_code=404, detail="mm txt not found")
     mm_key = _task_key(task, "mm_srt_path")
     if not mm_key or not object_exists(mm_key):
-        return _not_ready_response(task, "mm_txt", ["mm_srt_path"])
+        return _build_not_ready_response(task, "mm_txt", ["mm_srt_path"])
     txt_key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
     if not object_exists(txt_key):
-        return _not_ready_response(task, "mm_txt", ["mm_txt_path"])
+        return _build_not_ready_response(task, "mm_txt", ["mm_txt_path"])
     return _text_or_redirect(txt_key, inline=inline)
 
 
@@ -939,7 +944,7 @@ def download_pack(task_id: str, repo=Depends(get_task_repository)):
         )
         if repair_key and object_exists(str(repair_key)):
             return RedirectResponse(url=get_download_url(str(repair_key)), status_code=302)
-        return _not_ready_response(
+        return _build_not_ready_response(
             fresh,
             "pack",
             ["pack_key"],
@@ -948,7 +953,7 @@ def download_pack(task_id: str, repo=Depends(get_task_repository)):
             extra={"repair_attempted": True},
         )
 
-    return _not_ready_response(task, "pack", ["pack_key"])
+    return _build_not_ready_response(task, "pack", ["pack_key"])
 
 
 @pages_router.get("/v1/tasks/{task_id}/scenes")
@@ -959,11 +964,11 @@ def download_scenes(task_id: str, repo=Depends(get_task_repository)):
     scenes_key = _task_value(task, "scenes_pack_key") or _task_value(task, "scenes_key")
     scenes_status = str(_task_value(task, "scenes_pack_status") or _task_value(task, "scenes_status") or "").lower()
     if scenes_status == "skipped":
-        return _not_ready_response(task, "scenes", ["scenes_skipped"], reason="not_applicable")
+        return _build_not_ready_response(task, "scenes", ["scenes_skipped"], reason="not_applicable")
     if scenes_status == "failed":
-        return _not_ready_response(task, "scenes", ["scenes_failed"], reason="failed")
+        return _build_not_ready_response(task, "scenes", ["scenes_failed"], reason="failed")
     if not scenes_key or not object_exists(str(scenes_key)):
-        return _not_ready_response(task, "scenes", ["scenes_key"])
+        return _build_not_ready_response(task, "scenes", ["scenes_key"])
     return RedirectResponse(url=get_download_url(str(scenes_key)), status_code=302)
 
 
@@ -993,7 +998,7 @@ def download_publish_bundle(task_id: str, repo=Depends(get_task_repository)):
         if not scenes_key or not object_exists(str(scenes_key)):
             missing.append("scenes_key")
     if missing:
-        return _not_ready_response(task, "publish_bundle", missing)
+        return _build_not_ready_response(task, "publish_bundle", missing)
     pack_local = Path(tmpdir.name) / "pack.zip"
     scenes_local = Path(tmpdir.name) / "scenes.zip"
 
@@ -1035,48 +1040,22 @@ def download_publish_bundle(task_id: str, repo=Depends(get_task_repository)):
 
 @pages_router.get("/v1/tasks/{task_id}/publish_hub")
 def v1_task_publish_hub(task_id: str, repo=Depends(get_task_repository)):
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return _publish_hub_payload(task)
+    return _build_task_publish_hub(
+        task_id,
+        repo,
+        hot_follow_publish_hub_builder=_build_hot_follow_publish_hub,
+        fallback_publish_payload_builder=_publish_hub_payload,
+    )
 
 
 @pages_router.get("/v1/tasks/{task_id}/status")
 def task_status(task_id: str, repo=Depends(get_task_repository)):
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    raw_key = _task_key(task, "raw_path")
-    origin_key = _task_key(task, "origin_srt_path")
-    mm_key = _task_key(task, "mm_srt_path")
-    mm_txt_key = None
-    if mm_key and mm_key.endswith(".srt"):
-        mm_txt_key = f"{mm_key[:-4]}.txt"
-    audio_key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-    pack_key = _task_key(task, "pack_key") or _task_key(task, "pack_path")
-    scenes_key = _task_key(task, "scenes_pack_key") or _task_key(task, "scenes_key")
-
-    return {
-        "task_id": str(_task_value(task, "task_id") or _task_value(task, "id") or task_id),
-        "status": _task_value(task, "status"),
-        "last_step": _task_value(task, "last_step"),
-        "subtitles_status": _task_value(task, "subtitles_status"),
-        "subtitles_error": _task_value(task, "subtitles_error"),
-        "dub_status": _task_value(task, "dub_status"),
-        "dub_error": _task_value(task, "dub_error"),
-        "pack_status": _task_value(task, "pack_status"),
-        "pack_error": _task_value(task, "pack_error"),
-        "scenes_status": _task_value(task, "scenes_status"),
-        "scenes_error": _task_value(task, "scenes_error"),
-        "raw_exists": bool(raw_key and object_exists(raw_key)),
-        "origin_srt_exists": bool(origin_key and object_exists(origin_key)),
-        "mm_srt_exists": bool(mm_key and object_exists(mm_key)),
-        "mm_txt_exists": bool(mm_txt_key and object_exists(mm_txt_key)),
-        "mm_audio_exists": bool(audio_key and object_exists(audio_key)),
-        "pack_exists": bool(pack_key and object_exists(pack_key)),
-        "scenes_exists": bool(scenes_key and object_exists(scenes_key)),
-    }
+    return _build_v1_task_status_payload(
+        task_id,
+        repo,
+        task_key=_task_key,
+        object_exists=object_exists,
+    )
 
 
 
@@ -1168,112 +1147,6 @@ def _op_verify(task_id: str, kind: str, exp: int, sig: str) -> bool:
 
 
 # derive_status: moved to services/task_view_helpers.py (Phase 1.3)
-
-
-def _require_storage_key(task: dict, field: str, not_found: str) -> str:
-    key = _task_key(task, field)
-    if not key or not object_exists(key):
-        raise HTTPException(status_code=404, detail=not_found)
-    return key
-
-
-def _not_ready_response(
-    task: dict,
-    artifact: str,
-    missing: list[str],
-    *,
-    reason: str = "not_ready",
-    status_code: int = 409,
-    extra: dict | None = None,
-) -> JSONResponse:
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "ok": False,
-            "reason": reason,
-            "task_id": str(_task_value(task, "task_id") or _task_value(task, "id") or ""),
-            "artifact": artifact,
-            "missing": missing,
-            "status": {
-                "subtitles": _task_value(task, "subtitles_status"),
-                "dub": _task_value(task, "dub_status"),
-                "scenes": _task_value(task, "scenes_status"),
-                "pack": _task_value(task, "pack_status"),
-                "publish": _task_value(task, "publish_status"),
-            },
-            "hint": "Call generate or wait for pipeline to finish.",
-            **(extra or {}),
-        },
-    )
-
-
-def _text_or_redirect(key: str, inline: bool) -> Response:
-    if inline:
-        data = get_object_bytes(key)
-        if data is None:
-            raise HTTPException(status_code=404, detail="artifact not found")
-        return Response(content=data, media_type="text/plain; charset=utf-8")
-    return RedirectResponse(url=get_download_url(key), status_code=302)
-
-
-def _deliverable_download_redirect(task_id: str, task: dict, kind: str) -> RedirectResponse:
-    target_lang = task.get("target_lang") or task.get("content_lang") or "mm"
-    key = None
-    filename = None
-    content_type = None
-
-    if kind == "raw":
-        key = _task_key(task, "raw_path")
-        filename = "raw.mp4"
-        content_type = "video/mp4"
-    elif kind == "pack":
-        key = _task_value(task, "pack_key") or _task_value(task, "pack_path")
-        filename = "pack.zip"
-        content_type = "application/zip"
-    elif kind == "scenes":
-        key = _task_value(task, "scenes_pack_key") or _task_value(task, "scenes_key")
-        filename = "scenes.zip"
-        content_type = "application/zip"
-    elif kind == "final_mp4":
-        key = _task_key(task, "final_video_key") or _task_key(task, "final_video_path")
-        filename = "final.mp4"
-        content_type = "video/mp4"
-    elif kind == "origin_srt":
-        key = _task_key(task, "origin_srt_path")
-        filename = "origin.srt"
-        content_type = "application/x-subrip"
-    elif kind == "mm_srt":
-        key = _task_key(task, "mm_srt_path")
-        filename = hot_follow_subtitle_filename(target_lang)
-        content_type = "application/x-subrip"
-    elif kind == "mm_txt":
-        mm_key = _task_key(task, "mm_srt_path")
-        if mm_key:
-            key = mm_key[:-4] + ".txt" if mm_key.endswith(".srt") else f"{mm_key}.txt"
-        filename = hot_follow_subtitle_txt_filename(target_lang)
-        content_type = "text/plain"
-    elif kind == "mm_audio":
-        if str(task.get("kind") or "").strip().lower() == "hot_follow":
-            asset = _hf_current_voiceover_asset(task_id, task, get_settings())
-            key = str(asset.get("key") or "").strip() or None
-        else:
-            key = _task_key(task, "mm_audio_key") or _task_key(task, "mm_audio_path")
-        filename = hot_follow_audio_filename(target_lang)
-        content_type = "audio/mpeg"
-    elif kind == "publish_bundle":
-        return RedirectResponse(url=_task_endpoint(task_id, "publish_bundle"), status_code=302)
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported kind")
-
-    if not key or not object_exists(str(key)):
-        raise HTTPException(status_code=404, detail="Deliverable not found")
-    url = get_download_url(
-        str(key),
-        disposition="attachment",
-        filename=filename,
-        content_type=content_type,
-    )
-    return RedirectResponse(url=url, status_code=302)
 
 
 def _ensure_mp3_audio(src_path: Path, dst_path: Path) -> Path:
@@ -1814,7 +1687,7 @@ def op_download_proxy(
     task = repo.get(task_id)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
-    return _deliverable_download_redirect(task_id, task, kind)
+    return _build_deliverable_download_redirect(task_id, task, kind)
 
 
 @pages_router.get("/d/{code}")
@@ -2225,10 +2098,12 @@ def get_publish_hub(
 ):
     if not _op_key_valid_value(op_key):
         raise HTTPException(status_code=401, detail="OP key required")
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    return _publish_hub_payload(task)
+    return _build_task_publish_hub(
+        task_id,
+        repo,
+        hot_follow_publish_hub_builder=_build_hot_follow_publish_hub,
+        fallback_publish_payload_builder=_publish_hub_payload,
+    )
 
 
 def _execute_compose_task_contract(

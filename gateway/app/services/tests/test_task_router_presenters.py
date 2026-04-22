@@ -6,10 +6,12 @@ import pytest
 
 import gateway.app.services.task_router_presenters as presenters
 from gateway.app.services.task_router_presenters import (
+    build_task_publish_hub,
     build_task_summaries_page,
     build_task_workbench_page_context,
     build_tasks_page_rows,
     build_task_status_payload,
+    build_v1_task_status_payload,
     build_task_workbench_task_json,
     build_task_workbench_view,
     filter_tasks_for_kind,
@@ -33,6 +35,15 @@ class _Detail:
 
     def dict(self):
         return dict(self.__dict__)
+
+
+class _Repo:
+    def __init__(self, rows=None):
+        self._rows = dict(rows or {})
+
+    def get(self, task_id):
+        row = self._rows.get(task_id)
+        return dict(row) if isinstance(row, dict) else row
 
 
 def _make_detail() -> _Detail:
@@ -130,6 +141,92 @@ def test_build_task_status_payload_uses_compat_shape_by_default(monkeypatch):
     assert log_extra["step"] == "dub"
     assert log_extra["phase"] == "ready"
     assert log_extra["provider"] == "azure-speech"
+
+
+def test_build_task_publish_hub_dispatches_hot_follow_to_service_builder():
+    repo = _Repo(
+        {
+            "hf-1": {
+                "task_id": "hf-1",
+                "kind": "hot_follow",
+            }
+        }
+    )
+
+    payload = build_task_publish_hub(
+        "hf-1",
+        repo,
+        hot_follow_publish_hub_builder=lambda task_id, repo=None: {"task_id": task_id, "surface": "service"},
+        fallback_publish_payload_builder=lambda _task: {"surface": "fallback"},
+    )
+
+    assert payload == {"task_id": "hf-1", "surface": "service"}
+
+
+def test_build_task_publish_hub_keeps_fallback_builder_for_non_hot_follow():
+    repo = _Repo(
+        {
+            "task-1": {
+                "task_id": "task-1",
+                "kind": "generic",
+                "status": "processing",
+            }
+        }
+    )
+
+    payload = build_task_publish_hub(
+        "task-1",
+        repo,
+        hot_follow_publish_hub_builder=lambda *_args, **_kwargs: {"surface": "service"},
+        fallback_publish_payload_builder=lambda task: {"task_id": task["task_id"], "surface": "fallback"},
+    )
+
+    assert payload == {"task_id": "task-1", "surface": "fallback"}
+
+
+def test_build_v1_task_status_payload_keeps_storage_existence_shape():
+    repo = _Repo(
+        {
+            "hf-1": {
+                "task_id": "hf-1",
+                "status": "processing",
+                "last_step": "subtitles",
+                "subtitles_status": "done",
+                "dub_status": "pending",
+                "pack_status": "pending",
+                "scenes_status": "pending",
+                "raw_path": "deliver/tasks/hf-1/raw.mp4",
+                "origin_srt_path": "deliver/tasks/hf-1/origin.srt",
+                "mm_srt_path": "deliver/tasks/hf-1/mm.srt",
+                "mm_audio_key": "deliver/tasks/hf-1/audio.mp3",
+                "pack_key": "deliver/tasks/hf-1/pack.zip",
+            }
+        }
+    )
+
+    existing = {
+        "deliver/tasks/hf-1/raw.mp4",
+        "deliver/tasks/hf-1/origin.srt",
+        "deliver/tasks/hf-1/mm.srt",
+        "deliver/tasks/hf-1/mm.txt",
+        "deliver/tasks/hf-1/audio.mp3",
+        "deliver/tasks/hf-1/pack.zip",
+    }
+    payload = build_v1_task_status_payload(
+        "hf-1",
+        repo,
+        task_key=lambda task, field: task.get(field),
+        object_exists=lambda key: key in existing,
+    )
+
+    assert payload["task_id"] == "hf-1"
+    assert payload["raw_exists"] is True
+    assert payload["origin_srt_exists"] is True
+    assert payload["mm_srt_exists"] is True
+    assert payload["mm_txt_exists"] is True
+    assert payload["mm_audio_exists"] is True
+    assert payload["pack_exists"] is True
+    assert payload["scenes_exists"] is False
 
 
 def test_build_task_workbench_view_uses_first_source_url():
