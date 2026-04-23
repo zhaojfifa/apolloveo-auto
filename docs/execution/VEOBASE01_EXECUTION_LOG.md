@@ -1560,3 +1560,67 @@ Acceptance:
 - Gate 3 downstream classification honesty: repaired for the selected subset
 - `VeoBase01` is usable as the repair base for the next subtitle-authority
   tightening round
+
+## 2026-04-23 - VEOBASE01 Subtitle Authority Review
+
+Branch:
+
+- `VeoBase01-subtitle-authority-repair`
+
+Head reviewed:
+
+- `bc75f8ae8b74146bef113f16b8593d75eb7d7f59`
+
+Pass type:
+
+- review-only
+
+Authority set checked:
+
+- `README.md`
+- `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/README.md`
+- `docs/ENGINEERING_INDEX.md`
+- `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+- `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+- `docs/contracts/four_layer_state_contract.md`
+- `docs/contracts/status_ownership_matrix.md`
+- `docs/contracts/workbench_hub_response.contract.md`
+- `docs/contracts/hot_follow_ready_gate.yaml`
+- `docs/contracts/hot_follow_projection_rules_v1.md`
+- `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- `docs/architecture/line_contracts/hot_follow_line.yaml`
+- `docs/contracts/engineering_reading_contract_v1.md`
+
+Evidence availability:
+
+- requested real-task ids `6b40d86589da`, `944e2e8e6f0d`, `91990da2b72f`,
+  `796bf811a43b` were not present in the local repo/workspace or local
+  `shortvideo.db`
+- review therefore used authority docs, implementation trace, the existing
+  repair note, and the user-provided bad-shape/repair-lessons summary
+
+Review judgment:
+
+- the repeated subtitle-authority collapse is primarily a contract problem
+- the root failure class is a combination of:
+  - split authoritative target-subtitle write ownership
+  - helper side-channel leakage into subtitle-step success truth
+  - semantic-empty subtitle acceptance on the subtitles-step path
+  - downstream L4 masking after upstream truth is already inconsistent
+
+Primary ownership leak found:
+
+- `run_subtitles_step()` can persist `subtitles_status=\"ready\"` even when the
+  target subtitle is non-authoritative or absent from the canonical target
+  subtitle artifact path
+
+Required next pass:
+
+- `VeoBase01-subtitle-authority-contract-correction`
+
+Validation:
+
+- authority path existence check: passed
+- `git diff --check`: passed
+- runtime/code changes: none in this review pass
