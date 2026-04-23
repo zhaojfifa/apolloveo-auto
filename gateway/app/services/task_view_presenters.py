@@ -12,6 +12,11 @@ from typing import Any
 
 from gateway.app.config import get_settings
 from gateway.app.services.artifact_storage import object_exists
+from gateway.app.services.contract_runtime import (
+    apply_projection_runtime,
+    get_contract_runtime_refs,
+    get_projection_rules_runtime,
+)
 from gateway.app.services.hot_follow_skills_advisory import (
     maybe_build_hot_follow_advisory,
 )
@@ -551,17 +556,6 @@ def _build_hot_follow_authoritative_state(
     return task, projection, state_computer(task_runtime, payload)
 
 
-def _publish_hub_scene_pack_pending_reason(scene_pack: dict[str, Any]) -> str | None:
-    if bool(scene_pack.get("exists")):
-        return None
-    status = str(scene_pack.get("status") or "").strip().lower()
-    if status == "running":
-        return "scenes.running"
-    if status == "failed":
-        return "scenes.failed"
-    return "scenes.not_ready"
-
-
 def _publish_hub_deliverables(
     task_id: str,
     task: dict[str, Any],
@@ -610,6 +604,19 @@ def _publish_hub_deliverables(
     return deliverables
 
 
+def _apply_hot_follow_projection_runtime(
+    task: dict[str, Any],
+    payload: dict[str, Any],
+    *,
+    surface: str,
+) -> dict[str, Any]:
+    refs = get_contract_runtime_refs(task)
+    if not refs.projection_rules_ref:
+        return dict(payload)
+    runtime = get_projection_rules_runtime(refs.projection_rules_ref)
+    return apply_projection_runtime(dict(payload), surface=surface, projection_runtime=runtime)
+
+
 def _build_hot_follow_publish_surface_payload(
     task_id: str,
     task: dict[str, Any],
@@ -655,7 +662,7 @@ def _build_hot_follow_publish_surface_payload(
         "final_fresh": bool(authoritative_state.get("final_fresh")),
         "final_stale_reason": authoritative_state.get("final_stale_reason"),
         "scene_pack": scene_pack,
-        "scene_pack_pending_reason": _publish_hub_scene_pack_pending_reason(scene_pack),
+        "scene_pack_pending_reason": authoritative_state.get("scene_pack_pending_reason"),
         "scene_pack_action_url": f"/tasks/{task_id}",
         "copy_bundle": copy_bundle_builder(task),
         "download_code": short_code,
@@ -753,6 +760,11 @@ def build_hot_follow_publish_hub(
             state_computer=state_computer,
             projection_builder=projection_builder,
         )
+    authoritative_state = _apply_hot_follow_projection_runtime(
+        task,
+        authoritative_state,
+        surface="publish",
+    )
     payload = publish_surface_builder(
         task_id,
         task,
@@ -838,6 +850,7 @@ def build_hot_follow_workbench_hub(
             resolve_final_url_loader=resolve_final_url_loader,
             state_computer=state_computer,
         )
+    payload = _apply_hot_follow_projection_runtime(task, payload, surface="workbench")
     apply_ready_gate_compose_projection(payload)
     attach_task_aliases(payload, task, task_id)
     payload["line"] = line_binding_loader(task).to_payload()

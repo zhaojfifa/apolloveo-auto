@@ -14,6 +14,7 @@ def test_hot_follow_line_binding_exposes_runtime_contract_metadata():
     assert payload["input_contract_ref"] == "docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md"
     assert payload["worker_profile_ref"] == "docs/contracts/worker_gateway_runtime_contract.md"
     assert payload["ready_gate_ref"] == "docs/contracts/hot_follow_ready_gate.yaml"
+    assert payload["projection_rules_ref"] == "docs/contracts/hot_follow_projection_rules_v1.md"
     assert payload["status_policy_ref"] == "gateway/app/services/status_policy/hot_follow_state.py"
     assert payload["confirmation_policy"] == {
         "before_execute": False,

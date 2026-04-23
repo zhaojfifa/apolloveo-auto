@@ -26,6 +26,11 @@ from gateway.app.services.artifact_storage import (
     object_exists,
     object_head,
 )
+from gateway.app.services.contract_runtime import (
+    get_blocking_reason_runtime,
+    get_contract_runtime_refs,
+    scene_pack_pending_reason as runtime_scene_pack_pending_reason,
+)
 from gateway.app.services.media_validation import (
     MIN_AUDIO_BYTES,
     MIN_VIDEO_BYTES,
@@ -860,8 +865,15 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
                 )
             deliverables[key] = item
     scene_pack_pending_reason = None
+    refs = get_contract_runtime_refs(task)
     if not bool(scene_pack.get("exists")):
-        if scene_pack.get("status") == "running":
+        if refs.projection_rules_ref:
+            blocking_runtime = get_blocking_reason_runtime(refs.projection_rules_ref)
+            scene_pack_pending_reason = runtime_scene_pack_pending_reason(
+                scene_pack.get("status"),
+                blocking_runtime,
+            )
+        elif scene_pack.get("status") == "running":
             scene_pack_pending_reason = "scenes.running"
         elif scene_pack.get("status") == "failed":
             scene_pack_pending_reason = "scenes.failed"

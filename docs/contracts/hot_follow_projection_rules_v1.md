@@ -120,21 +120,84 @@ workbench_surface_rule_contract:
     - override final/audio/subtitle truth from compatibility fallback aliases
 ```
 
+## Projection Dominance Contract
+
+```yaml
+projection_dominance_contract:
+  final_exists_plus_current_attempt_ready_dominates_publish_truth: true
+  scene_pack_pending_non_blocking_when_publish_ready: true
+  compatibility_fields_cannot_override_authoritative_truth: true
+```
+
 ## Blocking-Reason Mapping Contract
 
 ```yaml
 blocking_reason_mapping_contract:
   source: ready_gate.blocking
   maps:
-    compose_input_derive_failed: terminal compose input failure
-    compose_input_blocked: route/input blocked
-    compose_not_done: compose not yet complete
-    audio_not_ready: current audio lane not ready
-    subtitle_missing: target subtitle missing
+    missing_voiceover: voiceover_missing
+    voiceover_missing: voiceover_missing
+    audio_not_ready: audio_not_ready
+    audio_not_done: audio_not_done
+    compose_input_not_ready: compose_input_not_ready
+    compose_input_derive_failed: compose_input_derive_failed
+    compose_input_blocked: compose_input_blocked
+    compose_exec_failed: compose_exec_failed
+    compose_not_done: compose_not_done
+    subtitle_missing: subtitle_missing
+    subtitle_not_ready: subtitle_not_ready
+    final_stale: final_stale
+    scenes.running: scenes.running
+    scenes.failed: scenes.failed
+    scenes_not_ready: scenes.not_ready
+    scenes.not_ready: scenes.not_ready
+  aliases:
+    missing_voiceover: voiceover_missing
+    scenes_not_ready: scenes.not_ready
   non_blocking:
     scenes.running: advisory
     scenes.not_ready: advisory
+    scenes.failed: advisory
     helper_translate_failed_after_target_ready: advisory
+  metadata:
+    compose_not_done:
+      class: blocking
+      suppress_when_publish_ready: true
+    voiceover_missing:
+      class: blocking
+      suppress_when_publish_ready: true
+    audio_not_ready:
+      class: blocking
+      suppress_when_publish_ready: true
+    audio_not_done:
+      class: blocking
+      suppress_when_publish_ready: true
+    compose_input_not_ready:
+      class: blocking
+    compose_input_blocked:
+      class: blocking
+    compose_input_derive_failed:
+      class: blocking
+    compose_exec_failed:
+      class: blocking
+    final_stale:
+      class: blocking
+    subtitle_missing:
+      class: blocking
+    subtitle_not_ready:
+      class: blocking
+    scenes.running:
+      class: advisory
+      suppress_when_publish_ready: true
+    scenes.not_ready:
+      class: advisory
+      suppress_when_publish_ready: true
+    scenes.failed:
+      class: advisory
+      suppress_when_publish_ready: true
+    helper_translate_failed_after_target_ready:
+      class: advisory
+      suppress_when_publish_ready: true
 ```
 
 ## Rule Set
