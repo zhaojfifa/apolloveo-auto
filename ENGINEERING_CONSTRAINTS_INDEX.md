@@ -9,11 +9,17 @@ Root governance files remain the highest authority:
 3. `CURRENT_ENGINEERING_FOCUS.md`
 4. `ENGINEERING_STATUS.md`
 
-This file defines how engineering work must be done. It does not replace the docs-level business/runtime/contract navigation entry in `docs/ENGINEERING_INDEX.md`. Before any future PR slice, read both:
+This file defines how engineering work must be done. It does not replace the docs-level business/runtime/contract navigation entry in `docs/ENGINEERING_INDEX.md`. Before any future PR slice, use index-first reading:
 
+- `README.md`
 - `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/README.md`
 - `docs/ENGINEERING_INDEX.md`
 - `docs/contracts/engineering_reading_contract_v1.md`
+
+Then classify the task through the indexes and read only the minimum
+task-specific authority files selected for that task. Do not begin from a long
+flat raw authority list.
 
 Authority lists in these entry files must only name docs that actually exist,
 unless the entry explicitly says one file is replaced by another.
@@ -140,10 +146,14 @@ Execution logs are acceptable for run evidence. Permanent rules belong in root g
 
 ## Required Future Pre-Read
 
-From PR-4 onward, every engineering PR must begin by reading:
+Every engineering PR must begin with index-first reading:
 
-1. Root governance files.
+1. `README.md`.
 2. `ENGINEERING_CONSTRAINTS_INDEX.md`.
-3. `docs/ENGINEERING_INDEX.md`.
-4. `docs/contracts/engineering_reading_contract_v1.md`.
-5. Task-specific contracts, architecture docs, ADRs, and execution logs selected through `docs/ENGINEERING_INDEX.md` and the reading contract.
+3. `docs/README.md`.
+4. `docs/ENGINEERING_INDEX.md`.
+5. `docs/contracts/engineering_reading_contract_v1.md`.
+6. Minimum task-specific contracts, architecture docs, ADRs, and execution logs selected through the indexes.
+
+Do not read broad raw authority sets "just in case." Reading Declarations must
+record the selected minimum authority files and why they were sufficient.

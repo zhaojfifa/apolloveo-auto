@@ -1236,3 +1236,54 @@ Acceptance:
 - `task_view_presenters.py`, `task_view_helpers.py`, `tasks.py`, and
   `hot_follow_api.py` each lost a narrow piece of selected rule ownership
 - Hot Follow business behavior was intentionally preserved
+
+## Index-First Reading Discipline Correction
+
+Branch: `VeoBase01-index-first-reading-discipline`
+Base SHA: `2a825cdfd260850ef75700ea84f6315e878bf1a2`
+
+Why:
+
+- the prior reading contract still encouraged broad raw authority lists for
+  every engineering task
+- future contract-runtime work needs a repeatable index-first pattern:
+  root indexes, docs indexes, task classification, then minimum authority files
+
+Reading Declaration:
+
+1. Root indexes read first:
+   - `README.md`
+   - `ENGINEERING_CONSTRAINTS_INDEX.md`
+2. Docs indexes read second:
+   - `docs/README.md`
+   - `docs/ENGINEERING_INDEX.md`
+3. Minimum task-specific authority files selected from the indexes:
+   - `docs/contracts/engineering_reading_contract_v1.md`
+   - `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+4. Sufficiency note:
+   - This was documentation-governance work only. It did not touch runtime,
+     state, projection, ready-gate, line contract, or business behavior.
+5. Missing-authority handling:
+   - none
+
+Files changed:
+
+- `README.md`
+- `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/README.md`
+- `docs/ENGINEERING_INDEX.md`
+- `docs/contracts/engineering_reading_contract_v1.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- `docs/execution/VEOBASE01_INDEX_FIRST_READING_DISCIPLINE.md`
+
+Validation:
+
+- `git diff --check`: passed
+- `ls README.md ENGINEERING_CONSTRAINTS_INDEX.md docs/README.md docs/ENGINEERING_INDEX.md docs/contracts/engineering_reading_contract_v1.md docs/execution/VEOBASE01_EXECUTION_LOG.md docs/execution/VEOBASE01_INDEX_FIRST_READING_DISCIPLINE.md docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md docs/contracts/four_layer_state_contract.md docs/contracts/status_ownership_matrix.md docs/contracts/workbench_hub_response.contract.md docs/contracts/hot_follow_ready_gate.yaml docs/contracts/hot_follow_projection_rules_v1.md docs/contracts/production_line_runtime_assembly_rules_v1.md docs/architecture/line_contracts/hot_follow_line.yaml docs/execution/VEOBASE01_CODE_DEPOWERING_PLAN_V1.md docs/architecture/factory_four_layer_architecture_baseline_v1.md docs/contracts/contract_driven_four_layer_state_baseline_v1.md`: passed
+
+Acceptance:
+
+- active reading rules now require index-first routing
+- Reading Declaration shape now records root indexes, docs indexes, minimum
+  task-specific authorities, sufficiency, and missing-authority handling
+- no runtime behavior was intentionally changed

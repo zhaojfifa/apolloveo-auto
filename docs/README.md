@@ -49,39 +49,27 @@
 - `archive/`
   - 放置 superseded / legacy material，不作为当前 source-of-truth
 
-## Current Source-Of-Truth Reading Order
+## Current Source-Of-Truth Reading Discipline
 
-1. `ENGINEERING_RULES.md`
-2. `CURRENT_ENGINEERING_FOCUS.md`
-3. `docs/baseline/PROJECT_BASELINE_INDEX.md`
-4. `docs/baseline/PRODUCT_BASELINE.md`
-5. `docs/baseline/ARCHITECTURE_BASELINE.md`
-6. `docs/baseline/EXECUTION_BASELINE.md`
-7. `docs/contracts/hot_follow_line_contract.md`
-8. `docs/contracts/status_ownership_matrix.md`
-9. `docs/contracts/hot_follow_ready_gate.yaml`
-10. `docs/contracts/worker_gateway_contract.md`
-11. `docs/contracts/skills_runtime_contract.md`
-12. `docs/contracts/worker_gateway_runtime_contract.md`
-13. `docs/contracts/script_video_planning_contract.md`
-14. `docs/contracts/action_replica_planning_assets_contract.md`
-15. `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
-16. `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
-17. `docs/contracts/COMPOSE_SERVICE_CONTRACT.md`
-18. `docs/contracts/SKILLS_MVP_ADVISORY_CONTRACT.md`
-19. `docs/adr/ADR-task-router-decomposition.md`
-20. `docs/adr/ADR-phase2-skills-worker-planning.md`
-21. `docs/runbooks/hot_follow_sop.md`
-22. `docs/runbooks/phase2_execution_plan.md`
-23. `docs/runbooks/HOT_FOLLOW_BUSINESS_REGRESSION.md`
-24. `docs/runbooks/VERIFICATION_BASELINE.md`
-25. `docs/architecture/line_contracts/HOT_FOLLOW_GATE_BINDING_CONTRACT.md`
-26. `docs/execution/VEOSOP05_STAGE_CLOSURE.md`
-27. `docs/execution/HOT_FOLLOW_SKILLS_MVP_V0_CLOSURE.md`
-28. `docs/execution/SKILLS_MVP_ENTRY_REVIEW.md`
-29. `docs/execution/NEXT_HOT_FOLLOW_CLEANUP_SCOPE.md`
-30. `docs/execution/logs/VEOSOP05_PROGRESS_LOG.md`
-31. `docs/execution/logs/PHASE2_PROGRESS_LOG.md`
+Engineering work starts from indexes, not from a long raw document list.
+
+Read in this order:
+
+1. Root indexes:
+   - `README.md`
+   - `ENGINEERING_CONSTRAINTS_INDEX.md`
+2. Docs indexes:
+   - `docs/README.md`
+   - `docs/ENGINEERING_INDEX.md`
+3. Reading contract:
+   - `docs/contracts/engineering_reading_contract_v1.md`
+4. Minimum task-specific authority files selected through
+   `docs/ENGINEERING_INDEX.md`.
+
+The files in `docs/contracts/`, `docs/architecture/`, `docs/baseline/`,
+`docs/runbooks/`, `docs/adr/`, and `docs/execution/` are authority candidates
+selected by task class. They are not a single mandatory flat pre-read list for
+every task.
 
 ## Important Review References
 
