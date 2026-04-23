@@ -135,9 +135,11 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
     compute_hot_follow_target_subtitle_currentness,
     has_semantic_target_subtitle_text,
 )
+from gateway.app.services.hot_follow_subtitle_authority import (
+    persist_hot_follow_authoritative_target_subtitle,
+)
 from gateway.app.services.hot_follow_helper_translation import (
     helper_translate_failure_updates,
-    helper_translate_resolved_updates,
     helper_translate_success_updates,
     sanitize_helper_translate_error,
 )
@@ -386,53 +388,34 @@ def _hf_save_authoritative_target_subtitle(
     text_mode: str,
     repo,
 ) -> dict:
-    if not has_semantic_target_subtitle_text(text):
-        raise HTTPException(
-            status_code=422,
-            detail={
-                "reason": "target_subtitle_semantically_empty",
-                "message": "目标字幕内容为空或只有时间轴，未保存为权威目标字幕。请填写目标语言字幕正文后再保存。",
-            },
-        )
-    _subtitle_content_hash = _hf_subtitle_content_hash(text)
-    override_path = _hf_subtitles_override_path(task_id)
-    override_path.parent.mkdir(parents=True, exist_ok=True)
-    override_path.write_text(text, encoding="utf-8")
-    synced_mm_key = _hf_sync_saved_target_subtitle_artifact(task_id, task, text)
     target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
-    target_currentness = compute_hot_follow_target_subtitle_currentness(
+    return persist_hot_follow_authoritative_target_subtitle(
+        task_id,
+        task,
+        repo=repo,
+        text=text,
+        text_mode=text_mode,
         target_lang=target_lang,
-        target_text=text,
         source_texts=(
             _hf_load_normalized_source_text(task_id, task),
             _hf_load_origin_subtitles_text(task),
         ),
-        subtitle_artifact_exists=bool(synced_mm_key),
         expected_subtitle_source=_hf_expected_subtitle_filename(target_lang),
-        actual_subtitle_source=(Path(str(synced_mm_key)).name if synced_mm_key else None),
-        translation_incomplete=False,
-        has_saved_revision=bool(text.strip()),
+        persist_artifact_fn=lambda saved_text: _hf_sync_saved_target_subtitle_artifact(task_id, task, saved_text),
+        write_override_fn=lambda saved_text: _hf_subtitles_override_path(task_id).parent.mkdir(parents=True, exist_ok=True)
+        or _hf_subtitles_override_path(task_id).write_text(saved_text, encoding="utf-8"),
+        content_hash_fn=_hf_subtitle_content_hash,
+        extra_updates=_hf_empty_dub_recovery_updates(
+            task_id,
+            task,
+            text,
+            {
+                "target_subtitle_current": True,
+                "target_subtitle_current_reason": "ready",
+            },
+        ),
+        resolve_helper_state=bool(str(text or "").strip()),
     )
-    updates = {
-        "subtitles_status": "ready" if text else task.get("subtitles_status"),
-        "last_step": "subtitles" if text else task.get("last_step"),
-        "mm_srt_path": synced_mm_key or task.get("mm_srt_path"),
-        "subtitles_override_updated_at": datetime.now(timezone.utc).isoformat(),
-        "subtitles_override_mode": text_mode,
-        "subtitles_content_hash": _subtitle_content_hash,
-        "compose_status": "pending",
-        "compose_error": None,
-        "compose_error_reason": None,
-        "error_message": None,
-        "error_reason": None,
-        "target_subtitle_current": bool(target_currentness.get("target_subtitle_current")),
-        "target_subtitle_current_reason": target_currentness.get("target_subtitle_current_reason"),
-    }
-    if text:
-        updates.update(helper_translate_resolved_updates())
-    updates.update(_hf_empty_dub_recovery_updates(task_id, task, text, target_currentness))
-    _policy_upsert(repo, task_id, updates)
-    return repo.get(task_id) or task
 
 
 def _hf_authoritative_target_subtitle_current(task_id: str, task: dict) -> bool:

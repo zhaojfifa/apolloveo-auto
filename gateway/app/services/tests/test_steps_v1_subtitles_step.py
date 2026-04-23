@@ -28,6 +28,10 @@ class _FakeRepo:
     def get(self, _task_id: str) -> dict:
         return dict(self.task)
 
+    def upsert(self, _task_id: str, updates: dict) -> dict:
+        self.task.update(updates or {})
+        return dict(self.task)
+
 
 class _MutableFakeRepo(_FakeRepo):
     def update(self, _task_id: str, updates: dict) -> dict:
@@ -36,9 +40,9 @@ class _MutableFakeRepo(_FakeRepo):
 
 
 def test_run_subtitles_step_consumes_result_contract_for_myanmar(monkeypatch, tmp_path):
-    updates: list[dict] = []
     pipeline_updates: list[dict] = []
     generate_kwargs: list[dict] = []
+    repo = _FakeRepo()
 
     async def _generate_subtitles(**kwargs):
         generate_kwargs.append(dict(kwargs))
@@ -56,18 +60,18 @@ def test_run_subtitles_step_consumes_result_contract_for_myanmar(monkeypatch, tm
         lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
     )
     monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
-    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: updates.append(dict(kwargs)))
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
     monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda _task_id, payload: pipeline_updates.append(dict(payload)))
     monkeypatch.setattr(steps_v1, "_upload_artifact", lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}")
     monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
     monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
-    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: _FakeRepo())
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
 
     req = SubtitlesRequest(task_id="hf-mm-sub2", target_lang="my", force=True, translate=True)
     result = asyncio.run(steps_v1.run_subtitles_step(req))
 
     assert result["mm_srt"]
-    final_update = updates[-1]
+    final_update = repo.get(req.task_id)
     assert final_update["subtitles_status"] == "ready"
     assert final_update["subtitles_error"] is None
     assert final_update["target_subtitle_current"] is True
@@ -111,8 +115,8 @@ def test_clear_no_dub_pipeline_flags_removes_stale_skip_marker(monkeypatch, tmp_
 
 
 def test_run_subtitles_step_marks_vi_translation_incomplete_without_step_error(monkeypatch, tmp_path):
-    updates: list[dict] = []
     pipeline_updates: list[dict] = []
+    repo = _FakeRepo()
 
     async def _generate_subtitles(**kwargs):
         return _fake_generate_subtitles(
@@ -129,28 +133,28 @@ def test_run_subtitles_step_marks_vi_translation_incomplete_without_step_error(m
         lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
     )
     monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
-    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: updates.append(dict(kwargs)))
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
     monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda _task_id, payload: pipeline_updates.append(dict(payload)))
     monkeypatch.setattr(steps_v1, "_upload_artifact", lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}")
     monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
     monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
-    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: _FakeRepo())
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
 
     req = SubtitlesRequest(task_id="hf-vi-sub2", target_lang="vi", force=True, translate=True)
     result = asyncio.run(steps_v1.run_subtitles_step(req))
 
     assert result["translation_incomplete"] is True
-    final_update = updates[-1]
-    assert final_update["subtitles_status"] == "ready"
-    assert final_update["subtitles_error"] is None
+    final_update = repo.get(req.task_id)
+    assert final_update["subtitles_status"] == "failed"
+    assert "翻译未完成" in final_update["subtitles_error"]
     assert final_update["target_subtitle_current"] is False
     assert final_update["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
     assert pipeline_updates[-1]["translation_incomplete"] == "true"
 
 
 def test_run_subtitles_step_marks_myanmar_translation_incomplete_without_step_error(monkeypatch, tmp_path):
-    updates: list[dict] = []
     pipeline_updates: list[dict] = []
+    repo = _FakeRepo()
 
     async def _generate_subtitles(**kwargs):
         return _fake_generate_subtitles(
@@ -167,30 +171,35 @@ def test_run_subtitles_step_marks_myanmar_translation_incomplete_without_step_er
         lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
     )
     monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
-    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: updates.append(dict(kwargs)))
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
     monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda _task_id, payload: pipeline_updates.append(dict(payload)))
     monkeypatch.setattr(steps_v1, "_upload_artifact", lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}")
     monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
     monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
-    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: _FakeRepo())
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
 
     req = SubtitlesRequest(task_id="hf-mm-sub-incomplete", target_lang="my", force=True, translate=True)
     result = asyncio.run(steps_v1.run_subtitles_step(req))
 
     assert result["translation_incomplete"] is True
-    final_update = updates[-1]
-    assert final_update["subtitles_status"] == "ready"
-    assert final_update["subtitles_error"] is None
+    final_update = repo.get(req.task_id)
+    assert final_update["subtitles_status"] == "failed"
+    assert "翻译未完成" in final_update["subtitles_error"]
     assert final_update["target_subtitle_current"] is False
     assert final_update["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
     assert pipeline_updates[-1]["translation_incomplete"] == "true"
 
 
 def test_run_subtitles_step_treats_preserved_source_audio_as_helper_only(monkeypatch, tmp_path):
-    updates: list[dict] = []
     pipeline_updates: list[dict] = []
     uploaded_artifacts: list[str] = []
     generate_kwargs: list[dict] = []
+    repo = _FakeRepo(
+        {
+            "config": {"source_audio_policy": "preserve"},
+            "pipeline_config": {"source_audio_policy": "preserve"},
+        }
+    )
 
     async def _generate_subtitles(**kwargs):
         generate_kwargs.append(dict(kwargs))
@@ -208,7 +217,7 @@ def test_run_subtitles_step_treats_preserved_source_audio_as_helper_only(monkeyp
         lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
     )
     monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
-    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: updates.append(dict(kwargs)))
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
     monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda _task_id, payload: pipeline_updates.append(dict(payload)))
     monkeypatch.setattr(
         steps_v1,
@@ -218,16 +227,7 @@ def test_run_subtitles_step_treats_preserved_source_audio_as_helper_only(monkeyp
     )
     monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
     monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
-    monkeypatch.setattr(
-        steps_v1,
-        "get_task_repository",
-        lambda: _FakeRepo(
-            {
-                "config": {"source_audio_policy": "preserve"},
-                "pipeline_config": {"source_audio_policy": "preserve"},
-            }
-        ),
-    )
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
 
     req = SubtitlesRequest(task_id="hf-preserve-helper", target_lang="vi", force=True, translate=True)
     result = asyncio.run(steps_v1.run_subtitles_step(req))
@@ -237,11 +237,11 @@ def test_run_subtitles_step_treats_preserved_source_audio_as_helper_only(monkeyp
     assert "subs/origin.srt" in uploaded_artifacts
     assert "subs/vi.srt" not in uploaded_artifacts
 
-    final_update = updates[-1]
-    assert final_update["subtitles_status"] == "ready"
+    final_update = repo.get(req.task_id)
+    assert final_update["subtitles_status"] == "failed"
     assert final_update["mm_srt_path"] is None
     assert final_update["target_subtitle_current"] is False
-    assert final_update["target_subtitle_current_reason"] == "subtitle_missing"
+    assert final_update["target_subtitle_current_reason"] == "target_subtitle_not_authoritative"
 
     final_pipeline = pipeline_updates[-1]
     assert final_pipeline["parse_source_mode"] == "preserved_source_audio_helper"
@@ -249,6 +249,104 @@ def test_run_subtitles_step_treats_preserved_source_audio_as_helper_only(monkeyp
     assert final_pipeline["parse_source_authoritative_for_target"] == "false"
     assert final_pipeline["target_subtitle_authoritative"] == "false"
     assert final_pipeline["translation_incomplete"] == "true"
+
+
+def test_run_subtitles_step_delegates_authoritative_truth_to_service(monkeypatch, tmp_path):
+    repo = _FakeRepo()
+    finalize_calls: list[dict] = []
+
+    async def _generate_subtitles(**kwargs):
+        return _fake_generate_subtitles(
+            tmp_path,
+            kwargs["task_id"],
+            kwargs["target_lang"],
+            complete=True,
+            parse_source_mode=kwargs["parse_source_mode"],
+        )
+
+    def _finalize(task_id, task, **kwargs):
+        finalize_calls.append({"task_id": task_id, "task": dict(task), **kwargs})
+        repo.upsert(
+            task_id,
+            {
+                "subtitles_status": "ready",
+                "target_subtitle_current": True,
+                "target_subtitle_current_reason": "ready",
+            },
+        )
+        return repo.get(task_id)
+
+    monkeypatch.setattr(
+        steps_v1,
+        "Workspace",
+        lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
+    )
+    monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
+    monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(steps_v1, "_upload_artifact", lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}")
+    monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
+    monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+    monkeypatch.setattr(steps_v1, "finalize_hot_follow_subtitles_step", _finalize)
+
+    asyncio.run(steps_v1.run_subtitles_step(SubtitlesRequest(task_id="hf-subtitle-owner", target_lang="vi", force=True, translate=True)))
+
+    assert len(finalize_calls) == 1
+    assert finalize_calls[0]["target_subtitle_authoritative"] is True
+    assert finalize_calls[0]["target_subtitle_key"] == "deliver/tasks/hf-subtitle-owner/subs/vi.srt"
+
+
+def test_run_subtitles_step_rejects_timing_only_target_subtitle_before_success(monkeypatch, tmp_path):
+    repo = _FakeRepo()
+    uploaded_artifacts: list[str] = []
+
+    async def _generate_subtitles(**kwargs):
+        workspace = _FakeWorkspace(tmp_path, kwargs["task_id"], kwargs["target_lang"])
+        origin_text = "1\n00:00:00,000 --> 00:00:02,000\n你好\n"
+        target_text = "1\n00:00:00,000 --> 00:00:02,000\n\n"
+        workspace.origin_srt_path.write_text(origin_text, encoding="utf-8")
+        workspace.mm_srt_path.write_text(target_text, encoding="utf-8")
+        workspace.segments_json.write_text(json.dumps({"scenes": []}), encoding="utf-8")
+        return {
+            "task_id": kwargs["task_id"],
+            "origin_srt": origin_text,
+            "origin_normalized_srt": origin_text,
+            "mm_srt": target_text,
+            "translation_qa": {"complete": True},
+            "translation_incomplete": False,
+            "stream_probe": {"has_audio": True, "has_subtitle_stream": False},
+            "parse_source_mode": kwargs["parse_source_mode"],
+            "parse_source_role": "subtitle_source_helper",
+            "parse_source_authoritative_for_target": True,
+            "target_subtitle_authoritative": True,
+        }
+
+    monkeypatch.setattr(
+        steps_v1,
+        "Workspace",
+        lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
+    )
+    monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
+    monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        steps_v1,
+        "_upload_artifact",
+        lambda task_id, _path, artifact_name: uploaded_artifacts.append(artifact_name)
+        or f"deliver/tasks/{task_id}/{artifact_name}",
+    )
+    monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
+    monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+
+    asyncio.run(steps_v1.run_subtitles_step(SubtitlesRequest(task_id="hf-empty-body", target_lang="vi", force=True, translate=True)))
+
+    final_update = repo.get("hf-empty-body")
+    assert "subs/vi.srt" not in uploaded_artifacts
+    assert final_update["subtitles_status"] == "failed"
+    assert final_update["target_subtitle_current"] is False
+    assert final_update["target_subtitle_current_reason"] == "target_subtitle_empty"
 
 
 def test_generate_subtitles_keeps_preserved_source_audio_helper_out_of_target_truth(monkeypatch, tmp_path):
@@ -415,21 +513,21 @@ def test_run_dub_step_skips_empty_target_subtitle_instead_of_failing(monkeypatch
 def test_subtitles_pipeline_state_distinguishes_no_subtitles_and_translation_incomplete():
     no_subtitles_status, no_subtitles_summary = steps_v1_hot_follow_pipeline_state(
         {
-            "subtitles_status": "ready",
+            "subtitles_status": "failed",
             "pipeline_config": {"no_subtitles": "true"},
         }
     )
-    assert no_subtitles_status == "done"
+    assert no_subtitles_status == "failed"
     assert no_subtitles_summary == "no_subtitles"
 
     vi_status, vi_summary = steps_v1_hot_follow_pipeline_state(
         {
-            "subtitles_status": "ready",
+            "subtitles_status": "failed",
             "pipeline_config": {"translation_incomplete": "true"},
             "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
         }
     )
-    assert vi_status == "done"
+    assert vi_status == "failed"
     assert vi_summary == "translation_incomplete"
 
 

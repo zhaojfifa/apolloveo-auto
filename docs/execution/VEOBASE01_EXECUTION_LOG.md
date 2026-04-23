@@ -1624,3 +1624,104 @@ Validation:
 - authority path existence check: passed
 - `git diff --check`: passed
 - runtime/code changes: none in this review pass
+
+## 2026-04-24 - VEOBASE01 Subtitle Authority Contract Correction
+
+Branch:
+
+- `VeoBase01-subtitle-authority-contract-correction`
+
+Base:
+
+- `a1a6837eaf11e55a806db487ca7120a32ba3fd4e`
+
+Reading declaration:
+
+- root indexes:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+- docs indexes:
+  - `docs/README.md`
+  - `docs/ENGINEERING_INDEX.md`
+- task-specific authority:
+  - `docs/contracts/engineering_reading_contract_v1.md`
+  - `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+  - `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/architecture/line_contracts/hot_follow_line.yaml`
+  - `docs/reviews/VEOBASE01_SUBTITLE_AUTHORITY_REVIEW.md`
+- missing authority: none
+
+Execution scope:
+
+- single-owner authoritative target subtitle write
+- subtitle-step success gate bound to authoritative truth
+- helper side-channel isolation from subtitle-step success
+- empty-body subtitle rejection before authoritative success
+
+Exact single owner chosen:
+
+- `gateway/app/services/hot_follow_subtitle_authority.py`
+
+Exact ownership correction:
+
+- `steps_v1.py` no longer writes authoritative subtitle success truth directly
+- `hot_follow_api.py` no longer writes authoritative subtitle success truth
+  directly
+- both delegate to the subtitle-authority service
+
+Exact success gate introduced:
+
+- `subtitles_status=\"ready\"` now requires:
+  - authoritative target subtitle
+  - semantic target subtitle body
+  - canonical target subtitle artifact
+  - `target_subtitle_current=true`
+
+Exact helper boundary correction:
+
+- helper/non-authoritative subtitle outcomes can no longer persist subtitle-step
+  success truth
+- helper remains side-channel only for the corrected boundary
+
+Exact empty-body rejection rule:
+
+- timing-only or semantic-empty subtitle content cannot become authoritative
+  subtitle success
+- physical file existence alone is insufficient
+
+Files changed:
+
+- `gateway/app/services/hot_follow_subtitle_authority.py`
+- `gateway/app/services/steps_v1.py`
+- `gateway/app/routers/hot_follow_api.py`
+- `gateway/app/services/tests/test_steps_v1_subtitles_step.py`
+- `gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_subtitle_authority.py gateway/app/services/steps_v1.py gateway/app/routers/hot_follow_api.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_subtitles_step_consumes_result_contract_for_myanmar gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_subtitles_step_marks_vi_translation_incomplete_without_step_error gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_subtitles_step_marks_myanmar_translation_incomplete_without_step_error gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_subtitles_step_treats_preserved_source_audio_as_helper_only gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_subtitles_step_delegates_authoritative_truth_to_service gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_subtitles_step_rejects_timing_only_target_subtitle_before_success gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_save_authoritative_target_subtitle_delegates_to_single_owner gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_save_authoritative_target_subtitle_rejects_source_copy_before_success gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_failure_persists_subtitle_authority_failure gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_failure_preserves_current_target_subtitle gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_failure_preserves_authoritative_outputs -q`: `11 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_helper_translate_429_persists_sanitized_helper_failure -q`: `1 passed`
+- `git diff --check`: passed
+
+Limitations:
+
+- live representative task replay was unavailable in this workspace
+- broader `test_hot_follow_subtitle_binding.py` still has two unrelated
+  subtitle-render expectation failures already present on this branch
+
+Acceptance:
+
+- subtitle authority has a single owner
+- subtitle-step success is bound to authoritative truth
+- helper is restored to side-channel status for the corrected boundary
+- empty-body subtitle success is impossible on the corrected paths
+- `VeoBase01` is safe for later resumed contract tightening on this boundary

@@ -140,6 +140,63 @@ def test_sync_saved_target_subtitle_reuploads_vi_artifact_for_vi_task(monkeypatc
     assert task["mm_srt_path"] == "deliver/tasks/hf-bind-vi/vi.srt"
 
 
+def test_save_authoritative_target_subtitle_delegates_to_single_owner(monkeypatch):
+    repo = _Repo({"task_id": "hf-owner", "kind": "hot_follow", "target_lang": "vi"})
+    seen: dict[str, object] = {}
+
+    def _persist(task_id, task, **kwargs):
+        seen["task_id"] = task_id
+        seen["task"] = dict(task)
+        seen["kwargs"] = dict(kwargs)
+        return {"task_id": task_id, "subtitles_status": "ready"}
+
+    monkeypatch.setattr(hf_router, "persist_hot_follow_authoritative_target_subtitle", _persist)
+
+    saved = hf_router._hf_save_authoritative_target_subtitle(
+        "hf-owner",
+        repo.get("hf-owner"),
+        text="1\n00:00:00,000 --> 00:00:02,000\nXin chao\n",
+        text_mode="manual_edit",
+        repo=repo,
+    )
+
+    assert saved["subtitles_status"] == "ready"
+    assert seen["task_id"] == "hf-owner"
+    assert dict(seen["kwargs"])["text_mode"] == "manual_edit"
+
+
+def test_save_authoritative_target_subtitle_rejects_source_copy_before_success(monkeypatch):
+    repo = _Repo(
+        {
+            "task_id": "hf-source-copy",
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "origin_srt_path": "deliver/tasks/hf-source-copy/origin.srt",
+        }
+    )
+    source_srt = "1\n00:00:00,000 --> 00:00:02,000\n你好\n"
+
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: source_srt)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(
+        hf_router,
+        "_hf_sync_saved_target_subtitle_artifact",
+        lambda *_args, **_kwargs: pytest.fail("source-copy subtitle must not persist authoritative success"),
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        hf_router._hf_save_authoritative_target_subtitle(
+            "hf-source-copy",
+            repo.get("hf-source-copy"),
+            text=source_srt,
+            text_mode="manual_edit",
+            repo=repo,
+        )
+
+    assert exc_info.value.status_code == 422
+    assert exc_info.value.detail["reason"] == "target_subtitle_source_copy"
+
+
 def test_resolve_target_srt_key_prefers_vi_artifact_before_legacy_mm_fallback(monkeypatch):
     monkeypatch.setattr(
         hf_router,

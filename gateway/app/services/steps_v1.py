@@ -41,8 +41,11 @@ from gateway.app.services.hot_follow_language_profiles import (
     hot_follow_subtitle_filename,
     hot_follow_subtitle_txt_filename,
 )
+from gateway.app.services.hot_follow_subtitle_authority import (
+    finalize_hot_follow_subtitles_step,
+)
 from gateway.app.services.hot_follow_subtitle_currentness import (
-    compute_hot_follow_target_subtitle_currentness,
+    has_semantic_target_subtitle_text,
 )
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.services.source_audio_policy import source_audio_policy_from_task
@@ -851,6 +854,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
             not isinstance(result, dict)
             or result.get("target_subtitle_authoritative", True)
         )
+        target_text_semantic = has_semantic_target_subtitle_text(mm_text)
 
         workspace = Workspace(req.task_id, target_lang=req.target_lang)
         subtitle_filename = hot_follow_subtitle_filename(req.target_lang)
@@ -864,7 +868,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
         if workspace.origin_srt_path.exists():
             origin_key = _upload_artifact(req.task_id, workspace.origin_srt_path, ORIGIN_SRT_ARTIFACT)
 
-        if target_subtitle_authoritative and workspace.mm_srt_path.exists():
+        if target_subtitle_authoritative and target_text_semantic and workspace.mm_srt_path.exists():
             mm_key = _upload_artifact(req.task_id, workspace.mm_srt_path, f"subs/{subtitle_filename}")
 
             mm_txt_path = workspace.mm_srt_path.with_suffix(".txt")
@@ -878,35 +882,26 @@ async def run_subtitles_step(req: SubtitlesRequest):
         subtitles_dir.mkdir(parents=True, exist_ok=True)
         if workspace.origin_srt_path.exists():
             shutil.copy2(workspace.origin_srt_path, subtitles_dir / "origin.srt")
-        if target_subtitle_authoritative and workspace.mm_srt_path.exists():
+        if target_subtitle_authoritative and target_text_semantic and workspace.mm_srt_path.exists():
             shutil.copy2(workspace.mm_srt_path, subtitles_dir / subtitle_filename)
         if translation_qa_path.exists():
             shutil.copy2(translation_qa_path, subtitles_dir / "translation_qa.json")
         if workspace.segments_json.exists():
             shutil.copy2(workspace.segments_json, subtitles_dir / "subtitles.json")
         subtitles_key = relative_to_workspace(subtitles_dir / "subtitles.json")
-        target_subtitle_currentness = compute_hot_follow_target_subtitle_currentness(
-            target_lang=req.target_lang,
-            target_text=mm_text,
-            source_texts=(normalized_origin_text, origin_text),
-            subtitle_artifact_exists=bool(mm_key),
-            expected_subtitle_source=subtitle_filename,
-            actual_subtitle_source=subtitle_filename if mm_key else None,
-            translation_incomplete=not bool(translation_qa_payload.get("complete")),
-            has_saved_revision=False,
-        )
-
-        _update_task(
+        finalize_hot_follow_subtitles_step(
             req.task_id,
-            origin_srt_path=origin_key,
-            mm_srt_path=mm_key,
-            last_step="subtitles",
-            subtitles_status="ready",
+            repo.get(req.task_id) or task_before,
+            repo=repo,
+            target_text=mm_text,
+            target_lang=req.target_lang,
+            source_texts=(normalized_origin_text, origin_text),
+            target_subtitle_key=mm_key,
             subtitles_key=subtitles_key,
-            subtitle_structure_path=subtitles_key,
-            subtitles_error=None,
-            target_subtitle_current=bool(target_subtitle_currentness.get("target_subtitle_current")),
-            target_subtitle_current_reason=target_subtitle_currentness.get("target_subtitle_current_reason"),
+            origin_key=origin_key,
+            expected_subtitle_source=subtitle_filename,
+            translation_incomplete=not bool(translation_qa_payload.get("complete")),
+            target_subtitle_authoritative=target_subtitle_authoritative,
         )
         logger.info(
             "SUB2_DONE",
