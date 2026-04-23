@@ -24,13 +24,17 @@ ApolloVeo 当前是一个以成片交付为目标的 AI 内容生产工厂代码
 
 ## Before Any Codex Task
 
-先读：
+Use index-first reading. Start with only:
 
-1. `ENGINEERING_RULES.md`
-2. `CURRENT_ENGINEERING_FOCUS.md`
-3. `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md`
-4. `docs/contracts/engineering_reading_contract_v1.md`
-5. relevant execution / contract / runbook docs selected through that reading contract
+1. `README.md`
+2. `ENGINEERING_CONSTRAINTS_INDEX.md`
+3. `docs/README.md`
+4. `docs/ENGINEERING_INDEX.md`
+5. `docs/contracts/engineering_reading_contract_v1.md`
+
+Then classify the task through the indexes and read only the minimum
+task-specific authority files selected by that path. Do not begin engineering
+work from a long flat list of contracts, baselines, and reviews.
 
 当前 canonical authority set 已补齐，阅读 contract/index 时不应再依赖缺失路径或隐式 fallback。
 

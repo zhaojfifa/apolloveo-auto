@@ -7,6 +7,10 @@ from gateway.app.services.ready_gate import evaluate_ready_gate
 from gateway.app.services.ready_gate.registry import get_ready_gate_spec
 
 from .blocking_reason_runtime import get_blocking_reason_runtime
+from .projection_rules_runtime import (
+    derive_compose_allowed_reason,
+    get_projection_rules_runtime,
+)
 from .runtime_loader import get_contract_runtime_refs
 
 
@@ -22,6 +26,11 @@ def _apply_route_truth(
     blocking_ref: str | None,
 ) -> None:
     blocking_runtime = get_blocking_reason_runtime(blocking_ref) if blocking_ref else None
+    projection_runtime = get_projection_rules_runtime(blocking_ref) if blocking_ref else None
+    route_reason_rules = projection_runtime.compose_route_reason_rules if projection_runtime else {}
+    terminal_modes = route_reason_rules.get("compose_input_terminal_modes") or {}
+    failed_statuses = set(route_reason_rules.get("compose_exec_failed_statuses") or {"failed", "error"})
+    no_tts_reasons = route_reason_rules.get("no_tts_route_reason_by_route") or {}
     route = selected_route_from_state(task, state)
     route_name = str(route.get("name") or "").strip()
     compose_allowed = bool(route.get("compose_allowed"))
@@ -58,16 +67,18 @@ def _apply_route_truth(
         gate_result["no_dub"] = True
 
     if compose_input_mode == "derive_failed":
-        reason = _reason(compose_input_reason) or "compose_input_derive_failed"
+        reason_key = str(terminal_modes.get("derive_failed") or "compose_input_derive_failed")
+        reason = _reason(compose_input_reason) or reason_key
         gate_result["compose_input_derive_failed_terminal"] = True
         gate_result["compose_input_blocked_terminal"] = False
         gate_result["compose_exec_failed_terminal"] = False
         gate_result["compose_execute_allowed"] = False
-        gate_result["compose_reason"] = "compose_input_derive_failed"
+        gate_result["compose_reason"] = reason_key
         gate_result["compose_input_reason"] = reason
-        gate_result["blocking"] = ["compose_input_derive_failed"]
+        gate_result["blocking"] = [reason_key]
     elif compose_input_mode == "blocked" or blocked_reason == "compose_input_blocked" or bool(gate_result.get("compose_blocked")):
-        reason = _reason(gate_result.get("compose_blocked_reason") or blocked_reason or "compose_input_blocked")
+        reason_key = str(terminal_modes.get("blocked") or "compose_input_blocked")
+        reason = _reason(gate_result.get("compose_blocked_reason") or blocked_reason or reason_key)
         gate_result["compose_blocked"] = True
         gate_result["compose_blocked_reason"] = reason
         gate_result["compose_execute_allowed"] = False
@@ -76,7 +87,7 @@ def _apply_route_truth(
         gate_result["compose_input_blocked_terminal"] = True
         gate_result["compose_input_derive_failed_terminal"] = False
         gate_result["compose_exec_failed_terminal"] = False
-    elif compose_status in {"failed", "error"}:
+    elif compose_status in failed_statuses:
         reason = _reason(compose_error_reason) or "compose_exec_failed"
         gate_result["compose_exec_failed_terminal"] = True
         gate_result["compose_execute_allowed"] = False
@@ -92,15 +103,17 @@ def _apply_route_truth(
     elif compose_allowed and gate_result.get("compose_reason") == "route_not_allowed":
         gate_result["compose_reason"] = "compose_not_done"
     elif gate_result["no_tts_compose_allowed"] and not str(gate_result.get("no_dub_reason") or "").strip():
-        if route_name == "preserve_source_route":
-            gate_result["no_dub_reason"] = "source_audio_preserved_no_tts"
-        elif route_name == "bgm_only_route":
-            gate_result["no_dub_reason"] = "bgm_only_no_tts"
-        elif route_name == "no_tts_compose_route":
-            gate_result["no_dub_reason"] = "compose_no_tts"
+        reason = str(no_tts_reasons.get(route_name) or "").strip()
+        if reason:
+            gate_result["no_dub_reason"] = reason
 
     if blocking_runtime is not None:
-        gate_result["blocking"] = blocking_runtime.normalize_list(gate_result.get("blocking") or [])
+        gate_result["blocking"] = blocking_runtime.sort_by_priority(gate_result.get("blocking") or [])
+    if projection_runtime is not None:
+        gate_result["compose_allowed_reason"] = derive_compose_allowed_reason(
+            gate_result,
+            projection_runtime,
+        )
 
 
 def evaluate_contract_ready_gate(

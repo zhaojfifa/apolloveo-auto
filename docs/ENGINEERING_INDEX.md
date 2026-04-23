@@ -6,11 +6,16 @@ Root governance files remain the highest authority. `ENGINEERING_CONSTRAINTS_IND
 
 `docs/README.md` is the docs structure and placement entry. Use it before adding, moving, or reclassifying documentation.
 
-Before any future PR slice, read both:
+Before any future PR slice, use index-first reading:
 
+- `README.md`
 - `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `docs/README.md`
 - `docs/ENGINEERING_INDEX.md`
 - `docs/contracts/engineering_reading_contract_v1.md`
+
+Then classify the task through this index and read only the minimum
+task-specific authority files needed for that task.
 
 ## Document Priority
 
@@ -117,26 +122,31 @@ Required preparation docs:
 
 ## VeoBase01 Reconstruction Entry
 
-Before any VeoBase01 engineering PR, read:
+Before any VeoBase01 engineering PR, read indexes first:
 
-- Root governance: `PROJECT_RULES.md`, `ENGINEERING_RULES.md`, `CURRENT_ENGINEERING_FOCUS.md`, `ENGINEERING_STATUS.md`
+- `README.md`
 - `ENGINEERING_CONSTRAINTS_INDEX.md`
-- `docs/contracts/engineering_reading_contract_v1.md`
 - `docs/README.md`
 - `docs/ENGINEERING_INDEX.md`
-- `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
-- `apolloveo_current_architecture_and_state_baseline.md`
-- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
-- `docs/contracts/four_layer_state_contract.md`
-- `docs/contracts/contract_driven_four_layer_state_baseline_v1.md`
-- `docs/contracts/workbench_hub_response.contract.md`
-- `docs/contracts/production_line_runtime_assembly_rules_v1.md`
-- `docs/contracts/status_ownership_matrix.md`
-- `docs/contracts/line_contract.schema.json`
-- `docs/architecture/factory_four_layer_architecture_baseline_v1.md`
-- `docs/execution/VEOBASE01_CODE_DEPOWERING_PLAN_V1.md`
-- `docs/baseline/PROJECT_BASELINE_INDEX.md`
-- Active review gate docs named by the task, including current Hot Follow recovery or alignment notes when applicable
+- `docs/contracts/engineering_reading_contract_v1.md`
+
+Then classify the work through the task-oriented map and read the minimum
+task-specific authority files. Do not start every VeoBase01 task by reading the
+full reconstruction, state, runtime, baseline, and review set.
+
+Examples:
+
+- execution/refactor work usually adds
+  `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md` and
+  `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+- state/projection work usually adds
+  `docs/contracts/four_layer_state_contract.md` and
+  `docs/contracts/status_ownership_matrix.md`
+- line/runtime assembly work usually adds
+  `docs/contracts/production_line_runtime_assembly_rules_v1.md` and
+  `docs/architecture/line_contracts/hot_follow_line.yaml`
+- ownership-reduction work usually adds
+  `docs/execution/VEOBASE01_CODE_DEPOWERING_PLAN_V1.md`
 
 ## Forbidden Doc Misuse
 
@@ -152,13 +162,13 @@ Before any VeoBase01 engineering PR, read:
 
 Before starting an engineering PR:
 
-1. Read root governance.
-2. Read `ENGINEERING_CONSTRAINTS_INDEX.md`.
+1. Read root indexes first: `README.md`, then `ENGINEERING_CONSTRAINTS_INDEX.md`.
+2. Read docs indexes second: `docs/README.md`, then `docs/ENGINEERING_INDEX.md`.
 3. Read `docs/contracts/engineering_reading_contract_v1.md`.
-4. Read `docs/README.md` when adding, moving, or classifying docs.
-5. Read this docs-level engineering index.
-6. Read the baseline/gate docs for the task.
-7. Read the relevant contracts and architecture docs from the task-oriented map.
+4. Classify the task through the task-oriented map.
+5. Read only the minimum task-specific authority files selected from the indexes.
+6. Record why the selected authority set was sufficient.
+7. Record missing-authority fallback handling, if any.
 8. Confirm the branch base requested by the task.
 9. Confirm forbidden scope before editing code.
 10. Identify required tests and business guardrails before implementation.

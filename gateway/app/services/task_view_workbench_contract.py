@@ -407,14 +407,11 @@ def attach_task_aliases(payload: dict[str, Any], task: dict[str, Any], task_id: 
 def apply_ready_gate_compose_projection(payload: dict[str, Any]) -> None:
     ready_gate = payload.get("ready_gate") if isinstance(payload.get("ready_gate"), dict) else {}
     compose_allowed = bool(ready_gate.get("compose_allowed"))
-    if compose_allowed:
-        compose_allowed_reason = "no_dub_inputs_ready" if bool(ready_gate.get("no_dub_compose_allowed")) else "voiceover_ready"
-    else:
-        compose_allowed_reason = str(
-            ready_gate.get("compose_allowed_reason")
-            or ready_gate.get("compose_reason")
-            or "route_not_allowed"
-        )
+    compose_allowed_reason = str(
+        ready_gate.get("compose_allowed_reason")
+        or ready_gate.get("compose_reason")
+        or "route_not_allowed"
+    )
     payload["compose_allowed"] = compose_allowed
     payload["compose_allowed_reason"] = compose_allowed_reason
     if isinstance(payload.get("ready_gate"), dict):

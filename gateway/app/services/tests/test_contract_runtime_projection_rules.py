@@ -3,6 +3,8 @@ from gateway.app.services.contract_runtime import (
     get_blocking_reason_runtime,
     get_contract_runtime_refs,
     get_projection_rules_runtime,
+    scene_pack_pending_reason_for_task,
+    select_presentation_final,
 )
 
 
@@ -77,9 +79,70 @@ def test_projection_runtime_preserves_in_progress_truth_without_final_dominance(
     assert projected["scene_pack_pending_reason"] == "scenes.not_ready"
 
 
+def test_projection_runtime_derives_no_tts_compose_allowed_reason_from_contract():
+    runtime = get_projection_rules_runtime("docs/contracts/hot_follow_projection_rules_v1.md")
+    payload = {
+        "final": {"exists": False},
+        "final_fresh": False,
+        "current_attempt": {"audio_ready": False},
+        "ready_gate": {
+            "compose_allowed": True,
+            "no_dub_compose_allowed": True,
+            "compose_ready": False,
+            "publish_ready": False,
+            "blocking": ["compose_not_done"],
+        },
+        "compose_status": "pending",
+        "composed_ready": False,
+        "scene_pack": {"exists": True, "status": "done"},
+    }
+
+    projected = apply_projection_runtime(
+        payload,
+        surface="workbench",
+        projection_runtime=runtime,
+    )
+
+    assert projected["compose_allowed"] is True
+    assert projected["compose_allowed_reason"] == "no_dub_inputs_ready"
+    assert projected["ready_gate"]["compose_allowed_reason"] == "no_dub_inputs_ready"
+
+
+def test_projection_runtime_selects_current_before_historical_final():
+    runtime = get_projection_rules_runtime("docs/contracts/hot_follow_projection_rules_v1.md")
+
+    selected = select_presentation_final(
+        {"exists": True, "url": "/current"},
+        {"exists": True, "url": "/historical"},
+        projection_runtime=runtime,
+    )
+    fallback = select_presentation_final(
+        {"exists": False, "url": None},
+        {"exists": True, "url": "/historical"},
+        projection_runtime=runtime,
+    )
+
+    assert selected["url"] == "/current"
+    assert fallback["url"] == "/historical"
+
+
 def test_blocking_reason_runtime_canonicalizes_aliases_and_scene_pack_reason():
     runtime = get_blocking_reason_runtime("docs/contracts/hot_follow_projection_rules_v1.md")
 
     assert runtime.canonicalize("missing_voiceover") == "voiceover_missing"
     assert runtime.normalize_list(["missing_voiceover", "voiceover_missing"]) == ["voiceover_missing"]
+    assert runtime.sort_by_priority(["subtitle_not_ready", "compose_input_blocked"]) == [
+        "compose_input_blocked",
+        "subtitle_not_ready",
+    ]
     assert runtime.scene_pack_pending_reason("failed") == "scenes.failed"
+
+
+def test_scene_pack_pending_reason_for_task_uses_bound_projection_contract():
+    assert (
+        scene_pack_pending_reason_for_task(
+            {"kind": "hot_follow"},
+            {"exists": False, "status": "running"},
+        )
+        == "scenes.running"
+    )

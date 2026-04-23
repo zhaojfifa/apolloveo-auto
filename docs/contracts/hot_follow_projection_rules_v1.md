@@ -129,6 +129,39 @@ projection_dominance_contract:
   compatibility_fields_cannot_override_authoritative_truth: true
 ```
 
+## Final Precedence Contract
+
+```yaml
+final_precedence_contract:
+  surface_selection:
+    prefer_current_final_when_exists: true
+    fallback_to_historical_final_when_current_absent: true
+    historical_final_never_satisfies_current_ready_truth: true
+```
+
+## Compose Route / Reason Contract
+
+```yaml
+compose_route_reason_contract:
+  compose_input_terminal_modes:
+    derive_failed: compose_input_derive_failed
+    blocked: compose_input_blocked
+  compose_exec_failed_statuses:
+    - failed
+    - error
+  no_tts_route_reason_by_route:
+    preserve_source_route: source_audio_preserved_no_tts
+    bgm_only_route: bgm_only_no_tts
+    no_tts_compose_route: compose_no_tts
+  compose_allowed_reason:
+    allowed_no_dub: no_dub_inputs_ready
+    allowed_default: voiceover_ready
+    blocked_default: route_not_allowed
+    blocked_fields:
+      - compose_allowed_reason
+      - compose_reason
+```
+
 ## Blocking-Reason Mapping Contract
 
 ```yaml
@@ -163,29 +196,40 @@ blocking_reason_mapping_contract:
     compose_not_done:
       class: blocking
       suppress_when_publish_ready: true
+      priority: 40
     voiceover_missing:
       class: blocking
       suppress_when_publish_ready: true
+      priority: 60
     audio_not_ready:
       class: blocking
       suppress_when_publish_ready: true
+      priority: 50
     audio_not_done:
       class: blocking
       suppress_when_publish_ready: true
+      priority: 55
     compose_input_not_ready:
       class: blocking
+      priority: 30
     compose_input_blocked:
       class: blocking
+      priority: 10
     compose_input_derive_failed:
       class: blocking
+      priority: 5
     compose_exec_failed:
       class: blocking
+      priority: 15
     final_stale:
       class: blocking
+      priority: 20
     subtitle_missing:
       class: blocking
+      priority: 70
     subtitle_not_ready:
       class: blocking
+      priority: 70
     scenes.running:
       class: advisory
       suppress_when_publish_ready: true
