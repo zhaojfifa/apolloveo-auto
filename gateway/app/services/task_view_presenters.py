@@ -169,12 +169,11 @@ def collect_hot_follow_workbench_ui(
         route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
         and not str(subtitle_lane.get("dub_input_text") or "").strip()
     )
-    helper_translate_failed_voice_led = bool(
+    helper_translate_failed_missing_target = bool(
         subtitle_lane.get("helper_translate_failed")
         and not bool(subtitle_lane.get("subtitle_ready"))
-        and str(route_state.get("content_mode") or "").strip().lower() == "voice_led"
     )
-    if helper_translate_failed_voice_led:
+    if helper_translate_failed_missing_target:
         no_dub = False
     if bool(subtitle_lane.get("subtitle_ready")) and stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
         no_dub = False

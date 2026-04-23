@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.services import task_view_presenters
 from gateway.app.services import task_view_workbench_contract
 from gateway.app.services import compose_service as compose_module
 from gateway.app.services.compose_service import (
@@ -462,6 +463,120 @@ def test_translate_subtitles_source_lane_persists_full_target_srt(monkeypatch, t
     assert saved["target_subtitle_current_reason"] == "ready"
     assert saved["dub_status"] == "pending"
     assert saved.get("dub_skip_reason") is None
+
+
+def test_translate_subtitles_source_lane_failure_persists_subtitle_authority_failure(monkeypatch, tmp_path):
+    task_id = "hf-source-lane-provider-failure"
+    source_srt = "1\n00:00:00,000 --> 00:00:02,000\n你好\n"
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "origin_srt_path": f"deliver/tasks/{task_id}/origin.srt",
+            "subtitles_status": "running",
+            "dub_status": "skipped",
+            "dub_skip_reason": "target_subtitle_empty",
+            "pipeline_config": {"no_dub": "true", "dub_skip_reason": "target_subtitle_empty"},
+        }
+    )
+
+    def _raise_resource_exhausted(*_args, **_kwargs):
+        raise hf_router.GeminiSubtitlesError(
+            'Gemini HTTP 429: {"error":{"status":"RESOURCE_EXHAUSTED","message":"quota exhausted"}}'
+        )
+
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: tmp_path / "override.srt")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "translate_segments_with_gemini", _raise_resource_exhausted)
+
+    with pytest.raises(HTTPException) as exc_info:
+        hf_router.translate_hot_follow_subtitles(
+            task_id,
+            hf_router.HotFollowTranslateRequest(target_lang="vi", input_source="source_subtitle_lane"),
+            repo=repo,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail["reason"] == "helper_translate_provider_exhausted"
+    saved = repo.get(task_id) or {}
+    assert saved["subtitle_helper_status"] == "failed"
+    assert saved["subtitle_helper_error_reason"] == "helper_translate_provider_exhausted"
+    assert saved["subtitle_helper_provider"] == "gemini"
+    assert saved["subtitle_helper_input_text"] == source_srt.strip()
+    assert saved["subtitles_status"] == "failed"
+    assert saved["subtitles_error_reason"] == "helper_translate_provider_exhausted"
+    assert saved["target_subtitle_current"] is False
+    assert saved["target_subtitle_current_reason"] == "helper_translate_provider_exhausted"
+    assert saved["compose_ready"] is False
+    assert saved["publish_ready"] is False
+
+    lane = hf_router._hf_subtitle_lane_state(task_id, saved)
+    assert lane["helper_translate_failed"] is True
+    assert lane["subtitle_ready"] is False
+    assert lane["subtitle_ready_reason"] == "helper_translate_provider_exhausted"
+    assert lane["target_subtitle_current_reason"] == "helper_translate_provider_exhausted"
+    assert lane["dub_input_text"] == ""
+
+    ui = task_view_presenters.collect_hot_follow_workbench_ui(
+        saved,
+        settings=None,
+        subtitle_lane_loader=lambda *_args, **_kwargs: lane,
+        dual_channel_state_loader=lambda *_args, **_kwargs: {"content_mode": "silent_candidate"},
+        source_audio_lane_loader=lambda *_args, **_kwargs: {},
+        screen_text_candidate_loader=lambda *_args, **_kwargs: {},
+        voice_execution_state_loader=lambda *_args, **_kwargs: {},
+        pipeline_state_loader=lambda *_args, **_kwargs: ("failed", {}),
+        object_exists_fn=lambda _key: False,
+        source_audio_semantics_loader=lambda *_args, **_kwargs: {},
+    )
+    assert ui["no_dub"] is False
+    assert ui["no_dub_reason"] is None
+
+
+def test_translate_subtitles_source_lane_failure_preserves_current_target_subtitle(monkeypatch):
+    task_id = "hf-source-lane-provider-failure-current-target"
+    source_srt = "1\n00:00:00,000 --> 00:00:02,000\n你好\n"
+    target_srt = f"deliver/tasks/{task_id}/vi.srt"
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "mm_srt_path": target_srt,
+            "subtitles_status": "ready",
+            "target_subtitle_current": True,
+            "target_subtitle_current_reason": "ready",
+            "publish_ready": True,
+        }
+    )
+
+    def _raise_resource_exhausted(*_args, **_kwargs):
+        raise hf_router.GeminiSubtitlesError(
+            'Gemini HTTP 429: {"error":{"status":"RESOURCE_EXHAUSTED","message":"quota exhausted"}}'
+        )
+
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "translate_segments_with_gemini", _raise_resource_exhausted)
+
+    with pytest.raises(HTTPException):
+        hf_router.translate_hot_follow_subtitles(
+            task_id,
+            hf_router.HotFollowTranslateRequest(target_lang="vi", input_source="source_subtitle_lane"),
+            repo=repo,
+        )
+
+    saved = repo.get(task_id) or {}
+    assert saved["subtitle_helper_status"] == "failed"
+    assert saved["subtitle_helper_error_reason"] == "helper_translate_provider_exhausted"
+    assert saved["subtitles_status"] == "ready"
+    assert saved["target_subtitle_current"] is True
+    assert saved["target_subtitle_current_reason"] == "ready"
+    assert saved["publish_ready"] is True
 
 
 def test_translate_subtitles_source_lane_uses_normalized_source_srt_when_origin_key_empty(monkeypatch, tmp_path):

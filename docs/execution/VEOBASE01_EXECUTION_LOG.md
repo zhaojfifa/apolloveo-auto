@@ -1473,3 +1473,90 @@ Acceptance:
   contract-runtime loaded
 - no scenario onboarding, new-line implementation, UI/editor work, or
   multi-role harness work was introduced
+
+## 2026-04-23 - VeoBase01 Subtitle Authority Repair
+
+Branch:
+
+- `VeoBase01-subtitle-authority-repair`
+
+Base:
+
+- `7e2e56b873f59537bf6d33a51b854343631bca63`
+
+Reading declaration:
+
+- root indexes: `README.md`, `ENGINEERING_CONSTRAINTS_INDEX.md`
+- docs indexes: `docs/README.md`, `docs/ENGINEERING_INDEX.md`
+- authority files:
+  - `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+  - `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/architecture/line_contracts/hot_follow_line.yaml`
+- missing authority: none
+
+Exact bug class addressed:
+
+- subtitle-authority chain failure on source-subtitle translation/provider
+  failure
+- helper/provider failure not entering authoritative subtitle state
+- downstream projection falling back to `subtitle_missing` and `no_dub`/`no_tts`
+  symptoms instead of exposing the upstream failure truth
+
+Exact root cause:
+
+- source-subtitle translation raised sanitized helper/provider errors without
+  persisting authoritative subtitle failure state when no current target
+  subtitle existed
+- duplicated subtitle-lane projection in `hot_follow_api.py` did not surface
+  helper failure metadata/reasons for the same shape
+
+Modules changed:
+
+- `gateway/app/routers/hot_follow_api.py`
+- `gateway/app/services/subtitle_helpers.py`
+- `gateway/app/services/task_view_presenters.py`
+- `gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_REPAIR.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Exact ownership changed:
+
+- `hot_follow_api.py`: source-subtitle lane now owns authoritative persistence
+  of helper/provider failure for missing-target-subtitle cases; duplicate lane
+  projection now reflects helper failure truth
+- `subtitle_helpers.py`: subtitle readiness/currentness projection now owns
+  helper-failure-first reason mapping for missing-target-subtitle cases
+- `task_view_presenters.py`: no longer allows helper-failure-with-missing-target
+  shapes to collapse into no-dub UI state
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/subtitle_helpers.py gateway/app/services/task_view_presenters.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`: passed
+- `git diff --check`: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_failure_persists_subtitle_authority_failure gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_failure_preserves_current_target_subtitle gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_persists_full_target_srt gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_failure_preserves_authoritative_outputs -q`: `4 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_helper_translate_429_persists_sanitized_helper_failure -q`: `1 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py::test_publish_hub_keeps_scene_pack_pending_non_blocking_when_final_ready -q`: `1 passed`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_skills_advisory.py::test_voice_led_retry_success_resolves_tts_replace_and_final_ready -q`: `1 passed`
+- `python3.11 -m pytest gateway/app/services/tests/test_contract_runtime_projection_rules.py::test_projection_runtime_final_ready_dominates_publish_truth -q`: `1 passed`
+
+Representative task verification:
+
+- live replay not available in this workspace
+- searched repo/workspace and local `shortvideo.db` for `6b40d86589da`,
+  `944e2e8e6f0d`, `91990da2b72f`; no local artifacts/rows found
+- evidence is in-process/runtime coverage only
+
+Acceptance:
+
+- Gate 1 target subtitle authority: repaired for the selected source-subtitle
+  helper/provider failure subset
+- Gate 2 helper failure propagation: repaired for the selected subset
+- Gate 3 downstream classification honesty: repaired for the selected subset
+- `VeoBase01` is usable as the repair base for the next subtitle-authority
+  tightening round

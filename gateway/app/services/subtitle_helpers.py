@@ -407,6 +407,14 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         target_currentness.get("target_subtitle_current_reason")
         or ("ready" if subtitle_ready else "subtitle_missing")
     )
+    helper_translate_failed = str(task.get("subtitle_helper_status") or "").strip().lower() == "failed"
+    helper_translate_error_reason = str(task.get("subtitle_helper_error_reason") or "").strip() or None
+    helper_translate_error_message = str(task.get("subtitle_helper_error_message") or "").strip() or None
+    if helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
+        subtitle_ready_reason = helper_translate_error_reason or "helper_translate_failed"
+    target_subtitle_current_reason = str(target_currentness.get("target_subtitle_current_reason") or subtitle_ready_reason)
+    if helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
+        target_subtitle_current_reason = subtitle_ready_reason
     dub_input_text = edited_text if subtitle_ready else ""
     helper_source_text = normalized_source_text or raw_source_text
     parse_source_role = (
@@ -437,13 +445,13 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "subtitle_ready": bool(subtitle_ready),
         "subtitle_ready_reason": subtitle_ready_reason,
         "target_subtitle_current": bool(target_currentness.get("target_subtitle_current")),
-        "target_subtitle_current_reason": str(target_currentness.get("target_subtitle_current_reason") or subtitle_ready_reason),
+        "target_subtitle_current_reason": target_subtitle_current_reason,
         "target_subtitle_authoritative_source": bool(target_currentness.get("target_subtitle_authoritative_source")),
         "target_subtitle_source_copy": bool(target_currentness.get("target_subtitle_source_copy")),
         "helper_translate_status": str(task.get("subtitle_helper_status") or "").strip() or None,
-        "helper_translate_failed": str(task.get("subtitle_helper_status") or "").strip().lower() == "failed",
-        "helper_translate_error_reason": str(task.get("subtitle_helper_error_reason") or "").strip() or None,
-        "helper_translate_error_message": str(task.get("subtitle_helper_error_message") or "").strip() or None,
+        "helper_translate_failed": helper_translate_failed,
+        "helper_translate_error_reason": helper_translate_error_reason,
+        "helper_translate_error_message": helper_translate_error_message,
         "helper_translate_provider": str(task.get("subtitle_helper_provider") or "").strip() or None,
         "helper_translate_input_text": str(task.get("subtitle_helper_input_text") or "").strip() or None,
         "helper_translate_translated_text": str(task.get("subtitle_helper_translated_text") or "").strip() or None,
