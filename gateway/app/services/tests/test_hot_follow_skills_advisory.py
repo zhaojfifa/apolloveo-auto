@@ -500,6 +500,139 @@ def test_helper_translate_failure_with_saved_target_subtitle_stays_helper_scoped
     assert advisory["id"] != "hf_advisory_helper_translate_failed"
 
 
+def test_first_tts_failure_stays_retriable_not_no_tts_terminal():
+    artifact_facts = {
+        "final_exists": False,
+        "audio_exists": False,
+        "subtitle_exists": True,
+        "audio_lane": {
+            "mode": "muted_no_tts",
+            "tts_voiceover_exists": False,
+            "source_audio_policy": "mute",
+            "source_audio_preserved": False,
+            "bgm_configured": False,
+            "no_tts": True,
+        },
+        "compose_input": {"mode": "direct", "ready": True, "blocked": False},
+        "selected_compose_route": {"name": "no_tts_compose_route"},
+    }
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": False,
+            "audio_ready_reason": "TTS_FAILED:EMPTY_OR_INVALID_AUDIO",
+            "dub_current": False,
+        },
+        subtitle_lane={
+            "subtitle_ready": True,
+            "subtitle_artifact_exists": True,
+            "edited_text": "1\n00:00:00,000 --> 00:00:01,000\nမင်္ဂလာပါ\n",
+            "srt_text": "1\n00:00:00,000 --> 00:00:01,000\nမင်္ဂလာပါ\n",
+            "dub_input_text": "မင်္ဂလာပါ",
+        },
+        dub_status="failed",
+        compose_status="pending",
+        composed_reason="compose_not_done",
+        artifact_facts=artifact_facts,
+        no_dub=False,
+    )
+
+    assert current_attempt["selected_compose_route"] == "tts_replace_route"
+    assert current_attempt["tts_lane_expected"] is True
+    assert current_attempt["retriable_dub_failure"] is True
+    assert current_attempt["current_attempt_failure_class"] == "retriable_dub_failure"
+    assert current_attempt["no_dub_route_terminal"] is False
+    assert current_attempt["no_tts_compose_allowed"] is False
+    assert current_attempt["compose_execute_allowed"] is False
+
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-first-tts-failure", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": False,
+                "audio_ready_reason": "TTS_FAILED:EMPTY_OR_INVALID_AUDIO",
+                "compose_allowed": False,
+                "compose_ready": False,
+                "publish_ready": False,
+                "no_tts_compose_allowed": False,
+                "no_dub_compose_allowed": False,
+                "selected_compose_route": "tts_replace_route",
+                "blocking": ["voiceover_missing"],
+            },
+            artifact_facts=artifact_facts,
+            current_attempt=current_attempt,
+        ),
+    )
+
+    assert advisory["id"] == "hf_advisory_retriable_dub_failure"
+    assert advisory["recommended_next_action"] == "retry_or_inspect_dub"
+    assert advisory["recommended_next_action"] != "compose_no_tts"
+
+
+def test_voice_led_retry_success_resolves_tts_replace_and_final_ready():
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "voiceover_url": "/audio.mp3",
+        },
+        subtitle_lane={
+            "subtitle_ready": True,
+            "subtitle_artifact_exists": True,
+            "edited_text": "1\n00:00:00,000 --> 00:00:01,000\nမင်္ဂလာပါ\n",
+            "srt_text": "1\n00:00:00,000 --> 00:00:01,000\nမင်္ဂလာပါ\n",
+            "dub_input_text": "မင်္ဂလာပါ",
+        },
+        dub_status="done",
+        compose_status="done",
+        composed_reason="ready",
+        artifact_facts={
+            "final_exists": True,
+            "audio_exists": True,
+            "subtitle_exists": True,
+            "audio_lane": {
+                "mode": "tts_voiceover_only",
+                "tts_voiceover_exists": True,
+                "source_audio_policy": "mute",
+                "source_audio_preserved": False,
+                "bgm_configured": False,
+                "no_tts": False,
+            },
+            "compose_input": {"mode": "direct", "ready": True, "blocked": False},
+        },
+        no_dub=False,
+    )
+
+    assert current_attempt["selected_compose_route"] == "tts_replace_route"
+    assert current_attempt["audio_ready"] is True
+    assert current_attempt["compose_status"] == "done"
+    assert current_attempt["retriable_dub_failure"] is False
+
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-retry-success", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": True,
+                "audio_ready": True,
+                "compose_ready": True,
+                "publish_ready": True,
+                "blocking": [],
+            },
+            artifact_facts={
+                "final_exists": True,
+                "audio_exists": True,
+                "subtitle_exists": True,
+            },
+            current_attempt=current_attempt,
+            operator_summary={"last_successful_output_available": True},
+        ),
+    )
+
+    assert advisory["recommended_next_action"] == "continue_qa"
+
+
 def test_hot_follow_advisory_legal_no_tts_route_beats_refresh_dub():
     advisory = skills_advisory.maybe_build_hot_follow_advisory(
         {"task_id": "hf-no-tts-priority", "kind": "hot_follow"},
@@ -683,6 +816,7 @@ def test_hot_follow_advisory_noop_preserves_workbench_payload(monkeypatch):
         },
     )
     _patch_workbench_dependencies(monkeypatch)
+    monkeypatch.setattr(skills_advisory, "maybe_resolve_contract_advisory", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(skills_advisory, "_HOT_FOLLOW_ADVISORY_HOOK", lambda _input: None)
 
     app = FastAPI()
@@ -783,6 +917,7 @@ def test_hot_follow_advisory_result_attaches_to_workbench_payload(monkeypatch):
         },
     )
     _patch_workbench_dependencies(monkeypatch)
+    monkeypatch.setattr(skills_advisory, "maybe_resolve_contract_advisory", lambda *_args, **_kwargs: None)
 
     captured = {}
 

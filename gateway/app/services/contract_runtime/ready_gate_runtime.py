@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from gateway.app.services.hot_follow_route_state import selected_route_from_state
+from gateway.app.services.contract_runtime.current_attempt_runtime import selected_route_from_state
 from gateway.app.services.ready_gate import evaluate_ready_gate
 from gateway.app.services.ready_gate.registry import get_ready_gate_spec
 

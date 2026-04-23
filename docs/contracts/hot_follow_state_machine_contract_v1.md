@@ -65,6 +65,8 @@ Allowed attempt states and flags:
 - `compose_blocked_terminal`
 - `compose_input_derive_failed_terminal`
 - `compose_exec_failed_terminal`
+- `retriable_dub_failure`
+- `tts_lane_expected`
 - `requires_redub`
 - `requires_recompose`
 - selected compose route
@@ -99,6 +101,9 @@ Allowed derived outputs:
 - `pending -> running -> failed`
 - preserve-source or other no-TTS-allowed routes may keep compose legally
   reachable without TTS voiceover readiness
+- a failed TTS/provider/audio generation attempt on a subtitle-ready,
+  TTS-expected path is retriable current-attempt failure, not no-dub terminal
+  truth
 
 ### Compose
 
@@ -118,6 +123,8 @@ Blocking:
 - compose input blocked
 - compose input derive failed
 - current route requires TTS audio but `audio_ready=false`
+- retriable TTS/provider/audio generation failure while the intended route is
+  `tts_replace_route`
 - current final absent
 - current final stale against current attempt
 
@@ -130,6 +137,24 @@ Non-blocking:
 - historical final presence when a current fresh final already exists
 
 ## Dominance Rules
+
+### TTS Expected Route Dominance
+
+Explicit rule:
+
+- `subtitle_ready + TTS lane expected + audio_ready=false + current TTS
+  failure` must remain `tts_replace_route` and must not collapse into
+  `no_tts_compose_route` unless an explicit no-dub/no-TTS terminal rule applies.
+
+Interpretation:
+
+- first-dub failures are retriable dub failures when Hot Follow still expects
+  TTS audio
+- L3 may mark `retriable_dub_failure=true`
+- L3/L4 must not set `no_dub_route_terminal=true` or recommend
+  `compose_no_tts` for that shape
+- true no-dub/no-TTS terminal paths require explicit no-dub/no-TTS facts and
+  route allowance
 
 ### Final Dominance
 

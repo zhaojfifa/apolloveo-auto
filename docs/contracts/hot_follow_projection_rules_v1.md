@@ -143,6 +143,15 @@ final_precedence_contract:
 
 ```yaml
 compose_route_reason_contract:
+  intended_route_precedence:
+    tts_replace_route:
+      when:
+        - subtitle_ready
+        - no explicit no_dub lane fact
+        - no explicit no_dub/no_tts terminal allowance
+        - no current TTS voiceover
+      precedence: "keep intended TTS route over fallback no_tts route"
+      failure_class: retriable_dub_failure
   compose_input_terminal_modes:
     derive_failed: compose_input_derive_failed
     blocked: compose_input_blocked
@@ -160,6 +169,88 @@ compose_route_reason_contract:
     blocked_fields:
       - compose_allowed_reason
       - compose_reason
+```
+
+## Current Attempt / Advisory Contract
+
+```yaml
+current_attempt_route_summary_contract:
+  retriable_dub_failure:
+    selected_compose_route: tts_replace_route
+    current_attempt_failure_class: retriable_dub_failure
+    no_dub_route_terminal: false
+    no_tts_compose_allowed: false
+    compose_execute_allowed: false
+    when_all:
+      - subtitle_ready
+      - tts_lane_expected
+      - audio_ready is false
+      - no_dub is not explicitly true
+      - dub status or audio reason indicates TTS/provider/audio generation failure
+  terminal_no_tts_route:
+    no_dub_route_terminal: true
+    allowed_routes:
+      - preserve_source_route
+      - bgm_only_route
+      - no_tts_compose_route
+    requires:
+      - explicit no_dub/no_tts route allowance
+      - route-specific compose allowance
+  subtitle_terminal_state:
+    helper_translate_failed: helper_translate_failed_terminal
+    terminal_no_tts_route: no_dub_route_terminal
+    empty_subtitle_without_no_dub_terminal: subtitle_empty_terminal
+
+advisory_resolution_contract:
+  selection:
+    final_ready: final_ready
+    retriable_dub_failure: retriable_dub_failure
+    terminal_no_tts: no_dub_route_terminal
+    terminal_no_tts_routes:
+      - preserve_source_route
+      - bgm_only_route
+      - no_tts_compose_route
+  advisories:
+    final_ready:
+      id: hf_advisory_final_ready
+      kind: operator_guidance
+      level: info
+      recommended_next_action: continue_qa
+      operator_hint: no further action currently required
+      explanation: "当前成片已可用，可继续做字幕、配音或成片 QA 复核。"
+      evidence_fields:
+        - final_exists
+        - compose_ready
+        - publish_ready
+        - last_successful_output_available
+    retriable_dub_failure:
+      id: hf_advisory_retriable_dub_failure
+      kind: operator_guidance
+      level: warning
+      recommended_next_action: retry_or_inspect_dub
+      operator_hint: retry or inspect TTS/dub path
+      explanation: "TTS lane is expected but current audio is not ready after a provider/audio generation failure. Retry or inspect dub before compose."
+      evidence_fields:
+        - selected_compose_route
+        - tts_lane_expected
+        - retriable_dub_failure
+        - current_attempt_failure_class
+        - audio_ready
+        - audio_ready_reason
+        - compose_status
+    no_dub_route_terminal:
+      id: hf_advisory_no_dub_route_terminal
+      kind: operator_guidance
+      level: info
+      recommended_next_action: compose_no_tts
+      operator_hint: no TTS compose route
+      explanation: "当前素材已进入无 TTS 合成路径：{no_dub_reason}。可继续合成保留原音或背景音版本。"
+      evidence_fields:
+        - selected_compose_route
+        - no_dub_route_terminal
+        - no_tts_compose_allowed
+        - no_dub_compose_allowed
+        - no_dub_reason
 ```
 
 ## Blocking-Reason Mapping Contract

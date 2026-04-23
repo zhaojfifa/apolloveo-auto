@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Dict
 import yaml
 
-from gateway.app.services.hot_follow_route_state import selected_route_from_state
+from gateway.app.services.contract_runtime.current_attempt_runtime import selected_route_from_state
 
 from .engine import (
     BlockingRule,

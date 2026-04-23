@@ -183,7 +183,7 @@ def test_current_attempt_marks_legal_no_tts_route_as_terminal_not_running():
     assert current_attempt["requires_recompose"] is False
 
 
-def test_route_local_no_tts_compose_allowed_without_voiceover():
+def test_route_local_tts_expected_when_subtitle_ready_without_voiceover():
     artifact_facts = build_hot_follow_artifact_facts(
         "c3a11f7852e2",
         {"task_id": "c3a11f7852e2", "compose_input_policy": {"mode": "direct"}},
@@ -205,11 +205,11 @@ def test_route_local_no_tts_compose_allowed_without_voiceover():
         },
     )
 
-    assert state["ready_gate"]["selected_compose_route"] == "no_tts_compose_route"
-    assert state["ready_gate"]["compose_allowed"] is True
-    assert state["ready_gate"]["no_tts_compose_allowed"] is True
+    assert state["ready_gate"]["selected_compose_route"] == "tts_replace_route"
+    assert state["ready_gate"]["compose_allowed"] is False
+    assert state["ready_gate"]["no_tts_compose_allowed"] is False
     assert state["ready_gate"]["audio_ready"] is False
-    assert "audio_missing" not in state["ready_gate"]["blocking"]
+    assert "voiceover_missing" in state["ready_gate"]["blocking"]
 
 
 def test_ready_gate_distinguishes_route_allowed_from_compose_execute_allowed():
@@ -243,8 +243,8 @@ def test_ready_gate_distinguishes_route_allowed_from_compose_execute_allowed():
     )
 
     gate = state["ready_gate"]
-    assert gate["selected_compose_route"] == "no_tts_compose_route"
-    assert gate["compose_route_allowed"] is True
+    assert gate["selected_compose_route"] == "tts_replace_route"
+    assert gate["compose_route_allowed"] is False
     assert gate["compose_input_ready"] is False
     assert gate["compose_execute_allowed"] is False
     assert gate["compose_reason"] == "compose_input_derive_failed"

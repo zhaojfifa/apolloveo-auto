@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from gateway.app.services.contract_runtime import evaluate_contract_ready_gate
+from gateway.app.services.contract_runtime.ready_gate_runtime import evaluate_contract_ready_gate
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:

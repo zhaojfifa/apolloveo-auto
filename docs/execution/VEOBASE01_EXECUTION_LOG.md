@@ -1362,3 +1362,114 @@ Acceptance:
 - publish/workbench alignment coverage remained green
 - no scenario onboarding, new-line runtime, or multi-role harness work was
   started
+
+## Contract Runtime Expansion Pass 3
+
+Branch: `VeoBase01`
+Base SHA: `3e6dc57a7c780886359035a90e99c0cc9130fc81`
+
+Why:
+
+- a real Hot Follow task exposed that a first TTS/dub failure with a ready
+  target subtitle could be misclassified as terminal no-TTS/no-dub route truth
+- pass 3 narrows the fix to current-attempt route-summary, advisory selection,
+  and retriable-vs-terminal route classification
+
+Reading Declaration:
+
+1. Root indexes read first:
+   - `README.md`
+   - `ENGINEERING_CONSTRAINTS_INDEX.md`
+2. Docs indexes read second:
+   - `docs/README.md`
+   - `docs/ENGINEERING_INDEX.md`
+3. Reading contract read:
+   - `docs/contracts/engineering_reading_contract_v1.md`
+4. Minimum task-specific authority files selected from indexes:
+   - `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+   - `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+   - `docs/contracts/four_layer_state_contract.md`
+   - `docs/contracts/status_ownership_matrix.md`
+   - `docs/contracts/production_line_runtime_assembly_rules_v1.md`
+   - `docs/contracts/hot_follow_ready_gate.yaml`
+   - `docs/contracts/hot_follow_projection_rules_v1.md`
+   - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+   - `docs/architecture/line_contracts/hot_follow_line.yaml`
+   - `docs/execution/VEOBASE01_CODE_DEPOWERING_PLAN_V1.md`
+5. Sufficiency note:
+   - This pass targets current-attempt/advisory/route-summary
+     contractization for Hot Follow and does not require broader scenario docs.
+6. Missing-authority handling:
+   - none
+
+Runtime subset expanded:
+
+- intended route vs fallback route precedence
+- subtitle-ready/TTS-expected current-attempt route summary
+- retriable TTS/provider/audio generation failure classification
+- terminal no-dub/no-TTS route classification
+- selected-subset `compose_allowed_reason` and `subtitle_terminal_state`
+- advisory selection for final-ready, retriable dub failure, and true no-TTS
+  terminal paths
+
+Files changed:
+
+- `docs/contracts/hot_follow_projection_rules_v1.md`
+- `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- `docs/execution/VEOBASE01_CONTRACT_RUNTIME_EXPANSION_PASS3.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- `gateway/app/services/contract_runtime/__init__.py`
+- `gateway/app/services/contract_runtime/advisory_runtime.py`
+- `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+- `gateway/app/services/contract_runtime/projection_rules_runtime.py`
+- `gateway/app/services/contract_runtime/ready_gate_runtime.py`
+- `gateway/app/services/hot_follow_route_state.py`
+- `gateway/app/services/hot_follow_skills_advisory.py`
+- `gateway/app/services/ready_gate/hot_follow_rules.py`
+- `gateway/app/services/status_policy/hot_follow_state.py`
+- `gateway/app/services/tests/test_hot_follow_artifact_facts.py`
+- `gateway/app/services/tests/test_hot_follow_skills_advisory.py`
+
+Ownership removed:
+
+- `hot_follow_route_state.py` lost selected current-attempt route-summary rule
+  ownership for the selected subset; it now delegates to
+  `contract_runtime/current_attempt_runtime.py`
+- `hot_follow_skills_advisory.py` lost advisory selection ownership for the
+  selected final-ready / retriable-dub-failure / terminal-no-TTS subset
+- ready-gate code now imports selected-route runtime from
+  `contract_runtime/current_attempt_runtime.py`
+- presenters/helpers remained output shapers and did not receive new rule power
+
+Validation:
+
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache python3 -m py_compile gateway/app/services/contract_runtime/__init__.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/contract_runtime/advisory_runtime.py gateway/app/services/contract_runtime/projection_rules_runtime.py gateway/app/services/contract_runtime/ready_gate_runtime.py gateway/app/services/hot_follow_route_state.py gateway/app/services/hot_follow_skills_advisory.py gateway/app/services/ready_gate/hot_follow_rules.py gateway/app/services/status_policy/hot_follow_state.py`: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_contract_runtime_projection_rules.py -q`: `37 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_state_line_binding.py gateway/app/services/tests/test_line_binding_service.py gateway/app/services/status_policy/tests/test_line_runtime_binding.py gateway/app/services/tests/test_contract_runtime_projection_rules.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_hot_follow_line_policy_layer.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`: `77 passed`
+- `git diff --check`: passed
+
+Regression evidence:
+
+- voice-led / subtitle-ready / first TTS failure stays `tts_replace_route`,
+  classifies as `retriable_dub_failure`, and does not recommend
+  `compose_no_tts`
+- voice-led retry success resolves to `tts_replace_route`, `audio_ready=true`,
+  `compose_status=done`, and final-ready advisory
+- true no-dub/no-TTS terminal path remains legal when explicit route facts and
+  no-dub/no-TTS allowance apply
+- final-ready / scene-pack pending remains non-blocking through existing
+  publish/workbench ready-gate coverage
+
+Live replay:
+
+- exact live task replay for `a71bb3fd679e` was not run
+- evidence is fixture/in-process coverage only
+
+Acceptance:
+
+- first-dub-failure misclassification fixed for the selected contract-runtime
+  subset
+- current-attempt/advisory logic for the selected subset is now genuinely
+  contract-runtime loaded
+- no scenario onboarding, new-line implementation, UI/editor work, or
+  multi-role harness work was introduced

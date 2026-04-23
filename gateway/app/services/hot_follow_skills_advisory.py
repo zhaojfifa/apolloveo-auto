@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from gateway.app.lines.base import ProductionLine
+from gateway.app.services.contract_runtime.advisory_runtime import maybe_resolve_contract_advisory
 from gateway.app.services.line_binding_service import get_line_runtime_binding
 from gateway.app.services.skills_runtime import load_line_skills_bundle, run_loaded_skills_bundle
 
@@ -122,6 +123,9 @@ def maybe_build_hot_follow_advisory(
     bundle = resolve_hot_follow_skills_bundle(line)
     if bundle is None:
         return None
+    contract_advisory = maybe_resolve_contract_advisory(task, payload)
+    if contract_advisory is not None:
+        return _normalize_advisory_output(contract_advisory)
     advisory_input = build_hot_follow_advisory_input(task, payload, line=line)
     try:
         return _normalize_advisory_output(_HOT_FOLLOW_ADVISORY_HOOK(advisory_input))
