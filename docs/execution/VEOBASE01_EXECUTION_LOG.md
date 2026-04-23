@@ -1362,3 +1362,75 @@ Acceptance:
 - publish/workbench alignment coverage remained green
 - no scenario onboarding, new-line runtime, or multi-role harness work was
   started
+
+## Subtitle Authority Rollback 1
+
+Branch: `VeoBase01-subtitle-authority-rollback1`
+Broken-tip SHA: `7e2e56b873f59537bf6d33a51b854343631bca63`
+Rollback target SHA: `3e6dc57a7c780886359035a90e99c0cc9130fc81`
+
+Why:
+
+- pass 3 crossed from the intended current-attempt/advisory interpretation
+  bugfix into a subtitle-authority break
+- broken evidence showed subtitles marked done while effective target subtitle
+  truth was empty/missing, helper failure was not represented, and downstream
+  no-dub/target-subtitle-empty classification hid the upstream failure class
+- the immediate previous baseline still had the smaller first-dub-failure
+  interpretation bug, but the Hot Follow mainline remained usable after retry
+
+Safety tag:
+
+- annotated tag: `VeoBase01-PreSubtitleAuthorityRollback`
+- tag target: `7e2e56b873f59537bf6d33a51b854343631bca63`
+- purpose: preserve the broken tip for later comparison
+
+Rollback method:
+
+- `git tag -a VeoBase01-PreSubtitleAuthorityRollback 7e2e56b873f59537bf6d33a51b854343631bca63 -m "Safety tag before subtitle authority rollback"`
+- `git checkout -B VeoBase01-subtitle-authority-rollback1 3e6dc57a7c780886359035a90e99c0cc9130fc81`
+
+Documentation:
+
+- `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_ROLLBACK1.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Gate 1 result:
+
+- target subtitle authority gate passed by fixture/in-process evidence
+- valid target subtitle output can be authoritative/current
+- `subtitle_ready=true` and non-empty `dub_input_text` are preserved when
+  target subtitle truth is valid
+- translation-incomplete/source-copy/empty target subtitle remains blocked
+
+Gate 2 result:
+
+- helper translation failure propagation gate passed by fixture/in-process
+  evidence
+- provider/helper failure is represented with authoritative helper error
+  reason/message fields
+- helper output remains helper-layer only and does not replace target subtitle
+  truth
+
+Validation:
+
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache python3 -m py_compile gateway/app/services/subtitle_helpers.py gateway/app/services/task_view_projection.py gateway/app/services/task_view_workbench_contract.py gateway/app/services/task_view_presenters.py gateway/app/services/status_policy/hot_follow_state.py gateway/app/services/hot_follow_route_state.py gateway/app/services/hot_follow_skills_advisory.py gateway/app/services/steps_v1.py`: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_hot_follow_subtitle_currentness.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_helper_translate_429_persists_sanitized_helper_failure gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_manual_subtitle_save_clears_helper_translate_failure -q`: `46 passed`, `2 failed`
+- failure note: the two failures were unrelated subtitle-rendering microtune
+  assertions for font size/render signature, not subtitle-authority or helper
+  failure propagation gates
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_hot_follow_subtitle_currentness.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_helper_translate_429_persists_sanitized_helper_failure gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_manual_subtitle_save_clears_helper_translate_failure -k 'not compose_subtitle_vf_uses_bottom_safe_zone_defaults_for_hot_follow and not subtitle_render_signature_tracks_minimal_retune_defaults' -q`: `46 passed`, `2 deselected`
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_generate_subtitles_keeps_preserved_source_audio_helper_out_of_target_truth gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_persists_full_target_srt gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_failure_preserves_authoritative_outputs gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_helper_translation_projection_stays_helper_layer_only gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_helper_translate_429_persists_sanitized_helper_failure gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_manual_subtitle_save_clears_helper_translate_failure -q`: `6 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_hot_follow_state_line_binding.py gateway/app/services/tests/test_contract_runtime_projection_rules.py gateway/app/services/status_policy/tests/test_hot_follow_line_policy_layer.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`: `60 passed`
+
+Live replay:
+
+- no live representative Hot Follow replay was run
+- evidence is fixture/in-process coverage only
+
+Decision:
+
+- rollback-one succeeded for the required subtitle-authority gates
+- rollback-two is not needed now
+- stop here; fresh subtitle-authority contract redo work should start from
+  `VeoBase01-subtitle-authority-rollback1`
