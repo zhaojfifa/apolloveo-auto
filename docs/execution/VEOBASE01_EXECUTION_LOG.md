@@ -1152,3 +1152,87 @@ Acceptance:
 - `steps_v1.py` line count reduced from `2413` to `2349`
 - neutral SRT/text compatibility helpers moved into a dedicated support module
 - step execution semantics were intentionally preserved
+
+## Minimal Contract Runtime Skeleton
+
+Branch: `VeoBase01-minimal-contract-runtime`
+Base SHA: `11ec2c192ef74e89cdc0e98f39e8ad8a3208e003`
+
+Why:
+
+- the rules-first baseline had been frozen in docs, but the selected
+  ready-gate / projection / blocking subset still lived in Python helper and
+  presenter branches instead of a dedicated runtime bridge.
+
+Scope:
+
+- add the minimal `gateway/app/services/contract_runtime/` package
+- route Hot Follow ready-gate evaluation through the contract runtime bridge
+- route publish/workbench selected projection dominance through the projection
+  runtime
+- load selected blocking-reason mapping from contract data
+- remove only the matching rule ownership replaced by the new runtime subset
+
+Reading Declaration:
+
+- current phase: `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`,
+  `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+- state truth: `docs/contracts/four_layer_state_contract.md`,
+  `docs/contracts/contract_driven_four_layer_state_baseline_v1.md`,
+  `docs/contracts/status_ownership_matrix.md`
+- ready-gate semantics: `docs/contracts/hot_follow_ready_gate.yaml`
+- projection semantics: `docs/contracts/hot_follow_projection_rules_v1.md`,
+  `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- ownership semantics: `docs/contracts/production_line_runtime_assembly_rules_v1.md`,
+  `docs/architecture/factory_four_layer_architecture_baseline_v1.md`,
+  `docs/execution/VEOBASE01_CODE_DEPOWERING_PLAN_V1.md`
+
+Files changed:
+
+- `docs/architecture/line_contracts/hot_follow_line.yaml`
+- `docs/contracts/hot_follow_projection_rules_v1.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- `docs/execution/VEOBASE01_MINIMAL_CONTRACT_RUNTIME_SKELETON.md`
+- `gateway/app/lines/base.py`
+- `gateway/app/lines/hot_follow.py`
+- `gateway/app/routers/hot_follow_api.py`
+- `gateway/app/routers/tasks.py`
+- `gateway/app/services/contract_runtime/__init__.py`
+- `gateway/app/services/contract_runtime/blocking_reason_runtime.py`
+- `gateway/app/services/contract_runtime/projection_rules_runtime.py`
+- `gateway/app/services/contract_runtime/ready_gate_runtime.py`
+- `gateway/app/services/contract_runtime/runtime_loader.py`
+- `gateway/app/services/status_policy/hot_follow_state.py`
+- `gateway/app/services/status_policy/tests/test_hot_follow_state_line_binding.py`
+- `gateway/app/services/status_policy/tests/test_line_runtime_binding.py`
+- `gateway/app/services/task_view_helpers.py`
+- `gateway/app/services/task_view_presenters.py`
+- `gateway/app/services/tests/test_contract_runtime_projection_rules.py`
+- `gateway/app/services/tests/test_line_binding_service.py`
+
+Validation:
+
+- `git diff --check`: passed
+- `PYTHONPYCACHEPREFIX=/tmp/apolloveo-pycache python3 -m py_compile gateway/app/services/status_policy/hot_follow_state.py gateway/app/services/task_view_presenters.py gateway/app/services/task_view_helpers.py gateway/app/routers/hot_follow_api.py gateway/app/routers/tasks.py gateway/app/services/contract_runtime/__init__.py gateway/app/services/contract_runtime/runtime_loader.py gateway/app/services/contract_runtime/ready_gate_runtime.py gateway/app/services/contract_runtime/projection_rules_runtime.py gateway/app/services/contract_runtime/blocking_reason_runtime.py gateway/app/services/status_policy/tests/test_hot_follow_state_line_binding.py gateway/app/services/tests/test_line_binding_service.py gateway/app/services/status_policy/tests/test_line_runtime_binding.py gateway/app/services/tests/test_contract_runtime_projection_rules.py`: passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_state_line_binding.py gateway/app/services/tests/test_line_binding_service.py gateway/app/services/status_policy/tests/test_line_runtime_binding.py gateway/app/services/tests/test_contract_runtime_projection_rules.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`: `31 passed`
+
+Regression evidence:
+
+- exact live task replay was not run in this workspace
+- in-process contradiction-class coverage passed for:
+  - local upload + preserved source audio + final done
+  - URL/reference + TTS-only + final done
+  - scene-pack pending but final publishable
+  - final absent / compose genuinely in progress
+
+Acceptance:
+
+- selected ready-gate evaluation now flows through
+  `gateway/app/services/contract_runtime/ready_gate_runtime.py`
+- publish/workbench selected projection dominance now flows through
+  `gateway/app/services/contract_runtime/projection_rules_runtime.py`
+- blocking-reason mapping is centralized in
+  `gateway/app/services/contract_runtime/blocking_reason_runtime.py`
+- `task_view_presenters.py`, `task_view_helpers.py`, `tasks.py`, and
+  `hot_follow_api.py` each lost a narrow piece of selected rule ownership
+- Hot Follow business behavior was intentionally preserved

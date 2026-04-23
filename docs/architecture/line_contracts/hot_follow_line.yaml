@@ -105,6 +105,7 @@ confirmation_policy:
 # ─── Status policy reference ──────────────────────────────────────────────────
 
 ready_gate_ref: docs/contracts/hot_follow_ready_gate.yaml
+projection_rules_ref: docs/contracts/hot_follow_projection_rules_v1.md
 status_policy_ref: gateway/app/services/status_policy/hot_follow_state.py
 
 # ─── Content routing summary ──────────────────────────────────────────────────

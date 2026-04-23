@@ -9,4 +9,5 @@ def test_status_runtime_binding_exposes_line_and_gate_spec_for_hot_follow():
     assert binding.line is not None
     assert binding.line.line_id == "hot_follow_line"
     assert binding.line.status_policy_ref == "gateway/app/services/status_policy/hot_follow_state.py"
+    assert binding.line.projection_rules_ref == "docs/contracts/hot_follow_projection_rules_v1.md"
     assert binding.ready_gate_spec is HOT_FOLLOW_GATE_SPEC

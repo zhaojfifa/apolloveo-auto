@@ -58,6 +58,9 @@ class ProductionLine:
     ready_gate_ref: str = ""
     """Path to the ready-gate spec source for this line."""
 
+    projection_rules_ref: str = ""
+    """Path to the projection-rules contract source for this line."""
+
     status_policy_ref: str = ""
     """Path to the status policy entrypoint for this line."""
 
@@ -108,6 +111,7 @@ class ProductionLine:
             "worker_profile_ref": self.worker_profile_ref or None,
             "asset_sink_profile_ref": self.asset_sink_profile_ref or None,
             "ready_gate_ref": self.ready_gate_ref or None,
+            "projection_rules_ref": self.projection_rules_ref or None,
             "status_policy_ref": self.status_policy_ref or None,
             "deliverable_kinds": list(self.deliverable_kinds),
             "auto_sink_enabled": bool(self.auto_sink_enabled),
@@ -116,6 +120,7 @@ class ProductionLine:
                 "skills_bundle_ref": self.skills_bundle_ref or None,
                 "worker_profile_ref": self.worker_profile_ref or None,
                 "ready_gate_ref": self.ready_gate_ref or None,
+                "projection_rules_ref": self.projection_rules_ref or None,
                 "status_policy_ref": self.status_policy_ref or None,
             },
         }
