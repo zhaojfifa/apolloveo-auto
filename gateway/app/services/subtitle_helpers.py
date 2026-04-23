@@ -40,6 +40,31 @@ from gateway.app.utils.pipeline_config import parse_pipeline_config
 logger = logging.getLogger(__name__)
 
 
+def _read_text_file(path: Path | None) -> str:
+    if path is None or not path.exists():
+        return ""
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return path.read_text(encoding="utf-8", errors="ignore")
+
+
+def _local_target_subtitle_path(task_id: str, target_lang: str | None) -> Path | None:
+    try:
+        workspace = Workspace(task_id, target_lang=hot_follow_internal_lang(target_lang or "mm"))
+        return workspace.mm_srt_path
+    except Exception:
+        return None
+
+
+def _local_origin_subtitle_path(task_id: str) -> Path | None:
+    try:
+        workspace = Workspace(task_id)
+        return workspace.origin_srt_path
+    except Exception:
+        return None
+
+
 def hf_is_srt_text(text: str) -> bool:
     source = str(text or "").strip()
     if not source or "-->" not in source:
@@ -260,12 +285,10 @@ def hf_subtitle_content_hash(text: str | None) -> str | None:
 def hf_load_subtitles_text(task_id: str, task: dict) -> str:
     override_path = hf_subtitles_override_path(task_id)
     if override_path.exists():
-        try:
-            return override_path.read_text(encoding="utf-8")
-        except Exception:
-            return override_path.read_text(encoding="utf-8", errors="ignore")
+        return _read_text_file(override_path)
 
-    mm_key = hf_task_target_subtitle_key(task, task.get("target_lang") or task.get("content_lang") or "mm") or task_key(task, "mm_srt_path")
+    target_lang = task.get("target_lang") or task.get("content_lang") or "mm"
+    mm_key = hf_task_target_subtitle_key(task, target_lang) or task_key(task, "mm_srt_path")
     if mm_key and object_exists(mm_key):
         data = get_object_bytes(mm_key)
         if data:
@@ -273,10 +296,15 @@ def hf_load_subtitles_text(task_id: str, task: dict) -> str:
                 return data.decode("utf-8")
             except Exception:
                 return data.decode("utf-8", errors="ignore")
+    local_target_path = _local_target_subtitle_path(task_id, target_lang)
+    local_text = _read_text_file(local_target_path)
+    if local_text:
+        return local_text
     return ""
 
 
 def hf_load_origin_subtitles_text(task: dict) -> str:
+    task_id = str(task.get("task_id") or task.get("id") or "")
     origin_key = task_key(task, "origin_srt_path")
     if origin_key and object_exists(origin_key):
         data = get_object_bytes(origin_key)
@@ -285,6 +313,11 @@ def hf_load_origin_subtitles_text(task: dict) -> str:
                 return data.decode("utf-8")
             except Exception:
                 return data.decode("utf-8", errors="ignore")
+    if task_id:
+        local_origin_path = _local_origin_subtitle_path(task_id)
+        local_text = _read_text_file(local_origin_path)
+        if local_text:
+            return local_text
     return ""
 
 
@@ -389,7 +422,11 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         if composed_key
         else (hf_expected_subtitle_filename(target_lang) if expected_key else None)
     )
-    subtitle_artifact_physical_exists = bool(expected_key and object_exists(str(expected_key)))
+    local_target_path = _local_target_subtitle_path(task_id, target_lang)
+    subtitle_artifact_physical_exists = bool(
+        (expected_key and object_exists(str(expected_key)))
+        or (local_target_path and local_target_path.exists())
+    )
     target_text_has_semantics = has_semantic_target_subtitle_text(edited_text)
     subtitle_artifact_exists = bool(subtitle_artifact_physical_exists and target_text_has_semantics)
     primary_editable_text = edited_text if target_text_has_semantics else ""
@@ -407,13 +444,18 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         target_currentness.get("target_subtitle_current_reason")
         or ("ready" if subtitle_ready else "subtitle_missing")
     )
+    explicit_target_reason = str(task.get("target_subtitle_current_reason") or "").strip()
     helper_translate_failed = str(task.get("subtitle_helper_status") or "").strip().lower() == "failed"
     helper_translate_error_reason = str(task.get("subtitle_helper_error_reason") or "").strip() or None
     helper_translate_error_message = str(task.get("subtitle_helper_error_message") or "").strip() or None
-    if helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
+    if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
+        subtitle_ready_reason = explicit_target_reason
+    elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
         subtitle_ready_reason = helper_translate_error_reason or "helper_translate_failed"
     target_subtitle_current_reason = str(target_currentness.get("target_subtitle_current_reason") or subtitle_ready_reason)
-    if helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
+    if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
+        target_subtitle_current_reason = subtitle_ready_reason
+    elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
         target_subtitle_current_reason = subtitle_ready_reason
     dub_input_text = edited_text if subtitle_ready else ""
     helper_source_text = normalized_source_text or raw_source_text

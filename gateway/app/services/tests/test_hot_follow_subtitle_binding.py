@@ -299,6 +299,73 @@ def test_subtitle_lane_does_not_treat_timing_only_target_artifact_as_existing_tr
     assert lane["dub_input_text"] == ""
 
 
+def test_subtitle_lane_reads_local_authoritative_target_when_storage_copy_missing(monkeypatch, tmp_path):
+    task_id = "hf-local-authoritative-target"
+    target_srt = "1\n00:00:00,000 --> 00:00:02,000\nXin chao\n"
+    origin_srt = "1\n00:00:00,000 --> 00:00:02,000\n你好\n"
+
+    class _Workspace:
+        def __init__(self, _task_id: str, target_lang: str | None = None):
+            _ = target_lang
+            assert _task_id == task_id
+            self.mm_srt_path = tmp_path / "subtitles" / "vi.srt"
+            self.origin_srt_path = tmp_path / "subs" / "origin.srt"
+
+    workspace = _Workspace(task_id, "vi")
+    workspace.mm_srt_path.parent.mkdir(parents=True, exist_ok=True)
+    workspace.origin_srt_path.parent.mkdir(parents=True, exist_ok=True)
+    workspace.mm_srt_path.write_text(target_srt, encoding="utf-8")
+    workspace.origin_srt_path.write_text(origin_srt, encoding="utf-8")
+
+    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: tmp_path / _task_id)
+
+    lane = hf_router._hf_subtitle_lane_state(
+        task_id,
+        {
+            "task_id": task_id,
+            "target_lang": "vi",
+            "origin_srt_path": f"deliver/tasks/{task_id}/origin.srt",
+            "mm_srt_path": f"deliver/tasks/{task_id}/vi.srt",
+        },
+    )
+
+    assert "你好" in lane["raw_source_text"]
+    assert "Xin chao" in lane["edited_text"]
+    assert lane["srt_text"] == lane["edited_text"]
+    assert lane["primary_editable_text"] == lane["edited_text"]
+    assert lane["subtitle_artifact_exists"] is True
+    assert lane["target_subtitle_authoritative_source"] is True
+    assert lane["target_subtitle_current"] is True
+    assert lane["target_subtitle_current_reason"] == "ready"
+    assert lane["subtitle_ready"] is True
+    assert "Xin chao" in lane["dub_input_text"]
+    assert lane["dub_input_source"] == "target_subtitle"
+
+
+def test_subtitle_lane_preserves_translation_incomplete_reason_over_generic_missing(monkeypatch):
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+
+    lane = hf_router._hf_subtitle_lane_state(
+        "hf-target-translation-incomplete",
+        {
+            "task_id": "hf-target-translation-incomplete",
+            "target_lang": "vi",
+            "mm_srt_path": "deliver/tasks/hf-target-translation-incomplete/vi.srt",
+            "pipeline_config": {"translation_incomplete": "true"},
+            "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+        },
+    )
+
+    assert lane["edited_text"] == ""
+    assert lane["subtitle_ready"] is False
+    assert lane["subtitle_ready_reason"] == "target_subtitle_translation_incomplete"
+    assert lane["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
+    assert lane["dub_input_text"] == ""
+
+
 def test_sync_saved_target_subtitle_artifact_refuses_semantically_empty_srt(monkeypatch):
     monkeypatch.setattr(hf_router, "upload_task_artifact", lambda *_args, **_kwargs: pytest.fail("empty target subtitle must not upload"))
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)

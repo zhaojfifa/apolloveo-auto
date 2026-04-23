@@ -1725,3 +1725,106 @@ Acceptance:
 - helper is restored to side-channel status for the corrected boundary
 - empty-body subtitle success is impossible on the corrected paths
 - `VeoBase01` is safe for later resumed contract tightening on this boundary
+
+## 2026-04-24 - VEOBASE01 Subtitle Authority Closure Continuation
+
+Branch:
+
+- `VeoBase01-subtitle-authority-contract-correction`
+
+Base:
+
+- `c8389b29b605cd36e37e853fb216486315bd0006`
+
+Reading declaration:
+
+- root indexes:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+- docs indexes:
+  - `docs/README.md`
+  - `docs/ENGINEERING_INDEX.md`
+- task-specific authority:
+  - `docs/contracts/engineering_reading_contract_v1.md`
+  - `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+  - `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/reviews/VEOBASE01_SUBTITLE_AUTHORITY_REVIEW.md`
+  - `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+- missing authority: none
+
+Exact remaining gap repaired:
+
+- projection still depended too heavily on storage-backed subtitle artifacts
+- authoritative local target subtitle text could exist while
+  `edited_text` / `srt_text` / `primary_editable_text` / `dub_input_text`
+  stayed empty
+- persisted upstream formation failure reasons such as
+  `target_subtitle_translation_incomplete` could still collapse to generic
+  `subtitle_missing`
+
+Exact modules changed:
+
+- `gateway/app/routers/hot_follow_api.py`
+- `gateway/app/services/subtitle_helpers.py`
+- `gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Exact formation path repaired:
+
+- subtitle text load path now falls back from override -> storage artifact ->
+  local workspace authoritative subtitle artifact
+- subtitle artifact physical existence now accepts the local workspace target
+  subtitle file as evidence for currentness/binding projection
+
+Helper/provider failure propagation before / after:
+
+- before: explicit helper/provider or translation-incomplete failure truth could
+  still be downgraded to `subtitle_missing` when no target text loaded
+- after: explicit persisted failure reasons survive subtitle-lane projection and
+  remain visible as the primary target-formation failure class
+
+Dub-input binding before / after:
+
+- before: `dub_input_text` could remain empty when the authoritative subtitle
+  existed only in the local/current artifact path
+- after: `dub_input_text` is restored from authoritative/current target
+  subtitle truth when that truth exists in override, storage, or local
+  workspace artifact form
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/subtitle_helpers.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -k "local_authoritative_target or translation_incomplete_reason or source_lane_failure_persists_subtitle_authority_failure or source_lane_persists_full_target_srt or helper_failure_preserves_authoritative_outputs or does_not_treat_timing_only_target_artifact_as_existing_truth"`: `6 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -k "vi_currentness_blocks_false_done_states or myanmar_currentness_blocks_false_done_states or helper_translate_429_persists_sanitized_helper_failure"`: `3 passed`
+- `git diff --check`: passed
+
+Validation note:
+
+- `test_manual_subtitle_save_clears_helper_translate_failure` currently returns
+  `422` in this workspace; that endpoint issue was not introduced by this pass
+  and was left out of scope
+
+Real representative task verification:
+
+- not available locally
+- `2825a683c861`, `6b40d86589da`, `944e2e8e6f0d`, `91990da2b72f`, and
+  `796bf811a43b` were not available in local repo artifacts or local
+  `shortvideo.db`
+- acceptance is therefore based on focused in-process/runtime coverage only
+
+Acceptance:
+
+- target subtitle formation closure is repaired for the storage-missing /
+  local-authoritative-artifact shape
+- helper/provider and translation-incomplete failure truth no longer disappears
+  into generic `subtitle_missing`
+- authoritative target subtitle to dub-input binding is restored
+- `VeoBase01-subtitle-authority-contract-correction` is now a safer merge
+  candidate for subtitle-authority completion
