@@ -16,6 +16,7 @@ from gateway.app.services.contract_runtime import (
     apply_projection_runtime,
     get_contract_runtime_refs,
     get_projection_rules_runtime,
+    select_presentation_final,
 )
 from gateway.app.services.hot_follow_skills_advisory import (
     maybe_build_hot_follow_advisory,
@@ -263,7 +264,17 @@ def hf_rerun_presentation_state(
     dub_status: str | None,
 ) -> dict[str, Any]:
     voice = voice_state or {}
-    final_payload = final_info or historical_final or {}
+    refs = get_contract_runtime_refs(task)
+    projection_runtime = (
+        get_projection_rules_runtime(refs.projection_rules_ref)
+        if refs.projection_rules_ref
+        else None
+    )
+    final_payload = select_presentation_final(
+        final_info,
+        historical_final,
+        projection_runtime=projection_runtime,
+    )
     final_exists = bool(final_payload.get("exists"))
     final_url = str(final_payload.get("url") or "").strip() or None
     final_asset_version = str(final_payload.get("asset_version") or "").strip() or None

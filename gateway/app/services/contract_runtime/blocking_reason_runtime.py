@@ -40,6 +40,19 @@ class BlockingReasonRuntime:
         meta = self.metadata.get(canonical) or {}
         return bool(meta.get("suppress_when_publish_ready"))
 
+    def priority(self, reason: str | None) -> int:
+        canonical = self.canonicalize(reason)
+        meta = self.metadata.get(canonical) or {}
+        value = meta.get("priority")
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 100
+
+    def sort_by_priority(self, reasons: list[str] | tuple[str, ...] | None) -> list[str]:
+        normalized = self.normalize_list(reasons)
+        return sorted(normalized, key=lambda reason: (self.priority(reason), normalized.index(reason)))
+
     def scene_pack_pending_reason(self, status: str | None) -> str | None:
         normalized = str(status or "").strip().lower()
         if normalized == "running":
@@ -78,7 +91,7 @@ def filter_publish_ready_blocking(
     runtime: BlockingReasonRuntime,
 ) -> list[str]:
     filtered: list[str] = []
-    for reason in runtime.normalize_list(reasons):
+    for reason in runtime.sort_by_priority(reasons):
         if runtime.is_non_blocking(reason):
             continue
         if runtime.suppress_when_publish_ready(reason):
