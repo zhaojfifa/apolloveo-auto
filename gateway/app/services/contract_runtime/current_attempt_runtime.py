@@ -693,10 +693,13 @@ def build_hot_follow_current_attempt_summary(
         "retriable_dub_failure": retriable_dub_failure,
         "current_attempt_failure_class": "retriable_dub_failure" if retriable_dub_failure else None,
         "subtitle_translation_waiting_retryable": translation_waiting_retryable,
+        "helper_translate_status": artifacts.get("helper_translate_status"),
         "helper_translate_failed": helper_translate_failed,
         "helper_translate_failed_voice_led": helper_translate_failed_voice_led,
         "helper_translate_error_reason": artifacts.get("helper_translate_error_reason"),
         "helper_translate_error_message": artifacts.get("helper_translate_error_message"),
+        "helper_translate_retryable": bool(artifacts.get("helper_translate_retryable")),
+        "helper_translate_terminal": bool(artifacts.get("helper_translate_terminal")),
         "subtitle_terminal_state": (
             "helper_translate_failed_terminal"
             if helper_translate_failed

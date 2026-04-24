@@ -178,6 +178,36 @@ L3/L4 derivation rule:
 - none of those L4 surfaces may keep stale failed projection once L2 says the
   task is `translation_waiting_retryable`
 
+### `helper_side_channel_explicit_state`
+
+Definition:
+
+- helper translation is a side-channel contract lane
+- helper lane may assist source understanding and manual subtitle fill
+- helper lane does not become authoritative target subtitle truth unless the
+  canonical target-subtitle save path succeeds
+
+Frozen helper lane states:
+
+- `helper_unavailable`
+- `helper_pending`
+- `helper_resolved`
+- `helper_retryable_failure`
+- `helper_terminal_failure`
+
+Dominance rule:
+
+- if `target_subtitle_current=true`
+- and `target_subtitle_authoritative_source=true`
+- and `subtitle_ready=true`
+- and `audio_ready=true`
+- and `final_exists=true`
+- then helper retryable or terminal failure remains helper-side diagnostic
+  truth only
+- in that shape helper history may stay visible, but it must not become
+  `subtitles.error`, `current_attempt_failed`, ready-gate failure, or publish
+  blocking truth
+
 ## Dominance Rules
 
 ### TTS Expected Route Dominance
@@ -225,6 +255,9 @@ Explicit rule:
 - once current subtitle/audio/final truth is ready, helper failure history may
   remain visible but must not downgrade route, current-attempt, or ready-gate
   truth
+- helper input text and translated text remain helper-scoped and must not
+  overwrite authoritative target subtitle fields unless canonical subtitle save
+  succeeds
 
 ### Historical Event Isolation
 

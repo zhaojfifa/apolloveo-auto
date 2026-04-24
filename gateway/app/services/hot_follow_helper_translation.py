@@ -17,6 +17,10 @@ _HELPER_TERMINAL_REASONS = {
     "helper_translate_unsupported_language",
     "helper_translate_input_invalid",
 }
+_HELPER_PENDING_STATES = {"queued", "running", "processing", "pending", "helper_pending"}
+_HELPER_RESOLVED_STATES = {"ready", "resolved", "helper_resolved"}
+_HELPER_RETRYABLE_FAILURE_STATES = {"failed", "helper_retryable_failure"}
+_HELPER_TERMINAL_FAILURE_STATES = {"helper_terminal_failure"}
 
 
 def sanitize_helper_translate_error(exc: BaseException | str) -> dict[str, Any]:
@@ -105,29 +109,34 @@ def helper_translate_lane_state(
     provider = str(task.get("subtitle_helper_provider") or "").strip() or None
     has_source = bool(str(helper_source_text or "").strip())
 
-    if status in {"queued", "running", "processing", "pending"}:
+    if status in _HELPER_PENDING_STATES:
+        status = "helper_pending"
         visibility = "pending_provider_work"
         failed = False
-    elif status == "failed":
-        visibility = (
-            "terminal_provider_failure"
-            if reason in _HELPER_TERMINAL_REASONS
-            else "temporary_provider_issue"
-        )
+    elif status in _HELPER_TERMINAL_FAILURE_STATES or (
+        status in _HELPER_RETRYABLE_FAILURE_STATES and reason in _HELPER_TERMINAL_REASONS
+    ):
+        status = "helper_terminal_failure"
+        visibility = "terminal_provider_failure"
         failed = True
-    elif status in {"ready", "resolved"}:
+    elif status in _HELPER_RETRYABLE_FAILURE_STATES:
+        status = "helper_retryable_failure"
+        visibility = "temporary_provider_issue"
+        failed = True
+    elif status in _HELPER_RESOLVED_STATES:
+        status = "helper_resolved"
         visibility = "resolved"
         failed = False
     elif translation_waiting and has_source:
-        status = "pending"
+        status = "helper_pending"
         reason = reason or "helper_translate_pending"
         message = message or "字幕翻译尚未就绪，正在等待翻译结果或可重试处理。"
         visibility = "pending_provider_work"
         failed = False
     else:
-        status = status or "not_involved"
-        reason = reason if status != "not_involved" else None
-        message = message if status != "not_involved" else None
+        status = "helper_unavailable"
+        reason = None
+        message = None
         visibility = "no_helper_used"
         failed = False
 

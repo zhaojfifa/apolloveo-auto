@@ -308,7 +308,7 @@ def test_hot_follow_workbench_vi_currentness_blocks_false_done_states(monkeypatc
     assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
     assert data["subtitles"]["status"] == "pending"
     assert data["subtitles"]["subtitle_ready_reason"] == "waiting_for_target_subtitle_translation"
-    assert data["subtitles"]["helper_translation"]["status"] == "pending"
+    assert data["subtitles"]["helper_translation"]["status"] == "helper_pending"
     assert data["subtitles"]["helper_translation"]["visibility"] == "pending_provider_work"
     assert data["ready_gate"]["subtitle_ready"] is False
     assert data["ready_gate"]["compose_ready"] is False
@@ -528,7 +528,7 @@ def test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empt
 
     assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
     assert data["subtitles"]["subtitle_ready_reason"] == "waiting_for_target_subtitle_translation"
-    assert data["subtitles"]["helper_translation"]["status"] == "pending"
+    assert data["subtitles"]["helper_translation"]["status"] == "helper_pending"
     assert data["subtitles"]["helper_translation"]["visibility"] == "pending_provider_work"
     assert data["artifact_facts"]["selected_compose_route"]["name"] == "tts_replace_route"
     assert data["current_attempt"]["selected_compose_route"] == "tts_replace_route"
@@ -1139,6 +1139,7 @@ def test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authorita
     assert subtitles_row.get("status") == "done"
     assert subtitles_row.get("state") == "done"
     assert subtitles_row.get("error") is None
+    assert helper.get("status") == "helper_retryable_failure"
     assert helper.get("failed") is True
     assert helper.get("reason") == "helper_translate_provider_exhausted"
     assert data.get("audio_ready") is True

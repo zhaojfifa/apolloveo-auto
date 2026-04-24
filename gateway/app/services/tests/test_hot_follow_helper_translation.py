@@ -32,21 +32,21 @@ def test_helper_translate_lane_state_distinguishes_pending_temporary_terminal_an
         helper_source_text="",
     )
 
-    assert pending["status"] == "pending"
+    assert pending["status"] == "helper_pending"
     assert pending["visibility"] == "pending_provider_work"
     assert pending["retryable"] is True
     assert pending["terminal"] is False
 
-    assert temporary["status"] == "failed"
+    assert temporary["status"] == "helper_retryable_failure"
     assert temporary["visibility"] == "temporary_provider_issue"
     assert temporary["failed"] is True
     assert temporary["retryable"] is True
 
-    assert terminal["status"] == "failed"
+    assert terminal["status"] == "helper_terminal_failure"
     assert terminal["visibility"] == "terminal_provider_failure"
     assert terminal["terminal"] is True
     assert terminal["retryable"] is False
 
-    assert not_involved["status"] == "not_involved"
+    assert not_involved["status"] == "helper_unavailable"
     assert not_involved["visibility"] == "no_helper_used"
     assert not_involved["failed"] is False

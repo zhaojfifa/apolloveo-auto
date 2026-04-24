@@ -184,7 +184,9 @@ current_attempt_route_summary_contract:
     no_tts_compose_allowed: false
     compose_execute_allowed: false
     helper_translation:
-      status: pending_or_retryable
+      status:
+        - helper_pending
+        - helper_retryable_failure
       retryable: true
       terminal: false
     when_all:
@@ -193,6 +195,22 @@ current_attempt_route_summary_contract:
       - audio_ready is false
       - audio_ready_reason is waiting_for_target_subtitle_translation
       - no_dub is not explicitly true
+  helper_side_channel_after_mainline_success:
+    helper_translation:
+      status:
+        - helper_retryable_failure
+        - helper_terminal_failure
+      retryable: any
+      terminal: any
+    current_attempt_failed: false
+    ready_gate_failed: false
+    publish_blocking: false
+    when_all:
+      - target_subtitle_current
+      - target_subtitle_authoritative_source
+      - subtitle_ready
+      - audio_ready
+      - final_exists
   retriable_dub_failure:
     selected_compose_route: tts_replace_route
     current_attempt_failure_class: retriable_dub_failure
@@ -373,6 +391,7 @@ blocking_reason_mapping_contract:
     scenes.not_ready: advisory
     scenes.failed: advisory
     helper_translate_failed_after_target_ready: advisory
+    helper_retryable_failure_after_mainline_success: advisory
   metadata:
     compose_not_done:
       class: blocking
@@ -423,6 +442,9 @@ blocking_reason_mapping_contract:
     helper_translate_failed_after_target_ready:
       class: advisory
       suppress_when_publish_ready: true
+    helper_retryable_failure_after_mainline_success:
+      class: advisory
+      suppress_when_publish_ready: true
 ```
 
 ## Rule Set
@@ -436,6 +458,11 @@ blocking_reason_mapping_contract:
    truth sources.
 5. Historical final may be shown, but it may not satisfy current-ready publish
    truth when current freshness is false.
+6. Helper lane projection must use one explicit helper state:
+   `helper_unavailable`, `helper_pending`, `helper_resolved`,
+   `helper_retryable_failure`, or `helper_terminal_failure`.
+7. Helper retryable failure after mainline success is warning/history only and
+   may not become the current mainline error surface.
 
 ## Migration Intention
 
