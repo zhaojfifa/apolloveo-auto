@@ -251,13 +251,21 @@ def test_hot_follow_workbench_vi_currentness_blocks_false_done_states(monkeypatc
             "audio_ready_reason": (
                 "ready"
                 if task.get("target_subtitle_current")
-                else str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current")
+                else (
+                    "waiting_for_target_subtitle_translation"
+                    if str(task.get("target_subtitle_current_reason") or "") == "target_subtitle_translation_incomplete"
+                    else str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current")
+                )
             ),
             "dub_current": bool(task.get("target_subtitle_current")),
             "dub_current_reason": (
                 "ready"
                 if task.get("target_subtitle_current")
-                else str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current")
+                else (
+                    "waiting_for_target_subtitle_translation"
+                    if str(task.get("target_subtitle_current_reason") or "") == "target_subtitle_translation_incomplete"
+                    else str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current")
+                )
             ),
             "resolved_voice": "vi-VN-HoaiMyNeural",
             "actual_provider": "azure-speech",
@@ -298,8 +306,13 @@ def test_hot_follow_workbench_vi_currentness_blocks_false_done_states(monkeypatc
 
     assert data["subtitles"]["target_subtitle_current"] is False
     assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
+    assert data["subtitles"]["status"] == "pending"
+    assert data["subtitles"]["subtitle_ready_reason"] == "waiting_for_target_subtitle_translation"
+    assert data["subtitles"]["helper_translation"]["status"] == "pending"
+    assert data["subtitles"]["helper_translation"]["visibility"] == "pending_provider_work"
     assert data["ready_gate"]["subtitle_ready"] is False
     assert data["ready_gate"]["compose_ready"] is False
+    assert data["ready_gate"]["subtitle_ready_reason"] == "waiting_for_target_subtitle_translation"
 
     dub_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "dub"), {})
     compose_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "compose"), {})
@@ -356,13 +369,21 @@ def test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states(monke
             "audio_ready_reason": (
                 "ready"
                 if task.get("target_subtitle_current")
-                else str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current")
+                else (
+                    "waiting_for_target_subtitle_translation"
+                    if str(task.get("target_subtitle_current_reason") or "") == "target_subtitle_translation_incomplete"
+                    else str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current")
+                )
             ),
             "dub_current": bool(task.get("target_subtitle_current")),
             "dub_current_reason": (
                 "ready"
                 if task.get("target_subtitle_current")
-                else str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current")
+                else (
+                    "waiting_for_target_subtitle_translation"
+                    if str(task.get("target_subtitle_current_reason") or "") == "target_subtitle_translation_incomplete"
+                    else str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current")
+                )
             ),
             "resolved_voice": "my-MM-NilarNeural",
             "actual_provider": "azure-speech",
@@ -403,9 +424,12 @@ def test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states(monke
 
     assert data["subtitles"]["target_subtitle_current"] is False
     assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
+    assert data["subtitles"]["status"] == "pending"
+    assert data["subtitles"]["subtitle_ready_reason"] == "waiting_for_target_subtitle_translation"
     assert data["ready_gate"]["subtitle_ready"] is False
     assert data["ready_gate"]["compose_ready"] is False
     assert data["ready_gate"]["publish_ready"] is False
+    assert data["ready_gate"]["audio_ready_reason"] == "waiting_for_target_subtitle_translation"
 
     dub_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "dub"), {})
     compose_step = next((row for row in (data.get("pipeline") or []) if row.get("key") == "compose"), {})
@@ -424,10 +448,11 @@ def test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empt
             "status": "processing",
             "target_lang": "mm",
             "content_lang": "mm",
-            "dub_status": "skipped",
+            "dub_status": "failed",
             "voice_id": "mm_female_1",
             "origin_srt_path": f"deliver/tasks/{task_id}/origin.srt",
             "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+            "subtitles_status": "pending",
             "pipeline_config": {
                 "translation_incomplete": "true",
                 "no_dub": "true",
@@ -454,9 +479,9 @@ def test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empt
         "_collect_voice_execution_state",
         lambda *_args, **_kwargs: {
             "audio_ready": False,
-            "audio_ready_reason": "target_subtitle_translation_incomplete",
+            "audio_ready_reason": "waiting_for_target_subtitle_translation",
             "dub_current": False,
-            "dub_current_reason": "target_subtitle_translation_incomplete",
+            "dub_current_reason": "waiting_for_target_subtitle_translation",
             "voiceover_url": None,
             "deliverable_audio_done": False,
             "resolved_voice": "my-MM-NilarNeural",
@@ -496,11 +521,20 @@ def test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empt
         data = res.json()
 
     assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
+    assert data["subtitles"]["subtitle_ready_reason"] == "waiting_for_target_subtitle_translation"
+    assert data["subtitles"]["helper_translation"]["status"] == "pending"
+    assert data["subtitles"]["helper_translation"]["visibility"] == "pending_provider_work"
     assert data["artifact_facts"]["selected_compose_route"]["name"] == "tts_replace_route"
     assert data["current_attempt"]["selected_compose_route"] == "tts_replace_route"
+    assert data["current_attempt"]["subtitle_translation_waiting_retryable"] is True
+    assert data["current_attempt"]["dub_status"] == "pending"
     assert data["ready_gate"]["selected_compose_route"] == "tts_replace_route"
+    assert data["ready_gate"]["subtitle_ready_reason"] == "waiting_for_target_subtitle_translation"
+    assert data["ready_gate"]["audio_ready_reason"] == "waiting_for_target_subtitle_translation"
     assert data["no_dub"] is False
     assert data["no_dub_reason"] is None
+    assert "等待" in data["operator_summary"]["recommended_next_action"]
+    assert data["advisory"]["recommended_next_action"] == "wait_or_retry_translation"
 
 
 def test_hot_follow_workbench_stale_final_is_historical_only_after_redub(monkeypatch):

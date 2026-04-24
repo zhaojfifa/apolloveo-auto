@@ -7,6 +7,16 @@ from typing import Any
 
 _JSON_OBJECT_RE = re.compile(r"\{.*\}", re.DOTALL)
 _WHITESPACE_RE = re.compile(r"\s+")
+_HELPER_TEMPORARY_REASONS = {
+    "helper_translate_pending",
+    "helper_translate_provider_exhausted",
+    "helper_translate_failed",
+}
+_HELPER_TERMINAL_REASONS = {
+    "helper_translate_terminal_failure",
+    "helper_translate_unsupported_language",
+    "helper_translate_input_invalid",
+}
 
 
 def sanitize_helper_translate_error(exc: BaseException | str) -> dict[str, Any]:
@@ -80,4 +90,57 @@ def helper_translate_resolved_updates() -> dict[str, Any]:
         "subtitle_helper_status": "resolved",
         "subtitle_helper_error_reason": None,
         "subtitle_helper_error_message": None,
+    }
+
+
+def helper_translate_lane_state(
+    task: dict[str, Any],
+    *,
+    translation_waiting: bool,
+    helper_source_text: str | None = None,
+) -> dict[str, Any]:
+    status = str(task.get("subtitle_helper_status") or "").strip().lower()
+    reason = str(task.get("subtitle_helper_error_reason") or "").strip() or None
+    message = str(task.get("subtitle_helper_error_message") or "").strip() or None
+    provider = str(task.get("subtitle_helper_provider") or "").strip() or None
+    has_source = bool(str(helper_source_text or "").strip())
+
+    if status in {"queued", "running", "processing", "pending"}:
+        visibility = "pending_provider_work"
+        failed = False
+    elif status == "failed":
+        visibility = (
+            "terminal_provider_failure"
+            if reason in _HELPER_TERMINAL_REASONS
+            else "temporary_provider_issue"
+        )
+        failed = True
+    elif status in {"ready", "resolved"}:
+        visibility = "resolved"
+        failed = False
+    elif translation_waiting and has_source:
+        status = "pending"
+        reason = reason or "helper_translate_pending"
+        message = message or "字幕翻译尚未就绪，正在等待翻译结果或可重试处理。"
+        visibility = "pending_provider_work"
+        failed = False
+    else:
+        status = status or "not_involved"
+        reason = reason if status != "not_involved" else None
+        message = message if status != "not_involved" else None
+        visibility = "no_helper_used"
+        failed = False
+
+    return {
+        "status": status,
+        "failed": failed,
+        "reason": reason,
+        "message": message,
+        "provider": provider,
+        "visibility": visibility,
+        "retryable": visibility in {"pending_provider_work", "temporary_provider_issue"},
+        "terminal": visibility == "terminal_provider_failure",
+        "input_text": str(task.get("subtitle_helper_input_text") or "").strip() or None,
+        "translated_text": str(task.get("subtitle_helper_translated_text") or "").strip() or None,
+        "target_lang": str(task.get("subtitle_helper_target_lang") or "").strip() or None,
     }

@@ -29,6 +29,7 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
     compute_hot_follow_target_subtitle_currentness,
     has_semantic_target_subtitle_text,
 )
+from gateway.app.services.hot_follow_helper_translation import helper_translate_lane_state
 from gateway.app.services.media_validation import media_meta_from_head, deliver_key
 from gateway.app.services.task_view_helpers import task_key
 from gateway.app.services.tts_policy import normalize_target_lang
@@ -457,16 +458,36 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         or ("ready" if subtitle_ready else "subtitle_missing")
     )
     explicit_target_reason = str(task.get("target_subtitle_current_reason") or "").strip()
-    helper_translate_failed = str(task.get("subtitle_helper_status") or "").strip().lower() == "failed"
-    helper_translate_error_reason = str(task.get("subtitle_helper_error_reason") or "").strip() or None
-    helper_translate_error_message = str(task.get("subtitle_helper_error_message") or "").strip() or None
+    translation_waiting = bool(
+        not subtitle_ready
+        and (
+            str(target_currentness.get("target_subtitle_current_reason") or "").strip() == "target_subtitle_translation_incomplete"
+            or explicit_target_reason == "target_subtitle_translation_incomplete"
+            or str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
+        )
+        and str(normalized_source_text or raw_source_text or "").strip()
+    )
+    helper_lane = helper_translate_lane_state(
+        task,
+        translation_waiting=translation_waiting,
+        helper_source_text=normalized_source_text or raw_source_text,
+    )
+    helper_translate_failed = bool(helper_lane.get("failed"))
+    helper_translate_error_reason = helper_lane.get("reason")
+    helper_translate_error_message = helper_lane.get("message")
     if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
-        subtitle_ready_reason = explicit_target_reason
+        subtitle_ready_reason = (
+            "waiting_for_target_subtitle_translation"
+            if explicit_target_reason == "target_subtitle_translation_incomplete" and translation_waiting
+            else explicit_target_reason
+        )
+    elif translation_waiting:
+        subtitle_ready_reason = "waiting_for_target_subtitle_translation"
     elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
         subtitle_ready_reason = helper_translate_error_reason or "helper_translate_failed"
     target_subtitle_current_reason = str(target_currentness.get("target_subtitle_current_reason") or subtitle_ready_reason)
     if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
-        target_subtitle_current_reason = subtitle_ready_reason
+        target_subtitle_current_reason = explicit_target_reason
     elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
         target_subtitle_current_reason = subtitle_ready_reason
     dub_input_text = edited_text if subtitle_ready else ""
@@ -502,14 +523,17 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "target_subtitle_current_reason": target_subtitle_current_reason,
         "target_subtitle_authoritative_source": bool(target_currentness.get("target_subtitle_authoritative_source")),
         "target_subtitle_source_copy": bool(target_currentness.get("target_subtitle_source_copy")),
-        "helper_translate_status": str(task.get("subtitle_helper_status") or "").strip() or None,
+        "helper_translate_status": helper_lane.get("status"),
         "helper_translate_failed": helper_translate_failed,
         "helper_translate_error_reason": helper_translate_error_reason,
         "helper_translate_error_message": helper_translate_error_message,
-        "helper_translate_provider": str(task.get("subtitle_helper_provider") or "").strip() or None,
-        "helper_translate_input_text": str(task.get("subtitle_helper_input_text") or "").strip() or None,
-        "helper_translate_translated_text": str(task.get("subtitle_helper_translated_text") or "").strip() or None,
-        "helper_translate_target_lang": str(task.get("subtitle_helper_target_lang") or "").strip() or None,
+        "helper_translate_provider": helper_lane.get("provider"),
+        "helper_translate_visibility": helper_lane.get("visibility"),
+        "helper_translate_retryable": bool(helper_lane.get("retryable")),
+        "helper_translate_terminal": bool(helper_lane.get("terminal")),
+        "helper_translate_input_text": helper_lane.get("input_text"),
+        "helper_translate_translated_text": helper_lane.get("translated_text"),
+        "helper_translate_target_lang": helper_lane.get("target_lang"),
     }
 
 

@@ -663,6 +663,44 @@ def _unresolved_translation_lane_blocks_empty_dub(task: dict | None, source_text
     return bool(translation_unresolved and _clean_text_for_dub(source_text or ""))
 
 
+def _block_dub_for_subtitle_translation(req: DubRequest, provider: str | None, current_task: dict | None = None) -> dict:
+    _clear_no_dub_pipeline_flags(req.task_id, current_task)
+    _update_task(
+        req.task_id,
+        last_step="dub",
+        dub_status="pending",
+        dub_error=None,
+        error_reason=None,
+        compose_status="pending",
+        mm_audio_key=None,
+        mm_audio_path=None,
+        mm_audio_bytes=None,
+        mm_audio_duration_ms=None,
+        mm_audio_mime=None,
+        audio_sha256=None,
+    )
+    logger.info(
+        "DUB3_BLOCKED_BY_SUBTITLE",
+        extra={
+            "task_id": req.task_id,
+            "step": "dub",
+            "stage": "DUB3_BLOCKED_BY_SUBTITLE",
+            "dub_provider": provider,
+            "voice_id": req.voice_id,
+            "reason": "waiting_for_target_subtitle_translation",
+        },
+    )
+    return {
+        "task_id": req.task_id,
+        "voice_id": req.voice_id,
+        "audio_mm_url": None,
+        "duration_sec": None,
+        "audio_path": None,
+        "dub_status": "pending",
+        "dub_blocked_reason": "waiting_for_target_subtitle_translation",
+    }
+
+
 def _maybe_fill_missing_for_pack(*, raw_path: Path, audio_path: Path, subs_path: Path) -> None:
     """Allow pack to proceed by generating silence audio if DUB_SKIP=1."""
 
@@ -1150,8 +1188,7 @@ async def run_dub_step(req: DubRequest):
     if _unresolved_translation_lane_blocks_empty_dub(current_task, origin_srt_text):
         unresolved_translation = not _clean_text_for_dub(mm_txt_text) or str(mm_txt_text or "").strip().lower() == "no subtitles"
         if unresolved_translation:
-            _clear_no_dub_pipeline_flags(req.task_id, current_task)
-            _fail_dub(req, "target_subtitle_translation_incomplete", provider, status_code=409)
+            return _block_dub_for_subtitle_translation(req, provider, current_task)
     if str(mm_txt_text or "").strip().lower() == "no subtitles":
         return _skip_empty_dub(req, "target_subtitle_empty", provider, current_task)
     if not mm_txt_text.strip():

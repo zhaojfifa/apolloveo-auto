@@ -180,6 +180,50 @@ def test_hot_follow_advisory_v0_recommends_subtitle_review_when_missing():
     }
 
 
+def test_hot_follow_advisory_projects_retryable_translation_waiting():
+    advisory = skills_advisory.maybe_build_hot_follow_advisory(
+        {"task_id": "hf-skills-translation-waiting", "kind": "hot_follow"},
+        _advisory_payload(
+            ready_gate={
+                "subtitle_ready": False,
+                "subtitle_ready_reason": "waiting_for_target_subtitle_translation",
+                "audio_ready": False,
+                "audio_ready_reason": "waiting_for_target_subtitle_translation",
+                "compose_ready": False,
+                "publish_ready": False,
+                "blocking": ["compose_not_done", "subtitle_not_ready"],
+            },
+            artifact_facts={
+                "final_exists": False,
+                "audio_exists": False,
+                "subtitle_exists": False,
+            },
+            current_attempt={
+                "audio_ready": False,
+                "dub_status": "pending",
+                "subtitle_translation_waiting_retryable": True,
+                "compose_status": "pending",
+                "requires_recompose": False,
+            },
+        ),
+    )
+
+    assert advisory == {
+        "id": "hf_advisory_translation_waiting_retryable",
+        "kind": "operator_guidance",
+        "level": "info",
+        "recommended_next_action": "wait_or_retry_translation",
+        "operator_hint": "subtitle translation still pending",
+        "explanation": "当前目标字幕翻译尚未就绪，线路处于等待/可重试状态；请等待翻译返回或重试字幕步骤，再继续配音和合成。",
+        "evidence": {
+            "subtitle_ready": False,
+            "subtitle_ready_reason": "waiting_for_target_subtitle_translation",
+            "audio_ready": False,
+            "audio_ready_reason": "waiting_for_target_subtitle_translation",
+        },
+    }
+
+
 def test_hot_follow_advisory_v0_projects_compose_blocked_before_recompose():
     advisory = skills_advisory.maybe_build_hot_follow_advisory(
         {"task_id": "hf-skills-compose-blocked", "kind": "hot_follow"},

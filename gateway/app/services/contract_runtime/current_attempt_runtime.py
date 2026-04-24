@@ -483,6 +483,11 @@ def build_hot_follow_current_attempt_summary(
         or subtitle_lane.get("subtitle_ready_reason")
         or ""
     ).strip()
+    translation_waiting_retryable = bool(
+        not subtitle_ready
+        and target_reason == "target_subtitle_translation_incomplete"
+        and selected_route == "tts_replace_route"
+    )
     target_authoritative = bool(subtitle_lane.get("target_subtitle_authoritative_source"))
     final_exists = bool(artifacts.get("final_exists"))
     final_fresh = bool(final_stale_reason is None and artifacts.get("final_exists") and compose_reason_norm == "ready")
@@ -614,6 +619,8 @@ def build_hot_follow_current_attempt_summary(
         no_dub=no_dub,
         no_dub_reason=no_dub_reason,
     )
+    if translation_waiting_retryable and dub_status_norm in {"failed", "error", "absent"}:
+        dub_status_norm = "pending"
     tts_lane_expected = bool(selected_route == "tts_replace_route" and subtitle_ready and not no_dub)
     retriable_dub_failure = bool(
         tts_lane_expected
@@ -685,6 +692,7 @@ def build_hot_follow_current_attempt_summary(
         "tts_lane_expected": tts_lane_expected,
         "retriable_dub_failure": retriable_dub_failure,
         "current_attempt_failure_class": "retriable_dub_failure" if retriable_dub_failure else None,
+        "subtitle_translation_waiting_retryable": translation_waiting_retryable,
         "helper_translate_failed": helper_translate_failed,
         "helper_translate_failed_voice_led": helper_translate_failed_voice_led,
         "helper_translate_error_reason": artifacts.get("helper_translate_error_reason"),
@@ -693,9 +701,13 @@ def build_hot_follow_current_attempt_summary(
             "helper_translate_failed_terminal"
             if helper_translate_failed
             else (
-                "no_dub_route_terminal"
+                "subtitle_translation_waiting_retryable"
+                if translation_waiting_retryable
+                else (
+                    "no_dub_route_terminal"
                 if no_dub_route_terminal
                 else ("subtitle_empty_terminal" if subtitle_empty_terminal else None)
+                )
             )
         ),
         "requires_redub": requires_redub,

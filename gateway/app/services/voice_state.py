@@ -401,6 +401,8 @@ def collect_voice_execution_state(task: dict, settings) -> dict[str, Any]:
     dub_matches_current_audio_config, dub_config_reason = hf_dub_matches_current_audio_config(task)
     if subtitle_current is False:
         audio_ready_reason = subtitle_current_reason
+        if audio_ready_reason == "target_subtitle_translation_incomplete":
+            audio_ready_reason = "waiting_for_target_subtitle_translation"
     elif not dub_matches_current_subtitle:
         audio_ready_reason = dub_subtitle_reason
     elif not dub_matches_current_audio_config:
