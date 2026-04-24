@@ -204,6 +204,8 @@ Dimension B helper provider health:
 Frozen helper composite state:
 
 - `helper_resolved_with_retryable_provider_warning`
+- `helper_translate_request_already_current`
+- `helper_translate_request_in_flight`
 
 Dominance rule:
 
@@ -221,6 +223,15 @@ Dominance rule:
   subtitle truth, helper current state must not project as failed
 - provider retryable issues remain helper warning/history only and must not
   replace current mainline success truth
+
+Interaction rule:
+
+- repeated helper translate requests with the same task, helper input text, and
+  target language are idempotent once authoritative/current target subtitle
+  truth already exists and helper output is already resolved/consumed
+- same-fingerprint helper requests permit only one in-flight execution at a
+  time; repeated submissions must dedupe to success/no-op or in-flight
+  informational response rather than create conflicting failure truth
 
 ## Dominance Rules
 

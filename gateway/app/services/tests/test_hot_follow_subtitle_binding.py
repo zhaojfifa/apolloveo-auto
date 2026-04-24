@@ -489,6 +489,114 @@ def test_translate_subtitles_helper_failure_preserves_authoritative_outputs(monk
     assert saved["publish_ready"] is True
 
 
+def test_translate_subtitles_helper_repeat_on_already_current_task_is_idempotent_success(monkeypatch):
+    task_id = "hf-helper-repeat-already-current"
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "subtitles_status": "ready",
+            "dub_status": "ready",
+            "compose_status": "ready",
+            "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
+            "subtitle_helper_status": "failed",
+            "subtitle_helper_error_reason": "helper_translate_provider_exhausted",
+            "subtitle_helper_error_message": "retry later",
+            "subtitle_helper_input_text": "this is you",
+            "subtitle_helper_translated_text": "đây là bạn",
+            "subtitle_helper_target_lang": "vi",
+            "mm_srt_path": f"deliver/tasks/{task_id}/vi.srt",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_vi.mp3",
+            "final_video_key": f"deliver/tasks/{task_id}/final.mp4",
+            "publish_ready": True,
+            "compose_ready": True,
+            "dub_current": True,
+        }
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "translate_segments_with_gemini",
+        lambda *_args, **_kwargs: pytest.fail("idempotent repeat must not invoke helper provider"),
+    )
+
+    data = hf_router.translate_hot_follow_subtitles(
+        task_id,
+        hf_router.HotFollowTranslateRequest(text="this is you", target_lang="vi", input_source="helper_only_text"),
+        repo=repo,
+    )
+
+    assert data["result"] == "resolved_with_warning"
+    assert data["single_flight"] == "noop_cached"
+    assert data["translated_text"] == "đây là bạn"
+    assert data["helper_translation"]["status"] == "helper_resolved_with_retryable_provider_warning"
+    assert data["helper_translation"]["warning_only"] is True
+    saved = repo.get(task_id) or {}
+    assert saved["target_subtitle_current"] is True
+    assert saved["target_subtitle_authoritative_source"] is True
+    assert saved["publish_ready"] is True
+
+
+def test_translate_subtitles_helper_repeat_dedupes_same_in_flight_request(monkeypatch):
+    task_id = "hf-helper-repeat-dedupe"
+    text = "this is you"
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "subtitles_status": "ready",
+            "dub_status": "ready",
+            "compose_status": "ready",
+            "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
+            "subtitle_helper_status": "failed",
+            "subtitle_helper_error_reason": "helper_translate_provider_exhausted",
+            "subtitle_helper_error_message": "retry later",
+            "subtitle_helper_input_text": text,
+            "subtitle_helper_translated_text": "đây là bạn",
+            "subtitle_helper_target_lang": "vi",
+            "mm_srt_path": f"deliver/tasks/{task_id}/vi.srt",
+            "mm_audio_key": f"deliver/tasks/{task_id}/audio_vi.mp3",
+            "final_video_key": f"deliver/tasks/{task_id}/final.mp4",
+            "publish_ready": True,
+            "compose_ready": True,
+            "dub_current": True,
+        }
+    )
+
+    fingerprint = hf_router._hf_helper_translate_request_fingerprint(
+        task_id=task_id,
+        source_text=text,
+        target_lang="vi",
+        input_source="helper_only_text",
+    )
+    lock = hf_router._hf_helper_translate_request_lock(fingerprint)
+    assert lock.acquire(blocking=False) is True
+    try:
+        monkeypatch.setattr(
+            hf_router,
+            "translate_segments_with_gemini",
+            lambda *_args, **_kwargs: pytest.fail("deduped repeat must not invoke helper provider"),
+        )
+        data = hf_router.translate_hot_follow_subtitles(
+            task_id,
+            hf_router.HotFollowTranslateRequest(text=text, target_lang="vi", input_source="helper_only_text"),
+            repo=repo,
+        )
+    finally:
+        lock.release()
+
+    assert data["result"] == "resolved_with_warning"
+    assert data["single_flight"] == "deduped_in_flight"
+    assert data["helper_translation"]["status"] == "helper_resolved_with_retryable_provider_warning"
+    saved = repo.get(task_id) or {}
+    assert saved["target_subtitle_current"] is True
+    assert saved["target_subtitle_authoritative_source"] is True
+
+
 def test_helper_translation_projection_stays_helper_layer_only():
     section = task_view_workbench_contract._subtitles_section(
         task={"task_id": "hf-helper-projection", "subtitles_error": None},

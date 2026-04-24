@@ -217,6 +217,32 @@ current_attempt_route_summary_contract:
       - subtitle_ready
       - audio_ready
       - final_exists
+  helper_translate_idempotent_repeat:
+    helper_translation:
+      status:
+        - helper_output_resolved
+        - helper_resolved_with_retryable_provider_warning
+      output_state: helper_output_resolved
+    api_result:
+      - already_current
+      - resolved_with_warning
+    blocking: false
+    when_all:
+      - target_subtitle_current
+      - target_subtitle_authoritative_source
+      - helper input text matches prior helper request
+      - helper target lang matches prior helper request
+  helper_translate_single_flight:
+    request_identity_fields:
+      - task_id
+      - helper_input_text
+      - target_lang
+      - input_source
+    duplicate_request_result:
+      - request_in_flight
+      - resolved_with_warning
+      - already_current
+    mutate_current_truth: false
   retriable_dub_failure:
     selected_compose_route: tts_replace_route
     current_attempt_failure_class: retriable_dub_failure
@@ -471,6 +497,10 @@ blocking_reason_mapping_contract:
    retryable-warning only.
 8. Helper retryable provider warning after mainline success is warning/history
    only and may not become the current mainline error surface.
+9. Repeated helper translate requests on an already-current authoritative task
+   must be idempotent success/no-op responses, not conflict-style failure.
+10. Same-fingerprint helper translate requests are single-flight and may not
+    create duplicate effective executions or contaminate current truth.
 
 ## Migration Intention
 
