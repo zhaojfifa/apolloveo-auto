@@ -493,7 +493,10 @@ def test_helper_translation_projection_stays_helper_layer_only():
     section = task_view_workbench_contract._subtitles_section(
         task={"task_id": "hf-helper-projection", "subtitles_error": None},
         subtitle_lane={
-            "helper_translate_status": "helper_resolved",
+            "helper_translate_status": "helper_output_resolved",
+            "helper_translate_output_state": "helper_output_resolved",
+            "helper_translate_provider_health": "provider_ok",
+            "helper_translate_composite_state": None,
             "helper_translate_failed": False,
             "helper_translate_provider": "gemini",
             "helper_translate_input_text": "helper candidate",
@@ -513,7 +516,10 @@ def test_helper_translation_projection_stays_helper_layer_only():
     )
 
     assert section["helper_translation"] == {
-        "status": "helper_resolved",
+        "status": "helper_output_resolved",
+        "output_state": "helper_output_resolved",
+        "provider_health": "provider_ok",
+        "composite_state": None,
         "failed": False,
         "reason": None,
         "message": None,
@@ -521,6 +527,7 @@ def test_helper_translation_projection_stays_helper_layer_only():
         "visibility": None,
         "retryable": False,
         "terminal": False,
+        "warning_only": False,
         "input_text": "helper candidate",
         "translated_text": "ung vien ho tro",
         "target_lang": "vi",

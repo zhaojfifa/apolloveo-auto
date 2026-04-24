@@ -187,13 +187,23 @@ Definition:
 - helper lane does not become authoritative target subtitle truth unless the
   canonical target-subtitle save path succeeds
 
-Frozen helper lane states:
+Frozen helper lane dimensions:
 
-- `helper_unavailable`
-- `helper_pending`
-- `helper_resolved`
-- `helper_retryable_failure`
-- `helper_terminal_failure`
+Dimension A helper output state:
+
+- `helper_output_unavailable`
+- `helper_output_pending`
+- `helper_output_resolved`
+
+Dimension B helper provider health:
+
+- `provider_ok`
+- `provider_retryable_failure`
+- `provider_terminal_failure`
+
+Frozen helper composite state:
+
+- `helper_resolved_with_retryable_provider_warning`
 
 Dominance rule:
 
@@ -207,6 +217,10 @@ Dominance rule:
 - in that shape helper history may stay visible, but it must not become
   `subtitles.error`, `current_attempt_failed`, ready-gate failure, or publish
   blocking truth
+- if helper output has already been consumed into authoritative/current target
+  subtitle truth, helper current state must not project as failed
+- provider retryable issues remain helper warning/history only and must not
+  replace current mainline success truth
 
 ## Dominance Rules
 

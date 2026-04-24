@@ -502,7 +502,9 @@ def test_current_truth_ignores_stale_empty_no_dub_reason_when_audio_is_ready():
                 "no_tts": False,
             },
             "compose_input": {"mode": "direct", "ready": True, "blocked": False},
-            "helper_translate_status": "helper_retryable_failure",
+            "helper_translate_status": "helper_output_unavailable",
+            "helper_translate_output_state": "helper_output_unavailable",
+            "helper_translate_provider_health": "provider_retryable_failure",
             "helper_translate_failed": True,
             "helper_translate_failed_voice_led": True,
             "helper_translate_retryable": True,
@@ -514,7 +516,9 @@ def test_current_truth_ignores_stale_empty_no_dub_reason_when_audio_is_ready():
     assert current_attempt["selected_compose_route"] == "tts_replace_route"
     assert current_attempt["no_dub_route_terminal"] is False
     assert current_attempt["tts_lane_expected"] is True
-    assert current_attempt["helper_translate_status"] == "helper_retryable_failure"
+    assert current_attempt["helper_translate_status"] == "helper_output_unavailable"
+    assert current_attempt["helper_translate_output_state"] == "helper_output_unavailable"
+    assert current_attempt["helper_translate_provider_health"] == "provider_retryable_failure"
     assert current_attempt["helper_translate_failed"] is False
     assert current_attempt["helper_translate_failed_voice_led"] is False
 
@@ -632,13 +636,17 @@ def test_helper_failure_does_not_override_mainline_success():
     artifact_facts = {
         "final_exists": True,
         "audio_exists": True,
-        "helper_translate_status": "helper_retryable_failure",
-        "helper_translate_failed": True,
-        "helper_translate_failed_voice_led": True,
+        "helper_translate_status": "helper_resolved_with_retryable_provider_warning",
+        "helper_translate_output_state": "helper_output_resolved",
+        "helper_translate_provider_health": "provider_retryable_failure",
+        "helper_translate_composite_state": "helper_resolved_with_retryable_provider_warning",
+        "helper_translate_failed": False,
+        "helper_translate_failed_voice_led": False,
         "helper_translate_error_reason": "helper_translate_provider_exhausted",
         "helper_translate_error_message": "翻译服务当前额度不足或请求过多，请稍后重试；也可以手动编辑目标字幕并保存后继续配音。",
         "helper_translate_retryable": True,
         "helper_translate_terminal": False,
+        "helper_translate_warning_only": True,
         "audio_lane": {
             "mode": "tts_voiceover_only",
             "tts_voiceover_exists": True,
@@ -678,7 +686,11 @@ def test_helper_failure_does_not_override_mainline_success():
         subtitle_ready=True,
     )
 
-    assert current_attempt["helper_translate_status"] == "helper_retryable_failure"
+    assert current_attempt["helper_translate_status"] == "helper_resolved_with_retryable_provider_warning"
+    assert current_attempt["helper_translate_output_state"] == "helper_output_resolved"
+    assert current_attempt["helper_translate_provider_health"] == "provider_retryable_failure"
+    assert current_attempt["helper_translate_composite_state"] == "helper_resolved_with_retryable_provider_warning"
+    assert current_attempt["helper_translate_warning_only"] is True
     assert current_attempt["helper_translate_failed"] is False
     assert current_attempt["helper_translate_failed_voice_led"] is False
     assert operator_summary["current_attempt_failed"] is False

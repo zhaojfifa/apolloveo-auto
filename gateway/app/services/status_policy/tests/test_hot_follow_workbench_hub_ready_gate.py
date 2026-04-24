@@ -308,7 +308,9 @@ def test_hot_follow_workbench_vi_currentness_blocks_false_done_states(monkeypatc
     assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
     assert data["subtitles"]["status"] == "pending"
     assert data["subtitles"]["subtitle_ready_reason"] == "waiting_for_target_subtitle_translation"
-    assert data["subtitles"]["helper_translation"]["status"] == "helper_pending"
+    assert data["subtitles"]["helper_translation"]["status"] == "helper_output_pending"
+    assert data["subtitles"]["helper_translation"]["output_state"] == "helper_output_pending"
+    assert data["subtitles"]["helper_translation"]["provider_health"] == "provider_ok"
     assert data["subtitles"]["helper_translation"]["visibility"] == "pending_provider_work"
     assert data["ready_gate"]["subtitle_ready"] is False
     assert data["ready_gate"]["compose_ready"] is False
@@ -528,7 +530,9 @@ def test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empt
 
     assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
     assert data["subtitles"]["subtitle_ready_reason"] == "waiting_for_target_subtitle_translation"
-    assert data["subtitles"]["helper_translation"]["status"] == "helper_pending"
+    assert data["subtitles"]["helper_translation"]["status"] == "helper_output_pending"
+    assert data["subtitles"]["helper_translation"]["output_state"] == "helper_output_pending"
+    assert data["subtitles"]["helper_translation"]["provider_health"] == "provider_ok"
     assert data["subtitles"]["helper_translation"]["visibility"] == "pending_provider_work"
     assert data["artifact_facts"]["selected_compose_route"]["name"] == "tts_replace_route"
     assert data["current_attempt"]["selected_compose_route"] == "tts_replace_route"
@@ -1058,6 +1062,9 @@ def test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authorita
             "subtitle_helper_status": "failed",
             "subtitle_helper_error_reason": "helper_translate_provider_exhausted",
             "subtitle_helper_error_message": "翻译服务当前额度不足或请求过多，请稍后重试。",
+            "subtitle_helper_input_text": "this is you",
+            "subtitle_helper_translated_text": "Xin chao",
+            "subtitle_helper_target_lang": "vi",
             "mm_srt_path": target_key,
             "pipeline_config": {"no_dub": "true", "dub_skip_reason": "target_subtitle_empty"},
             "dub_skip_reason": "target_subtitle_empty",
@@ -1139,8 +1146,12 @@ def test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authorita
     assert subtitles_row.get("status") == "done"
     assert subtitles_row.get("state") == "done"
     assert subtitles_row.get("error") is None
-    assert helper.get("status") == "helper_retryable_failure"
-    assert helper.get("failed") is True
+    assert helper.get("status") == "helper_resolved_with_retryable_provider_warning"
+    assert helper.get("output_state") == "helper_output_resolved"
+    assert helper.get("provider_health") == "provider_retryable_failure"
+    assert helper.get("composite_state") == "helper_resolved_with_retryable_provider_warning"
+    assert helper.get("warning_only") is True
+    assert helper.get("failed") is False
     assert helper.get("reason") == "helper_translate_provider_exhausted"
     assert data.get("audio_ready") is True
     assert data.get("dub_current") is True

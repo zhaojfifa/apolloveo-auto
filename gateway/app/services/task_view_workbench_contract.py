@@ -252,6 +252,9 @@ def _subtitles_section(
         "parse_source_authoritative_for_target": bool(subtitle_lane.get("parse_source_authoritative_for_target")),
         "helper_translation": {
             "status": subtitle_lane.get("helper_translate_status"),
+            "output_state": subtitle_lane.get("helper_translate_output_state"),
+            "provider_health": subtitle_lane.get("helper_translate_provider_health"),
+            "composite_state": subtitle_lane.get("helper_translate_composite_state"),
             "failed": bool(subtitle_lane.get("helper_translate_failed")),
             "reason": subtitle_lane.get("helper_translate_error_reason"),
             "message": subtitle_lane.get("helper_translate_error_message"),
@@ -259,6 +262,7 @@ def _subtitles_section(
             "visibility": subtitle_lane.get("helper_translate_visibility"),
             "retryable": bool(subtitle_lane.get("helper_translate_retryable")),
             "terminal": bool(subtitle_lane.get("helper_translate_terminal")),
+            "warning_only": bool(subtitle_lane.get("helper_translate_warning_only")),
             "input_text": subtitle_lane.get("helper_translate_input_text"),
             "translated_text": subtitle_lane.get("helper_translate_translated_text"),
             "target_lang": subtitle_lane.get("helper_translate_target_lang"),
