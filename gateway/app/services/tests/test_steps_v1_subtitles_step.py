@@ -238,17 +238,18 @@ def test_run_subtitles_step_treats_preserved_source_audio_as_helper_only(monkeyp
     assert "subs/vi.srt" not in uploaded_artifacts
 
     final_update = repo.get(req.task_id)
-    assert final_update["subtitles_status"] == "failed"
+    assert final_update["subtitles_status"] == "ready"
+    assert final_update["subtitles_error"] is None
     assert final_update["mm_srt_path"] is None
     assert final_update["target_subtitle_current"] is False
-    assert final_update["target_subtitle_current_reason"] == "target_subtitle_not_authoritative"
+    assert final_update["target_subtitle_current_reason"] == "preserve_source_route_no_target_subtitle_required"
 
     final_pipeline = pipeline_updates[-1]
     assert final_pipeline["parse_source_mode"] == "preserved_source_audio_helper"
     assert final_pipeline["parse_source_role"] == "preserved_source_audio_helper"
     assert final_pipeline["parse_source_authoritative_for_target"] == "false"
     assert final_pipeline["target_subtitle_authoritative"] == "false"
-    assert final_pipeline["translation_incomplete"] == "true"
+    assert final_pipeline["translation_incomplete"] == "false"
 
 
 def test_run_subtitles_step_delegates_authoritative_truth_to_service(monkeypatch, tmp_path):

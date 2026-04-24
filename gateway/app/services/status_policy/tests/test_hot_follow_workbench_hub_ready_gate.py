@@ -1011,6 +1011,190 @@ def test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authorita
     assert data.get("no_dub_reason") is None
 
 
+def test_hot_follow_workbench_recovers_current_audio_preview_and_clears_stale_failed_residue(monkeypatch):
+    task_id = "hf-workbench-audio-preview-recovery"
+    repo = _Repo()
+    target_key = f"deliver/tasks/{task_id}/vi.srt"
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "target_lang": "vi",
+            "content_lang": "vi",
+            "subtitles_status": "ready",
+            "mm_srt_path": target_key,
+            "subtitle_helper_status": "failed",
+            "subtitle_helper_error_reason": "helper_translate_provider_exhausted",
+            "subtitle_helper_error_message": "翻译服务当前额度不足或请求过多，请稍后重试。",
+            "dub_status": "failed",
+            "dub_error": "stale audio generation failure",
+            "pipeline_config": {"no_dub": "true", "dub_skip_reason": "target_subtitle_empty"},
+            "dub_skip_reason": "target_subtitle_empty",
+            "voice_id": "vi_female_1",
+            "dub_provider": "azure-speech",
+            "mm_audio_key": f"deliver/tasks/{task_id}/voiceover/audio_vi.dry.mp3",
+            "mm_audio_provider": "azure-speech",
+            "mm_audio_voice_id": "vi-VN-HoaiMyNeural",
+            "config": {
+                "tts_requested_voice": "vi_female_1",
+                "tts_resolved_voice": "vi-VN-HoaiMyNeural",
+                "tts_provider": "azure-speech",
+                "tts_voiceover_key": f"deliver/tasks/{task_id}/voiceover/audio_vi.dry.mp3",
+            },
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "not_ready",
+            "final": {"exists": False},
+            "historical_final": {"exists": False},
+            "compose_error_reason": None,
+            "compose_error_message": None,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "deliverable_audio_done": True,
+            "voiceover_url": None,
+            "resolved_voice": "vi-VN-HoaiMyNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "vi_female_1",
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in {target_key, f"deliver/tasks/{task_id}/voiceover/audio_vi.dry.mp3"})
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda _key: b"1\n00:00:00,000 --> 00:00:02,000\nXin chao\n")
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "1\n00:00:00,000 --> 00:00:02,000\nXin chao\n")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "1\n00:00:00,000 --> 00:00:02,000\n你好\n")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    audio = data.get("audio") or {}
+    media = data.get("media") or {}
+    dub_row = next(row for row in (data.get("pipeline") or []) if row.get("key") == "dub")
+    helper = ((data.get("subtitles") or {}).get("helper_translation") or {})
+
+    assert audio.get("audio_ready") is True
+    assert audio.get("dub_current") is True
+    assert audio.get("error") in {None, ""}
+    assert audio.get("voiceover_url") == f"/v1/tasks/{task_id}/audio_mm"
+    assert audio.get("tts_voiceover_url") == f"/v1/tasks/{task_id}/audio_mm"
+    assert audio.get("dub_preview_url") == f"/v1/tasks/{task_id}/audio_mm"
+    assert media.get("voiceover_url") == f"/v1/tasks/{task_id}/audio_mm"
+    assert dub_row.get("status") == "done"
+    assert data.get("no_dub") is False
+    assert data.get("no_dub_reason") is None
+    assert helper.get("failed") is True
+
+
+def test_hot_follow_workbench_preserve_source_route_does_not_project_target_subtitle_authority_failure(monkeypatch):
+    task_id = "hf-workbench-preserve-source-contract"
+    repo = _Repo()
+    origin_key = f"deliver/tasks/{task_id}/origin.srt"
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "target_lang": "vi",
+            "content_lang": "vi",
+            "subtitles_status": "ready",
+            "subtitles_error": None,
+            "target_subtitle_current": False,
+            "target_subtitle_current_reason": "preserve_source_route_no_target_subtitle_required",
+            "origin_srt_path": origin_key,
+            "pipeline_config": {
+                "parse_source_mode": "preserved_source_audio_helper",
+                "parse_source_role": "preserved_source_audio_helper",
+                "parse_source_authoritative_for_target": "false",
+                "target_subtitle_authoritative": "false",
+                "source_audio_policy": "preserve",
+            },
+            "config": {"source_audio_policy": "preserve"},
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "not_ready",
+            "final": {"exists": False},
+            "historical_final": {"exists": False},
+            "compose_error_reason": None,
+            "compose_error_message": None,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda *_args, **_kwargs: {
+            "audio_ready": False,
+            "audio_ready_reason": "audio_missing",
+            "dub_current": False,
+            "dub_current_reason": "audio_missing",
+            "deliverable_audio_done": False,
+            "voiceover_url": None,
+            "resolved_voice": None,
+            "actual_provider": "azure-speech",
+            "requested_voice": None,
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) == origin_key)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "get_object_bytes", lambda _key: b"1\n00:00:00,000 --> 00:00:02,000\nlyric source line\n")
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "1\n00:00:00,000 --> 00:00:02,000\nlyric source line\n")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    subtitles = data.get("subtitles") or {}
+    subtitles_row = next(row for row in (data.get("pipeline") or []) if row.get("key") == "subtitles")
+    ready_gate = data.get("ready_gate") or {}
+
+    assert subtitles_row.get("status") == "done"
+    assert subtitles_row.get("error") in {None, ""}
+    assert subtitles.get("target_subtitle_current") is False
+    assert subtitles.get("target_subtitle_current_reason") == "preserve_source_route_no_target_subtitle_required"
+    assert ready_gate.get("selected_compose_route") == "preserve_source_route"
+    assert ready_gate.get("compose_allowed") is True
+    assert ready_gate.get("no_dub_reason") == "source_audio_preserved_no_tts"
+
+
 def test_hot_follow_workbench_hub_survives_optional_presentation_aggregation_failure(monkeypatch):
     task_id = "hf-workbench-presentation-safe-01"
     repo = _Repo()

@@ -117,7 +117,10 @@ def hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None 
 def hf_source_audio_semantics(task: dict, voice_state: dict[str, Any] | None) -> dict[str, Any]:
     voice = voice_state or {}
     policy = source_audio_policy_from_task(task)
+    task_id = str(task.get("task_id") or task.get("id") or "").strip()
     tts_url = str(voice.get("voiceover_url") or "").strip() or None
+    if not tts_url and task_id and voice.get("audio_ready") and voice.get("deliverable_audio_done"):
+        tts_url = f"/v1/tasks/{task_id}/audio_mm"
     tts_ready = bool(voice.get("dub_current") and tts_url)
     preserve_source = policy == "preserve"
     if tts_ready and preserve_source:
@@ -195,6 +198,11 @@ def hf_audio_config(task: dict) -> dict[str, Any]:
     voice_state = collect_voice_execution_state(task, settings)
     provider = normalize_provider(voice_state.get("expected_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None))
     semantics = hf_source_audio_semantics(task, voice_state)
+    preview_url = (
+        str(voice_state.get("voiceover_url") or "").strip()
+        or str(semantics.get("tts_voiceover_url") or semantics.get("dub_preview_url") or "").strip()
+        or None
+    )
     return {
         "tts_engine": hf_engine_public(provider),
         "tts_voice": voice_state.get("resolved_voice"),
@@ -203,8 +211,8 @@ def hf_audio_config(task: dict) -> dict[str, Any]:
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
         **semantics,
-        "voiceover_url": voice_state.get("voiceover_url"),
-        "audio_url": voice_state.get("voiceover_url"),
+        "voiceover_url": preview_url,
+        "audio_url": preview_url,
         "audio_fit_max_speed": audio_fit_max_speed,
     }
 
@@ -212,6 +220,8 @@ def hf_audio_config(task: dict) -> dict[str, Any]:
 def hf_audio_display_error(dub_state: str, dub_error: str | None, voice_state: dict[str, Any]) -> str | None:
     state = str(dub_state or "").strip().lower()
     reason = str(voice_state.get("dub_current_reason") or voice_state.get("audio_ready_reason") or "").strip().lower()
+    if voice_state.get("audio_ready"):
+        return None
     if state in {"running", "processing", "queued"} or reason == "dub_running":
         return None
     if state == "failed":

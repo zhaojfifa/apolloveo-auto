@@ -1912,3 +1912,90 @@ Acceptance:
 - helper 429 remains visible but side-channel only
 - stale skip-state no longer outranks current subtitle/audio truth
 - branch is safer for later compose/final acceptance work
+
+## 2026-04-24 - VEOBASE01 subtitle-authority continuation: URL recovery surface + preserve-source route
+
+Branch:
+
+- `VeoBase01-subtitle-authority-contract-correction`
+
+Base:
+
+- `d8dd55673c5034ac01d644110afe3539c054d947`
+
+Reading declaration:
+
+- root indexes:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+- docs indexes:
+  - `docs/README.md`
+  - `docs/ENGINEERING_INDEX.md`
+- task-specific authority:
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/reviews/VEOBASE01_SUBTITLE_AUTHORITY_REVIEW.md`
+  - `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+- missing authority: none
+
+Pass A - exact correction:
+
+- recovered current-audio truth now overrides stale raw `dub_status=failed` in
+  pipeline projection
+- stale dub error display is suppressed once `audio_ready=true`
+- audio preview URL now falls back to `/v1/tasks/{task_id}/audio_mm` when
+  current audio is ready/deliverable even if the raw `voiceover_url` field is
+  missing
+
+Pass B - exact correction:
+
+- preserve-source helper-only subtitle extraction is no longer treated as
+  `target_subtitle_not_authoritative` mainline failure
+- subtitles step now resolves to accepted completion for that route with:
+  - `subtitles_status=ready`
+  - `subtitles_error=None`
+  - `target_subtitle_current=false`
+  - `target_subtitle_current_reason=preserve_source_route_no_target_subtitle_required`
+- helper-only preserve-source output no longer sets mainline
+  `translation_incomplete=true`
+
+Exact modules changed:
+
+- `gateway/app/services/voice_service.py`
+- `gateway/app/services/task_view_projection.py`
+- `gateway/app/routers/hot_follow_api.py`
+- `gateway/app/services/hot_follow_subtitle_authority.py`
+- `gateway/app/services/steps_v1.py`
+- `gateway/app/services/tests/test_steps_v1_subtitles_step.py`
+- `gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/voice_service.py gateway/app/services/task_view_projection.py gateway/app/routers/hot_follow_api.py gateway/app/services/hot_follow_subtitle_authority.py gateway/app/services/steps_v1.py`: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_subtitles_step_treats_preserved_source_audio_as_helper_only -q`: `1 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -k "recovers_current_audio_preview_and_clears_stale_failed_residue or preserve_source_route_does_not_project_target_subtitle_authority_failure or resolves_subtitles_terminal_success_when_authoritative_truth_is_current" -q`: `3 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_line_policy_layer.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`: `20 passed`
+- `git diff --check`: passed
+
+Real representative task verification:
+
+- direct local replay of `42c51c62581b` and `7fe6dc8b4e95` was not available
+- repo/workspace search returned no local artifacts for those ids
+- local `shortvideo.db` did not contain those rows
+- acceptance is therefore based on focused in-process/runtime coverage only
+
+Acceptance:
+
+- Pass A URL helper-recovery / preview issue: corrected for the tested current
+  truth shape
+- Pass B local preserve-source contract: corrected for the tested helper-only
+  preserve-source shape
+- URL mainline remains healthy
+- preserve-source route no longer inherits a misleading target-subtitle
+  authority failure at the subtitles-step boundary

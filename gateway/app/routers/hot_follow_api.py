@@ -605,6 +605,11 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         voice_state.get("expected_provider") or task.get("dub_provider") or getattr(settings, "dub_provider", None)
     )
     semantics = hf_source_audio_semantics(task, voice_state)
+    preview_url = (
+        str(voice_state.get("voiceover_url") or "").strip()
+        or str(semantics.get("tts_voiceover_url") or semantics.get("dub_preview_url") or "").strip()
+        or None
+    )
     return {
         "tts_engine": _hf_engine_public(provider),
         "tts_voice": voice_state.get("resolved_voice"),
@@ -613,8 +618,8 @@ def _hf_audio_config(task: dict) -> dict[str, Any]:
         "bgm_mix": max(0.0, min(1.0, mix_val)),
         "bgm_url": get_download_url(str(bgm.get("bgm_key"))) if bgm.get("bgm_key") else None,
         **semantics,
-        "voiceover_url": voice_state.get("voiceover_url"),
-        "audio_url": voice_state.get("voiceover_url"),
+        "voiceover_url": preview_url,
+        "audio_url": preview_url,
         "audio_fit_max_speed": audio_fit_max_speed,
     }
 

@@ -443,3 +443,120 @@ Accepted for the subtitle-step terminal-resolution scope.
 - helper 429 remains visible but side-channel only
 - stale skip-state no longer outranks current subtitle/audio truth
 - this branch is safer for later compose/final acceptance work
+
+## Continuation: URL Recovery Surface Cleanup + Local Preserve-Source Contract
+
+### Reading Declaration
+
+1. Root indexes read first:
+   - `README.md`
+   - `ENGINEERING_CONSTRAINTS_INDEX.md`
+2. Docs indexes read second:
+   - `docs/README.md`
+   - `docs/ENGINEERING_INDEX.md`
+3. Minimum task-specific authority files selected from the indexes:
+   - `docs/contracts/four_layer_state_contract.md`
+   - `docs/contracts/status_ownership_matrix.md`
+   - `docs/contracts/workbench_hub_response.contract.md`
+   - `docs/contracts/hot_follow_ready_gate.yaml`
+   - `docs/contracts/hot_follow_projection_rules_v1.md`
+   - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+   - `docs/reviews/VEOBASE01_SUBTITLE_AUTHORITY_REVIEW.md`
+   - this execution note
+4. Missing-authority handling:
+   - no indexed authority docs were missing
+
+### Pass A: URL Helper-Recovery + Preview Cleanup
+
+#### Exact Remaining Gap
+
+The URL Hot Follow mainline was already healthy, but recovered current-audio
+truth could still leave stale surface residue:
+
+- raw `dub_status=failed` could keep the pipeline/audio surface looking failed
+  after current audio was already ready
+- stale dub error text could remain visible even after current dub truth had
+  recovered
+- preview URL binding could stay empty when current audio was ready/deliverable,
+  which left the surface behaving like a missing or zero-length preview
+
+#### Exact Correction
+
+- current audio truth now dominates stale raw dub failure state in pipeline
+  projection: if `audio_ready=true`, dub pipeline status resolves to `done`
+- stale dub error display is suppressed once current audio truth is ready
+- audio preview URL now falls back to `/v1/tasks/{task_id}/audio_mm` when
+  current audio is ready/deliverable even if the raw in-memory `voiceover_url`
+  field is absent
+
+#### Exact Modules Changed For Pass A
+
+- `gateway/app/services/voice_service.py`
+- `gateway/app/services/task_view_projection.py`
+- `gateway/app/routers/hot_follow_api.py`
+- `gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+
+### Pass B: Local Preserve-Source Contract Correction
+
+#### Exact Remaining Gap
+
+Local preserve-source tasks were still passing through the target-subtitle
+authority failure gate even when the intended route was
+`preserve_source_route`.
+
+That produced the wrong mainline truth:
+
+- helper-only preserved-source subtitle extraction ended as
+  `target_subtitle_not_authoritative`
+- subtitles step was marked failed even though the preserve-source route did not
+  require a target subtitle for compose acceptance
+- downstream surfaces inherited a misleading subtitle-authority failure instead
+  of the real preserve-source route truth
+
+#### Exact Correction
+
+- preserve-source helper-only subtitle extraction is now treated as an accepted
+  subtitles-step completion path, not a target-subtitle authority failure
+- the subtitles step now persists:
+  - `subtitles_status=ready`
+  - `subtitles_error=None`
+  - `target_subtitle_current=false`
+  - `target_subtitle_current_reason=preserve_source_route_no_target_subtitle_required`
+- helper-only preserve-source output no longer writes mainline
+  `translation_incomplete=true`; target-subtitle incompleteness is not allowed
+  to masquerade as a broken preserve-source route
+
+#### Exact Modules Changed For Pass B
+
+- `gateway/app/services/hot_follow_subtitle_authority.py`
+- `gateway/app/services/steps_v1.py`
+- `gateway/app/services/tests/test_steps_v1_subtitles_step.py`
+- `gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+
+### Validation
+
+- `python3.11 -m py_compile gateway/app/services/voice_service.py gateway/app/services/task_view_projection.py gateway/app/routers/hot_follow_api.py gateway/app/services/hot_follow_subtitle_authority.py gateway/app/services/steps_v1.py`: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_subtitles_step_treats_preserved_source_audio_as_helper_only -q`: `1 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -k "recovers_current_audio_preview_and_clears_stale_failed_residue or preserve_source_route_does_not_project_target_subtitle_authority_failure or resolves_subtitles_terminal_success_when_authoritative_truth_is_current" -q`: `3 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_line_policy_layer.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`: `20 passed`
+- `git diff --check`: passed
+
+### Real Representative Task Verification
+
+Direct replay of `42c51c62581b` and `7fe6dc8b4e95` was not available locally.
+
+- repo/workspace search returned no local artifacts for those ids
+- local `shortvideo.db` did not contain those rows
+- acceptance is therefore based on focused in-process/runtime coverage only
+
+### Acceptance Judgment
+
+Accepted for the two-pass continuation scope.
+
+- Pass A fixes the recovered URL helper-side-channel surface residue without
+  reopening subtitle-authority formation
+- Pass B gives local preserve-source tasks an explicit contract-valid subtitles
+  step outcome instead of a misleading target-subtitle authority failure
+- URL mainline remains healthy
+- preserve-source route semantics now align with the existing route contract
+- this branch is in a better state for final acceptance and merge review

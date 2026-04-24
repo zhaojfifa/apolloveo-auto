@@ -100,7 +100,7 @@ def hf_pipeline_state(
     if step == "audio":
         status = hf_state_from_status(task.get("dub_status"))
         voice_state = voice_execution_state_loader(task, settings_obj)
-        if status == "pending" and voice_state.get("audio_ready"):
+        if voice_state.get("audio_ready"):
             status = "done"
         if status == "done" and not voice_state.get("audio_ready"):
             status = "pending"

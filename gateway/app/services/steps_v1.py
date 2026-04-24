@@ -814,8 +814,18 @@ async def run_subtitles_step(req: SubtitlesRequest):
         updates: dict[str, str] = {}
         if no_subtitles_flag:
             updates["no_subtitles"] = "true"
+        target_subtitle_authoritative = bool(
+            not isinstance(result, dict)
+            or result.get("target_subtitle_authoritative", True)
+        )
+        helper_only_preserve_route = bool(
+            source_audio_policy == "preserve"
+            and not target_subtitle_authoritative
+        )
         if isinstance(result, dict) and "translation_incomplete" in result:
-            updates["translation_incomplete"] = "true" if translation_incomplete else "false"
+            updates["translation_incomplete"] = (
+                "false" if helper_only_preserve_route else ("true" if translation_incomplete else "false")
+            )
         if isinstance(result, dict):
             if result.get("parse_source_mode"):
                 updates["parse_source_mode"] = str(result.get("parse_source_mode"))
@@ -850,10 +860,6 @@ async def run_subtitles_step(req: SubtitlesRequest):
             updates["clean_video_generated"] = "true"
         _update_pipeline_config(req.task_id, updates)
         origin_text, normalized_origin_text, mm_text, translation_qa_payload = _subtitle_result_contract(result)
-        target_subtitle_authoritative = bool(
-            not isinstance(result, dict)
-            or result.get("target_subtitle_authoritative", True)
-        )
         target_text_semantic = has_semantic_target_subtitle_text(mm_text)
 
         workspace = Workspace(req.task_id, target_lang=req.target_lang)
@@ -900,8 +906,12 @@ async def run_subtitles_step(req: SubtitlesRequest):
             subtitles_key=subtitles_key,
             origin_key=origin_key,
             expected_subtitle_source=subtitle_filename,
-            translation_incomplete=not bool(translation_qa_payload.get("complete")),
+            translation_incomplete=(
+                not helper_only_preserve_route
+                and not bool(translation_qa_payload.get("complete"))
+            ),
             target_subtitle_authoritative=target_subtitle_authoritative,
+            target_subtitle_required=not helper_only_preserve_route,
         )
         logger.info(
             "SUB2_DONE",

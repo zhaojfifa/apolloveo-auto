@@ -182,6 +182,7 @@ def finalize_hot_follow_subtitles_step(
     expected_subtitle_source: str,
     translation_incomplete: bool,
     target_subtitle_authoritative: bool,
+    target_subtitle_required: bool = True,
 ) -> dict[str, Any]:
     actual_source = Path(str(target_subtitle_key)).name if target_subtitle_key else None
     decision = evaluate_hot_follow_subtitle_authority(
@@ -209,6 +210,15 @@ def finalize_hot_follow_subtitles_step(
             {
                 "subtitles_status": "ready",
                 "subtitles_error": None,
+            }
+        )
+    elif not target_subtitle_required:
+        updates.update(
+            {
+                "subtitles_status": "ready",
+                "subtitles_error": None,
+                "target_subtitle_current": False,
+                "target_subtitle_current_reason": "preserve_source_route_no_target_subtitle_required",
             }
         )
     else:
