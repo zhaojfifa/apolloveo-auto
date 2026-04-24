@@ -2084,3 +2084,94 @@ Acceptance:
 - historical skip/failure events no longer override current truth for the
   frozen boundary subset
 - this line is in a better state for final acceptance and merge consideration
+
+## 2026-04-24 - Hot Follow current-branch final acceptance freeze
+
+Branch:
+
+- `VeoBase01-subtitle-authority-contract-correction`
+
+Base:
+
+- `7687ba9aaeaae3ac5f55d37c3d511aff37cabc9f`
+
+Starting SHA:
+
+- `0d804fd149a5dc4aec1143ea684e1b12d940a1f8`
+
+Reading declaration:
+
+- root indexes:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+- docs indexes:
+  - `docs/README.md`
+  - `docs/ENGINEERING_INDEX.md`
+- task-specific authority:
+  - `docs/contracts/engineering_reading_contract_v1.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/reviews/VEOBASE01_SUBTITLE_AUTHORITY_REVIEW.md`
+  - `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+  - `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+- missing authority:
+  - none
+
+Scope:
+
+- acceptance verification only
+- baseline-freeze judgment only
+- one minimal same-branch correction only because acceptance evidence forced it
+
+Acceptance-evidence correction forced by this pass:
+
+- manual subtitle save after helper failure still returned `422`
+- root cause was strict currentness matching between canonical Myanmar
+  `mm.srt` and legacy Myanmar `my.srt`
+- narrow correction accepted `my.srt` as a Myanmar-only authoritative alias for
+  currentness/source matching
+
+Exact modules changed:
+
+- `gateway/app/services/hot_follow_subtitle_currentness.py`
+- `gateway/app/services/tests/test_hot_follow_subtitle_currentness.py`
+- `docs/reviews/HOT_FOLLOW_CURRENT_BRANCH_FINAL_ACCEPTANCE_FREEZE.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_subtitle_currentness.py gateway/app/services/tests/test_hot_follow_subtitle_currentness.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_currentness.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_manual_subtitle_save_clears_helper_translate_failure -q`
+  - result: `7 passed`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py -q`
+  - result: `61 passed`
+- `git diff --check`
+  - result: passed
+
+Representative task verification:
+
+- direct live replay of `791a826f4e11`, `c0dac743a540`, and `e7c248b90ef4`
+  was not available in this workspace
+- repo/workspace search and local `shortvideo.db` lookup did not find those
+  rows
+- acceptance therefore relies on contract/runtime inspection plus focused
+  in-process validation
+
+Freeze judgment:
+
+- four-layer architecture acceptance: accepted
+- contract-driven status acceptance: accepted
+- business-flow acceptance: accepted
+- boundary stability acceptance: accepted
+- final freeze judgment: `A. Freeze accepted`
+
+Next action:
+
+- move upward into factory-level contract objects and line-template design
+- do not reopen Hot Follow internals unless a new acceptance regression is
+  found against this frozen baseline

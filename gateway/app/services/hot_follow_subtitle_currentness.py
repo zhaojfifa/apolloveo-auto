@@ -4,6 +4,15 @@ import re
 from typing import Iterable
 
 
+def _normalize_subtitle_source_name(target_lang: str | None, source_name: str | None) -> str:
+    name = str(source_name or "").strip().lower()
+    if not name:
+        return ""
+    if str(target_lang or "").strip().lower() in {"my", "mm"} and name == "my.srt":
+        return "mm.srt"
+    return name
+
+
 def normalize_subtitle_semantic_text(text: str | None) -> str:
     source = str(text or "")
     if not source:
@@ -50,15 +59,17 @@ def compute_hot_follow_target_subtitle_currentness(
     has_saved_revision: bool = False,
 ) -> dict[str, object]:
     target_exists = has_semantic_target_subtitle_text(target_text)
+    normalized_expected = _normalize_subtitle_source_name(target_lang, expected_subtitle_source)
+    normalized_actual = _normalize_subtitle_source_name(target_lang, actual_subtitle_source)
     authoritative_source = bool(
         subtitle_artifact_exists
-        and expected_subtitle_source
-        and actual_subtitle_source
-        and str(expected_subtitle_source).strip() == str(actual_subtitle_source).strip()
+        and normalized_expected
+        and normalized_actual
+        and normalized_expected == normalized_actual
     )
     source_copy = _matches_any_source(target_text, source_texts)
 
-    if not subtitle_artifact_exists or not expected_subtitle_source or not actual_subtitle_source:
+    if not subtitle_artifact_exists or not normalized_expected or not normalized_actual:
         current = False
         reason = "subtitle_missing"
     elif not authoritative_source:

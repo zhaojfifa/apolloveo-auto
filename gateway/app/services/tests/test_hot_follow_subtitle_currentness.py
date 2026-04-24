@@ -47,6 +47,14 @@ def test_myanmar_valid_authoritative_target_subtitle_is_current():
     assert state["target_subtitle_authoritative_source"] is True
 
 
+def test_myanmar_legacy_my_srt_alias_is_treated_as_authoritative():
+    state = _currentness("my", MY_TARGET_SRT, actual_subtitle_source="my.srt")
+
+    assert state["target_subtitle_current"] is True
+    assert state["target_subtitle_current_reason"] == "ready"
+    assert state["target_subtitle_authoritative_source"] is True
+
+
 def test_timing_only_srt_has_no_semantic_target_subtitle_text():
     timing_only = "1\n00:00:00,000 --> 00:00:02,000\n\n"
 
