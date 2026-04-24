@@ -174,6 +174,18 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
     compose_input_derive_failed = bool(gate_result.get("compose_input_derive_failed_terminal"))
     compose_exec_failed = bool(gate_result.get("compose_exec_failed_terminal"))
     historical_exists = bool((_as_dict(state.get("historical_final"))).get("exists"))
+    current_attempt = _as_dict(state.get("current_attempt"))
+    waiting_retryable = bool(
+        current_attempt.get("subtitle_translation_waiting_retryable")
+        or (
+            not bool(gate_result.get("subtitle_ready"))
+            and not bool(gate_result.get("audio_ready"))
+            and str(gate_result.get("subtitle_ready_reason") or "").strip() == "waiting_for_target_subtitle_translation"
+            and str(gate_result.get("audio_ready_reason") or "").strip() == "waiting_for_target_subtitle_translation"
+            and str(gate_result.get("selected_compose_route") or "").strip() == "tts_replace_route"
+            and not bool(gate_result.get("no_dub"))
+        )
+    )
 
     compose = dict(_as_dict(state.get("compose")))
     last = dict(_as_dict(compose.get("last")))
@@ -223,7 +235,12 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
         for item in state.get("deliverables") or []:
             if not isinstance(item, dict):
                 continue
-            if str(item.get("kind") or "").strip().lower() != "final":
+            kind = str(item.get("kind") or "").strip().lower()
+            if waiting_retryable and kind in {"subtitle", "audio"}:
+                item["status"] = "pending"
+                item["state"] = "pending"
+                continue
+            if kind != "final":
                 continue
             item_status = (
                 "done"

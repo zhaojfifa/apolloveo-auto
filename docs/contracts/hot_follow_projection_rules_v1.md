@@ -118,6 +118,8 @@ workbench_surface_rule_contract:
   forbidden:
     - mutate authoritative projection after ready-gate computation
     - override final/audio/subtitle truth from compatibility fallback aliases
+    - preserve stale failed deliverable status when current L2/L3 truth is
+      translation_waiting_retryable
 ```
 
 ## Projection Dominance Contract
@@ -175,6 +177,22 @@ compose_route_reason_contract:
 
 ```yaml
 current_attempt_route_summary_contract:
+  translation_waiting_retryable:
+    selected_compose_route: tts_replace_route
+    subtitle_translation_waiting_retryable: true
+    no_dub_route_terminal: false
+    no_tts_compose_allowed: false
+    compose_execute_allowed: false
+    helper_translation:
+      status: pending_or_retryable
+      retryable: true
+      terminal: false
+    when_all:
+      - subtitle_ready is false
+      - subtitle_ready_reason is waiting_for_target_subtitle_translation
+      - audio_ready is false
+      - audio_ready_reason is waiting_for_target_subtitle_translation
+      - no_dub is not explicitly true
   retriable_dub_failure:
     selected_compose_route: tts_replace_route
     current_attempt_failure_class: retriable_dub_failure
@@ -204,6 +222,7 @@ current_attempt_route_summary_contract:
 advisory_resolution_contract:
   selection:
     final_ready: final_ready
+    translation_waiting_retryable: subtitle_translation_waiting_retryable
     retriable_dub_failure: retriable_dub_failure
     terminal_no_tts: no_dub_route_terminal
     terminal_no_tts_routes:
@@ -211,6 +230,18 @@ advisory_resolution_contract:
       - bgm_only_route
       - no_tts_compose_route
   advisories:
+    subtitle_translation_waiting_retryable:
+      id: hf_advisory_translation_waiting_retryable
+      kind: operator_guidance
+      level: info
+      recommended_next_action: wait_or_retry_translation
+      operator_hint: subtitle translation still pending
+      explanation: "当前目标字幕翻译尚未就绪，线路处于等待/可重试状态；请等待翻译返回或重试字幕步骤，再继续配音和合成。"
+      evidence_fields:
+        - subtitle_ready
+        - subtitle_ready_reason
+        - audio_ready
+        - audio_ready_reason
     final_ready:
       id: hf_advisory_final_ready
       kind: operator_guidance
@@ -289,6 +320,27 @@ runtime_boundary_rule_freeze_contract:
     stale_no_dub_reasons_ignored_when_current_truth:
       - target_subtitle_empty
       - dub_input_empty
+```
+
+## Deliverable Projection Isolation
+
+```yaml
+deliverable_projection_isolation_contract:
+  translation_waiting_retryable:
+    derives_from:
+      - l2.subtitle_ready
+      - l2.subtitle_ready_reason
+      - l2.audio_ready
+      - l2.audio_ready_reason
+      - l2.selected_compose_route
+      - l3.subtitle_translation_waiting_retryable
+    forces:
+      subtitle_deliverable: pending
+      audio_deliverable: pending
+    forbidden:
+      - reuse stale subtitles_status failed projection
+      - reuse stale dub_status failed projection
+      - derive failed state from historical post.dub.fail event
 ```
 
 ## Blocking-Reason Mapping Contract

@@ -2254,3 +2254,38 @@ Acceptance result:
 - helper/provider visibility is explicit on the subtitle lane
 - ready gate, advisory, and operator summary now use waiting/retryable wording
   for unresolved translation lanes
+
+## 2026-04-24 Hot Follow Four-Layer Projection Drift Repair
+
+Context:
+
+- Current branch only narrow projection repair for representative waiting-state
+  class `d215fbcb5d5e`
+- Scope held to L4 projection derivation only
+
+Fix:
+
+- froze `translation_waiting_retryable` as a strict non-terminal contract state
+  spanning L2 truth and L3 gate/current-attempt derivation
+- patched L4 deliverable projection so subtitle/audio rows derive from current
+  waiting truth instead of stale failed residue
+- isolated historical `post.dub.fail(target_subtitle_translation_incomplete)`
+  to events only; it no longer drives deliverables when the current contract
+  state is waiting/retryable
+- updated state-machine and projection-rule docs so L4 surfaces must derive
+  strictly from L2 facts plus L3 gate state for this boundary
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/status_policy/hot_follow_state.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_hot_follow_helper_translation.py -q`
+- `git diff --check`
+
+Acceptance result:
+
+- translation waiting now projects consistently across pipeline, deliverables,
+  current attempt, ready gate, advisory, and operator summary
+- deliverable failed residue is removed for subtitle/audio while helper
+  translation remains pending/retryable
+- historical dub-fail events remain diagnostic-only and do not override current
+  truth
