@@ -25,6 +25,7 @@ from gateway.app.services.subtitle_helpers import (
 )
 from gateway.app.services.task_view_helpers import (
     compute_composed_state,
+    hot_follow_terminal_no_dub_projection,
     resolve_hub_final_url,
     scene_pack_info,
     scenes_status_from_ssot,
@@ -420,25 +421,13 @@ def build_hot_follow_workbench_projection(
     route_state = dual_channel_state_loader(task_id, task_runtime, subtitle_lane, subtitles_step_done=subtitles_step_done)
     audio_cfg = audio_config_loader(task_runtime)
     voice_state = voice_execution_state_loader(task_runtime, settings_obj)
-    stored_no_dub_reason = str(
-        pipeline_config.get("dub_skip_reason") or task_runtime.get("dub_skip_reason") or ""
-    ).strip()
-    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
-        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
-        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    no_dub, no_dub_reason, _ = hot_follow_terminal_no_dub_projection(
+        pipeline_config=pipeline_config,
+        task=task_runtime,
+        route_state=route_state,
+        subtitle_lane=subtitle_lane,
+        voice_state=voice_state,
     )
-    if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
-        no_dub = False
-    if stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
-        no_dub_reason = stored_no_dub_reason
-    elif route_state.get("content_mode") == "subtitle_led":
-        no_dub_reason = "subtitle_led"
-    elif route_state.get("content_mode") == "silent_candidate":
-        no_dub_reason = "no_speech_detected"
-    else:
-        no_dub_reason = None
-    if not no_dub:
-        no_dub_reason = None
     no_dub_compose_allowed = bool(
         no_dub and str(no_dub_reason or "").strip().lower() in {"target_subtitle_empty", "dub_input_empty"}
     )

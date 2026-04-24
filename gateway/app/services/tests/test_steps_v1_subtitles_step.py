@@ -5,6 +5,9 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+from fastapi import HTTPException
+
 from gateway.app.schemas import DubRequest, SubtitlesRequest
 from gateway.app.services import steps_v1
 from gateway.app.steps import subtitles as subtitles_step
@@ -509,6 +512,86 @@ def test_run_dub_step_skips_empty_target_subtitle_instead_of_failing(monkeypatch
     assert pipeline["no_dub"] == "true"
     assert pipeline["dub_skip_reason"] == "target_subtitle_empty"
     assert (tmp_path / "hf-empty-dub" / "dub" / "no_dub.txt").exists()
+
+
+def test_run_dub_step_does_not_skip_translation_incomplete_first_attempt_as_empty_target(monkeypatch, tmp_path):
+    updates: list[dict] = []
+
+    class _DubWorkspace:
+        def __init__(self, task_id: str, target_lang: str | None = None):
+            self.base_dir = tmp_path / task_id
+            self.subtitles_dir = self.base_dir / "subs"
+            self.subtitles_dir.mkdir(parents=True, exist_ok=True)
+            suffix = "vi.srt" if str(target_lang or "").strip().lower() == "vi" else "mm.srt"
+            self.mm_txt_path = self.subtitles_dir / suffix.replace(".srt", ".txt")
+            self.mm_srt_path = self.subtitles_dir / suffix
+            self.origin_srt_path = self.subtitles_dir / "origin.srt"
+            self.origin_srt_path.write_text("1\n00:00:00,000 --> 00:00:02,000\nvoice led transcript\n", encoding="utf-8")
+
+        def mm_srt_exists(self) -> bool:
+            return self.mm_srt_path.exists()
+
+        def read_mm_edited_text(self) -> str:
+            return ""
+
+    class _DummyDb:
+        def query(self, *_args, **_kwargs):
+            return self
+
+        def filter(self, *_args, **_kwargs):
+            return self
+
+        def first(self):
+            return SimpleNamespace(pipeline_config=None)
+
+        def close(self):
+            return None
+
+    repo = _FakeRepo(
+        {
+            "pipeline_config": {"translation_incomplete": "true"},
+            "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+            "config": {"tts_voiceover_key": "deliver/tasks/old/audio_mm.dry.mp3"},
+        }
+    )
+
+    monkeypatch.setattr(
+        steps_v1.config,
+        "get_settings",
+        lambda: SimpleNamespace(
+            edge_tts_voice_map={"mm_female_1": "my-MM-NilarNeural"},
+            azure_tts_voice_map={},
+        ),
+    )
+    monkeypatch.setattr(steps_v1, "Workspace", _DubWorkspace)
+    monkeypatch.setattr(steps_v1, "SessionLocal", lambda: _DummyDb())
+    monkeypatch.setattr(steps_v1, "task_base_dir", lambda task_id: tmp_path / task_id)
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+    monkeypatch.setattr(steps_v1, "_append_event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: updates.append(dict(kwargs)))
+    monkeypatch.setattr(
+        steps_v1,
+        "synthesize_voice",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("translation incomplete must not call TTS")),
+    )
+
+    with pytest.raises(HTTPException) as excinfo:
+        asyncio.run(
+            steps_v1.run_dub_step(
+                DubRequest(
+                    task_id="hf-translation-incomplete-first-attempt",
+                    target_lang="my",
+                    provider="edge-tts",
+                    force=True,
+                )
+            )
+        )
+
+    assert excinfo.value.status_code == 409
+    assert excinfo.value.detail == "target_subtitle_translation_incomplete"
+    assert updates[-1]["dub_status"] == "failed"
+    assert updates[-1]["dub_error"] == "target_subtitle_translation_incomplete"
+    assert "pipeline_config" not in updates[-1]
 
 
 def test_subtitles_pipeline_state_distinguishes_no_subtitles_and_translation_incomplete():

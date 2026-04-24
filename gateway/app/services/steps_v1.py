@@ -652,6 +652,17 @@ def _skip_empty_dub(req: DubRequest, reason: str, provider: str | None, current_
     }
 
 
+def _unresolved_translation_lane_blocks_empty_dub(task: dict | None, source_text: str | None) -> bool:
+    task_obj = task if isinstance(task, dict) else {}
+    pipeline_config = parse_pipeline_config(task_obj.get("pipeline_config"))
+    target_reason = str(task_obj.get("target_subtitle_current_reason") or "").strip()
+    translation_unresolved = bool(
+        str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
+        or target_reason == "target_subtitle_translation_incomplete"
+    )
+    return bool(translation_unresolved and _clean_text_for_dub(source_text or ""))
+
+
 def _maybe_fill_missing_for_pack(*, raw_path: Path, audio_path: Path, subs_path: Path) -> None:
     """Allow pack to proceed by generating silence audio if DUB_SKIP=1."""
 
@@ -1107,6 +1118,12 @@ async def run_dub_step(req: DubRequest):
             mm_srt_text = workspace.mm_srt_path.read_text(encoding="utf-8")
         except Exception:
             mm_srt_text = ""
+    origin_srt_text = ""
+    if workspace.origin_srt_path.exists():
+        try:
+            origin_srt_text = workspace.origin_srt_path.read_text(encoding="utf-8")
+        except Exception:
+            origin_srt_text = workspace.origin_srt_path.read_text(encoding="utf-8", errors="ignore")
     mm_txt_resolved, used_fallback, fallback_source = _resolve_mm_txt_text(
         mm_txt_text=mm_txt_text,
         override_text=req.mm_text,
@@ -1130,6 +1147,11 @@ async def run_dub_step(req: DubRequest):
             },
         )
     mm_txt_text = mm_txt_resolved
+    if _unresolved_translation_lane_blocks_empty_dub(current_task, origin_srt_text):
+        unresolved_translation = not _clean_text_for_dub(mm_txt_text) or str(mm_txt_text or "").strip().lower() == "no subtitles"
+        if unresolved_translation:
+            _clear_no_dub_pipeline_flags(req.task_id, current_task)
+            _fail_dub(req, "target_subtitle_translation_incomplete", provider, status_code=409)
     if str(mm_txt_text or "").strip().lower() == "no subtitles":
         return _skip_empty_dub(req, "target_subtitle_empty", provider, current_task)
     if not mm_txt_text.strip():

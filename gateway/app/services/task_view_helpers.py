@@ -187,6 +187,66 @@ def normalize_selected_tool_ids(value: Any) -> Optional[list[str]]:
     return None
 
 
+def hot_follow_terminal_no_dub_projection(
+    *,
+    pipeline_config: dict[str, Any],
+    task: dict[str, Any],
+    route_state: dict[str, Any],
+    subtitle_lane: dict[str, Any],
+    voice_state: dict[str, Any],
+) -> tuple[bool, str | None, str | None]:
+    stored_no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
+    ).strip()
+    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
+        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
+        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    )
+    unresolved_translation_voice_led = bool(
+        route_state.get("content_mode") == "voice_led"
+        and str(
+            subtitle_lane.get("target_subtitle_current_reason")
+            or subtitle_lane.get("subtitle_ready_reason")
+            or ""
+        ).strip()
+        == "target_subtitle_translation_incomplete"
+        and (
+            str(subtitle_lane.get("parse_source_text") or "").strip()
+            or str(subtitle_lane.get("raw_source_text") or "").strip()
+            or str(subtitle_lane.get("normalized_source_text") or "").strip()
+        )
+    )
+    helper_translate_failed_missing_target = bool(
+        subtitle_lane.get("helper_translate_failed")
+        and not bool(subtitle_lane.get("subtitle_ready"))
+    )
+    if helper_translate_failed_missing_target or unresolved_translation_voice_led:
+        no_dub = False
+    if bool(subtitle_lane.get("subtitle_ready")) and stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
+        no_dub = False
+    if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
+        no_dub = False
+    if stored_no_dub_reason == "target_subtitle_empty":
+        no_dub_reason = "target_subtitle_empty"
+        no_dub_message = "Target subtitle is empty; dubbing is skipped."
+    elif stored_no_dub_reason == "dub_input_empty":
+        no_dub_reason = "dub_input_empty"
+        no_dub_message = "Dub input is empty; dubbing is skipped."
+    elif route_state.get("content_mode") == "subtitle_led":
+        no_dub_reason = "subtitle_led"
+        no_dub_message = "No reliable speech detected. Review subtitles or provide text before dubbing."
+    elif route_state.get("content_mode") == "silent_candidate":
+        no_dub_reason = "no_speech_detected"
+        no_dub_message = "No spoken speech detected in source video; dubbing is skipped."
+    else:
+        no_dub_reason = None
+        no_dub_message = None
+    if not no_dub:
+        no_dub_reason = None
+        no_dub_message = None
+    return bool(no_dub), no_dub_reason, no_dub_message
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SRT / translation QA
 # ═══════════════════════════════════════════════════════════════════════════════

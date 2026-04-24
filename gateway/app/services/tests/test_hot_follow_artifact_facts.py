@@ -322,6 +322,77 @@ def test_translation_incomplete_voice_led_shape_stays_on_tts_replace_route():
     assert state["ready_gate"]["no_tts_compose_allowed"] is False
 
 
+def test_translation_incomplete_voice_led_route_stays_single_source_across_fact_and_gate():
+    artifact_facts = build_hot_follow_artifact_facts(
+        "hf-url-translation-incomplete-single-source",
+        {
+            "task_id": "hf-url-translation-incomplete-single-source",
+            "compose_input_policy": {"mode": "direct"},
+        },
+        final_info={"exists": False},
+        historical_final=None,
+        persisted_audio={"exists": False, "voiceover_url": None},
+        subtitle_lane={
+            "subtitle_artifact_exists": False,
+            "subtitle_ready": False,
+            "subtitle_ready_reason": "target_subtitle_translation_incomplete",
+            "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+            "parse_source_text": "voice led transcript",
+        },
+        scene_pack=None,
+        deliverable_url=_deliverable_url,
+    )
+    state = compute_hot_follow_state(
+        {"task_id": "hf-url-translation-incomplete-single-source", "kind": "hot_follow"},
+        {
+            "task_id": "hf-url-translation-incomplete-single-source",
+            "final": {"exists": False},
+            "subtitles": {
+                "subtitle_ready": False,
+                "subtitle_ready_reason": "target_subtitle_translation_incomplete",
+                "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+                "target_subtitle_authoritative_source": False,
+                "parse_source_text": "voice led transcript",
+            },
+            "audio": {
+                "status": "pending",
+                "audio_ready": False,
+                "audio_ready_reason": "audio_missing",
+                "no_dub": True,
+                "no_dub_reason": "target_subtitle_empty",
+            },
+            "artifact_facts": artifact_facts,
+        },
+    )
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": False,
+            "audio_ready_reason": "audio_missing",
+            "dub_current": False,
+            "no_dub_reason": "target_subtitle_empty",
+        },
+        subtitle_lane={
+            "subtitle_ready": False,
+            "subtitle_ready_reason": "target_subtitle_translation_incomplete",
+            "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+            "target_subtitle_authoritative_source": False,
+            "parse_source_text": "voice led transcript",
+            "edited_text": "",
+            "srt_text": "",
+            "dub_input_text": "",
+        },
+        dub_status="pending",
+        compose_status="pending",
+        composed_reason="compose_not_done",
+        artifact_facts=artifact_facts,
+        no_dub=True,
+    )
+
+    assert artifact_facts["selected_compose_route"]["name"] == "tts_replace_route"
+    assert current_attempt["selected_compose_route"] == "tts_replace_route"
+    assert state["ready_gate"]["selected_compose_route"] == "tts_replace_route"
+
+
 def test_preserve_policy_translation_incomplete_still_requires_tts_route_without_explicit_preserve_exception():
     current_attempt = build_hot_follow_current_attempt_summary(
         voice_state={
