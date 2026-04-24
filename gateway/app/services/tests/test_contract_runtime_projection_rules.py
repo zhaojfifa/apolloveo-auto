@@ -146,3 +146,12 @@ def test_scene_pack_pending_reason_for_task_uses_bound_projection_contract():
         )
         == "scenes.running"
     )
+
+
+def test_projection_runtime_loads_boundary_rule_freeze_contract():
+    runtime = get_projection_rules_runtime("docs/contracts/hot_follow_projection_rules_v1.md")
+
+    assert "url_voice_led_standard_dubbing" in runtime.runtime_boundary_rule_freeze_rules
+    assert "preserve_source_route_resolution" in runtime.runtime_boundary_rule_freeze_rules
+    assert "helper_side_channel_coexistence" in runtime.runtime_boundary_rule_freeze_rules
+    assert "historical_event_isolation" in runtime.runtime_boundary_rule_freeze_rules

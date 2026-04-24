@@ -253,6 +253,44 @@ advisory_resolution_contract:
         - no_dub_reason
 ```
 
+## Runtime Boundary Rule Freeze Contract
+
+```yaml
+runtime_boundary_rule_freeze_contract:
+  url_voice_led_standard_dubbing:
+    keep_tts_replace_when:
+      - subtitle_ready
+      - target_subtitle_authoritative_source
+    keep_tts_replace_current_reasons:
+      - target_subtitle_translation_incomplete
+      - helper_translate_provider_exhausted
+      - helper_translate_failed
+    helper_failure_history_diagnostic_only_after_target_ready: true
+  preserve_source_route_resolution:
+    explicit_no_target_required_reasons:
+      - preserve_source_route_no_target_subtitle_required
+    preserve_policy_alone_does_not_force_no_tts_terminal: true
+    preserve_policy_still_uses_tts_route_when:
+      - subtitle_ready
+      - helper_translate_failed_voice_led
+      - target_subtitle_translation_incomplete
+  helper_side_channel_coexistence:
+    helper_failure_is_side_channel_only_when_any:
+      - subtitle_ready
+      - audio_ready
+      - final_exists
+      - final_fresh
+  historical_event_isolation:
+    current_truth_dominates_when_any:
+      - subtitle_ready
+      - audio_ready
+      - final_exists
+      - final_fresh
+    stale_no_dub_reasons_ignored_when_current_truth:
+      - target_subtitle_empty
+      - dub_input_empty
+```
+
 ## Blocking-Reason Mapping Contract
 
 ```yaml

@@ -1999,3 +1999,88 @@ Acceptance:
 - URL mainline remains healthy
 - preserve-source route no longer inherits a misleading target-subtitle
   authority failure at the subtitles-step boundary
+
+## 2026-04-24 - VEOBASE01 runtime rule-freeze for business-boundary stabilization
+
+Branch:
+
+- `VeoBase01-subtitle-authority-contract-correction`
+
+Base:
+
+- `e42fbb7f0776886e619130e521a1c82352187e23`
+
+Reading declaration:
+
+- root indexes:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+- docs indexes:
+  - `docs/README.md`
+  - `docs/ENGINEERING_INDEX.md`
+- task-specific authority:
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/reviews/VEOBASE01_SUBTITLE_AUTHORITY_REVIEW.md`
+  - `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+- missing authority: none
+
+Exact top-level rules frozen:
+
+- URL voice-led standard dubbing:
+  - authoritative/current target subtitle truth keeps the task on
+    `tts_replace_route`
+  - helper failure history and translation-incomplete history are diagnostic
+    only after current authoritative subtitle truth exists
+- local preserve-source route separation:
+  - preserve-policy tasks now distinguish explicit
+    `preserve_source_route_no_target_subtitle_required` exceptions from
+    preserve-policy tasks that still require the normal TTS route
+- helper side-channel coexistence:
+  - helper/provider failure is side-channel only once current subtitle/audio/
+    final truth exists, unless an explicit rule says it blocks mainline
+- historical event isolation:
+  - stale `target_subtitle_empty` / `dub_input_empty` skip history does not
+    override current authoritative truth for the frozen rule subset
+
+Exact runtime modules changed:
+
+- `gateway/app/services/contract_runtime/projection_rules_runtime.py`
+- `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+- `gateway/app/services/tests/test_contract_runtime_projection_rules.py`
+- `gateway/app/services/tests/test_hot_follow_artifact_facts.py`
+- `docs/contracts/hot_follow_projection_rules_v1.md`
+- `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/contract_runtime/projection_rules_runtime.py`: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_contract_runtime_projection_rules.py -q`: `42 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -k "preserve_source_route_does_not_project_target_subtitle_authority_failure or resolves_subtitles_terminal_success_when_authoritative_truth_is_current or recovers_current_audio_preview_and_clears_stale_failed_residue" -q`: `3 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_line_policy_layer.py gateway/app/services/status_policy/tests/test_hot_follow_publish_hub_final_url.py -q`: `7 passed`
+- `git diff --check`: passed
+
+Representative task verification:
+
+- direct replay of the successful URL closure case, failed URL
+  translation-incomplete case, and local preserve-source first/recovered cases
+  was not available locally
+- acceptance is therefore based on focused in-process/runtime coverage only
+
+Acceptance:
+
+- URL same-class route resolution is now constrained by explicit top-level
+  rules instead of drifting through scattered current-attempt branching
+- local preserve-source route handling is now rule-separated from the normal
+  voice-led TTS route
+- helper failure no longer pollutes recovered current truth once authoritative
+  subtitle/audio/final truth exists
+- historical skip/failure events no longer override current truth for the
+  frozen boundary subset
+- this line is in a better state for final acceptance and merge consideration

@@ -23,6 +23,7 @@ class ProjectionRulesRuntime:
     final_precedence_rules: dict[str, Any]
     compose_route_reason_rules: dict[str, Any]
     advisory_resolution_rules: dict[str, Any]
+    runtime_boundary_rule_freeze_rules: dict[str, Any]
 
 
 @lru_cache(maxsize=16)
@@ -37,6 +38,7 @@ def get_projection_rules_runtime(ref: str) -> ProjectionRulesRuntime:
         final_precedence_rules=dict(sections.get("final_precedence_contract") or {}),
         compose_route_reason_rules=dict(sections.get("compose_route_reason_contract") or {}),
         advisory_resolution_rules=dict(sections.get("advisory_resolution_contract") or {}),
+        runtime_boundary_rule_freeze_rules=dict(sections.get("runtime_boundary_rule_freeze_contract") or {}),
     )
 
 

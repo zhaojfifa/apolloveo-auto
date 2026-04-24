@@ -156,6 +156,49 @@ Interpretation:
 - true no-dub/no-TTS terminal paths require explicit no-dub/no-TTS facts and
   route allowance
 
+### Preserve-Source Route Separation
+
+Explicit rule:
+
+- `source_audio_policy=preserve` by itself does not decide the route
+- preserve-source without target subtitle is legal only when an explicit
+  preserve-source/no-target contract fact applies
+- otherwise preserve-policy tasks remain on the standard dubbing route when the
+  current subtitle/audio boundary says target subtitle is required or expected
+
+Interpretation:
+
+- `preserve_source_route_no_target_subtitle_required` is an explicit legal
+  preserve-source boundary fact
+- translation-incomplete / helper-failed voice-led shapes are not silently
+  reclassified into preserve/no-TTS terminal just because preserve policy is
+  enabled
+
+### Helper Side-Channel Coexistence
+
+Explicit rule:
+
+- helper/provider failure remains diagnostic side-channel truth unless an
+  explicit subtitle-formation rule says it blocks target subtitle formation
+- once current subtitle/audio/final truth is ready, helper failure history may
+  remain visible but must not downgrade route, current-attempt, or ready-gate
+  truth
+
+### Historical Event Isolation
+
+Explicit rule:
+
+- historical skip/failure events may remain in `events`
+- they must not override current subtitle/audio/final truth once current truth
+  is ready
+
+Interpretation:
+
+- stale `target_subtitle_empty` / `dub_input_empty` skip history may remain
+  visible in logs
+- it must not keep `no_dub`, `no_tts`, or terminal-route interpretation active
+  after current subtitle/audio/final truth is ready
+
 ### Final Dominance
 
 Explicit rule:
