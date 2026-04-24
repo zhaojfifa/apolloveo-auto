@@ -2340,3 +2340,246 @@ Acceptance:
 - branch drift reduced by aligning `main` to accepted `VeoBase01`
 - discussion moved upward into factory-level contract scope
 - frozen Hot Follow internals remain closed in this pass
+
+## 2026-04-24 - product-driven factory alignment pass for Matrix Script, Digital Anchor, and frozen Hot Follow
+
+Branch:
+
+- `factory-contract-objects-discussion-v1`
+
+Reading Declaration:
+
+1. Root indexes read first:
+   - `README.md`
+   - `ENGINEERING_CONSTRAINTS_INDEX.md`
+2. Docs indexes read second:
+   - `docs/README.md`
+   - `docs/ENGINEERING_INDEX.md`
+3. Minimum task-specific authority files selected from indexes:
+   - `docs/contracts/engineering_reading_contract_v1.md`
+   - `docs/architecture/factory_four_layer_architecture_baseline_v1.md`
+   - `docs/contracts/production_line_runtime_assembly_rules_v1.md`
+   - `docs/contracts/factory_input_contract_v1.md`
+   - `docs/contracts/factory_content_structure_contract_v1.md`
+   - `docs/contracts/factory_scene_plan_contract_v1.md`
+   - `docs/contracts/factory_audio_plan_contract_v1.md`
+   - `docs/contracts/factory_language_plan_contract_v1.md`
+   - `docs/contracts/factory_delivery_contract_v1.md`
+   - `docs/architecture/factory_line_template_design_v1.md`
+   - `docs/contracts/script_video_planning_contract.md`
+   - `docs/contracts/action_replica_planning_assets_contract.md`
+   - `docs/reviews/review_jellyfish_importability_for_factory.md`
+   - `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md`
+   - `docs/reviews/HOT_FOLLOW_CURRENT_BRANCH_FINAL_ACCEPTANCE_FREEZE.md`
+4. Why these files were sufficient:
+   - this pass is a product-driven factory alignment pass above the frozen Hot
+     Follow sample
+   - Matrix Script line truth is represented by the script-video planning
+     contract and the script-driven planning review path
+   - Digital Anchor line truth is represented by the action-replica planning
+     asset contract and the digital-human planning review path
+   - Hot Follow is used only as the frozen production-line reference sample
+5. Missing-authority handling:
+   - no indexed authority file was missing
+   - no new product doc was created in this pass; write-back stays in the
+     execution log only
+
+Execution scope:
+
+- raise contract architecture one level higher without starting runtime
+  onboarding
+- map product flow to architecture layers, UI surfaces, and backend domains
+- define tool integration as backend capability supply rather than front-end
+  model selection
+- define the Broll asset-library vs tool-backend boundary
+- produce one implementation backlog split by:
+  - factory-generic
+  - line-specific
+  - runtime-policy
+  - tool-supply
+  - asset-supply
+  - platform capabilities
+
+Scenario alignment baseline:
+
+- Matrix Script Line:
+  - treated as a script-driven, result-oriented matrix production line
+  - authoritative upstream truth is the script planning chain:
+    script -> segment -> shot -> candidate asset -> linked asset -> delivery
+  - `docs/contracts/script_video_planning_contract.md` is the current product
+    truth proxy
+- Digital Anchor Line:
+  - treated as a script-driven personal-anchor production line
+  - authoritative upstream truth is the role/scene binding chain:
+    script/plan -> identity -> role binding -> shot binding -> language/audio
+    plan -> delivery
+  - `docs/contracts/action_replica_planning_assets_contract.md` is the current
+    product truth proxy
+- Hot Follow:
+  - remains the frozen reference line
+  - contributes the accepted four-layer runtime sample, delivery precedence,
+    and workbench/publish truth-path discipline
+  - no Hot Follow internal reopening is allowed in this pass
+
+### Execution Alignment Summary
+
+Contract architecture must now be raised one level above the current
+factory-object set.
+
+The next abstraction layer is not “another line contract” and not “runtime
+onboarding”. It is the factory product packet that binds:
+
+- input contract
+- content structure contract
+- scene plan contract
+- audio plan contract
+- language plan contract
+- delivery contract
+- line template bindings
+
+into one product-facing packet that a line must provide before runtime work is
+allowed.
+
+Debt-reduction path:
+
+1. keep Hot Follow frozen as the runtime reference line
+2. stop treating front-end workbench payloads as the place where line product
+   concepts are discovered
+3. lift Matrix Script and Digital Anchor product logic into contract-object
+   packets first
+4. define backend domains that can consume those packets without putting tool
+   choice, asset browsing, or route policy into routers/UI
+5. only after those packet and domain boundaries are explicit, allow line
+   runtime onboarding discussion
+
+Product flow to architecture-layer mapping:
+
+- Layer 1 production-line contract:
+  - declares which line is active and which packet bindings it requires
+- Layer 2 state/projection:
+  - interprets artifact truth, route truth, language/audio currentness, and
+    delivery readiness from packet-driven rules
+- Layer 3 surface/execution:
+  - exposes workbench and delivery center surfaces and dispatches services that
+    consume packet-driven rules
+
+Product flow to UI-surface mapping:
+
+- intake/create surface:
+  - factory input contract
+- planning/workbench surface:
+  - content structure, scene plan, language plan, audio plan
+- candidate confirmation/editor surface:
+  - Matrix Script candidate/link flow
+  - Digital Anchor identity/role/shot binding flow
+- delivery center:
+  - factory delivery contract
+- operator-facing publish/final review:
+  - ready-gate and delivery outputs derived from authoritative state, not
+    planning drafts
+
+Backend integration rule:
+
+- tool registry -> capability adapters -> routing policy -> worker execution
+- front end must not select raw model/provider as product runtime logic
+- front end may select product intent, quality tier, or line options
+- backend resolves that into tools/capabilities and execution routing
+
+Broll and tool boundary:
+
+- Broll asset library is asset supply:
+  - reusable references, candidate assets, linked assets, file-usage indexes,
+    asset availability, licensing/usage metadata
+- tool backend is capability supply:
+  - text analysis, script planning, image generation, speech, dubbing, motion,
+    composition, retrieval, ranking
+- neither Broll nor tool backend should own task/workbench business truth
+- line runtime consumes both through contracts and supply adapters
+
+Additional platform capabilities required for a true video factory:
+
+- factory packet validator before runtime onboarding
+- capability registry and adapter governance
+- asset-supply index and usage tracing
+- product-intent to capability-routing policy layer
+- versioned workbench/delivery response models
+- line conformance and packet completeness checks
+- execution/provenance tracing across planning, asset linking, and delivery
+
+### Implementation Backlog
+
+A. factory-generic
+
+- define one factory packet envelope that groups the six contract objects as
+  one pre-runtime onboarding requirement
+- add packet completeness and contract cross-reference validation
+- define factory-level product flow vocabulary shared by Matrix Script and
+  Digital Anchor without copying Hot Follow runtime residue
+- define versioned surface response contracts for intake, planning, and
+  delivery center
+
+B. line-specific
+
+- Matrix Script line:
+  - bind script planning draft, shot candidate flow, and result-oriented
+    delivery profile into one line packet
+- Digital Anchor line:
+  - bind identity/role/shot planning, speaker/language/audio expectations, and
+    personal-anchor delivery profile into one line packet
+- Hot Follow:
+  - no new internal work; retain only as frozen reference sample
+
+C. runtime-policy
+
+- formalize packet-to-line-template binding rules
+- formalize which packet fields become L2 facts, which become L3 route
+  decisions, and which remain L4-only planning/presentation inputs
+- define runtime onboarding gate checks that prove a new line is packet-complete
+  before any router/service runtime work starts
+- define ready-gate selection and delivery precedence rules as line policy, not
+  UI or router heuristics
+
+D. tool-supply
+
+- create/strengthen backend domains for:
+  - capability registry
+  - capability adapters
+  - routing policy
+  - worker execution envelope
+  - provider/model/settings governance
+- remove product dependence on front-end model selection
+- expose product-level intent knobs only, with backend resolution to tools
+
+E. asset-supply
+
+- create/strengthen backend domains for:
+  - Broll/reference asset library
+  - candidate vs linked asset confirmation
+  - file-usage / scope indexing
+  - asset availability / provenance / usage metadata
+- keep asset supply distinct from task/workbench truth and from tool capability
+  supply
+
+F. platform capabilities
+
+- packet validation service
+- line conformance tests
+- versioned response schemas for workbench and delivery center
+- provenance tracing from planning draft to linked assets to accepted delivery
+- operator confirmation hooks that remain contract-driven
+- cross-line policy observability and execution audit views
+
+Validation:
+
+- `git diff --check`
+  - result: passed
+
+Acceptance:
+
+- contract architecture is now aligned one layer higher than the current
+  factory object set
+- Matrix Script and Digital Anchor are both mapped as script-driven planning
+  lines without starting runtime onboarding
+- tool integration is aligned to backend capability supply
+- Broll is aligned to asset supply
+- Hot Follow remains frozen and unopened in this pass
