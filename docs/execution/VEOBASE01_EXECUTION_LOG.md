@@ -2175,3 +2175,91 @@ Next action:
 - move upward into factory-level contract objects and line-template design
 - do not reopen Hot Follow internals unless a new acceptance regression is
   found against this frozen baseline
+
+## 2026-04-24 - Hot Follow baseline freeze tag, VeoBase01 alignment, and factory-layer lift
+
+Source-of-truth docs used:
+
+- `docs/reviews/HOT_FOLLOW_CURRENT_BRANCH_FINAL_ACCEPTANCE_FREEZE.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Part 1 - frozen baseline tag:
+
+- source branch: `VeoBase01-subtitle-authority-contract-correction`
+- frozen baseline commit SHA: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+- tag name: `HotFollow-ContractDriven-Baseline-Freeze01`
+- tag SHA: `4d271022cef1bfe94b3e0a33cb4a429a6ab25d36`
+- tag target commit SHA: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+- tag type: annotated
+- remote push:
+  - `origin` updated with the new tag
+
+Part 2 - VeoBase01 alignment:
+
+- local `VeoBase01` SHA before alignment: `7e2e56b873f59537bf6d33a51b854343631bca63`
+- remote `origin/VeoBase01` SHA before alignment: `7e2e56b873f59537bf6d33a51b854343631bca63`
+- alignment method used: `git checkout VeoBase01` + `git merge --ff-only VeoBase01-subtitle-authority-contract-correction`
+- accepted lineage preserved: yes
+- history rewrite used: no
+- local `VeoBase01` SHA after alignment: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+- remote `origin/VeoBase01` updated: yes
+- remote `origin/VeoBase01` SHA after alignment: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+- `main` touched in this pass: no
+
+Part 3 - Hot Follow freeze write-back:
+
+- Hot Follow is now recorded as the first frozen contract-driven
+  production-line baseline
+- further Hot Follow internal work is paused unless a new acceptance regression
+  appears
+- next work is explicitly routed upward into factory-level contract objects and
+  line-template design
+
+Part 4 - factory-layer docs created on `VeoBase01`:
+
+- `docs/execution/HOT_FOLLOW_BASELINE_FREEZE_AND_VEOBASE01_ALIGNMENT.md`
+- `docs/contracts/factory_input_contract_v1.md`
+- `docs/contracts/factory_content_structure_contract_v1.md`
+- `docs/contracts/factory_scene_plan_contract_v1.md`
+- `docs/contracts/factory_audio_plan_contract_v1.md`
+- `docs/contracts/factory_language_plan_contract_v1.md`
+- `docs/contracts/factory_delivery_contract_v1.md`
+- `docs/architecture/factory_line_template_design_v1.md`
+
+Index update:
+
+- `docs/ENGINEERING_INDEX.md`
+  - added factory contract-object baseline authority entries
+  - added a task-oriented reading path for factory-level contract object design
+  - updated the new-line gate to keep work at the factory-contract/template
+    layer while Hot Follow stays frozen
+
+Validation:
+
+- `git diff --check`
+  - result: passed
+- authority path existence checks:
+  - `test -f docs/reviews/HOT_FOLLOW_CURRENT_BRANCH_FINAL_ACCEPTANCE_FREEZE.md`
+  - `test -f docs/execution/HOT_FOLLOW_BASELINE_FREEZE_AND_VEOBASE01_ALIGNMENT.md`
+  - `test -f docs/contracts/factory_input_contract_v1.md`
+  - `test -f docs/contracts/factory_content_structure_contract_v1.md`
+  - `test -f docs/contracts/factory_scene_plan_contract_v1.md`
+  - `test -f docs/contracts/factory_audio_plan_contract_v1.md`
+  - `test -f docs/contracts/factory_language_plan_contract_v1.md`
+  - `test -f docs/contracts/factory_delivery_contract_v1.md`
+  - `test -f docs/architecture/factory_line_template_design_v1.md`
+  - result: passed
+
+Conflict-resolution note:
+
+- no code/doc conflict resolution was required during VeoBase01 alignment
+- alignment was a pure fast-forward to the accepted frozen baseline
+
+Acceptance:
+
+- annotated freeze tag created and pushed
+- `VeoBase01` now contains the accepted frozen Hot Follow baseline
+- accepted lineage was preserved by fast-forward only
+- Hot Follow is now frozen as the first production-line sample
+- next work has moved upward one layer into factory-level contract objects and
+  line-template design only
