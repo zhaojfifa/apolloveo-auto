@@ -2175,3 +2175,124 @@ Next action:
 - move upward into factory-level contract objects and line-template design
 - do not reopen Hot Follow internals unless a new acceptance regression is
   found against this frozen baseline
+
+## 2026-04-24 Tag-Derived Recovery Write-Path Repair
+
+Branch:
+
+- `VeoBase02-clean-tag-verify`
+
+Base SHA:
+
+- `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+
+Reading declaration:
+
+- root entry first:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `docs/contracts/engineering_reading_contract_v1.md`
+- phase / authority:
+  - `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`
+  - `docs/execution/VEOBASE01_SEQUENTIAL_EXECUTION_DECISION.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+- line / runtime ownership:
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/contracts/worker_gateway_runtime_contract.md`
+  - `docs/contracts/skills_runtime_contract.md`
+  - `docs/architecture/line_contracts/hot_follow_line.yaml`
+- code inspection after authority read:
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+  - `gateway/app/services/task_view_presenters.py`
+  - `gateway/app/services/task_view_projection.py`
+  - `gateway/app/services/task_view_helpers.py`
+  - `gateway/app/services/steps_v1.py`
+  - `gateway/app/routers/hot_follow_api.py`
+  - direct imported downstream adapter inspected because it owned the stale L4
+    error projection:
+    - `gateway/app/services/task_view_workbench_contract.py`
+
+Problem statement:
+
+- defect A:
+  translation-incomplete tasks were still inheriting old
+  `target_subtitle_empty` no-dub writes and were being projected as terminal
+  no-TTS paths
+- defect B:
+  once current subtitle/audio truth recovered, top-level workbench errors still
+  read stale coarse task error fields
+- defect C:
+  helper provider failure stayed visible as a broad failed shape instead of a
+  clean side-channel split
+
+Exact code changes:
+
+- `gateway/app/services/steps_v1.py`
+  - added `_fail_translation_incomplete_dub()`
+  - dub step no longer writes `_skip_empty_dub(... target_subtitle_empty ...)`
+    when `pipeline_config.translation_incomplete=true`
+  - stale no-dub flags are cleared first, then dub fails with
+    `target_subtitle_translation_incomplete`
+- `gateway/app/services/task_view_helpers.py`
+  - added `derive_hot_follow_no_dub_state()`
+  - `no_dub` now comes from current subtitle/audio reducer inputs instead of
+    stale skip flags alone
+- `gateway/app/services/task_view_projection.py`
+  - switched projection `no_dub` / `no_dub_reason` /
+    `no_dub_compose_allowed` to the shared reducer helper
+- `gateway/app/services/task_view_presenters.py`
+  - switched workbench UI `no_dub` projection to the same reducer helper
+- `gateway/app/services/task_view_workbench_contract.py`
+  - top-level `errors` now clear from recovered subtitle/audio/compose truth
+    instead of reading stale coarse task error fields
+  - helper projection now exposes `output_state` and `provider_health`
+- `gateway/app/routers/hot_follow_api.py`
+  - helper lane now splits helper side-channel into `helper_translate_output_state`
+    and `helper_translate_provider_health`
+
+Behavior result:
+
+- defect A repaired:
+  translation-incomplete no longer auto-terminalizes to `no_dub` /
+  `target_subtitle_empty`
+- defect B repaired:
+  recovered subtitle/audio truth clears top-level L4 errors
+- defect C repaired:
+  helper provider failure remains visible as side-channel evidence without
+  rewriting recovered mainline truth
+
+Targeted validation:
+
+- `PYTHONPYCACHEPREFIX=/tmp/veobase02-verify-runtime/pycache python3.11 -m py_compile gateway/app/services/task_view_helpers.py gateway/app/services/task_view_projection.py gateway/app/services/task_view_presenters.py gateway/app/services/task_view_workbench_contract.py gateway/app/services/steps_v1.py gateway/app/routers/hot_follow_api.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+  - result: passed
+- `git diff --check`
+  - result: passed
+- `WORKSPACE_ROOT=/tmp/veobase02-verify-runtime/workspace TASK_REPO_BACKEND=file TASK_REPO_DIR=/tmp/veobase02-verify-runtime/task_repo STORAGE_BACKEND=local DATABASE_URL=sqlite:////tmp/veobase02-verify-runtime/verify.db PYTHONPYCACHEPREFIX=/tmp/veobase02-verify-runtime/pycache python3.11 -m pytest gateway/app/services/tests/test_steps_v1_subtitles_step.py::test_run_dub_step_translation_incomplete_does_not_terminalize_to_no_dub gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_translation_incomplete_does_not_reuse_stale_no_dub_skip_truth gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authoritative_truth_is_current gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_recovers_current_audio_preview_and_clears_stale_failed_residue gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_failure_preserves_authoritative_outputs gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_helper_translation_projection_stays_helper_layer_only gateway/app/services/tests/test_hot_follow_artifact_facts.py::test_translation_incomplete_voice_led_shape_stays_on_tts_replace_route gateway/app/services/tests/test_hot_follow_artifact_facts.py::test_current_truth_ignores_stale_empty_no_dub_reason_when_audio_is_ready -q`
+  - result: `8 passed`
+
+Regression replay mapping for task `0f03d0807e23` shapes:
+
+1. premature terminalization
+   - replayed by:
+     `test_run_dub_step_translation_incomplete_does_not_terminalize_to_no_dub`
+     and
+     `test_hot_follow_workbench_translation_incomplete_does_not_reuse_stale_no_dub_skip_truth`
+2. corrected subtitle with stale top-level errors
+   - replayed by:
+     `test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authoritative_truth_is_current`
+3. helper failure rewritten into current facts
+   - replayed by:
+     `test_translate_subtitles_helper_failure_preserves_authoritative_outputs`
+     and
+     `test_hot_follow_workbench_recovers_current_audio_preview_and_clears_stale_failed_residue`
+
+Judgment:
+
+- the tag-derived branch now behaves as a clean recovery baseline for these
+  three legacy write-path leaks

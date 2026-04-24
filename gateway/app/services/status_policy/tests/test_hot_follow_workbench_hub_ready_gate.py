@@ -413,6 +413,83 @@ def test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states(monke
     assert compose_step.get("status") == "pending"
 
 
+def test_hot_follow_workbench_translation_incomplete_does_not_reuse_stale_no_dub_skip_truth(monkeypatch):
+    task_id = "hf-workbench-translation-incomplete-stale-skip"
+    repo = _Repo()
+    repo.upsert(
+        task_id,
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "status": "processing",
+            "target_lang": "vi",
+            "content_lang": "vi",
+            "subtitles_status": "failed",
+            "dub_status": "skipped",
+            "dub_skip_reason": "target_subtitle_empty",
+            "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+            "pipeline_config": {
+                "translation_incomplete": "true",
+                "no_dub": "true",
+                "dub_skip_reason": "target_subtitle_empty",
+            },
+            "events": [{"code": "post.dub.skip", "message": "reason=target_subtitle_empty"}],
+        },
+    )
+
+    monkeypatch.setattr(
+        hf_router,
+        "_compute_composed_state",
+        lambda *_args, **_kwargs: {
+            "composed_ready": False,
+            "composed_reason": "not_ready",
+            "final": {"exists": False},
+            "historical_final": {"exists": False},
+            "compose_error_reason": None,
+            "compose_error_message": None,
+        },
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "_collect_voice_execution_state",
+        lambda task, _settings: {
+            "audio_ready": False,
+            "audio_ready_reason": str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current"),
+            "dub_current": False,
+            "dub_current_reason": str(task.get("target_subtitle_current_reason") or "target_subtitle_not_current"),
+            "resolved_voice": "vi-VN-HoaiMyNeural",
+            "actual_provider": "azure-speech",
+            "requested_voice": "vi_female_1",
+            "voiceover_url": None,
+            "deliverable_audio_done": False,
+        },
+    )
+    _patch_workbench_storage_dependencies(monkeypatch)
+    monkeypatch.setattr(hf_router, "task_base_dir", lambda current_task_id: Path("/tmp") / current_task_id)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "1\n00:00:00,000 --> 00:00:02,000\n你好\n")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+
+    app = FastAPI()
+    app.include_router(tasks_router.api_router)
+    app.include_router(hf_router.hot_follow_api_router)
+    app.dependency_overrides[get_task_repository] = lambda: repo
+
+    with TestClient(app) as client:
+        res = client.get(f"/api/hot_follow/tasks/{task_id}/workbench_hub")
+        assert res.status_code == 200
+        data = res.json()
+
+    assert data["subtitles"]["target_subtitle_current"] is False
+    assert data["subtitles"]["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
+    assert data["no_dub"] is False
+    assert data["no_dub_reason"] is None
+    assert data["ready_gate"]["selected_compose_route"] == "tts_replace_route"
+    assert data["ready_gate"]["no_tts_compose_allowed"] is False
+
+
 def test_hot_follow_workbench_stale_final_is_historical_only_after_redub(monkeypatch):
     task_id = "hf-workbench-stale-final-01"
     repo = _Repo()
@@ -1003,7 +1080,10 @@ def test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authorita
     assert subtitles_row.get("status") == "done"
     assert subtitles_row.get("state") == "done"
     assert subtitles_row.get("error") is None
+    assert (data.get("errors") or {}).get("subtitles") == {"reason": None, "message": None}
     assert helper.get("failed") is True
+    assert helper.get("output_state") == "helper_output_unavailable"
+    assert helper.get("provider_health") == "provider_retryable_failure"
     assert helper.get("reason") == "helper_translate_provider_exhausted"
     assert data.get("audio_ready") is True
     assert data.get("dub_current") is True
@@ -1104,9 +1184,13 @@ def test_hot_follow_workbench_recovers_current_audio_preview_and_clears_stale_fa
     assert audio.get("dub_preview_url") == f"/v1/tasks/{task_id}/audio_mm"
     assert media.get("voiceover_url") == f"/v1/tasks/{task_id}/audio_mm"
     assert dub_row.get("status") == "done"
+    assert ((data.get("errors") or {}).get("audio")) == {"reason": None, "message": None}
+    assert ((data.get("errors") or {}).get("compose")) == {"reason": None, "message": None}
     assert data.get("no_dub") is False
     assert data.get("no_dub_reason") is None
     assert helper.get("failed") is True
+    assert helper.get("output_state") == "helper_output_unavailable"
+    assert helper.get("provider_health") == "provider_retryable_failure"
 
 
 def test_hot_follow_workbench_preserve_source_route_does_not_project_target_subtitle_authority_failure(monkeypatch):

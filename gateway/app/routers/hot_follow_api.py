@@ -871,9 +871,33 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         or ("ready" if subtitle_ready else "subtitle_missing")
     )
     explicit_target_reason = str(task.get("target_subtitle_current_reason") or "").strip()
-    helper_translate_failed = str(task.get("subtitle_helper_status") or "").strip().lower() == "failed"
+    helper_translate_status = str(task.get("subtitle_helper_status") or "").strip() or None
+    helper_translate_failed = str(helper_translate_status or "").strip().lower() == "failed"
     helper_translate_error_reason = str(task.get("subtitle_helper_error_reason") or "").strip() or None
     helper_translate_error_message = str(task.get("subtitle_helper_error_message") or "").strip() or None
+    helper_translate_translated_text = str(task.get("subtitle_helper_translated_text") or "").strip() or None
+    helper_translate_provider = str(task.get("subtitle_helper_provider") or "").strip() or None
+    helper_translate_input_text = str(task.get("subtitle_helper_input_text") or "").strip() or None
+    helper_translate_output_state = None
+    helper_translate_provider_health = None
+    if any(
+        (
+            helper_translate_status,
+            helper_translate_error_reason,
+            helper_translate_error_message,
+            helper_translate_translated_text,
+            helper_translate_provider,
+            helper_translate_input_text,
+        )
+    ):
+        helper_translate_output_state = (
+            "helper_output_resolved" if helper_translate_translated_text else "helper_output_unavailable"
+        )
+        helper_translate_provider_health = (
+            "provider_retryable_failure"
+            if helper_translate_failed
+            else "provider_ok"
+        )
     if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
         subtitle_ready_reason = explicit_target_reason
     elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
@@ -916,13 +940,15 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "target_subtitle_current_reason": target_subtitle_current_reason,
         "target_subtitle_authoritative_source": bool(target_currentness.get("target_subtitle_authoritative_source")),
         "target_subtitle_source_copy": bool(target_currentness.get("target_subtitle_source_copy")),
-        "helper_translate_status": str(task.get("subtitle_helper_status") or "").strip() or None,
+        "helper_translate_status": helper_translate_status,
+        "helper_translate_output_state": helper_translate_output_state,
+        "helper_translate_provider_health": helper_translate_provider_health,
         "helper_translate_failed": helper_translate_failed,
         "helper_translate_error_reason": helper_translate_error_reason,
         "helper_translate_error_message": helper_translate_error_message,
-        "helper_translate_provider": str(task.get("subtitle_helper_provider") or "").strip() or None,
-        "helper_translate_input_text": str(task.get("subtitle_helper_input_text") or "").strip() or None,
-        "helper_translate_translated_text": str(task.get("subtitle_helper_translated_text") or "").strip() or None,
+        "helper_translate_provider": helper_translate_provider,
+        "helper_translate_input_text": helper_translate_input_text,
+        "helper_translate_translated_text": helper_translate_translated_text,
         "helper_translate_target_lang": str(task.get("subtitle_helper_target_lang") or "").strip() or None,
     }
 

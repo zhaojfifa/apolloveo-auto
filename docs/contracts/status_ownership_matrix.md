@@ -40,6 +40,7 @@ Display-only fields exist for board/workbench/publish presentation and must neve
 | deliverable artifact truth | `raw_path`, `origin_srt_path`, `mm_srt_path`, `vi.srt` storage keys, final video key/path/url | artifact truth | deliverable write path / repository persistence | service/controller after artifact validation | worker direct writes, skills, presenters | artifact truth answers “what exists” |
 | freshness input snapshots | `subtitles_content_hash`, `subtitles_override_updated_at`, `dub_source_subtitles_content_hash`, `dub_source_subtitle_updated_at`, `dub_source_audio_fit_max_speed`, compose render signature/snapshots | truth inputs for derivation | service/controller for the relevant step | persisted together with accepted step outputs | worker direct writes, presenters | these are the facts used to derive stale/current judgments |
 | authoritative target subtitle source | target subtitle key/path + selected target subtitle artifact | artifact truth | subtitle/service write path | accepted subtitle save/generation | worker direct writes, frontend-only state | target subtitle truth is not whatever the page is currently showing |
+| helper side-channel facts | helper output state, helper provider health, helper input/output text, helper retryable failure evidence | derived side-channel facts | subtitle/service + presenter-safe derivation | helper execution result and projection-safe derivation | helper path rewriting mainline subtitle/audio truth | helper facts may explain current blocking subtitle formation, but they do not outrank authoritative current subtitle/audio truth |
 | ready gate fields | `ready_gate.compose_ready`, `ready_gate.publish_ready`, `ready_gate.blocking`, `ready_gate.*_reason` | derived | status policy / ready gate engine | computed from task + state facts | worker, skills, frontend manual writes | derived authority for readiness; should be consumed by board/workbench/publish |
 | stale/currentness fields | `target_subtitle_current`, `target_subtitle_current_reason`, `dub_current`, `audio_ready`, `audio_ready_reason`, `final_stale_reason`, `composed_ready` | derived | status policy / freshness evaluators | computed from artifact truth + freshness inputs | worker, skills, presenters | may be cached on task for compatibility, but ownership stays derived |
 | board/workbench/publish labels | `filter_status`, chips, CTA enabled flags, badge text, summary rows | display-only | presenter / route assembly / frontend | computed at presentation time | worker, skills, repo direct writes | must not be written back as truth |
@@ -112,3 +113,14 @@ This matrix freezes the intended separation before code moves:
 - service/deliverable write path owns artifact truth
 - status policy owns derived readiness/currentness
 - presenters own display-only projection
+
+## Recovery Clarification
+
+For the tag-derived Hot Follow recovery branch:
+
+- stale `no_dub` skip markers are historical operational truth only until the
+  current subtitle/audio reducer confirms they still apply
+- top-level `errors` are L4 projection-only outputs and must clear when L2/L3
+  truth is recovered
+- helper provider failure is side-channel evidence unless helper output absence
+  is the live blocking subtitle truth

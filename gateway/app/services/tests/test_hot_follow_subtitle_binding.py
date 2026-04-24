@@ -494,6 +494,8 @@ def test_helper_translation_projection_stays_helper_layer_only():
         task={"task_id": "hf-helper-projection", "subtitles_error": None},
         subtitle_lane={
             "helper_translate_status": "ready",
+            "helper_translate_output_state": "helper_output_resolved",
+            "helper_translate_provider_health": "provider_ok",
             "helper_translate_failed": False,
             "helper_translate_provider": "gemini",
             "helper_translate_input_text": "helper candidate",
@@ -514,6 +516,8 @@ def test_helper_translation_projection_stays_helper_layer_only():
 
     assert section["helper_translation"] == {
         "status": "ready",
+        "output_state": "helper_output_resolved",
+        "provider_health": "provider_ok",
         "failed": False,
         "reason": None,
         "message": None,

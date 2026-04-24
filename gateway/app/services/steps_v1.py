@@ -652,6 +652,20 @@ def _skip_empty_dub(req: DubRequest, reason: str, provider: str | None, current_
     }
 
 
+def _fail_translation_incomplete_dub(
+    req: DubRequest,
+    provider: str | None,
+    current_task: dict | None = None,
+) -> None:
+    _clear_no_dub_pipeline_flags(req.task_id, current_task)
+    _fail_dub(
+        req,
+        "target_subtitle_translation_incomplete",
+        provider,
+        status_code=409,
+    )
+
+
 def _maybe_fill_missing_for_pack(*, raw_path: Path, audio_path: Path, subs_path: Path) -> None:
     """Allow pack to proceed by generating silence audio if DUB_SKIP=1."""
 
@@ -1113,6 +1127,10 @@ async def run_dub_step(req: DubRequest):
         edited_text=workspace.read_mm_edited_text(),
         mm_srt_text=mm_srt_text,
     )
+    current_pipeline_config = parse_pipeline_config((current_task or {}).get("pipeline_config"))
+    translation_incomplete = (
+        str(current_pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
+    )
     if used_fallback and mm_txt_resolved:
         mm_txt_path.parent.mkdir(parents=True, exist_ok=True)
         mm_txt_path.write_text(mm_txt_resolved + "\n", encoding="utf-8")
@@ -1131,8 +1149,12 @@ async def run_dub_step(req: DubRequest):
         )
     mm_txt_text = mm_txt_resolved
     if str(mm_txt_text or "").strip().lower() == "no subtitles":
+        if translation_incomplete:
+            _fail_translation_incomplete_dub(req, provider, current_task)
         return _skip_empty_dub(req, "target_subtitle_empty", provider, current_task)
     if not mm_txt_text.strip():
+        if translation_incomplete:
+            _fail_translation_incomplete_dub(req, provider, current_task)
         return _skip_empty_dub(req, "target_subtitle_empty", provider, current_task)
 
     override_text = (req.mm_text or "").strip()

@@ -196,7 +196,17 @@ def build_hot_follow_workbench_payload(
             "last": compose_last,
             "warning": task.get("compose_warning"),
         },
-        "errors": _errors_section(task=task, composed=composed, text_audio_warning=text_audio_warning),
+        "errors": _errors_section(
+            task=task,
+            composed=composed,
+            text_audio_warning=text_audio_warning,
+            subtitle_lane=subtitle_lane,
+            voice_state=voice_state,
+            subtitles_state=subtitles_state,
+            dub_state=dub_state,
+            compose_state=compose_state,
+            audio_error=audio_error,
+        ),
         "pipeline_legacy": pipeline_legacy,
     }
 
@@ -252,6 +262,8 @@ def _subtitles_section(
         "parse_source_authoritative_for_target": bool(subtitle_lane.get("parse_source_authoritative_for_target")),
         "helper_translation": {
             "status": subtitle_lane.get("helper_translate_status"),
+            "output_state": subtitle_lane.get("helper_translate_output_state"),
+            "provider_health": subtitle_lane.get("helper_translate_provider_health"),
             "failed": bool(subtitle_lane.get("helper_translate_failed")),
             "reason": subtitle_lane.get("helper_translate_error_reason"),
             "message": subtitle_lane.get("helper_translate_error_message"),
@@ -379,11 +391,44 @@ def _errors_section(
     task: dict[str, Any],
     composed: dict[str, Any],
     text_audio_warning: str | None,
+    subtitle_lane: dict[str, Any],
+    voice_state: dict[str, Any],
+    subtitles_state: str,
+    dub_state: str,
+    compose_state: str,
+    audio_error: str | None,
 ) -> dict[str, Any]:
+    subtitles_done = str(subtitles_state or "").strip().lower() in {"done", "ready", "success", "completed"}
+    subtitles_recovered = bool(subtitle_lane.get("subtitle_ready")) and bool(
+        subtitle_lane.get("target_subtitle_current")
+    )
+    audio_done = str(dub_state or "").strip().lower() in {"done", "ready", "success", "completed"}
+    audio_recovered = bool(voice_state.get("audio_ready")) and audio_done
+    compose_done = bool(composed.get("composed_ready")) or str(compose_state or "").strip().lower() in {
+        "done",
+        "ready",
+        "success",
+        "completed",
+    }
     return {
-        "audio": {"reason": task.get("error_reason"), "message": task.get("dub_error") or text_audio_warning},
-        "pack": {"reason": task.get("error_reason"), "message": task.get("pack_error")},
-        "compose": {"reason": composed.get("compose_error_reason"), "message": composed.get("compose_error_message")},
+        "subtitles": {
+            "reason": None if (subtitles_done and subtitles_recovered) else task.get("subtitles_error_reason"),
+            "message": None if (subtitles_done and subtitles_recovered) else task.get("subtitles_error"),
+        },
+        "audio": {
+            "reason": None if audio_recovered else (
+                voice_state.get("audio_ready_reason") or task.get("error_reason")
+            ),
+            "message": None if audio_recovered else (audio_error or text_audio_warning),
+        },
+        "pack": {
+            "reason": task.get("error_reason") if task.get("pack_error") else None,
+            "message": task.get("pack_error"),
+        },
+        "compose": {
+            "reason": None if compose_done else composed.get("compose_error_reason"),
+            "message": None if compose_done else composed.get("compose_error_message"),
+        },
     }
 
 

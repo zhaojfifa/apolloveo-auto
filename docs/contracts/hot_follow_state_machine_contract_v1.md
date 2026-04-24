@@ -265,3 +265,24 @@ hot_follow_state_machine:
   reintroducing scene-pack or helper-translation downgrade drift.
 - It makes dominance rules reviewable before runtime code changes, so the next
   cleanup slice can move more logic from conditionals into contracts.
+
+## Tag-Derived Recovery Addendum
+
+The `VeoBase02-clean-tag-verify` recovery repair adds three explicit state
+machine constraints:
+
+- `translation_incomplete` is a subtitle-currentness failure shape, not an
+  automatic `no_dub` terminal write.
+- stale `target_subtitle_empty` / `dub_input_empty` skip markers must be
+  cleared when the current subtitle/audio truth is recovered.
+- helper provider failure must remain side-channel evidence unless helper
+  output absence is the current blocking subtitle truth.
+
+Required consequence:
+
+- the intended route for translation-incomplete voice-led tasks stays
+  `tts_replace_route`
+- helper provider health may remain visible after recovery, but it may not
+  downgrade current subtitle/audio truth
+- top-level presentation errors must clear when current subtitle/audio truth is
+  ready

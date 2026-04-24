@@ -32,6 +32,7 @@ from gateway.app.services.task_view_helpers import (
     _build_copy_bundle,
     _publish_sop_markdown,
     backfill_compose_done_if_final_ready,
+    derive_hot_follow_no_dub_state,
     deliverable_url,
     download_code,
     op_gate_enabled,
@@ -167,41 +168,12 @@ def collect_hot_follow_workbench_ui(
     compose_status = str(task.get("compose_status") or task.get("compose_last_status") or "").strip() or "never"
     lipsync_enabled = os.getenv("HF_LIPSYNC_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-    stored_no_dub_reason = str(
-        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
-    ).strip()
-    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
-        route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
-        and not str(subtitle_lane.get("dub_input_text") or "").strip()
+    no_dub_state = derive_hot_follow_no_dub_state(
+        task_runtime,
+        route_state=route_state,
+        subtitle_lane=subtitle_lane,
+        voice_state=voice_state,
     )
-    helper_translate_failed_missing_target = bool(
-        subtitle_lane.get("helper_translate_failed")
-        and not bool(subtitle_lane.get("subtitle_ready"))
-    )
-    if helper_translate_failed_missing_target:
-        no_dub = False
-    if bool(subtitle_lane.get("subtitle_ready")) and stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
-        no_dub = False
-    if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
-        no_dub = False
-    if stored_no_dub_reason == "target_subtitle_empty":
-        no_dub_reason = "target_subtitle_empty"
-        no_dub_message = "Target subtitle is empty; dubbing is skipped."
-    elif stored_no_dub_reason == "dub_input_empty":
-        no_dub_reason = "dub_input_empty"
-        no_dub_message = "Dub input is empty; dubbing is skipped."
-    elif route_state.get("content_mode") == "subtitle_led":
-        no_dub_reason = "subtitle_led"
-        no_dub_message = "No reliable speech detected. Review subtitles or provide text before dubbing."
-    elif route_state.get("content_mode") == "silent_candidate":
-        no_dub_reason = "no_speech_detected"
-        no_dub_message = "No spoken speech detected in source video; dubbing is skipped."
-    else:
-        no_dub_reason = None
-        no_dub_message = None
-    if not no_dub:
-        no_dub_reason = None
-        no_dub_message = None
     return {
         **subtitle_lane,
         **route_state,
@@ -214,9 +186,9 @@ def collect_hot_follow_workbench_ui(
         "compose_status": compose_status,
         "final_exists": final_exists,
         "actual_burn_subtitle_source": subtitle_lane.get("actual_burn_subtitle_source"),
-        "no_dub": bool(no_dub),
-        "no_dub_reason": no_dub_reason,
-        "no_dub_message": no_dub_message,
+        "no_dub": bool(no_dub_state["no_dub"]),
+        "no_dub_reason": no_dub_state["no_dub_reason"],
+        "no_dub_message": no_dub_state["no_dub_message"],
         "lipsync_enabled": lipsync_enabled,
         "lipsync_status": "enhanced_soft_fail" if lipsync_enabled else "off",
         "voiceover_url": voice_state.get("voiceover_url"),

@@ -275,6 +275,86 @@ def _compose_done_like(status: Any) -> bool:
     }
 
 
+def derive_hot_follow_no_dub_state(
+    task: dict[str, Any],
+    *,
+    route_state: dict[str, Any] | None,
+    subtitle_lane: dict[str, Any] | None,
+    voice_state: dict[str, Any] | None,
+) -> dict[str, Any]:
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    route = route_state or {}
+    lane = subtitle_lane or {}
+    voice = voice_state or {}
+
+    stored_no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
+    ).strip()
+    target_reason = str(
+        lane.get("target_subtitle_current_reason")
+        or lane.get("subtitle_ready_reason")
+        or task.get("target_subtitle_current_reason")
+        or ""
+    ).strip()
+    translation_incomplete = (
+        str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
+        or target_reason == "target_subtitle_translation_incomplete"
+    )
+    helper_translate_failed_missing_target = bool(
+        lane.get("helper_translate_failed")
+        and not bool(lane.get("subtitle_ready"))
+        and not bool(lane.get("target_subtitle_current"))
+    )
+    recovered_mainline_truth = bool(
+        bool(lane.get("subtitle_ready"))
+        or (
+            bool(lane.get("target_subtitle_current"))
+            and bool(lane.get("target_subtitle_authoritative_source"))
+        )
+        or bool(voice.get("audio_ready"))
+        or bool(voice.get("deliverable_audio_done"))
+        or bool(voice.get("voiceover_url"))
+    )
+
+    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
+        str(route.get("content_mode") or "").strip().lower() in {"silent_candidate", "subtitle_led"}
+        and not str(lane.get("dub_input_text") or "").strip()
+    )
+
+    if translation_incomplete or helper_translate_failed_missing_target or recovered_mainline_truth:
+        no_dub = False
+
+    if stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"} and not translation_incomplete:
+        no_dub_reason = stored_no_dub_reason
+        no_dub_message = (
+            "Target subtitle is empty; dubbing is skipped."
+            if stored_no_dub_reason == "target_subtitle_empty"
+            else "Dub input is empty; dubbing is skipped."
+        )
+    elif str(route.get("content_mode") or "").strip().lower() == "subtitle_led":
+        no_dub_reason = "subtitle_led"
+        no_dub_message = "No reliable speech detected. Review subtitles or provide text before dubbing."
+    elif str(route.get("content_mode") or "").strip().lower() == "silent_candidate":
+        no_dub_reason = "no_speech_detected"
+        no_dub_message = "No spoken speech detected in source video; dubbing is skipped."
+    else:
+        no_dub_reason = None
+        no_dub_message = None
+
+    if not no_dub:
+        no_dub_reason = None
+        no_dub_message = None
+
+    return {
+        "no_dub": bool(no_dub),
+        "no_dub_reason": no_dub_reason,
+        "no_dub_message": no_dub_message,
+        "no_dub_compose_allowed": bool(
+            no_dub and str(no_dub_reason or "").strip().lower() in {"target_subtitle_empty", "dub_input_empty"}
+        ),
+    }
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Compose error
 # ═══════════════════════════════════════════════════════════════════════════════

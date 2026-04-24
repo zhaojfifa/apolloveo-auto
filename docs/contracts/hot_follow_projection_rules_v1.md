@@ -406,3 +406,19 @@ Later intention:
   hidden truth writer.
 - It turns blocking reasons into named contract outputs, which reduces ad hoc
   remapping in routers and presenters.
+
+## Tag-Derived Recovery Projection Freeze
+
+The `VeoBase02-clean-tag-verify` repair freezes these projection rules:
+
+1. `no_dub` / `no_dub_reason` are projection outputs derived from the current
+   subtitle/audio reducer inputs, not direct passthrough of stale
+   `pipeline_config.no_dub` history.
+2. `translation_incomplete` may not be remapped into
+   `target_subtitle_empty` / `dub_input_empty` terminal projection.
+3. top-level `errors.*` must clear when current subtitle/audio/compose truth is
+   recovered, even if coarse task error fields still contain stale residue.
+4. helper side-channel projection must expose:
+   - `output_state`
+   - `provider_health`
+   and these fields must not overwrite current subtitle/audio truth.
