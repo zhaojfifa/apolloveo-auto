@@ -2698,3 +2698,46 @@ Acceptance result:
   translation remains pending/retryable
 - historical dub-fail events remain diagnostic-only and do not override current
   truth
+
+## 2026-04-24 Hot Follow Helper-Translation Side-Channel Repair
+
+Context:
+
+- Current branch only narrow helper-translation repair pass for representative
+  mainline-success class `fad8c8c4d050`
+- Scope held to helper classification, projection, and messaging only
+- No subtitle-authority, no-dub, route-selection, compose, or publish policy
+  changes
+
+Fix:
+
+- froze helper lane public state to one explicit contract state set:
+  `helper_unavailable`, `helper_pending`, `helper_resolved`,
+  `helper_retryable_failure`, `helper_terminal_failure`
+- kept helper input/output helper-scoped and left authoritative target subtitle
+  ownership unchanged
+- carried explicit helper status/retryable/terminal facts through subtitle
+  lane, artifact facts, and current attempt so the helper side-channel is no
+  longer half-represented across layers
+- preserved existing current-truth dominance: when authoritative target
+  subtitle, dub, and final are already current, helper retryable failure stays
+  helper warning/history only and does not become the current mainline failure
+  surface
+- kept the resolved helper path valid for helper-only input samples and manual
+  authoritative subtitle save flow
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_helper_translation.py gateway/app/services/hot_follow_route_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/tests/test_hot_follow_helper_translation.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_helper_translation.py::test_helper_translate_lane_state_distinguishes_pending_temporary_terminal_and_not_involved gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_helper_translation_projection_stays_helper_layer_only gateway/app/services/tests/test_hot_follow_artifact_facts.py::test_helper_failure_does_not_override_mainline_success -q`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_subtitle_lane_preserves_translation_incomplete_reason_over_generic_missing gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_failure_preserves_authoritative_outputs gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empty_no_dub gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_recovers_current_audio_preview_and_clears_stale_failed_residue gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_manual_subtitle_save_clears_helper_translate_failure -q`
+- `git diff --check`
+
+Acceptance result:
+
+- helper retryable failure is non-blocking once mainline authoritative truth is
+  ready
+- helper retryable failure no longer overrides current mainline success
+  surfaces
+- helper resolved path remains valid
+- Hot Follow contract freeze remains stable after this narrow helper-only fix

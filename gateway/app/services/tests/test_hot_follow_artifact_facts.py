@@ -502,8 +502,11 @@ def test_current_truth_ignores_stale_empty_no_dub_reason_when_audio_is_ready():
                 "no_tts": False,
             },
             "compose_input": {"mode": "direct", "ready": True, "blocked": False},
+            "helper_translate_status": "helper_retryable_failure",
             "helper_translate_failed": True,
             "helper_translate_failed_voice_led": True,
+            "helper_translate_retryable": True,
+            "helper_translate_terminal": False,
         },
         no_dub=True,
     )
@@ -511,6 +514,7 @@ def test_current_truth_ignores_stale_empty_no_dub_reason_when_audio_is_ready():
     assert current_attempt["selected_compose_route"] == "tts_replace_route"
     assert current_attempt["no_dub_route_terminal"] is False
     assert current_attempt["tts_lane_expected"] is True
+    assert current_attempt["helper_translate_status"] == "helper_retryable_failure"
     assert current_attempt["helper_translate_failed"] is False
     assert current_attempt["helper_translate_failed_voice_led"] is False
 
@@ -622,3 +626,60 @@ def test_operator_summary_projects_terminal_blocked_and_no_dub_attempts():
 
     assert "bitrate_too_high" in blocked["recommended_next_action"]
     assert "无 TTS 合成路径" in no_dub["recommended_next_action"]
+
+
+def test_helper_failure_does_not_override_mainline_success():
+    artifact_facts = {
+        "final_exists": True,
+        "audio_exists": True,
+        "helper_translate_status": "helper_retryable_failure",
+        "helper_translate_failed": True,
+        "helper_translate_failed_voice_led": True,
+        "helper_translate_error_reason": "helper_translate_provider_exhausted",
+        "helper_translate_error_message": "翻译服务当前额度不足或请求过多，请稍后重试；也可以手动编辑目标字幕并保存后继续配音。",
+        "helper_translate_retryable": True,
+        "helper_translate_terminal": False,
+        "audio_lane": {
+            "mode": "tts_voiceover_only",
+            "tts_voiceover_exists": True,
+            "source_audio_policy": "mute",
+            "source_audio_preserved": False,
+            "bgm_configured": False,
+            "no_tts": False,
+        },
+        "compose_input": {"mode": "direct", "ready": True, "blocked": False},
+    }
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+        },
+        subtitle_lane={
+            "subtitle_ready": True,
+            "subtitle_artifact_exists": True,
+            "target_subtitle_authoritative_source": True,
+            "edited_text": "1\n00:00:00,000 --> 00:00:01,000\nđây là cô gái\n",
+            "srt_text": "1\n00:00:00,000 --> 00:00:01,000\nđây là cô gái\n",
+            "dub_input_text": "đây là cô gái",
+        },
+        dub_status="done",
+        compose_status="done",
+        composed_reason="ready",
+        artifact_facts=artifact_facts,
+        no_dub=False,
+    )
+
+    operator_summary = build_hot_follow_operator_summary(
+        artifact_facts=artifact_facts,
+        current_attempt=current_attempt,
+        no_dub=False,
+        subtitle_ready=True,
+    )
+
+    assert current_attempt["helper_translate_status"] == "helper_retryable_failure"
+    assert current_attempt["helper_translate_failed"] is False
+    assert current_attempt["helper_translate_failed_voice_led"] is False
+    assert operator_summary["current_attempt_failed"] is False
+    assert "翻译助手" not in operator_summary["recommended_next_action"]
