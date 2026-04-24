@@ -459,6 +459,12 @@ def test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empt
                 "dub_skip_reason": "target_subtitle_empty",
             },
             "dub_skip_reason": "target_subtitle_empty",
+            "events": [
+                {
+                    "code": "post.dub.fail",
+                    "message": "reason=target_subtitle_translation_incomplete",
+                }
+            ],
         },
     )
 
@@ -533,6 +539,12 @@ def test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empt
     assert data["ready_gate"]["audio_ready_reason"] == "waiting_for_target_subtitle_translation"
     assert data["no_dub"] is False
     assert data["no_dub_reason"] is None
+    subtitle_deliverable = next(item for item in data.get("deliverables") or [] if item.get("kind") == "subtitle")
+    audio_deliverable = next(item for item in data.get("deliverables") or [] if item.get("kind") == "audio")
+    assert subtitle_deliverable["status"] == "pending"
+    assert subtitle_deliverable["state"] == "pending"
+    assert audio_deliverable["status"] == "pending"
+    assert audio_deliverable["state"] == "pending"
     assert "等待" in data["operator_summary"]["recommended_next_action"]
     assert data["advisory"]["recommended_next_action"] == "wait_or_retry_translation"
 

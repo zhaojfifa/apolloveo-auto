@@ -60,6 +60,7 @@ Allowed attempt states and flags:
 
 - `audio_ready`
 - `dub_current`
+- `subtitle_translation_waiting_retryable`
 - `compose_input_ready`
 - `compose_execute_allowed`
 - `compose_blocked_terminal`
@@ -92,6 +93,9 @@ Allowed derived outputs:
 
 - `pending -> running -> done`
 - `pending -> running -> failed`
+- `pending -> running -> pending` when target subtitle translation is still
+  unresolved but parse/source evidence exists and no terminal contract evidence
+  exists
 - helper translation failure does not force subtitle truth to failed when the
   authoritative target subtitle already exists and is current
 
@@ -99,6 +103,8 @@ Allowed derived outputs:
 
 - `pending -> running -> done`
 - `pending -> running -> failed`
+- `pending -> pending` when target subtitle translation is still unresolved
+  and subtitle readiness is the only blocker
 - preserve-source or other no-TTS-allowed routes may keep compose legally
   reachable without TTS voiceover readiness
 - a failed TTS/provider/audio generation attempt on a subtitle-ready,
@@ -135,6 +141,42 @@ Non-blocking:
 - scene pack pending while current final is fresh and publishable
 - helper translation failure after authoritative target subtitle truth is valid
 - historical final presence when a current fresh final already exists
+- historical `post.dub.fail(target_subtitle_translation_incomplete)` events when
+  current subtitle/audio truth says the task is still
+  `translation_waiting_retryable`
+
+## Frozen Non-Terminal Contract State
+
+### `translation_waiting_retryable`
+
+Definition:
+
+- target subtitle translation unresolved
+- helper/provider lane is pending or retryable
+- non-terminal
+- `no_dub=false`
+- selected compose route remains `tts_replace_route`
+- subtitle/audio are not ready yet
+- compose is blocked only by the waiting state
+
+L2 truth ownership:
+
+- `helper_translation.status`
+- `helper_translation.retryable`
+- `helper_translation.terminal`
+- `subtitle_ready`
+- `subtitle_ready_reason`
+- `audio_ready`
+- `audio_ready_reason`
+- `selected_compose_route`
+- `no_dub`
+
+L3/L4 derivation rule:
+
+- `ready_gate`, `current_attempt`, `advisory`, `pipeline`, `deliverables`, and
+  `operator_summary` must derive from the above truth set
+- none of those L4 surfaces may keep stale failed projection once L2 says the
+  task is `translation_waiting_retryable`
 
 ## Dominance Rules
 
