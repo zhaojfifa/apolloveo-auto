@@ -2583,3 +2583,39 @@ Acceptance:
 - tool integration is aligned to backend capability supply
 - Broll is aligned to asset supply
 - Hot Follow remains frozen and unopened in this pass
+
+## 2026-04-24 Hot Follow First-Attempt Subtitle-Authority Stabilization
+
+Context:
+
+- Current branch only narrow stabilization pass for representative failure class
+  `0b4ad74b6244`
+- Scope held to first-attempt subtitle-authority stabilization only
+
+Fix:
+
+- separated unresolved translation from terminal empty-target handling for
+  first-attempt voice-led tasks by blocking dub-step empty-target skip when
+  `target_subtitle_translation_incomplete` still has parse-source evidence
+- stopped premature `no_dub=true` and `post.dub.skip(target_subtitle_empty)`
+  projection for voice-led unresolved translation lanes
+- moved `artifact_facts.selected_compose_route` onto the same runtime-policy
+  route derivation used by current-attempt and ready-gate
+- kept stale `target_subtitle_empty` / `no_dub` residue out of current truth
+  surfaces once current subtitle/audio truth recovers
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/task_view_helpers.py gateway/app/services/task_view_presenters.py gateway/app/services/task_view_projection.py gateway/app/services/hot_follow_route_state.py gateway/app/services/steps_v1.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q`
+- `git diff --check`
+
+Acceptance result:
+
+- unresolved translation first-attempt no longer collapses into
+  `target_subtitle_empty`
+- selected compose route is consistent across artifact facts, current attempt,
+  and ready gate
+- `no_dub` emission is now terminal-only for this boundary
+- retry/current-truth recovery keeps stale empty-target residue out of current
+  surfaces
