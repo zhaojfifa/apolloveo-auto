@@ -1828,3 +1828,87 @@ Acceptance:
 - authoritative target subtitle to dub-input binding is restored
 - `VeoBase01-subtitle-authority-contract-correction` is now a safer merge
   candidate for subtitle-authority completion
+
+## 2026-04-24 - VEOBASE01 Subtitle-Step Terminal Resolution
+
+Branch:
+
+- `VeoBase01-subtitle-authority-contract-correction`
+
+Base:
+
+- `d328c6f39134b308bcdb7555cfd667b44251ed8e`
+
+Reading declaration:
+
+- root indexes:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+- docs indexes:
+  - `docs/README.md`
+  - `docs/ENGINEERING_INDEX.md`
+- task-specific authority:
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/reviews/VEOBASE01_SUBTITLE_AUTHORITY_REVIEW.md`
+  - `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+- missing authority: none
+
+Exact issue addressed:
+
+- subtitles step could remain `failed` or `running` even after authoritative
+  target subtitle truth was fully current
+- helper 429 remained visible correctly, but still polluted subtitle-step
+  terminal resolution
+- stale `target_subtitle_empty` / no-dub skip-state could linger after current
+  subtitle/audio truth already existed
+
+Exact modules changed:
+
+- `gateway/app/services/subtitle_helpers.py`
+- `gateway/app/services/task_view_projection.py`
+- `gateway/app/services/task_view_presenters.py`
+- `gateway/app/routers/hot_follow_api.py`
+- `gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Exact correction:
+
+- added a narrow subtitle terminal-success predicate based on authoritative
+  current subtitle truth
+- workbench/projection now resolves subtitle-step state to terminal success
+  when authoritative/current subtitle truth is already established
+- source-subtitle-lane helper failure updates now keep helper failure visible
+  while restoring `subtitles_status=ready` and clearing stale subtitle-step
+  errors when current authoritative subtitle already exists
+- stale no-dub skip-state is cleared through the existing empty-dub recovery
+  path when current subtitle truth is present
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/subtitle_helpers.py gateway/app/services/task_view_projection.py gateway/app/services/task_view_presenters.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -k "source_lane_failure_preserves_current_target_subtitle"`: `1 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -k "subtitles_terminal_success or helper_translate_429_persists_sanitized_helper_failure or does_not_hydrate_timing_only_target_artifact"`: `3 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -k "does_not_keep_no_dub_when_audio_is_current or successful_redub_persists_current_subtitle_snapshot"`: `2 passed`
+- `git diff --check`: passed
+
+Real representative task verification:
+
+- direct local replay of `42c51c62581b` was not available
+- repo/workspace search returned no local artifact for that id
+- local `shortvideo.db` schema does not expose the newer subtitle-currentness
+  columns needed for direct comparison
+- acceptance is therefore based on focused in-process/runtime coverage only
+
+Acceptance:
+
+- subtitle-authority formation remains intact
+- subtitle-step terminal success now resolves correctly from current
+  authoritative subtitle truth
+- helper 429 remains visible but side-channel only
+- stale skip-state no longer outranks current subtitle/audio truth
+- branch is safer for later compose/final acceptance work

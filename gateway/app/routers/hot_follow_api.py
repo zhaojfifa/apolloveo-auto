@@ -442,6 +442,33 @@ def _hf_source_subtitle_translation_failure_updates(
         target_lang=target_lang,
     )
     if _hf_authoritative_target_subtitle_current(task_id, task):
+        lane = _hf_subtitle_lane_state(task_id, task)
+        updates.update(
+            {
+                "subtitles_status": "ready",
+                "subtitles_error": None,
+                "subtitles_error_reason": None,
+                "target_subtitle_current": True,
+                "target_subtitle_current_reason": str(
+                    lane.get("target_subtitle_current_reason") or "ready"
+                ),
+                "error_message": None,
+                "error_reason": None,
+            }
+        )
+        updates.update(
+            _hf_empty_dub_recovery_updates(
+                task_id,
+                task,
+                str(lane.get("edited_text") or ""),
+                {
+                    "target_subtitle_current": True,
+                    "target_subtitle_current_reason": str(
+                        lane.get("target_subtitle_current_reason") or "ready"
+                    ),
+                },
+            )
+        )
         return updates
     reason = str(detail.get("reason") or "helper_translate_failed").strip()
     message = str(detail.get("message") or reason).strip()
@@ -1059,11 +1086,13 @@ def _hf_pipeline_state(
     step: str,
     *,
     composed: dict[str, Any] | None = None,
+    subtitle_lane: dict[str, Any] | None = None,
 ) -> tuple[str, str]:
     return _svc_hf_pipeline_state(
         task,
         step,
         composed=composed,
+        subtitle_lane=subtitle_lane,
         parse_artifact_ready_loader=_hf_parse_artifact_ready,
         voice_execution_state_loader=_collect_voice_execution_state,
         audio_config_loader=_hf_audio_config,

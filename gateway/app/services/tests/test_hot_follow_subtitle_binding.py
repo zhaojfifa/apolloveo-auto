@@ -19,6 +19,7 @@ from gateway.app.services.compose_service import (
     compose_subtitle_vf,
     optimize_hot_follow_subtitle_layout_srt,
 )
+from gateway.app.utils.pipeline_config import parse_pipeline_config
 
 
 def _hash16(text: str) -> str:
@@ -670,9 +671,12 @@ def test_translate_subtitles_source_lane_failure_preserves_current_target_subtit
             "kind": "hot_follow",
             "target_lang": "vi",
             "mm_srt_path": target_srt,
-            "subtitles_status": "ready",
+            "subtitles_status": "failed",
             "target_subtitle_current": True,
             "target_subtitle_current_reason": "ready",
+            "dub_status": "skipped",
+            "dub_skip_reason": "target_subtitle_empty",
+            "pipeline_config": {"no_dub": "true", "dub_skip_reason": "target_subtitle_empty"},
             "publish_ready": True,
         }
     )
@@ -686,6 +690,15 @@ def test_translate_subtitles_source_lane_failure_preserves_current_target_subtit
     monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "translate_segments_with_gemini", _raise_resource_exhausted)
+    monkeypatch.setattr(
+        hf_router,
+        "_hf_subtitle_lane_state",
+        lambda *_args, **_kwargs: {
+            "target_subtitle_current": True,
+            "target_subtitle_current_reason": "ready",
+            "edited_text": "1\n00:00:00,000 --> 00:00:02,000\nXin chao\n",
+        },
+    )
 
     with pytest.raises(HTTPException):
         hf_router.translate_hot_follow_subtitles(
@@ -698,9 +711,16 @@ def test_translate_subtitles_source_lane_failure_preserves_current_target_subtit
     assert saved["subtitle_helper_status"] == "failed"
     assert saved["subtitle_helper_error_reason"] == "helper_translate_provider_exhausted"
     assert saved["subtitles_status"] == "ready"
+    assert saved["subtitles_error"] is None
+    assert saved["subtitles_error_reason"] is None
     assert saved["target_subtitle_current"] is True
     assert saved["target_subtitle_current_reason"] == "ready"
     assert saved["publish_ready"] is True
+    assert saved["dub_status"] == "pending"
+    assert saved.get("dub_skip_reason") is None
+    pipeline = parse_pipeline_config(saved.get("pipeline_config"))
+    assert "no_dub" not in pipeline
+    assert "dub_skip_reason" not in pipeline
 
 
 def test_translate_subtitles_source_lane_uses_normalized_source_srt_when_origin_key_empty(monkeypatch, tmp_path):

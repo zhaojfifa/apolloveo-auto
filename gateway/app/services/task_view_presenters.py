@@ -54,6 +54,7 @@ from gateway.app.services.subtitle_helpers import (
     hf_load_normalized_source_text,
     hf_load_origin_subtitles_text,
     hf_load_subtitles_text,
+    hf_subtitle_terminal_success,
     hf_subtitle_lane_state,
 )
 from gateway.app.services.task_view_helpers import (
@@ -151,7 +152,11 @@ def collect_hot_follow_workbench_ui(
     task_runtime = dict(task)
     task_runtime["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
     task_runtime["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
-    subtitles_state, _ = pipeline_state_loader(task, "subtitles")
+    if hf_subtitle_terminal_success(subtitle_lane):
+        task_runtime["subtitles_status"] = "ready"
+        task_runtime["subtitles_error"] = None
+        task_runtime["subtitles_error_reason"] = None
+    subtitles_state, _ = pipeline_state_loader(task_runtime, "subtitles", subtitle_lane=subtitle_lane)
     subtitles_step_done = subtitles_state in {"done", "ready", "success", "completed", "failed", "error"}
     route_state = dual_channel_state_loader(task_id, task_runtime, subtitle_lane, subtitles_step_done=subtitles_step_done)
     audio_lane = source_audio_lane_loader(task, route_state)

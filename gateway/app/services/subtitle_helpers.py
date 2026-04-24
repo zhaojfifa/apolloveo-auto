@@ -321,6 +321,18 @@ def hf_load_origin_subtitles_text(task: dict) -> str:
     return ""
 
 
+def hf_subtitle_terminal_success(subtitle_lane: dict[str, Any] | None) -> bool:
+    lane = subtitle_lane if isinstance(subtitle_lane, dict) else {}
+    return bool(
+        lane.get("target_subtitle_authoritative_source")
+        and lane.get("target_subtitle_current")
+        and lane.get("subtitle_ready")
+        and str(lane.get("edited_text") or "").strip()
+        and str(lane.get("srt_text") or "").strip()
+        and str(lane.get("primary_editable_text") or "").strip()
+    )
+
+
 def hf_load_normalized_source_text(task_id: str, task: dict) -> str:
     try:
         normalized_path = task_base_dir(task_id) / "subs" / "origin_normalized.srt"

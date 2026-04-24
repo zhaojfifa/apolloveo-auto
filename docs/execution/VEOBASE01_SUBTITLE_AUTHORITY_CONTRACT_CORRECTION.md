@@ -312,3 +312,134 @@ Accepted for the remaining subtitle-authority closure scope.
 - authoritative target subtitle to `dub_input_text` binding is restored
 - this branch is now a safer merge candidate for subtitle-authority repair
   completion before later contract tightening resumes
+
+## Subtitle-Step Terminal Resolution - 2026-04-24
+
+### Reading Declaration
+
+1. Root indexes read first:
+   - `README.md`
+   - `ENGINEERING_CONSTRAINTS_INDEX.md`
+2. Docs indexes read second:
+   - `docs/README.md`
+   - `docs/ENGINEERING_INDEX.md`
+3. Minimum task-specific authority files selected from the indexes:
+   - `docs/contracts/four_layer_state_contract.md`
+   - `docs/contracts/status_ownership_matrix.md`
+   - `docs/contracts/workbench_hub_response.contract.md`
+   - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+   - `docs/reviews/VEOBASE01_SUBTITLE_AUTHORITY_REVIEW.md`
+   - this execution note
+4. Missing-authority handling:
+   - no indexed authority docs were missing
+
+### Exact Terminal-Resolution Problem Addressed
+
+After subtitle-authority formation was repaired, a remaining contract bug still
+allowed the subtitles step to stay `failed` or `running` even when the current
+authoritative target subtitle truth was already fully established.
+
+That happened in the helper-429 coexistence shape:
+
+- authoritative target subtitle already existed and was current
+- helper translation failure remained visible as side-channel truth
+- but the main subtitle-step terminal state did not resolve back to success
+
+### Exact Runtime Subset Corrected
+
+This continuation corrects only:
+
+- subtitle-step terminal success resolution when authoritative subtitle truth is
+  already current
+- helper 429 coexistence with current subtitle truth
+- stale no-dub / `target_subtitle_empty` skip-state isolation after current
+  subtitle/audio truth exists
+
+No compose/advisory/runtime expansion was added.
+
+### Exact Rule Introduced
+
+If all are true:
+
+- `target_subtitle_authoritative_source=true`
+- `target_subtitle_current=true`
+- `subtitle_ready=true`
+- `edited_text` is non-empty
+- `srt_text` is non-empty
+- `primary_editable_text` is non-empty
+
+then the subtitle step resolves to terminal success for current workbench /
+projection truth, even if older helper side-channel failure or stale step state
+still exists on the task row.
+
+### Helper 429 Coexistence Before / After
+
+Before:
+
+- helper 429 remained visible
+- but if the task already had stale `subtitles_status=failed` or `running`, the
+  main subtitles step could remain failed/running even though authoritative
+  subtitle truth was already current
+
+After:
+
+- helper 429 remains visible in `helper_translation`
+- but it no longer downgrades the main subtitle step once authoritative target
+  subtitle truth is current
+- source-subtitle-lane helper failure updates now preserve helper failure while
+  restoring `subtitles_status=ready` and clearing stale subtitle-step errors
+
+### Historical Skip-State Isolation Before / After
+
+Before:
+
+- stale `no_dub=true` / `dub_skip_reason=target_subtitle_empty` snapshots could
+  survive after current subtitle truth was restored
+
+After:
+
+- when helper failure arrives after authoritative subtitle truth is already
+  current, stale no-dub skip state is cleared through the existing empty-dub
+  recovery path
+- workbench projection already-current audio/subtitle truth continues to
+  dominate stale skip-state and event history
+
+### Modules Changed In This Continuation
+
+- `gateway/app/services/subtitle_helpers.py`
+- `gateway/app/services/task_view_projection.py`
+- `gateway/app/services/task_view_presenters.py`
+- `gateway/app/routers/hot_follow_api.py`
+- `gateway/app/services/tests/test_hot_follow_subtitle_binding.py`
+- `gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `docs/execution/VEOBASE01_SUBTITLE_AUTHORITY_CONTRACT_CORRECTION.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+### Validations Run
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/subtitle_helpers.py gateway/app/services/task_view_projection.py gateway/app/services/task_view_presenters.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -k "source_lane_failure_preserves_current_target_subtitle"`: `1 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -k "subtitles_terminal_success or helper_translate_429_persists_sanitized_helper_failure or does_not_hydrate_timing_only_target_artifact"`: `3 passed`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_current_dub_state.py -k "does_not_keep_no_dub_when_audio_is_current or successful_redub_persists_current_subtitle_snapshot"`: `2 passed`
+- `git diff --check`: passed
+
+### Real Representative Task Verification
+
+Direct local replay of task `42c51c62581b` was not available.
+
+- repo/workspace search for `42c51c62581b` returned no local artifacts
+- local `shortvideo.db` does not expose the newer subtitle-currentness columns
+  needed for direct comparison
+- this continuation is therefore validated with focused in-process/runtime
+  coverage only
+
+### Acceptance Judgment
+
+Accepted for the subtitle-step terminal-resolution scope.
+
+- subtitle-authority formation remains intact
+- current authoritative subtitle truth now resolves the subtitles step to
+  terminal success in workbench/projection truth
+- helper 429 remains visible but side-channel only
+- stale skip-state no longer outranks current subtitle/audio truth
+- this branch is safer for later compose/final acceptance work

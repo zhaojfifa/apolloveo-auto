@@ -20,6 +20,7 @@ from gateway.app.services.subtitle_helpers import (
     hf_load_subtitles_text,
     hf_parse_artifact_ready,
     hf_state_from_status,
+    hf_subtitle_terminal_success,
     hf_subtitle_lane_state,
 )
 from gateway.app.services.task_view_helpers import (
@@ -56,6 +57,7 @@ def hf_pipeline_state(
     step: str,
     *,
     composed: dict[str, Any] | None = None,
+    subtitle_lane: dict[str, Any] | None = None,
     parse_artifact_ready_loader=hf_parse_artifact_ready,
     voice_execution_state_loader=collect_voice_execution_state,
     audio_config_loader=hf_audio_config,
@@ -80,6 +82,8 @@ def hf_pipeline_state(
         translation_incomplete = str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
         current_reason = str(task.get("target_subtitle_current_reason") or "").strip()
         summary = "origin/mm subtitles"
+        if hf_subtitle_terminal_success(subtitle_lane):
+            return "done", "ready"
         if status == "pending" and (task.get("origin_srt_path") or task.get("mm_srt_path")):
             status = "done"
         if status == "pending" and task_status == "processing" and last_step == "subtitles":
@@ -384,9 +388,17 @@ def build_hot_follow_workbench_projection(
     task_runtime = dict(task)
     task_runtime["target_subtitle_current"] = bool(subtitle_lane.get("target_subtitle_current"))
     task_runtime["target_subtitle_current_reason"] = subtitle_lane.get("target_subtitle_current_reason")
+    if hf_subtitle_terminal_success(subtitle_lane):
+        task_runtime["subtitles_status"] = "ready"
+        task_runtime["subtitles_error"] = None
+        task_runtime["subtitles_error_reason"] = None
     composed = composed_state_loader(task_runtime, task_id)
     parse_state, parse_summary = pipeline_state_loader(task_runtime, "parse")
-    subtitles_state, subtitles_summary = pipeline_state_loader(task_runtime, "subtitles")
+    subtitles_state, subtitles_summary = pipeline_state_loader(
+        task_runtime,
+        "subtitles",
+        subtitle_lane=subtitle_lane,
+    )
     dub_state, dub_summary = pipeline_state_loader(task_runtime, "audio")
     pack_state, pack_summary = pipeline_state_loader(task_runtime, "pack")
     compose_state, compose_summary = pipeline_state_loader(task_runtime, "compose", composed=composed)
