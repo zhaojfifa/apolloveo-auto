@@ -2823,3 +2823,102 @@ Acceptance result:
 - same-request helper calls are single-flight
 - resolved-with-warning remains success-led and warning-only
 - current mainline truth stays clean for the `33c0b9a82024`-class success shape
+
+## 2026-04-24 VeoBase02 Baseline Recovery Verification And Re-Stack
+
+Context:
+
+- recovery branch created from accepted freeze tag
+  `HotFollow-ContractDriven-Baseline-Freeze01`
+- verification authority branch: `VeoBase02`
+- objective: verify the clean baseline first, then re-stack later Hot Follow
+  repairs one narrow slice at a time before any `main` alignment
+
+Part 1 - branch recovery:
+
+- tag SHA used: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+- `VeoBase02` created directly from that tag with no later `main` patches
+  carried over
+- `origin/VeoBase02` pushed before re-stack work started
+
+Part 2 - baseline verification only:
+
+- no code changes were applied before this verification pass
+- forbidden-state invariant subset checked on the clean baseline:
+  - `subtitles.status=done` does not project `subtitles.error`
+  - current authoritative target subtitle truth does not collapse into
+    missing-authority projection
+  - current audio-ready truth does not collapse into top-level audio error
+  - helper remains side-channel only on baseline-supported success/current
+    shapes
+- representative classes used:
+  - accepted success-led helper-side-channel class from the frozen baseline
+  - contradictory broken class seen later on `main` was checked as a clean-tag
+    non-reproduction condition
+- baseline verification result: passed for the checked invariant subset;
+  contradictory split was not present on the clean freeze baseline
+
+Baseline verification validation:
+
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -k "helper_failure_preserves_authoritative_outputs or helper_translation_projection_stays_helper_layer_only" -q`
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -k "subtitles_terminal_success or helper_translate_429 or manual_subtitle_save_clears_helper_translate_failure" -q`
+
+Part 3 - slice-by-slice re-stack on `VeoBase02`:
+
+1. first-attempt stabilization
+   - commit: `9e3909a`
+   - source slice: `45a0f630bbcd5cbe239ce791834a4d2400ea8f8f`
+   - validation:
+     - `python3.11 -m py_compile gateway/app/services/task_view_helpers.py gateway/app/services/task_view_presenters.py gateway/app/services/task_view_projection.py gateway/app/services/hot_follow_route_state.py gateway/app/services/steps_v1.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+     - `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py -q`
+   - result: passed, no contradictory split introduced
+
+2. translation waiting state
+   - commit: `36ba437`
+   - source slice: `473aa6650e47c3630e236df49338501673ca0129`
+   - validation:
+     - `python3.11 -m py_compile gateway/app/services/hot_follow_helper_translation.py gateway/app/services/subtitle_helpers.py gateway/app/routers/hot_follow_api.py gateway/app/services/hot_follow_subtitle_authority.py gateway/app/services/voice_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/hot_follow_workbench_presenter.py gateway/app/services/task_view_workbench_contract.py gateway/app/services/steps_v1.py gateway/app/services/contract_runtime/advisory_runtime.py gateway/app/services/tests/test_hot_follow_helper_translation.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_skills_advisory.py`
+     - `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_helper_translation.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`
+   - result: passed, no contradictory split introduced
+
+3. translation waiting projection cleanup
+   - commit: `9be27e7`
+   - source slice: `a2040a6cf9fdd122a8d0660a98a7727c7033d548`
+   - validation:
+     - `python3.11 -m py_compile gateway/app/services/status_policy/hot_follow_state.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+     - `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_hot_follow_helper_translation.py -q`
+   - result: passed, no contradictory split introduced
+
+4. helper lane stabilization prerequisite
+   - commit: `2649b0e`
+   - source slice: `119bc611eef146ec8a0f14d1ccf7ab0db67bdc7a`
+   - validation:
+     - `python3.11 -m py_compile gateway/app/services/hot_follow_helper_translation.py gateway/app/services/hot_follow_route_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/tests/test_hot_follow_helper_translation.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+     - `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_helper_translation.py::test_helper_translate_lane_state_distinguishes_pending_temporary_terminal_and_not_involved gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_helper_translation_projection_stays_helper_layer_only gateway/app/services/tests/test_hot_follow_artifact_facts.py::test_helper_failure_does_not_override_mainline_success gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_subtitle_lane_preserves_translation_incomplete_reason_over_generic_missing gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_failure_preserves_authoritative_outputs gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empty_no_dub gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_recovers_current_audio_preview_and_clears_stale_failed_residue gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_manual_subtitle_save_clears_helper_translate_failure -q`
+   - result: passed, no contradictory split introduced
+
+5. helper dual-state
+   - commit: `706f91a`
+   - source slice: `4da86022f309953a45308d3fed0b8b68cac71719`
+   - validation:
+     - `python3.11 -m py_compile gateway/app/services/hot_follow_helper_translation.py gateway/app/services/subtitle_helpers.py gateway/app/routers/hot_follow_api.py gateway/app/services/hot_follow_route_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/task_view_workbench_contract.py gateway/app/services/tests/test_hot_follow_helper_translation.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+     - `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_helper_translation.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_helper_translation_projection_stays_helper_layer_only gateway/app/services/tests/test_hot_follow_artifact_facts.py::test_helper_failure_does_not_override_mainline_success gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authoritative_truth_is_current gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empty_no_dub gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_manual_subtitle_save_clears_helper_translate_failure -q`
+   - result: passed, no contradictory split introduced
+
+6. helper idempotency + single-flight
+   - commit: `6d45684`
+   - source slice: `0480adc456865cbe228bea8bd7850794147dabc9`
+   - validation:
+     - `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/hot_follow_helper_translation.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/hot_follow_route_state.py gateway/app/services/subtitle_helpers.py gateway/app/services/task_view_workbench_contract.py`
+     - `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_repeat_on_already_current_task_is_idempotent_success gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_repeat_dedupes_same_in_flight_request gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_failure_preserves_authoritative_outputs gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authoritative_truth_is_current gateway/app/services/tests/test_hot_follow_artifact_facts.py::test_helper_failure_does_not_override_mainline_success -q`
+   - result: passed, no contradictory split introduced
+
+Part 4 - VeoBase02 gate result:
+
+- no contradictory success/failure split remained after the full re-stack
+- helper remained side-channel only
+- current mainline truth stayed clean
+- repeated helper/provider retryable issues did not corrupt current state
+- workbench/current-attempt/artifact-facts agreement held on the checked truth
+  set
+- `VeoBase02` accepted as the new verification authority branch
