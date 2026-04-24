@@ -2263,3 +2263,80 @@ Acceptance:
 - Hot Follow is now frozen as the first production-line sample
 - next work has moved upward one layer into factory-level contract objects and
   line-template design only
+
+## 2026-04-24 - main alignment to accepted VeoBase01 baseline and factory discussion branch start
+
+Source-of-truth docs used:
+
+- `docs/reviews/HOT_FOLLOW_CURRENT_BRANCH_FINAL_ACCEPTANCE_FREEZE.md`
+- this execution log
+
+Before-state:
+
+- current branch before alignment: `VeoBase01`
+- local `main` SHA before alignment: `7687ba9aaeaae3ac5f55d37c3d511aff37cabc9f`
+- remote `origin/main` SHA before alignment: `7687ba9aaeaae3ac5f55d37c3d511aff37cabc9f`
+- local `VeoBase01` SHA before alignment: `093a6e2dfb5abeb1bfd1600eebfd75a00359873d`
+- remote `origin/VeoBase01` SHA before alignment: `093a6e2dfb5abeb1bfd1600eebfd75a00359873d`
+- accepted tag name: `HotFollow-ContractDriven-Baseline-Freeze01`
+- accepted tag SHA: `4d271022cef1bfe94b3e0a33cb4a429a6ab25d36`
+- accepted tag target SHA: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+
+Part 2 - main alignment:
+
+- alignment source: `VeoBase01`
+- alignment method used: `git checkout main` + `git merge --ff-only VeoBase01`
+- history rewrite used: no
+- `main` SHA after alignment: `093a6e2dfb5abeb1bfd1600eebfd75a00359873d`
+- remote `origin/main` updated: yes
+- remote `origin/main` SHA after alignment: `093a6e2dfb5abeb1bfd1600eebfd75a00359873d`
+- freeze tag changed: no
+- `VeoBase01` contents changed for alignment: no
+
+Part 3 - fresh discussion branch:
+
+- branch name: `factory-contract-objects-discussion-v1`
+- branch base: updated `main`
+- branch created from SHA: `093a6e2dfb5abeb1bfd1600eebfd75a00359873d`
+- remote branch pushed: yes
+
+Part 4 - write-back:
+
+- execution note created:
+  - `docs/execution/MAIN_ALIGNMENT_AND_FACTORY_DISCUSSION_BRANCH_START.md`
+- execution log updated
+- `docs/ENGINEERING_INDEX.md` did not require a further discoverability update
+  because the factory-level contract-object design path was already added in
+  the prior baseline pass
+
+Current active scope:
+
+- accepted Hot Follow freeze tag remains unchanged
+- `main` is aligned to the accepted `VeoBase01` baseline
+- next active branch is `factory-contract-objects-discussion-v1`
+- next work is factory-level contract discussion only
+- runtime onboarding for the next line remains blocked
+
+Validation:
+
+- `git diff --check`
+  - result: passed
+- branch/commit/tag verification:
+  - `git rev-parse main`
+  - `git rev-parse origin/main`
+  - `git rev-parse VeoBase01`
+  - `git rev-parse origin/VeoBase01`
+  - `git rev-parse HotFollow-ContractDriven-Baseline-Freeze01`
+  - `git rev-parse HotFollow-ContractDriven-Baseline-Freeze01^{}`
+  - result: verified
+- authority path existence checks:
+  - `test -f docs/execution/MAIN_ALIGNMENT_AND_FACTORY_DISCUSSION_BRANCH_START.md`
+  - `test -f docs/execution/VEOBASE01_EXECUTION_LOG.md`
+  - result: passed
+
+Acceptance:
+
+- lineage preserved
+- branch drift reduced by aligning `main` to accepted `VeoBase01`
+- discussion moved upward into factory-level contract scope
+- frozen Hot Follow internals remain closed in this pass
