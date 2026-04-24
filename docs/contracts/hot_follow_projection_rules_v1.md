@@ -184,9 +184,9 @@ current_attempt_route_summary_contract:
     no_tts_compose_allowed: false
     compose_execute_allowed: false
     helper_translation:
-      status:
-        - helper_pending
-        - helper_retryable_failure
+      status: helper_output_pending
+      output_state: helper_output_pending
+      provider_health: provider_ok
       retryable: true
       terminal: false
     when_all:
@@ -198,10 +198,16 @@ current_attempt_route_summary_contract:
   helper_side_channel_after_mainline_success:
     helper_translation:
       status:
-        - helper_retryable_failure
-        - helper_terminal_failure
-      retryable: any
-      terminal: any
+        - helper_output_resolved
+        - helper_resolved_with_retryable_provider_warning
+      output_state: helper_output_resolved
+      provider_health:
+        - provider_ok
+        - provider_retryable_failure
+      composite_state:
+        - null
+        - helper_resolved_with_retryable_provider_warning
+      warning_only: any
     current_attempt_failed: false
     ready_gate_failed: false
     publish_blocking: false
@@ -391,7 +397,7 @@ blocking_reason_mapping_contract:
     scenes.not_ready: advisory
     scenes.failed: advisory
     helper_translate_failed_after_target_ready: advisory
-    helper_retryable_failure_after_mainline_success: advisory
+    helper_retryable_provider_warning_after_helper_resolved: advisory
   metadata:
     compose_not_done:
       class: blocking
@@ -442,7 +448,7 @@ blocking_reason_mapping_contract:
     helper_translate_failed_after_target_ready:
       class: advisory
       suppress_when_publish_ready: true
-    helper_retryable_failure_after_mainline_success:
+    helper_retryable_provider_warning_after_helper_resolved:
       class: advisory
       suppress_when_publish_ready: true
 ```
@@ -458,11 +464,13 @@ blocking_reason_mapping_contract:
    truth sources.
 5. Historical final may be shown, but it may not satisfy current-ready publish
    truth when current freshness is false.
-6. Helper lane projection must use one explicit helper state:
-   `helper_unavailable`, `helper_pending`, `helper_resolved`,
-   `helper_retryable_failure`, or `helper_terminal_failure`.
-7. Helper retryable failure after mainline success is warning/history only and
-   may not become the current mainline error surface.
+6. Helper lane projection must expose explicit output state and provider-health
+   state separately.
+7. `helper_resolved_with_retryable_provider_warning` is the allowed composite
+   state when helper output is already consumed but provider health is currently
+   retryable-warning only.
+8. Helper retryable provider warning after mainline success is warning/history
+   only and may not become the current mainline error surface.
 
 ## Migration Intention
 

@@ -2741,3 +2741,47 @@ Acceptance result:
   surfaces
 - helper resolved path remains valid
 - Hot Follow contract freeze remains stable after this narrow helper-only fix
+
+## 2026-04-24 Hot Follow Helper Dual-State Warning Repair
+
+Context:
+
+- Current branch only ultra-narrow helper-lane repair pass for representative
+  success class `fad8c8c4d050`
+- Scope held to helper-side classification, projection, and messaging only
+- No subtitle authority, route, no-dub, dub, compose, or publish policy
+  changes
+
+Fix:
+
+- split helper state into two contract dimensions:
+  - output state:
+    `helper_output_unavailable`, `helper_output_pending`,
+    `helper_output_resolved`
+  - provider health:
+    `provider_ok`, `provider_retryable_failure`,
+    `provider_terminal_failure`
+- added explicit composite contract state
+  `helper_resolved_with_retryable_provider_warning` for the shape where helper
+  output already exists and is already consumed, but the provider currently
+  reports a retryable warning such as quota/429 exhaustion
+- helper output consumed into authoritative/current target subtitle truth no
+  longer projects as helper failure
+- provider retryable warning remains preserved in helper facts/history, but
+  current-attempt and presentation surfaces stay clean and success-led
+- helper manual input/resolved path remains valid
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_helper_translation.py gateway/app/services/subtitle_helpers.py gateway/app/routers/hot_follow_api.py gateway/app/services/hot_follow_route_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/task_view_workbench_contract.py gateway/app/services/tests/test_hot_follow_helper_translation.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/tests/test_hot_follow_artifact_facts.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_helper_translation.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_helper_translation_projection_stays_helper_layer_only gateway/app/services/tests/test_hot_follow_artifact_facts.py::test_helper_failure_does_not_override_mainline_success gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authoritative_truth_is_current gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empty_no_dub gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_manual_subtitle_save_clears_helper_translate_failure -q`
+- `git diff --check`
+
+Acceptance result:
+
+- helper output resolved plus provider retryable warning is now representable as
+  a dual-state contract shape
+- `helper_resolved_with_retryable_provider_warning` is projected explicitly
+- provider retryable issues remain warning/history only once mainline truth is
+  already successful
+- mainline success surfaces remain clean

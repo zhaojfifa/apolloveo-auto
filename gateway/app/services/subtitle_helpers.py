@@ -471,6 +471,11 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         task,
         translation_waiting=translation_waiting,
         helper_source_text=normalized_source_text or raw_source_text,
+        helper_output_consumed=bool(
+            target_currentness.get("target_subtitle_current")
+            and target_currentness.get("target_subtitle_authoritative_source")
+            and str(task.get("subtitle_helper_translated_text") or "").strip()
+        ),
     )
     helper_translate_failed = bool(helper_lane.get("failed"))
     helper_translate_error_reason = helper_lane.get("reason")
@@ -524,6 +529,9 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "target_subtitle_authoritative_source": bool(target_currentness.get("target_subtitle_authoritative_source")),
         "target_subtitle_source_copy": bool(target_currentness.get("target_subtitle_source_copy")),
         "helper_translate_status": helper_lane.get("status"),
+        "helper_translate_output_state": helper_lane.get("output_state"),
+        "helper_translate_provider_health": helper_lane.get("provider_health"),
+        "helper_translate_composite_state": helper_lane.get("composite_state"),
         "helper_translate_failed": helper_translate_failed,
         "helper_translate_error_reason": helper_translate_error_reason,
         "helper_translate_error_message": helper_translate_error_message,
@@ -531,6 +539,7 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "helper_translate_visibility": helper_lane.get("visibility"),
         "helper_translate_retryable": bool(helper_lane.get("retryable")),
         "helper_translate_terminal": bool(helper_lane.get("terminal")),
+        "helper_translate_warning_only": bool(helper_lane.get("warning_only")),
         "helper_translate_input_text": helper_lane.get("input_text"),
         "helper_translate_translated_text": helper_lane.get("translated_text"),
         "helper_translate_target_lang": helper_lane.get("target_lang"),
