@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import shutil
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -181,6 +182,9 @@ def _policy_upsert(repo, task_id, updates, *, task=None, step="router.hf_api", f
 
 logger = logging.getLogger(__name__)
 
+_HELPER_TRANSLATE_LOCKS_GUARD = threading.Lock()
+_HELPER_TRANSLATE_LOCKS: dict[str, threading.Lock] = {}
+
 hot_follow_api_router = APIRouter(prefix="/api", tags=["hot-follow"])
 
 
@@ -224,6 +228,75 @@ class ComposePlanPatchRequest(BaseModel):
     freeze_tail_enabled: bool | None = None
     freeze_tail_cap_sec: int | None = None
     cleanup_mode: str | None = None
+
+
+def _hf_helper_translate_request_fingerprint(
+    *,
+    task_id: str,
+    source_text: str,
+    target_lang: str,
+    input_source: str,
+) -> str:
+    digest = hashlib.sha256(
+        f"{task_id}\n{input_source}\n{target_lang}\n{str(source_text or '').strip()}".encode("utf-8")
+    ).hexdigest()[:16]
+    return f"{task_id}:{input_source}:{target_lang}:{digest}"
+
+
+def _hf_helper_translate_request_lock(fingerprint: str) -> threading.Lock:
+    with _HELPER_TRANSLATE_LOCKS_GUARD:
+        lock = _HELPER_TRANSLATE_LOCKS.get(fingerprint)
+        if lock is None:
+            lock = threading.Lock()
+            _HELPER_TRANSLATE_LOCKS[fingerprint] = lock
+        return lock
+
+
+def _hf_helper_repeat_success_payload(
+    *,
+    task_id: str,
+    task: dict[str, Any],
+    target_lang: str,
+    source_text: str,
+) -> dict[str, Any] | None:
+    if not (
+        bool(task.get("target_subtitle_current"))
+        and bool(task.get("target_subtitle_authoritative_source"))
+        and str(task.get("subtitle_helper_input_text") or "").strip() == str(source_text or "").strip()
+        and str(task.get("subtitle_helper_target_lang") or "").strip() == str(target_lang or "").strip()
+        and str(task.get("subtitle_helper_translated_text") or "").strip()
+    ):
+        return None
+    helper_lane = helper_translate_lane_state(
+        task,
+        translation_waiting=False,
+        helper_source_text=source_text,
+        helper_output_consumed=True,
+    )
+    result = (
+        "resolved_with_warning"
+        if helper_lane.get("composite_state") == "helper_resolved_with_retryable_provider_warning"
+        else "already_current"
+    )
+    return {
+        "task_id": task_id,
+        "target_lang": public_target_lang(target_lang),
+        "input_source": "helper_only_text",
+        "persisted": False,
+        "result": result,
+        "single_flight": "noop_cached",
+        "translated_text": task.get("subtitle_helper_translated_text"),
+        "helper_translation": {
+            "status": helper_lane.get("status"),
+            "output_state": helper_lane.get("output_state"),
+            "provider_health": helper_lane.get("provider_health"),
+            "composite_state": helper_lane.get("composite_state"),
+            "warning_only": bool(helper_lane.get("warning_only")),
+            "failed": bool(helper_lane.get("failed")),
+            "reason": helper_lane.get("reason"),
+            "message": helper_lane.get("message"),
+        },
+    }
 
 
 
@@ -1883,29 +1956,104 @@ def translate_hot_follow_subtitles(
         source_text = str(payload.text or "").strip()
         if not source_text:
             raise HTTPException(status_code=400, detail="text is empty")
-        if "-->" in source_text:
-            segments = _parse_srt_to_segments(source_text)
-            if not segments:
-                raise HTTPException(status_code=400, detail="invalid srt text")
-            translations = translate_segments_with_gemini(segments=segments, target_lang=target_lang)
-            for seg in segments:
-                idx = int(seg.get("index") or 0)
-                seg[target_lang] = str(translations.get(idx) or seg.get("origin") or "").strip()
-            translated_text = segments_to_srt(segments, target_lang)
-        else:
-            translated_text = _hf_translate_plain_lines(source_text, target_lang=target_lang)
-    except GeminiSubtitlesError as exc:
-        detail = sanitize_helper_translate_error(exc)
-        _policy_upsert(
-            repo,
-            task_id,
-            helper_translate_failure_updates(
-                detail,
-                input_text=source_text,
-                target_lang=target_lang,
-            ),
+        request_fingerprint = _hf_helper_translate_request_fingerprint(
+            task_id=task_id,
+            source_text=source_text,
+            target_lang=target_lang,
+            input_source=input_source,
         )
-        raise HTTPException(status_code=409, detail=detail) from exc
+        request_lock = _hf_helper_translate_request_lock(request_fingerprint)
+        request_lock_acquired = request_lock.acquire(blocking=False)
+        if not request_lock_acquired:
+            latest = repo.get(task_id) or task
+            repeated_success = _hf_helper_repeat_success_payload(
+                task_id=task_id,
+                task=latest,
+                target_lang=target_lang,
+                source_text=source_text,
+            )
+            if repeated_success is not None:
+                repeated_success["single_flight"] = "deduped_in_flight"
+                return repeated_success
+            return {
+                "task_id": task_id,
+                "target_lang": public_target_lang(target_lang),
+                "input_source": "helper_only_text",
+                "persisted": False,
+                "result": "request_in_flight",
+                "single_flight": "deduped_in_flight",
+                "translated_text": str(latest.get("subtitle_helper_translated_text") or "").strip() or None,
+            }
+        repeated_success = _hf_helper_repeat_success_payload(
+            task_id=task_id,
+            task=task,
+            target_lang=target_lang,
+            source_text=source_text,
+        )
+        if repeated_success is not None:
+            return repeated_success
+        if "-->" in source_text:
+            try:
+                segments = _parse_srt_to_segments(source_text)
+                if not segments:
+                    raise HTTPException(status_code=400, detail="invalid srt text")
+                translations = translate_segments_with_gemini(segments=segments, target_lang=target_lang)
+                for seg in segments:
+                    idx = int(seg.get("index") or 0)
+                    seg[target_lang] = str(translations.get(idx) or seg.get("origin") or "").strip()
+                translated_text = segments_to_srt(segments, target_lang)
+            except GeminiSubtitlesError as exc:
+                detail = sanitize_helper_translate_error(exc)
+                latest = repo.get(task_id) or task
+                repeated_success = _hf_helper_repeat_success_payload(
+                    task_id=task_id,
+                    task=latest,
+                    target_lang=target_lang,
+                    source_text=source_text,
+                )
+                if repeated_success is not None:
+                    repeated_success["result"] = "resolved_with_warning"
+                    repeated_success["single_flight"] = "noop_cached"
+                    return repeated_success
+                _policy_upsert(
+                    repo,
+                    task_id,
+                    helper_translate_failure_updates(
+                        detail,
+                        input_text=source_text,
+                        target_lang=target_lang,
+                    ),
+                )
+                raise HTTPException(status_code=409, detail=detail) from exc
+        else:
+            try:
+                translated_text = _hf_translate_plain_lines(source_text, target_lang=target_lang)
+            except GeminiSubtitlesError as exc:
+                detail = sanitize_helper_translate_error(exc)
+                latest = repo.get(task_id) or task
+                repeated_success = _hf_helper_repeat_success_payload(
+                    task_id=task_id,
+                    task=latest,
+                    target_lang=target_lang,
+                    source_text=source_text,
+                )
+                if repeated_success is not None:
+                    repeated_success["result"] = "resolved_with_warning"
+                    repeated_success["single_flight"] = "noop_cached"
+                    return repeated_success
+                _policy_upsert(
+                    repo,
+                    task_id,
+                    helper_translate_failure_updates(
+                        detail,
+                        input_text=source_text,
+                        target_lang=target_lang,
+                    ),
+                )
+                raise HTTPException(status_code=409, detail=detail) from exc
+    finally:
+        if locals().get("request_lock_acquired"):
+            request_lock.release()
     _policy_upsert(
         repo,
         task_id,
@@ -1920,6 +2068,8 @@ def translate_hot_follow_subtitles(
         "target_lang": public_target_lang(target_lang),
         "input_source": "helper_only_text",
         "persisted": False,
+        "result": "resolved",
+        "single_flight": "executed",
         "translated_text": translated_text,
     }
 

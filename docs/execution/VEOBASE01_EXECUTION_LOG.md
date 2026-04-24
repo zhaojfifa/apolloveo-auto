@@ -2376,3 +2376,41 @@ Acceptance result:
 - provider retryable issues remain warning/history only once mainline truth is
   already successful
 - mainline success surfaces remain clean
+
+## 2026-04-24 Hot Follow Helper Translate Idempotency And Single-Flight Repair
+
+Context:
+
+- Current branch only final ultra-narrow helper interaction repair pass
+- Scope held to helper translate API idempotency, same-request single-flight,
+  and resolved-with-warning success-led projection only
+- No subtitle authority, route, no-dub, dub, compose, or publish policy
+  changes
+
+Fix:
+
+- added stable helper request fingerprinting from `task_id`, helper input text,
+  target language, and input source
+- added same-fingerprint single-flight guard at the helper translate endpoint
+- repeated helper-only translate requests on an already-current authoritative
+  task now return idempotent success/no-op responses instead of conflict-style
+  provider failure
+- when helper output is already resolved/consumed and provider health remains
+  retryable-warning only, API/result projection stays success-led as
+  `resolved_with_warning`
+- repeated helper calls no longer mutate current mainline status/error truth
+  for already-current tasks
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/hot_follow_helper_translation.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/hot_follow_route_state.py gateway/app/services/subtitle_helpers.py gateway/app/services/task_view_workbench_contract.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_repeat_on_already_current_task_is_idempotent_success gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_repeat_dedupes_same_in_flight_request gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_helper_failure_preserves_authoritative_outputs gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_resolves_subtitles_terminal_success_when_authoritative_truth_is_current gateway/app/services/tests/test_hot_follow_artifact_facts.py::test_helper_failure_does_not_override_mainline_success -q`
+- `git diff --check`
+
+Acceptance result:
+
+- repeated helper translate on already-current authoritative tasks is now
+  idempotent and non-destructive
+- same-request helper calls are single-flight
+- resolved-with-warning remains success-led and warning-only
+- current mainline truth stays clean for the `33c0b9a82024`-class success shape
