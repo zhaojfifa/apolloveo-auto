@@ -40,6 +40,7 @@ def _advisory_facts(payload: dict[str, Any]) -> dict[str, Any]:
         "publish_ready": bool(ready_gate.get("publish_ready")),
         "compose_ready": bool(ready_gate.get("compose_ready")),
         "subtitle_ready": bool(ready_gate.get("subtitle_ready")),
+        "subtitle_ready_reason": str(ready_gate.get("subtitle_ready_reason") or "").strip() or None,
         "audio_ready": bool(current_attempt.get("audio_ready") or ready_gate.get("audio_ready")),
         "audio_ready_reason": str(
             current_attempt.get("audio_ready_reason") or ready_gate.get("audio_ready_reason") or ""
@@ -74,6 +75,8 @@ def _select_advisory_key(facts: dict[str, Any], rules: dict[str, Any]) -> str | 
     routes = set(selection.get("terminal_no_tts_routes") or ["preserve_source_route", "bgm_only_route", "no_tts_compose_route"])
     if facts["publish_ready"] and facts["compose_ready"] and facts["final_exists"]:
         return str(selection.get("final_ready") or "final_ready")
+    if facts["subtitle_ready_reason"] == "waiting_for_target_subtitle_translation":
+        return "subtitle_translation_waiting_retryable"
     if facts["retriable_dub_failure"]:
         return str(selection.get("retriable_dub_failure") or "retriable_dub_failure")
     if (
@@ -96,8 +99,23 @@ def maybe_resolve_contract_advisory(
     runtime = get_projection_rules_runtime(refs.projection_rules_ref)
     rules = runtime.advisory_resolution_rules
     if not rules:
-        return None
+        rules = {}
     facts = _advisory_facts(payload)
+    if facts.get("subtitle_ready_reason") == "waiting_for_target_subtitle_translation":
+        return {
+            "id": "hf_advisory_translation_waiting_retryable",
+            "kind": "operator_guidance",
+            "level": "info",
+            "recommended_next_action": "wait_or_retry_translation",
+            "operator_hint": "subtitle translation still pending",
+            "explanation": "当前目标字幕翻译尚未就绪，线路处于等待/可重试状态；请等待翻译返回或重试字幕步骤，再继续配音和合成。",
+            "evidence": {
+                "subtitle_ready": facts.get("subtitle_ready"),
+                "subtitle_ready_reason": facts.get("subtitle_ready_reason"),
+                "audio_ready": facts.get("audio_ready"),
+                "audio_ready_reason": facts.get("audio_ready_reason"),
+            },
+        }
     rule_key = _select_advisory_key(facts, rules)
     if not rule_key:
         return None

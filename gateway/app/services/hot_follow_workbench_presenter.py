@@ -70,13 +70,19 @@ def build_hot_follow_operator_summary(
     last_successful_output_available = bool(artifact_facts.get("final_exists"))
     dub_status = str(current_attempt.get("dub_status") or "").strip().lower()
     compose_status = str(current_attempt.get("compose_status") or "").strip().lower()
-    current_attempt_failed = dub_status in {"failed", "error"} or compose_status in {"failed", "error"}
+    subtitle_translation_waiting_retryable = bool(current_attempt.get("subtitle_translation_waiting_retryable"))
+    current_attempt_failed = (
+        not subtitle_translation_waiting_retryable
+        and (dub_status in {"failed", "error"} or compose_status in {"failed", "error"})
+    )
     show_previous_final_as_primary = bool(
         last_successful_output_available
         and not bool(current_attempt.get("audio_ready"))
         and not no_dub
     )
-    if current_attempt.get("helper_translate_failed"):
+    if subtitle_translation_waiting_retryable:
+        recommended_next_action = "目标字幕翻译尚未就绪，当前处于等待/可重试状态；请等待翻译返回或重试字幕步骤后再继续配音。"
+    elif current_attempt.get("helper_translate_failed"):
         recommended_next_action = current_attempt.get("helper_translate_error_message") or "翻译助手暂时失败，请稍后重试；也可以手动编辑目标字幕并保存后继续配音。"
     elif current_attempt.get("compose_input_derive_failed_terminal"):
         recommended_next_action = f"当前合成输入派生失败：{current_attempt.get('compose_reason') or 'compose_input_derive_failed'}。请先修复素材或转码配置后再重试合成。"

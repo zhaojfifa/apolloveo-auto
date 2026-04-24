@@ -82,11 +82,14 @@ def hf_pipeline_state(
         no_subtitles = str(pipeline_config.get("no_subtitles") or "").strip().lower() == "true"
         translation_incomplete = str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
         current_reason = str(task.get("target_subtitle_current_reason") or "").strip()
+        translation_waiting = translation_incomplete or current_reason == "target_subtitle_translation_incomplete"
         summary = "origin/mm subtitles"
         if hf_subtitle_terminal_success(subtitle_lane):
             return "done", "ready"
-        if status == "pending" and (task.get("origin_srt_path") or task.get("mm_srt_path")):
+        if status == "pending" and not translation_waiting and (task.get("origin_srt_path") or task.get("mm_srt_path")):
             status = "done"
+        if status == "failed" and translation_waiting:
+            status = "pending"
         if status == "pending" and task_status == "processing" and last_step == "subtitles":
             status = "running"
         if status == "error":
@@ -103,6 +106,8 @@ def hf_pipeline_state(
         voice_state = voice_execution_state_loader(task, settings_obj)
         if voice_state.get("audio_ready"):
             status = "done"
+        elif str(voice_state.get("audio_ready_reason") or "").strip() == "waiting_for_target_subtitle_translation":
+            status = "pending"
         if status == "done" and not voice_state.get("audio_ready"):
             status = "pending"
         if status == "pending" and task_status == "processing" and last_step == "dub":

@@ -2619,3 +2619,47 @@ Acceptance result:
 - `no_dub` emission is now terminal-only for this boundary
 - retry/current-truth recovery keeps stale empty-target residue out of current
   surfaces
+
+## 2026-04-24 Hot Follow Translation-Lane State-Machine Stabilization
+
+Context:
+
+- Current branch only narrow follow-up pass for representative failure class
+  `d215fbcb5d5e`
+- Scope held to translation-lane non-terminal state modeling only
+
+Fix:
+
+- converted first unresolved target-subtitle translation from terminal
+  `subtitles_status=failed` into non-terminal pending/waiting state when
+  voice-led parse-source evidence exists and no terminal contract evidence is
+  present
+- converted dub first unresolved translation from hard failure into blocked
+  pending state with `waiting_for_target_subtitle_translation`
+- preserved contract-precise authority reason
+  `target_subtitle_translation_incomplete` while projecting retryable waiting
+  wording through `subtitle_ready_reason`, `audio_ready_reason`, current
+  attempt, ready gate, advisory, and operator summary
+- added helper-lane visibility classification so unresolved translation now
+  exposes one of:
+  - pending provider work
+  - temporary provider issue
+  - terminal provider failure
+  - no helper used
+- kept prior no-dub suppression, single-source route selection, and stale
+  residue cleanup behavior intact
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_helper_translation.py gateway/app/services/subtitle_helpers.py gateway/app/routers/hot_follow_api.py gateway/app/services/hot_follow_subtitle_authority.py gateway/app/services/voice_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/hot_follow_workbench_presenter.py gateway/app/services/task_view_workbench_contract.py gateway/app/services/steps_v1.py gateway/app/services/contract_runtime/advisory_runtime.py gateway/app/services/tests/test_hot_follow_helper_translation.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_skills_advisory.py`
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_helper_translation.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py gateway/app/services/tests/test_hot_follow_skills_advisory.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`
+- `git diff --check`
+
+Acceptance result:
+
+- subtitles first unresolved translation is now non-terminal
+- dub is blocked/pending instead of hard-failed when subtitle translation is
+  the only blocker
+- helper/provider visibility is explicit on the subtitle lane
+- ready gate, advisory, and operator summary now use waiting/retryable wording
+  for unresolved translation lanes

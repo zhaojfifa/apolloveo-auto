@@ -148,8 +148,8 @@ def test_run_subtitles_step_marks_vi_translation_incomplete_without_step_error(m
 
     assert result["translation_incomplete"] is True
     final_update = repo.get(req.task_id)
-    assert final_update["subtitles_status"] == "failed"
-    assert "翻译未完成" in final_update["subtitles_error"]
+    assert final_update["subtitles_status"] == "pending"
+    assert "waiting" in final_update["subtitles_error"]
     assert final_update["target_subtitle_current"] is False
     assert final_update["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
     assert pipeline_updates[-1]["translation_incomplete"] == "true"
@@ -186,8 +186,8 @@ def test_run_subtitles_step_marks_myanmar_translation_incomplete_without_step_er
 
     assert result["translation_incomplete"] is True
     final_update = repo.get(req.task_id)
-    assert final_update["subtitles_status"] == "failed"
-    assert "翻译未完成" in final_update["subtitles_error"]
+    assert final_update["subtitles_status"] == "pending"
+    assert "waiting" in final_update["subtitles_error"]
     assert final_update["target_subtitle_current"] is False
     assert final_update["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
     assert pipeline_updates[-1]["translation_incomplete"] == "true"
@@ -575,22 +575,21 @@ def test_run_dub_step_does_not_skip_translation_incomplete_first_attempt_as_empt
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("translation incomplete must not call TTS")),
     )
 
-    with pytest.raises(HTTPException) as excinfo:
-        asyncio.run(
-            steps_v1.run_dub_step(
-                DubRequest(
-                    task_id="hf-translation-incomplete-first-attempt",
-                    target_lang="my",
-                    provider="edge-tts",
-                    force=True,
-                )
+    result = asyncio.run(
+        steps_v1.run_dub_step(
+            DubRequest(
+                task_id="hf-translation-incomplete-first-attempt",
+                target_lang="my",
+                provider="edge-tts",
+                force=True,
             )
         )
+    )
 
-    assert excinfo.value.status_code == 409
-    assert excinfo.value.detail == "target_subtitle_translation_incomplete"
-    assert updates[-1]["dub_status"] == "failed"
-    assert updates[-1]["dub_error"] == "target_subtitle_translation_incomplete"
+    assert result["dub_status"] == "pending"
+    assert result["dub_blocked_reason"] == "waiting_for_target_subtitle_translation"
+    assert updates[-1]["dub_status"] == "pending"
+    assert updates[-1]["dub_error"] is None
     assert "pipeline_config" not in updates[-1]
 
 
@@ -606,12 +605,12 @@ def test_subtitles_pipeline_state_distinguishes_no_subtitles_and_translation_inc
 
     vi_status, vi_summary = steps_v1_hot_follow_pipeline_state(
         {
-            "subtitles_status": "failed",
+            "subtitles_status": "pending",
             "pipeline_config": {"translation_incomplete": "true"},
             "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
         }
     )
-    assert vi_status == "failed"
+    assert vi_status == "pending"
     assert vi_summary == "translation_incomplete"
 
 

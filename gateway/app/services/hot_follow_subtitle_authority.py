@@ -196,6 +196,11 @@ def finalize_hot_follow_subtitles_step(
         has_saved_revision=False,
         target_subtitle_authoritative=target_subtitle_authoritative,
     )
+    translation_waiting_retryable = bool(
+        translation_incomplete
+        and target_subtitle_required
+        and any(has_semantic_target_subtitle_text(text) for text in source_texts)
+    )
     updates: dict[str, Any] = {
         "origin_srt_path": origin_key,
         "mm_srt_path": target_subtitle_key if target_subtitle_authoritative else None,
@@ -210,6 +215,13 @@ def finalize_hot_follow_subtitles_step(
             {
                 "subtitles_status": "ready",
                 "subtitles_error": None,
+            }
+        )
+    elif translation_waiting_retryable:
+        updates.update(
+            {
+                "subtitles_status": "pending",
+                "subtitles_error": "subtitle translation not ready yet; waiting for retryable translation resolution",
             }
         )
     elif not target_subtitle_required:
