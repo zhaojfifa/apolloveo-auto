@@ -10,6 +10,11 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
+from gateway.app.services.contract_runtime.current_attempt_runtime import (
+    HOT_FOLLOW_COMPOSE_ROUTES,
+    build_hot_follow_current_attempt_summary,
+    selected_route_from_state,
+)
 from gateway.app.services.contract_runtime.ready_gate_runtime import evaluate_contract_ready_gate
 
 
@@ -238,6 +243,168 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
             break
 
 
+def _selected_route_payload(route_name: str) -> Dict[str, Any]:
+    route = HOT_FOLLOW_COMPOSE_ROUTES.get(route_name) or HOT_FOLLOW_COMPOSE_ROUTES["tts_replace_route"]
+    return {
+        "name": route.name,
+        "required_artifacts": route.required_artifacts,
+        "optional_artifacts": route.optional_artifacts,
+        "irrelevant_artifacts": route.irrelevant_artifacts,
+        "allow_conditions": route.allow_conditions,
+        "blocked_conditions": route.blocked_conditions,
+    }
+
+
+def _helper_contract_state(
+    *,
+    subtitles: Dict[str, Any],
+    audio: Dict[str, Any],
+    final_exists: bool,
+    final_fresh: bool,
+) -> Dict[str, Any]:
+    status = str(subtitles.get("helper_translate_status") or "").strip().lower()
+    failed = bool(subtitles.get("helper_translate_failed")) or status == "failed"
+    mainline_recovered = bool(
+        subtitles.get("subtitle_ready")
+        or audio.get("audio_ready")
+        or final_fresh
+        or final_exists
+    )
+    if failed and mainline_recovered:
+        current_state = "helper_resolved_with_retryable_provider_warning"
+    elif failed:
+        current_state = "helper_retryable_failure_warning_only"
+    elif status in {"pending", "running", "queued"}:
+        current_state = "helper_sidechannel_waiting"
+    else:
+        current_state = "irrelevant_to_current_mainline_truth"
+    return {
+        "current_state": current_state,
+        "warning_only": current_state in {
+            "helper_retryable_failure_warning_only",
+            "helper_resolved_with_retryable_provider_warning",
+        },
+        "side_channel_only": current_state != "helper_sidechannel_waiting",
+    }
+
+
+def _clear_pipeline_error(pipeline: list[Any], key: str) -> None:
+    for row in pipeline:
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("key") or "").strip().lower() != key:
+            continue
+        row["error"] = None
+        break
+
+
+def _reduce_projection_truth(task: Dict[str, Any], state: Dict[str, Any]) -> None:
+    subtitles = dict(_as_dict(state.get("subtitles")))
+    audio = dict(_as_dict(state.get("audio")))
+    errors = dict(_as_dict(state.get("errors")))
+    artifact_facts = dict(_as_dict(state.get("artifact_facts")))
+    had_artifact_facts = isinstance(state.get("artifact_facts"), dict) and bool(state.get("artifact_facts"))
+    had_current_attempt = isinstance(state.get("current_attempt"), dict) and bool(state.get("current_attempt"))
+    ready_gate = dict(_as_dict(state.get("ready_gate")))
+    pipeline = list(_as_list(state.get("pipeline")))
+    pipeline_legacy = dict(_as_dict(state.get("pipeline_legacy")))
+    final_payload = _as_dict(state.get("final"))
+    historical_final = _as_dict(state.get("historical_final"))
+    final_exists = bool(final_payload.get("exists") or historical_final.get("exists") or artifact_facts.get("final_exists"))
+    final_fresh = bool(state.get("final_fresh") or final_payload.get("fresh") or ready_gate.get("publish_ready"))
+
+    route_truth = selected_route_from_state(task, state)
+    route_name = str(route_truth.get("name") or "tts_replace_route").strip() or "tts_replace_route"
+    if had_artifact_facts:
+        artifact_facts["selected_compose_route"] = _selected_route_payload(route_name)
+        state["artifact_facts"] = artifact_facts
+
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state=audio,
+        subtitle_lane=subtitles,
+        dub_status=str(audio.get("status") or state.get("dub_status") or ""),
+        compose_status=str(state.get("compose_status") or ""),
+        composed_reason=str(state.get("composed_reason") or ""),
+        final_stale_reason=state.get("final_stale_reason"),
+        artifact_facts=artifact_facts,
+        no_dub=bool(audio.get("no_dub")),
+        no_dub_compose_allowed=bool(route_truth.get("no_dub_compose_allowed")),
+    )
+    route_name = str(current_attempt.get("selected_compose_route") or route_name).strip() or "tts_replace_route"
+    if had_artifact_facts:
+        artifact_facts["selected_compose_route"] = _selected_route_payload(route_name)
+
+    ready_gate["selected_compose_route"] = route_name
+    ready_gate["compose_allowed"] = bool(current_attempt.get("compose_allowed"))
+    ready_gate["compose_route_allowed"] = bool(current_attempt.get("compose_route_allowed"))
+    ready_gate["compose_input_ready"] = bool(current_attempt.get("compose_input_ready"))
+    ready_gate["compose_execute_allowed"] = bool(current_attempt.get("compose_execute_allowed"))
+    ready_gate["no_tts_compose_allowed"] = bool(current_attempt.get("no_tts_compose_allowed"))
+    ready_gate["no_dub_compose_allowed"] = bool(current_attempt.get("no_dub_compose_allowed"))
+    state["ready_gate"] = ready_gate
+
+    authoritative_subtitle_truth = bool(
+        subtitles.get("target_subtitle_current")
+        and subtitles.get("target_subtitle_authoritative_source")
+    )
+    if authoritative_subtitle_truth:
+        subtitles["subtitle_ready"] = True
+        subtitles["subtitle_ready_reason"] = "ready"
+        subtitles["target_subtitle_current_reason"] = "ready"
+        subtitles["error"] = None
+        subtitles["status"] = "done"
+        _clear_pipeline_error(pipeline, "subtitles")
+        legacy_subtitles = dict(_as_dict(pipeline_legacy.get("subtitles")))
+        legacy_subtitles["status"] = "done"
+        pipeline_legacy["subtitles"] = legacy_subtitles
+        subtitle_errors = dict(_as_dict(errors.get("subtitles")))
+        subtitle_errors["reason"] = None
+        subtitle_errors["message"] = None
+        errors["subtitles"] = subtitle_errors
+
+    audio_done = str(audio.get("status") or "").strip().lower() in {
+        "done",
+        "ready",
+        "success",
+        "completed",
+    }
+    if audio_done and bool(audio.get("audio_ready")):
+        audio["error"] = None
+        _clear_pipeline_error(pipeline, "dub")
+        legacy_audio = dict(_as_dict(pipeline_legacy.get("audio")))
+        legacy_audio["status"] = "done"
+        pipeline_legacy["audio"] = legacy_audio
+        audio_errors = dict(_as_dict(errors.get("audio")))
+        audio_errors["reason"] = None
+        audio_errors["message"] = None
+        errors["audio"] = audio_errors
+
+    if route_name == "tts_replace_route":
+        audio["no_dub"] = False
+        audio["no_dub_reason"] = None
+        audio["no_dub_compose_allowed"] = False
+
+    helper_state = _helper_contract_state(
+        subtitles=subtitles,
+        audio=audio,
+        final_exists=final_exists,
+        final_fresh=final_fresh,
+    )
+    helper_translation = dict(_as_dict(subtitles.get("helper_translation")))
+    helper_translation["contract_state"] = helper_state["current_state"]
+    subtitles["helper_translation"] = helper_translation
+    state["helper"] = helper_state
+
+    state["pipeline"] = pipeline
+    state["pipeline_legacy"] = pipeline_legacy
+    state["subtitles"] = subtitles
+    state["audio"] = audio
+    state["errors"] = errors
+    state["artifact_facts"] = artifact_facts
+    if had_current_attempt or had_artifact_facts:
+        state["current_attempt"] = current_attempt
+
+
 def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | None = None) -> Dict[str, Any]:
     state: Dict[str, Any] = dict(base_state or {})
     task_id = str(state.get("task_id") or task.get("task_id") or task.get("id") or "")
@@ -258,4 +425,5 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
         else str(state.get("final_stale_reason") or state.get("composed_reason") or "not_ready")
     )
     state["ready_gate"] = gate_result
+    _reduce_projection_truth(task, state)
     return state
