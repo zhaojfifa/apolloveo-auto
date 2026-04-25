@@ -2922,3 +2922,98 @@ Part 4 - VeoBase02 gate result:
 - workbench/current-attempt/artifact-facts agreement held on the checked truth
   set
 - `VeoBase02` accepted as the new verification authority branch
+
+## 2026-04-25 Factory Abstraction Closeout For Veo 2.0 Preparation
+
+Branch:
+
+- `VeoBase02-clean-tag-verify`
+
+Base SHA:
+
+- `8e06351f53e8801980da83e66ab158578ecdba91`
+
+Reading declaration:
+
+- phase 0 index-first:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+  - `docs/README.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `docs/contracts/engineering_reading_contract_v1.md`
+- phase 1 Hot Follow frozen authority:
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/hot_follow_state_flow_v1.md`
+  - `docs/contracts/hot_follow_state_table_v1.md`
+  - `docs/contracts/hot_follow_forbidden_invariants_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/architecture/line_contracts/hot_follow_line.yaml`
+- phase 2 factory abstraction reference:
+  - branch-local fallback read from `factory-contract-objects-discussion-v1`:
+    - `docs/contracts/factory_input_contract_v1.md`
+    - `docs/contracts/factory_content_structure_contract_v1.md`
+    - `docs/contracts/factory_scene_plan_contract_v1.md`
+    - `docs/contracts/factory_audio_plan_contract_v1.md`
+    - `docs/contracts/factory_language_plan_contract_v1.md`
+    - `docs/contracts/factory_delivery_contract_v1.md`
+    - `docs/architecture/factory_line_template_design_v1.md`
+- supporting authority selected through the indexes:
+  - `docs/architecture/factory_four_layer_architecture_baseline_v1.md`
+  - `docs/contracts/production_line_runtime_assembly_rules_v1.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+
+Why this authority set was sufficient:
+
+- the pass was limited to factory contract-object closeout, runtime boundary
+  closeout, workbench abstraction closeout, and line-template closeout
+- verified Hot Follow runtime truth was already frozen on this branch, so the
+  abstraction work only needed the Hot Follow packet plus the exact
+  branch-local factory contract references
+- no runtime rewrite or new-line onboarding was in scope
+
+Scope:
+
+- docs-only factory abstraction closeout
+- no new business line
+- no UI redesign
+- no broad Hot Follow bug-fixing reopen
+
+Created documents:
+
+- `docs/contracts/factory_input_contract_v1.md`
+- `docs/contracts/factory_content_structure_contract_v1.md`
+- `docs/contracts/factory_scene_plan_contract_v1.md`
+- `docs/contracts/factory_audio_plan_contract_v1.md`
+- `docs/contracts/factory_language_plan_contract_v1.md`
+- `docs/contracts/factory_delivery_contract_v1.md`
+- `docs/architecture/factory_line_template_design_v1.md`
+- `docs/architecture/factory_runtime_boundary_design_v1.md`
+- `docs/architecture/factory_workbench_mapping_v1.md`
+
+Updated documents:
+
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Closeout results:
+
+- Hot Follow is now described through factory-level input, content structure,
+  language, audio, scene-plan, and delivery contract objects
+- Hot Follow runtime ownership is now stated as a factory boundary set instead
+  of an implicit router-file shape
+- workbench/product surfaces are now described as seven generic operator zones
+  consuming L2/L3 truth and L4 projection only
+- line onboarding is now described as filling one factory line-template
+  checklist instead of starting from code branches
+
+Validation:
+
+- `git diff --check`
+  - result: passed
+
+Behavior change:
+
+- none; authority closeout only
