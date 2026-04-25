@@ -315,11 +315,9 @@ def derive_hot_follow_no_dub_state(
         or bool(voice.get("deliverable_audio_done"))
         or bool(voice.get("voiceover_url"))
     )
+    explicit_boundary_no_dub = stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}
 
-    no_dub = bool(pipeline_config.get("no_dub") == "true") or (
-        str(route.get("content_mode") or "").strip().lower() in {"silent_candidate", "subtitle_led"}
-        and not str(lane.get("dub_input_text") or "").strip()
-    )
+    no_dub = bool(pipeline_config.get("no_dub") == "true" and explicit_boundary_no_dub)
 
     if translation_incomplete or helper_translate_failed_missing_target or recovered_mainline_truth:
         no_dub = False
@@ -350,7 +348,7 @@ def derive_hot_follow_no_dub_state(
         "no_dub_reason": no_dub_reason,
         "no_dub_message": no_dub_message,
         "no_dub_compose_allowed": bool(
-            no_dub and str(no_dub_reason or "").strip().lower() in {"target_subtitle_empty", "dub_input_empty"}
+            no_dub and explicit_boundary_no_dub
         ),
     }
 

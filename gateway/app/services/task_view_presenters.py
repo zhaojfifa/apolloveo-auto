@@ -367,33 +367,32 @@ def hf_safe_presentation_aggregates(
             subtitle_lane=subtitle_lane,
             scene_pack=scene_pack,
         )
-        current_attempt = current_attempt_loader(
-            voice_state=voice_state,
-            subtitle_lane=subtitle_lane or {},
-            dub_status=dub_status,
-            compose_status=compose_status,
-            composed_reason=composed_reason,
-            final_stale_reason=final_stale_reason,
-            artifact_facts=artifact_facts,
-            no_dub=no_dub,
-            no_dub_compose_allowed=bool((artifact_facts.get("selected_compose_route") or {}).get("name") in {
-                "preserve_source_route",
-                "bgm_only_route",
-                "no_tts_compose_route",
-            })
-            if isinstance(artifact_facts.get("selected_compose_route"), dict)
-            else False,
-        )
-        operator_summary = operator_summary_loader(
-            artifact_facts=artifact_facts,
-            current_attempt=current_attempt,
-            no_dub=no_dub,
-            subtitle_ready=bool((subtitle_lane or {}).get("subtitle_ready")),
-        )
-        return artifact_facts, current_attempt, operator_summary
+        return artifact_facts, {}, {}
     except Exception:
         logger.exception("HF_PRESENTATION_AGGREGATES_SAFE_FALLBACK task=%s", task_id)
         return {}, {}, {}
+
+
+def _restore_authoritative_projection_aliases(payload: dict[str, Any]) -> None:
+    subtitles = payload.get("subtitles") if isinstance(payload.get("subtitles"), dict) else {}
+    audio = payload.get("audio") if isinstance(payload.get("audio"), dict) else {}
+    current_attempt = payload.get("current_attempt") if isinstance(payload.get("current_attempt"), dict) else {}
+    helper = payload.get("helper") if isinstance(payload.get("helper"), dict) else {}
+
+    payload["subtitle_ready"] = bool(subtitles.get("subtitle_ready"))
+    payload["subtitle_ready_reason"] = subtitles.get("subtitle_ready_reason")
+    payload["target_subtitle_current"] = bool(subtitles.get("target_subtitle_current"))
+    payload["target_subtitle_current_reason"] = subtitles.get("target_subtitle_current_reason")
+    payload["target_subtitle_authoritative_source"] = bool(subtitles.get("target_subtitle_authoritative_source"))
+    payload["no_dub"] = bool(audio.get("no_dub"))
+    payload["no_dub_reason"] = audio.get("no_dub_reason")
+    payload["no_dub_compose_allowed"] = bool(audio.get("no_dub_compose_allowed"))
+    payload["audio_ready"] = bool(current_attempt.get("audio_ready") or audio.get("audio_ready"))
+    payload["audio_ready_reason"] = current_attempt.get("audio_ready_reason") or audio.get("audio_ready_reason")
+    payload["selected_compose_route"] = current_attempt.get("selected_compose_route")
+    payload["helper_state"] = helper.get("current_state")
+    payload["helper_output_state"] = helper.get("output_state")
+    payload["helper_provider_health"] = helper.get("provider_health")
 
 
 def _build_hot_follow_authoritative_state(
@@ -416,6 +415,7 @@ def _build_hot_follow_authoritative_state(
     persisted_audio_state_loader=hf_persisted_audio_state,
     deliverables_loader=hf_deliverables,
     presentation_aggregates_loader=hf_safe_presentation_aggregates,
+    operator_summary_loader=hf_operator_summary,
     presentation_state_loader=hf_rerun_presentation_state,
     resolve_final_url_loader=resolve_hub_final_url,
     state_computer=compute_hot_follow_state,
@@ -531,8 +531,6 @@ def _build_hot_follow_authoritative_state(
         no_dub=bool((payload.get("audio") or {}).get("no_dub")),
     )
     payload["artifact_facts"] = artifact_facts
-    payload["current_attempt"] = current_attempt
-    payload["operator_summary"] = operator_summary
     payload["presentation"] = presentation_state_loader(
         task,
         projection["voice_state"],
@@ -540,7 +538,19 @@ def _build_hot_follow_authoritative_state(
         projection["historical_final"],
         projection["dub_state"],
     )
-    return task, projection, state_computer(task_runtime, payload)
+    authoritative_state = state_computer(task_runtime, payload)
+    authoritative_artifact_facts = dict(authoritative_state.get("artifact_facts") or {})
+    authoritative_current_attempt = dict(authoritative_state.get("current_attempt") or {})
+    authoritative_operator_summary = operator_summary_loader(
+        artifact_facts=authoritative_artifact_facts,
+        current_attempt=authoritative_current_attempt,
+        no_dub=bool((authoritative_state.get("audio") or {}).get("no_dub")),
+        subtitle_ready=bool((authoritative_state.get("subtitles") or {}).get("subtitle_ready")),
+    )
+    authoritative_state["artifact_facts"] = authoritative_artifact_facts
+    authoritative_state["current_attempt"] = authoritative_current_attempt
+    authoritative_state["operator_summary"] = authoritative_operator_summary
+    return task, projection, authoritative_state
 
 
 def _publish_hub_deliverables(
@@ -846,4 +856,5 @@ def build_hot_follow_workbench_hub(
         payload["advisory"] = advisory
     payload.update(operational_defaults_loader())
     payload.update(workbench_ui_loader(task, projection["settings"]))
+    _restore_authoritative_projection_aliases(payload)
     return payload

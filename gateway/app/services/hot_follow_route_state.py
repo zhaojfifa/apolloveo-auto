@@ -3,10 +3,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from gateway.app.services.contract_runtime.current_attempt_runtime import (
-    HOT_FOLLOW_COMPOSE_ROUTES,
     build_hot_follow_current_attempt_summary as _contract_current_attempt_summary,
-    select_compose_route_name,
-    selected_route_from_state,
 )
 from gateway.app.services.source_audio_policy import source_audio_policy_from_task
 
@@ -122,14 +119,6 @@ def build_hot_follow_artifact_facts(
             or str(subtitle_payload.get("normalized_source_text") or "").strip()
         )
     )
-    selected_route = select_compose_route_name(
-        audio_lane=audio_lane,
-        no_dub=False,
-        no_dub_compose_allowed=False,
-        subtitle_ready=bool(subtitle_payload.get("subtitle_ready")),
-        helper_translate_failed_voice_led=helper_translate_failed_voice_led,
-    )
-    route = HOT_FOLLOW_COMPOSE_ROUTES[selected_route]
     return {
         "final_exists": bool(current_final_payload.get("exists") or historical_payload.get("exists")),
         "final_url": str(final_payload.get("url") or "").strip() or None,
@@ -156,14 +145,6 @@ def build_hot_follow_artifact_facts(
         "audio_lane": audio_lane,
         "audio_lane_mode": audio_lane["mode"],
         "tts_voiceover_exists": bool(audio_lane["tts_voiceover_exists"]),
-        "selected_compose_route": {
-            "name": selected_route,
-            "required_artifacts": route.required_artifacts,
-            "optional_artifacts": route.optional_artifacts,
-            "irrelevant_artifacts": route.irrelevant_artifacts,
-            "allow_conditions": route.allow_conditions,
-            "blocked_conditions": route.blocked_conditions,
-        },
     }
 
 

@@ -357,6 +357,7 @@ def test_hot_follow_live_muted_no_tts_route_recommends_compose_no_tts():
     )
 
     assert advisory["recommended_next_action"] == "compose_no_tts"
+    assert advisory["evidence"]["selected_compose_route"] == "no_tts_compose_route"
 
 
 def test_helper_translate_failure_voice_led_does_not_recommend_no_tts_compose():
@@ -427,6 +428,7 @@ def test_helper_translate_failure_voice_led_does_not_recommend_no_tts_compose():
     assert advisory["id"] == "hf_advisory_helper_translate_failed"
     assert advisory["recommended_next_action"] == "retry_translate_or_edit_subtitle"
     assert advisory["recommended_next_action"] != "compose_no_tts"
+    assert advisory["evidence"]["selected_compose_route"] == "tts_replace_route"
 
 
 def test_helper_translate_failure_with_saved_target_subtitle_stays_helper_scoped():
@@ -498,6 +500,7 @@ def test_helper_translate_failure_with_saved_target_subtitle_stays_helper_scoped
     assert advisory["recommended_next_action"] == "refresh_dub"
     assert advisory["recommended_next_action"] != "compose_no_tts"
     assert advisory["id"] != "hf_advisory_helper_translate_failed"
+    assert advisory["evidence"]["selected_compose_route"] == "tts_replace_route"
 
 
 def test_first_tts_failure_stays_retriable_not_no_tts_terminal():
@@ -567,6 +570,7 @@ def test_first_tts_failure_stays_retriable_not_no_tts_terminal():
     assert advisory["id"] == "hf_advisory_retriable_dub_failure"
     assert advisory["recommended_next_action"] == "retry_or_inspect_dub"
     assert advisory["recommended_next_action"] != "compose_no_tts"
+    assert advisory["evidence"]["selected_compose_route"] == "tts_replace_route"
 
 
 def test_voice_led_retry_success_resolves_tts_replace_and_final_ready():
@@ -631,6 +635,7 @@ def test_voice_led_retry_success_resolves_tts_replace_and_final_ready():
     )
 
     assert advisory["recommended_next_action"] == "continue_qa"
+    assert advisory["evidence"]["selected_compose_route"] == "tts_replace_route"
 
 
 def test_hot_follow_advisory_legal_no_tts_route_beats_refresh_dub():
@@ -959,5 +964,8 @@ def test_hot_follow_advisory_result_attaches_to_workbench_payload(monkeypatch):
         "recommended_next_action": "noop",
         "operator_hint": "safe",
         "explanation": "read only",
-        "evidence": {"source": "test"},
+        "evidence": {
+            "source": "test",
+            "selected_compose_route": "no_tts_compose_route",
+        },
     }

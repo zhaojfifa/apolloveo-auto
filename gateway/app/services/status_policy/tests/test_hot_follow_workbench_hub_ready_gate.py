@@ -1328,8 +1328,13 @@ def test_hot_follow_workbench_hub_survives_optional_presentation_aggregation_fai
         data = res.json()
 
     assert data.get("artifact_facts") == {}
-    assert data.get("current_attempt") == {}
-    assert data.get("operator_summary") == {}
+    current_attempt = data.get("current_attempt") or {}
+    assert current_attempt.get("selected_compose_route") == "tts_replace_route"
+    assert current_attempt.get("compose_allowed") is False
+    assert current_attempt.get("compose_allowed_reason") == "subtitle_missing"
+    operator_summary = data.get("operator_summary") or {}
+    assert "recommended_next_action" in operator_summary
+    assert operator_summary.get("last_successful_output_available") is False
 
 
 def test_hot_follow_compose_rejects_stale_revision_submission(monkeypatch):

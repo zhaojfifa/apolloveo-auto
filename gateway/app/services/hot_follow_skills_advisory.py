@@ -114,6 +114,31 @@ def _normalize_advisory_output(value: dict[str, Any] | None) -> dict[str, Any] |
     return advisory
 
 
+def _inject_selected_compose_route_evidence(
+    advisory: dict[str, Any] | None,
+    payload: dict[str, Any],
+) -> dict[str, Any] | None:
+    if not isinstance(advisory, dict):
+        return None
+    current_attempt = dict(payload.get("current_attempt") or {})
+    ready_gate = dict(payload.get("ready_gate") or {})
+    artifact_facts = dict(payload.get("artifact_facts") or {})
+    artifact_route = artifact_facts.get("selected_compose_route")
+    if isinstance(artifact_route, dict):
+        artifact_route = artifact_route.get("name")
+    selected_route = (
+        current_attempt.get("selected_compose_route")
+        or ready_gate.get("selected_compose_route")
+        or artifact_route
+    )
+    if not selected_route:
+        return advisory
+    evidence = dict(advisory.get("evidence") or {})
+    evidence["selected_compose_route"] = selected_route
+    advisory["evidence"] = evidence
+    return advisory
+
+
 def maybe_build_hot_follow_advisory(
     task: dict[str, Any],
     payload: dict[str, Any],
@@ -125,10 +150,16 @@ def maybe_build_hot_follow_advisory(
         return None
     contract_advisory = maybe_resolve_contract_advisory(task, payload)
     if contract_advisory is not None:
-        return _normalize_advisory_output(contract_advisory)
+        return _inject_selected_compose_route_evidence(
+            _normalize_advisory_output(contract_advisory),
+            payload,
+        )
     advisory_input = build_hot_follow_advisory_input(task, payload, line=line)
     try:
-        return _normalize_advisory_output(_HOT_FOLLOW_ADVISORY_HOOK(advisory_input))
+        return _inject_selected_compose_route_evidence(
+            _normalize_advisory_output(_HOT_FOLLOW_ADVISORY_HOOK(advisory_input)),
+            payload,
+        )
     except Exception:
         logger.exception(
             "HF_SKILLS_ADVISORY_SAFE_FALLBACK task=%s bundle=%s",

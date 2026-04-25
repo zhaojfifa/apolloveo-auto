@@ -85,8 +85,7 @@ def test_artifact_facts_formalize_muted_no_tts_audio_lane():
     assert facts["audio_lane"]["no_tts"] is True
     assert facts["audio_lane"]["bgm_configured"] is True
     assert facts["tts_voiceover_exists"] is False
-    assert facts["selected_compose_route"]["name"] == "bgm_only_route"
-    assert "tts_voiceover" in facts["selected_compose_route"]["irrelevant_artifacts"]
+    assert "selected_compose_route" not in facts
 
 
 def test_current_attempt_marks_blocked_compose_as_terminal():

@@ -878,25 +878,23 @@ def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
     helper_translate_translated_text = str(task.get("subtitle_helper_translated_text") or "").strip() or None
     helper_translate_provider = str(task.get("subtitle_helper_provider") or "").strip() or None
     helper_translate_input_text = str(task.get("subtitle_helper_input_text") or "").strip() or None
-    helper_translate_output_state = None
-    helper_translate_provider_health = None
-    if any(
-        (
-            helper_translate_status,
-            helper_translate_error_reason,
-            helper_translate_error_message,
-            helper_translate_translated_text,
-            helper_translate_provider,
-            helper_translate_input_text,
-        )
-    ):
-        helper_translate_output_state = (
-            "helper_output_resolved" if helper_translate_translated_text else "helper_output_unavailable"
-        )
+    helper_translate_output_state = "helper_output_unavailable"
+    if helper_translate_translated_text:
+        helper_translate_output_state = "helper_output_resolved"
+    elif str(helper_translate_status or "").strip().lower() in {"pending", "running", "queued"}:
+        helper_translate_output_state = "helper_output_pending"
+    terminal_helper_reasons = {
+        "helper_translate_invalid_request",
+        "helper_translate_unsupported_language",
+        "helper_translate_permission_denied",
+        "helper_translate_auth_failed",
+    }
+    helper_translate_provider_health = "provider_ok"
+    if helper_translate_failed:
         helper_translate_provider_health = (
-            "provider_retryable_failure"
-            if helper_translate_failed
-            else "provider_ok"
+            "provider_terminal_failure"
+            if str(helper_translate_error_reason or "").strip().lower() in terminal_helper_reasons
+            else "provider_retryable_failure"
         )
     if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
         subtitle_ready_reason = explicit_target_reason

@@ -262,8 +262,52 @@ def _helper_contract_state(
     final_exists: bool,
     final_fresh: bool,
 ) -> Dict[str, Any]:
-    status = str(subtitles.get("helper_translate_status") or "").strip().lower()
-    failed = bool(subtitles.get("helper_translate_failed")) or status == "failed"
+    helper_translation = dict(_as_dict(subtitles.get("helper_translation")))
+    status = str(
+        subtitles.get("helper_translate_status")
+        or helper_translation.get("status")
+        or ""
+    ).strip().lower()
+    failed = bool(
+        subtitles.get("helper_translate_failed")
+        or helper_translation.get("failed")
+    ) or status == "failed"
+    translated_text = str(
+        subtitles.get("helper_translate_translated_text")
+        or helper_translation.get("translated_text")
+        or ""
+    ).strip()
+    provider_health = str(
+        subtitles.get("helper_translate_provider_health")
+        or helper_translation.get("provider_health")
+        or ""
+    ).strip() or "provider_ok"
+    output_state = str(
+        subtitles.get("helper_translate_output_state")
+        or helper_translation.get("output_state")
+        or ""
+    ).strip() or "helper_output_unavailable"
+    if translated_text:
+        output_state = "helper_output_resolved"
+    elif status in {"pending", "running", "queued"}:
+        output_state = "helper_output_pending"
+    elif output_state not in {
+        "helper_output_unavailable",
+        "helper_output_pending",
+        "helper_output_resolved",
+    }:
+        output_state = "helper_output_unavailable"
+    if failed and provider_health not in {
+        "provider_retryable_failure",
+        "provider_terminal_failure",
+    }:
+        provider_health = "provider_retryable_failure"
+    elif not failed and provider_health not in {
+        "provider_ok",
+        "provider_retryable_failure",
+        "provider_terminal_failure",
+    }:
+        provider_health = "provider_ok"
     mainline_recovered = bool(
         subtitles.get("subtitle_ready")
         or audio.get("audio_ready")
@@ -280,6 +324,8 @@ def _helper_contract_state(
         current_state = "irrelevant_to_current_mainline_truth"
     return {
         "current_state": current_state,
+        "output_state": output_state,
+        "provider_health": provider_health,
         "warning_only": current_state in {
             "helper_retryable_failure_warning_only",
             "helper_resolved_with_retryable_provider_warning",
@@ -312,6 +358,25 @@ def _reduce_projection_truth(task: Dict[str, Any], state: Dict[str, Any]) -> Non
     historical_final = _as_dict(state.get("historical_final"))
     final_exists = bool(final_payload.get("exists") or historical_final.get("exists") or artifact_facts.get("final_exists"))
     final_fresh = bool(state.get("final_fresh") or final_payload.get("fresh") or ready_gate.get("publish_ready"))
+    subtitles_done = str(subtitles.get("status") or "").strip().lower() in {
+        "done",
+        "ready",
+        "success",
+        "completed",
+    }
+    pack_errors = dict(_as_dict(errors.get("pack")))
+    pack_status = str(
+        state.get("pack_status")
+        or (_as_dict(pipeline_legacy.get("pack"))).get("status")
+        or ""
+    ).strip().lower()
+    if not pack_status:
+        for row in pipeline:
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("key") or "").strip().lower() == "pack":
+                pack_status = str(row.get("status") or "").strip().lower()
+                break
 
     route_truth = selected_route_from_state(task, state)
     route_name = str(route_truth.get("name") or "tts_replace_route").strip() or "tts_replace_route"
@@ -347,6 +412,9 @@ def _reduce_projection_truth(task: Dict[str, Any], state: Dict[str, Any]) -> Non
         subtitles.get("target_subtitle_current")
         and subtitles.get("target_subtitle_authoritative_source")
     )
+    if subtitles_done:
+        subtitles["error"] = None
+        _clear_pipeline_error(pipeline, "subtitles")
     if authoritative_subtitle_truth:
         subtitles["subtitle_ready"] = True
         subtitles["subtitle_ready_reason"] = "ready"
@@ -379,6 +447,11 @@ def _reduce_projection_truth(task: Dict[str, Any], state: Dict[str, Any]) -> Non
         audio_errors["message"] = None
         errors["audio"] = audio_errors
 
+    if pack_status not in {"failed", "error"}:
+        pack_errors["reason"] = None
+        pack_errors["message"] = None
+        errors["pack"] = pack_errors
+
     if route_name == "tts_replace_route":
         audio["no_dub"] = False
         audio["no_dub_reason"] = None
@@ -392,7 +465,11 @@ def _reduce_projection_truth(task: Dict[str, Any], state: Dict[str, Any]) -> Non
     )
     helper_translation = dict(_as_dict(subtitles.get("helper_translation")))
     helper_translation["contract_state"] = helper_state["current_state"]
+    helper_translation["output_state"] = helper_state["output_state"]
+    helper_translation["provider_health"] = helper_state["provider_health"]
     subtitles["helper_translation"] = helper_translation
+    subtitles["helper_translate_output_state"] = helper_state["output_state"]
+    subtitles["helper_translate_provider_health"] = helper_state["provider_health"]
     state["helper"] = helper_state
 
     state["pipeline"] = pipeline
@@ -401,8 +478,7 @@ def _reduce_projection_truth(task: Dict[str, Any], state: Dict[str, Any]) -> Non
     state["audio"] = audio
     state["errors"] = errors
     state["artifact_facts"] = artifact_facts
-    if had_current_attempt or had_artifact_facts:
-        state["current_attempt"] = current_attempt
+    state["current_attempt"] = current_attempt
 
 
 def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | None = None) -> Dict[str, Any]:
