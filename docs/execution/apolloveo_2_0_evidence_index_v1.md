@@ -55,6 +55,7 @@ Status: P2 pre-execution evidence index
 | Matrix Script validator report (green) | `docs/execution/logs/packet_validator_matrix_script_v1.json` |
 | Digital Anchor validator report (green) | `docs/execution/logs/packet_validator_digital_anchor_v1.json` |
 | packet validator pytest gate (6/6 green, 2026-04-26) | `tests/contracts/packet_validator/test_pm_samples.py` |
+| architect packet gate signoff (Conditional Pass, 2026-04-26) | `docs/reviews/architect_signoff_packet_gate_v1.md` |
 
 ## Architecture / Flow Evidence
 
