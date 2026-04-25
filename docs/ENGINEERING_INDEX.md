@@ -64,9 +64,15 @@ or active architecture decisions.
 
 Read root governance, `docs/baseline/PROJECT_BASELINE_INDEX.md`,
 `ENGINEERING_CONSTRAINTS_INDEX.md`, `docs/contracts/status_ownership_matrix.md`,
-and the latest active Hot Follow execution note. Business-line changes must
-include regression validation for normal translation, helper translation, dub,
-compose, and final availability.
+the latest active Hot Follow execution note, and when the task is state-flow
+freezing also read:
+
+- `docs/contracts/hot_follow_state_flow_v1.md`
+- `docs/contracts/hot_follow_state_table_v1.md`
+- `docs/contracts/hot_follow_forbidden_invariants_v1.md`
+
+Business-line changes must include regression validation for normal
+translation, helper translation, dub, compose, and final availability.
 
 ### Four-Layer State Changes
 
@@ -75,7 +81,14 @@ Read `docs/contracts/four_layer_state_contract.md`,
 `docs/contracts/status_ownership_matrix.md`, and
 `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`. Use
 `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md` only as a drafting
-template, not as the primary authority. Changes must preserve:
+template, not as the primary authority. For Hot Follow state freeze/review
+work, also read:
+
+- `docs/contracts/hot_follow_state_flow_v1.md`
+- `docs/contracts/hot_follow_state_table_v1.md`
+- `docs/contracts/hot_follow_forbidden_invariants_v1.md`
+
+Changes must preserve:
 
 - L1 as step execution status only.
 - L2 as artifact facts only.

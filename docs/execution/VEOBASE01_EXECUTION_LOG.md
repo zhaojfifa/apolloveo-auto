@@ -2296,3 +2296,95 @@ Judgment:
 
 - the tag-derived branch now behaves as a clean recovery baseline for these
   three legacy write-path leaks
+
+## 2026-04-25 Hot Follow Explicit State Freeze Packet
+
+Branch:
+
+- `VeoBase02-clean-tag-verify`
+
+Base SHA:
+
+- `bf9ee2f028a4dcd46b2c7736c12b68c42fa369f7`
+
+Reading declaration:
+
+- phase 0 root/index only, read in order:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `docs/contracts/engineering_reading_contract_v1.md`
+- phase 1 current state/ownership authority, read in order:
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/architecture/line_contracts/hot_follow_line.yaml`
+- phase 2 baseline / flow docs only, read in order:
+  - `docs/architecture/hot_follow_business_flow_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/architecture/contract_editor_preparation_notes_v1.md`
+  - `docs/contracts/STATE_SCHEMA_FOUR_LAYER_TEMPLATE.md`
+- phase 3 factory abstraction reference only after Hot Follow read:
+  - requested but missing:
+    - `docs/contracts/factory_input_contract_v1.md`
+    - `docs/contracts/factory_content_structure_contract_v1.md`
+    - `docs/contracts/factory_scene_plan_contract_v1.md`
+    - `docs/contracts/factory_audio_plan_contract_v1.md`
+    - `docs/contracts/factory_language_plan_contract_v1.md`
+    - `docs/contracts/factory_delivery_contract_v1.md`
+    - `docs/architecture/factory_line_template_design_v1.md`
+
+Why this authority set was sufficient:
+
+- the pass was limited to freezing Hot Follow state flow, state table, and
+  forbidden invariants
+- the existing Hot Follow four-layer, ownership, projection, ready-gate, and
+  line contracts already contained the authority needed to make the flow
+  explicit without changing runtime behavior
+- missing factory-reference docs were recorded as missing-authority context only
+  and did not block this docs-only Hot Follow freeze
+
+Scope:
+
+- docs-only Hot Follow state packet
+- no runtime code change
+- no router/service edit
+- no factory runtime onboarding
+
+Created documents:
+
+- `docs/contracts/hot_follow_state_flow_v1.md`
+- `docs/contracts/hot_follow_state_table_v1.md`
+- `docs/contracts/hot_follow_forbidden_invariants_v1.md`
+
+Indexed documents updated:
+
+- `docs/ENGINEERING_INDEX.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Frozen outcomes:
+
+- one explicit Hot Follow state flow now exists from `task_created` through
+  `publish_ready`
+- one explicit state table now defines entry/exit/blocking/transition rules for
+  waiting, retryable, manual-intervention, and terminal states
+- one forbidden-invariants set now freezes the contradictory regression shapes
+  that must never exist
+- no-dub/no-TTS boundaries are explicit and may not consume subtitle-waiting or
+  translation-incomplete shapes without explicit contract allowance
+
+Validation:
+
+- authority path existence check for cited Hot Follow docs
+  - result: passed
+- `git diff --check`
+  - result: passed
+
+Behavior change:
+
+- none
