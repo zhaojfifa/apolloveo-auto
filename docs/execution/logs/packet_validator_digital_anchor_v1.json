@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "missing": [],
+  "violations": [],
+  "advisories": [],
+  "rule_versions": {
+    "rules": "v1",
+    "envelope": "v1"
+  }
+}

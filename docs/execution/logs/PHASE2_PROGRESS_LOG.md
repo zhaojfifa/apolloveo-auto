@@ -207,3 +207,29 @@ Remaining risks:
 - top-level engineering focus still reflects the post-VeoSop05 continuation stage and will need explicit alignment before broad Phase-2 implementation lands
 - the new contracts are frozen before runtime implementation, so some fields remain hook-only until PR-6/PR-7
 - planning contracts intentionally remain non-executable until later PRs
+
+## Packet Gate — Matrix Script + Digital Anchor PM Sample Pass-Through
+
+Date: 2026-04-26
+
+This node completed:
+
+- shipped `gateway/app/services/packet/envelope.py` (PacketValidationReport / Violation / Advisory dataclasses)
+- shipped `gateway/app/services/packet/validator.py` implementing E1–E5 envelope structural rules and R1–R5 content rules per `docs/contracts/factory_packet_envelope_contract_v1.md` and `docs/contracts/factory_packet_validator_rules_v1.md`
+- registered `matrix_script` and `digital_anchor` in `LINE_IDS` and confirmed all eleven `CAPABILITY_KINDS` cover the new lines (`variation`, `speaker`, `avatar`, `lip_sync` already present — no kind additions required)
+- ran `pytest tests/contracts/packet_validator/test_pm_samples.py -v` → **6 passed in 0.14s** on Python 3.9.6 / pytest 8.4.2
+- persisted green validator reports to `docs/execution/logs/packet_validator_matrix_script_v1.json` and `docs/execution/logs/packet_validator_digital_anchor_v1.json` (`ok=true`, `violations=[]`, `rule_versions={"rules":"v1","envelope":"v1"}`)
+- updated `docs/execution/apolloveo_2_0_evidence_index_v1.md` to point at the new validator/runtime/report evidence and resolved the two corresponding evidence gaps
+
+Scope boundary:
+
+- no donor absorption — `swiftcraft` token is rejected by R3 vendor-leak check, never written
+- no provider/vendor implementation — capability adapters / routing untouched
+- no Hot Follow business changes — Hot Follow remains the reference line only
+- validator is read-only: no L1/L2/L3/L4 state, no mutation of input packet
+- minimal-support principle observed: only constants registry (`LINE_IDS`) and the missing implementation modules were added; no schema redesign
+
+Outstanding:
+
+- onboarding gate (`onboarding_gate.py`) consumption of these reports is still pending
+- line-specific contracts under `docs/contracts/matrix_script/` and `docs/contracts/digital_anchor/` are referenced by the samples but not yet authored — currently unblocked because R1 only resolves `generic_refs[]`; will become a blocker when E3-derived line-specific path resolution is tightened

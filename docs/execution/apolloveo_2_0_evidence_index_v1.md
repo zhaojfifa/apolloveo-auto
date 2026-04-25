@@ -46,6 +46,15 @@ Status: P2 pre-execution evidence index
 | runtime assembly | `docs/contracts/production_line_runtime_assembly_rules_v1.md` |
 | packet envelope | `docs/contracts/factory_packet_envelope_contract_v1.md` |
 | packet validator rules | `docs/contracts/factory_packet_validator_rules_v1.md` |
+| packet validator implementation | `gateway/app/services/packet/validator.py` |
+| packet envelope dataclasses | `gateway/app/services/packet/envelope.py` |
+| Matrix Script packet schema | `schemas/packets/matrix_script/packet.schema.json` |
+| Matrix Script packet sample | `schemas/packets/matrix_script/sample/matrix_script_packet_v1.sample.json` |
+| Digital Anchor packet schema | `schemas/packets/digital_anchor/packet.schema.json` |
+| Digital Anchor packet sample | `schemas/packets/digital_anchor/sample/digital_anchor_packet_v1.sample.json` |
+| Matrix Script validator report (green) | `docs/execution/logs/packet_validator_matrix_script_v1.json` |
+| Digital Anchor validator report (green) | `docs/execution/logs/packet_validator_digital_anchor_v1.json` |
+| packet validator pytest gate (6/6 green, 2026-04-26) | `tests/contracts/packet_validator/test_pm_samples.py` |
 
 ## Architecture / Flow Evidence
 
@@ -84,8 +93,8 @@ Status: P2 pre-execution evidence index
 
 | Gap | Effect |
 | --- | --- |
-| Matrix Script / Digital Anchor packet schema and sample instances missing | packet gate cannot pass for P2 implementation |
-| packet validator runtime/report missing | validator rules exist, but implementation entry remains blocked |
+| Matrix Script / Digital Anchor packet schema and sample instances missing | RESOLVED 2026-04-26 — schemas + samples shipped, validator pytest green |
+| packet validator runtime/report missing | RESOLVED 2026-04-26 — `gateway/app/services/packet/validator.py` + reports under `docs/execution/logs/packet_validator_*_v1.json` |
 | capability adapter base missing | donor absorption remains blocked even though boundary/mapping docs exist |
 | factory-wide versioned surface response contracts missing | surface gate remains partial |
 | some indexed future authority files do not exist | must be resolved before they are used as P2 evidence |
