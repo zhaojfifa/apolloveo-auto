@@ -1,0 +1,126 @@
+{
+  "line_id": "digital_anchor",
+  "packet_version": "v1",
+  "generic_refs": [
+    {
+      "ref_id": "g_input",
+      "path": "docs/contracts/factory_input_contract_v1.md",
+      "version": "v1"
+    },
+    {
+      "ref_id": "g_struct",
+      "path": "docs/contracts/factory_content_structure_contract_v1.md",
+      "version": "v1"
+    },
+    {
+      "ref_id": "g_scene",
+      "path": "docs/contracts/factory_scene_plan_contract_v1.md",
+      "version": "v1"
+    },
+    {
+      "ref_id": "g_audio",
+      "path": "docs/contracts/factory_audio_plan_contract_v1.md",
+      "version": "v1"
+    },
+    {
+      "ref_id": "g_lang",
+      "path": "docs/contracts/factory_language_plan_contract_v1.md",
+      "version": "v1"
+    },
+    {
+      "ref_id": "g_deliv",
+      "path": "docs/contracts/factory_delivery_contract_v1.md",
+      "version": "v1"
+    }
+  ],
+  "line_specific_refs": [
+    {
+      "ref_id": "digital_anchor_role_pack",
+      "path": "docs/contracts/digital_anchor/role_pack_contract_v1.md",
+      "version": "v1",
+      "binds_to": ["g_input", "g_struct"],
+      "delta": {
+        "framing_kind_set": ["head", "half_body", "full_body"],
+        "appearance_ref_kind_set": ["role_card", "role_pose_set"],
+        "roles": [
+          {
+            "role_id": "role_anchor_a",
+            "display_name": "Anchor A",
+            "framing_kind": "half_body",
+            "language_scope_ref": "lang_scope_en_zh",
+            "appearance_ref": "catalog://role_card/anchor_a_v1",
+            "notes": "primary anchor for product launch line"
+          },
+          {
+            "role_id": "role_anchor_b",
+            "display_name": "Anchor B",
+            "framing_kind": "head",
+            "language_scope_ref": "lang_scope_en_only",
+            "appearance_ref": "catalog://role_card/anchor_b_v1"
+          }
+        ]
+      }
+    },
+    {
+      "ref_id": "digital_anchor_speaker_plan",
+      "path": "docs/contracts/digital_anchor/speaker_plan_contract_v1.md",
+      "version": "v1",
+      "binds_to": ["g_audio", "g_lang", "g_scene"],
+      "delta": {
+        "dub_kind_set": ["tts_neutral", "tts_role_voice", "source_passthrough"],
+        "lip_sync_kind_set": ["tight", "loose", "none"],
+        "segments": [
+          {
+            "segment_id": "seg_001",
+            "binds_role_id": "role_anchor_a",
+            "script_ref": "content://digital_anchor/v1/seg_001",
+            "dub_kind": "tts_role_voice",
+            "lip_sync_kind": "tight",
+            "language_pick": "en-US"
+          },
+          {
+            "segment_id": "seg_002",
+            "binds_role_id": "role_anchor_a",
+            "script_ref": "content://digital_anchor/v1/seg_002",
+            "dub_kind": "tts_role_voice",
+            "lip_sync_kind": "tight",
+            "language_pick": "zh-CN"
+          },
+          {
+            "segment_id": "seg_003",
+            "binds_role_id": "role_anchor_b",
+            "script_ref": "content://digital_anchor/v1/seg_003",
+            "dub_kind": "tts_neutral",
+            "lip_sync_kind": "loose",
+            "language_pick": "en-US"
+          }
+        ]
+      }
+    }
+  ],
+  "binding": {
+    "worker_profile_ref": "worker_profile_digital_anchor_v1",
+    "deliverable_profile_ref": "deliverable_profile_digital_anchor_v1",
+    "asset_sink_profile_ref": "asset_sink_profile_digital_anchor_v1",
+    "capability_plan": [
+      { "kind": "understanding", "mode": "analyze", "required": true },
+      { "kind": "avatar", "mode": "role_render", "required": true },
+      { "kind": "speaker", "mode": "segment_speak", "required": true },
+      { "kind": "subtitles", "mode": "author", "required": true },
+      { "kind": "dub", "mode": "tts", "required": true },
+      { "kind": "lip_sync", "mode": "sync", "required": false },
+      { "kind": "pack", "mode": "bundle", "required": false }
+    ]
+  },
+  "evidence": {
+    "reference_line": "hot_follow",
+    "reference_evidence_path": "docs/contracts/hot_follow_line_contract.md",
+    "validator_report_path": "docs/execution/logs/packet_validator_digital_anchor_v1.json",
+    "ready_state": "draft"
+  },
+  "metadata": {
+    "created_at": "2026-04-26T00:00:00Z",
+    "created_by": "product",
+    "notes": "Initial Digital Anchor packet sample for P2 packet gate. No vendors, no avatar engines, no truth fields."
+  }
+}
