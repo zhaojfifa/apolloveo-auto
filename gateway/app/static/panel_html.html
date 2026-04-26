@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Matrix Script — Variation Panel</title>
+  <link rel="stylesheet" href="panel.css" />
+</head>
+<body>
+
+<div class="panel" role="region" aria-label="Matrix Script Variation Panel">
+  <h2 class="sr-only">Matrix Script Variation Panel</h2>
+
+  <!-- ── Top bar ── -->
+  <header class="panel-header">
+    <div class="panel-title">
+      <span class="panel-title-main">Matrix Script</span>
+      <span class="panel-title-sep">—</span>
+      <span class="panel-title-sub">Variation Panel</span>
+    </div>
+    <div class="panel-meta">
+      <span class="packet-ver">packet v1</span>
+      <span class="pill pill-ready" id="ready-badge">ready</span>
+    </div>
+  </header>
+
+  <div class="panel-body">
+
+    <!-- ── Axes ── -->
+    <div class="section-divider">Axes</div>
+    <table class="axes-table" aria-label="Axes">
+      <colgroup>
+        <col class="col-id" />
+        <col class="col-kind" />
+        <col class="col-val" />
+        <col class="col-req" />
+      </colgroup>
+      <thead>
+        <tr>
+          <th>axis_id</th>
+          <th>kind</th>
+          <th>values</th>
+          <th>required</th>
+        </tr>
+      </thead>
+      <tbody id="axes-body"></tbody>
+    </table>
+
+    <!-- ── Cells × Slots ── -->
+    <div class="section-divider">Cells × Slots</div>
+    <div class="cells-wrap">
+      <div class="cells-colhead" role="row">
+        <div class="col-cellid ch">cell_id</div>
+        <div class="col-axes   ch">axis selections</div>
+        <div class="col-slot   ch">script_slot</div>
+        <div class="col-notes  ch">notes</div>
+      </div>
+      <div id="cells-body"></div>
+    </div>
+
+  </div>
+
+  <!-- ── Footer ── -->
+  <footer class="panel-footer">
+    <span class="footer-ref">
+      capability_plan[kind=variation] · refs: variation_matrix + slot_pack
+    </span>
+    <span class="footer-count" id="footer-count"></span>
+  </footer>
+</div>
+
+<script src="panel.js"></script>
+</body>
+</html>
