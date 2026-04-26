@@ -19,7 +19,7 @@ Status: P2 pre-execution gate checklist
 | Role gate | multi-role matrix | Pass after this doc | No if accepted by review owner | `docs/execution/apolloveo_2_0_role_matrix_v1.md` |
 | Evidence gate | evidence index | Pass after this doc | No if kept current | `docs/execution/apolloveo_2_0_evidence_index_v1.md` |
 | Business-flow gate | top-level factory flow diagram | Pass after this doc | No if accepted as shared baseline | `docs/architecture/apolloveo_2_0_top_level_business_flow_v1.md` |
-| Packet gate | factory packet envelope + validator rules + line packet schema/sample | Partial | Yes | envelope/rules exist; line packet schema/sample and validator report missing |
+| Packet gate | factory packet envelope + validator rules + line packet schema/sample | Partial | Yes | envelope/rules + validator skeleton + onboarding gate + Hot Follow green evidence (`docs/execution/evidence/hot_follow_reference_packet_validation_v1.md`); Matrix Script / Digital Anchor `schemas/packets/<line>/packet.schema.json` + sample still missing |
 | Surface gate | versioned intake/planning/delivery response contracts | Partial | Yes for implementation | workbench contract and design handoff exist; factory-wide surface contracts missing |
 | Donor gate | donor boundary + capability mapping + adapter-base precondition | Partial | Yes for donor-based implementation | boundary/mapping/ADR exist; capability adapter base and donor absorption signoff missing |
 | Runtime gate | router/service implementation plan after packet/surface gates | Blocked | Yes | current gate forbids runtime work |

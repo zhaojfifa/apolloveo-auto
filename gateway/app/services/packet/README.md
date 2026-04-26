@@ -7,11 +7,12 @@
 
 Host directory for the factory packet runtime: envelope dataclass, validator, and onboarding gate.
 
-Planned modules:
+Modules:
 
-- `envelope.py` — packet envelope dataclass; mirrors `factory_packet_envelope_contract_v1.md`
-- `validator.py` — runs R1..R5 + E1..E5 rules; emits `PacketValidationReport`
-- `onboarding_gate.py` — consumes validator report + reference evidence; emits `OnboardingGateResult`
+- `envelope.py` — packet envelope dataclass; mirrors `factory_packet_envelope_contract_v1.md` (in tree)
+- `validator.py` — runs R1..R5 + E1..E5 rules; emits `PacketValidationReport` (in tree)
+- `onboarding_gate.py` — consumes validator report + reference evidence; emits `OnboardingGateResult` (in tree)
+- `entry.py` — dict / JSON-file validation entry helpers (`envelope_from_dict`, `validate_packet_dict`, `validate_packet_path`) (in tree)
 
 ## Consumes
 
@@ -29,8 +30,10 @@ Planned modules:
 
 ## Schemas
 
-JSON Schemas live at `schemas/packet/envelope.schema.json` (Draft 2020-12). Sample instances live at `schemas/packet/sample/`.
+Per-line packet schemas live at `schemas/packets/<line>/packet.schema.json` (Draft 2020-12). Sample instances live at `schemas/packets/<line>/sample/`. See `schemas/packets/README.md` for the layout and onboarding flow.
+
+Hot Follow reference instance: `schemas/packets/hot_follow/sample/reference_packet_v1.json` — used as the green baseline. See `docs/execution/evidence/hot_follow_reference_packet_validation_v1.md`.
 
 ## Test surface
 
-Contract tests live at `tests/contracts/packet_validator/` (one positive + one negative per rule).
+Contract tests live at `tests/contracts/packet_validator/` — one positive + one negative per rule, plus the onboarding gate matrix and the Hot Follow reference baseline regression.

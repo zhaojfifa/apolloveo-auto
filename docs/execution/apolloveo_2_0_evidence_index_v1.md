@@ -30,6 +30,7 @@ Status: P2 pre-execution evidence index
 | P2 unified review | `docs/reviews/APOLLOVEO_2_0_P2_READINESS_UNIFIED_REVIEW.md` |
 | P2 execution base | `docs/execution/apolloveo_2_0_p2_execution_base_v1.md` |
 | P2 gate checklist | `docs/execution/apolloveo_2_0_p2_gate_checklist_v1.md` |
+| P2 pre-unlock wave log | `docs/execution/apolloveo_2_0_p2_pre_unlock_wave_v1.md` |
 | product handoff | `docs/handoffs/apolloveo_2_0_product_handoff_v1.md` |
 | design handoff | `docs/handoffs/apolloveo_2_0_design_handoff_v1.md` |
 
@@ -46,16 +47,6 @@ Status: P2 pre-execution evidence index
 | runtime assembly | `docs/contracts/production_line_runtime_assembly_rules_v1.md` |
 | packet envelope | `docs/contracts/factory_packet_envelope_contract_v1.md` |
 | packet validator rules | `docs/contracts/factory_packet_validator_rules_v1.md` |
-| packet validator implementation | `gateway/app/services/packet/validator.py` |
-| packet envelope dataclasses | `gateway/app/services/packet/envelope.py` |
-| Matrix Script packet schema | `schemas/packets/matrix_script/packet.schema.json` |
-| Matrix Script packet sample | `schemas/packets/matrix_script/sample/matrix_script_packet_v1.sample.json` |
-| Digital Anchor packet schema | `schemas/packets/digital_anchor/packet.schema.json` |
-| Digital Anchor packet sample | `schemas/packets/digital_anchor/sample/digital_anchor_packet_v1.sample.json` |
-| Matrix Script validator report (green) | `docs/execution/logs/packet_validator_matrix_script_v1.json` |
-| Digital Anchor validator report (green) | `docs/execution/logs/packet_validator_digital_anchor_v1.json` |
-| packet validator pytest gate (6/6 green, 2026-04-26) | `tests/contracts/packet_validator/test_pm_samples.py` |
-| architect packet gate signoff (Conditional Pass, 2026-04-26) | `docs/reviews/architect_signoff_packet_gate_v1.md` |
 
 ## Architecture / Flow Evidence
 
@@ -78,6 +69,19 @@ Status: P2 pre-execution evidence index
 | state machine | `docs/contracts/hot_follow_state_machine_contract_v1.md` |
 | line contract | `docs/contracts/hot_follow_line_contract.md` |
 | YAML line binding | `docs/architecture/line_contracts/hot_follow_line.yaml` |
+| reference packet instance | `schemas/packets/hot_follow/sample/reference_packet_v1.json` |
+| reference validator + onboarding gate green evidence | `docs/execution/evidence/hot_follow_reference_packet_validation_v1.md` |
+
+## Packet Onboarding Evidence
+
+| Concern | Evidence |
+| --- | --- |
+| packet validator skeleton | `gateway/app/services/packet/validator.py` |
+| envelope shapes | `gateway/app/services/packet/envelope.py` |
+| onboarding gate skeleton | `gateway/app/services/packet/onboarding_gate.py` |
+| validation entry helpers | `gateway/app/services/packet/entry.py` |
+| packet sample scaffolding | `schemas/packets/README.md` |
+| validator + onboarding gate tests | `tests/contracts/packet_validator/` |
 
 ## Donor / Capability Mapping Evidence
 
@@ -94,9 +98,9 @@ Status: P2 pre-execution evidence index
 
 | Gap | Effect |
 | --- | --- |
-| Matrix Script / Digital Anchor packet schema and sample instances missing | RESOLVED 2026-04-26 — schemas + samples shipped, validator pytest green |
-| packet validator runtime/report missing | RESOLVED 2026-04-26 — `gateway/app/services/packet/validator.py` + reports under `docs/execution/logs/packet_validator_*_v1.json` |
-| capability adapter base missing | donor absorption remains blocked even though boundary/mapping docs exist |
+| Matrix Script / Digital Anchor packet schema and sample instances missing | packet gate cannot pass for P2 implementation (validation entry path exists; awaiting product handoff at `schemas/packets/<line>/`) |
+| packet validator runtime/report missing | RESOLVED for Hot Follow reference (`docs/execution/evidence/hot_follow_reference_packet_validation_v1.md`); still pending for new lines |
+| capability adapter base missing | RESOLVED at base wave (`gateway/app/services/capability/adapters/base.py`); donor absorption itself still blocked |
 | factory-wide versioned surface response contracts missing | surface gate remains partial |
 | some indexed future authority files do not exist | must be resolved before they are used as P2 evidence |
 

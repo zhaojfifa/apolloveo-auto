@@ -7,7 +7,6 @@ schema. Both samples MUST pass with zero violations / zero missing fields.
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
@@ -16,12 +15,8 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(REPO_ROOT))
 
-from gateway.app.services.packet.validator import (  # noqa: E402
-    CAPABILITY_KINDS,
-    LINE_IDS,
-    RULE_SET_VERSION,
-    validate_packet,
-)
+from gateway.app.services.packet.entry import validate_packet_dict, validate_packet_path  # noqa: E402
+from gateway.app.services.packet.validator import CAPABILITY_KINDS, RULE_SET_VERSION  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -43,23 +38,17 @@ def test_pm_sample_passes_validator(repo_root: Path, line_id: str, sample_name: 
     assert sample_path.exists(), f"PM sample missing: {sample_path}"
     assert schema_path.exists(), f"schema missing: {schema_path}"
 
-    packet = json.loads(sample_path.read_text(encoding="utf-8"))
-
-    report = validate_packet(
-        packet,
-        contracts_root=repo_root / "docs" / "contracts",
-        schema_path=schema_path,
-    )
+    report = validate_packet_path(sample_path, repo_root=repo_root, schema_path=schema_path)
 
     assert report.missing == [], f"missing fields: {report.missing}"
     assert report.violations == [], f"violations: {[v.__dict__ for v in report.violations]}"
     assert report.ok is True
-    assert report.rule_versions["rules"] == RULE_SET_VERSION
+    assert report.rule_versions["content_rules"] == RULE_SET_VERSION
 
 
 def test_new_lines_registered() -> None:
-    assert "matrix_script" in LINE_IDS
-    assert "digital_anchor" in LINE_IDS
+    assert (REPO_ROOT / "schemas/packets/matrix_script/packet.schema.json").exists()
+    assert (REPO_ROOT / "schemas/packets/digital_anchor/packet.schema.json").exists()
 
 
 def test_capability_kinds_cover_new_lines() -> None:
@@ -94,7 +83,7 @@ def test_validator_rejects_vendor_pin() -> None:
             "ready_state": "draft",
         },
     }
-    report = validate_packet(bad, contracts_root=REPO_ROOT / "docs" / "contracts")
+    report = validate_packet_dict(bad, repo_root=REPO_ROOT)
     rule_ids = {v.rule_id for v in report.violations}
     assert "R3.provider-pin" in rule_ids
     assert "R3.vendor-leak" in rule_ids
@@ -119,8 +108,8 @@ def test_validator_rejects_truth_state_field() -> None:
             "deliverable_profile_ref": "dp",
             "asset_sink_profile_ref": "asp",
             "capability_plan": [{"kind": "subtitles", "mode": "author"}],
-            "status": "ready",
         },
+        "line_specific_objects": {"variation_matrix": {"status": "ready"}},
         "evidence": {
             "reference_line": "hot_follow",
             "reference_evidence_path": "docs/contracts/hot_follow_line_contract.md",
@@ -128,5 +117,5 @@ def test_validator_rejects_truth_state_field() -> None:
             "ready_state": "draft",
         },
     }
-    report = validate_packet(bad, contracts_root=REPO_ROOT / "docs" / "contracts")
+    report = validate_packet_dict(bad, repo_root=REPO_ROOT)
     assert any(v.rule_id == "R5.forbidden-field-name" for v in report.violations)

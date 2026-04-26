@@ -1,365 +1,417 @@
-"""Factory packet validator.
+"""Factory packet validator skeleton.
 
-Implements:
-  - E1..E5 envelope structural rules from `factory_packet_envelope_contract_v1.md`
-  - R1..R5 content rules from `factory_packet_validator_rules_v1.md`
+Implements R1..R5 (factory_packet_validator_rules_v1.md) and E1..E5
+(factory_packet_envelope_contract_v1.md). Read-only: no packet mutation,
+no truth writes, no orchestration.
 
-Read-only. Emits `PacketValidationReport`. Does not mutate input or write
-any L1/L2/L3/L4 state.
+This is a P1 skeleton — sufficient to validate Hot Follow reference packets
+and future Matrix Script / Digital Anchor packets once their schemas land.
 """
-
 from __future__ import annotations
 
 import json
+import os
 import re
+from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, List, Mapping, Optional, Sequence, Tuple
 
-from .envelope import Advisory, FieldRef, PacketValidationReport, Violation
+from .envelope import (
+    CAPABILITY_KINDS,
+    FORBIDDEN_STATE_FIELDS,
+    KNOWN_VENDOR_TOKENS,
+    PERMITTED_READY_STATES,
+    Advisory,
+    FieldRef,
+    PacketEnvelope,
+    PacketValidationReport,
+    Violation,
+)
 
 RULE_SET_VERSION = "v1"
-ENVELOPE_VERSION = "v1"
+ENVELOPE_RULE_SET_VERSION = "v1"
 
-LINE_IDS: frozenset[str] = frozenset({"hot_follow", "matrix_script", "digital_anchor"})
+GENERIC_PATH_PREFIX = "docs/contracts/factory_"
+GENERIC_PATH_SUFFIX = "_contract_v1.md"
 
-CAPABILITY_KINDS: frozenset[str] = frozenset(
-    {
-        "understanding",
-        "subtitles",
-        "dub",
-        "video_gen",
-        "avatar",
-        "face_swap",
-        "post_production",
-        "pack",
-        "variation",
-        "speaker",
-        "lip_sync",
-    }
+GENERIC_SHAPE_SUFFIXES = (
+    "_input",
+    "_content_structure",
+    "_scene_plan",
+    "_audio_plan",
+    "_language_plan",
+    "_delivery",
+    "_delivery_pack",
 )
 
-FORBIDDEN_STATE_FIELDS: frozenset[str] = frozenset(
-    {
-        "status",
-        "state",
-        "phase",
-        "stage_status",
-        "ready",
-        "is_ready",
-        "ready_state",
-        "ready_gate",
-        "done",
-        "completed",
-        "finished",
-        "current_attempt",
-        "attempt_state",
-        "step_status",
-        "pipeline_status",
-        "publishable",
-        "is_publishable",
-        "delivery_ready",
-        "final_ready",
-    }
-)
 
-VENDOR_TOKENS: frozenset[str] = frozenset(
-    {
-        "akool",
-        "fal",
-        "kling",
-        "wan",
-        "azure",
-        "gemini",
-        "openai",
-        "whisper",
-        "anthropic",
-        "elevenlabs",
-        "runway",
-        "pika",
-    }
-)
-
-FORBIDDEN_VENDOR_FIELDS: frozenset[str] = frozenset(
-    {"vendor_id", "model_id", "provider", "provider_id", "engine_id"}
-)
-
-GENERIC_PATH_RE = re.compile(r"^docs/contracts/factory_[a-z_]+_contract_v[0-9]+\.md$")
-PACKET_VERSION_RE = re.compile(r"^v[0-9]+(\.[0-9]+)?$")
-PERMITTED_READY_STATES: frozenset[str] = frozenset(
-    {"draft", "validating", "ready", "gated", "frozen"}
-)
-DONOR_TOKEN = "swiftcraft"  # Banned per master plan; never appear in packets.
+def _fr(path: str) -> FieldRef:
+    return FieldRef(path=path)
 
 
-def _heading_for_path(path: str) -> str:
-    """Derive expected first-heading text from a `factory_*_contract_v1.md` path."""
-    name = Path(path).stem  # factory_input_contract_v1
-    parts = name.split("_")
-    return "# " + " ".join(p.capitalize() for p in parts)
+def _is_vendor_leak(value: Any) -> Optional[str]:
+    if not isinstance(value, str):
+        return None
+    lowered = value.lower()
+    for token in KNOWN_VENDOR_TOKENS:
+        if token in lowered:
+            return token
+    return None
 
 
-def _walk(obj: Any, prefix: str = ""):
-    """Yield (path, key, value) for every dict key in a nested object."""
-    if isinstance(obj, dict):
+def _check_r1_generic_refs(
+    envelope: PacketEnvelope, repo_root: Path
+) -> Tuple[List[Violation], List[FieldRef]]:
+    violations: List[Violation] = []
+    missing: List[FieldRef] = []
+    for idx, ref in enumerate(envelope.generic_refs):
+        base = f"generic_refs[{idx}]"
+        if not ref.path.startswith(GENERIC_PATH_PREFIX) or not ref.path.endswith(
+            GENERIC_PATH_SUFFIX
+        ):
+            violations.append(
+                Violation(
+                    rule_id="R1.path-shape",
+                    field=_fr(f"{base}.path"),
+                    reason=(
+                        f"generic_refs path must start with '{GENERIC_PATH_PREFIX}' "
+                        f"and end with '{GENERIC_PATH_SUFFIX}'; got '{ref.path}'"
+                    ),
+                )
+            )
+            continue
+        full = repo_root / ref.path
+        if not full.is_file():
+            missing.append(_fr(f"{base}.path"))
+            violations.append(
+                Violation(
+                    rule_id="R1.path-not-found",
+                    field=_fr(f"{base}.path"),
+                    reason=f"contract file does not exist: {ref.path}",
+                )
+            )
+    return violations, missing
+
+
+def _walk(obj: Any, prefix: str) -> Iterable[Tuple[str, Any]]:
+    if isinstance(obj, Mapping):
         for k, v in obj.items():
-            here = f"{prefix}.{k}" if prefix else k
-            yield here, k, v
-            yield from _walk(v, here)
-    elif isinstance(obj, list):
+            sub = f"{prefix}.{k}" if prefix else k
+            yield sub, v
+            yield from _walk(v, sub)
+    elif isinstance(obj, (list, tuple)):
         for i, v in enumerate(obj):
-            here = f"{prefix}[{i}]"
-            yield from _walk(v, here)
+            sub = f"{prefix}[{i}]"
+            yield sub, v
+            yield from _walk(v, sub)
 
 
-def _string_values(obj: Any, prefix: str = ""):
-    if isinstance(obj, str):
-        yield prefix, obj
-    elif isinstance(obj, dict):
-        for k, v in obj.items():
-            here = f"{prefix}.{k}" if prefix else k
-            yield from _string_values(v, here)
-    elif isinstance(obj, list):
-        for i, v in enumerate(obj):
-            yield from _string_values(v, f"{prefix}[{i}]")
+def _check_r2_no_duplication(envelope: PacketEnvelope) -> List[Violation]:
+    violations: List[Violation] = []
+    generic_ids = {ref.ref_id for ref in envelope.generic_refs}
+
+    line_ref_index = {ref.ref_id: ref for ref in envelope.line_specific_refs}
+
+    for ref_id, line_ref in line_ref_index.items():
+        # Suffix heuristic: if the line-specific contract path looks like a generic-shape
+        # extension (e.g. *_scene_plan_v1.md), it MUST declare binds_to into a generic ref.
+        path_lower = line_ref.path.lower()
+        looks_like_generic = any(suf in path_lower for suf in GENERIC_SHAPE_SUFFIXES)
+        if looks_like_generic and not line_ref.binds_to:
+            violations.append(
+                Violation(
+                    rule_id="R2.missing-binds_to",
+                    field=_fr(f"line_specific_refs[{ref_id}].binds_to"),
+                    reason=(
+                        "line-specific contract appears to extend a generic shape but "
+                        "declares no binds_to; bind to a generic_ref or rename"
+                    ),
+                )
+            )
+
+    # line_specific_objects payload check: if a payload object names itself with a
+    # generic-shape suffix, require a `binds_to` declaration in the corresponding ref.
+    for obj_name, obj_payload in envelope.line_specific_objects.items():
+        looks_like_generic = any(obj_name.endswith(suf) for suf in GENERIC_SHAPE_SUFFIXES)
+        if not looks_like_generic:
+            continue
+        ref = line_ref_index.get(obj_name)
+        if ref is None or not ref.binds_to:
+            violations.append(
+                Violation(
+                    rule_id="R2.duplicate-shape",
+                    field=_fr(f"line_specific_objects.{obj_name}"),
+                    reason=(
+                        f"object '{obj_name}' uses a generic-shape suffix but is not "
+                        f"bound to a generic_ref via binds_to"
+                    ),
+                )
+            )
+            continue
+        # binds_to ids must resolve into generic_refs (E3 also covers this; we re-check here for R2 context)
+        for bid in ref.binds_to:
+            if bid not in generic_ids:
+                violations.append(
+                    Violation(
+                        rule_id="R2.non-delta-fields-in-binding",
+                        field=_fr(f"line_specific_refs[{ref.ref_id}].binds_to"),
+                        reason=f"binds_to id '{bid}' does not resolve to a generic_ref",
+                    )
+                )
+    return violations
+
+
+def _check_r3_capability_kinds(envelope: PacketEnvelope) -> List[Violation]:
+    violations: List[Violation] = []
+    for idx, item in enumerate(envelope.binding.capability_plan):
+        base = f"binding.capability_plan[{idx}]"
+        if item.kind not in CAPABILITY_KINDS:
+            violations.append(
+                Violation(
+                    rule_id="R3.unknown-kind",
+                    field=_fr(f"{base}.kind"),
+                    reason=f"kind '{item.kind}' not in closed set {sorted(CAPABILITY_KINDS)}",
+                )
+            )
+        # Forbid vendor / model / engine fields in extras + any string value matching a vendor token.
+        forbidden_keys = {"vendor_id", "model_id", "provider", "provider_id", "engine_id"}
+        for k in forbidden_keys:
+            if k in item.extras:
+                violations.append(
+                    Violation(
+                        rule_id="R3.provider-pin",
+                        field=_fr(f"{base}.{k}"),
+                        reason=f"forbidden vendor-pin field '{k}' on capability plan entry",
+                    )
+                )
+        for sub_path, value in _walk(item.extras, base):
+            leak = _is_vendor_leak(value)
+            if leak is not None:
+                violations.append(
+                    Violation(
+                        rule_id="R3.vendor-leak",
+                        field=_fr(sub_path),
+                        reason=f"value contains vendor token '{leak}'",
+                    )
+                )
+    return violations
+
+
+_DRAFT_2020_12_URI = "https://json-schema.org/draft/2020-12/schema"
+
+
+def _check_r4_schema_loadable(schema_path: Optional[Path]) -> List[Violation]:
+    if schema_path is None:
+        return []
+    violations: List[Violation] = []
+    base = f"schema:{schema_path}"
+    if not schema_path.is_file():
+        violations.append(
+            Violation(
+                rule_id="R4.parse-error",
+                field=_fr(base),
+                reason=f"schema file does not exist: {schema_path}",
+            )
+        )
+        return violations
+    try:
+        data = json.loads(schema_path.read_text())
+    except json.JSONDecodeError as exc:
+        violations.append(
+            Violation(
+                rule_id="R4.parse-error",
+                field=_fr(base),
+                reason=f"JSON parse error: {exc}",
+            )
+        )
+        return violations
+    if not isinstance(data, dict):
+        violations.append(
+            Violation(
+                rule_id="R4.parse-error",
+                field=_fr(base),
+                reason="schema root must be a JSON object",
+            )
+        )
+        return violations
+    if data.get("$schema") != _DRAFT_2020_12_URI:
+        violations.append(
+            Violation(
+                rule_id="R4.draft-mismatch",
+                field=_fr(f"{base}.$schema"),
+                reason=f"$schema must be '{_DRAFT_2020_12_URI}'; got {data.get('$schema')!r}",
+            )
+        )
+    sid = data.get("$id")
+    if not isinstance(sid, str) or not sid.startswith("apolloveo://packets/"):
+        violations.append(
+            Violation(
+                rule_id="R4.missing-id",
+                field=_fr(f"{base}.$id"),
+                reason="$id must be set and start with 'apolloveo://packets/<line_id>/<version>'",
+            )
+        )
+    return violations
+
+
+def _check_r5_no_state_fields(envelope: PacketEnvelope) -> List[Violation]:
+    violations: List[Violation] = []
+    # Walk binding, line_specific_objects, and metadata for forbidden field names.
+    candidates: List[Tuple[str, Any]] = [
+        ("binding", asdict(envelope.binding)),
+        ("metadata", dict(envelope.metadata)),
+        ("line_specific_objects", dict(envelope.line_specific_objects)),
+    ]
+    for top, payload in candidates:
+        for path, value in _walk(payload, top):
+            # Last segment of path is the field name (strip array indices).
+            tail = re.sub(r"\[\d+\]", "", path).split(".")[-1]
+            if tail in FORBIDDEN_STATE_FIELDS:
+                violations.append(
+                    Violation(
+                        rule_id="R5.forbidden-field-name",
+                        field=_fr(path),
+                        reason=f"field name '{tail}' is in forbidden state-field set",
+                    )
+                )
+    return violations
+
+
+# ---- Envelope structural rules E1..E5 ----
+
+
+def _check_e1_line_id(envelope: PacketEnvelope) -> List[Violation]:
+    if not envelope.line_id or not isinstance(envelope.line_id, str):
+        return [
+            Violation(
+                rule_id="E1",
+                field=_fr("line_id"),
+                reason="line_id must be a non-empty string",
+            )
+        ]
+    return []
+
+
+def _check_e2_generic_refs_paths(envelope: PacketEnvelope) -> List[Violation]:
+    violations: List[Violation] = []
+    for idx, ref in enumerate(envelope.generic_refs):
+        if not (
+            ref.path.startswith(GENERIC_PATH_PREFIX) and ref.path.endswith(GENERIC_PATH_SUFFIX)
+        ):
+            violations.append(
+                Violation(
+                    rule_id="E2",
+                    field=_fr(f"generic_refs[{idx}].path"),
+                    reason="generic_refs paths must point at factory-generic contracts only",
+                )
+            )
+    return violations
+
+
+def _check_e3_binds_to_resolves(envelope: PacketEnvelope) -> List[Violation]:
+    generic_ids = {ref.ref_id for ref in envelope.generic_refs}
+    violations: List[Violation] = []
+    for idx, ref in enumerate(envelope.line_specific_refs):
+        for bid in ref.binds_to:
+            if bid not in generic_ids:
+                violations.append(
+                    Violation(
+                        rule_id="E3",
+                        field=_fr(f"line_specific_refs[{idx}].binds_to"),
+                        reason=f"binds_to id '{bid}' does not resolve to a generic_ref",
+                    )
+                )
+    return violations
+
+
+def _check_e4_ready_state(envelope: PacketEnvelope) -> List[Violation]:
+    rs = envelope.evidence.ready_state
+    if rs not in PERMITTED_READY_STATES:
+        return [
+            Violation(
+                rule_id="E4",
+                field=_fr("evidence.ready_state"),
+                reason=(
+                    f"ready_state must be one of {sorted(PERMITTED_READY_STATES)}; got '{rs}'"
+                ),
+            )
+        ]
+    return []
+
+
+def _check_e5_capability_kind_closure(envelope: PacketEnvelope) -> List[Violation]:
+    violations: List[Violation] = []
+    for idx, item in enumerate(envelope.binding.capability_plan):
+        if item.kind not in CAPABILITY_KINDS:
+            violations.append(
+                Violation(
+                    rule_id="E5",
+                    field=_fr(f"binding.capability_plan[{idx}].kind"),
+                    reason=f"capability kind '{item.kind}' outside closed set",
+                )
+            )
+    return violations
+
+
+# ---- Public entry point ----
 
 
 def validate_packet(
-    packet: dict[str, Any],
-    *,
-    contracts_root: Path | str = "docs/contracts",
-    schema_path: Path | str | None = None,
+    envelope: PacketEnvelope,
+    repo_root: Optional[os.PathLike] = None,
+    schema_path: Optional[os.PathLike] = None,
 ) -> PacketValidationReport:
-    """Validate a packet envelope dict; return read-only report."""
-    contracts_root = Path(contracts_root)
-    violations: list[Violation] = []
-    missing: list[FieldRef] = []
-    advisories: list[Advisory] = []
+    """Run R1..R5 + E1..E5 against `envelope`.
 
-    for key in (
-        "line_id",
-        "packet_version",
-        "generic_refs",
-        "line_specific_refs",
-        "binding",
-        "evidence",
-    ):
-        if key not in packet:
-            missing.append(FieldRef(path=key))
+    `repo_root` defaults to the repo containing this module (four parents up
+    from validator.py: gateway/app/services/packet/validator.py → repo root).
+    `schema_path` is optional; when provided, R4 is run against that JSON file.
+    """
+    root = Path(repo_root) if repo_root is not None else Path(__file__).resolve().parents[4]
+    schema = Path(schema_path) if schema_path is not None else None
 
-    if missing:
-        return PacketValidationReport(
-            ok=False,
-            missing=missing,
-            violations=violations,
-            advisories=advisories,
-            rule_versions={"rules": RULE_SET_VERSION, "envelope": ENVELOPE_VERSION},
-        )
+    violations: List[Violation] = []
+    missing: List[FieldRef] = []
+    advisories: List[Advisory] = []
 
-    line_id = packet["line_id"]
-    if line_id not in LINE_IDS:
-        violations.append(
-            Violation("E1.unregistered-line-id", "line_id", f"line_id '{line_id}' is not registered")
-        )
+    # Envelope structural checks first.
+    violations.extend(_check_e1_line_id(envelope))
+    violations.extend(_check_e2_generic_refs_paths(envelope))
+    violations.extend(_check_e3_binds_to_resolves(envelope))
+    violations.extend(_check_e4_ready_state(envelope))
+    violations.extend(_check_e5_capability_kind_closure(envelope))
 
-    if not PACKET_VERSION_RE.match(str(packet.get("packet_version", ""))):
-        violations.append(
-            Violation(
-                "E1.bad-packet-version",
-                "packet_version",
-                f"packet_version '{packet.get('packet_version')}' is not vN[.M]",
-            )
-        )
+    # Content rules.
+    r1_viol, r1_missing = _check_r1_generic_refs(envelope, root)
+    violations.extend(r1_viol)
+    missing.extend(r1_missing)
+    violations.extend(_check_r2_no_duplication(envelope))
+    violations.extend(_check_r3_capability_kinds(envelope))
+    violations.extend(_check_r4_schema_loadable(schema))
+    violations.extend(_check_r5_no_state_fields(envelope))
 
-    generic_ref_ids: set[str] = set()
-    for i, ref in enumerate(packet.get("generic_refs", []) or []):
-        base = f"generic_refs[{i}]"
-        path = ref.get("path", "")
-        ref_id = ref.get("ref_id")
-        if ref_id:
-            generic_ref_ids.add(ref_id)
-
-        if not GENERIC_PATH_RE.match(path):
-            violations.append(
-                Violation("E2.non-generic-path", f"{base}.path", f"path '{path}' is not factory-generic")
-            )
-            continue
-
-        repo_path = Path(path)
-        if not repo_path.exists():
-            violations.append(
-                Violation("R1.path-not-found", f"{base}.path", f"contract file '{path}' does not exist")
-            )
-            continue
-
-        first_line = repo_path.read_text(encoding="utf-8").splitlines()[0].strip()
-        expected = _heading_for_path(path)
-        if first_line.lower() != expected.lower():
-            violations.append(
-                Violation(
-                    "R1.heading-mismatch",
-                    f"{base}.path",
-                    f"first heading '{first_line}' does not match expected '{expected}'",
+    # Advisories: unused generic refs.
+    referenced = {bid for ref in envelope.line_specific_refs for bid in ref.binds_to}
+    for ref in envelope.generic_refs:
+        if ref.ref_id not in referenced:
+            advisories.append(
+                Advisory(
+                    code="A.unused-generic-ref",
+                    field=_fr(f"generic_refs[{ref.ref_id}]"),
+                    note="generic_ref is not bound by any line_specific_ref",
                 )
             )
-
-        if not PACKET_VERSION_RE.match(str(ref.get("version", ""))):
-            violations.append(
-                Violation(
-                    "R1.version-skew",
-                    f"{base}.version",
-                    f"version '{ref.get('version')}' is not vN[.M]",
-                )
-            )
-
-    for j, lref in enumerate(packet.get("line_specific_refs", []) or []):
-        base = f"line_specific_refs[{j}]"
-        for k, dep in enumerate(lref.get("binds_to", []) or []):
-            if dep not in generic_ref_ids:
-                violations.append(
-                    Violation(
-                        "E3.dangling-binds_to",
-                        f"{base}.binds_to[{k}]",
-                        f"binds_to '{dep}' is not a known generic ref_id",
-                    )
-                )
-        delta = lref.get("delta")
-        if isinstance(delta, dict):
-            forbidden_full_shapes = {
-                "factory_input",
-                "factory_content_structure",
-                "factory_scene_plan",
-                "factory_audio_plan",
-                "factory_language_plan",
-                "factory_delivery",
-            }
-            for fk in delta.keys():
-                if fk in forbidden_full_shapes:
-                    violations.append(
-                        Violation(
-                            "R2.duplicate-shape",
-                            f"{base}.delta.{fk}",
-                            "line-specific delta redeclares a generic-shape full record",
-                        )
-                    )
-            if not lref.get("binds_to"):
-                violations.append(
-                    Violation(
-                        "R2.missing-binds_to",
-                        f"{base}.binds_to",
-                        "line-specific ref carries delta but declares no binds_to",
-                    )
-                )
-
-    binding = packet.get("binding", {}) or {}
-    plan = binding.get("capability_plan", []) or []
-    for n, entry in enumerate(plan):
-        base = f"binding.capability_plan[{n}]"
-        kind = entry.get("kind")
-        if kind not in CAPABILITY_KINDS:
-            violations.append(
-                Violation("R3.unknown-kind", f"{base}.kind", f"kind '{kind}' is not in closed set")
-            )
-        for fk in entry.keys():
-            if fk in FORBIDDEN_VENDOR_FIELDS:
-                violations.append(
-                    Violation("R3.provider-pin", f"{base}.{fk}", f"vendor-pin field '{fk}' is forbidden")
-                )
-        for fpath, sval in _string_values(entry, base):
-            tokens = set(re.findall(r"[a-z]+", sval.lower()))
-            leaked = tokens & VENDOR_TOKENS
-            if leaked:
-                violations.append(
-                    Violation(
-                        "R3.vendor-leak",
-                        fpath,
-                        f"vendor token(s) {sorted(leaked)} present in value",
-                    )
-                )
-
-    schema_p = Path(schema_path) if schema_path else None
-    if schema_p is not None:
-        if not schema_p.exists():
-            violations.append(
-                Violation("R4.parse-error", str(schema_p), "schema file does not exist")
-            )
-        else:
-            try:
-                schema = json.loads(schema_p.read_text(encoding="utf-8"))
-            except json.JSONDecodeError as e:
-                violations.append(Violation("R4.parse-error", str(schema_p), f"json parse: {e}"))
-                schema = None
-            if schema is not None:
-                if schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema":
-                    violations.append(
-                        Violation(
-                            "R4.draft-mismatch",
-                            f"{schema_p}#/$schema",
-                            "schema is not Draft 2020-12",
-                        )
-                    )
-                if not schema.get("$id"):
-                    violations.append(
-                        Violation("R4.missing-id", f"{schema_p}#/$id", "schema is missing $id")
-                    )
-                try:
-                    from jsonschema import Draft202012Validator
-
-                    Draft202012Validator.check_schema(schema)
-                    errors = sorted(
-                        Draft202012Validator(schema).iter_errors(packet), key=lambda e: e.path
-                    )
-                    for err in errors:
-                        loc = "/".join(str(p) for p in err.absolute_path) or "<root>"
-                        violations.append(
-                            Violation("R4.sample-fails", loc, err.message.splitlines()[0])
-                        )
-                except ImportError:
-                    advisories.append(
-                        Advisory("R4.skipped", str(schema_p), "jsonschema not installed; schema validation skipped")
-                    )
-
-    evidence = packet.get("evidence", {}) or {}
-    ready_state = evidence.get("ready_state")
-    if ready_state not in PERMITTED_READY_STATES:
-        violations.append(
-            Violation(
-                "E4.bad-ready-state",
-                "evidence.ready_state",
-                f"ready_state '{ready_state}' is not in {{draft,validating,ready,gated,frozen}}",
-            )
-        )
-
-    for fpath, key, _value in _walk(packet):
-        if key in FORBIDDEN_STATE_FIELDS and fpath != "evidence.ready_state":
-            violations.append(
-                Violation("R5.forbidden-field-name", fpath, f"forbidden state field '{key}'")
-            )
-
-    for fpath, sval in _string_values(packet):
-        if DONOR_TOKEN in sval.lower():
-            violations.append(
-                Violation("R3.vendor-leak", fpath, f"donor token '{DONOR_TOKEN}' is forbidden")
-            )
-
-    plan_kinds = [e.get("kind") for e in plan]
-    for n, entry in enumerate(plan):
-        if entry.get("kind") not in CAPABILITY_KINDS:
-            violations.append(
-                Violation(
-                    "E5.kind-not-in-closure",
-                    f"binding.capability_plan[{n}].kind",
-                    "kind violates envelope-level closure",
-                )
-            )
-    if len(set(plan_kinds)) != len(plan_kinds):
-        advisories.append(
-            Advisory("E5.duplicate-kinds", "binding.capability_plan", "duplicate capability kinds present")
-        )
 
     return PacketValidationReport(
         ok=not violations and not missing,
         missing=missing,
         violations=violations,
         advisories=advisories,
-        rule_versions={"rules": RULE_SET_VERSION, "envelope": ENVELOPE_VERSION},
+        rule_versions={
+            "content_rules": RULE_SET_VERSION,
+            "envelope_rules": ENVELOPE_RULE_SET_VERSION,
+        },
     )
+
+
+__all__ = ["validate_packet", "RULE_SET_VERSION", "ENVELOPE_RULE_SET_VERSION"]
