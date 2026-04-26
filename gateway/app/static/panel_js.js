@@ -4,34 +4,47 @@
    ───────────────────────────────────────────── */
 
 // ═══════════════════════════════════════════════════════
-// DATA  — replace with your real API/fetch payload.
-//         Field names mirror packet.schema.json exactly.
+// DATA  — fallback static projection from Matrix Script packet sample.
+//         Live mode (?source=live) fetches the same projection from the
+//         read-only debug endpoint and then reuses the render flow below.
 // ═══════════════════════════════════════════════════════
 
 const DATA = {
+  sourceMode: "fallback static",
   packetVersion: "v1",
-  readyState: "ready",          // evidence.ready_state
-
-  // variation_matrix.delta.axes[]
-  axes: [
-    { axis_id: "tone",     kind: "categorical", values: ["formal","casual","playful"], is_required: true  },
-    { axis_id: "audience", kind: "enum",        values: ["b2b","b2c","internal"],     is_required: true  },
-    { axis_id: "length",   kind: "range",       values: { min:30, max:120, step:15 }, is_required: false },
-  ],
-
-  // variation_matrix.delta.cells[]
-  cells: [
-    { cell_id: "cell_001", axis_selections: { tone:"formal",  audience:"b2b",      length:60 }, script_slot_ref: "slot_001", notes: "Primary enterprise variant" },
-    { cell_id: "cell_002", axis_selections: { tone:"casual",  audience:"b2c",      length:45 }, script_slot_ref: "slot_002", notes: "" },
-    { cell_id: "cell_003", axis_selections: { tone:"playful", audience:"internal", length:30 }, script_slot_ref: "slot_003", notes: "Short internal teaser" },
-  ],
-
-  // slot_pack.delta.slots[]
-  slots: [
-    { slot_id:"slot_001", binds_cell_id:"cell_001", language_scope:{ source_language:"en-US", target_language:["zh-CN","ja-JP"] }, body_ref:"content://matrix_script/v1/slot_001", length_hint:60 },
-    { slot_id:"slot_002", binds_cell_id:"cell_002", language_scope:{ source_language:"en-US", target_language:["fr-FR","de-DE"] }, body_ref:"content://matrix_script/v1/slot_002", length_hint:45 },
-    { slot_id:"slot_003", binds_cell_id:"cell_003", language_scope:{ source_language:"en-US", target_language:["ja-JP"]         }, body_ref:"content://matrix_script/v1/slot_003", length_hint:30 },
-  ],
+  readyState: "draft",
+  variation_plan: {
+    axis_kind_set: ["categorical", "range", "enum"],
+    axes: [
+      { axis_id: "tone", kind: "categorical", values: ["formal", "casual", "playful"], is_required: true },
+      { axis_id: "audience", kind: "enum", values: ["b2b", "b2c", "internal"], is_required: true },
+      { axis_id: "length", kind: "range", values: { min: 30, max: 120, step: 15 }, is_required: false },
+    ],
+    cells: [
+      { cell_id: "cell_001", axis_selections: { tone: "formal", audience: "b2b", length: 60 }, script_slot_ref: "slot_001", notes: "primary derivative for B2B formal tone" },
+      { cell_id: "cell_002", axis_selections: { tone: "casual", audience: "b2c", length: 45 }, script_slot_ref: "slot_002" },
+    ],
+  },
+  copy_bundle: {
+    slot_kind_set: ["primary", "alternate", "fallback"],
+    slots: [
+      { slot_id: "slot_001", binds_cell_id: "cell_001", language_scope: { source_language: "en-US", target_language: ["zh-CN", "ja-JP"] }, body_ref: "content://matrix_script/v1/slot_001", length_hint: 60 },
+      { slot_id: "slot_002", binds_cell_id: "cell_002", language_scope: { source_language: "en-US", target_language: ["zh-CN"] }, body_ref: "content://matrix_script/v1/slot_002", length_hint: 45 },
+    ],
+  },
+  publish_feedback: {
+    reference_line: "hot_follow",
+    validator_report_path: "docs/execution/logs/packet_validator_matrix_script_v1.json",
+    ready_state: "draft",
+    deliverable_profile_ref: "deliverable_profile_matrix_script_v1",
+    asset_sink_profile_ref: "asset_sink_profile_matrix_script_v1",
+  },
+  result_packet_binding: {
+    generic_refs: ["g_input", "g_struct", "g_scene", "g_audio", "g_lang", "g_deliv"],
+    line_specific_refs: ["matrix_script_variation_matrix", "matrix_script_slot_pack"],
+    capability_plan: ["understanding", "variation", "subtitles", "dub", "pack"],
+    worker_profile_ref: "worker_profile_matrix_script_v1",
+  },
 };
 
 
@@ -63,6 +76,36 @@ function pill(text, cls) {
 
 function fieldLabel(text) {
   return el("div", { className: "field-label" }, text);
+}
+
+function normalizePanelData(raw) {
+  const payload = raw && raw.panel_data ? raw.panel_data : raw;
+  const variation = payload.variation_plan || {};
+  const bundle = payload.copy_bundle || {};
+  const feedback = payload.publish_feedback || {};
+  return {
+    ...payload,
+    axes: payload.axes || variation.axes || [],
+    cells: payload.cells || variation.cells || [],
+    slots: payload.slots || bundle.slots || [],
+    readyState: payload.readyState || feedback.ready_state || "draft",
+    packetVersion: payload.packetVersion || payload.packet_version || "v1",
+    sourceMode: payload.sourceMode || payload.source_mode || "fallback static",
+    variation_plan: variation,
+    copy_bundle: bundle,
+    publish_feedback: feedback,
+    result_packet_binding: payload.result_packet_binding || {},
+  };
+}
+
+async function loadPanelData() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("source") !== "live") return normalizePanelData(DATA);
+  const response = await fetch("/debug/panels/matrix-script/data", {
+    headers: { "Accept": "application/json" },
+  });
+  if (!response.ok) throw new Error(`live preview fetch failed: ${response.status}`);
+  return normalizePanelData(await response.json());
 }
 
 /** Inline SVG helper (namespace-aware). */
@@ -266,13 +309,42 @@ function renderCells(cells, slots) {
   });
 }
 
+function renderAttributionTags(data) {
+  const container = document.getElementById("attribution-tags");
+  const binding = data.result_packet_binding || {};
+  const tags = [
+    ...(binding.generic_refs || []),
+    ...(binding.line_specific_refs || []),
+    ...((binding.capability_plan || []).map(kind => `capability:${kind}`)),
+    binding.worker_profile_ref ? `worker:${binding.worker_profile_ref}` : null,
+  ].filter(Boolean);
+
+  tags.forEach(tag => container.appendChild(el("span", { className: "pill-value" }, tag)));
+}
+
+function renderPublishFeedback(data) {
+  const feedback = data.publish_feedback || {};
+  document.getElementById("source-tag").textContent = data.sourceMode;
+  document.getElementById("reference-line").textContent = feedback.reference_line || "";
+  document.getElementById("validator-report-path").textContent = feedback.validator_report_path || "";
+  document.getElementById("deliverable-profile-ref").textContent = feedback.deliverable_profile_ref || "";
+  document.getElementById("asset-sink-profile-ref").textContent = feedback.asset_sink_profile_ref || "";
+}
+
 
 // ═══════════════════
 // INIT
 // ═══════════════════
 
-document.addEventListener("DOMContentLoaded", () => {
-  const { axes, cells, slots, readyState, packetVersion } = DATA;
+document.addEventListener("DOMContentLoaded", async () => {
+  let panelData;
+  try {
+    panelData = await loadPanelData();
+  } catch (error) {
+    console.warn("[matrix-script-panel] live data unavailable; using fallback", error);
+    panelData = normalizePanelData(DATA);
+  }
+  const { axes, cells, slots, readyState, packetVersion } = panelData;
 
   // ready_state badge
   const badge = document.getElementById("ready-badge");
@@ -284,6 +356,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   renderAxes(axes);
   renderCells(cells, slots);
+  renderAttributionTags(panelData);
+  renderPublishFeedback(panelData);
 
   // footer summary
   document.getElementById("footer-count").textContent =

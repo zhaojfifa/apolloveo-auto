@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Matrix Script — Variation Panel</title>
-  <link rel="stylesheet" href="panel.css" />
+  <link rel="stylesheet" href="panel_css.css" />
 </head>
 <body>
 
@@ -19,8 +19,9 @@
       <span class="panel-title-sub">Variation Panel</span>
     </div>
     <div class="panel-meta">
+      <span class="source-tag" id="source-tag">fallback static</span>
       <span class="packet-ver">packet v1</span>
-      <span class="pill pill-ready" id="ready-badge">ready</span>
+      <span class="pill pill-draft" id="ready-badge">draft</span>
     </div>
   </header>
 
@@ -58,6 +59,31 @@
       <div id="cells-body"></div>
     </div>
 
+    <!-- ── Attribution ── -->
+    <div class="section-divider">Attribution Tags</div>
+    <div class="tag-grid" id="attribution-tags" aria-label="Attribution tags"></div>
+
+    <!-- ── Publish Feedback ── -->
+    <div class="section-divider">Publish Feedback</div>
+    <div class="feedback-grid" aria-label="Publish feedback">
+      <div>
+        <div class="field-label">reference_line</div>
+        <code class="mono-tag" id="reference-line"></code>
+      </div>
+      <div>
+        <div class="field-label">validator_report_path</div>
+        <code class="mono-muted" id="validator-report-path"></code>
+      </div>
+      <div>
+        <div class="field-label">deliverable_profile_ref</div>
+        <code class="mono-muted" id="deliverable-profile-ref"></code>
+      </div>
+      <div>
+        <div class="field-label">asset_sink_profile_ref</div>
+        <code class="mono-muted" id="asset-sink-profile-ref"></code>
+      </div>
+    </div>
+
   </div>
 
   <!-- ── Footer ── -->
@@ -69,6 +95,6 @@
   </footer>
 </div>
 
-<script src="panel.js"></script>
+<script src="panel_js.js"></script>
 </body>
 </html>
