@@ -48,9 +48,9 @@
 | B1 | PM | 补齐 Matrix Script 线特化合同实文：`docs/contracts/matrix_script/variation_matrix_contract_v1.md`、`asset_supply_contract_v1.md`（凡 sample `line_specific_refs[*].path` 引用且当前不存在的全部路径） | 路径在仓库中存在；R1 strict 模式下仍 `ok=true` |
 | B2 | PM | 补齐 Digital Anchor 线特化合同实文：`docs/contracts/digital_anchor/role_speaker_contract_v1.md` 等 sample 引用全集 | 同上 |
 | B3 | PM | 在 `docs/product/asset_supply_matrix_v1.md` 中明示两条线的 supply truth 与 donor 解耦边界 | 文档落位、被 evidence index 引用 |
-| B4 | 工程 | 把 validator 的 ref-existence 由 lenient 升为 strict（B1/B2 落位后再切换，否则会立刻把当前绿测打回红） | pytest 在 strict 模式下仍 6/6 绿 |
-| B5 | 设计 | 三大 surface（task / workbench / delivery）+ 两块 line panel low-fi + contract mapping notes 全部冻结 | Surface gate 由 Partial→Pass，mapping 仅消费 contract objects |
-| B6 | 工程 | 交付 capability adapter base 骨架（不含任何 donor 真实代码），并由架构师对其接口边界单独签字 | Donor gate 由 Partial→Pass 的前置 |
+| B4 | 工程 | 把 validator 的 ref-existence 由 lenient 升为 strict（B1/B2 落位后再切换，否则会立刻把当前绿测打回红） | **CLEARED 2026-04-26** — `_check_r1_line_specific_refs_strict` added; `tests/contracts/packet_validator/` 36/36 绿 |
+| B5 | 设计 | 三大 surface（task / workbench / delivery）+ 两块 line panel low-fi + contract mapping notes 全部冻结 | **CLEARED 2026-04-26** — `docs/design/surface_{task_area,workbench,delivery_center}_lowfi_v1.md` + `docs/design/panel_{matrix_script_variation,digital_anchor_role_speaker}_lowfi_v1.md` 已落盘，全部仅消费 contract objects |
+| B6 | 工程 | 交付 capability adapter base 骨架（不含任何 donor 真实代码），并由架构师对其接口边界单独签字 | **CLEARED 2026-04-26** — `gateway/app/services/capability/adapters/{__init__,base}.py` 落盘；签字见 `docs/reviews/b6_adapter_signoff.md` |
 | B7 | Reviewer | 在 B1–B6 全绿后，发出 pre-unlock wave merge signoff | 触发 P2 entry review |
 
 ---

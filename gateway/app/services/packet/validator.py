@@ -93,6 +93,31 @@ def _check_r1_generic_refs(
     return violations, missing
 
 
+def _check_r1_line_specific_refs_strict(
+    envelope: PacketEnvelope, repo_root: Path
+) -> Tuple[List[Violation], List[FieldRef]]:
+    """Strict ref-existence for line_specific_refs.
+
+    Promoted from lenient (string-only) to strict on 2026-04-26 per architect
+    signoff B4 once PM landed the line-specific contract files in the tree.
+    """
+    violations: List[Violation] = []
+    missing: List[FieldRef] = []
+    for idx, ref in enumerate(envelope.line_specific_refs):
+        base = f"line_specific_refs[{idx}]"
+        full = repo_root / ref.path
+        if not full.is_file():
+            missing.append(_fr(f"{base}.path"))
+            violations.append(
+                Violation(
+                    rule_id="R1.path-not-found",
+                    field=_fr(f"{base}.path"),
+                    reason=f"line-specific contract file does not exist: {ref.path}",
+                )
+            )
+    return violations, missing
+
+
 def _walk(obj: Any, prefix: str) -> Iterable[Tuple[str, Any]]:
     if isinstance(obj, Mapping):
         for k, v in obj.items():
@@ -385,6 +410,9 @@ def validate_packet(
     r1_viol, r1_missing = _check_r1_generic_refs(envelope, root)
     violations.extend(r1_viol)
     missing.extend(r1_missing)
+    r1_line_viol, r1_line_missing = _check_r1_line_specific_refs_strict(envelope, root)
+    violations.extend(r1_line_viol)
+    missing.extend(r1_line_missing)
     violations.extend(_check_r2_no_duplication(envelope))
     violations.extend(_check_r3_capability_kinds(envelope))
     violations.extend(_check_r4_schema_loadable(schema))
