@@ -3,13 +3,13 @@
 - Status: Frozen for P1.5 (absorption-PR prerequisite)
 - Date: 2026-04-25
 - Authority: ADR `ADR-donor-swiftcraft-capability-only.md`, `docs/donor/swiftcraft_donor_boundary_v1.md`, Master Plan v1.1 Part I Q9 / Part III P1.5
-- Donor commit pin (P2 absorption wave 1): TBD — set at the first absorption PR; one pin per absorption wave; recorded below
+- Donor commit pin (P2 absorption wave 1): `62b6da0` — pinned 2026-04-26 with M-04/M-05 absorption PR; one pin per absorption wave; recorded below
 
 ## 0. Donor commit pins
 
 | Wave | Donor commit (short SHA) | Recorded by | Date |
 |---|---|---|---|
-| W1 (helpers + storage) | TBD | TBD | TBD |
+| W1 (helpers + storage) | `62b6da0` | zhaojfifa | 2026-04-26 |
 | W2 (ASR / translate / TTS) | TBD | TBD | TBD |
 | W3 (provider clients) | TBD | TBD | TBD |
 | W4 (vendor / asset bridge) | TBD | TBD | TBD |
@@ -35,8 +35,8 @@ Row id schema: `<category>-<##>` where category is `M / A / P / V / E / R / O` m
 | M-01 | `backend/app/utils/ffmpeg_localization.py` | `gateway/app/services/media/ffmpeg_localization.py` | `factory_audio_plan` + `factory_language_plan` consumer; called by `DubAdapter` and `PackAdapter` impls | Wrap | All entry points return Apollo `MediaResult` shape; no SwiftCraft `task_*` references; attribution header present | Not started |
 | M-02 | `backend/app/utils/media.py` | `gateway/app/services/media/media_helpers.py` | `factory_scene_plan` + `factory_audio_plan` consumer | Wrap | Merge against existing `gateway/app/services/media_helpers.py`; deduplicate; preserve existing Apollo callers | Not started |
 | M-03 | `backend/app/utils/subtitle_builder.py` | `gateway/app/services/media/subtitle_builder.py` | `factory_language_plan` consumer; called by `SubtitlesAdapter` impls | Wrap | Plain-text SRT path preserved (matches Hot Follow frozen rule); no language-plan invention | Not started |
-| M-04 | `backend/app/utils/serialize.py` | `gateway/app/services/media/serialize.py` | n/a (pure utility) | Wrap | Pure functions only; unit tested | Not started |
-| M-05 | `backend/app/utils/zh_normalize.py` | `gateway/app/services/media/zh_normalize.py` | n/a (text utility) | Wrap | Pure functions only; preserves Apollo's existing dub text guard semantics | Not started |
+| M-04 | `backend/app/utils/serialize.py` | `gateway/app/services/media/serialize.py` | n/a (pure utility) | Wrap | Pure functions only; unit tested | In progress |
+| M-05 | `backend/app/utils/zh_normalize.py` | `gateway/app/services/media/zh_normalize.py` | n/a (text utility) | Wrap | Pure functions only; preserves Apollo's existing dub text guard semantics | In progress |
 
 ### 2.2 A — ASR / translate / TTS (boundary §3.2)
 
