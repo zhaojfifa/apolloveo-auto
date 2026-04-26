@@ -226,6 +226,18 @@ def _helper_failure_is_side_channel_only(
     return any(checks.get(name, False) for name in names)
 
 
+def _visible_target_text_pending_authority(subtitles: dict[str, Any], *, subtitle_ready: bool) -> bool:
+    return bool(
+        not subtitle_ready
+        and str(
+            subtitles.get("primary_editable_text")
+            or subtitles.get("edited_text")
+            or subtitles.get("srt_text")
+            or ""
+        ).strip()
+    )
+
+
 def select_compose_route_name(
     *,
     audio_lane: dict[str, Any],
@@ -330,6 +342,10 @@ def selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
         no_dub and no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}
     )
     subtitle_ready = bool(subtitles.get("subtitle_ready"))
+    visible_target_text_pending_authority = _visible_target_text_pending_authority(
+        subtitles,
+        subtitle_ready=subtitle_ready,
+    )
     target_reason = str(subtitles.get("target_subtitle_current_reason") or subtitles.get("subtitle_ready_reason") or "").strip()
     target_authoritative = bool(subtitles.get("target_subtitle_authoritative_source"))
     final_payload = state.get("final") if isinstance(state.get("final"), dict) else {}
@@ -399,7 +415,14 @@ def selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
     if current_truth_dominates and keep_tts_route and no_dub_reason in stale_no_dub_reasons:
         no_dub = False
         no_dub_reason = ""
+        no_dub_compose_allowed = False
+    if visible_target_text_pending_authority and no_dub_reason in stale_no_dub_reasons:
+        no_dub = False
+        no_dub_reason = ""
+        no_dub_compose_allowed = False
     if keep_tts_route:
+        route_name = "tts_replace_route"
+    if visible_target_text_pending_authority and route_name == "no_tts_compose_route":
         route_name = "tts_replace_route"
     if _route_should_stay_tts(
         route_name=route_name,
@@ -477,6 +500,10 @@ def build_hot_follow_current_attempt_summary(
     selected = artifacts.get("selected_compose_route") if isinstance(artifacts.get("selected_compose_route"), dict) else {}
     selected_route = str(selected.get("name") or "").strip()
     subtitle_ready = bool(subtitle_lane.get("subtitle_ready"))
+    visible_target_text_pending_authority = _visible_target_text_pending_authority(
+        subtitle_lane,
+        subtitle_ready=subtitle_ready,
+    )
     audio_ready = bool(voice_state.get("audio_ready"))
     target_reason = str(
         subtitle_lane.get("target_subtitle_current_reason")
@@ -543,7 +570,14 @@ def build_hot_follow_current_attempt_summary(
     if current_truth_dominates and keep_tts_route and str(no_dub_reason or "").strip() in stale_no_dub_reasons:
         no_dub = False
         no_dub_reason = None
+        no_dub_compose_allowed = False
+    if visible_target_text_pending_authority and str(no_dub_reason or "").strip() in stale_no_dub_reasons:
+        no_dub = False
+        no_dub_reason = None
+        no_dub_compose_allowed = False
     if keep_tts_route:
+        selected_route = "tts_replace_route"
+    if visible_target_text_pending_authority and selected_route == "no_tts_compose_route":
         selected_route = "tts_replace_route"
     if _route_should_stay_tts(
         route_name=selected_route,

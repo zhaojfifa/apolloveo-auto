@@ -220,7 +220,19 @@ def hot_follow_terminal_no_dub_projection(
         subtitle_lane.get("helper_translate_failed")
         and not bool(subtitle_lane.get("subtitle_ready"))
     )
+    visible_target_text_pending_commit = bool(
+        not bool(subtitle_lane.get("subtitle_ready"))
+        and str(
+            subtitle_lane.get("primary_editable_text")
+            or subtitle_lane.get("edited_text")
+            or subtitle_lane.get("srt_text")
+            or ""
+        ).strip()
+        and stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}
+    )
     if helper_translate_failed_missing_target or unresolved_translation_voice_led:
+        no_dub = False
+    if visible_target_text_pending_commit:
         no_dub = False
     if bool(subtitle_lane.get("subtitle_ready")) and stored_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
         no_dub = False

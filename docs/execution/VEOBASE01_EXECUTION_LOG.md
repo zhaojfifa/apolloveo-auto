@@ -3017,3 +3017,83 @@ Validation:
 Behavior change:
 
 - none; authority closeout only
+
+---
+
+## 2026-04-26 — Hot Follow URL state commit repair
+
+Reading Declaration:
+
+- phase 0 authority:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `docs/contracts/engineering_reading_contract_v1.md`
+- phase 1 Hot Follow authority:
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/architecture/line_contracts/hot_follow_line.yaml`
+  - `docs/reviews/HOT_FOLLOW_URL_STATE_INSTABILITY_REVIEW_v1.md`
+- phase 2 repair scope:
+  - `gateway/app/services/hot_follow_subtitle_authority.py`
+  - `gateway/app/services/hot_follow_subtitle_currentness.py`
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+  - `gateway/app/services/task_view_helpers.py`
+  - `gateway/app/services/task_view_projection.py`
+  - `gateway/app/services/task_view_presenters.py`
+  - `gateway/app/services/steps_v1.py`
+  - `gateway/app/routers/hot_follow_api.py`
+- direct delegated route/presentation paths:
+  - `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+  - `gateway/app/services/contract_runtime/ready_gate_runtime.py`
+  - `gateway/app/services/subtitle_helpers.py`
+  - `gateway/app/services/hot_follow_route_state.py`
+  - `gateway/app/services/task_view_workbench_contract.py`
+  - `gateway/app/services/hot_follow_workbench_presenter.py`
+
+Scope:
+
+- contract-driven repair for the Hot Follow URL instability class only
+- no provider adapter change
+- no factory abstraction change
+- no UI redesign
+- no new line behavior
+
+Contract added:
+
+- `docs/contracts/hot_follow_state_commit_contract_v1.md`
+
+Runtime changes:
+
+- authoritative subtitle success now publishes `target_subtitle_authoritative_source=true`,
+  clears subtitle/helper error residue, and scrubs stale
+  `target_subtitle_empty` / `dub_input_empty` no-dub residue as part of the
+  recovered subtitle commit update bundle
+- route reduction now treats visible target subtitle text before full authority
+  commit as waiting/intermediate, not as permission to project
+  `no_tts_compose_route`
+- L4 subtitle presentation clears `subtitles.error` and helper failure aliases
+  after subtitle status/currentness/authoritative-source truth has recovered
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_subtitle_authority.py gateway/app/services/task_view_helpers.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/hot_follow_route_state.py gateway/app/services/task_view_workbench_contract.py gateway/app/services/tests/test_hot_follow_state_commit_contract.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_state_commit_contract.py -q`
+  - result: 6 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empty_no_dub gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_ready_gate_backfills_compose_when_current_final_is_fresh gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_vi_currentness_blocks_false_done_states -q`
+  - result: 3 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_manual_subtitle_save_clears_helper_translate_failure gateway/app/services/tests/test_hot_follow_skills_advisory.py::test_helper_translate_failure_with_saved_target_subtitle_stays_helper_scoped -q`
+  - result: 2 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_source_audio_policy_persistence.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+  - result: 12 passed
+
+Behavior change:
+
+- limited to authoritative subtitle commit ordering, route reduction ordering,
+  recovered-error scrub ordering, and stale no-dub/no-tts residue suppression
+  for the reviewed URL instability class

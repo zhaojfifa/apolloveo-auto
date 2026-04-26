@@ -243,6 +243,38 @@ def _subtitles_section(
 ) -> dict[str, Any]:
     primary_text = str(subtitle_lane.get("primary_editable_text") or "")
     srt_text = primary_text if str(subtitle_lane.get("primary_editable_format") or "srt").strip().lower() == "srt" else ""
+    recovered = bool(
+        str(subtitles_state or "").strip().lower() in {"done", "ready", "success", "completed"}
+        and subtitle_lane.get("subtitle_ready")
+        and subtitle_lane.get("target_subtitle_current")
+        and subtitle_lane.get("target_subtitle_authoritative_source")
+    )
+    helper_translation = {
+        "status": subtitle_lane.get("helper_translate_status"),
+        "output_state": subtitle_lane.get("helper_translate_output_state"),
+        "provider_health": subtitle_lane.get("helper_translate_provider_health"),
+        "composite_state": subtitle_lane.get("helper_translate_composite_state"),
+        "failed": bool(subtitle_lane.get("helper_translate_failed")),
+        "reason": subtitle_lane.get("helper_translate_error_reason"),
+        "message": subtitle_lane.get("helper_translate_error_message"),
+        "provider": subtitle_lane.get("helper_translate_provider"),
+        "visibility": subtitle_lane.get("helper_translate_visibility"),
+        "retryable": bool(subtitle_lane.get("helper_translate_retryable")),
+        "terminal": bool(subtitle_lane.get("helper_translate_terminal")),
+        "warning_only": bool(subtitle_lane.get("helper_translate_warning_only")),
+        "input_text": subtitle_lane.get("helper_translate_input_text"),
+        "translated_text": subtitle_lane.get("helper_translate_translated_text"),
+        "target_lang": subtitle_lane.get("helper_translate_target_lang"),
+    }
+    if recovered:
+        helper_translation.update(
+            {
+                "failed": False,
+                "reason": None,
+                "message": None,
+                "terminal": False,
+            }
+        )
     return {
         "origin_text": origin_text or "",
         "raw_source_text": subtitle_lane.get("raw_source_text") or origin_text or "",
@@ -250,23 +282,7 @@ def _subtitles_section(
         "parse_source_text": subtitle_lane.get("parse_source_text") or "",
         "parse_source_role": subtitle_lane.get("parse_source_role") or "none",
         "parse_source_authoritative_for_target": bool(subtitle_lane.get("parse_source_authoritative_for_target")),
-        "helper_translation": {
-            "status": subtitle_lane.get("helper_translate_status"),
-            "output_state": subtitle_lane.get("helper_translate_output_state"),
-            "provider_health": subtitle_lane.get("helper_translate_provider_health"),
-            "composite_state": subtitle_lane.get("helper_translate_composite_state"),
-            "failed": bool(subtitle_lane.get("helper_translate_failed")),
-            "reason": subtitle_lane.get("helper_translate_error_reason"),
-            "message": subtitle_lane.get("helper_translate_error_message"),
-            "provider": subtitle_lane.get("helper_translate_provider"),
-            "visibility": subtitle_lane.get("helper_translate_visibility"),
-            "retryable": bool(subtitle_lane.get("helper_translate_retryable")),
-            "terminal": bool(subtitle_lane.get("helper_translate_terminal")),
-            "warning_only": bool(subtitle_lane.get("helper_translate_warning_only")),
-            "input_text": subtitle_lane.get("helper_translate_input_text"),
-            "translated_text": subtitle_lane.get("helper_translate_translated_text"),
-            "target_lang": subtitle_lane.get("helper_translate_target_lang"),
-        },
+        "helper_translation": helper_translation,
         "edited_text": primary_text,
         "srt_text": srt_text,
         "primary_editable_text": primary_text,
@@ -275,7 +291,7 @@ def _subtitles_section(
         "dub_input_format": subtitle_lane.get("dub_input_format") or "plain_text",
         "dub_input_source": subtitle_lane.get("dub_input_source"),
         "status": subtitles_state,
-        "error": task.get("subtitles_error"),
+        "error": None if recovered else task.get("subtitles_error"),
         "subtitle_ready": bool(subtitle_lane.get("subtitle_ready")),
         "subtitle_ready_reason": subtitle_lane.get("subtitle_ready_reason"),
         "target_subtitle_current": bool(subtitle_lane.get("target_subtitle_current")),

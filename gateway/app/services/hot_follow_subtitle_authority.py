@@ -13,6 +13,7 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
     has_semantic_target_subtitle_text,
 )
 from gateway.app.services.status_policy.service import policy_upsert
+from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
 
 
 @dataclass(frozen=True)
@@ -84,6 +85,27 @@ def evaluate_hot_follow_subtitle_authority(
     )
 
 
+def _recovered_subtitle_commit_scrub_updates(task: dict[str, Any]) -> dict[str, Any]:
+    updates: dict[str, Any] = {
+        "subtitles_error_reason": None,
+        "target_subtitle_authoritative_source": True,
+    }
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    stale_no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
+    ).strip().lower()
+    if stale_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
+        pipeline_config.pop("no_dub", None)
+        pipeline_config.pop("dub_skip_reason", None)
+        updates["pipeline_config"] = pipeline_config_to_storage(pipeline_config)
+        updates["dub_skip_reason"] = None
+        if str(task.get("dub_status") or "").strip().lower() == "skipped":
+            updates["dub_status"] = "pending"
+    if str(task.get("subtitle_helper_status") or "").strip().lower() == "failed":
+        updates.update(helper_translate_resolved_updates())
+    return updates
+
+
 def persist_hot_follow_authoritative_target_subtitle(
     task_id: str,
     task: dict[str, Any],
@@ -148,6 +170,7 @@ def persist_hot_follow_authoritative_target_subtitle(
     updates: dict[str, Any] = {
         "subtitles_status": "ready",
         "subtitles_error": None,
+        "subtitles_error_reason": None,
         "last_step": "subtitles",
         "mm_srt_path": synced_key or task.get("mm_srt_path"),
         "subtitles_override_updated_at": (now_fn or (lambda: datetime.now(timezone.utc).isoformat()))(),
@@ -160,7 +183,9 @@ def persist_hot_follow_authoritative_target_subtitle(
         "error_reason": None,
         "target_subtitle_current": True,
         "target_subtitle_current_reason": persisted.reason,
+        "target_subtitle_authoritative_source": True,
     }
+    updates.update(_recovered_subtitle_commit_scrub_updates(task))
     if resolve_helper_state:
         updates.update(helper_translate_resolved_updates())
     if extra_updates:
@@ -215,8 +240,13 @@ def finalize_hot_follow_subtitles_step(
             {
                 "subtitles_status": "ready",
                 "subtitles_error": None,
+                "subtitles_error_reason": None,
+                "target_subtitle_authoritative_source": True,
+                "error_message": None,
+                "error_reason": None,
             }
         )
+        updates.update(_recovered_subtitle_commit_scrub_updates(task))
     elif translation_waiting_retryable:
         updates.update(
             {

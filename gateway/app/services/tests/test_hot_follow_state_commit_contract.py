@@ -1,0 +1,219 @@
+from gateway.app.services.contract_runtime.current_attempt_runtime import (
+    build_hot_follow_current_attempt_summary,
+    selected_route_from_state,
+)
+from gateway.app.services.task_view_helpers import hot_follow_terminal_no_dub_projection
+from gateway.app.services.task_view_workbench_contract import _subtitles_section
+
+
+VI_TARGET_SRT = "1\n00:00:00,000 --> 00:00:02,000\nXin chao\n"
+
+
+def _compose_input():
+    return {
+        "mode": "direct",
+        "ready": True,
+        "blocked": False,
+        "reason": None,
+    }
+
+
+def test_visible_target_text_before_authority_commit_does_not_project_no_tts_route():
+    route = selected_route_from_state(
+        {"kind": "hot_follow"},
+        {
+            "artifact_facts": {
+                "compose_input": _compose_input(),
+                "audio_lane": {
+                    "tts_voiceover_exists": False,
+                    "source_audio_preserved": False,
+                    "bgm_configured": False,
+                    "no_tts": True,
+                },
+            },
+            "audio": {
+                "audio_ready": False,
+                "no_dub": True,
+                "no_dub_reason": "target_subtitle_empty",
+            },
+            "subtitles": {
+                "subtitle_ready": False,
+                "target_subtitle_current": False,
+                "target_subtitle_authoritative_source": False,
+                "target_subtitle_current_reason": "subtitle_missing",
+                "edited_text": VI_TARGET_SRT,
+                "srt_text": VI_TARGET_SRT,
+                "primary_editable_text": VI_TARGET_SRT,
+            },
+            "final": {"exists": False},
+        },
+    )
+
+    assert route["name"] == "tts_replace_route"
+    assert route["no_tts_compose_allowed"] is False
+    assert route["compose_execute_allowed"] is False
+
+
+def test_recovered_authoritative_subtitle_truth_clears_subtitles_error_surface():
+    section = _subtitles_section(
+        task={"subtitles_error": "权威目标字幕缺失，不能记录为字幕成功。"},
+        subtitle_lane={
+            "subtitle_ready": True,
+            "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
+            "target_subtitle_current_reason": "ready",
+            "subtitle_ready_reason": "ready",
+            "primary_editable_text": VI_TARGET_SRT,
+            "edited_text": VI_TARGET_SRT,
+            "srt_text": VI_TARGET_SRT,
+            "helper_translate_failed": True,
+            "helper_translate_error_reason": "helper_translate_provider_exhausted",
+            "helper_translate_error_message": "翻译服务当前额度不足或请求过多，请稍后重试。",
+            "helper_translate_terminal": True,
+        },
+        subtitles_state="done",
+        origin_text="",
+        subtitles_text=VI_TARGET_SRT,
+        normalized_source_text="",
+    )
+
+    assert section["error"] is None
+    assert section["helper_translation"]["failed"] is False
+    assert section["helper_translation"]["reason"] is None
+    assert section["helper_translation"]["message"] is None
+    assert section["helper_translation"]["terminal"] is False
+
+
+def test_recovered_authoritative_route_ignores_stale_no_dub_residue():
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": False,
+            "audio_ready_reason": "audio_missing",
+            "no_dub_reason": "target_subtitle_empty",
+        },
+        subtitle_lane={
+            "subtitle_ready": True,
+            "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
+            "target_subtitle_current_reason": "ready",
+            "edited_text": VI_TARGET_SRT,
+            "srt_text": VI_TARGET_SRT,
+        },
+        dub_status="skipped",
+        compose_status="pending",
+        composed_reason="audio_not_ready",
+        artifact_facts={
+            "compose_input": _compose_input(),
+            "audio_lane": {
+                "tts_voiceover_exists": False,
+                "source_audio_preserved": False,
+                "bgm_configured": False,
+                "no_tts": True,
+            },
+        },
+        no_dub=True,
+        no_dub_compose_allowed=True,
+    )
+
+    assert current_attempt["selected_compose_route"] == "tts_replace_route"
+    assert current_attempt["no_dub_route_terminal"] is False
+    assert current_attempt["no_tts_compose_allowed"] is False
+
+
+def test_stable_local_upload_helper_success_still_uses_tts_route():
+    route = selected_route_from_state(
+        {"kind": "hot_follow"},
+        {
+            "artifact_facts": {
+                "compose_input": _compose_input(),
+                "audio_lane": {
+                    "tts_voiceover_exists": False,
+                    "source_audio_preserved": False,
+                    "bgm_configured": False,
+                    "no_tts": True,
+                },
+            },
+            "audio": {"audio_ready": False, "no_dub": False, "no_dub_reason": None},
+            "subtitles": {
+                "subtitle_ready": True,
+                "target_subtitle_current": True,
+                "target_subtitle_authoritative_source": True,
+                "target_subtitle_current_reason": "ready",
+                "edited_text": VI_TARGET_SRT,
+            },
+        },
+    )
+
+    assert route["name"] == "tts_replace_route"
+
+
+def test_stable_preserve_bgm_source_audio_route_is_unchanged():
+    route = selected_route_from_state(
+        {"kind": "hot_follow"},
+        {
+            "artifact_facts": {
+                "compose_input": _compose_input(),
+                "audio_lane": {
+                    "tts_voiceover_exists": False,
+                    "source_audio_preserved": True,
+                    "bgm_configured": True,
+                    "no_tts": True,
+                },
+            },
+            "audio": {"audio_ready": False, "no_dub": False, "no_dub_reason": None},
+            "subtitles": {
+                "subtitle_ready": False,
+                "target_subtitle_current_reason": "preserve_source_route_no_target_subtitle_required",
+            },
+        },
+    )
+
+    assert route["name"] == "preserve_source_route"
+    assert route["compose_allowed"] is True
+
+
+def test_stable_successful_url_closure_route_and_no_dub_projection_are_unchanged():
+    no_dub, no_dub_reason, no_dub_message = hot_follow_terminal_no_dub_projection(
+        pipeline_config={"no_dub": "true", "dub_skip_reason": "target_subtitle_empty"},
+        task={"dub_skip_reason": "target_subtitle_empty"},
+        route_state={"content_mode": "voice_led"},
+        subtitle_lane={
+            "subtitle_ready": True,
+            "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
+            "target_subtitle_current_reason": "ready",
+            "edited_text": VI_TARGET_SRT,
+        },
+        voice_state={"audio_ready": True, "voiceover_url": "/v1/tasks/hf/audio_mm"},
+    )
+    route = selected_route_from_state(
+        {"kind": "hot_follow"},
+        {
+            "artifact_facts": {
+                "compose_input": _compose_input(),
+                "audio_lane": {
+                    "tts_voiceover_exists": True,
+                    "source_audio_preserved": False,
+                    "bgm_configured": False,
+                    "no_tts": False,
+                },
+                "final_exists": True,
+            },
+            "audio": {"audio_ready": True, "no_dub": False, "no_dub_reason": None},
+            "subtitles": {
+                "subtitle_ready": True,
+                "target_subtitle_current": True,
+                "target_subtitle_authoritative_source": True,
+                "target_subtitle_current_reason": "ready",
+                "edited_text": VI_TARGET_SRT,
+            },
+            "final": {"exists": True, "fresh": True},
+        },
+    )
+
+    assert no_dub is False
+    assert no_dub_reason is None
+    assert no_dub_message is None
+    assert route["name"] == "tts_replace_route"
+    assert route["compose_allowed"] is True
+
