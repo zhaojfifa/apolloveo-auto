@@ -32,11 +32,11 @@ Row id schema: `<category>-<##>` where category is `M / A / P / V / E / R / O` m
 
 | ID | Donor path | Apollo target | Capability / contract binding | Strategy | Acceptance criteria | Status |
 |---|---|---|---|---|---|---|
-| M-01 | `backend/app/utils/ffmpeg_localization.py` | `gateway/app/services/media/ffmpeg_localization.py` | `factory_audio_plan` + `factory_language_plan` consumer; called by `DubAdapter` and `PackAdapter` impls | Wrap | All entry points return Apollo `MediaResult` shape; no SwiftCraft `task_*` references; attribution header present | Not started |
-| M-02 | `backend/app/utils/media.py` | `gateway/app/services/media/media_helpers.py` | `factory_scene_plan` + `factory_audio_plan` consumer | Wrap | Merge against existing `gateway/app/services/media_helpers.py`; deduplicate; preserve existing Apollo callers | Not started |
-| M-03 | `backend/app/utils/subtitle_builder.py` | `gateway/app/services/media/subtitle_builder.py` | `factory_language_plan` consumer; called by `SubtitlesAdapter` impls | Wrap | Plain-text SRT path preserved (matches Hot Follow frozen rule); no language-plan invention | Not started |
-| M-04 | `backend/app/utils/serialize.py` | `gateway/app/services/media/serialize.py` | n/a (pure utility) | Wrap | Pure functions only; unit tested | In progress |
-| M-05 | `backend/app/utils/zh_normalize.py` | `gateway/app/services/media/zh_normalize.py` | n/a (text utility) | Wrap | Pure functions only; preserves Apollo's existing dub text guard semantics | In progress |
+| M-01 | `backend/app/utils/ffmpeg_localization.py` | `gateway/app/services/media/ffmpeg_localization.py` | `factory_audio_plan` + `factory_language_plan` consumer; called by `DubAdapter` and `PackAdapter` impls | Wrap | All entry points return Apollo `MediaResult` shape; no SwiftCraft `task_*` references; attribution header present | Absorbed |
+| M-02 | `backend/app/utils/media.py` | `gateway/app/services/media/media_helpers.py` | `factory_scene_plan` + `factory_audio_plan` consumer | Wrap | Merge against existing `gateway/app/services/media_helpers.py`; deduplicate; preserve existing Apollo callers | Absorbed |
+| M-03 | `backend/app/utils/subtitle_builder.py` | `gateway/app/services/media/subtitle_builder.py` | `factory_language_plan` consumer; called by `SubtitlesAdapter` impls | Wrap | Plain-text SRT path preserved (matches Hot Follow frozen rule); no language-plan invention | Absorbed |
+| M-04 | `backend/app/utils/serialize.py` | `gateway/app/services/media/serialize.py` | n/a (pure utility) | Wrap | Pure functions only; unit tested | Absorbed |
+| M-05 | `backend/app/utils/zh_normalize.py` | `gateway/app/services/media/zh_normalize.py` | n/a (text utility) | Wrap | Pure functions only; preserves Apollo's existing dub text guard semantics | Absorbed |
 
 ### 2.2 A — ASR / translate / TTS (boundary §3.2)
 
