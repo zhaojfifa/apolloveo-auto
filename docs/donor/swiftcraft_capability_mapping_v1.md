@@ -92,8 +92,8 @@ Row id schema: `<category>-<##>` where category is `M / A / P / V / E / R / O` m
 
 | ID | Donor path | Apollo target | Capability / contract binding | Strategy | Acceptance criteria | Status |
 |---|---|---|---|---|---|---|
-| O-01 | `.env.example` shape | `ops/env/env_matrix_v1.md` | env matrix | Pattern-only | Capture provider env matrix; record key naming normalization in doc; do not copy file | Not started |
-| O-02 | R2 / S3 split, storage assumptions | `ops/env/storage_layout_v1.md` | storage layout | Pattern-only | Record patterns; do not copy code | Not started |
+| O-01 | `.env.example` shape | `ops/env/env_matrix_v1.md` | env matrix | Pattern-only | Capture provider env matrix; record key naming normalization in doc; do not copy file | In progress (W2 admission Phase B PR open; see `docs/execution/evidence/w2_admission_phase_b_env_matrix_v1.md`) |
+| O-02 | R2 / S3 split, storage assumptions | `ops/env/storage_layout_v1.md` | storage layout | Pattern-only | Record patterns; do not copy code | In progress (W2 admission Phase B PR open; see `docs/execution/evidence/w2_admission_phase_b_env_matrix_v1.md`) |
 | O-03 | `scripts/render_preflight.sh` | `ops/runbooks/render_preflight.sh` | deploy preflight | Wrap | Optional; only absorb if Apollo deploy pipeline needs it | Not started |
 
 ## 3. Row lifecycle
