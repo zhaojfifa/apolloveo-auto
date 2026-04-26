@@ -94,6 +94,8 @@ Status: P2 pre-execution evidence index
 | W1 absorption evidence (M-04/M-05) | `docs/execution/evidence/donor_absorption_w1_m04_m05_v1.md` |
 | W1 absorption evidence (M-01/M-02/M-03) | `docs/execution/evidence/donor_absorption_w1_m01_m02_m03_v1.md` |
 | W1 completion review | `docs/reviews/W1_COMPLETION_REVIEW_v1.md` |
+| W2 admission Phase A — guardrail foundation | `docs/execution/evidence/w2_admission_phase_a_guardrail_foundation_v1.md` |
+| W2 guardrail host (tests) | `tests/guardrails/` |
 | skills/worker/planning ADR | `docs/adr/ADR-phase2-skills-worker-planning.md` |
 | task router decomposition ADR | `docs/adr/ADR-task-router-decomposition.md` |
 
@@ -103,7 +105,7 @@ Status: P2 pre-execution evidence index
 | --- | --- |
 | Matrix Script / Digital Anchor packet schema and sample instances missing | packet gate cannot pass for P2 implementation (validation entry path exists; awaiting product handoff at `schemas/packets/<line>/`) |
 | packet validator runtime/report missing | RESOLVED for Hot Follow reference (`docs/execution/evidence/hot_follow_reference_packet_validation_v1.md`); still pending for new lines |
-| capability adapter base missing | RESOLVED at base wave (`gateway/app/services/capability/adapters/base.py`); W1 (Media helpers M-01..M-05) now Absorbed; W2 (ASR/translate/TTS) requires prerequisites in `docs/reviews/W1_COMPLETION_REVIEW_v1.md` §3 |
+| capability adapter base missing | RESOLVED at base wave (`gateway/app/services/capability/adapters/base.py`); W1 (Media helpers M-01..M-05) now Absorbed; W2 admission Phase A (guardrail host + foundation leak/fallback tests) closed at `docs/execution/evidence/w2_admission_phase_a_guardrail_foundation_v1.md`; remaining W2 admission Phases B–E (env matrix, donor SHA pin, AdapterBase lifecycle review, Hot Follow regression freeze) still required before W2.1 per `docs/reviews/W1_COMPLETION_REVIEW_v1.md` §3 and `docs/architecture/ApolloVeo_2.0_W2_Admission_Preparation_Wave_指挥单_v1.md` §9 |
 | factory-wide versioned surface response contracts missing | surface gate remains partial |
 | some indexed future authority files do not exist | must be resolved before they are used as P2 evidence |
 
