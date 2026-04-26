@@ -100,6 +100,8 @@ Status: P2 pre-execution evidence index
 | W2 env matrix (O-01) | `ops/env/env_matrix_v1.md` |
 | W2 storage layout (O-02) | `ops/env/storage_layout_v1.md` |
 | W2 secret loading baseline | `ops/env/secret_loading_baseline_v1.md` |
+| W2 admission Phase C — donor / lifecycle freeze | `docs/execution/evidence/w2_admission_phase_c_donor_lifecycle_freeze_v1.md` |
+| W2 admission Phase C — AdapterBase lifecycle review | `docs/reviews/W2_ADMISSION_ADAPTERBASE_LIFECYCLE_REVIEW_v1.md` |
 | skills/worker/planning ADR | `docs/adr/ADR-phase2-skills-worker-planning.md` |
 | task router decomposition ADR | `docs/adr/ADR-task-router-decomposition.md` |
 
@@ -109,7 +111,7 @@ Status: P2 pre-execution evidence index
 | --- | --- |
 | Matrix Script / Digital Anchor packet schema and sample instances missing | packet gate cannot pass for P2 implementation (validation entry path exists; awaiting product handoff at `schemas/packets/<line>/`) |
 | packet validator runtime/report missing | RESOLVED for Hot Follow reference (`docs/execution/evidence/hot_follow_reference_packet_validation_v1.md`); still pending for new lines |
-| capability adapter base missing | RESOLVED at base wave (`gateway/app/services/capability/adapters/base.py`); W1 (Media helpers M-01..M-05) now Absorbed; W2 admission Phase A (guardrail host + foundation leak/fallback tests) closed at `docs/execution/evidence/w2_admission_phase_a_guardrail_foundation_v1.md`; W2 admission Phase B (env / secret matrix, storage layout, secret loading baseline) closed at `docs/execution/evidence/w2_admission_phase_b_env_matrix_v1.md`; remaining W2 admission Phases C–E (donor SHA pin, AdapterBase lifecycle review, Hot Follow regression freeze, W2.1 admission signoff) still required before W2.1 per `docs/reviews/W1_COMPLETION_REVIEW_v1.md` §3 and `docs/architecture/ApolloVeo_2.0_W2_Admission_Preparation_Wave_指挥单_v1.md` §9 |
+| capability adapter base missing | RESOLVED at base wave (`gateway/app/services/capability/adapters/base.py`); W1 (Media helpers M-01..M-05) now Absorbed; W2 admission Phase A (guardrail host + foundation leak/fallback tests) closed at `docs/execution/evidence/w2_admission_phase_a_guardrail_foundation_v1.md`; W2 admission Phase B (env / secret matrix, storage layout, secret loading baseline) closed at `docs/execution/evidence/w2_admission_phase_b_env_matrix_v1.md`; W2 admission Phase C (fresh W2 donor SHA pin, mapping row lifecycle freeze, AdapterBase lifecycle review) closed at `docs/execution/evidence/w2_admission_phase_c_donor_lifecycle_freeze_v1.md` and `docs/reviews/W2_ADMISSION_ADAPTERBASE_LIFECYCLE_REVIEW_v1.md`; remaining W2 admission Phase D (Hot Follow regression baseline freeze) and Phase E (W2.1 admission signoff) still required before W2.1, plus four base-only AdapterBase gap-closing PRs (auth/credential, retry/timeout/cancellation, error envelope, construction-vs-invocation) per `docs/reviews/W2_ADMISSION_ADAPTERBASE_LIFECYCLE_REVIEW_v1.md` §5 before the first W2.1 absorption PR |
 | factory-wide versioned surface response contracts missing | surface gate remains partial |
 | some indexed future authority files do not exist | must be resolved before they are used as P2 evidence |
 
