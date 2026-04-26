@@ -113,6 +113,56 @@ The packet validator MUST be able to confirm, for each line's packet:
 - Any frontend exposure of `vendor_id`, `model_id`, or `donor_*` concept (consumed by surface design as guardrail)
 - Any second source of task / state truth
 
+## Supply truth vs donor decoupling boundary
+
+This section is normative for both production lines. It declares the boundary that separates **supply truth** (owned by this matrix and the line packets) from **donor** (SwiftCraft) absorption (owned by runtime). The two sides MUST NOT reach into each other.
+
+### What is supply truth
+
+For each line, supply truth comprises:
+
+- the operator-supplied input asset kinds declared in this matrix (per-line `required` / `optional` / `not applicable` discipline)
+- the line-produced deliverable kinds declared in this matrix
+- the line-specific contract objects that extend generic refs (`matrix_script_variation_matrix`, `matrix_script_slot_pack`, `digital_anchor_role_pack`, `digital_anchor_speaker_plan`)
+- the closed kind-sets declared inside those line-specific contracts (axis kinds, slot kinds, framing kinds, appearance-ref kinds, dub kinds, lip-sync kinds)
+
+Supply truth answers: *what kinds of assets exist, who supplies them, who emits them, and what closed sets describe their shape.*
+
+### What is donor
+
+Donor refers to the SwiftCraft absorption surface — runtime modules that realize capability kinds via concrete vendors, models, providers, or engines. Donor concerns include:
+
+- vendor / model / provider / engine selection for any capability kind
+- runtime adapter, client, or absorption-module identity
+- runtime-level retry, fallback, or quota logic
+- vendor-pinned credentials, endpoints, or rate envelopes
+
+Donor answers: *which concrete realization performs a given capability kind at runtime.*
+
+### Decoupling rules (normative)
+
+For both `matrix_script` and `digital_anchor`:
+
+1. **Supply truth MUST NOT name a donor.** No vendor / model / provider / engine identifier appears in this matrix, in either line packet, or in any line-specific contract object. (Validator rule R3.)
+2. **Donor MUST NOT redeclare supply truth.** Runtime donor modules consume supply truth as a read-only input; they MUST NOT add, remove, or reshape kinds from the closed kind-sets declared on the supply side.
+3. **Closed kind-sets are owned by supply.** Adding a kind to `axis_kind_set`, `slot_kind_set`, `framing_kind_set`, `appearance_ref_kind_set`, `dub_kind_set`, or `lip_sync_kind_set` requires a packet re-version on the supply side; donor cannot extend a closed set by absorbing a new vendor.
+4. **Capability `mode` is descriptive, not selective.** The `mode` value on a capability-plan entry (e.g. `analyze`, `matrix`, `author`, `tts`, `role_render`, `segment_speak`, `sync`, `bundle`) is a supply-side hint about *what kind of work* is required; it MUST NOT be interpreted by donor as a vendor selector. Vendor selection is the sole responsibility of `capability_routing_policy_v1` at runtime.
+5. **Asset references are opaque across the boundary.** Supply-side `body_ref`, `script_ref`, `appearance_ref`, and similar fields are opaque content / catalog handles. Donor MAY resolve them through their respective storage / catalog systems but MUST NOT push vendor-shaped state back into the packet.
+6. **No truth round-trip from donor to supply.** Donor MUST NOT write `status`, `ready`, `done`, `delivery_ready`, or any state-shape field back onto supply objects. (Validator rule R5.)
+7. **Frontend MUST NOT cross the boundary.** Surfaces consume supply truth only; `vendor_id`, `model_id`, `donor_*`, `provider`, and `engine` MUST NOT be exposed to the operator under any circumstance.
+
+### Per-line application
+
+| boundary item                   | matrix_script                                   | digital_anchor                                          |
+| ------------------------------- | ----------------------------------------------- | ------------------------------------------------------- |
+| supply-owned kind-sets          | `axis_kind_set`, `slot_kind_set`                | `framing_kind_set`, `appearance_ref_kind_set`, `dub_kind_set`, `lip_sync_kind_set` |
+| supply-owned references         | `body_ref`, `script_slot_ref`, `binds_cell_id`  | `appearance_ref`, `script_ref`, `binds_role_id`         |
+| supply-owned capability kinds   | `understanding`, `variation`, `subtitles`, `dub` (opt.), `pack` (opt.) | `understanding`, `avatar`, `speaker`, `subtitles`, `dub`, `lip_sync` (opt.), `pack` (opt.) |
+| donor-owned at runtime          | TTS vendor (when `dub` runs), scene-pack engine (when `pack` runs) | avatar render engine, TTS vendor, lip-sync engine       |
+| boundary direction              | supply → donor (read-only)                      | supply → donor (read-only)                              |
+
+This decoupling lets the supply side freeze for P2 entry independent of any donor onboarding, and lets donor evolve (vendor swaps, new absorption modules) without re-versioning supply packets.
+
 ## Surface implications (handoff to design)
 
 For Phase B (Surface Freeze), design MUST:
