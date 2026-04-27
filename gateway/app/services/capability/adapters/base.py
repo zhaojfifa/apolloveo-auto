@@ -181,6 +181,145 @@ class AdapterCredentials:
             )
 
 
+class CancellationToken(abc.ABC):
+    """Provider-agnostic cancellation signal.
+
+    The base ships only the abstract surface; it does **not** ship a
+    concrete token (manual, deadline-driven, parent-linked). Concrete
+    tokens live in the runtime / caller layer outside this base, so the
+    adapter base never grows a direct dependency on a specific async
+    framework, scheduler, or provider client.
+
+    Discipline:
+    - MUST be side-effect-free at construction (no I/O at ``__init__``).
+    - ``is_cancelled`` MUST be cheap and side-effect-free.
+    - The base never authors cancellation truth; it only reads the
+      signal a caller hands in via ``AdapterExecutionContext``.
+    """
+
+    @property
+    @abc.abstractmethod
+    def is_cancelled(self) -> bool:
+        """Return ``True`` if the operation has been cancelled."""
+        raise NotImplementedError
+
+    def raise_if_cancelled(self) -> None:
+        """Raise ``AdapterError(CANCELLED)`` if the token is cancelled.
+
+        Provided as a small base-only convenience so callers raise a
+        consistent, provider-agnostic error shape. Subclasses MUST NOT
+        override this with provider-specific exception types.
+        """
+        if self.is_cancelled:
+            raise AdapterError(
+                AdapterErrorCategory.CANCELLED,
+                "execution cancelled before completion",
+            )
+
+
+@dataclass(frozen=True)
+class RetryPolicy:
+    """Provider-agnostic retry advisory shape.
+
+    Carries hints only — does NOT bind to any third-party retry library
+    or vendor SDK retry helper, does NOT encode provider-specific
+    backoff tuning, and does NOT itself execute the retry. The (future)
+    caller / runtime layer owns the retry loop.
+
+    Discipline:
+    - MUST NOT carry vendor / model / engine identifiers.
+    - MUST NOT encode jitter / scheduling primitives — those belong to
+      the caller layer, not the base envelope.
+    - ``max_attempts`` counts *total* attempts (initial try + retries),
+      so ``1`` means "no retry".
+    """
+
+    max_attempts: int = 1
+    initial_backoff_seconds: float = 0.0
+    max_backoff_seconds: float = 0.0
+    backoff_multiplier: float = 1.0
+
+    def __post_init__(self) -> None:
+        if (
+            not isinstance(self.max_attempts, int)
+            or isinstance(self.max_attempts, bool)
+            or self.max_attempts < 1
+        ):
+            raise ValueError(
+                "RetryPolicy.max_attempts must be an int >= 1"
+            )
+        for fname in ("initial_backoff_seconds", "max_backoff_seconds"):
+            value = getattr(self, fname)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or value < 0
+            ):
+                raise ValueError(
+                    f"RetryPolicy.{fname} must be a non-negative number"
+                )
+        if self.max_backoff_seconds < self.initial_backoff_seconds:
+            raise ValueError(
+                "RetryPolicy.max_backoff_seconds must be >= initial_backoff_seconds"
+            )
+        if (
+            isinstance(self.backoff_multiplier, bool)
+            or not isinstance(self.backoff_multiplier, (int, float))
+            or self.backoff_multiplier < 1.0
+        ):
+            raise ValueError(
+                "RetryPolicy.backoff_multiplier must be a number >= 1.0"
+            )
+
+
+@dataclass(frozen=True)
+class AdapterExecutionContext:
+    """Per-invocation execution control envelope.
+
+    Provider-agnostic on purpose:
+    - MUST NOT carry vendor / model / engine identifiers.
+    - MUST NOT bind to any specific retry library or async framework.
+    - MUST NOT encode business / task / packet truth.
+    - MUST NOT carry presenter / UI wording.
+    - MUST NOT carry fallback strategy — fallback is a business-layer
+      concern (cf. W2 admission Phase A
+      ``test_fallback_never_primary_truth``).
+
+    Fields are advisory inputs to the (future) caller / runtime layer
+    that drives timing, retries, and cancellation around ``invoke``.
+    The base never starts timers, never schedules retries, and never
+    polls cancellation itself — it only carries the shape.
+    """
+
+    timeout_seconds: Optional[float] = None
+    cancellation: Optional[CancellationToken] = None
+    retry: Optional[RetryPolicy] = None
+
+    def __post_init__(self) -> None:
+        if self.timeout_seconds is not None:
+            if (
+                isinstance(self.timeout_seconds, bool)
+                or not isinstance(self.timeout_seconds, (int, float))
+                or self.timeout_seconds <= 0
+            ):
+                raise ValueError(
+                    "AdapterExecutionContext.timeout_seconds must be a positive "
+                    "number when set"
+                )
+        if self.cancellation is not None and not isinstance(
+            self.cancellation, CancellationToken
+        ):
+            raise TypeError(
+                "AdapterExecutionContext.cancellation must be a "
+                "CancellationToken instance when set"
+            )
+        if self.retry is not None and not isinstance(self.retry, RetryPolicy):
+            raise TypeError(
+                "AdapterExecutionContext.retry must be a RetryPolicy "
+                "instance when set"
+            )
+
+
 @dataclass(frozen=True)
 class AdapterInvocation:
     """Contract-shaped inputs handed to an adapter.
@@ -257,8 +396,20 @@ class AdapterBase(abc.ABC):
         return self._credentials
 
     @abc.abstractmethod
-    def invoke(self, invocation: AdapterInvocation) -> AdapterResult:
-        """Execute the capability against ``invocation``. Vendor-specific."""
+    def invoke(
+        self,
+        invocation: AdapterInvocation,
+        *,
+        context: Optional[AdapterExecutionContext] = None,
+    ) -> AdapterResult:
+        """Execute the capability against ``invocation``. Vendor-specific.
+
+        ``context`` is the unified base-only execution control entry
+        (timeout / retry / cancellation hints). The base never inspects
+        ``context`` itself; honouring it is the (future) caller / runtime
+        and vendor adapter responsibility. Construction-vs-invocation
+        lifecycle policy beyond this signature is deferred to the B4 PR.
+        """
         raise NotImplementedError
 
 
@@ -300,8 +451,11 @@ __all__ = [
     "AdapterCredentials",
     "AdapterError",
     "AdapterErrorCategory",
+    "AdapterExecutionContext",
     "AdapterInvocation",
     "AdapterResult",
+    "CancellationToken",
+    "RetryPolicy",
     "SecretRef",
     "SecretResolver",
     "UnderstandingAdapter",
