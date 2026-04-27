@@ -62,7 +62,40 @@ was added, what was intentionally not added, and what blockers remain.
 
 ## B2 — Retry / Timeout / Cancellation
 
-- Status: NOT STARTED.
+- Date: 2026-04-27
+- Status: implementation green; awaiting architect + reviewer signoff
+- Evidence: `docs/execution/evidence/w2_1_b2_adapter_execution_context_v1.md`
+- Code:
+  - `gateway/app/services/capability/adapters/base.py` (added
+    `CancellationToken`, `RetryPolicy`, `AdapterExecutionContext`;
+    extended `AdapterBase.invoke` with keyword-only
+    `context: Optional[AdapterExecutionContext] = None`)
+  - `gateway/app/services/capability/adapters/__init__.py` (exports)
+  - `tests/services/capability/adapters/test_adapter_execution_context.py`
+    (31 tests, pass)
+- What B2 adds: provider-agnostic `CancellationToken` (abstract,
+  base ships no concrete impl); frozen `RetryPolicy` advisory shape
+  with `max_attempts` / `initial_backoff_seconds` /
+  `max_backoff_seconds` / `backoff_multiplier`, no library binding;
+  frozen `AdapterExecutionContext` envelope holding `timeout_seconds`,
+  `cancellation`, `retry`; unified execution control entry on
+  `AdapterBase.invoke(*, context=None)`. Reuses the B3
+  `AdapterErrorCategory.CANCELLED` shape for
+  `CancellationToken.raise_if_cancelled()` without widening B3.
+- What B2 does NOT add: no concrete cancellation token; no retry-loop
+  executor; no timer / deadline plumbing; no third-party retry
+  library binding (`tenacity`, `backoff`, `urllib3`, vendor SDK retry
+  helpers — all AST-checked); no async runtime binding (`asyncio`,
+  `trio`, `anyio` — all AST-checked); no provider-specific retry
+  policy; no business-layer fallback strategy; no broader B4
+  lifecycle policy; no change to B1 or B3 surfaces; no provider code;
+  no runtime wiring; no Hot Follow / packet / schema / contracts /
+  workbench / frontend changes.
+- Validation: `python3 -m pytest tests/services/capability/adapters/ tests/guardrails -v`
+  → 72 passed (B2: 31 new, B1: 21 unchanged, B3: 13 unchanged,
+  guardrails: 7 unchanged).
+- Next handoff: architect signoff on B2 boundary; reviewer closes B2 PR;
+  B4 may then start.
 
 ## B4 — Construction-vs-Invocation Lifecycle
 
