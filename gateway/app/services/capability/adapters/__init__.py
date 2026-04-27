@@ -19,6 +19,8 @@ Non-responsibilities:
 from .base import (
     AdapterBase,
     AdapterCapabilityKind,
+    AdapterError,
+    AdapterErrorCategory,
     AdapterInvocation,
     AdapterResult,
     AvatarAdapter,
@@ -34,6 +36,8 @@ from .base import (
 __all__ = [
     "AdapterBase",
     "AdapterCapabilityKind",
+    "AdapterError",
+    "AdapterErrorCategory",
     "AdapterInvocation",
     "AdapterResult",
     "UnderstandingAdapter",
