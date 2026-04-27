@@ -139,4 +139,61 @@ strictly non-overlapping; each phase is reviewable independently.
 
 ## Phase D — Publish Feedback Closure
 
-- Status: NOT STARTED — gated on Phase C acceptance + explicit next instruction.
+### Phase D.0 — Contract Freeze
+
+- Date: 2026-04-28
+- Status: contract freeze landed (no implementation); awaiting architect + reviewer signoff
+- Phase C signoff input: PASS (per total-control instruction issued 2026-04-28)
+- Authority:
+  - 指挥单 Phase D (target, minimum scope, acceptance)
+  - `docs/contracts/matrix_script/task_entry_contract_v1.md` (Phase A boundary)
+  - `docs/contracts/matrix_script/workbench_variation_surface_contract_v1.md` (Phase B boundary)
+  - `docs/contracts/matrix_script/delivery_binding_contract_v1.md` (Phase C boundary)
+  - `docs/contracts/matrix_script/packet_v1.md` (frozen packet truth)
+  - `schemas/packets/matrix_script/packet.schema.json`
+- Evidence: `docs/execution/evidence/matrix_script_phase_d_publish_feedback_closure_contract_v1.md`
+- Code / docs:
+  - `docs/contracts/matrix_script/publish_feedback_closure_contract_v1.md` (NEW — Phase D.0 contract freeze)
+  - `docs/execution/evidence/matrix_script_phase_d_publish_feedback_closure_contract_v1.md` (NEW — Phase D.0 evidence)
+  - `docs/execution/MATRIX_SCRIPT_FIRST_PRODUCTION_LINE_LOG.md` (UPDATED — this row)
+  - `docs/execution/apolloveo_2_0_evidence_index_v1.md` (UPDATED — Phase D contract + evidence rows)
+- What this phase adds:
+  - Formal Publish Feedback Closure object `matrix_script_publish_feedback_closure_v1`
+    with `closure_id`, `line_id`, `packet_version`, `variation_feedback[]`, and
+    `feedback_closure_records[]`.
+  - Variation-level feedback row shape: `variation_id`, `publish_url`,
+    `publish_status` ∈ `{pending, published, failed, retracted}`, `channel_metrics`,
+    `operator_publish_notes`, `last_event_id`.
+  - Closed `channel_metrics` snapshot keys: `channel_id`, `captured_at`,
+    `impressions`, `views`, `engagement_rate`, `completion_rate`, `raw_payload_ref`.
+  - Append-only `feedback_closure_records[]` audit trail keyed by `event_id` with
+    `event_kind` ∈ `{operator_publish, operator_retract, operator_note,
+    platform_callback, metrics_snapshot}` and `actor_kind` ∈
+    `{operator, platform, system}`.
+  - Explicit ownership and mutability rules; explicit boundary vs Phase A/B/C.
+  - Canonical variation-id join rule:
+    `packet.line_specific_refs[matrix_script_variation_matrix].delta.cells[].cell_id`
+    ↔ `variation_feedback[].variation_id`.
+  - Mapping note from Phase C delivery projection fields to Phase D closure fields,
+    with explicit operator-action vs platform-callback origin.
+  - Explicit out-of-scope list (no per-deliverable feedback, no provider controls,
+    no Digital Anchor, no Hot Follow, no W2.2 / W2.3, no packet schema change,
+    no write-back implementation).
+- What this phase does NOT add:
+  - no write-back implementation code (no changes under `gateway/`);
+  - no schema / sample / packet contract change;
+  - no change to Phase A/B/C contracts;
+  - no delivery projector mutation;
+  - no manifest or metadata projection ownership mutation;
+  - no provider / model / vendor / engine controls;
+  - no Digital Anchor;
+  - no Hot Follow;
+  - no W2.2 / W2.3 advancement;
+  - no tests added (contract-freeze wave; review-only validation).
+- Hard stop: after Phase D.0, do not start Phase D.1 implementation. Wait for
+  review / next instruction.
+
+### Phase D.1+ — Implementation
+
+- Status: NOT STARTED — gated on Phase D.0 acceptance + explicit next instruction
+  authorizing write-back implementation.
