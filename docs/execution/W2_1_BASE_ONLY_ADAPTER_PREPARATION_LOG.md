@@ -31,8 +31,34 @@ was added, what was intentionally not added, and what blockers remain.
 
 ## B1 — Auth / Credential Surface
 
-- Status: NOT STARTED. Blocked on B3 signoff per recommended order
-  (W2.1 directive §4).
+- Date: 2026-04-27
+- Status: implementation green; awaiting architect + reviewer signoff
+- Evidence: `docs/execution/evidence/w2_1_b1_adapter_credential_surface_v1.md`
+- Code:
+  - `gateway/app/services/capability/adapters/base.py` (added
+    `SecretRef`, `SecretResolver`, `AdapterCredentials`, plus
+    `AdapterBase.__init__(*, credentials=None)` and read-only
+    `credentials` property)
+  - `gateway/app/services/capability/adapters/__init__.py` (exports)
+  - `tests/services/capability/adapters/test_adapter_credentials.py`
+    (21 tests, pass)
+- What B1 adds: provider-agnostic `SecretRef` (logical handle) and
+  abstract `SecretResolver` surface; frozen `AdapterCredentials`
+  envelope holding a single `resolver` field; construction-time
+  injection on `AdapterBase` via `__init__(*, credentials=None)` that
+  stores the envelope without any I/O and exposes it as a read-only
+  `credentials` property. Compatible with the frozen
+  `ops/env/env_matrix_v1.md` / `ops/env/secret_loading_baseline_v1.md`
+  authority — neither file is modified.
+- What B1 does NOT add: any concrete `SecretResolver` implementation
+  (env / vault / KMS / file loaders); B2 (retry / timeout /
+  cancellation); broader B4 lifecycle policy beyond bare storage of
+  the envelope; provider code; runtime wiring; Hot Follow / packet /
+  schema / contracts / workbench / frontend changes.
+- Validation: `python3 -m pytest tests/services/capability/adapters/test_adapter_credentials.py tests/services/capability/adapters/test_adapter_error.py -v`
+  → 34 passed (B1: 21 new, B3: 13 unchanged).
+- Next handoff: architect signoff on B1 boundary; reviewer closes B1 PR;
+  B2 may then start.
 
 ## B2 — Retry / Timeout / Cancellation
 
