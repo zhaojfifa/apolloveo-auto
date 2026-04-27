@@ -148,3 +148,22 @@ signed off (W2.1 directive §9). After B4, all four base-only PRs are
 implementation-green; only architect + reviewer signoff on B2 and B4
 (B1 and B3 are merged on `main`) remains before the first W2.1 Provider
 PR may open. Provider absorption is still NOT started in this wave.
+
+## Guardrail reconciliation — donor literal scan
+
+- Date: 2026-04-27
+- Status: reconciled; combined validation green
+- Evidence: `docs/execution/evidence/w2_1_guardrail_reconciliation_v1.md`
+- Root cause: scan-scope drift in
+  `tests/guardrails/test_donor_leak_boundary.py::test_no_swiftcraft_string_in_python_source_outside_donor_docs`.
+  The import guardrail was valid, but the auxiliary literal-string scan
+  searched all Python text under `gateway/` and `tests/`, including W1
+  attribution docstrings and boundary-test fixtures that intentionally
+  mention the donor token for audit / assertion purposes.
+- Fix: keep the import guardrail unchanged; narrow the literal-string
+  guardrail to executable gateway string literals via AST and exclude
+  docstrings/comments/tests.
+- Validation: `python3.11 -m pytest tests/services/capability/adapters/ tests/guardrails -q`
+  → 92 passed.
+- Boundary: no provider code, no B1–B4 redesign, no Hot Follow changes,
+  no W2.2/W2.3 work.

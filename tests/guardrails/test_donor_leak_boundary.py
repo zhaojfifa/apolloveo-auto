@@ -17,6 +17,7 @@ re-introduced through a stray import statement.
 """
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 
 from tests.guardrails._scan import REPO_ROOT, find_forbidden, iter_py_files, imported_names
@@ -75,32 +76,57 @@ def test_no_donor_truth_module_imports_in_apollo_source():
 
 
 def test_no_swiftcraft_string_in_python_source_outside_donor_docs():
-    """Belt-and-suspenders: scan `.py` source for the literal token
-    `swiftcraft` (case-insensitive). Pure docs under `docs/` are not
-    scanned — only executable Python source.
+    """Belt-and-suspenders: scan executable gateway string literals for
+    the literal token `swiftcraft` (case-insensitive).
 
-    This catches accidental string literals like a hardcoded URL or a
-    fallback path string, which the AST scan would not see.
+    Attribution headers/docstrings are intentionally not executable donor
+    package usage; W1 absorption requires those audit strings in absorbed
+    media helpers. Import leakage remains covered separately by the AST
+    import scan across both `gateway/` and `tests/`.
     """
     needle = "swiftcraft"
     offenders: list[tuple[Path, int]] = []
-    for path in iter_py_files(APOLLO_ROOTS):
-        # Allow this very test file (and its README) to mention the token.
-        if path.parent.name == "guardrails":
-            continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        idx = text.lower().find(needle)
-        if idx >= 0:
-            line = text.count("\n", 0, idx) + 1
-            offenders.append((path, line))
+    for path in iter_py_files([REPO_ROOT / "gateway"]):
+        for node in _non_docstring_string_literals(path):
+            if needle not in str(node.value).lower():
+                continue
+            offenders.append((path, getattr(node, "lineno", 0)))
 
     assert not offenders, "\n".join(
-        [f"Literal 'swiftcraft' string found in Apollo Python source:"]
+        [f"Literal 'swiftcraft' executable string found in Apollo gateway source:"]
         + [f"  - {p.relative_to(REPO_ROOT)}:{ln}" for p, ln in offenders]
     )
+
+
+def _non_docstring_string_literals(path: Path) -> list[ast.Constant]:
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+    except (SyntaxError, UnicodeDecodeError):
+        return []
+
+    docstring_nodes: set[ast.AST] = set()
+    for node in ast.walk(tree):
+        if not isinstance(
+            node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
+            continue
+        if not node.body:
+            continue
+        first = node.body[0]
+        if (
+            isinstance(first, ast.Expr)
+            and isinstance(first.value, ast.Constant)
+            and isinstance(first.value.value, str)
+        ):
+            docstring_nodes.add(first.value)
+
+    return [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and isinstance(node.value, str)
+        and node not in docstring_nodes
+    ]
 
 
 def _format_hits(header: str, hits: list[tuple[Path, str]]) -> str:
