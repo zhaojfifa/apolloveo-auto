@@ -105,10 +105,12 @@ Status: P2 pre-execution evidence index
 | W2 admission Phase D — Hot Follow regression baseline freeze | `docs/execution/evidence/w2_admission_phase_d_hot_follow_regression_freeze_v1.md` |
 | W2 admission Phase E — admission signoff | `docs/reviews/W2_ADMISSION_SIGNOFF_v1.md` |
 | W2.1 base-only adapter preparation — execution log | `docs/execution/W2_1_BASE_ONLY_ADAPTER_PREPARATION_LOG.md` |
+| W2.1 first provider absorption — execution log | `docs/execution/W2_1_FIRST_PROVIDER_ABSORPTION_LOG.md` |
 | W2.1 base-only adapter preparation — B3 error envelope | `docs/execution/evidence/w2_1_b3_adapter_error_envelope_v1.md` |
 | W2.1 base-only adapter preparation — B1 auth/credential surface | `docs/execution/evidence/w2_1_b1_adapter_credential_surface_v1.md` |
 | W2.1 base-only adapter preparation — B2 retry/timeout/cancellation | `docs/execution/evidence/w2_1_b2_adapter_execution_context_v1.md` |
 | W2.1 base-only adapter preparation — B4 construction-vs-invocation lifecycle | `docs/execution/evidence/w2_1_b4_adapter_lifecycle_boundary_v1.md` |
+| W2.1 first provider absorption — UnderstandingAdapter ← Gemini text translate (A-03) | `docs/execution/evidence/w2_1_first_provider_absorption_understanding_gemini_v1.md` |
 | skills/worker/planning ADR | `docs/adr/ADR-phase2-skills-worker-planning.md` |
 | task router decomposition ADR | `docs/adr/ADR-task-router-decomposition.md` |
 

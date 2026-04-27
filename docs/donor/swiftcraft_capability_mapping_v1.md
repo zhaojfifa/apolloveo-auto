@@ -12,7 +12,7 @@
 |---|---|---|---|---|
 | W1 (helpers + storage) | `62b6da0` | zhaojfifa | 2026-04-26 | Closed wave; M-01..M-05 Absorbed |
 | W2 admission (Phase C) | `62b6da0` | zhaojfifa | 2026-04-26 | Pin recorded at admission, not at first absorption PR. Donor HEAD verified equal to W1 pin (no donor drift since W1). Pin governs the W2.1..W2.3 sub-waves unless re-pinned at a sub-wave entry note. |
-| W2.1 (Understanding Provider) | inherits W2 admission pin unless re-pinned | TBD | TBD | If donor HEAD has moved at W2.1 entry note, a new row MUST be added; do not silently reuse this pin. |
+| W2.1 (Understanding Provider) | `62b6da0` (inherits W2 admission pin) | zhaojfifa | 2026-04-27 | First provider absorption PR (A-03 → `UnderstandingAdapter` only). Donor HEAD verified equal to W2 admission pin (no donor drift); pin recorded explicitly per §0 "no silent reuse" rule. Evidence: `docs/execution/evidence/w2_1_first_provider_absorption_understanding_gemini_v1.md`. |
 | W2.2 (Subtitles / Dub Provider) | TBD | TBD | TBD | Pin recorded at W2.2 entry note. |
 | W2.3 (Avatar / VideoGen / Storage Provider) | TBD | TBD | TBD | Pin recorded at W2.3 entry note. |
 | W3 (provider clients — legacy planning row, superseded by W2.x split) | TBD | TBD | TBD | Retained for traceability; no longer the active sequencing axis. |
@@ -48,7 +48,7 @@ Row id schema: `<category>-<##>` where category is `M / A / P / V / E / R / O` m
 |---|---|---|---|---|---|---|
 | A-01 | `backend/app/utils/asr_worker.py` | `gateway/app/services/providers/whisper/worker.py` | `SubtitlesAdapter` (ASR mode) | Rewrite | No SwiftCraft task / queue coupling; outputs Apollo `SubtitlesResult`; fallback paths emit advisories, never primary truth | Not started |
 | A-02 | `backend/app/utils/fastwhisper_asr.py` | `gateway/app/services/providers/whisper/fastwhisper.py` | `SubtitlesAdapter` (ASR provider) | Wrap | Provider client only; cache / preflight retained; no fallback-as-truth | Not started |
-| A-03 | `backend/app/utils/translate_gemini.py` | `gateway/app/services/providers/gemini/translate.py` | `UnderstandingAdapter` + `SubtitlesAdapter` | Wrap | Bound to adapter base; no direct front-end exposure | Not started |
+| A-03 | `backend/app/utils/translate_gemini.py` | `gateway/app/services/providers/gemini/translate.py` | `UnderstandingAdapter` (W2.1, this row) + `SubtitlesAdapter` (deferred to a later wave) | Wrap | Bound to adapter base; no direct front-end exposure | Absorbed (UnderstandingAdapter only — see `docs/execution/evidence/w2_1_first_provider_absorption_understanding_gemini_v1.md`; `SubtitlesAdapter` half intentionally deferred per W2.1 wave §4.2) |
 | A-04 | `backend/app/utils/translate_mm.py` | n/a | n/a | Pattern-only | Capture as ADR or contract note if MM fallback design is needed; do not copy code | Not started |
 | A-05 | `backend/app/utils/dubbing_service.py` | `gateway/app/services/providers/azure/dub.py` | `DubAdapter` | Rewrite | Bound to `DubAdapter`; no SwiftCraft task references; honors `dub_text_guard` semantics already in Apollo | Not started |
 
