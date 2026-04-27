@@ -19,11 +19,96 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Optional
+from enum import Enum
+from types import MappingProxyType
+from typing import Any, Mapping, Optional, Union
 
 from gateway.app.services.packet.envelope import CAPABILITY_KINDS
 
 AdapterCapabilityKind = str  # constrained at runtime to CAPABILITY_KINDS
+
+
+class AdapterErrorCategory(str, Enum):
+    """Closed, provider-agnostic error categories for ``AdapterError``.
+
+    Categories describe *shape of failure*, not vendor-specific error codes.
+    A provider adapter MUST translate its native errors into one of these
+    categories at its own boundary; provider-specific codes belong only in
+    ``AdapterError.details``.
+    """
+
+    INVALID_INVOCATION = "invalid_invocation"
+    UNAVAILABLE = "unavailable"
+    TIMEOUT = "timeout"
+    CANCELLED = "cancelled"
+    AUTH = "auth"
+    RATE_LIMITED = "rate_limited"
+    UPSTREAM = "upstream"
+    INTERNAL = "internal"
+
+
+class AdapterError(Exception):
+    """Base-only error envelope raised by adapters.
+
+    Provider-agnostic on purpose:
+    - MUST NOT carry vendor / model / engine identifiers as first-class fields
+      (free-form provider codes may sit inside ``details`` only).
+    - MUST NOT encode business truth (no task/packet/state semantics).
+    - MUST NOT carry UI / presenter wording — ``message`` is a developer-facing
+      diagnostic, not a user-facing string.
+    - Advisory-shaped: callers surface this through ``AdapterResult.advisories``
+      or equivalent, never as primary truth (cf. W2 admission Phase A
+      ``test_fallback_never_primary_truth``).
+
+    ``retryable`` is an *advisory hint* only. Actual retry policy is owned by
+    the (future) base-only retry/timeout/cancellation surface (B2); this hint
+    does not by itself authorise a retry.
+    """
+
+    __slots__ = ("category", "message", "source", "retryable", "details")
+
+    def __init__(
+        self,
+        category: Union["AdapterErrorCategory", str],
+        message: str,
+        *,
+        source: Optional[str] = None,
+        retryable: Optional[bool] = None,
+        details: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        if isinstance(category, AdapterErrorCategory):
+            normalised = category
+        else:
+            try:
+                normalised = AdapterErrorCategory(category)
+            except ValueError as exc:
+                raise ValueError(
+                    f"AdapterError category '{category}' is not in the closed "
+                    f"set {[c.value for c in AdapterErrorCategory]}"
+                ) from exc
+        if not isinstance(message, str) or not message:
+            raise ValueError("AdapterError message must be a non-empty string")
+        if source is not None and not isinstance(source, str):
+            raise TypeError("AdapterError source must be a string when set")
+        if retryable is not None and not isinstance(retryable, bool):
+            raise TypeError("AdapterError retryable must be a bool when set")
+
+        self.category: AdapterErrorCategory = normalised
+        self.message: str = message
+        self.source: Optional[str] = source
+        self.retryable: Optional[bool] = retryable
+        self.details: Mapping[str, Any] = MappingProxyType(dict(details or {}))
+        super().__init__(message)
+
+    def to_dict(self) -> dict:
+        """Stable serialisation shape — keys are frozen by this base."""
+        return {
+            "category": self.category.value,
+            "message": self.message,
+            "source": self.source,
+            "retryable": self.retryable,
+            "details": dict(self.details),
+        }
 
 
 @dataclass(frozen=True)
@@ -117,6 +202,8 @@ class PackAdapter(AdapterBase):
 __all__ = [
     "AdapterBase",
     "AdapterCapabilityKind",
+    "AdapterError",
+    "AdapterErrorCategory",
     "AdapterInvocation",
     "AdapterResult",
     "UnderstandingAdapter",
