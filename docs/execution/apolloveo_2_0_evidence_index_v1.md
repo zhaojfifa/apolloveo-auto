@@ -115,6 +115,9 @@ Status: P2 pre-execution evidence index
 | Matrix Script First Production Line — Phase A (Task Entry) — contract | `docs/contracts/matrix_script/task_entry_contract_v1.md` |
 | Matrix Script First Production Line — Phase A (Task Entry) — evidence | `docs/execution/evidence/matrix_script_phase_a_task_entry_v1.md` |
 | Matrix Script First Production Line — Phase A (Task Entry) — tests | `tests/contracts/matrix_script/test_task_entry_phase_a.py` |
+| Matrix Script First Production Line — Phase B (Workbench Variation Surface) — contract | `docs/contracts/matrix_script/workbench_variation_surface_contract_v1.md` |
+| Matrix Script First Production Line — Phase B (Workbench Variation Surface) — evidence | `docs/execution/evidence/matrix_script_phase_b_workbench_variation_surface_v1.md` |
+| Matrix Script First Production Line — Phase B (Workbench Variation Surface) — tests | `tests/contracts/matrix_script/test_workbench_variation_phase_b.py` |
 | skills/worker/planning ADR | `docs/adr/ADR-phase2-skills-worker-planning.md` |
 | task router decomposition ADR | `docs/adr/ADR-task-router-decomposition.md` |
 

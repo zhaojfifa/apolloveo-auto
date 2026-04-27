@@ -52,7 +52,48 @@ strictly non-overlapping; each phase is reviewable independently.
 
 ## Phase B — Workbench Variation Surface
 
-- Status: NOT STARTED — gated on Phase A acceptance + explicit next instruction.
+- Date: 2026-04-27
+- Status: implementation green (contract-first / projection-only); awaiting architect + reviewer signoff
+- Authority:
+  - 指挥单 §7 Phase B (target, minimum scope, acceptance)
+  - `docs/contracts/matrix_script/task_entry_contract_v1.md` (Phase A entry seed boundary)
+  - `docs/contracts/matrix_script/packet_v1.md` (frozen packet truth)
+  - `schemas/packets/matrix_script/packet.schema.json`
+  - `schemas/packets/matrix_script/sample/*.json`
+  - `docs/design/panel_matrix_script_variation_lowfi_v1.md`
+  - `docs/design/surface_task_area_lowfi_v1.md`
+- Evidence: `docs/execution/evidence/matrix_script_phase_b_workbench_variation_surface_v1.md`
+- Code / docs:
+  - `docs/contracts/matrix_script/workbench_variation_surface_contract_v1.md` (NEW — Phase B surface contract)
+  - `docs/execution/evidence/matrix_script_phase_b_workbench_variation_surface_v1.md` (NEW — Phase B evidence)
+  - `gateway/app/services/matrix_script/workbench_variation_surface.py` (NEW — read-only packet projection)
+  - `gateway/app/services/matrix_script/__init__.py` (NEW)
+  - `gateway/app/routers/matrix_script_panel_debug.py` (UPDATED — debug panel consumes formal projection)
+  - `tests/contracts/matrix_script/test_workbench_variation_phase_b.py` (NEW — Phase B validation suite)
+- What this phase adds:
+  - Formal Workbench Variation Surface projection object:
+    `variation_plan`, `copy_bundle`, `slot_detail_surface`, `attribution_refs`,
+    `publish_feedback_projection`, plus legacy preview aliases for the current
+    lightweight debug panel.
+  - Variation matrix surface derived only from
+    `line_specific_refs[matrix_script_variation_matrix].delta`: `axis_kind_set`,
+    `axes`, and `cells`.
+  - Slot detail surface derived only from
+    `line_specific_refs[matrix_script_slot_pack].delta`: `slot_kind_set` and `slots`,
+    joined by `variation_plan.cells[].script_slot_ref == copy_bundle.slots[].slot_id`.
+  - Attribution / refs projection from packet provenance only: `generic_refs`,
+    `line_specific_refs`, `binding.capability_plan`, and `binding.worker_profile_ref`.
+  - Publish feedback projection as read-only context only: `reference_line`,
+    `validator_report_path`, `ready_state`, and `feedback_writeback =
+    not_implemented_phase_b`.
+  - Phase B validation tests for contract presence, sample projection fidelity,
+    slot join integrity, attribution boundary, publish feedback read-only boundary,
+    packet immutability, and forbidden-scope absence.
+- What this phase does NOT add: no delivery binding, no publish feedback write-back,
+  no provider/model/vendor controls, no packet/schema redesign, no Digital Anchor,
+  no Hot Follow change, no W2.2 / W2.3 advancement, no heavy frontend rebuild,
+  and no formal runtime API commitment beyond the existing debug preview route.
+- Hard stop: after Phase B, do not start Phase C. Wait for review / next instruction.
 
 ## Phase C — Delivery Binding
 

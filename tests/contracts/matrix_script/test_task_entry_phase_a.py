@@ -255,15 +255,20 @@ def test_evidence_index_records_phase_a_rows() -> None:
         assert needle in text, f"evidence index missing Phase A row: {needle}"
 
 
-def test_log_freezes_phase_a_only() -> None:
-    """The execution log must mark Phase B/C/D as NOT STARTED."""
+def test_log_preserves_phase_sequence_after_phase_a() -> None:
+    """The execution log must keep later phases sequenced after Phase A."""
     text = _read(LOG_PATH)
     for phase in ("Phase B", "Phase C", "Phase D"):
         assert f"## {phase}" in text, f"execution log missing {phase} marker"
-    # Each later phase must be flagged NOT STARTED.
-    for phase in ("Phase B", "Phase C", "Phase D"):
+
+    phase_b_idx = text.index("## Phase B")
+    phase_c_idx = text.index("## Phase C")
+    phase_b_section = text[phase_b_idx:phase_c_idx]
+    assert "implementation green" in phase_b_section, "Phase B is not recorded as implemented"
+    assert "do not start Phase C" in phase_b_section, "Phase B hard stop is missing"
+
+    for phase in ("Phase C", "Phase D"):
         idx = text.index(f"## {phase}")
-        # Window of 400 chars after the heading is enough for the status line.
         window = text[idx : idx + 400]
         assert "NOT STARTED" in window, (
             f"execution log does not mark {phase} as NOT STARTED"
