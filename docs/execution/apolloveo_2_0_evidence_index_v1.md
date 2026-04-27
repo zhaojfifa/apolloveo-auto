@@ -111,6 +111,10 @@ Status: P2 pre-execution evidence index
 | W2.1 base-only adapter preparation — B2 retry/timeout/cancellation | `docs/execution/evidence/w2_1_b2_adapter_execution_context_v1.md` |
 | W2.1 base-only adapter preparation — B4 construction-vs-invocation lifecycle | `docs/execution/evidence/w2_1_b4_adapter_lifecycle_boundary_v1.md` |
 | W2.1 first provider absorption — UnderstandingAdapter ← Gemini text translate (A-03) | `docs/execution/evidence/w2_1_first_provider_absorption_understanding_gemini_v1.md` |
+| Matrix Script First Production Line Wave — execution log | `docs/execution/MATRIX_SCRIPT_FIRST_PRODUCTION_LINE_LOG.md` |
+| Matrix Script First Production Line — Phase A (Task Entry) — contract | `docs/contracts/matrix_script/task_entry_contract_v1.md` |
+| Matrix Script First Production Line — Phase A (Task Entry) — evidence | `docs/execution/evidence/matrix_script_phase_a_task_entry_v1.md` |
+| Matrix Script First Production Line — Phase A (Task Entry) — tests | `tests/contracts/matrix_script/test_task_entry_phase_a.py` |
 | skills/worker/planning ADR | `docs/adr/ADR-phase2-skills-worker-planning.md` |
 | task router decomposition ADR | `docs/adr/ADR-task-router-decomposition.md` |
 
