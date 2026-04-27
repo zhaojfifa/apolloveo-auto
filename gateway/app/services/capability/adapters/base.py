@@ -357,6 +357,49 @@ class AdapterBase(abc.ABC):
 
     Subclasses pin a single ``capability_kind`` from ``CAPABILITY_KINDS`` and
     implement ``invoke``. The base layer performs no I/O.
+
+    Construction-vs-invocation lifecycle (B4 — frozen)
+    --------------------------------------------------
+    The boundary between *construction* and *invocation* is base-only,
+    provider-agnostic, and load-bearing for every future vendor adapter.
+
+    Construction time (``__init__``) — what is allowed:
+      - Accepting and storing the injected ``AdapterCredentials`` envelope
+        (B1) on a private slot, exposed read-only via ``credentials``.
+      - Type validation of injected dependencies (raise ``TypeError`` /
+        ``ValueError`` on shape violations).
+      - Pure assignment to instance state derived from the constructor
+        arguments only.
+
+    Construction time — what is forbidden:
+      - I/O of any kind: no socket / network / disk reads, no env reads
+        (env resolution is resolver-side per B1), no sleep / scheduler /
+        timer calls, no database or queue calls.
+      - Calling ``credentials.resolver.resolve(...)``. Secret resolution
+        is invocation-time only and belongs to the vendor adapter.
+      - Starting timers, spawning background work, polling cancellation.
+      - Provider-specific initialisation (SDK client construction, auth
+        handshake, capability probe). Provider clients are constructed
+        in the vendor adapter layer, not in ``AdapterBase``.
+      - Reading or writing any business / packet truth.
+
+    Invocation time (``invoke``) — what is allowed:
+      - The first reachable I/O point of an adapter.
+      - Calling ``self.credentials.resolver.resolve(...)`` (B1).
+      - Honouring the injected ``AdapterExecutionContext`` (B2):
+        ``timeout_seconds`` / ``cancellation`` / ``retry`` are advisory
+        hints, executed by the vendor adapter / caller layer.
+      - Raising ``AdapterError`` (B3) with a closed
+        ``AdapterErrorCategory`` on failure.
+
+    Module / import time:
+      - Module import is side-effect-free. No I/O may be triggered at
+        import; ``invoke`` is the only path that reaches I/O.
+
+    The base does not enforce these rules at runtime beyond the explicit
+    type checks above; enforcement lives in the B4 test surface and in
+    code review of vendor adapters. Vendor adapters that violate this
+    boundary are rejected at PR review.
     """
 
     capability_kind: AdapterCapabilityKind = ""
@@ -373,14 +416,15 @@ class AdapterBase(abc.ABC):
     def __init__(
         self, *, credentials: Optional[AdapterCredentials] = None
     ) -> None:
-        """Base-only construction surface.
+        """Base-only construction surface — I/O-free by contract (B4).
 
-        Accepts an optional ``AdapterCredentials`` envelope and stores it for
-        later invocation-time use by the vendor adapter. The base performs
-        no I/O here and never calls ``credentials.resolver.resolve(...)`` —
-        secret resolution is the vendor adapter's responsibility at invoke
-        time. Construction-vs-invocation lifecycle policy beyond this storage
-        is deferred to the B4 PR.
+        Accepts an optional ``AdapterCredentials`` envelope (B1) and stores
+        it for later invocation-time use by the vendor adapter. Per the
+        construction-vs-invocation lifecycle (see class docstring), the
+        base MUST NOT call ``credentials.resolver.resolve(...)`` here, MUST
+        NOT perform any I/O, and MUST NOT run provider-specific
+        initialisation. Subclasses inherit this rule: any first I/O is
+        reachable only via ``invoke``.
         """
         if credentials is not None and not isinstance(
             credentials, AdapterCredentials
@@ -405,10 +449,11 @@ class AdapterBase(abc.ABC):
         """Execute the capability against ``invocation``. Vendor-specific.
 
         ``context`` is the unified base-only execution control entry
-        (timeout / retry / cancellation hints). The base never inspects
-        ``context`` itself; honouring it is the (future) caller / runtime
-        and vendor adapter responsibility. Construction-vs-invocation
-        lifecycle policy beyond this signature is deferred to the B4 PR.
+        (timeout / retry / cancellation hints, B2). The base never
+        inspects ``context`` itself; honouring it is the (future) caller
+        / runtime and vendor adapter responsibility. Per the
+        construction-vs-invocation lifecycle (see class docstring),
+        ``invoke`` is the first method on which I/O is permitted.
         """
         raise NotImplementedError
 

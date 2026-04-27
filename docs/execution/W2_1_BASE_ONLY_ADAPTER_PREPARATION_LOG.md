@@ -99,12 +99,52 @@ was added, what was intentionally not added, and what blockers remain.
 
 ## B4 — Construction-vs-Invocation Lifecycle
 
-- Status: NOT STARTED.
+- Date: 2026-04-27
+- Status: implementation green; awaiting architect + reviewer signoff
+- Evidence: `docs/execution/evidence/w2_1_b4_adapter_lifecycle_boundary_v1.md`
+- Code:
+  - `gateway/app/services/capability/adapters/base.py` (consolidated the
+    construction-vs-invocation lifecycle policy as a single
+    authoritative section in the `AdapterBase` class docstring; removed
+    the B1 / B2 "deferred to the B4 PR" placeholders on `__init__` and
+    `invoke` docstrings; no new code surface added)
+  - `tests/services/capability/adapters/test_adapter_lifecycle.py`
+    (20 tests, pass)
+- What B4 adds: explicit construction-vs-invocation lifecycle boundary
+  on `AdapterBase`. Construction time may store the injected
+  `AdapterCredentials` envelope (B1) and validate dependency shapes,
+  but performs no I/O, no `resolver.resolve(...)` call, no timer /
+  scheduler, and no provider-specific initialisation. Invocation time
+  (`invoke`) is the first reachable I/O surface; it carries the
+  `AdapterInvocation` plus an optional `AdapterExecutionContext` (B2)
+  and may raise `AdapterError` (B3). Module import is
+  side-effect-free. The boundary is enforced via 20 tests covering
+  allowed/forbidden construction state, invocation surface,
+  module/import-time discipline, no provider-specific init, and
+  compatibility with the frozen B1/B2/B3 surfaces.
+- What B4 does NOT add: no new dataclass / abstract class / public
+  method / exported symbol; no concrete `SecretResolver` or
+  `CancellationToken`; no retry-loop / scheduler / timer plumbing;
+  no provider SDK / client absorption; no provider adapter
+  implementation; no runtime wiring; no business-layer fallback / truth
+  path; no change to B1/B2/B3 frozen field shapes; no change to
+  `AdapterInvocation` / `AdapterResult` / capability-kind subclasses;
+  no change to `ops/env/*`, `gateway/app/services/packet/`,
+  `tests/contracts/`, `tests/guardrails/`, Hot Follow, frontend, or
+  workbench.
+- Validation: `python3 -m pytest tests/services/capability/adapters/ tests/guardrails -v`
+  → 92 passed (B4: 20 new, B2: 31 unchanged, B1: 21 unchanged, B3: 13
+  unchanged, guardrails: 7 unchanged).
+- Next handoff: architect signoff on B4 boundary; reviewer closes B4
+  PR; B1–B4 are then implementation-complete and the W2.1 Provider
+  Absorption gate may open after governance signoff.
 
 ---
 
 ## W2.1 Provider Absorption gate
 
 W2.1 Provider Absorption remains BLOCKED until B1–B4 are all green and
-signed off (W2.1 directive §9). After B3, three of the four base-only PRs
-remain outstanding.
+signed off (W2.1 directive §9). After B4, all four base-only PRs are
+implementation-green; only architect + reviewer signoff on B2 and B4
+(B1 and B3 are merged on `main`) remains before the first W2.1 Provider
+PR may open. Provider absorption is still NOT started in this wave.
