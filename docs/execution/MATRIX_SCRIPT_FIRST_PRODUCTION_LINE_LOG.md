@@ -97,7 +97,45 @@ strictly non-overlapping; each phase is reviewable independently.
 
 ## Phase C — Delivery Binding
 
-- Status: NOT STARTED — gated on Phase B acceptance + explicit next instruction.
+- Date: 2026-04-28
+- Status: implementation green (contract-first / projection-only); awaiting architect + reviewer signoff
+- Authority:
+  - 指挥单 Phase C (target, minimum scope, acceptance)
+  - `docs/contracts/matrix_script/task_entry_contract_v1.md` (Phase A entry boundary)
+  - `docs/contracts/matrix_script/workbench_variation_surface_contract_v1.md` (Phase B workbench boundary)
+  - `docs/contracts/matrix_script/packet_v1.md` (frozen packet truth)
+  - `schemas/packets/matrix_script/packet.schema.json`
+  - `schemas/packets/matrix_script/sample/*.json`
+  - `docs/contracts/factory_delivery_contract_v1.md`
+- Evidence: `docs/execution/evidence/matrix_script_phase_c_delivery_binding_v1.md`
+- Code / docs:
+  - `docs/contracts/matrix_script/delivery_binding_contract_v1.md` (NEW — Phase C delivery contract)
+  - `docs/execution/evidence/matrix_script_phase_c_delivery_binding_v1.md` (NEW — Phase C evidence)
+  - `gateway/app/services/matrix_script/delivery_binding.py` (NEW — read-only delivery projection)
+  - `gateway/app/services/matrix_script/__init__.py` (UPDATED — export delivery projector)
+  - `gateway/app/routers/matrix_script_panel_debug.py` (UPDATED — read-only `/delivery-data`)
+  - `tests/contracts/matrix_script/test_delivery_binding_phase_c.py` (NEW — Phase C validation suite)
+- What this phase adds:
+  - Formal Delivery Binding projection object:
+    `delivery_pack`, `result_packet_binding`, `manifest`, `metadata_projection`,
+    and `phase_d_deferred`.
+  - Visible delivery-center rows for Matrix Script:
+    `matrix_script_variation_manifest`, `matrix_script_slot_bundle`,
+    `matrix_script_subtitle_bundle`, `matrix_script_audio_preview`, and
+    `matrix_script_scene_pack`.
+  - `result_packet_binding` visualization from packet truth only: generic refs,
+    line-specific refs, binding profile refs, capability plan, and cell-to-slot
+    bindings from `variation_matrix.delta.cells[]` joined to `slot_pack.delta.slots[]`.
+  - Manifest / metadata behavior as read-only display projection from packet identity,
+    binding refs, packet metadata, and validator report path.
+  - Phase C validation tests for contract presence, deliverable projection,
+    result binding projection, manifest/metadata read-only behavior, Phase D feedback
+    deferral, packet immutability, and forbidden-scope absence.
+- What this phase does NOT add: no publish feedback write-back, no provider/model/vendor
+  controls, no packet/schema redesign, no Digital Anchor, no Hot Follow change,
+  no W2.2 / W2.3 advancement, no frontend heavy rebuild, no artifact lookup,
+  and no runtime/provider orchestration.
+- Hard stop: after Phase C, do not start Phase D. Wait for review / next instruction.
 
 ## Phase D — Publish Feedback Closure
 

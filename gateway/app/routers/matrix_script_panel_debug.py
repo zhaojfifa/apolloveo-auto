@@ -7,6 +7,7 @@ from typing import Any, Dict
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
+from gateway.app.services.matrix_script.delivery_binding import project_delivery_binding
 from gateway.app.services.matrix_script.workbench_variation_surface import (
     project_workbench_variation_surface,
 )
@@ -40,4 +41,14 @@ def matrix_script_panel_data() -> Dict[str, Any]:
         "source": "schemas/packets/matrix_script/sample/matrix_script_packet_v1.sample.json",
         "packet_instance": packet,
         "panel_data": project_workbench_variation_surface(packet),
+    }
+
+
+@router.get("/delivery-data")
+def matrix_script_delivery_data() -> Dict[str, Any]:
+    packet = json.loads(SAMPLE_PACKET.read_text(encoding="utf-8"))
+    return {
+        "source": "schemas/packets/matrix_script/sample/matrix_script_packet_v1.sample.json",
+        "packet_instance": packet,
+        "delivery_binding": project_delivery_binding(packet),
     }
