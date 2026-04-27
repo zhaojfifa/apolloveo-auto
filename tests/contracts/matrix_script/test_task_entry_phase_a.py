@@ -272,10 +272,10 @@ def test_log_preserves_phase_sequence_after_phase_a() -> None:
     assert "implementation green" in phase_c_section, "Phase C is not recorded as implemented"
     assert "do not start Phase D" in phase_c_section, "Phase C hard stop is missing"
 
-    phase_d_window = text[phase_d_idx : phase_d_idx + 400]
-    assert "NOT STARTED" in phase_d_window, (
-        "execution log does not mark Phase D as NOT STARTED"
-    )
+    phase_d_section = text[phase_d_idx:]
+    assert "Phase D.0" in phase_d_section, "execution log missing Phase D.0 row"
+    assert "Phase D.1" in phase_d_section, "execution log missing Phase D.1 row"
+    assert "contract freeze" in phase_d_section, "Phase D.0 contract freeze marker missing"
 
 
 @pytest.mark.parametrize("entry", sorted(LINE_TRUTH_ENTRIES))

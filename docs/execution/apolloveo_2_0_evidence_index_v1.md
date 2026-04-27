@@ -123,6 +123,8 @@ Status: P2 pre-execution evidence index
 | Matrix Script First Production Line — Phase C (Delivery Binding) — tests | `tests/contracts/matrix_script/test_delivery_binding_phase_c.py` |
 | Matrix Script First Production Line — Phase D.0 (Publish Feedback Closure Contract Freeze) — contract | `docs/contracts/matrix_script/publish_feedback_closure_contract_v1.md` |
 | Matrix Script First Production Line — Phase D.0 (Publish Feedback Closure Contract Freeze) — evidence | `docs/execution/evidence/matrix_script_phase_d_publish_feedback_closure_contract_v1.md` |
+| Matrix Script First Production Line — Phase D.1 (Publish Feedback Closure Write-Back) — evidence | `docs/execution/evidence/matrix_script_phase_d1_publish_feedback_closure_writeback_v1.md` |
+| Matrix Script First Production Line — Phase D.1 (Publish Feedback Closure Write-Back) — tests | `tests/contracts/matrix_script/test_publish_feedback_closure_phase_d1.py` |
 | skills/worker/planning ADR | `docs/adr/ADR-phase2-skills-worker-planning.md` |
 | task router decomposition ADR | `docs/adr/ADR-task-router-decomposition.md` |
 

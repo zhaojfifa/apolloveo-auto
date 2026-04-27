@@ -193,7 +193,62 @@ strictly non-overlapping; each phase is reviewable independently.
 - Hard stop: after Phase D.0, do not start Phase D.1 implementation. Wait for
   review / next instruction.
 
-### Phase D.1+ — Implementation
+### Phase D.1 — Minimal Publish Feedback Closure Write-Back
 
-- Status: NOT STARTED — gated on Phase D.0 acceptance + explicit next instruction
-  authorizing write-back implementation.
+- Date: 2026-04-28
+- Status: implementation green (minimal write-back); awaiting architect + reviewer signoff
+- Phase D.0 signoff input: PASS (per total-control instruction issued 2026-04-28)
+- Authority:
+  - 指挥单 Phase D (target, minimum scope, acceptance)
+  - `docs/contracts/matrix_script/publish_feedback_closure_contract_v1.md` (Phase D.0 freeze)
+  - `docs/contracts/matrix_script/delivery_binding_contract_v1.md` (Phase C boundary)
+  - `docs/contracts/matrix_script/workbench_variation_surface_contract_v1.md` (Phase B boundary)
+  - `docs/contracts/matrix_script/task_entry_contract_v1.md` (Phase A boundary)
+  - `docs/contracts/matrix_script/packet_v1.md` (frozen packet truth)
+  - `schemas/packets/matrix_script/packet.schema.json`
+- Evidence: `docs/execution/evidence/matrix_script_phase_d1_publish_feedback_closure_writeback_v1.md`
+- Code / docs:
+  - `gateway/app/services/matrix_script/publish_feedback_closure.py` (NEW — minimal closure persistence and append-only event surface)
+  - `gateway/app/services/matrix_script/__init__.py` (UPDATED — export closure entry points)
+  - `tests/contracts/matrix_script/test_publish_feedback_closure_phase_d1.py` (NEW — Phase D.1 validation suite)
+  - `tests/contracts/matrix_script/test_task_entry_phase_a.py` (UPDATED — phase-sequence assertion advanced from "Phase D NOT STARTED" to "Phase D.0 contract freeze + Phase D.1 implementation row")
+  - `docs/execution/evidence/matrix_script_phase_d1_publish_feedback_closure_writeback_v1.md` (NEW — Phase D.1 evidence)
+  - `docs/execution/MATRIX_SCRIPT_FIRST_PRODUCTION_LINE_LOG.md` (UPDATED — this row)
+  - `docs/execution/apolloveo_2_0_evidence_index_v1.md` (UPDATED — Phase D.1 evidence + tests rows)
+- What this phase adds:
+  - In-process persistence surface for `matrix_script_publish_feedback_closure_v1`
+    seeded one row per `cell_id` from
+    `line_specific_refs[matrix_script_variation_matrix].delta.cells[]`.
+  - Variation-level write-back via the canonical `cell_id ↔ variation_id`
+    join with closed enum enforcement on `publish_status`, `event_kind`,
+    `actor_kind`, and `channel_metrics` keys.
+  - Append-only `feedback_closure_records[]` with per-event
+    `event_id`, `recorded_at`, `actor_kind`, `payload_ref`, and
+    `last_event_id` pointer maintained on each `variation_feedback[]` row.
+  - Origin-rule enforcement: operator-only `pending` / `retracted`,
+    platform-only `published` / `failed`, metrics-snapshot-only
+    `channel_metrics` writes, operator-note-only `operator_publish_notes`
+    writes.
+  - Phase D.1 validation tests covering closure creation, packet
+    immutability, each event-kind path, append-only audit growth,
+    in-memory store isolation, the Phase C read-only invariant, and
+    forbidden-scope absence.
+- What this phase does NOT add:
+  - no durable persistence backend (database / queue / file);
+  - no HTTP / WebSocket / callback-handler transport;
+  - no provider / model / vendor / engine controls;
+  - no per-deliverable feedback (variation-level only);
+  - no multi-channel arbitration or routing policy;
+  - no analytics aggregation, dashboards, or cross-line rollup;
+  - no ACL / auth model for closure mutation;
+  - no additive `schemas/feedback/matrix_script/*.schema.json` file
+    (deferred to the durable-persistence wave);
+  - no change to Phase A / B / C contracts, the Matrix Script packet,
+    schema, sample, the workbench projector, or the delivery projector;
+  - no Digital Anchor scope;
+  - no Hot Follow scope;
+  - no W2.2 / W2.3 advancement;
+  - no frontend rebuild;
+  - no debug-panel mutation.
+- Hard stop: after Phase D.1, do not auto-start Digital Anchor. Wait for
+  Matrix Script line signoff and explicit next instruction.
