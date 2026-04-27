@@ -112,6 +112,76 @@ class AdapterError(Exception):
 
 
 @dataclass(frozen=True)
+class SecretRef:
+    """Logical, provider-agnostic handle to a single secret value.
+
+    ``name`` is an adapter-defined logical key. It MUST NOT be an env var
+    name, a vendor-pinned token id, or a credential literal — mapping a
+    logical name to its concrete source (env, vault, KMS, file) is the
+    resolver's responsibility, not the base's. Concrete env-name authority
+    lives in ``ops/env/env_matrix_v1.md`` (W2 admission Phase B).
+
+    ``purpose`` is an optional, human-readable annotation (e.g. "translate
+    api key"). It carries no truth and no vendor identifier.
+    """
+
+    name: str
+    purpose: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.name, str) or not self.name:
+            raise ValueError("SecretRef.name must be a non-empty string")
+        if self.purpose is not None and not isinstance(self.purpose, str):
+            raise TypeError("SecretRef.purpose must be a string when set")
+
+
+class SecretResolver(abc.ABC):
+    """Provider-agnostic resolver of logical ``SecretRef`` handles.
+
+    The base only declares this surface; it does **not** ship an
+    implementation. Concrete resolvers live in the runtime / ops layer
+    (outside this base module), so the adapter base never grows a direct
+    dependency on env-loading, vault clients, or vendor SDKs.
+
+    Discipline:
+    - MUST NOT be implemented inside ``capability/adapters/`` itself.
+    - MUST be side-effect-free at construction (no I/O at ``__init__``).
+    - ``resolve`` MAY perform I/O; it returns the secret value or ``None``
+      when absent. Fail-closed semantics belong to the caller per
+      ``ops/env/secret_loading_baseline_v1.md`` §3.5.
+    """
+
+    @abc.abstractmethod
+    def resolve(self, ref: "SecretRef") -> Optional[str]:
+        """Return the secret value bound to ``ref`` or ``None`` if absent."""
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class AdapterCredentials:
+    """Construction-time credential surface handed to an adapter.
+
+    Holds an injected ``SecretResolver``. Provider-agnostic on purpose:
+    - MUST NOT carry vendor / model / engine identifiers.
+    - MUST NOT carry resolved secret values (the value lives only inside
+      ``resolver.resolve(...)`` calls at invocation time).
+    - MUST NOT carry env var names — those are resolver-internal.
+    - MUST NOT encode business / task / packet truth.
+
+    The base never calls ``resolver.resolve(...)`` itself; resolution is
+    the vendor adapter's job at invocation time.
+    """
+
+    resolver: SecretResolver
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.resolver, SecretResolver):
+            raise TypeError(
+                "AdapterCredentials.resolver must be a SecretResolver instance"
+            )
+
+
+@dataclass(frozen=True)
 class AdapterInvocation:
     """Contract-shaped inputs handed to an adapter.
 
@@ -161,6 +231,31 @@ class AdapterBase(abc.ABC):
                 f"outside closed set {sorted(CAPABILITY_KINDS)}"
             )
 
+    def __init__(
+        self, *, credentials: Optional[AdapterCredentials] = None
+    ) -> None:
+        """Base-only construction surface.
+
+        Accepts an optional ``AdapterCredentials`` envelope and stores it for
+        later invocation-time use by the vendor adapter. The base performs
+        no I/O here and never calls ``credentials.resolver.resolve(...)`` —
+        secret resolution is the vendor adapter's responsibility at invoke
+        time. Construction-vs-invocation lifecycle policy beyond this storage
+        is deferred to the B4 PR.
+        """
+        if credentials is not None and not isinstance(
+            credentials, AdapterCredentials
+        ):
+            raise TypeError(
+                "credentials must be an AdapterCredentials instance"
+            )
+        self._credentials: Optional[AdapterCredentials] = credentials
+
+    @property
+    def credentials(self) -> Optional[AdapterCredentials]:
+        """Read-only access to injected credentials (may be ``None``)."""
+        return self._credentials
+
     @abc.abstractmethod
     def invoke(self, invocation: AdapterInvocation) -> AdapterResult:
         """Execute the capability against ``invocation``. Vendor-specific."""
@@ -202,10 +297,13 @@ class PackAdapter(AdapterBase):
 __all__ = [
     "AdapterBase",
     "AdapterCapabilityKind",
+    "AdapterCredentials",
     "AdapterError",
     "AdapterErrorCategory",
     "AdapterInvocation",
     "AdapterResult",
+    "SecretRef",
+    "SecretResolver",
     "UnderstandingAdapter",
     "SubtitlesAdapter",
     "DubAdapter",
