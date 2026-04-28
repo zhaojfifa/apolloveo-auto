@@ -208,4 +208,43 @@ forbidden at all phases.
 
 ### Phase D.1 — Publish Feedback Closure Write-Back
 
-- Status: NOT STARTED. Sequenced after Phase D.0 signoff.
+- Date: 2026-04-28
+- Status: implementation green (minimal closure-object write-back); awaiting architect + reviewer line-closure signoff
+- Phase D.0 signoff input: PASS (latest architect/reviewer signoff in current conversation)
+- Authority:
+  - `docs/architecture/apolloveo_2_0_master_plan_v1_1.md`
+  - `docs/architecture/ApolloVeo_2.0_多角色实施指挥单_v1.md`
+  - `docs/contracts/digital_anchor/task_entry_contract_v1.md`
+  - `docs/contracts/digital_anchor/workbench_role_speaker_surface_contract_v1.md`
+  - `docs/contracts/digital_anchor/delivery_binding_contract_v1.md`
+  - `docs/contracts/digital_anchor/publish_feedback_closure_contract_v1.md`
+  - `docs/contracts/digital_anchor/packet_v1.md` (frozen packet truth)
+  - `docs/contracts/digital_anchor/role_pack_contract_v1.md`
+  - `docs/contracts/digital_anchor/speaker_plan_contract_v1.md`
+  - `schemas/packets/digital_anchor/packet.schema.json`
+  - `schemas/packets/digital_anchor/sample/*.json`
+- Evidence: `docs/execution/evidence/digital_anchor_phase_d1_publish_feedback_closure_writeback_v1.md`
+- Code / docs:
+  - `gateway/app/services/digital_anchor/publish_feedback_closure.py` (NEW — separate feedback closure write-back surface)
+  - `tests/contracts/digital_anchor/test_publish_feedback_closure_phase_d1.py` (NEW — Phase D.1 validation suite)
+  - `docs/execution/evidence/digital_anchor_phase_d1_publish_feedback_closure_writeback_v1.md` (NEW — Phase D.1 evidence)
+- What this phase implements:
+  - Minimal separate `digital_anchor_publish_feedback_closure_v1` object creation
+    from packet identity and Phase C manifest identity.
+  - Role-level feedback write-back joined to
+    `digital_anchor_role_pack.delta.roles[]`.
+  - Segment-level feedback write-back joined to
+    `digital_anchor_speaker_plan.delta.segments[]`.
+  - Scoped `publish_status`, `publish_url`, `channel_metrics`, and
+    `operator_publish_notes` updates inside the closure object only.
+  - Append-only `feedback_closure_records[]` for role, segment, publish,
+    archive, and correction records.
+  - Minimal in-process closure store for validation; no formal runtime API or
+    durable persistence backend is introduced in this wave.
+- What this phase does NOT add: no Phase C delivery projector mutation, no
+  `manifest.*` or `metadata_projection.*` ownership mutation, no packet/schema/sample
+  redesign, no provider/model/vendor/avatar-engine/TTS/lip-sync controls, no
+  Matrix Script mutation, no Hot Follow change, no W2.2 / W2.3 advancement,
+  no frontend heavy rebuild, and no delivery readiness or task status semantics.
+- Hard stop: after Phase D.1, do not start any new wave. Wait for Digital Anchor
+  line-closure signoff.
