@@ -86,7 +86,14 @@ def hf_pipeline_state(
         summary = "origin/mm subtitles"
         if hf_subtitle_terminal_success(subtitle_lane):
             return "done", "ready"
-        if status == "pending" and not translation_waiting and (task.get("origin_srt_path") or task.get("mm_srt_path")):
+        target_subtitle_current = bool(task.get("target_subtitle_current"))
+        target_subtitle_authoritative_source = bool(task.get("target_subtitle_authoritative_source"))
+        if (
+            status == "pending"
+            and not translation_waiting
+            and target_subtitle_current
+            and target_subtitle_authoritative_source
+        ):
             status = "done"
         if status == "failed" and translation_waiting:
             status = "pending"
