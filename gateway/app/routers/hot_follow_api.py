@@ -1242,6 +1242,7 @@ def _hf_rerun_presentation_state(
     final_info: dict[str, Any] | None,
     historical_final: dict[str, Any] | None,
     dub_status: str | None,
+    current_attempt: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return _svc_hf_rerun_presentation_state(
         task,
@@ -1249,6 +1250,7 @@ def _hf_rerun_presentation_state(
         final_info,
         historical_final,
         dub_status,
+        current_attempt=current_attempt,
     )
 
 
