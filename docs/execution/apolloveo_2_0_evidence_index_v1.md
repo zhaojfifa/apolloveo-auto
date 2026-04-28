@@ -125,6 +125,10 @@ Status: P2 pre-execution evidence index
 | Matrix Script First Production Line — Phase D.0 (Publish Feedback Closure Contract Freeze) — evidence | `docs/execution/evidence/matrix_script_phase_d_publish_feedback_closure_contract_v1.md` |
 | Matrix Script First Production Line — Phase D.1 (Publish Feedback Closure Write-Back) — evidence | `docs/execution/evidence/matrix_script_phase_d1_publish_feedback_closure_writeback_v1.md` |
 | Matrix Script First Production Line — Phase D.1 (Publish Feedback Closure Write-Back) — tests | `tests/contracts/matrix_script/test_publish_feedback_closure_phase_d1.py` |
+| Digital Anchor Second Production Line Wave — execution log | `docs/execution/DIGITAL_ANCHOR_SECOND_PRODUCTION_LINE_LOG.md` |
+| Digital Anchor Second Production Line — Phase A (Task / Role Entry) — contract | `docs/contracts/digital_anchor/task_entry_contract_v1.md` |
+| Digital Anchor Second Production Line — Phase A (Task / Role Entry) — evidence | `docs/execution/evidence/digital_anchor_phase_a_task_entry_v1.md` |
+| Digital Anchor Second Production Line — Phase A (Task / Role Entry) — tests | `tests/contracts/digital_anchor/test_task_entry_phase_a.py` |
 | skills/worker/planning ADR | `docs/adr/ADR-phase2-skills-worker-planning.md` |
 | task router decomposition ADR | `docs/adr/ADR-task-router-decomposition.md` |
 
