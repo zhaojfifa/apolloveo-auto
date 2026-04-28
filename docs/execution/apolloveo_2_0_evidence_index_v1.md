@@ -132,6 +132,9 @@ Status: P2 pre-execution evidence index
 | Digital Anchor Second Production Line — Phase B (Workbench Role / Speaker Surface) — contract | `docs/contracts/digital_anchor/workbench_role_speaker_surface_contract_v1.md` |
 | Digital Anchor Second Production Line — Phase B (Workbench Role / Speaker Surface) — evidence | `docs/execution/evidence/digital_anchor_phase_b_workbench_role_speaker_surface_v1.md` |
 | Digital Anchor Second Production Line — Phase B (Workbench Role / Speaker Surface) — tests | `tests/contracts/digital_anchor/test_workbench_role_speaker_phase_b.py` |
+| Digital Anchor Second Production Line — Phase C (Delivery Binding) — contract | `docs/contracts/digital_anchor/delivery_binding_contract_v1.md` |
+| Digital Anchor Second Production Line — Phase C (Delivery Binding) — evidence | `docs/execution/evidence/digital_anchor_phase_c_delivery_binding_v1.md` |
+| Digital Anchor Second Production Line — Phase C (Delivery Binding) — tests | `tests/contracts/digital_anchor/test_delivery_binding_phase_c.py` |
 | skills/worker/planning ADR | `docs/adr/ADR-phase2-skills-worker-planning.md` |
 | task router decomposition ADR | `docs/adr/ADR-task-router-decomposition.md` |
 

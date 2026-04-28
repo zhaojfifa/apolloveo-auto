@@ -123,7 +123,46 @@ forbidden at all phases.
 
 ## Phase C — Delivery Binding
 
-- Status: NOT STARTED. Sequenced after Phase B.
+- Date: 2026-04-28
+- Status: implementation green (contract-first / projection-only); awaiting architect + reviewer signoff
+- Phase B signoff input: PASS (latest architect/reviewer signoff in current conversation)
+- Authority:
+  - `docs/architecture/apolloveo_2_0_master_plan_v1_1.md`
+  - `docs/architecture/ApolloVeo_2.0_多角色实施指挥单_v1.md`
+  - `docs/contracts/digital_anchor/task_entry_contract_v1.md`
+  - `docs/contracts/digital_anchor/workbench_role_speaker_surface_contract_v1.md`
+  - `docs/contracts/digital_anchor/packet_v1.md` (frozen packet truth)
+  - `docs/contracts/digital_anchor/role_pack_contract_v1.md`
+  - `docs/contracts/digital_anchor/speaker_plan_contract_v1.md`
+  - `schemas/packets/digital_anchor/packet.schema.json`
+  - `schemas/packets/digital_anchor/sample/*.json`
+  - `docs/contracts/factory_delivery_contract_v1.md`
+- Evidence: `docs/execution/evidence/digital_anchor_phase_c_delivery_binding_v1.md`
+- Code / docs:
+  - `docs/contracts/digital_anchor/delivery_binding_contract_v1.md` (NEW — Phase C delivery contract)
+  - `docs/execution/evidence/digital_anchor_phase_c_delivery_binding_v1.md` (NEW — Phase C evidence)
+  - `gateway/app/services/digital_anchor/delivery_binding.py` (NEW — read-only packet projection)
+  - `gateway/app/services/digital_anchor/__init__.py` (UPDATED — exports Phase C projector)
+  - `tests/contracts/digital_anchor/test_delivery_binding_phase_c.py` (NEW — Phase C validation suite)
+- What this phase adds:
+  - Formal Delivery Binding projection object:
+    `delivery_pack`, `result_packet_binding`, `manifest`,
+    `metadata_projection`, and `phase_d_deferred`.
+  - Visible deliverables for role manifest, speaker segment bundle, subtitle bundle,
+    audio bundle, lip-sync bundle, and scene pack.
+  - Result packet binding visualization from packet provenance only: `generic_refs`,
+    `line_specific_refs`, binding profile refs, capability plan, and role-to-segment
+    bindings.
+  - Manifest / metadata projection as read-only display from packet identity,
+    binding refs, metadata, validator report path, and packet ready state.
+  - Phase C validation tests for delivery pack, packet binding visualization,
+    read-only manifest / metadata behavior, Phase D feedback deferral, packet
+    immutability, and forbidden-scope absence.
+- What this phase does NOT add: no publish feedback write-back, no provider/model/vendor/
+  avatar-engine/TTS/lip-sync controls, no packet/schema/sample redesign, no Matrix
+  Script mutation, no Hot Follow change, no W2.2 / W2.3 advancement, no frontend
+  heavy rebuild, and no runtime/provider orchestration.
+- Hard stop: after Phase C, do not start Phase D. Wait for review / next instruction.
 
 ---
 
