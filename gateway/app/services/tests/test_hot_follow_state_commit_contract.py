@@ -2,6 +2,7 @@ from gateway.app.services.contract_runtime.current_attempt_runtime import (
     build_hot_follow_current_attempt_summary,
     selected_route_from_state,
 )
+from gateway.app.services import task_view_presenters
 from gateway.app.services.task_view_helpers import hot_follow_terminal_no_dub_projection
 from gateway.app.services.task_view_workbench_contract import _subtitles_section
 
@@ -172,6 +173,68 @@ def test_stable_preserve_bgm_source_audio_route_is_unchanged():
     assert route["compose_allowed"] is True
 
 
+def test_preserve_source_no_tts_lane_does_not_select_tts_replace_or_stale_block():
+    state = {
+        "artifact_facts": {
+            "compose_input": _compose_input(),
+            "audio_lane": {
+                "tts_voiceover_exists": False,
+                "source_audio_preserved": True,
+                "bgm_configured": False,
+                "no_tts": True,
+            },
+        },
+        "audio": {
+            "audio_ready": False,
+            "audio_ready_reason": "dub_stale_after_subtitles",
+            "dub_current": False,
+            "dub_current_reason": "dub_stale_after_subtitles",
+            "no_dub": False,
+            "no_dub_reason": None,
+        },
+        "subtitles": {
+            "subtitle_ready": False,
+            "target_subtitle_current": False,
+            "target_subtitle_authoritative_source": False,
+            "target_subtitle_current_reason": "preserve_source_route_no_target_subtitle_required",
+            "dub_input_text": "",
+        },
+        "final": {"exists": False},
+    }
+
+    route = selected_route_from_state({"kind": "hot_follow"}, state)
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state=state["audio"],
+        subtitle_lane=state["subtitles"],
+        dub_status="pending",
+        compose_status="pending",
+        composed_reason="compose_not_done",
+        artifact_facts=state["artifact_facts"],
+        no_dub=False,
+    )
+
+    assert route["name"] == "preserve_source_route"
+    assert route["name"] != "tts_replace_route"
+    assert route["compose_allowed"] is True
+    assert current_attempt["selected_compose_route"] == "preserve_source_route"
+    assert current_attempt["no_dub_route_terminal"] is True
+    assert current_attempt["tts_lane_expected"] is False
+    assert current_attempt["compose_allowed_reason"] == "ready"
+
+
+def test_presentation_current_attempt_dub_status_uses_l3_summary_not_l1_pipeline():
+    presentation = task_view_presenters.hf_rerun_presentation_state(
+        {"task_id": "hf-present-dub-status", "kind": "hot_follow"},
+        {"audio_ready": False, "audio_ready_reason": "dub_stale_after_subtitles"},
+        {"exists": False},
+        {"exists": False},
+        "done",
+        current_attempt={"dub_status": "pending"},
+    )
+
+    assert presentation["current_attempt"]["dub_status"] == "pending"
+
+
 def test_stable_successful_url_closure_route_and_no_dub_projection_are_unchanged():
     no_dub, no_dub_reason, no_dub_message = hot_follow_terminal_no_dub_projection(
         pipeline_config={"no_dub": "true", "dub_skip_reason": "target_subtitle_empty"},
@@ -216,4 +279,3 @@ def test_stable_successful_url_closure_route_and_no_dub_projection_are_unchanged
     assert no_dub_message is None
     assert route["name"] == "tts_replace_route"
     assert route["compose_allowed"] is True
-

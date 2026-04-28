@@ -7,6 +7,7 @@ import pytest
 from fastapi import HTTPException
 
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.services import subtitle_helpers
 from gateway.app.services import task_view_presenters
 from gateway.app.services import task_view_workbench_contract
 from gateway.app.services import compose_service as compose_module
@@ -45,6 +46,44 @@ def _compose_inputs() -> _ComposeInputs:
         compose_policy="match_video",
         ffmpeg="ffmpeg",
     )
+
+
+def test_authority_false_subtitle_lane_does_not_emit_burn_source(monkeypatch):
+    target_text = "1\n00:00:00,000 --> 00:00:02,000\nXin chao\n"
+    target_currentness = {
+        "target_subtitle_current": False,
+        "target_subtitle_current_reason": "target_subtitle_not_authoritative",
+        "target_subtitle_authoritative_source": False,
+        "target_subtitle_source_copy": False,
+    }
+    task = {
+        "task_id": "hf-url-authority-false",
+        "kind": "hot_follow",
+        "target_lang": "vi",
+        "vi_srt_path": "deliver/tasks/hf-url-authority-false/vi.srt",
+        "final_source_subtitle_storage_key": "deliver/tasks/hf-url-authority-false/final/vi.srt",
+    }
+
+    monkeypatch.setattr(subtitle_helpers, "hf_load_origin_subtitles_text", lambda _task: "source")
+    monkeypatch.setattr(subtitle_helpers, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "source")
+    monkeypatch.setattr(subtitle_helpers, "hf_load_subtitles_text", lambda *_args, **_kwargs: target_text)
+    monkeypatch.setattr(subtitle_helpers, "hf_target_subtitle_currentness_state", lambda *_args, **_kwargs: target_currentness)
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda _key: True)
+
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "source")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "source")
+    monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: target_text)
+    monkeypatch.setattr(hf_router, "_hf_target_subtitle_currentness_state", lambda *_args, **_kwargs: target_currentness)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)
+
+    service_lane = subtitle_helpers.hf_subtitle_lane_state("hf-url-authority-false", dict(task))
+    router_lane = hf_router._hf_subtitle_lane_state("hf-url-authority-false", dict(task))
+
+    for lane in (service_lane, router_lane):
+        assert lane["target_subtitle_authoritative_source"] is False
+        assert lane["target_subtitle_current"] is False
+        assert lane["actual_burn_subtitle_source"] is None
+        assert lane["dub_input_text"] == ""
 
 
 class _FakeStorage:

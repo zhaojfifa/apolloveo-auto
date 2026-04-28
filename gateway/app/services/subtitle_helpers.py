@@ -495,6 +495,12 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         target_subtitle_current_reason = explicit_target_reason
     elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
         target_subtitle_current_reason = subtitle_ready_reason
+    authoritative_burn_subtitle_source = (
+        actual_burn_subtitle_source
+        if bool(target_currentness.get("target_subtitle_current"))
+        and bool(target_currentness.get("target_subtitle_authoritative_source"))
+        else None
+    )
     dub_input_text = edited_text if subtitle_ready else ""
     helper_source_text = normalized_source_text or raw_source_text
     parse_source_role = (
@@ -520,7 +526,7 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "dub_input_text": dub_input_text,
         "dub_input_format": "srt" if hf_is_srt_text(dub_input_text) else "plain_text",
         "dub_input_source": "target_subtitle" if dub_input_text else None,
-        "actual_burn_subtitle_source": actual_burn_subtitle_source,
+        "actual_burn_subtitle_source": authoritative_burn_subtitle_source,
         "subtitle_artifact_exists": bool(subtitle_artifact_exists),
         "subtitle_ready": bool(subtitle_ready),
         "subtitle_ready_reason": subtitle_ready_reason,
