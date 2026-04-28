@@ -93,6 +93,7 @@ def test_hot_follow_local_upload_creates_normal_hot_follow_task(monkeypatch, tmp
 
     def _fake_save_upload_to_paths(*, upload, inputs_path, raw_path_target, max_bytes):
         data = upload.file.read()
+        assert max_bytes == 300 * 1024 * 1024
         assert len(data) <= max_bytes
         inputs_path.parent.mkdir(parents=True, exist_ok=True)
         inputs_path.write_bytes(data)
@@ -157,6 +158,13 @@ def test_hot_follow_local_upload_creates_normal_hot_follow_task(monkeypatch, tmp
     assert stored["raw_path"] == f"deliver/tasks/{task_id}/raw.mp4"
     assert payload["raw_path"] == f"/v1/tasks/{task_id}/raw"
     assert parse_pipeline_config(stored.get("pipeline_config")).get("ingest_mode") == "local"
+    assert parse_pipeline_config(stored.get("pipeline_config")).get("max_upload_size_mb") == "300"
+    assert parse_pipeline_config(stored.get("pipeline_config")).get("target_output_band") == "720p_1080p"
+    assert parse_pipeline_config(stored.get("pipeline_config")).get("prefer_source_quality_preservation") == "true"
+    assert (
+        parse_pipeline_config(stored.get("pipeline_config")).get("oversize_handling_policy")
+        == "preserve_original_and_derive_runtime_safe_compose_asset"
+    )
     assert parse_pipeline_config(stored.get("pipeline_config")).get("source_language_hint") == "en"
     assert parse_pipeline_config(stored.get("pipeline_config")).get("process_mode") == "smart_rewrite"
     assert parse_pipeline_config(stored.get("pipeline_config")).get("publish_account") == "account_a"

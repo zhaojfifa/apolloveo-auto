@@ -85,6 +85,7 @@ from gateway.app.services.media_helpers import (
     update_pipeline_probe as _update_pipeline_probe,
     upload_task_bgm_impl as _upload_task_bgm_impl,
 )
+from gateway.app.services.hot_follow_media_policy import hot_follow_media_input_policy
 from gateway.app.services.task_view_helpers import (
     backfill_compose_done_if_final_ready as _backfill_compose_done_if_final_ready,
     build_translation_qa_summary as _build_translation_qa_summary,
@@ -1577,8 +1578,9 @@ def create_hot_follow_task_local_upload(
     if not file or not file.filename:
         raise HTTPException(status_code=400, detail="file is required")
 
+    media_policy = hot_follow_media_input_policy()
     ext = Path(file.filename).suffix.lower()
-    if ext not in {".mp4", ".mov", ".mkv"}:
+    if ext not in set(media_policy.accepted_extensions):
         raise HTTPException(status_code=400, detail="unsupported file type")
 
     source_lang_norm = str(source_lang or "zh").strip().lower()
@@ -1586,8 +1588,7 @@ def create_hot_follow_task_local_upload(
         raise HTTPException(status_code=400, detail="unsupported source language")
 
     task_id = uuid4().hex[:12]
-    max_mb = int(os.getenv("MAX_LOCAL_UPLOAD_MB", "200"))
-    max_bytes = max_mb * 1024 * 1024
+    max_bytes = media_policy.max_upload_size_bytes
     raw_file_path = raw_path(task_id)
     _save_upload_to_paths(
         upload=file,
@@ -1619,15 +1620,26 @@ def create_hot_follow_task_local_upload(
             "auto_start": bool(auto_start),
             "pipeline_config": _merge_probe_into_pipeline_config(
                 {
-            "ingest_mode": "local",
-            "source_language_hint": source_lang_norm,
-            "process_mode": str(process_mode or "fast_clone"),
-            "publish_account": str(publish_account or "default"),
-            "source_audio_policy": normalize_source_audio_policy(source_audio_policy),
-            "bgm_strategy": "keep" if normalize_source_audio_policy(source_audio_policy) == "preserve" else "replace",
-        },
-        probe,
-    ),
+                    "ingest_mode": "local",
+                    "max_upload_size_mb": str(media_policy.max_upload_size_mb),
+                    "quality_tier_default": media_policy.quality_tier_default,
+                    "target_output_band": media_policy.target_output_band,
+                    "prefer_source_quality_preservation": (
+                        "true" if media_policy.prefer_source_quality_preservation else "false"
+                    ),
+                    "oversize_handling_policy": media_policy.oversize_handling_policy,
+                    "source_language_hint": source_lang_norm,
+                    "process_mode": str(process_mode or "fast_clone"),
+                    "publish_account": str(publish_account or "default"),
+                    "source_audio_policy": normalize_source_audio_policy(source_audio_policy),
+                    "bgm_strategy": (
+                        "keep"
+                        if normalize_source_audio_policy(source_audio_policy) == "preserve"
+                        else "replace"
+                    ),
+                },
+                probe,
+            ),
         }
     )
     task_payload = {

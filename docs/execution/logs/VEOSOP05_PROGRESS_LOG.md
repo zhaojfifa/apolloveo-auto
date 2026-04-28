@@ -2135,3 +2135,50 @@ Verification results:
 Remaining risks:
 
 - Live validation should confirm task `ffe9083de6ee` no longer shows compose-ready/recompose-style guidance when blocked, and task `c3a11f7852e2` no longer shows review-subtitles/running guidance for a legal no-TTS path.
+
+## Hot Follow Media Input And Subtitle Style Contract Improvement Wave
+
+日期：2026-04-28
+
+Reading Declaration:
+
+- Root indexes read first: `README.md`, `ENGINEERING_CONSTRAINTS_INDEX.md`, plus current root governance `ENGINEERING_RULES.md`, `CURRENT_ENGINEERING_FOCUS.md`, `PROJECT_RULES.md`.
+- Docs indexes read second: `docs/README.md`, `docs/ENGINEERING_INDEX.md`, `docs/contracts/engineering_reading_contract_v1.md`.
+- Minimum task-specific authority read: `docs/contracts/hot_follow_line_contract.md`, `docs/contracts/hot_follow_ready_gate.yaml`, `docs/contracts/status_ownership_matrix.md`, `docs/contracts/hot_follow_projection_rules_v1.md`, `docs/architecture/line_contracts/hot_follow_line.yaml`, `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`.
+- Code read after authority: Hot Follow local upload router path, compose service derive/output path, subtitle rendering helper, pipeline config persistence, and focused tests.
+- This set was sufficient because the task only changed Hot Follow media ingress/runtime compose input policy and subtitle style policy; it did not touch provider, ready-gate formulas, publish/workbench payload shape, or new-line runtime assembly.
+
+Scope:
+
+- Media input quality policy and runtime wiring only.
+- Subtitle style profile policy and runtime wiring only.
+- No provider/model/vendor changes.
+- No new production line work.
+- No broad Hot Follow closure work.
+
+Changes:
+
+- Added `gateway/app/services/hot_follow_media_policy.py` as the narrow owner for Hot Follow media input policy and subtitle style profile.
+- Raised Hot Follow local upload ingress default to 300MB through runtime policy, not UI-only masking.
+- Persisted media policy fields through the local upload pipeline config path.
+- Kept raw uploaded source preserved as `raw_path`.
+- Kept compose derive runtime-safe behavior for large/high-bitrate/high-pixel local inputs.
+- Changed derive scaling to orientation-aware 720p-1080p target-band preservation instead of collapsing landscape inputs to a low-height output.
+- Persisted `compose_output_quality_policy` on compose success and target-band fields on compose input policy.
+- Moved subtitle defaults behind `hot_follow_compact_default`; default font size is smaller while bottom safe margin behavior and two-line wrapping remain owned by policy.
+
+Validation results:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_media_policy.py gateway/app/services/compose_subtitle_rendering.py gateway/app/services/compose_service.py gateway/app/routers/hot_follow_api.py gateway/app/utils/pipeline_config.py` -> passed.
+- `python3.11 -m pytest gateway/app/services/tests/test_compose_subtitle_rendering.py gateway/app/services/tests/test_compose_service_contract.py gateway/app/services/status_policy/tests/test_hot_follow_new_page_routes.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q` -> 61 passed, 41 pre-existing Pydantic deprecation warnings.
+- `git diff --check` -> passed.
+
+Validation limits:
+
+- No true 300MB live upload was executed in this local environment.
+- Large input handling was validated by focused policy/runtime tests and existing compose derive tests with FFmpeg calls mocked.
+
+Remaining risks:
+
+- Live/staging should confirm real 250-300MB local uploads complete within infrastructure body-size and storage timeout limits.
+- Visual subtitle compactness was validated by render signature/style values and wrapping samples, not by a rendered video screenshot in this run.

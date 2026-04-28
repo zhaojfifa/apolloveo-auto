@@ -29,6 +29,10 @@ from fastapi import HTTPException
 from gateway.app.services.artifact_storage import object_exists, object_head
 from gateway.app.services.line_binding_service import get_line_runtime_binding
 from gateway.app.services.media_helpers import sha256_file
+from gateway.app.services.hot_follow_media_policy import (
+    hot_follow_compose_scale_expr,
+    hot_follow_media_input_policy,
+)
 from gateway.app.services.media_validation import (
     MIN_VIDEO_BYTES,
     assert_artifact_ready,
@@ -1226,6 +1230,7 @@ class CompositionService:
             self._storage.download_file(str(inputs.bgm_key), str(bgm_path))
 
         compose_input_policy = dict(task.get("compose_input_policy") or {})
+        media_policy = hot_follow_media_input_policy()
         if derive_warning:
             compose_input_policy.update(
                 {
@@ -1235,6 +1240,9 @@ class CompositionService:
                     "safe_key": video_path.name,
                     "reason": "large_local_input_derived",
                     "failure_code": None,
+                    "quality_tier_default": media_policy.quality_tier_default,
+                    "target_output_band": media_policy.target_output_band,
+                    "prefer_source_quality_preservation": media_policy.prefer_source_quality_preservation,
                 }
             )
         elif str(compose_input_policy.get("mode") or "").strip().lower() not in {"blocked", "derive_failed"}:
@@ -1246,6 +1254,9 @@ class CompositionService:
                     "safe_key": video_path.name,
                     "reason": compose_input_policy.get("reason"),
                     "failure_code": None,
+                    "quality_tier_default": media_policy.quality_tier_default,
+                    "target_output_band": media_policy.target_output_band,
+                    "prefer_source_quality_preservation": media_policy.prefer_source_quality_preservation,
                 }
             )
 
@@ -1408,6 +1419,8 @@ class CompositionService:
 
     @staticmethod
     def _large_input_limits() -> dict[str, int]:
+        policy = hot_follow_media_input_policy()
+
         def _env_int(name: str, default: int) -> int:
             try:
                 return int(os.getenv(name, str(default)))
@@ -1415,12 +1428,13 @@ class CompositionService:
                 return default
 
         return {
-            "bytes": _env_int("HF_COMPOSE_DERIVE_MIN_BYTES", 250 * 1024 * 1024),
-            "bitrate": _env_int("HF_COMPOSE_DERIVE_MIN_BITRATE", 12_000_000),
-            "pixels": _env_int("HF_COMPOSE_DERIVE_MIN_PIXELS", 1920 * 1080),
-            "max_width": _env_int("HF_COMPOSE_DERIVE_MAX_WIDTH", 1080),
-            "max_height": _env_int("HF_COMPOSE_DERIVE_MAX_HEIGHT", 1920),
-            "crf": _env_int("HF_COMPOSE_DERIVE_CRF", 23),
+            "bytes": _env_int("HF_COMPOSE_DERIVE_MIN_BYTES", policy.derive_min_bytes),
+            "bitrate": policy.derive_min_bitrate,
+            "pixels": policy.derive_min_pixels,
+            "max_short_edge": policy.target_short_edge_max,
+            "max_long_edge": policy.target_long_edge_max,
+            "short_edge_floor": policy.target_short_edge_floor,
+            "crf": policy.derive_crf,
         }
 
     @staticmethod
@@ -1433,7 +1447,7 @@ class CompositionService:
         return bool(
             int(profile.size_bytes or 0) >= limits["bytes"]
             or int(profile.bit_rate or 0) >= limits["bitrate"]
-            or int(profile.pixels or 0) >= limits["pixels"]
+            or int(profile.pixels or 0) > limits["pixels"]
         )
 
     def _guard_workdir_space(self, task_id: str, tmp: Path, profile: ComposeInputProfile, *, multiplier: float = 3.0) -> None:
@@ -1468,11 +1482,9 @@ class CompositionService:
             return video_path, profile, None
 
         limits = self._large_input_limits()
+        media_policy = hot_follow_media_input_policy()
         safe_path = tmp / "video_input_safe.mp4"
-        scale_expr = (
-            f"scale='min(iw,{limits['max_width']})':'min(ih,{limits['max_height']})':"
-            "force_original_aspect_ratio=decrease:force_divisible_by=2"
-        )
+        scale_expr = hot_follow_compose_scale_expr(media_policy)
         cmd = [
             inputs.ffmpeg,
             "-y",
@@ -1514,6 +1526,8 @@ class CompositionService:
                     "failure_code": "derive_ffmpeg_failed",
                     "compose_input_profile": profile.to_dict(),
                     "safe_key": safe_path.name,
+                    "quality_tier_default": media_policy.quality_tier_default,
+                    "target_output_band": media_policy.target_output_band,
                 },
             )
         safe_size, safe_duration = assert_local_video_ok(safe_path)
@@ -1536,6 +1550,8 @@ class CompositionService:
                     "compose_input_profile": profile.to_dict(),
                     "derived_compose_input_profile": safe_profile.to_dict(),
                     "safe_key": safe_path.name,
+                    "quality_tier_default": media_policy.quality_tier_default,
+                    "target_output_band": media_policy.target_output_band,
                 },
             )
         logger.info(
@@ -2098,6 +2114,7 @@ class CompositionService:
             "freeze_tail_cap_sec": int(freeze_tail_cap_sec),
             "compose_warning": compose_warning,
             "compose_input_policy": dict(ws.compose_input_policy or {}),
+            "compose_output_quality_policy": hot_follow_media_input_policy().to_contract_dict(),
             "last_step": "compose",
             "status": "ready",
             "error_message": None,

@@ -14,6 +14,27 @@ task_kind: hot_follow
 input_contract_ref: docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md
 deliverable_profile_ref: docs/architecture/line_contracts/hot_follow_line.yaml
 
+media_input_policy:
+  max_upload_size_mb: 300
+  accepted_input_types:
+    - video/mp4
+    - video/quicktime
+    - video/x-matroska
+  accepted_extensions:
+    - .mp4
+    - .mov
+    - .mkv
+  quality_tier_default: source_preserving_720p_1080p
+  target_output_band: 720p_1080p
+  prefer_source_quality_preservation: true
+  oversize_handling_policy: preserve_original_and_derive_runtime_safe_compose_asset
+
+subtitle_style_policy:
+  subtitle_style_profile: hot_follow_compact_default
+  font_scaling_owner: gateway/app/services/hot_follow_media_policy.py
+  line_height_spacing_owner: gateway/app/services/hot_follow_media_policy.py
+  safe_margin_behavior: preserve_existing_bottom_safe_area
+
 # ─── Deliverable profile ──────────────────────────────────────────────────────
 
 deliverables:
