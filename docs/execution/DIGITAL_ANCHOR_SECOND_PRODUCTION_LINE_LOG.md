@@ -168,4 +168,44 @@ forbidden at all phases.
 
 ## Phase D — Publish Feedback Closure
 
-- Status: NOT STARTED. Sequenced after Phase C.
+### Phase D.0 — Publish Feedback Closure Contract Freeze
+
+- Date: 2026-04-28
+- Status: contract freeze green; awaiting architect + reviewer signoff
+- Phase C signoff input: PASS (latest architect/reviewer signoff in current conversation)
+- Authority:
+  - `docs/architecture/apolloveo_2_0_master_plan_v1_1.md`
+  - `docs/architecture/ApolloVeo_2.0_多角色实施指挥单_v1.md`
+  - `docs/contracts/digital_anchor/task_entry_contract_v1.md`
+  - `docs/contracts/digital_anchor/workbench_role_speaker_surface_contract_v1.md`
+  - `docs/contracts/digital_anchor/delivery_binding_contract_v1.md`
+  - `docs/contracts/digital_anchor/packet_v1.md` (frozen packet truth)
+  - `docs/contracts/digital_anchor/role_pack_contract_v1.md`
+  - `docs/contracts/digital_anchor/speaker_plan_contract_v1.md`
+  - `schemas/packets/digital_anchor/packet.schema.json`
+  - `schemas/packets/digital_anchor/sample/*.json`
+- Evidence: `docs/execution/evidence/digital_anchor_phase_d0_publish_feedback_closure_contract_v1.md`
+- Code / docs:
+  - `docs/contracts/digital_anchor/publish_feedback_closure_contract_v1.md` (NEW — Phase D.0 contract freeze)
+  - `docs/execution/evidence/digital_anchor_phase_d0_publish_feedback_closure_contract_v1.md` (NEW — Phase D.0 evidence)
+  - `tests/contracts/digital_anchor/test_publish_feedback_closure_phase_d0.py` (NEW — Phase D.0 contract validation)
+- What this phase freezes:
+  - Formal feedback closure object: `digital_anchor_publish_feedback_closure_v1`.
+  - Role-level feedback object and segment-level feedback object.
+  - `publish_url`, scoped `publish_status`, `channel_metrics`,
+    `operator_publish_notes`, and append-only `feedback_closure_records[]`.
+  - Ownership and mutability rules: feedback closure owns additive feedback truth;
+    Phase C delivery binding remains read-only.
+  - Schema impact: no packet/schema change is needed in Phase D.0; any future
+    persistence schema must be additive and external to packet schema.
+  - Mapping from Phase C delivery projection fields to feedback closure fields.
+- What this phase does NOT add: no write-back implementation, no delivery projector
+  mutation, no manifest or metadata projection ownership mutation, no
+  provider/model/vendor/avatar-engine/TTS/lip-sync controls, no Matrix Script
+  mutation, no Hot Follow change, no W2.2 / W2.3 advancement, and no packet/schema
+  redesign.
+- Hard stop: after Phase D.0, do not implement Phase D write-back. Wait for review / next instruction.
+
+### Phase D.1 — Publish Feedback Closure Write-Back
+
+- Status: NOT STARTED. Sequenced after Phase D.0 signoff.

@@ -135,6 +135,9 @@ Status: P2 pre-execution evidence index
 | Digital Anchor Second Production Line — Phase C (Delivery Binding) — contract | `docs/contracts/digital_anchor/delivery_binding_contract_v1.md` |
 | Digital Anchor Second Production Line — Phase C (Delivery Binding) — evidence | `docs/execution/evidence/digital_anchor_phase_c_delivery_binding_v1.md` |
 | Digital Anchor Second Production Line — Phase C (Delivery Binding) — tests | `tests/contracts/digital_anchor/test_delivery_binding_phase_c.py` |
+| Digital Anchor Second Production Line — Phase D.0 (Publish Feedback Closure Contract Freeze) — contract | `docs/contracts/digital_anchor/publish_feedback_closure_contract_v1.md` |
+| Digital Anchor Second Production Line — Phase D.0 (Publish Feedback Closure Contract Freeze) — evidence | `docs/execution/evidence/digital_anchor_phase_d0_publish_feedback_closure_contract_v1.md` |
+| Digital Anchor Second Production Line — Phase D.0 (Publish Feedback Closure Contract Freeze) — tests | `tests/contracts/digital_anchor/test_publish_feedback_closure_phase_d0.py` |
 | skills/worker/planning ADR | `docs/adr/ADR-phase2-skills-worker-planning.md` |
 | task router decomposition ADR | `docs/adr/ADR-task-router-decomposition.md` |
 
