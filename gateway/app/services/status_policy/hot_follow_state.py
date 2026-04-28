@@ -186,6 +186,17 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
             and not bool(gate_result.get("no_dub"))
         )
     )
+    no_dub_route_terminal = bool(
+        current_attempt.get("no_dub_route_terminal")
+        or (
+            bool(gate_result.get("no_dub"))
+            and bool(gate_result.get("no_dub_compose_allowed"))
+            and str(gate_result.get("selected_compose_route") or "").strip()
+            in {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"}
+        )
+    )
+    if no_dub_route_terminal and not bool(gate_result.get("subtitle_ready")):
+        gate_result["subtitle_ready_reason"] = "no_dub_route_terminal"
 
     compose = dict(_as_dict(state.get("compose")))
     last = dict(_as_dict(compose.get("last")))
@@ -230,6 +241,24 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
         elif compose_input_derive_failed or compose_exec_failed:
             step["error"] = gate_result.get("compose_input_reason") or gate_result.get("compose_reason")
     state["pipeline"] = pipeline
+
+    if no_dub_route_terminal:
+        subtitles = dict(_as_dict(state.get("subtitles")))
+        subtitles["status"] = "skipped"
+        subtitles["state"] = "skipped"
+        subtitles["subtitle_ready_reason"] = "no_dub_route_terminal"
+        state["subtitles"] = subtitles
+        for step in pipeline:
+            if not isinstance(step, dict):
+                continue
+            if str(step.get("key") or "").strip().lower() != "subtitles":
+                continue
+            step["status"] = "skipped"
+            step["state"] = "skipped"
+            step["error"] = None
+            step["message"] = "no_dub_route_terminal"
+            break
+        state["pipeline"] = pipeline
 
     if isinstance(state.get("deliverables"), list):
         for item in state.get("deliverables") or []:

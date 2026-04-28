@@ -480,19 +480,26 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
     helper_translate_failed = bool(helper_lane.get("failed"))
     helper_translate_error_reason = helper_lane.get("reason")
     helper_translate_error_message = helper_lane.get("message")
+    helper_translate_pending = bool(
+        helper_lane.get("output_state") == "helper_output_pending"
+        and not subtitle_ready
+        and str(normalized_source_text or raw_source_text or "").strip()
+    )
     if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
         subtitle_ready_reason = (
             "waiting_for_target_subtitle_translation"
             if explicit_target_reason == "target_subtitle_translation_incomplete" and translation_waiting
             else explicit_target_reason
         )
-    elif translation_waiting:
+    elif translation_waiting or helper_translate_pending:
         subtitle_ready_reason = "waiting_for_target_subtitle_translation"
     elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
         subtitle_ready_reason = helper_translate_error_reason or "helper_translate_failed"
     target_subtitle_current_reason = str(target_currentness.get("target_subtitle_current_reason") or subtitle_ready_reason)
     if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
         target_subtitle_current_reason = explicit_target_reason
+    elif helper_translate_pending:
+        target_subtitle_current_reason = "target_subtitle_translation_incomplete"
     elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
         target_subtitle_current_reason = subtitle_ready_reason
     authoritative_burn_subtitle_source = (

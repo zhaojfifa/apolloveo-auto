@@ -88,6 +88,10 @@ def hf_pipeline_state(
             return "done", "ready"
         target_subtitle_current = bool(task.get("target_subtitle_current"))
         target_subtitle_authoritative_source = bool(task.get("target_subtitle_authoritative_source"))
+        if status in {"done", "ready", "success", "completed"} and not (
+            target_subtitle_current and target_subtitle_authoritative_source
+        ):
+            status = "pending"
         if (
             status == "pending"
             and not translation_waiting

@@ -4,6 +4,7 @@ from gateway.app.services.contract_runtime.current_attempt_runtime import (
 )
 from gateway.app.services import task_view_presenters
 from gateway.app.services.task_view_helpers import hot_follow_terminal_no_dub_projection
+from gateway.app.services.task_view_projection import hf_pipeline_state
 from gateway.app.services.task_view_workbench_contract import _subtitles_section
 
 
@@ -100,6 +101,81 @@ def test_url_lane_authority_false_helper_pending_keeps_downstream_deferred():
     assert current_attempt["tts_lane_expected"] is False
     assert current_attempt["current_subtitle_source"] is None
     assert current_attempt["no_dub_route_terminal"] is False
+
+
+def test_voice_led_helper_pending_is_retryable_translation_waiting_state():
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": False,
+            "audio_ready_reason": "waiting_for_target_subtitle_translation",
+            "dub_current": False,
+            "dub_current_reason": "waiting_for_target_subtitle_translation",
+        },
+        subtitle_lane={
+            "subtitle_ready": False,
+            "subtitle_ready_reason": "waiting_for_target_subtitle_translation",
+            "target_subtitle_current": False,
+            "target_subtitle_authoritative_source": False,
+            "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+            "parse_source_text": "1\n00:00:00,000 --> 00:00:02,000\n你好\n",
+            "dub_input_text": "",
+            "helper_translate_status": "helper_output_pending",
+            "helper_translate_output_state": "helper_output_pending",
+            "helper_translate_provider_health": "provider_ok",
+            "helper_translate_retryable": True,
+        },
+        dub_status="pending",
+        compose_status="pending",
+        composed_reason="audio_not_ready",
+        artifact_facts={
+            "compose_input": _compose_input(),
+            "audio_lane": {
+                "tts_voiceover_exists": False,
+                "source_audio_preserved": False,
+                "bgm_configured": False,
+                "no_tts": False,
+            },
+            "selected_compose_route": {"name": "tts_replace_route"},
+            "helper_translate_status": "helper_output_pending",
+            "helper_translate_output_state": "helper_output_pending",
+            "helper_translate_provider_health": "provider_ok",
+            "helper_translate_retryable": True,
+        },
+        no_dub=False,
+        no_dub_compose_allowed=False,
+    )
+
+    assert current_attempt["selected_compose_route"] == "tts_replace_route"
+    assert current_attempt["subtitle_translation_waiting_retryable"] is True
+    assert current_attempt["subtitle_terminal_state"] == "subtitle_translation_waiting_retryable"
+    assert current_attempt["compose_execute_allowed"] is False
+    assert current_attempt["helper_translate_retryable"] is True
+
+
+def test_retry_subtitles_pipeline_done_is_demoted_without_target_authority():
+    status, summary = hf_pipeline_state(
+        {
+            "kind": "hot_follow",
+            "status": "processing",
+            "last_step": "subtitles",
+            "subtitles_status": "done",
+            "target_subtitle_current": False,
+            "target_subtitle_current_reason": "subtitle_missing",
+            "target_subtitle_authoritative_source": False,
+        },
+        "subtitles",
+        subtitle_lane={
+            "subtitle_ready": False,
+            "subtitle_ready_reason": "subtitle_missing",
+            "target_subtitle_current": False,
+            "target_subtitle_current_reason": "subtitle_missing",
+            "target_subtitle_authoritative_source": False,
+        },
+    )
+
+    assert status != "done"
+    assert status == "running"
+    assert summary == "subtitle_missing"
 
 
 def test_url_lane_authority_true_success_transitions_coherently_to_tts_ready():

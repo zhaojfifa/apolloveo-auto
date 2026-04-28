@@ -512,7 +512,11 @@ def build_hot_follow_current_attempt_summary(
     ).strip()
     translation_waiting_retryable = bool(
         not subtitle_ready
-        and target_reason == "target_subtitle_translation_incomplete"
+        and target_reason
+        in {
+            "target_subtitle_translation_incomplete",
+            "waiting_for_target_subtitle_translation",
+        }
         and selected_route == "tts_replace_route"
     )
     target_authoritative = bool(subtitle_lane.get("target_subtitle_authoritative_source"))
