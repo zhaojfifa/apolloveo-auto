@@ -239,8 +239,10 @@ def hf_rerun_presentation_state(
     final_info: dict[str, Any] | None,
     historical_final: dict[str, Any] | None,
     dub_status: str | None,
+    current_attempt: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     voice = voice_state or {}
+    l3_current_attempt = current_attempt or {}
     refs = get_contract_runtime_refs(task)
     projection_runtime = (
         get_projection_rules_runtime(refs.projection_rules_ref)
@@ -264,7 +266,7 @@ def hf_rerun_presentation_state(
             "final_updated_at": final_updated_at,
         },
         "current_attempt": {
-            "dub_status": str(dub_status or "").strip().lower() or "never",
+            "dub_status": str(l3_current_attempt.get("dub_status") or dub_status or "").strip().lower() or "never",
             "audio_ready": bool(voice.get("audio_ready")),
             "audio_ready_reason": str(voice.get("audio_ready_reason") or "").strip() or "unknown",
             "dub_current": bool(voice.get("dub_current")),
@@ -540,6 +542,7 @@ def _build_hot_follow_authoritative_state(
         projection["final_info"],
         projection["historical_final"],
         projection["dub_state"],
+        current_attempt=current_attempt,
     )
     return task, projection, state_computer(task_runtime, payload)
 
