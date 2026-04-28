@@ -74,14 +74,50 @@ forbidden at all phases.
 
 ## Phase B — Workbench Role / Speaker Surface
 
-- Status: NOT STARTED. Blocked on Phase A signoff and an explicit next
-  instruction. Phase B is NOT auto-unlocked by Phase A acceptance.
-- Expected scope (forecast only; not authority): authoring of
-  `digital_anchor_role_pack.delta.roles[]` (role_id, framing_kind,
-  language_scope_ref, appearance_ref) and
-  `digital_anchor_speaker_plan.delta.segments[]` (segment_id, binds_role_id,
-  script_ref, dub_kind, lip_sync_kind, language_pick), consuming the
-  Phase A entry seed verbatim and never re-authoring it.
+- Date: 2026-04-28
+- Status: implementation green (contract-first / projection-only); awaiting architect + reviewer signoff
+- Phase A signoff input: PASS (latest architect/reviewer signoff in current conversation)
+- Authority:
+  - `docs/architecture/apolloveo_2_0_master_plan_v1_1.md`
+  - `docs/architecture/ApolloVeo_2.0_多角色实施指挥单_v1.md`
+  - `docs/contracts/digital_anchor/task_entry_contract_v1.md` (Phase A entry seed boundary)
+  - `docs/contracts/digital_anchor/packet_v1.md` (frozen packet truth)
+  - `docs/contracts/digital_anchor/role_pack_contract_v1.md`
+  - `docs/contracts/digital_anchor/speaker_plan_contract_v1.md`
+  - `schemas/packets/digital_anchor/packet.schema.json`
+  - `schemas/packets/digital_anchor/sample/*.json`
+  - `docs/design/panel_digital_anchor_role_speaker_lowfi_v1.md`
+- Evidence: `docs/execution/evidence/digital_anchor_phase_b_workbench_role_speaker_surface_v1.md`
+- Code / docs:
+  - `docs/contracts/digital_anchor/workbench_role_speaker_surface_contract_v1.md` (NEW — Phase B surface contract)
+  - `docs/execution/evidence/digital_anchor_phase_b_workbench_role_speaker_surface_v1.md` (NEW — Phase B evidence)
+  - `gateway/app/services/digital_anchor/workbench_role_speaker_surface.py` (NEW — read-only packet projection)
+  - `gateway/app/services/digital_anchor/__init__.py` (NEW)
+  - `tests/contracts/digital_anchor/test_workbench_role_speaker_phase_b.py` (NEW — Phase B validation suite)
+- What this phase adds:
+  - Formal Workbench Role / Speaker Surface projection object:
+    `role_surface`, `speaker_surface`, `role_segment_binding_surface`,
+    `scene_binding_projection`, `attribution_refs`, and `phase_c_deferred`.
+  - Role surface derived only from
+    `line_specific_refs[digital_anchor_role_pack].delta`: `framing_kind_set`,
+    `appearance_ref_kind_set`, and `roles`.
+  - Speaker surface derived only from
+    `line_specific_refs[digital_anchor_speaker_plan].delta`: `dub_kind_set`,
+    `lip_sync_kind_set`, and `segments`.
+  - Role ↔ segment binding projection from `segments[].binds_role_id` joined to
+    `roles[].role_id`. Unresolved joins are workbench warnings only, not new state.
+  - Scene binding projection notes at workbench scope only; scene delivery remains
+    Phase C.
+  - Attribution / refs projection from packet provenance only: `generic_refs`,
+    `line_specific_refs`, `binding.capability_plan`, and `binding.worker_profile_ref`.
+  - Phase B validation tests for contract presence, sample projection fidelity,
+    role/segment join integrity, scene binding projection discipline, attribution
+    boundary, packet immutability, and forbidden-scope absence.
+- What this phase does NOT add: no delivery binding, no publish feedback write-back,
+  no provider/model/vendor/avatar-engine/TTS/lip-sync controls, no packet/schema/sample
+  redesign, no Matrix Script mutation, no Hot Follow change, no W2.2 / W2.3
+  advancement, no frontend heavy rebuild, and no runtime task-creation code.
+- Hard stop: after Phase B, do not start Phase C. Wait for review / next instruction.
 
 ---
 
