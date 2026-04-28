@@ -202,6 +202,23 @@ def hot_follow_terminal_no_dub_projection(
         route_state.get("content_mode") in {"silent_candidate", "subtitle_led"}
         and not str(subtitle_lane.get("dub_input_text") or "").strip()
     )
+    source_audio_policy = str(
+        pipeline_config.get("source_audio_policy")
+        or (task.get("config") or {}).get("source_audio_policy")
+        or ""
+    ).strip().lower()
+    target_subtitle_reason = str(
+        subtitle_lane.get("target_subtitle_current_reason")
+        or subtitle_lane.get("subtitle_ready_reason")
+        or ""
+    ).strip()
+    preserve_source_no_target_required = bool(
+        source_audio_policy == "preserve"
+        and not bool(subtitle_lane.get("subtitle_ready"))
+        and target_subtitle_reason == "preserve_source_route_no_target_subtitle_required"
+    )
+    if preserve_source_no_target_required:
+        no_dub = True
     unresolved_translation_voice_led = bool(
         route_state.get("content_mode") == "voice_led"
         and str(
@@ -238,7 +255,10 @@ def hot_follow_terminal_no_dub_projection(
         no_dub = False
     if voice_state.get("audio_ready") or voice_state.get("deliverable_audio_done") or voice_state.get("voiceover_url"):
         no_dub = False
-    if stored_no_dub_reason == "target_subtitle_empty":
+    if preserve_source_no_target_required and no_dub:
+        no_dub_reason = "source_audio_preserved_no_tts"
+        no_dub_message = "Source audio is preserved; target subtitle is not required for this compose route."
+    elif stored_no_dub_reason == "target_subtitle_empty":
         no_dub_reason = "target_subtitle_empty"
         no_dub_message = "Target subtitle is empty; dubbing is skipped."
     elif stored_no_dub_reason == "dub_input_empty":

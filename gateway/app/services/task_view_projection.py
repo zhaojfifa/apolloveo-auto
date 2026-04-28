@@ -441,7 +441,9 @@ def build_hot_follow_workbench_projection(
         voice_state=voice_state,
     )
     no_dub_compose_allowed = bool(
-        no_dub and str(no_dub_reason or "").strip().lower() in {"target_subtitle_empty", "dub_input_empty"}
+        no_dub
+        and str(no_dub_reason or "").strip().lower()
+        in {"target_subtitle_empty", "dub_input_empty", "source_audio_preserved_no_tts", "bgm_only_no_tts", "compose_no_tts"}
     )
     persisted_audio = persisted_audio_state_loader(task_id, task_runtime)
     target_lang_internal = normalize_target_lang(task_runtime.get("target_lang") or task_runtime.get("content_lang") or "mm")

@@ -55,6 +55,99 @@ def test_visible_target_text_before_authority_commit_does_not_project_no_tts_rou
     assert route["compose_execute_allowed"] is False
 
 
+def test_url_lane_authority_false_helper_pending_keeps_downstream_deferred():
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": False,
+            "audio_ready_reason": "target_subtitle_not_authoritative",
+            "dub_current": False,
+            "dub_current_reason": "target_subtitle_not_authoritative",
+            "dub_matches_current_subtitle": False,
+            "dub_subtitle_reason": "target_subtitle_not_authoritative",
+        },
+        subtitle_lane={
+            "subtitle_ready": False,
+            "subtitle_ready_reason": "helper_output_pending",
+            "target_subtitle_current": False,
+            "target_subtitle_authoritative_source": False,
+            "target_subtitle_current_reason": "target_subtitle_not_authoritative",
+            "dub_input_text": "",
+            "dub_input_source": None,
+            "actual_burn_subtitle_source": None,
+            "helper_translate_status": "helper_output_pending",
+        },
+        dub_status="pending",
+        compose_status="pending",
+        composed_reason="audio_not_ready",
+        artifact_facts={
+            "compose_input": _compose_input(),
+            "audio_lane": {
+                "tts_voiceover_exists": False,
+                "source_audio_preserved": False,
+                "bgm_configured": False,
+                "no_tts": False,
+            },
+            "helper_translate_status": "helper_output_pending",
+        },
+        no_dub=False,
+        no_dub_compose_allowed=False,
+    )
+
+    assert current_attempt["selected_compose_route"] == "tts_replace_route"
+    assert current_attempt["audio_ready"] is False
+    assert current_attempt["compose_allowed"] is False
+    assert current_attempt["compose_execute_allowed"] is False
+    assert current_attempt["tts_lane_expected"] is False
+    assert current_attempt["current_subtitle_source"] is None
+    assert current_attempt["no_dub_route_terminal"] is False
+
+
+def test_url_lane_authority_true_success_transitions_coherently_to_tts_ready():
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": True,
+            "audio_ready_reason": "ready",
+            "dub_current": True,
+            "dub_current_reason": "ready",
+            "voiceover_url": "/v1/tasks/6de25b30e6e1/audio_mm",
+        },
+        subtitle_lane={
+            "subtitle_ready": True,
+            "subtitle_ready_reason": "ready",
+            "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
+            "target_subtitle_current_reason": "ready",
+            "dub_input_text": VI_TARGET_SRT,
+            "dub_input_source": "target_subtitle",
+            "actual_burn_subtitle_source": "vi.srt",
+            "edited_text": VI_TARGET_SRT,
+        },
+        dub_status="done",
+        compose_status="done",
+        composed_reason="ready",
+        final_stale_reason=None,
+        artifact_facts={
+            "compose_input": _compose_input(),
+            "audio_lane": {
+                "tts_voiceover_exists": True,
+                "source_audio_preserved": False,
+                "bgm_configured": False,
+                "no_tts": False,
+            },
+            "final_exists": True,
+        },
+        no_dub=False,
+        no_dub_compose_allowed=False,
+    )
+
+    assert current_attempt["selected_compose_route"] == "tts_replace_route"
+    assert current_attempt["audio_ready"] is True
+    assert current_attempt["compose_allowed"] is True
+    assert current_attempt["compose_execute_allowed"] is True
+    assert current_attempt["current_subtitle_source"] == "vi.srt"
+    assert current_attempt["no_dub_route_terminal"] is False
+
+
 def test_recovered_authoritative_subtitle_truth_clears_subtitles_error_surface():
     section = _subtitles_section(
         task={"subtitles_error": "权威目标字幕缺失，不能记录为字幕成功。"},
@@ -220,6 +313,71 @@ def test_preserve_source_no_tts_lane_does_not_select_tts_replace_or_stale_block(
     assert current_attempt["no_dub_route_terminal"] is True
     assert current_attempt["tts_lane_expected"] is False
     assert current_attempt["compose_allowed_reason"] == "ready"
+
+
+def test_preserve_source_no_target_projection_sets_legal_no_dub_owner():
+    no_dub, no_dub_reason, no_dub_message = hot_follow_terminal_no_dub_projection(
+        pipeline_config={"source_audio_policy": "preserve"},
+        task={"kind": "hot_follow", "config": {"source_audio_policy": "preserve"}},
+        route_state={"content_mode": "voice_led"},
+        subtitle_lane={
+            "subtitle_ready": False,
+            "target_subtitle_current": False,
+            "target_subtitle_authoritative_source": False,
+            "target_subtitle_current_reason": "preserve_source_route_no_target_subtitle_required",
+            "dub_input_text": "",
+        },
+        voice_state={"audio_ready": False, "deliverable_audio_done": False, "voiceover_url": None},
+    )
+
+    assert no_dub is True
+    assert no_dub_reason == "source_audio_preserved_no_tts"
+    assert no_dub_message
+
+
+def test_local_preserve_source_plus_tts_success_keeps_tts_route_and_no_dub_false():
+    no_dub, no_dub_reason, no_dub_message = hot_follow_terminal_no_dub_projection(
+        pipeline_config={"source_audio_policy": "preserve"},
+        task={"kind": "hot_follow", "config": {"source_audio_policy": "preserve"}},
+        route_state={"content_mode": "voice_led"},
+        subtitle_lane={
+            "subtitle_ready": True,
+            "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
+            "target_subtitle_current_reason": "ready",
+            "dub_input_text": VI_TARGET_SRT,
+            "dub_input_source": "target_subtitle",
+        },
+        voice_state={"audio_ready": True, "deliverable_audio_done": True, "voiceover_url": "/v1/tasks/a1c142fbf911/audio_mm"},
+    )
+    route = selected_route_from_state(
+        {"kind": "hot_follow"},
+        {
+            "artifact_facts": {
+                "compose_input": _compose_input(),
+                "audio_lane": {
+                    "tts_voiceover_exists": True,
+                    "source_audio_preserved": True,
+                    "bgm_configured": False,
+                    "no_tts": False,
+                },
+            },
+            "audio": {"audio_ready": True, "no_dub": no_dub, "no_dub_reason": no_dub_reason},
+            "subtitles": {
+                "subtitle_ready": True,
+                "target_subtitle_current": True,
+                "target_subtitle_authoritative_source": True,
+                "target_subtitle_current_reason": "ready",
+                "edited_text": VI_TARGET_SRT,
+            },
+        },
+    )
+
+    assert no_dub is False
+    assert no_dub_reason is None
+    assert no_dub_message is None
+    assert route["name"] == "tts_replace_route"
+    assert route["compose_allowed"] is True
 
 
 def test_presentation_current_attempt_dub_status_uses_l3_summary_not_l1_pipeline():

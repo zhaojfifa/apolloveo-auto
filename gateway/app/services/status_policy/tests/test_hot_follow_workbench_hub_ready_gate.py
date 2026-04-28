@@ -1450,8 +1450,13 @@ def test_hot_follow_workbench_preserve_source_route_does_not_project_target_subt
     assert subtitles_row.get("error") in {None, ""}
     assert subtitles.get("target_subtitle_current") is False
     assert subtitles.get("target_subtitle_current_reason") == "preserve_source_route_no_target_subtitle_required"
+    assert data.get("no_dub") is True
+    assert data.get("no_dub_reason") == "source_audio_preserved_no_tts"
+    assert (data.get("audio") or {}).get("no_dub_compose_allowed") is True
     assert ready_gate.get("selected_compose_route") == "preserve_source_route"
     assert ready_gate.get("compose_allowed") is True
+    assert ready_gate.get("compose_allowed_reason") == "no_dub_inputs_ready"
+    assert ready_gate.get("no_dub") is True
     assert ready_gate.get("no_dub_reason") == "source_audio_preserved_no_tts"
 
 
