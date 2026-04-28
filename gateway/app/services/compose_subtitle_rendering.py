@@ -10,6 +10,11 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from gateway.app.services.hot_follow_media_policy import (
+    hot_follow_subtitle_style_profile,
+    normalize_hot_follow_layout_lang,
+)
+
 _CJK_CHAR_RE = re.compile(r"[\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF]")
 _MYANMAR_CHAR_RE = re.compile(r"[\u1000-\u109F\uAA60-\uAA7F\uA9E0-\uA9FF]")
 _SRT_TIME_RE = re.compile(
@@ -46,40 +51,11 @@ def _feathered_bottom_band_filter(
     return ",".join(filters)
 
 
-def _normalize_layout_lang(target_lang: str | None) -> str:
-    raw = str(target_lang or "").strip().lower()
-    if raw == "mm":
-        return "my"
-    return raw or "my"
-
-
-def _subtitle_layout_profile(target_lang: str | None) -> dict[str, float | str]:
-    lang = _normalize_layout_lang(target_lang)
-    if lang == "zh":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 16, "margin_v": 18, "line_width": 11.5}
-    if lang == "en":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 15, "margin_v": 18, "line_width": 24.0}
-    if lang == "vi":
-        return {"font_name": "Noto Sans Myanmar", "font_size": 15, "margin_v": 18, "line_width": 22.0}
-    return {"font_name": "Noto Sans Myanmar", "font_size": 16, "margin_v": 18, "line_width": 13.0}
-
-
 def subtitle_render_signature(*, target_lang: str | None, cleanup_mode: str | None) -> str:
-    profile = _subtitle_layout_profile(target_lang)
-    lang = _normalize_layout_lang(target_lang)
+    profile = hot_follow_subtitle_style_profile(target_lang)
+    lang = normalize_hot_follow_layout_lang(target_lang)
     cleanup = str(cleanup_mode or "none").strip().lower() or "none"
-    return "|".join(
-        [
-            f"lang={lang}",
-            f"cleanup={cleanup}",
-            f"font={profile['font_name']}",
-            f"size={int(profile['font_size'])}",
-            f"margin_v={int(profile['margin_v'])}",
-            f"line_width={float(profile['line_width']):.2f}",
-            "align=2",
-            "wrap=1",
-        ]
-    )
+    return "|".join(profile.to_signature_parts(lang=lang, cleanup=cleanup))
 
 
 def _text_display_width(text: str) -> float:
@@ -107,7 +83,7 @@ def _tokenize_subtitle_text(text: str, target_lang: str | None) -> tuple[list[st
     compact = _compact_subtitle_text(text)
     if not compact:
         return [], "words"
-    lang = _normalize_layout_lang(target_lang)
+    lang = normalize_hot_follow_layout_lang(target_lang)
     if lang == "zh":
         return [ch for ch in compact if ch.strip()], "chars"
     if not re.search(r"\s", compact) and (_CJK_CHAR_RE.search(compact) or _MYANMAR_CHAR_RE.search(compact)):
@@ -133,8 +109,8 @@ def _break_bonus(left: str, right: str, mode: str) -> float:
 
 
 def _best_two_line_layout(text: str, target_lang: str | None) -> str:
-    profile = _subtitle_layout_profile(target_lang)
-    max_width = float(profile["line_width"])
+    profile = hot_follow_subtitle_style_profile(target_lang)
+    max_width = float(profile.line_width)
     tokens, mode = _tokenize_subtitle_text(text, target_lang)
     if not tokens:
         return ""
@@ -237,19 +213,20 @@ def compose_subtitle_vf(
     target_lang: str | None = None,
 ) -> str:
     """Build the complete subtitle video-filter string for FFmpeg."""
-    profile = _subtitle_layout_profile(target_lang)
+    profile = hot_follow_subtitle_style_profile(target_lang)
     subtitle_filter = (
         f"subtitles='{escape_subtitles_path(subtitle_path_obj)}':"
         "charenc=UTF-8:"
         f"fontsdir='{escape_subtitles_path(Path(fontsdir))}':"
         "force_style='"
-        f"FontName={profile['font_name']},"
-        f"FontSize={int(profile['font_size'])},"
+        f"FontName={profile.font_name},"
+        f"FontSize={profile.font_size_ass()},"
         "Outline=2,"
         "Shadow=1,"
-        "Alignment=2,"
-        f"MarginV={int(profile['margin_v'])},"
-        "WrapStyle=1'"
+        f"Alignment={int(profile.alignment)},"
+        f"MarginV={int(profile.margin_v)},"
+        f"Spacing={float(profile.line_spacing):.1f},"
+        f"WrapStyle={int(profile.wrap_style)}'"
     )
     cover_filter = source_subtitle_cover_filter(cleanup_mode, target_lang=target_lang)
     return f"{cover_filter},{subtitle_filter}" if cover_filter else subtitle_filter
