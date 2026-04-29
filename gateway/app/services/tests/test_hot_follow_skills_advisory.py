@@ -22,6 +22,7 @@ from gateway.app.deps import get_task_repository
 from gateway.app.lines.base import LineRegistry
 from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.routers import tasks as tasks_router
+from gateway.app.services import subtitle_helpers
 from gateway.app.services import hot_follow_skills_advisory as skills_advisory
 from gateway.app.services.hot_follow_route_state import build_hot_follow_current_attempt_summary
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
@@ -50,6 +51,12 @@ def _patch_workbench_dependencies(monkeypatch):
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
     monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda _key: False)
+    monkeypatch.setattr(subtitle_helpers, "object_head", lambda _key: None)
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers, "hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(subtitle_helpers, "hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(subtitle_helpers, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(
         hf_router,
         "_collect_voice_execution_state",
@@ -927,12 +934,12 @@ def test_hot_follow_advisory_noop_preserves_workbench_payload(monkeypatch):
         "audio_lane_mode": "muted_no_tts",
         "tts_voiceover_exists": False,
         "selected_compose_route": {
-            "name": "no_tts_compose_route",
-            "required_artifacts": ["compose_input"],
-            "optional_artifacts": ["target_subtitle", "scene_pack"],
-            "irrelevant_artifacts": ["tts_voiceover", "bgm", "source_audio_preserved"],
-            "allow_conditions": ["compose_input_ready", "no_tts_compose_selected"],
-            "blocked_conditions": ["compose_input_blocked", "no_tts_not_selected"],
+            "name": "tts_replace_route",
+            "required_artifacts": ["compose_input", "tts_voiceover"],
+            "optional_artifacts": ["target_subtitle", "bgm", "scene_pack"],
+            "irrelevant_artifacts": ["source_audio_preserved"],
+            "allow_conditions": ["compose_input_ready", "audio_ready"],
+            "blocked_conditions": ["compose_input_blocked", "audio_missing"],
         },
     }
 

@@ -5,6 +5,7 @@ from typing import Any
 
 NO_TTS_ROUTES = {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"}
 STALE_NO_DUB_REASONS = {"target_subtitle_empty", "dub_input_empty"}
+NO_DUB_COMPOSE_REASONS = {"target_subtitle_empty", "dub_input_empty", "no_speech_detected", "compose_no_tts"}
 WAITING_SUBTITLE_REASONS = {
     "target_subtitle_translation_incomplete",
     "waiting_for_target_subtitle_translation",
@@ -34,6 +35,12 @@ def _n(value: Any) -> str:
 
 def _truthy_text(*values: Any) -> bool:
     return any(bool(_s(value)) for value in values)
+
+
+def _boolish(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return _n(value) in {"1", "true", "yes", "y", "on"}
 
 
 def _is_tts_failure(value: Any) -> bool:
@@ -69,6 +76,46 @@ def _compose_input_state(artifact_facts: dict[str, Any]) -> tuple[dict[str, Any]
         or "compose_input_not_ready"
     )
     return compose_input, ready, blocked, derive_failed, reason
+
+
+def _voice_led_route_evidence(*, task: dict[str, Any], state: dict[str, Any], artifact_facts: dict[str, Any]) -> bool:
+    route_state = _d(
+        artifact_facts.get("route_state")
+        or state.get("route_state")
+        or task.get("route_state")
+    )
+    source_audio = _d(
+        artifact_facts.get("source_audio_lane")
+        or state.get("source_audio_lane")
+        or task.get("source_audio_lane")
+    )
+    content_mode = _n(
+        route_state.get("content_mode")
+        or artifact_facts.get("content_mode")
+        or state.get("content_mode")
+        or task.get("content_mode")
+    )
+    speech_confidence = _n(
+        route_state.get("speech_confidence")
+        or artifact_facts.get("speech_confidence")
+        or state.get("speech_confidence")
+        or task.get("speech_confidence")
+    )
+    speech_detection_is_stable = speech_confidence != "pending"
+    source_audio_lane = _n(
+        source_audio.get("source_audio_lane")
+        or artifact_facts.get("source_audio_lane")
+        or state.get("source_audio_lane")
+        or task.get("source_audio_lane")
+    )
+    return bool(
+        (content_mode == "voice_led" and speech_detection_is_stable)
+        or (_boolish(route_state.get("speech_detected")) and speech_detection_is_stable)
+        or (_boolish(artifact_facts.get("speech_detected")) and speech_detection_is_stable)
+        or (_boolish(state.get("speech_detected")) and speech_detection_is_stable)
+        or (_boolish(task.get("speech_detected")) and speech_detection_is_stable)
+        or source_audio_lane in {"speech_primary", "mixed_audio"}
+    )
 
 
 def reduce_hot_follow_process_state(
@@ -133,6 +180,7 @@ def reduce_hot_follow_process_state(
         )
         and source_available
     )
+    voice_led_evidence = _voice_led_route_evidence(task=task, state=state, artifact_facts=artifacts)
 
     audio_ready = bool(audio.get("audio_ready"))
     voiceover_exists = bool(
@@ -145,13 +193,24 @@ def reduce_hot_follow_process_state(
     bgm_configured = bool(audio_lane.get("bgm_configured"))
     no_tts_audio_lane = bool(audio_lane.get("no_tts"))
     no_dub_reason = _n(audio.get("no_dub_reason") or task.get("dub_skip_reason"))
+    no_dub_reason_allows_compose = bool(no_dub_reason in NO_DUB_COMPOSE_REASONS)
     explicit_no_dub = bool(audio.get("no_dub")) if no_dub is None else bool(no_dub)
     explicit_no_dub_allowed = (
         bool(audio.get("no_dub_compose_allowed"))
         if no_dub_compose_allowed is None
         else bool(no_dub_compose_allowed)
     )
-    if no_dub_reason in STALE_NO_DUB_REASONS and (target_ready or visible_target_pending or translation_waiting):
+    if no_dub_reason in STALE_NO_DUB_REASONS and (
+        target_ready
+        or visible_target_pending
+        or translation_waiting
+        or source_available
+        or voice_led_evidence
+    ):
+        explicit_no_dub = False
+        explicit_no_dub_allowed = False
+        no_dub_reason = ""
+    if voice_led_evidence and no_dub_reason in NO_DUB_COMPOSE_REASONS:
         explicit_no_dub = False
         explicit_no_dub_allowed = False
         no_dub_reason = ""
@@ -176,7 +235,13 @@ def reduce_hot_follow_process_state(
     elif target_ready or subtitle_ready:
         route = "tts_replace_route"
         lane = "voice_led_tts_route"
-    elif explicit_no_dub or explicit_no_dub_allowed:
+    elif source_available or voice_led_evidence:
+        route = "tts_replace_route"
+        lane = "voice_led_tts_route"
+    elif _s(selected.get("name")) in NO_TTS_ROUTES and not source_available and not voice_led_evidence and not target_ready:
+        route = _s(selected.get("name"))
+        lane = "voice_led_plus_preserved_source_audio_route" if route == "preserve_source_route" else "no_dub_no_tts_route"
+    elif explicit_no_dub_allowed or (explicit_no_dub and no_dub_reason_allows_compose):
         if source_audio_preserved:
             route = "preserve_source_route"
             lane = "voice_led_plus_preserved_source_audio_route"
@@ -186,9 +251,6 @@ def reduce_hot_follow_process_state(
         else:
             route = "no_tts_compose_route"
             lane = "no_dub_no_tts_route"
-    elif no_tts_audio_lane and not source_available and not target_ready:
-        route = "no_tts_compose_route"
-        lane = "no_dub_no_tts_route"
     elif not route:
         route = "tts_replace_route"
 
@@ -295,6 +357,7 @@ def reduce_hot_follow_process_state(
         if subtitle_state == "target_subtitle_translation_waiting_retryable"
         else ("no_dub_route_terminal" if no_dub_route_terminal else None)
     )
+    current_subtitle_source = _s(subtitles.get("actual_burn_subtitle_source")) if target_ready else None
 
     return {
         "version": "hot_follow_process_state_v1",
@@ -320,6 +383,8 @@ def reduce_hot_follow_process_state(
         "subtitle_terminal_state": subtitle_terminal_state,
         "subtitle_translation_waiting_retryable": subtitle_state == "target_subtitle_translation_waiting_retryable",
         "target_subtitle_authoritative_current": target_ready,
+        "actual_burn_subtitle_source": current_subtitle_source,
+        "current_subtitle_source": current_subtitle_source,
         "dub_process_state": dub_state,
         "dub_step_status": dub_step_status,
         "audio_ready": audio_ready,

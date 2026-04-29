@@ -520,7 +520,7 @@ def _build_hot_follow_authoritative_state(
     payload["final_fresh"] = bool(projection["composed"].get("final_fresh"))
     artifact_facts, current_attempt, operator_summary = presentation_aggregates_loader(
         task_id,
-        task,
+        projection["task_runtime"],
         final_info=projection["final_info"],
         historical_final=projection["historical_final"],
         persisted_audio=projection["persisted_audio"],

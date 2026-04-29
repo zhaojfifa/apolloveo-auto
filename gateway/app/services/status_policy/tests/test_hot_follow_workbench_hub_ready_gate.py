@@ -21,6 +21,7 @@ except Exception:
 from gateway.app.deps import get_task_repository
 from gateway.app.routers import tasks as tasks_router
 from gateway.app.routers import hot_follow_api as hf_router
+from gateway.app.services import subtitle_helpers
 from gateway.app.services.compose_helpers import task_compose_lock
 from gateway.app.services.compose_service import ComposeResult
 from gateway.app.utils.pipeline_config import parse_pipeline_config
@@ -80,6 +81,10 @@ def _patch_minimal_unready_workbench(monkeypatch):
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda _key: False)
+    monkeypatch.setattr(subtitle_helpers, "object_head", lambda _key: None)
+    monkeypatch.setattr(subtitle_helpers, "hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(subtitle_helpers, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
 
 
 def test_hot_follow_workbench_authority_false_task_returns_safe_payload(monkeypatch):
@@ -394,14 +399,26 @@ def test_hot_follow_workbench_vi_currentness_blocks_false_done_states(monkeypatc
     monkeypatch.setattr(hf_router, "_scene_pack_info", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(hf_router, "_deliverable_url", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(hf_router, "task_base_dir", lambda current_task_id: Path("/tmp") / current_task_id)
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda current_task_id: Path("/tmp") / current_task_id)
     monkeypatch.setattr(
         hf_router,
         "object_exists",
         lambda key: str(key).endswith(("origin.srt", "vi.srt", "final.mp4")),
     )
+    monkeypatch.setattr(
+        subtitle_helpers,
+        "object_exists",
+        lambda key: str(key).endswith(("origin.srt", "vi.srt", "final.mp4")),
+    )
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(subtitle_helpers, "object_head", lambda _key: None)
     monkeypatch.setattr(
         hf_router,
+        "get_object_bytes",
+        lambda _key: "1\n00:00:00,000 --> 00:00:02,000\n原始文案\n".encode("utf-8"),
+    )
+    monkeypatch.setattr(
+        subtitle_helpers,
         "get_object_bytes",
         lambda _key: "1\n00:00:00,000 --> 00:00:02,000\n原始文案\n".encode("utf-8"),
     )
@@ -514,14 +531,26 @@ def test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states(monke
     monkeypatch.setattr(hf_router, "_scene_pack_info", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(hf_router, "_deliverable_url", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(hf_router, "task_base_dir", lambda current_task_id: Path("/tmp") / current_task_id)
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda current_task_id: Path("/tmp") / current_task_id)
     monkeypatch.setattr(
         hf_router,
         "object_exists",
         lambda key: str(key).endswith(("origin.srt", "mm.srt", "final.mp4")),
     )
+    monkeypatch.setattr(
+        subtitle_helpers,
+        "object_exists",
+        lambda key: str(key).endswith(("origin.srt", "mm.srt", "final.mp4")),
+    )
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(subtitle_helpers, "object_head", lambda _key: None)
     monkeypatch.setattr(
         hf_router,
+        "get_object_bytes",
+        lambda _key: "1\n00:00:00,000 --> 00:00:02,000\n原始文案\n".encode("utf-8"),
+    )
+    monkeypatch.setattr(
+        subtitle_helpers,
         "get_object_bytes",
         lambda _key: "1\n00:00:00,000 --> 00:00:02,000\n原始文案\n".encode("utf-8"),
     )
@@ -1122,6 +1151,10 @@ def test_hot_follow_workbench_does_not_hydrate_timing_only_target_artifact(monke
     monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
     monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
     monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda task_id: Path("/tmp") / task_id / "override.srt")
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(subtitle_helpers, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(subtitle_helpers, "object_head", lambda _key: None)
+    monkeypatch.setattr(subtitle_helpers, "hf_subtitles_override_path", lambda task_id: Path("/tmp") / task_id / "override.srt")
 
     app = FastAPI()
     app.include_router(tasks_router.api_router)

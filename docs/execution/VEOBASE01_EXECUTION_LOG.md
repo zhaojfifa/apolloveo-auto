@@ -3184,3 +3184,163 @@ Behavior change:
 - stale `target_subtitle_empty` / `dub_input_empty` no-dub residue no longer
   preserves no-TTS compose allowance when current subtitle truth requires the
   voice-led TTS lane
+
+---
+
+## 2026-04-29 — Hot Follow state-machine consumer demotion
+
+Reading Declaration:
+
+- required authority:
+  - `CURRENT_ENGINEERING_FOCUS.md`
+  - `README.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `apolloveo_current_architecture_and_state_baseline.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- execution baseline:
+  - prior `VEOBASE01_EXECUTION_LOG.md` state-machine closure entry
+- baseline reference:
+  - `HotFollow-ContractDriven-Baseline-Freeze01`
+- implementation owners inspected:
+  - `gateway/app/services/hot_follow_process_state.py`
+  - `gateway/app/routers/hot_follow_api.py`
+  - `gateway/app/services/subtitle_helpers.py`
+  - `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+
+Scope:
+
+- Hot Follow state-machine consumer demotion only
+- no canonical state-machine redesign
+- no provider behavior change
+- no UI redesign
+- no new production-line work
+
+Runtime changes:
+
+- `hot_follow_api.py` subtitle-lane and dual-channel wrappers now delegate to
+  `subtitle_helpers` service consumers instead of retaining copied semantic
+  lane/state derivation.
+- `subtitle_helpers.py` now attaches `hot_follow_process_state` from
+  `reduce_hot_follow_process_state()` and emits
+  `current_subtitle_source` / `actual_burn_subtitle_source` from reducer output.
+- `subtitle_helpers.hf_dual_channel_state()` consumes reducer lane state when
+  present, leaving its legacy heuristic path as a compatibility fallback for
+  callers that do not provide process state.
+- `current_attempt_runtime.py` now prefers the reducer-owned
+  `current_subtitle_source`.
+- `hot_follow_process_state.py` now emits canonical subtitle source aliases
+  only when target subtitle authority/currentness is satisfied.
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/subtitle_helpers.py gateway/app/services/hot_follow_process_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/status_policy/hot_follow_state.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+  - result: 45 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_state_commit_contract.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`
+  - result: 37 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_vi_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_does_not_hydrate_timing_only_target_artifact -q`
+  - result: 3 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+  - result: 10 passed
+
+Behavior change:
+
+- router compatibility wrappers no longer independently decide subtitle lane or
+  dual-channel route semantics
+- subtitle helper compatibility output is now pinned to canonical process
+  reducer state for route/subtitle source semantics
+- no-dub/no-TTS skipped-terminal subtitle semantics are verified as reducer
+  output, not router/helper reinterpretation
+- non-empty no-dub reasons such as `subtitle_led` do not gain no-TTS compose
+  legality unless the reducer sees an allowed no-dub compose reason or explicit
+  no-dub compose allowance
+
+---
+
+## 2026-04-29 — Hot Follow route classification and subtitle-ingestion stabilization
+
+Reading Declaration:
+
+- required authority:
+  - `CURRENT_ENGINEERING_FOCUS.md`
+  - `apolloveo_current_architecture_and_state_baseline.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- current branch context:
+  - consumer-demotion changes in `hot_follow_api.py` and
+    `subtitle_helpers.py`
+- sample evidence:
+  - `8372fbaa402f` snapshot A contradictory no-dub/no-TTS route despite
+    voice-led evidence
+  - `8372fbaa402f` snapshot B coherent voice-led helper-pending waiting state
+- focused owners inspected:
+  - `gateway/app/services/hot_follow_process_state.py`
+  - `gateway/app/services/hot_follow_route_state.py`
+  - `gateway/app/services/subtitle_helpers.py`
+  - `gateway/app/services/task_view_projection.py`
+  - `gateway/app/services/task_view_presenters.py`
+  - `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+  - `gateway/app/routers/hot_follow_api.py`
+
+Scope:
+
+- route classification and subtitle-ingestion waiting stabilization only
+- no provider work
+- no UI redesign
+- no broad Hot Follow refactor
+- no push/merge in this wave
+
+Runtime changes:
+
+- `reduce_hot_follow_process_state()` now treats stable voice-led evidence
+  (`content_mode=voice_led`, `speech_detected=true`, or
+  `source_audio_lane=speech_primary/mixed_audio`) as a blocker against weak
+  no-dub/no-TTS route selection.
+- Origin/source subtitle presence now keeps the process in
+  `voice_led_tts_route` instead of allowing stale `target_subtitle_empty` /
+  `dub_input_empty` no-dub residue to terminalize subtitles.
+- Helper-pending plus origin/source text remains
+  `target_subtitle_translation_waiting_retryable`, with dub and compose waiting
+  on target subtitle translation.
+- The workbench projection now carries computed route evidence into the
+  aggregation path so the reducer sees the same voice/source facts as L4.
+- Explicit selected no-TTS routes with no voice/source evidence remain legal,
+  preserving the no-dub path where there is true route-valid evidence.
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/subtitle_helpers.py gateway/app/services/hot_follow_process_state.py gateway/app/services/task_view_projection.py gateway/app/services/task_view_presenters.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/status_policy/hot_follow_state.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_state_commit_contract.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`
+  - result: 40 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+  - result: 45 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+  - result: 10 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_vi_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_does_not_hydrate_timing_only_target_artifact -q`
+  - result: 3 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`
+  - result: 18 passed
+
+Behavior change:
+
+- a `8372fbaa402f`-style voice-led URL payload with missing target subtitle no
+  longer flips into `no_dub_no_tts_route`
+- origin/source subtitle plus helper pending stays in one bounded translation
+  waiting chain
+- no skipped subtitle terminal or compose-ready projection is emitted for
+  voice-led target-SRT waiting states

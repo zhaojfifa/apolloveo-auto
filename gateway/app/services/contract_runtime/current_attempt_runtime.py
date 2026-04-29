@@ -816,5 +816,9 @@ def build_hot_follow_current_attempt_summary(
         "hot_follow_process_state": process_state,
         "requires_redub": requires_redub,
         "requires_recompose": requires_recompose,
-        "current_subtitle_source": str(subtitle_lane.get("actual_burn_subtitle_source") or "").strip() or None,
+        "current_subtitle_source": str(
+            process_state.get("current_subtitle_source")
+            or subtitle_lane.get("actual_burn_subtitle_source")
+            or ""
+        ).strip() or None,
     }

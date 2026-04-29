@@ -435,6 +435,10 @@ def build_hot_follow_workbench_projection(
     normalized_source_text = normalized_source_text_loader(task_id, task_runtime)
     subtitles_step_done = str(subtitles_state).strip().lower() in {"done", "ready", "success", "completed", "failed", "error"}
     route_state = dual_channel_state_loader(task_id, task_runtime, subtitle_lane, subtitles_step_done=subtitles_step_done)
+    task_runtime["route_state"] = route_state
+    task_runtime["content_mode"] = route_state.get("content_mode")
+    task_runtime["speech_detected"] = bool(route_state.get("speech_detected"))
+    task_runtime["speech_confidence"] = route_state.get("speech_confidence")
     audio_cfg = audio_config_loader(task_runtime)
     voice_state = voice_execution_state_loader(task_runtime, settings_obj)
     no_dub, no_dub_reason, _ = hot_follow_terminal_no_dub_projection(

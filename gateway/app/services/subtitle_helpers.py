@@ -30,6 +30,7 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
     has_semantic_target_subtitle_text,
 )
 from gateway.app.services.hot_follow_helper_translation import helper_translate_lane_state
+from gateway.app.services.hot_follow_process_state import reduce_hot_follow_process_state
 from gateway.app.services.media_validation import media_meta_from_head, deliver_key
 from gateway.app.services.task_view_helpers import task_key
 from gateway.app.services.tts_policy import normalize_target_lang
@@ -520,7 +521,7 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         .lower()
         == "true"
     )
-    return {
+    lane = {
         "raw_source_text": raw_source_text or "",
         "normalized_source_text": normalized_source_text or "",
         "parse_source_text": helper_source_text or "",
@@ -557,6 +558,26 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "helper_translate_translated_text": helper_lane.get("translated_text"),
         "helper_translate_target_lang": helper_lane.get("target_lang"),
     }
+    pipeline_no_dub = str(pipeline_config.get("no_dub") or "").strip().lower() == "true"
+    dub_skip_reason = str(pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or "").strip()
+    process_state = reduce_hot_follow_process_state(
+        task=task,
+        subtitle_lane=lane,
+        artifact_facts={
+            "audio_lane": {"no_tts": pipeline_no_dub},
+            "selected_compose_route": {"name": "no_tts_compose_route"} if pipeline_no_dub else {},
+        },
+        voice_state={
+            "no_dub": pipeline_no_dub,
+            "no_dub_compose_allowed": pipeline_no_dub,
+            "no_dub_reason": dub_skip_reason or None,
+        },
+    )
+    lane["hot_follow_process_state"] = process_state
+    lane["process_state"] = process_state
+    lane["actual_burn_subtitle_source"] = process_state.get("actual_burn_subtitle_source")
+    lane["current_subtitle_source"] = process_state.get("current_subtitle_source")
+    return lane
 
 
 def hf_dual_channel_state(
@@ -567,6 +588,41 @@ def hf_dual_channel_state(
     subtitles_step_done: bool = True,
 ) -> dict[str, Any]:
     lane = subtitle_lane or hf_subtitle_lane_state(task_id, task)
+    process_state = lane.get("hot_follow_process_state") or lane.get("process_state")
+    if isinstance(process_state, dict):
+        lane_state = str(process_state.get("lane_state") or "").strip()
+        subtitle_required = bool(process_state.get("subtitle_required"))
+        if lane_state == "voice_led_tts_route":
+            content_mode = "voice_led"
+            speech_detected = True
+            speech_confidence = "high" if str(lane.get("parse_source_text") or lane.get("raw_source_text") or "").strip() else "pending"
+        elif lane_state == "voice_led_plus_preserved_source_audio_route":
+            content_mode = "voice_led"
+            speech_detected = True
+            speech_confidence = "high"
+        else:
+            content_mode = "silent_candidate"
+            speech_detected = False
+            speech_confidence = "none"
+        raw_text = str(lane.get("raw_source_text") or "")
+        normalized_text = str(lane.get("normalized_source_text") or "")
+        has_text = bool(normalized_text.strip() or raw_text.strip())
+        onscreen_text_detected = bool(has_text and not subtitle_required)
+        onscreen_text_density = "high" if onscreen_text_detected and len(normalized_text.strip() or raw_text.strip()) >= 20 else ("low" if onscreen_text_detected else "none")
+        recommended_path = (
+            "Voice dubbing"
+            if content_mode == "voice_led"
+            else ("OCR subtitle translation candidate" if content_mode == "subtitle_led" else "Manual text input required")
+        )
+        return {
+            "speech_detected": bool(speech_detected),
+            "speech_confidence": speech_confidence,
+            "onscreen_text_detected": bool(onscreen_text_detected),
+            "onscreen_text_density": onscreen_text_density,
+            "content_mode": content_mode,
+            "recommended_path": recommended_path,
+            "hot_follow_process_state": process_state,
+        }
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
     raw_text = str(lane.get("raw_source_text") or "")
     normalized_text = str(lane.get("normalized_source_text") or "")

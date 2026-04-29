@@ -86,6 +86,91 @@ def test_authority_false_subtitle_lane_does_not_emit_burn_source(monkeypatch):
         assert lane["dub_input_text"] == ""
 
 
+def test_router_subtitle_wrappers_delegate_to_service_consumers(monkeypatch):
+    subtitle_sentinel = {
+        "subtitle_ready": False,
+        "hot_follow_process_state": {"lane_state": "voice_led_tts_route"},
+    }
+    route_sentinel = {
+        "content_mode": "voice_led",
+        "hot_follow_process_state": subtitle_sentinel["hot_follow_process_state"],
+    }
+
+    monkeypatch.setattr(hf_router, "_svc_hf_subtitle_lane_state", lambda task_id, task: subtitle_sentinel)
+    monkeypatch.setattr(
+        hf_router,
+        "_svc_hf_dual_channel_state",
+        lambda task_id, task, subtitle_lane, *, subtitles_step_done=True: route_sentinel,
+    )
+
+    assert hf_router._hf_subtitle_lane_state("hf-router-consumer", {"kind": "hot_follow"}) is subtitle_sentinel
+    assert (
+        hf_router._hf_dual_channel_state(
+            "hf-router-consumer",
+            {"kind": "hot_follow"},
+            subtitle_sentinel,
+        )
+        is route_sentinel
+    )
+
+
+def test_subtitle_helper_sources_are_canonical_process_outputs(monkeypatch):
+    target_text = "1\n00:00:00,000 --> 00:00:02,000\nXin chao\n"
+    monkeypatch.setattr(subtitle_helpers, "hf_load_origin_subtitles_text", lambda _task: "source")
+    monkeypatch.setattr(subtitle_helpers, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "source")
+    monkeypatch.setattr(subtitle_helpers, "hf_load_subtitles_text", lambda *_args, **_kwargs: target_text)
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda _key: True)
+    monkeypatch.setattr(
+        subtitle_helpers,
+        "hf_target_subtitle_currentness_state",
+        lambda *_args, **_kwargs: {
+            "target_subtitle_current": True,
+            "target_subtitle_current_reason": "ready",
+            "target_subtitle_authoritative_source": True,
+            "target_subtitle_source_copy": False,
+        },
+    )
+
+    lane = subtitle_helpers.hf_subtitle_lane_state(
+        "hf-helper-consumer",
+        {
+            "task_id": "hf-helper-consumer",
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "vi_srt_path": "deliver/tasks/hf-helper-consumer/vi.srt",
+        },
+    )
+
+    process_state = lane["hot_follow_process_state"]
+    assert process_state["target_subtitle_authoritative_current"] is True
+    assert process_state["actual_burn_subtitle_source"] == "vi.srt"
+    assert lane["actual_burn_subtitle_source"] == process_state["actual_burn_subtitle_source"]
+    assert lane["current_subtitle_source"] == process_state["current_subtitle_source"]
+
+
+def test_subtitle_helper_no_dub_terminal_comes_from_process_reducer(monkeypatch):
+    monkeypatch.setattr(subtitle_helpers, "hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(subtitle_helpers, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(subtitle_helpers, "hf_load_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda _key: False)
+
+    lane = subtitle_helpers.hf_subtitle_lane_state(
+        "hf-helper-no-dub",
+        {
+            "task_id": "hf-helper-no-dub",
+            "kind": "hot_follow",
+            "pipeline_config": {"no_dub": "true", "dub_skip_reason": "target_subtitle_empty"},
+        },
+    )
+
+    process_state = lane["hot_follow_process_state"]
+    route = subtitle_helpers.hf_dual_channel_state("hf-helper-no-dub", {"kind": "hot_follow"}, lane)
+    assert process_state["lane_state"] == "no_dub_no_tts_route"
+    assert process_state["subtitle_process_state"] == "subtitle_skipped_terminal"
+    assert route["hot_follow_process_state"] is process_state
+    assert route["content_mode"] == "silent_candidate"
+
+
 class _FakeStorage:
     def __init__(self, subtitle_text: str):
         self.subtitle_text = subtitle_text
@@ -287,9 +372,9 @@ def test_subtitle_lane_keeps_target_editor_empty_when_only_origin_exists(monkeyp
         "deliver/tasks/hf-origin-only/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\n\xe4\xbd\xa0\xe5\xa5\xbd\n",
     }
 
-    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
-    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
-    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(subtitle_helpers, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
 
     lane = hf_router._hf_subtitle_lane_state(
         "hf-origin-only",
@@ -317,9 +402,9 @@ def test_subtitle_lane_does_not_treat_timing_only_target_artifact_as_existing_tr
         "deliver/tasks/hf-empty-target/mm.srt": b"1\n00:00:00,000 --> 00:00:02,000\n\n",
     }
 
-    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
-    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
-    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(subtitle_helpers, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
 
     lane = hf_router._hf_subtitle_lane_state(
         "hf-empty-target",
@@ -357,9 +442,9 @@ def test_subtitle_lane_reads_local_authoritative_target_when_storage_copy_missin
     workspace.mm_srt_path.write_text(target_srt, encoding="utf-8")
     workspace.origin_srt_path.write_text(origin_srt, encoding="utf-8")
 
-    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
-    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: tmp_path / _task_id)
+    monkeypatch.setattr(subtitle_helpers, "Workspace", _Workspace)
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda _key: False)
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: tmp_path / _task_id)
 
     lane = hf_router._hf_subtitle_lane_state(
         task_id,
@@ -385,8 +470,8 @@ def test_subtitle_lane_reads_local_authoritative_target_when_storage_copy_missin
 
 
 def test_subtitle_lane_preserves_translation_incomplete_reason_over_generic_missing(monkeypatch):
-    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
-    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda _key: False)
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
 
     lane = hf_router._hf_subtitle_lane_state(
         "hf-target-translation-incomplete",
@@ -718,6 +803,8 @@ def test_translate_subtitles_source_lane_persists_full_target_srt(monkeypatch, t
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: source_srt)
     monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(subtitle_helpers, "hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(subtitle_helpers, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(hf_router, "_srt_to_txt", lambda text: "Xin chao\nTam biet")
     monkeypatch.setattr(hf_router, "upload_task_artifact", _fake_upload)
     monkeypatch.setattr(
@@ -771,7 +858,10 @@ def test_translate_subtitles_source_lane_failure_persists_subtitle_authority_fai
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: source_srt)
     monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: tmp_path / "override.srt")
-    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda _key: False)
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: tmp_path / _task_id)
+    monkeypatch.setattr(subtitle_helpers, "hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(subtitle_helpers, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(hf_router, "translate_segments_with_gemini", _raise_resource_exhausted)
 
     with pytest.raises(HTTPException) as exc_info:
@@ -940,9 +1030,9 @@ def test_subtitle_lane_marks_preserved_source_audio_parse_as_helper_only(monkeyp
         "deliver/tasks/hf-preserve-source/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\nlyric source line\n",
     }
 
-    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
-    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
-    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(subtitle_helpers, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
 
     lane = hf_router._hf_subtitle_lane_state(
         "hf-preserve-source",
@@ -974,9 +1064,9 @@ def test_subtitle_parse_lane_does_not_read_from_bgm_lane(monkeypatch):
         "deliver/tasks/hf-bgm-parse/bgm.mp3": b"not subtitle text",
     }
 
-    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
-    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
-    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(subtitle_helpers, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
 
     lane = hf_router._hf_subtitle_lane_state(
         "hf-bgm-parse",
@@ -998,9 +1088,9 @@ def test_subtitle_parse_lane_does_not_read_from_preserved_source_audio_lane(monk
         "deliver/tasks/hf-preserve-parse/source_audio.mp3": b"not subtitle text",
     }
 
-    monkeypatch.setattr(hf_router, "object_exists", lambda key: str(key) in store)
-    monkeypatch.setattr(hf_router, "get_object_bytes", lambda key: store[str(key)])
-    monkeypatch.setattr(hf_router, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda key: str(key) in store)
+    monkeypatch.setattr(subtitle_helpers, "get_object_bytes", lambda key: store[str(key)])
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
 
     lane = hf_router._hf_subtitle_lane_state(
         "hf-preserve-parse",
