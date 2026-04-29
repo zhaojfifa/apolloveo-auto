@@ -3460,3 +3460,115 @@ Behavior change:
 - ready gate and current attempt consume the same reducer-owned subflow
   blocking reason, preventing top-level/current-attempt reason drift for the
   core translation blocker.
+
+---
+
+## 2026-04-29 — Hot Follow translation execution unblock wave A
+
+Reading Declaration:
+
+- required authority:
+  - `CURRENT_ENGINEERING_FOCUS.md`
+  - `apolloveo_current_architecture_and_state_baseline.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/contracts/hot_follow_target_subtitle_translation_subflow_contract_v1.md`
+- evidence honored:
+  - `e41e102d5bca`, `98038599f48c`, and `2df9b5508ccf` blocked
+    translation examples described in the task prompt
+- focused owners inspected:
+  - `gateway/app/services/hot_follow_translation_subflow.py`
+  - `gateway/app/services/hot_follow_process_state.py`
+  - `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+  - `gateway/app/services/ready_gate/hot_follow_rules.py`
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+  - `gateway/app/services/task_view_projection.py`
+  - `gateway/app/services/task_view_presenters.py`
+  - `gateway/app/routers/hot_follow_api.py`
+  - `gateway/app/services/hot_follow_helper_translation.py`
+  - `gateway/app/services/subtitle_helpers.py`
+  - `gateway/app/services/steps_v1.py`
+  - `gateway/app/steps/subtitles.py`
+
+Scope:
+
+- Wave A only on branch `codex/hot-follow-translation-subflow`.
+- No provider redesign, UI redesign, route-machine redesign, new line work, or
+  unrelated Hot Follow refactor.
+
+Root cause:
+
+- The prior wave correctly modeled Target Subtitle Translation as a canonical
+  subflow, but source-lane execution still had no single owner that wrote
+  execution facts.
+- A task could therefore project a stable
+  `translation_output_pending_retryable` state while carrying
+  `helper_translation_requested=true` with null request/poll/materialization
+  timestamps and `retry_count=0`.
+- Operator retry could re-enter the source subtitle lane without a dedicated
+  execution owner responsible for dispatch, output observation, authoritative
+  target-SRT materialization, and retry fact updates.
+
+Runtime changes:
+
+- Added `gateway/app/services/hot_follow_translation_execution.py` as the
+  single owner for target subtitle translation execution.
+- The owner now performs the source-lane lifecycle:
+  - loads normalized/origin source SRT
+  - writes dispatch facts through `policy_upsert(...,
+    step="target_subtitle_translation")`
+  - dispatches segment translation through the existing Gemini subtitle
+    translator boundary
+  - writes output receipt facts when translated segments return
+  - materializes the authoritative target subtitle through
+    `persist_hot_follow_authoritative_target_subtitle()`
+  - writes failure facts on provider error
+- Added execution fact fields to the translation subflow contract/fact reader:
+  - `subtitle_translation_execution_ref`
+  - `subtitle_translation_requested_at`
+  - `subtitle_translation_last_polled_at`
+  - `subtitle_translation_output_received_at`
+  - `subtitle_translation_materialized_at`
+  - `subtitle_translation_failed_at`
+  - `subtitle_translation_retry_count`
+- `hot_follow_api.py` now delegates `source_subtitle_lane` translation to the
+  execution owner.
+- `HotFollowTranslateRequest.retry` now drives a real execution retry for the
+  source subtitle lane and returns the resulting `execution_ref` and
+  `retry_count`.
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_translation_execution.py gateway/app/services/hot_follow_translation_subflow.py gateway/app/routers/hot_follow_api.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_translation_subflow.py -q`
+  - result: 10 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_persists_full_target_srt gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_retry_advances_execution_facts gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_failure_persists_subtitle_authority_failure gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_failure_preserves_current_target_subtitle gateway/app/services/tests/test_hot_follow_subtitle_binding.py::test_translate_subtitles_source_lane_uses_normalized_source_srt_when_origin_key_empty -q`
+  - result: 5 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_translation_subflow.py gateway/app/services/tests/test_hot_follow_state_commit_contract.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`
+  - result: 50 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+  - result: 46 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_vi_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_does_not_hydrate_timing_only_target_artifact gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`
+  - result: 31 passed
+- `git diff --check`
+  - result: passed
+
+Behavior change:
+
+- For the owner-invoked source subtitle lane, the old passive pattern
+  `helper_translation_requested=true` plus null requested/poll/materialized
+  timestamps is no longer a normal resting state.
+- Dispatch writes `execution_ref`, `requested_at`, `last_polled_at`, and
+  `retry_count`.
+- Successful provider output writes `output_received_at`; authoritative target
+  subtitle materialization writes `materialized_at` and target subtitle
+  authority/currentness truth.
+- Provider failure writes `failed_at`, preserves already-current target
+  subtitles where applicable, and remains a retryable execution failure rather
+  than an uninitialized pending state.

@@ -141,6 +141,7 @@ from gateway.app.services.hot_follow_helper_translation import helper_translate_
 from gateway.app.services.hot_follow_subtitle_authority import (
     persist_hot_follow_authoritative_target_subtitle,
 )
+from gateway.app.services.hot_follow_translation_execution import execute_target_subtitle_translation
 from gateway.app.services.hot_follow_helper_translation import (
     helper_translate_failure_updates,
     helper_translate_success_updates,
@@ -212,6 +213,7 @@ class HotFollowTranslateRequest(BaseModel):
     text: str = ""
     target_lang: str = "my"
     input_source: str = "helper_only_text"
+    retry: bool = False
 
 
 
@@ -566,62 +568,15 @@ def _hf_source_subtitle_translation_failure_updates(
 
 
 def _hf_translate_source_subtitle_lane(task_id: str, task: dict, *, target_lang: str, repo) -> tuple[str, dict]:
-    normalized_source_text = _hf_load_normalized_source_text(task_id, task).strip()
-    origin_source_text = _hf_load_origin_subtitles_text(task).strip()
-    source_text = normalized_source_text if "-->" in normalized_source_text else origin_source_text
-    if not source_text:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "reason": "source_subtitle_lane_empty",
-                "message": "来源字幕为空，无法执行完整字幕翻译。",
-            },
-        )
-    if "-->" not in source_text:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "reason": "source_subtitle_lane_not_srt",
-                "message": "来源字幕不是 SRT，无法保留时间轴执行完整字幕翻译。",
-            },
-        )
-    segments = _parse_srt_to_segments(source_text)
-    if not segments:
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "reason": "source_subtitle_lane_invalid_srt",
-                "message": "来源字幕 SRT 无法解析，未写入目标字幕。",
-            },
-        )
-    try:
-        translations = translate_segments_with_gemini(segments=segments, target_lang=target_lang)
-    except GeminiSubtitlesError as exc:
-        detail = sanitize_helper_translate_error(exc)
-        _policy_upsert(
-            repo,
-            task_id,
-            _hf_source_subtitle_translation_failure_updates(
-                task_id,
-                task,
-                detail=detail,
-                source_text=source_text,
-                target_lang=target_lang,
-            ),
-        )
-        raise
-    for seg in segments:
-        idx = int(seg.get("index") or 0)
-        seg[target_lang] = str(translations.get(idx) or seg.get("origin") or "").strip()
-    translated_text = segments_to_srt(segments, target_lang)
-    saved_task = _hf_save_authoritative_target_subtitle(
+    result = execute_target_subtitle_translation(
         task_id,
         task,
-        text=translated_text,
-        text_mode="source_subtitle_lane_translation",
         repo=repo,
+        target_lang=target_lang,
+        retry=bool(task.get("_translation_retry_requested")),
+        translate_segments_fn=translate_segments_with_gemini,
     )
-    return translated_text, saved_task
+    return result.translated_text, result.saved_task
 
 
 
@@ -1785,21 +1740,21 @@ def translate_hot_follow_subtitles(
             },
         )
     if input_source == "source_subtitle_lane":
-        try:
-            translated_text, saved_task = _hf_translate_source_subtitle_lane(
-                task_id,
-                task,
-                target_lang=target_lang,
-                repo=repo,
-            )
-        except GeminiSubtitlesError as exc:
-            detail = sanitize_helper_translate_error(exc)
-            raise HTTPException(status_code=409, detail=detail) from exc
+        task_for_execution = {**task, "_translation_retry_requested": bool(payload.retry)}
+        translated_text, saved_task = _hf_translate_source_subtitle_lane(
+            task_id,
+            task_for_execution,
+            target_lang=target_lang,
+            repo=repo,
+        )
         return {
             "task_id": task_id,
             "target_lang": public_target_lang(target_lang),
             "input_source": "source_subtitle_lane",
             "persisted": True,
+            "retry": bool(payload.retry),
+            "execution_ref": saved_task.get("subtitle_translation_execution_ref"),
+            "retry_count": saved_task.get("subtitle_translation_retry_count"),
             "translated_text": translated_text,
             "subtitles": {
                 "srt_text": _hf_load_subtitles_text(task_id, saved_task),

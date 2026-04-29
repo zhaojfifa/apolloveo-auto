@@ -33,8 +33,11 @@ Allowed facts:
 - `helper_input_text`
 - `helper_translated_text`
 - `helper_target_lang`
+- `translation_execution_ref`
 - `helper_requested_at`
+- `last_polled_at`
 - `helper_responded_at`
+- `materialized_at`
 - `helper_failed_at`
 - `retry_count`
 - `target_subtitle_artifact_exists`

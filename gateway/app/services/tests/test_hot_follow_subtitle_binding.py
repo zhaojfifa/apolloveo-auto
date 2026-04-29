@@ -8,6 +8,7 @@ from fastapi import HTTPException
 
 from gateway.app.routers import hot_follow_api as hf_router
 from gateway.app.services import subtitle_helpers
+from gateway.app.services import hot_follow_translation_execution as translation_execution
 from gateway.app.services import task_view_presenters
 from gateway.app.services import task_view_workbench_contract
 from gateway.app.services import compose_service as compose_module
@@ -803,8 +804,17 @@ def test_translate_subtitles_source_lane_persists_full_target_srt(monkeypatch, t
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: source_srt)
     monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: tmp_path / "override.srt")
     monkeypatch.setattr(subtitle_helpers, "hf_load_origin_subtitles_text", lambda _task: source_srt)
     monkeypatch.setattr(subtitle_helpers, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(translation_execution, "hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(translation_execution, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(translation_execution, "hf_subtitles_override_path", lambda _task_id: tmp_path / "override.srt")
+    monkeypatch.setattr(
+        translation_execution,
+        "hf_sync_saved_target_subtitle_artifact",
+        lambda _task_id, _task, saved_text: _fake_upload(_task, tmp_path / "override.srt", "vi.srt", task_id=task_id),
+    )
     monkeypatch.setattr(hf_router, "_srt_to_txt", lambda text: "Xin chao\nTam biet")
     monkeypatch.setattr(hf_router, "upload_task_artifact", _fake_upload)
     monkeypatch.setattr(
@@ -832,6 +842,63 @@ def test_translate_subtitles_source_lane_persists_full_target_srt(monkeypatch, t
     assert saved["target_subtitle_current_reason"] == "ready"
     assert saved["dub_status"] == "pending"
     assert saved.get("dub_skip_reason") is None
+
+
+def test_translate_subtitles_source_lane_retry_advances_execution_facts(monkeypatch, tmp_path):
+    task_id = "hf-source-lane-retry"
+    source_srt = "1\n00:00:00,000 --> 00:00:02,000\n你好\n"
+    uploads: list[tuple[str, str]] = []
+
+    def _fake_upload(_task, local_path, artifact_name, task_id=None, **_kwargs):
+        uploads.append((artifact_name, Path(local_path).read_text(encoding="utf-8")))
+        return f"deliver/tasks/{task_id}/{artifact_name}"
+
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "origin_srt_path": f"deliver/tasks/{task_id}/origin.srt",
+            "subtitle_translation_execution_ref": "old-ref",
+            "subtitle_translation_requested_at": "2026-04-28T00:00:00+00:00",
+            "subtitle_translation_retry_count": 2,
+        }
+    )
+
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: tmp_path / "override-retry.srt")
+    monkeypatch.setattr(translation_execution, "hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(translation_execution, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(translation_execution, "hf_subtitles_override_path", lambda _task_id: tmp_path / "override-retry.srt")
+    monkeypatch.setattr(
+        translation_execution,
+        "hf_sync_saved_target_subtitle_artifact",
+        lambda _task_id, _task, _text: _fake_upload(_task, tmp_path / "override-retry.srt", "vi.srt", task_id=task_id),
+    )
+    monkeypatch.setattr(
+        hf_router,
+        "translate_segments_with_gemini",
+        lambda segments, target_lang: {1: "Xin chao retry"},
+    )
+
+    data = hf_router.translate_hot_follow_subtitles(
+        task_id,
+        hf_router.HotFollowTranslateRequest(target_lang="vi", input_source="source_subtitle_lane", retry=True),
+        repo=repo,
+    )
+
+    saved = repo.get(task_id) or {}
+    assert data["retry"] is True
+    assert data["retry_count"] == 3
+    assert saved["subtitle_translation_retry_count"] == 3
+    assert saved["subtitle_translation_execution_ref"] != "old-ref"
+    assert saved["subtitle_translation_requested_at"] != "2026-04-28T00:00:00+00:00"
+    assert saved["subtitle_translation_last_polled_at"]
+    assert saved["subtitle_translation_output_received_at"]
+    assert saved["subtitle_translation_materialized_at"]
+    assert saved["target_subtitle_current"] is True
+    assert uploads[0][0] == "vi.srt"
 
 
 def test_translate_subtitles_source_lane_failure_persists_subtitle_authority_failure(monkeypatch, tmp_path):
@@ -862,6 +929,8 @@ def test_translate_subtitles_source_lane_failure_persists_subtitle_authority_fai
     monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: tmp_path / _task_id)
     monkeypatch.setattr(subtitle_helpers, "hf_load_origin_subtitles_text", lambda _task: source_srt)
     monkeypatch.setattr(subtitle_helpers, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(translation_execution, "hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(translation_execution, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(hf_router, "translate_segments_with_gemini", _raise_resource_exhausted)
 
     with pytest.raises(HTTPException) as exc_info:
@@ -935,6 +1004,8 @@ def test_translate_subtitles_source_lane_failure_preserves_current_target_subtit
 
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: source_srt)
     monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(translation_execution, "hf_load_origin_subtitles_text", lambda _task: source_srt)
+    monkeypatch.setattr(translation_execution, "hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "translate_segments_with_gemini", _raise_resource_exhausted)
     monkeypatch.setattr(
@@ -1001,6 +1072,14 @@ def test_translate_subtitles_source_lane_uses_normalized_source_srt_when_origin_
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
     monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: normalized_srt)
+    monkeypatch.setattr(translation_execution, "hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(translation_execution, "hf_load_normalized_source_text", lambda *_args, **_kwargs: normalized_srt)
+    monkeypatch.setattr(translation_execution, "hf_subtitles_override_path", lambda _task_id: tmp_path / "override-normalized.srt")
+    monkeypatch.setattr(
+        translation_execution,
+        "hf_sync_saved_target_subtitle_artifact",
+        lambda _task_id, _task, saved_text: _fake_upload(_task, tmp_path / "override-normalized.srt", "vi.srt", task_id=task_id),
+    )
     monkeypatch.setattr(hf_router, "_srt_to_txt", lambda text: "Day du nguon tieng Trung\nCau thu hai")
     monkeypatch.setattr(hf_router, "upload_task_artifact", _fake_upload)
     monkeypatch.setattr(
