@@ -77,12 +77,59 @@ def test_run_subtitles_step_consumes_result_contract_for_myanmar(monkeypatch, tm
     final_update = repo.get(req.task_id)
     assert final_update["subtitles_status"] == "ready"
     assert final_update["subtitles_error"] is None
+    assert final_update["target_subtitle_artifact_exists"] is True
+    assert final_update["target_subtitle_materialized"] is True
+    assert final_update["target_subtitle_authoritative_source"] is True
     assert final_update["target_subtitle_current"] is True
     assert final_update["target_subtitle_current_reason"] == "ready"
     assert generate_kwargs[-1]["parse_source_mode"] == "raw_video_audio"
     assert pipeline_updates[-1]["translation_incomplete"] == "false"
     assert pipeline_updates[-1]["parse_source_authoritative_for_target"] == "true"
     assert pipeline_updates[-1]["target_subtitle_authoritative"] == "true"
+
+
+def test_run_subtitles_step_materializes_vi_srt_and_authoritative_truth(monkeypatch, tmp_path):
+    uploaded_artifacts: list[tuple[str, str]] = []
+    repo = _FakeRepo()
+
+    async def _generate_subtitles(**kwargs):
+        return _fake_generate_subtitles(
+            tmp_path,
+            kwargs["task_id"],
+            kwargs["target_lang"],
+            complete=True,
+            parse_source_mode=kwargs["parse_source_mode"],
+        )
+
+    def _upload_artifact(task_id, path, artifact_name):
+        uploaded_artifacts.append((artifact_name, Path(path).read_text(encoding="utf-8")))
+        return f"deliver/tasks/{task_id}/{artifact_name}"
+
+    monkeypatch.setattr(
+        steps_v1,
+        "Workspace",
+        lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
+    )
+    monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
+    monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(steps_v1, "_upload_artifact", _upload_artifact)
+    monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
+    monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+
+    req = SubtitlesRequest(task_id="hf-vi-auto-recovered", target_lang="vi", force=True, translate=True)
+    result = asyncio.run(steps_v1.run_subtitles_step(req))
+
+    final_update = repo.get(req.task_id)
+    assert result["mm_srt"]
+    assert ("subs/vi.srt", result["mm_srt"]) in uploaded_artifacts
+    assert final_update["mm_srt_path"] == f"deliver/tasks/{req.task_id}/subs/vi.srt"
+    assert final_update["target_subtitle_artifact_exists"] is True
+    assert final_update["target_subtitle_materialized"] is True
+    assert final_update["target_subtitle_authoritative_source"] is True
+    assert final_update["target_subtitle_current"] is True
+    assert final_update["target_subtitle_current_reason"] == "ready"
 
 
 def test_clear_no_dub_pipeline_flags_removes_stale_skip_marker(monkeypatch, tmp_path):

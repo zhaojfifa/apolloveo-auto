@@ -94,13 +94,19 @@ def _recovered_subtitle_commit_scrub_updates(task: dict[str, Any]) -> dict[str, 
     stale_no_dub_reason = str(
         pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
     ).strip().lower()
+    pipeline_changed = False
+    if str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true":
+        pipeline_config["translation_incomplete"] = "false"
+        pipeline_changed = True
     if stale_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
         pipeline_config.pop("no_dub", None)
         pipeline_config.pop("dub_skip_reason", None)
-        updates["pipeline_config"] = pipeline_config_to_storage(pipeline_config)
+        pipeline_changed = True
         updates["dub_skip_reason"] = None
         if str(task.get("dub_status") or "").strip().lower() == "skipped":
             updates["dub_status"] = "pending"
+    if pipeline_changed:
+        updates["pipeline_config"] = pipeline_config_to_storage(pipeline_config)
     if str(task.get("subtitle_helper_status") or "").strip().lower() == "failed":
         updates.update(helper_translate_resolved_updates())
     return updates
@@ -167,13 +173,14 @@ def persist_hot_follow_authoritative_target_subtitle(
             },
         )
 
+    updated_at = (now_fn or (lambda: datetime.now(timezone.utc).isoformat()))()
     updates: dict[str, Any] = {
         "subtitles_status": "ready",
         "subtitles_error": None,
         "subtitles_error_reason": None,
         "last_step": "subtitles",
         "mm_srt_path": synced_key or task.get("mm_srt_path"),
-        "subtitles_override_updated_at": (now_fn or (lambda: datetime.now(timezone.utc).isoformat()))(),
+        "subtitles_override_updated_at": updated_at,
         "subtitles_override_mode": text_mode,
         "subtitles_content_hash": content_hash_fn(text),
         "compose_status": "pending",
@@ -181,6 +188,10 @@ def persist_hot_follow_authoritative_target_subtitle(
         "compose_error_reason": None,
         "error_message": None,
         "error_reason": None,
+        "target_subtitle_artifact_exists": True,
+        "target_subtitle_materialized": True,
+        "target_subtitle_materialized_at": updated_at,
+        "target_subtitle_production_path": text_mode,
         "target_subtitle_current": True,
         "target_subtitle_current_reason": persisted.reason,
         "target_subtitle_authoritative_source": True,
@@ -232,16 +243,21 @@ def finalize_hot_follow_subtitles_step(
         "last_step": "subtitles",
         "subtitles_key": subtitles_key,
         "subtitle_structure_path": subtitles_key,
+        "target_subtitle_artifact_exists": bool(decision.accepted and target_subtitle_key),
+        "target_subtitle_materialized": bool(decision.accepted and target_subtitle_key),
         "target_subtitle_current": bool(decision.target_currentness.get("target_subtitle_current")),
         "target_subtitle_current_reason": decision.reason,
     }
     if decision.accepted:
+        now = datetime.now(timezone.utc).isoformat()
         updates.update(
             {
                 "subtitles_status": "ready",
                 "subtitles_error": None,
                 "subtitles_error_reason": None,
                 "target_subtitle_authoritative_source": True,
+                "target_subtitle_materialized_at": now,
+                "target_subtitle_production_path": "auto_translation",
                 "error_message": None,
                 "error_reason": None,
             }

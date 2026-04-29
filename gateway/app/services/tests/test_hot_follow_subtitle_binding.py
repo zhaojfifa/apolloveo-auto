@@ -290,6 +290,61 @@ def test_save_authoritative_target_subtitle_delegates_to_single_owner(monkeypatc
     assert dict(seen["kwargs"])["text_mode"] == "manual_edit"
 
 
+def test_manual_target_subtitle_save_materializes_vi_and_current_truth(monkeypatch, tmp_path):
+    task_id = "hf-manual-vi-materialize"
+    origin_srt = "1\n00:00:00,000 --> 00:00:02,000\n你好\n"
+    target_srt = "1\n00:00:00,000 --> 00:00:02,000\nXin chao\n"
+    uploads: list[tuple[str, str]] = []
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "origin_srt_path": f"deliver/tasks/{task_id}/subs/origin.srt",
+            "pipeline_config": {"translation_incomplete": "true"},
+        }
+    )
+
+    class _Workspace:
+        def __init__(self, _task_id: str, target_lang: str | None = None):
+            assert _task_id == task_id
+            assert target_lang == "vi"
+            self.mm_srt_path = tmp_path / task_id / "subs" / "vi.srt"
+
+    def _upload_task_artifact(_task, local_path, artifact_name, task_id=None, **_kwargs):
+        uploads.append((artifact_name, Path(local_path).read_text(encoding="utf-8")))
+        return f"deliver/tasks/{task_id}/{artifact_name}"
+
+    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: origin_srt)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: origin_srt)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "upload_task_artifact", _upload_task_artifact)
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: tmp_path / task_id / "override.srt")
+    monkeypatch.setattr(hf_router, "_hf_empty_dub_recovery_updates", lambda *_args, **_kwargs: {})
+
+    saved = hf_router._hf_save_authoritative_target_subtitle(
+        task_id,
+        repo.get(task_id),
+        text=target_srt,
+        text_mode="manual_edit",
+        repo=repo,
+    )
+
+    local_vi = tmp_path / task_id / "subs" / "vi.srt"
+    assert local_vi.read_text(encoding="utf-8") == target_srt
+    assert ("vi.srt", target_srt) in uploads
+    assert ("vi.txt", "Xin chao\n") in uploads
+    assert saved["subtitles_status"] == "ready"
+    assert saved["mm_srt_path"] == f"deliver/tasks/{task_id}/vi.srt"
+    assert saved["target_subtitle_artifact_exists"] is True
+    assert saved["target_subtitle_materialized"] is True
+    assert saved["target_subtitle_authoritative_source"] is True
+    assert saved["target_subtitle_current"] is True
+    assert saved["target_subtitle_current_reason"] == "ready"
+    assert parse_pipeline_config(saved["pipeline_config"])["translation_incomplete"] == "false"
+
+
 def test_save_authoritative_target_subtitle_rejects_source_copy_before_success(monkeypatch):
     repo = _Repo(
         {
