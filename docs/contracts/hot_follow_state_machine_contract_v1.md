@@ -17,6 +17,12 @@ Baseline reference:
 Runtime owner:
 
 - `gateway/app/services/hot_follow_process_state.py`
+- Target subtitle translation subflow owner:
+  `gateway/app/services/hot_follow_translation_subflow.py`
+
+Subflow contract:
+
+- `docs/contracts/hot_follow_target_subtitle_translation_subflow_contract_v1.md`
 
 Compatibility wrappers may remain, but semantic ownership is in the process
 state reducer.
@@ -61,6 +67,8 @@ Facts are existence/metadata only:
 - TTS voiceover artifact exists
 - final output exists/freshness inputs exist
 - helper translate output is pending/resolved/unavailable
+- target subtitle translation subflow facts as defined by
+  `hot_follow_target_subtitle_translation_subflow_contract_v1.md`
 
 Facts do not imply process terminal state.
 
@@ -104,6 +112,9 @@ Rules:
   source-audio route selected by the reducer
 - audio artifact existence alone does not imply `dub_ready_current`
 - compose legality consumes route + subtitle process + dub process only
+- target subtitle translation waiting/materialization/terminality is consumed
+  from the target subtitle translation subflow object, not re-derived from
+  helper result tokens
 
 ### Layer 3 Pipeline Step State Machine
 

@@ -322,6 +322,7 @@ def compute_hot_follow_state(task: Dict[str, Any], base_state: Dict[str, Any] | 
 
     _resolve_artifacts(task_id, task, state)
 
+    state["hot_follow_process_state"] = reduce_hot_follow_process_state(state=state)
     gate_result = evaluate_contract_ready_gate(task, state)
     _apply_gate_side_effects(state, gate_result)
 

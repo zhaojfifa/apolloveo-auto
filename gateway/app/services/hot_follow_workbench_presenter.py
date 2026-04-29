@@ -81,7 +81,14 @@ def build_hot_follow_operator_summary(
         and not no_dub
     )
     if subtitle_translation_waiting_retryable:
-        recommended_next_action = "目标字幕翻译尚未就绪，当前处于等待/可重试状态；请等待翻译返回或重试字幕步骤后再继续配音。"
+        subflow = current_attempt.get("target_subtitle_translation_subflow")
+        subflow_state = str((subflow or {}).get("state") if isinstance(subflow, dict) else "").strip()
+        if subflow_state == "translation_output_received_unmaterialized":
+            recommended_next_action = "翻译助手已返回内容，但目标 SRT 尚未物化为权威字幕；请重试字幕物化或手动保存目标字幕后继续配音。"
+        elif subflow_state == "translation_materialization_failed_retryable":
+            recommended_next_action = "目标字幕物化失败但可重试；请重试字幕步骤或手动保存目标字幕后继续配音。"
+        else:
+            recommended_next_action = "目标字幕翻译尚未就绪，当前处于等待/可重试状态；请等待翻译返回或重试字幕步骤后再继续配音。"
     elif current_attempt.get("helper_translate_failed"):
         recommended_next_action = current_attempt.get("helper_translate_error_message") or "翻译助手暂时失败，请稍后重试；也可以手动编辑目标字幕并保存后继续配音。"
     elif current_attempt.get("compose_input_derive_failed_terminal"):

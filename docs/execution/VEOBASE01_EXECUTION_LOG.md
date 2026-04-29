@@ -3344,3 +3344,119 @@ Behavior change:
   waiting chain
 - no skipped subtitle terminal or compose-ready projection is emitted for
   voice-led target-SRT waiting states
+
+---
+
+## 2026-04-29 — Hot Follow target subtitle translation subflow reconstruction
+
+Reading Declaration:
+
+- required authority:
+  - `CURRENT_ENGINEERING_FOCUS.md`
+  - `README.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `apolloveo_current_architecture_and_state_baseline.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- execution baseline:
+  - current `VEOBASE01_EXECUTION_LOG.md` state-machine, consumer-demotion, and
+    route/subtitle-ingestion stabilization entries
+- baseline reference:
+  - `HotFollow-ContractDriven-Baseline-Freeze01`
+- evidence honored:
+  - `e41e102d5bca` and `98038599f48c` blocked translation snapshots described
+    in the task prompt
+- focused owners inspected:
+  - `gateway/app/services/hot_follow_process_state.py`
+  - `gateway/app/services/hot_follow_subtitle_authority.py`
+  - `gateway/app/services/hot_follow_subtitle_currentness.py`
+  - `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+  - `gateway/app/services/task_view_projection.py`
+  - `gateway/app/services/task_view_presenters.py`
+  - `gateway/app/services/subtitle_helpers.py`
+  - `gateway/app/services/hot_follow_helper_translation.py`
+  - `gateway/app/services/ready_gate/hot_follow_rules.py`
+  - `gateway/app/routers/hot_follow_api.py`
+
+Review findings:
+
+1. Existing fact fields were overloaded with semantic meaning:
+   `helper_translate_status`, `helper_translate_output_state`,
+   `target_subtitle_current_reason`, and `subtitle_ready_reason` were being
+   used both as raw facts and as readiness/blocking-state decisions.
+2. Helper translation was represented as a result token in
+   `hot_follow_helper_translation.py` and `subtitle_helpers.py`; it was not a
+   closed process object with requested/inflight/output/materialization states.
+3. Top-level and inner process reason drift came from separate consumers
+   reading helper tokens directly: reducer, current-attempt summary, ready-gate
+   reason extraction, artifact facts, and operator summary.
+4. The minimum additive object needed was a canonical
+   `target_subtitle_translation_subflow` with a fact model plus closed contract
+   states for provider wait, raw-output received, materialization failure,
+   terminal failure, manual override, and authoritative/current target SRT.
+5. Legacy helper fields remain compatibility projections only. They no longer
+   need to carry the full translation-subflow semantics.
+
+Contract update:
+
+- Added
+  `docs/contracts/hot_follow_target_subtitle_translation_subflow_contract_v1.md`.
+- Updated `docs/contracts/hot_follow_state_machine_contract_v1.md` to reference
+  the translation subflow owner and contract.
+
+Runtime changes:
+
+- Added `gateway/app/services/hot_follow_translation_subflow.py` as the
+  canonical owner for translation subflow facts and contract state.
+- `reduce_hot_follow_process_state()` now consumes
+  `target_subtitle_translation_subflow` and exposes:
+  - `target_subtitle_translation_state`
+  - `target_subtitle_translation_reason`
+  - `target_subtitle_translation_blocking_reason`
+  - `target_subtitle_translation_retryable`
+  - `target_subtitle_translation_terminal`
+- `build_hot_follow_artifact_facts()` now emits
+  `target_subtitle_translation_facts` as Layer 1 artifact/process facts.
+- `build_hot_follow_current_attempt_summary()` now projects the reducer-owned
+  subflow object instead of only helper status aliases.
+- `compute_hot_follow_state()` seeds the canonical process state before
+  ready-gate evaluation so ready-gate reasons can consume the subflow truth.
+- `hot_follow_rules._reason_subtitle_ready()` now prefers the reducer-owned
+  translation subflow blocking reason.
+- Workbench subtitle projection and operator summary now expose/consume the
+  precise subflow state where relevant.
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_translation_subflow.py gateway/app/services/hot_follow_process_state.py gateway/app/services/hot_follow_route_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/status_policy/hot_follow_state.py gateway/app/services/ready_gate/hot_follow_rules.py gateway/app/services/hot_follow_workbench_presenter.py gateway/app/services/task_view_workbench_contract.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_translation_subflow.py -q`
+  - result: 7 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_translation_subflow.py gateway/app/services/tests/test_hot_follow_state_commit_contract.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`
+  - result: 47 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+  - result: 55 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_vi_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_does_not_hydrate_timing_only_target_artifact gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`
+  - result: 21 passed
+
+Behavior change:
+
+- `helper_output_pending` is now formalized as
+  `translation_output_pending_retryable`, not an ambiguous loose pending token.
+- helper raw output received but missing target SRT materialization is now
+  `translation_output_received_unmaterialized`.
+- retryable target SRT materialization failure is distinct from provider
+  pending.
+- terminal provider/materialization failure is explicit and separate from
+  retryable waiting.
+- manual authoritative target subtitle override is represented as
+  `manual_target_subtitle_override_current`.
+- ready gate and current attempt consume the same reducer-owned subflow
+  blocking reason, preventing top-level/current-attempt reason drift for the
+  core translation blocker.

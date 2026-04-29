@@ -743,6 +743,9 @@ def build_hot_follow_current_attempt_summary(
     if str(process_state.get("selected_compose_route") or "") == "tts_replace_route":
         dub_status_norm = str(process_state.get("dub_step_status") or dub_status_norm).strip()
     translation_waiting_retryable = bool(process_state.get("subtitle_translation_waiting_retryable"))
+    translation_subflow = process_state.get("target_subtitle_translation_subflow")
+    if not isinstance(translation_subflow, dict):
+        translation_subflow = {}
     retriable_dub_failure = bool(process_state.get("retriable_dub_failure"))
     tts_lane_expected = bool(process_state.get("tts_lane_expected"))
     requires_redub = bool(process_state.get("requires_redub"))
@@ -793,6 +796,12 @@ def build_hot_follow_current_attempt_summary(
         "retriable_dub_failure": retriable_dub_failure,
         "current_attempt_failure_class": "retriable_dub_failure" if retriable_dub_failure else None,
         "subtitle_translation_waiting_retryable": translation_waiting_retryable,
+        "target_subtitle_translation_subflow": translation_subflow,
+        "target_subtitle_translation_state": process_state.get("target_subtitle_translation_state"),
+        "target_subtitle_translation_reason": process_state.get("target_subtitle_translation_reason"),
+        "target_subtitle_translation_blocking_reason": process_state.get("target_subtitle_translation_blocking_reason"),
+        "target_subtitle_translation_retryable": bool(process_state.get("target_subtitle_translation_retryable")),
+        "target_subtitle_translation_terminal": bool(process_state.get("target_subtitle_translation_terminal")),
         "helper_translate_status": artifacts.get("helper_translate_status"),
         "helper_translate_output_state": artifacts.get("helper_translate_output_state"),
         "helper_translate_provider_health": artifacts.get("helper_translate_provider_health"),

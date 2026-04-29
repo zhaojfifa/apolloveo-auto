@@ -266,6 +266,12 @@ def _subtitles_section(
         "translated_text": subtitle_lane.get("helper_translate_translated_text"),
         "target_lang": subtitle_lane.get("helper_translate_target_lang"),
     }
+    process_state = subtitle_lane.get("hot_follow_process_state") if isinstance(subtitle_lane.get("hot_follow_process_state"), dict) else {}
+    translation_subflow = (
+        process_state.get("target_subtitle_translation_subflow")
+        if isinstance(process_state.get("target_subtitle_translation_subflow"), dict)
+        else {}
+    )
     if recovered:
         helper_translation.update(
             {
@@ -283,6 +289,7 @@ def _subtitles_section(
         "parse_source_role": subtitle_lane.get("parse_source_role") or "none",
         "parse_source_authoritative_for_target": bool(subtitle_lane.get("parse_source_authoritative_for_target")),
         "helper_translation": helper_translation,
+        "target_subtitle_translation_subflow": translation_subflow,
         "edited_text": primary_text,
         "srt_text": srt_text,
         "primary_editable_text": primary_text,

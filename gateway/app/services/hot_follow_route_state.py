@@ -8,6 +8,7 @@ from gateway.app.services.contract_runtime.current_attempt_runtime import (
     selected_route_from_state,
 )
 from gateway.app.services.source_audio_policy import source_audio_policy_from_task
+from gateway.app.services.hot_follow_translation_subflow import build_target_subtitle_translation_facts
 
 
 def _first_mapping(*values: Any) -> dict[str, Any]:
@@ -160,6 +161,17 @@ def build_hot_follow_artifact_facts(
         },
     )["name"]
     route = HOT_FOLLOW_COMPOSE_ROUTES[selected_route]
+    translation_facts = build_target_subtitle_translation_facts(
+        task=task,
+        subtitle_lane=subtitle_payload,
+        artifact_facts={
+            "helper_translate_status": subtitle_payload.get("helper_translate_status"),
+            "helper_translate_output_state": subtitle_payload.get("helper_translate_output_state"),
+            "helper_translate_provider_health": subtitle_payload.get("helper_translate_provider_health"),
+            "helper_translate_error_reason": None if subtitle_recovered else subtitle_payload.get("helper_translate_error_reason"),
+            "subtitle_exists": subtitle_exists,
+        },
+    )
     return {
         "final_exists": bool(current_final_payload.get("exists") or historical_payload.get("exists")),
         "final_url": str(final_payload.get("url") or "").strip() or None,
@@ -169,6 +181,7 @@ def build_hot_follow_artifact_facts(
         "audio_url": str(audio_payload.get("voiceover_url") or "").strip() or None,
         "subtitle_exists": subtitle_exists,
         "subtitle_url": str(subtitle_url or "").strip() or None,
+        "target_subtitle_translation_facts": translation_facts,
         "helper_translate_failed": helper_translate_failed,
         "helper_translate_failed_voice_led": helper_translate_failed_voice_led,
         "helper_translate_status": subtitle_payload.get("helper_translate_status"),

@@ -453,7 +453,8 @@ def test_helper_translate_failure_voice_led_does_not_recommend_no_tts_compose():
 
     assert current_attempt["selected_compose_route"] == "tts_replace_route"
     assert current_attempt["no_dub_route_terminal"] is False
-    assert current_attempt["subtitle_terminal_state"] == "helper_translate_failed_terminal"
+    assert current_attempt["subtitle_terminal_state"] == "subtitle_translation_waiting_retryable"
+    assert current_attempt["target_subtitle_translation_state"] == "translation_output_pending_retryable"
 
     advisory = skills_advisory.maybe_build_hot_follow_advisory(
         {"task_id": "hf-helper-translate-failed", "kind": "hot_follow"},
@@ -882,6 +883,9 @@ def test_hot_follow_advisory_noop_preserves_workbench_payload(monkeypatch):
 
     assert "advisory" not in data
     artifact_facts = data.get("artifact_facts") or {}
+    translation_facts = artifact_facts.pop("target_subtitle_translation_facts", {})
+    assert translation_facts["origin_subtitle_exists"] is False
+    assert translation_facts["target_subtitle_materialized"] is False
     assert artifact_facts == {
         "final_exists": False,
         "final_url": None,

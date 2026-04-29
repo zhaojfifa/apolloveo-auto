@@ -184,6 +184,10 @@ def _extract_no_dub_compose_allowed(task: dict, state: dict) -> bool:
 
 def _reason_subtitle_ready(task: dict, state: dict) -> str:
     subs = _d(state.get("subtitles"))
+    process = _d(state.get("hot_follow_process_state"))
+    subflow = _d(process.get("target_subtitle_translation_subflow"))
+    if subflow.get("blocking_reason"):
+        return str(subflow.get("blocking_reason"))
     explicit = subs.get("subtitle_ready_reason")
     if explicit:
         return str(explicit)

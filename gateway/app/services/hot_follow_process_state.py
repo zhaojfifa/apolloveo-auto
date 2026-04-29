@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from gateway.app.services.hot_follow_translation_subflow import (
+    build_target_subtitle_translation_facts,
+    reduce_target_subtitle_translation_subflow,
+)
 
 NO_TTS_ROUTES = {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"}
 STALE_NO_DUB_REASONS = {"target_subtitle_empty", "dub_input_empty"}
@@ -172,13 +176,24 @@ def reduce_hot_follow_process_state(
     helper_output = _s(subtitles.get("helper_translate_output_state") or artifacts.get("helper_translate_output_state"))
     helper_status = _s(subtitles.get("helper_translate_status") or artifacts.get("helper_translate_status"))
     helper_pending = helper_output == "helper_output_pending" or helper_status == "helper_output_pending"
+    translation_facts = build_target_subtitle_translation_facts(
+        task=task,
+        state=state,
+        subtitle_lane=subtitles,
+        artifact_facts=artifacts,
+    )
+    preliminary_translation_subflow = reduce_target_subtitle_translation_subflow(
+        facts=translation_facts,
+        lane_state="voice_led_tts_route",
+    )
     translation_waiting = bool(
         not target_ready
+        and source_available
         and (
-            target_reason in WAITING_SUBTITLE_REASONS
+            preliminary_translation_subflow.get("waiting")
+            or target_reason in WAITING_SUBTITLE_REASONS
             or helper_pending
         )
-        and source_available
     )
     voice_led_evidence = _voice_led_route_evidence(task=task, state=state, artifact_facts=artifacts)
 
@@ -256,11 +271,22 @@ def reduce_hot_follow_process_state(
 
     subtitle_required = lane == "voice_led_tts_route"
     no_dub_route_terminal = bool(lane in {"no_dub_no_tts_route", "voice_led_plus_preserved_source_audio_route"})
+    translation_subflow = reduce_target_subtitle_translation_subflow(
+        facts=translation_facts,
+        lane_state=lane,
+    )
+    translation_waiting = bool(
+        subtitle_required
+        and not target_ready
+        and translation_subflow.get("waiting")
+    )
     if subtitle_required:
         if target_ready:
             subtitle_state = "target_subtitle_authoritative_current"
         elif translation_waiting:
             subtitle_state = "target_subtitle_translation_waiting_retryable"
+        elif translation_subflow.get("terminal"):
+            subtitle_state = "subtitle_terminal_failure"
         elif source_available:
             subtitle_state = "subtitle_source_available"
         else:
@@ -355,6 +381,7 @@ def reduce_hot_follow_process_state(
     subtitle_terminal_state = (
         "subtitle_translation_waiting_retryable"
         if subtitle_state == "target_subtitle_translation_waiting_retryable"
+        or translation_subflow.get("waiting")
         else ("no_dub_route_terminal" if no_dub_route_terminal else None)
     )
     current_subtitle_source = _s(subtitles.get("actual_burn_subtitle_source")) if target_ready else None
@@ -382,6 +409,12 @@ def reduce_hot_follow_process_state(
         ),
         "subtitle_terminal_state": subtitle_terminal_state,
         "subtitle_translation_waiting_retryable": subtitle_state == "target_subtitle_translation_waiting_retryable",
+        "target_subtitle_translation_subflow": translation_subflow,
+        "target_subtitle_translation_state": translation_subflow.get("state"),
+        "target_subtitle_translation_reason": translation_subflow.get("reason"),
+        "target_subtitle_translation_blocking_reason": translation_subflow.get("blocking_reason"),
+        "target_subtitle_translation_retryable": bool(translation_subflow.get("retryable")),
+        "target_subtitle_translation_terminal": bool(translation_subflow.get("terminal")),
         "target_subtitle_authoritative_current": target_ready,
         "actual_burn_subtitle_source": current_subtitle_source,
         "current_subtitle_source": current_subtitle_source,
