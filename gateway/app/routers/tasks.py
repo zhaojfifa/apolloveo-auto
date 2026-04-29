@@ -2058,24 +2058,6 @@ def _run_subtitles_job(
         )
     )
 
-    origin_key, mm_key = _upload_target_subtitle_artifacts(task, task_id, target_lang)
-
-    subtitles_dir = Path("deliver") / "subtitles" / task_id
-    subtitles_key = str(subtitles_dir / "subtitles.json")
-
-    _policy_upsert(repo, 
-        task_id,
-        {
-            "origin_srt_path": origin_key,
-            "mm_srt_path": mm_key,
-            "last_step": "subtitles",
-            "subtitles_status": "ready",
-            "subtitles_key": subtitles_key,
-            "subtitle_structure_path": subtitles_key,
-            "subtitles_error": None,
-        },
-    )
-
     stored = repo.get(task_id)
     return _task_to_detail(stored)
 

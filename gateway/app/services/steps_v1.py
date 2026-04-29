@@ -136,13 +136,18 @@ async def _materialize_missing_target_subtitle_from_origin(
 ):
     if bool(task.get("target_subtitle_current")) and bool(task.get("target_subtitle_authoritative_source")):
         return None
-    if not str(task.get("origin_srt_path") or "").strip():
+    try:
+        origin_exists = Workspace(task_id, target_lang=target_lang).origin_srt_path.exists()
+    except Exception:
+        origin_exists = False
+    if not (origin_exists or str(task.get("origin_srt_path") or "").strip()):
         return None
     retry = bool(task.get("subtitle_translation_requested_at") or task.get("subtitle_translation_execution_ref"))
+    execution_task = {**dict(task or {}), "task_id": task_id}
     return await asyncio.to_thread(
         execute_target_subtitle_translation,
         task_id,
-        task,
+        execution_task,
         repo=repo,
         target_lang=target_lang,
         retry=retry,
@@ -952,6 +957,9 @@ async def run_subtitles_step(req: SubtitlesRequest):
 
         if workspace.origin_srt_path.exists():
             origin_key = _upload_artifact(req.task_id, workspace.origin_srt_path, ORIGIN_SRT_ARTIFACT)
+        origin_ref = origin_key
+        if not origin_ref and workspace.origin_srt_path.exists():
+            origin_ref = relative_to_workspace(workspace.origin_srt_path)
 
         if target_subtitle_authoritative and target_text_semantic and workspace.mm_srt_path.exists():
             mm_key = _upload_artifact(req.task_id, workspace.mm_srt_path, f"subs/{subtitle_filename}")
@@ -983,7 +991,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
             source_texts=(normalized_origin_text, origin_text),
             target_subtitle_key=mm_key,
             subtitles_key=subtitles_key,
-            origin_key=origin_key,
+            origin_key=origin_ref,
             expected_subtitle_source=subtitle_filename,
             translation_incomplete=(
                 not helper_only_preserve_route
@@ -994,7 +1002,7 @@ async def run_subtitles_step(req: SubtitlesRequest):
         )
         if (
             not helper_only_preserve_route
-            and origin_key
+            and workspace.origin_srt_path.exists()
             and (translation_incomplete or not target_subtitle_authoritative)
         ):
             latest_task = repo.get(req.task_id) or task_before

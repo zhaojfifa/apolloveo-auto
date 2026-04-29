@@ -3629,3 +3629,57 @@ Behavior change:
   `translation_output_pending_retryable` result when `origin.srt` exists.
 - The step now performs the missing execution handoff needed to form the target
   SRT artifact and unblock downstream dub/compose currentness gates.
+
+---
+
+## 2026-04-29 — Hot Follow subtitles step ownership closure
+
+Reading Declaration:
+
+- `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+- `docs/contracts/hot_follow_target_subtitle_translation_subflow_contract_v1.md`
+- focused implementation:
+  - `gateway/app/services/steps_v1.py`
+  - `gateway/app/services/hot_follow_translation_execution.py`
+  - `gateway/app/services/hot_follow_subtitle_authority.py`
+  - subtitle helper/retry path tests
+- evidence honored:
+  - `5c9c177fbca4`
+  - `7e57b213afdf`
+
+Root cause:
+
+- The live subtitles step still gated target subtitle execution on
+  `origin_key`, which depended on storage upload/key resolution. A local
+  `origin.srt` could exist while `origin_key` was empty, leaving execution refs
+  and timestamps null.
+- The router-level subtitles job also wrote subtitle success/path fields after
+  the step returned, creating a second writeback owner.
+
+Runtime change:
+
+- `run_subtitles_step()` now owns the voice-led target subtitle closure based
+  on actual local `origin.srt` existence, not only an uploaded artifact key.
+- If upload does not return an origin key, the step still records a local origin
+  reference and executes target subtitle production.
+- The task subtitles job delegates subtitle writeback to `run_subtitles_step()`
+  and no longer uploads or stamps ready/path fields after the step.
+- `build_target_subtitle_from_origin()` now dispatches execution facts before
+  SRT validation/provider execution, so invalid source/provider failures leave
+  `execution_ref`, `requested_at`, `last_polled_at` or `failed_at`, and
+  `retry_count` instead of all-null pending facts.
+
+Validation:
+
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_translation_subflow.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -k 'not slow'`
+  - result: 49 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_tasks_subtitle_upload_paths.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py -k 'subtitle or translate'`
+  - result: 50 passed
+- `python3.11 -m py_compile gateway/app/services/steps_v1.py gateway/app/services/hot_follow_translation_execution.py gateway/app/routers/tasks.py gateway/app/routers/hot_follow_api.py`
+  - result: passed
+
+Behavior change:
+
+- The bad live shape `origin.srt exists + subtitle step ran + vi.srt pending +
+  all execution/materialization facts null` is no longer a valid result for the
+  normal voice-led subtitles step path.

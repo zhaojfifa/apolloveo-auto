@@ -1041,7 +1041,7 @@ def test_translate_subtitles_source_lane_failure_preserves_current_target_subtit
     assert "dub_skip_reason" not in pipeline
 
 
-def test_translate_subtitles_source_lane_uses_normalized_source_srt_when_origin_key_empty(monkeypatch, tmp_path):
+def test_translate_subtitles_source_lane_rejects_normalized_source_without_origin_srt(monkeypatch, tmp_path):
     task_id = "hf-source-lane-normalized"
     normalized_srt = (
         "1\n00:00:00,000 --> 00:00:02,000\n完整中文来源\n\n"
@@ -1088,20 +1088,16 @@ def test_translate_subtitles_source_lane_uses_normalized_source_srt_when_origin_
         lambda segments, target_lang: {1: "Day du nguon tieng Trung", 2: "Cau thu hai"},
     )
 
-    data = hf_router.translate_hot_follow_subtitles(
-        task_id,
-        hf_router.HotFollowTranslateRequest(target_lang="vi", input_source="source_subtitle_lane"),
-        repo=repo,
-    )
+    with pytest.raises(HTTPException) as exc:
+        hf_router.translate_hot_follow_subtitles(
+            task_id,
+            hf_router.HotFollowTranslateRequest(target_lang="vi", input_source="source_subtitle_lane"),
+            repo=repo,
+        )
 
-    assert data["input_source"] == "source_subtitle_lane"
-    assert data["persisted"] is True
-    assert "00:00:00,000 --> 00:00:02,000" in data["translated_text"]
-    assert "Day du nguon tieng Trung" in data["translated_text"]
-    assert uploads[0][0] == "vi.srt"
-    saved = repo.get(task_id) or {}
-    assert saved["mm_srt_path"] == f"deliver/tasks/{task_id}/vi.srt"
-    assert saved["target_subtitle_current"] is True
+    assert exc.value.status_code == 400
+    assert exc.value.detail["reason"] == "origin_subtitle_missing"
+    assert uploads == []
 
 
 def test_subtitle_lane_marks_preserved_source_audio_parse_as_helper_only(monkeypatch):

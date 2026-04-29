@@ -182,6 +182,191 @@ def test_run_subtitles_step_materializes_vi_srt_when_translation_incomplete(monk
     assert pipeline_updates[-1]["translation_incomplete"] == "false"
 
 
+def test_run_subtitles_step_owner_uses_local_origin_when_upload_key_missing(monkeypatch, tmp_path):
+    pipeline_updates: list[dict] = []
+    repo = _FakeRepo()
+    execution_calls: list[dict] = []
+
+    async def _generate_subtitles(**kwargs):
+        return _fake_generate_subtitles(
+            tmp_path,
+            kwargs["task_id"],
+            kwargs["target_lang"],
+            complete=False,
+            parse_source_mode=kwargs["parse_source_mode"],
+        )
+
+    monkeypatch.setattr(
+        steps_v1,
+        "Workspace",
+        lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
+    )
+    monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
+    monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda _task_id, payload: pipeline_updates.append(dict(payload)))
+    monkeypatch.setattr(steps_v1, "_upload_artifact", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
+    monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+    monkeypatch.setattr(
+        steps_v1,
+        "execute_target_subtitle_translation",
+        lambda task_id, task, **_kwargs: execution_calls.append({"task_id": task_id, "task": dict(task)})
+        or repo.upsert(
+            task_id,
+            {
+                "mm_srt_path": f"deliver/tasks/{task_id}/vi.srt",
+                "subtitles_status": "ready",
+                "target_subtitle_current": True,
+                "target_subtitle_current_reason": "ready",
+                "target_subtitle_authoritative_source": True,
+                "subtitle_translation_execution_ref": "exec-local-origin",
+                "subtitle_translation_requested_at": "2026-04-29T00:00:00+00:00",
+                "subtitle_translation_last_polled_at": "2026-04-29T00:00:01+00:00",
+                "subtitle_translation_output_received_at": "2026-04-29T00:00:01+00:00",
+                "subtitle_translation_materialized_at": "2026-04-29T00:00:02+00:00",
+                "subtitle_translation_retry_count": 0,
+            },
+        )
+        and SimpleNamespace(translated_text="1\n00:00:00,000 --> 00:00:02,000\nXin chao\n"),
+    )
+
+    result = asyncio.run(
+        steps_v1.run_subtitles_step(SubtitlesRequest(task_id="hf-local-origin", target_lang="vi", force=True, translate=True))
+    )
+
+    assert result["translation_incomplete"] is False
+    assert execution_calls
+    assert execution_calls[0]["task"]["task_id"] == "hf-local-origin"
+    final_update = repo.get("hf-local-origin")
+    assert final_update["origin_srt_path"].endswith("/hf-local-origin/subs/origin.srt")
+    assert final_update["subtitle_translation_execution_ref"] == "exec-local-origin"
+    assert final_update["target_subtitle_current"] is True
+    assert final_update["target_subtitle_authoritative_source"] is True
+    assert pipeline_updates[-1]["translation_incomplete"] == "false"
+
+
+def test_run_subtitles_step_retry_uses_same_owner_flow(monkeypatch, tmp_path):
+    repo = _FakeRepo(
+        {
+            "subtitle_translation_execution_ref": "old-exec",
+            "subtitle_translation_requested_at": "2026-04-28T00:00:00+00:00",
+            "subtitle_translation_retry_count": 1,
+        }
+    )
+    execution_kwargs: list[dict] = []
+
+    async def _generate_subtitles(**kwargs):
+        return _fake_generate_subtitles(
+            tmp_path,
+            kwargs["task_id"],
+            kwargs["target_lang"],
+            complete=False,
+            parse_source_mode=kwargs["parse_source_mode"],
+        )
+
+    monkeypatch.setattr(
+        steps_v1,
+        "Workspace",
+        lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
+    )
+    monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
+    monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(steps_v1, "_upload_artifact", lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}")
+    monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
+    monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+    monkeypatch.setattr(
+        steps_v1,
+        "execute_target_subtitle_translation",
+        lambda task_id, task, **kwargs: execution_kwargs.append(dict(kwargs))
+        or repo.upsert(
+            task_id,
+            {
+                "mm_srt_path": f"deliver/tasks/{task_id}/vi.srt",
+                "subtitles_status": "ready",
+                "target_subtitle_current": True,
+                "target_subtitle_authoritative_source": True,
+                "target_subtitle_current_reason": "ready",
+                "subtitle_translation_execution_ref": "retry-exec",
+                "subtitle_translation_requested_at": "2026-04-29T00:00:00+00:00",
+                "subtitle_translation_last_polled_at": "2026-04-29T00:00:01+00:00",
+                "subtitle_translation_output_received_at": "2026-04-29T00:00:01+00:00",
+                "subtitle_translation_materialized_at": "2026-04-29T00:00:02+00:00",
+                "subtitle_translation_retry_count": 2,
+            },
+        )
+        and SimpleNamespace(translated_text="1\n00:00:00,000 --> 00:00:02,000\nXin chao retry\n"),
+    )
+
+    asyncio.run(
+        steps_v1.run_subtitles_step(SubtitlesRequest(task_id="hf-retry-owner", target_lang="vi", force=True, translate=True))
+    )
+
+    assert execution_kwargs[0]["retry"] is True
+    final_update = repo.get("hf-retry-owner")
+    assert final_update["subtitle_translation_execution_ref"] == "retry-exec"
+    assert final_update["subtitle_translation_retry_count"] == 2
+    assert final_update["target_subtitle_current"] is True
+
+
+def test_run_subtitles_step_failure_writes_execution_facts(monkeypatch, tmp_path):
+    pipeline_updates: list[dict] = []
+    repo = _FakeRepo()
+
+    async def _generate_subtitles(**kwargs):
+        return _fake_generate_subtitles(
+            tmp_path,
+            kwargs["task_id"],
+            kwargs["target_lang"],
+            complete=False,
+            parse_source_mode=kwargs["parse_source_mode"],
+        )
+
+    def _fail_execution(task_id, task, **_kwargs):
+        repo.upsert(
+            task_id,
+            {
+                "subtitle_translation_execution_ref": "failed-exec",
+                "subtitle_translation_requested_at": "2026-04-29T00:00:00+00:00",
+                "subtitle_translation_last_polled_at": "2026-04-29T00:00:01+00:00",
+                "subtitle_translation_failed_at": "2026-04-29T00:00:01+00:00",
+                "subtitle_translation_retry_count": 0,
+                "subtitles_status": "failed",
+                "target_subtitle_current": False,
+                "target_subtitle_current_reason": "helper_translate_failed",
+            },
+        )
+        raise HTTPException(status_code=409, detail={"reason": "helper_translate_failed"})
+
+    monkeypatch.setattr(
+        steps_v1,
+        "Workspace",
+        lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
+    )
+    monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
+    monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda _task_id, payload: pipeline_updates.append(dict(payload)))
+    monkeypatch.setattr(steps_v1, "_upload_artifact", lambda task_id, _path, artifact_name: f"deliver/tasks/{task_id}/{artifact_name}")
+    monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
+    monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+    monkeypatch.setattr(steps_v1, "execute_target_subtitle_translation", _fail_execution)
+
+    with pytest.raises(HTTPException):
+        asyncio.run(
+            steps_v1.run_subtitles_step(SubtitlesRequest(task_id="hf-fail-owner", target_lang="vi", force=True, translate=True))
+        )
+
+    final_update = repo.get("hf-fail-owner")
+    assert final_update["subtitle_translation_execution_ref"] == "failed-exec"
+    assert final_update["subtitle_translation_requested_at"] == "2026-04-29T00:00:00+00:00"
+    assert final_update["subtitle_translation_last_polled_at"] == "2026-04-29T00:00:01+00:00"
+    assert final_update["subtitle_translation_failed_at"] == "2026-04-29T00:00:01+00:00"
+    assert final_update["subtitle_translation_retry_count"] == 0
+
+
 def test_run_subtitles_step_materializes_myanmar_srt_when_translation_incomplete(monkeypatch, tmp_path):
     pipeline_updates: list[dict] = []
     repo = _FakeRepo()

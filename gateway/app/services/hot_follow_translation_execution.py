@@ -203,18 +203,6 @@ def build_target_subtitle_from_origin(
             status_code=400,
             detail={"reason": "source_subtitle_lane_empty", "message": "来源字幕为空，无法执行完整字幕翻译。"},
         )
-    if "-->" not in source_text:
-        raise HTTPException(
-            status_code=400,
-            detail={"reason": "source_subtitle_lane_not_srt", "message": "来源字幕不是 SRT，无法保留时间轴执行完整字幕翻译。"},
-        )
-    segments = _parse_srt_to_segments(source_text)
-    if not segments:
-        raise HTTPException(
-            status_code=400,
-            detail={"reason": "source_subtitle_lane_invalid_srt", "message": "来源字幕 SRT 无法解析，未写入目标字幕。"},
-        )
-
     execution_ref, retry_count, dispatch = _dispatch_updates(
         task=task,
         source_text=source_text,
@@ -223,9 +211,68 @@ def build_target_subtitle_from_origin(
         now_fn=now_fn,
     )
     running_task = policy_upsert(repo, task_id, task, dispatch, step="target_subtitle_translation")
+
+    if "-->" not in source_text:
+        detail = {"reason": "source_subtitle_lane_not_srt", "message": "来源字幕不是 SRT，无法保留时间轴执行完整字幕翻译。"}
+        policy_upsert(
+            repo,
+            task_id,
+            running_task,
+            _failure_updates(
+                detail=detail,
+                source_text=source_text,
+                target_lang=target_lang,
+                retry_count=retry_count,
+                now_fn=now_fn,
+            ),
+            step="target_subtitle_translation",
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=detail,
+        )
+    segments = _parse_srt_to_segments(source_text)
+    if not segments:
+        detail = {"reason": "source_subtitle_lane_invalid_srt", "message": "来源字幕 SRT 无法解析，未写入目标字幕。"}
+        policy_upsert(
+            repo,
+            task_id,
+            running_task,
+            _failure_updates(
+                detail=detail,
+                source_text=source_text,
+                target_lang=target_lang,
+                retry_count=retry_count,
+                now_fn=now_fn,
+            ),
+            step="target_subtitle_translation",
+        )
+        raise HTTPException(
+            status_code=400,
+            detail=detail,
+        )
     try:
         translations = translate_segments_fn(segments=segments, target_lang=target_lang)
     except GeminiSubtitlesError as exc:
+        detail = sanitize_helper_translate_error(exc)
+        policy_upsert(
+            repo,
+            task_id,
+            running_task,
+            {
+                **_failure_updates(
+                    detail=detail,
+                    source_text=source_text,
+                    target_lang=target_lang,
+                    retry_count=retry_count,
+                    now_fn=now_fn,
+                ),
+                **_current_target_recovery_updates(task),
+            },
+            step="target_subtitle_translation",
+        )
+        raise HTTPException(status_code=409, detail=detail) from exc
+    except Exception as exc:
         detail = sanitize_helper_translate_error(exc)
         policy_upsert(
             repo,

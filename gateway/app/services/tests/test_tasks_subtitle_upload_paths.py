@@ -57,11 +57,21 @@ def test_upload_target_subtitle_artifacts_uses_vi_filenames(monkeypatch, tmp_pat
     assert uploads == ["origin.srt", "vi.srt", "vi.txt"]
 
 
-def test_run_subtitles_job_persists_vi_target_artifact_path(monkeypatch, tmp_path):
+def test_run_subtitles_job_delegates_subtitle_writeback_to_step_owner(monkeypatch, tmp_path):
     policy_updates: list[dict] = []
     repo = _Repo({"task_id": "hf-vi-job", "content_lang": "vi", "target_lang": "vi"})
 
-    monkeypatch.setattr(tasks_router, "run_subtitles_step_entry", lambda **_kwargs: None)
+    def _run_step(**_kwargs):
+        repo.upsert(
+            "hf-vi-job",
+            {
+                "origin_srt_path": "deliver/tasks/hf-vi-job/origin.srt",
+                "mm_srt_path": "deliver/tasks/hf-vi-job/vi.srt",
+                "subtitles_status": "ready",
+            },
+        )
+
+    monkeypatch.setattr(tasks_router, "run_subtitles_step_entry", _run_step)
     monkeypatch.setattr(tasks_router.asyncio, "run", lambda result: result)
     monkeypatch.setattr(tasks_router, "Workspace", lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang))
     monkeypatch.setattr(tasks_router, "_task_to_detail", lambda task: task)
@@ -77,7 +87,7 @@ def test_run_subtitles_job_persists_vi_target_artifact_path(monkeypatch, tmp_pat
     workspace.mm_srt_path.write_text("translated", encoding="utf-8")
     workspace.mm_srt_path.with_suffix(".txt").write_text("translated", encoding="utf-8")
 
-    tasks_router._run_subtitles_job(
+    result = tasks_router._run_subtitles_job(
         task_id="hf-vi-job",
         target_lang="vi",
         force=False,
@@ -85,8 +95,9 @@ def test_run_subtitles_job_persists_vi_target_artifact_path(monkeypatch, tmp_pat
         repo=repo,
     )
 
-    assert policy_updates[-1]["origin_srt_path"] == "deliver/tasks/hf-vi-job/origin.srt"
-    assert policy_updates[-1]["mm_srt_path"] == "deliver/tasks/hf-vi-job/vi.srt"
+    assert policy_updates == []
+    assert result["origin_srt_path"] == "deliver/tasks/hf-vi-job/origin.srt"
+    assert result["mm_srt_path"] == "deliver/tasks/hf-vi-job/vi.srt"
 
 
 def test_run_pipeline_background_skips_link_parse_for_local_ingest_when_raw_ready(monkeypatch, tmp_path):
