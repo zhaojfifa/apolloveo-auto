@@ -117,9 +117,10 @@ def test_clear_no_dub_pipeline_flags_removes_stale_skip_marker(monkeypatch, tmp_
     assert note_path.exists() is False
 
 
-def test_run_subtitles_step_marks_vi_translation_incomplete_without_step_error(monkeypatch, tmp_path):
+def test_run_subtitles_step_materializes_vi_srt_when_translation_incomplete(monkeypatch, tmp_path):
     pipeline_updates: list[dict] = []
     repo = _FakeRepo()
+    execution_calls: list[dict] = []
 
     async def _generate_subtitles(**kwargs):
         return _fake_generate_subtitles(
@@ -142,20 +143,46 @@ def test_run_subtitles_step_marks_vi_translation_incomplete_without_step_error(m
     monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
     monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
     monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+    monkeypatch.setattr(
+        steps_v1,
+        "execute_target_subtitle_translation",
+        lambda task_id, task, **_kwargs: execution_calls.append({"task_id": task_id, "task": dict(task)})
+        or repo.upsert(
+            task_id,
+            {
+                "mm_srt_path": f"deliver/tasks/{task_id}/vi.srt",
+                "subtitles_status": "ready",
+                "target_subtitle_current": True,
+                "target_subtitle_current_reason": "ready",
+                "target_subtitle_authoritative_source": True,
+                "subtitle_translation_execution_ref": "exec-vi",
+                "subtitle_translation_requested_at": "2026-04-29T00:00:00+00:00",
+                "subtitle_translation_last_polled_at": "2026-04-29T00:00:01+00:00",
+                "subtitle_translation_output_received_at": "2026-04-29T00:00:01+00:00",
+                "subtitle_translation_materialized_at": "2026-04-29T00:00:02+00:00",
+                "subtitle_translation_retry_count": 0,
+            },
+        )
+        and SimpleNamespace(translated_text="1\n00:00:00,000 --> 00:00:02,000\nXin chao\n"),
+    )
 
     req = SubtitlesRequest(task_id="hf-vi-sub2", target_lang="vi", force=True, translate=True)
     result = asyncio.run(steps_v1.run_subtitles_step(req))
 
-    assert result["translation_incomplete"] is True
+    assert result["translation_incomplete"] is False
+    assert execution_calls[0]["task"]["origin_srt_path"] == "deliver/tasks/hf-vi-sub2/subs/origin.srt"
     final_update = repo.get(req.task_id)
-    assert final_update["subtitles_status"] == "pending"
-    assert "waiting" in final_update["subtitles_error"]
-    assert final_update["target_subtitle_current"] is False
-    assert final_update["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
-    assert pipeline_updates[-1]["translation_incomplete"] == "true"
+    assert final_update["subtitles_status"] == "ready"
+    assert final_update["target_subtitle_current"] is True
+    assert final_update["target_subtitle_current_reason"] == "ready"
+    assert final_update["target_subtitle_authoritative_source"] is True
+    assert final_update["mm_srt_path"] == "deliver/tasks/hf-vi-sub2/vi.srt"
+    assert final_update["subtitle_translation_execution_ref"] == "exec-vi"
+    assert final_update["subtitle_translation_materialized_at"] == "2026-04-29T00:00:02+00:00"
+    assert pipeline_updates[-1]["translation_incomplete"] == "false"
 
 
-def test_run_subtitles_step_marks_myanmar_translation_incomplete_without_step_error(monkeypatch, tmp_path):
+def test_run_subtitles_step_materializes_myanmar_srt_when_translation_incomplete(monkeypatch, tmp_path):
     pipeline_updates: list[dict] = []
     repo = _FakeRepo()
 
@@ -180,17 +207,39 @@ def test_run_subtitles_step_marks_myanmar_translation_incomplete_without_step_er
     monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
     monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
     monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+    monkeypatch.setattr(
+        steps_v1,
+        "execute_target_subtitle_translation",
+        lambda task_id, task, **_kwargs: repo.upsert(
+            task_id,
+            {
+                "mm_srt_path": f"deliver/tasks/{task_id}/mm.srt",
+                "subtitles_status": "ready",
+                "target_subtitle_current": True,
+                "target_subtitle_current_reason": "ready",
+                "target_subtitle_authoritative_source": True,
+                "subtitle_translation_execution_ref": "exec-mm",
+                "subtitle_translation_requested_at": "2026-04-29T00:00:00+00:00",
+                "subtitle_translation_last_polled_at": "2026-04-29T00:00:01+00:00",
+                "subtitle_translation_output_received_at": "2026-04-29T00:00:01+00:00",
+                "subtitle_translation_materialized_at": "2026-04-29T00:00:02+00:00",
+                "subtitle_translation_retry_count": 0,
+            },
+        )
+        and SimpleNamespace(translated_text="1\n00:00:00,000 --> 00:00:02,000\nမင်္ဂလာပါ\n"),
+    )
 
     req = SubtitlesRequest(task_id="hf-mm-sub-incomplete", target_lang="my", force=True, translate=True)
     result = asyncio.run(steps_v1.run_subtitles_step(req))
 
-    assert result["translation_incomplete"] is True
+    assert result["translation_incomplete"] is False
     final_update = repo.get(req.task_id)
-    assert final_update["subtitles_status"] == "pending"
-    assert "waiting" in final_update["subtitles_error"]
-    assert final_update["target_subtitle_current"] is False
-    assert final_update["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
-    assert pipeline_updates[-1]["translation_incomplete"] == "true"
+    assert final_update["subtitles_status"] == "ready"
+    assert final_update["target_subtitle_current"] is True
+    assert final_update["target_subtitle_current_reason"] == "ready"
+    assert final_update["target_subtitle_authoritative_source"] is True
+    assert final_update["subtitle_translation_execution_ref"] == "exec-mm"
+    assert pipeline_updates[-1]["translation_incomplete"] == "false"
 
 
 def test_run_subtitles_step_treats_preserved_source_audio_as_helper_only(monkeypatch, tmp_path):

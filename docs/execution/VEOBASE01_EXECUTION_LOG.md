@@ -3572,3 +3572,60 @@ Behavior change:
 - Provider failure writes `failed_at`, preserves already-current target
   subtitles where applicable, and remains a retryable execution failure rather
   than an uninitialized pending state.
+
+---
+
+## 2026-04-29 — Hot Follow SRT-first target materialization hard fix
+
+Reading Declaration:
+
+- `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+- `docs/contracts/hot_follow_target_subtitle_translation_subflow_contract_v1.md`
+- focused implementation:
+  - `gateway/app/services/hot_follow_translation_execution.py`
+  - `gateway/app/services/hot_follow_translation_subflow.py`
+  - `gateway/app/services/hot_follow_subtitle_authority.py`
+  - `gateway/app/services/steps_v1.py`
+  - source subtitle lane tests and subtitle-step tests
+- evidence honored:
+  - `7e57b213afdf`
+
+Root cause:
+
+- The source subtitle translation owner existed, but the normal subtitles step
+  could still finish with `origin.srt` present and target subtitle missing
+  without invoking that owner.
+- That left voice-led tasks in a modeled retryable wait with null execution
+  facts and no `vi.srt` artifact.
+
+Runtime change:
+
+- `run_subtitles_step()` now detects the narrow case:
+  - origin subtitle artifact was produced/uploaded
+  - route is not the preserved-source/no-target-subtitle-required lane
+  - target subtitle translation is incomplete or non-authoritative
+- In that case, the step calls the existing target subtitle translation
+  execution owner immediately.
+- The owner synchronously translates source SRT, persists the authoritative
+  target subtitle artifact (`vi.srt` for Vietnamese), and writes execution
+  facts plus target subtitle authority/currentness.
+- Successful authoritative target subtitle commits now also clear stale
+  `translation_incomplete=true` from pipeline config.
+- The canonical synchronous execution unit is
+  `build_target_subtitle_from_origin()`: validate `origin.srt`, parse source
+  SRT cues, translate segments, materialize the target SRT artifact, persist
+  authoritative/current subtitle truth, and write execution facts.
+
+Validation:
+
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_translation_subflow.py gateway/app/services/tests/test_steps_v1_subtitles_step.py`
+  - result: 26 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_artifact_facts.py -k no_dub`
+  - result: 3 passed
+
+Behavior change:
+
+- A normal voice-led subtitle step no longer stops at a passive
+  `translation_output_pending_retryable` result when `origin.srt` exists.
+- The step now performs the missing execution handoff needed to form the target
+  SRT artifact and unblock downstream dub/compose currentness gates.

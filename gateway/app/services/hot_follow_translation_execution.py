@@ -47,8 +47,14 @@ def _retry_count(task: dict[str, Any], *, retry: bool) -> int:
 
 
 def _source_subtitle_text(task_id: str, task: dict[str, Any]) -> str:
-    normalized_source_text = hf_load_normalized_source_text(task_id, task).strip()
     origin_source_text = hf_load_origin_subtitles_text(task).strip()
+    if not origin_source_text:
+        raise HTTPException(
+            status_code=400,
+            detail={"reason": "origin_subtitle_missing", "message": "origin.srt 缺失，无法执行完整字幕翻译。"},
+        )
+
+    normalized_source_text = hf_load_normalized_source_text(task_id, task).strip()
     return normalized_source_text if "-->" in normalized_source_text else origin_source_text
 
 
@@ -178,7 +184,7 @@ def _materialize_authoritative_target_subtitle(
     )
 
 
-def execute_target_subtitle_translation(
+def build_target_subtitle_from_origin(
     task_id: str,
     task: dict[str, Any],
     *,
@@ -188,6 +194,8 @@ def execute_target_subtitle_translation(
     translate_segments_fn: Callable[..., dict[int, str]] = translate_segments_with_gemini,
     now_fn: Callable[[], str] = _now,
 ) -> TargetSubtitleTranslationExecutionResult:
+    """Synchronously translate origin.srt and materialize the authoritative target SRT."""
+
     target_lang = hot_follow_internal_lang(target_lang)
     source_text = _source_subtitle_text(task_id, task)
     if not source_text:
@@ -274,4 +282,25 @@ def execute_target_subtitle_translation(
         execution_ref=execution_ref,
         retry_count=retry_count,
         materialized=True,
+    )
+
+
+def execute_target_subtitle_translation(
+    task_id: str,
+    task: dict[str, Any],
+    *,
+    repo: Any,
+    target_lang: str,
+    retry: bool = False,
+    translate_segments_fn: Callable[..., dict[int, str]] = translate_segments_with_gemini,
+    now_fn: Callable[[], str] = _now,
+) -> TargetSubtitleTranslationExecutionResult:
+    return build_target_subtitle_from_origin(
+        task_id,
+        task,
+        repo=repo,
+        target_lang=target_lang,
+        retry=retry,
+        translate_segments_fn=translate_segments_fn,
+        now_fn=now_fn,
     )

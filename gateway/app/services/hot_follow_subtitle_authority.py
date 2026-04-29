@@ -91,16 +91,19 @@ def _recovered_subtitle_commit_scrub_updates(task: dict[str, Any]) -> dict[str, 
         "target_subtitle_authoritative_source": True,
     }
     pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    if str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true":
+        pipeline_config["translation_incomplete"] = "false"
     stale_no_dub_reason = str(
         pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
     ).strip().lower()
     if stale_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
         pipeline_config.pop("no_dub", None)
         pipeline_config.pop("dub_skip_reason", None)
-        updates["pipeline_config"] = pipeline_config_to_storage(pipeline_config)
         updates["dub_skip_reason"] = None
         if str(task.get("dub_status") or "").strip().lower() == "skipped":
             updates["dub_status"] = "pending"
+    if pipeline_config != parse_pipeline_config(task.get("pipeline_config")):
+        updates["pipeline_config"] = pipeline_config_to_storage(pipeline_config)
     if str(task.get("subtitle_helper_status") or "").strip().lower() == "failed":
         updates.update(helper_translate_resolved_updates())
     return updates

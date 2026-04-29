@@ -119,6 +119,36 @@ def _subtitle_result_contract(result: dict | None) -> tuple[str, str, str, dict[
     return _svc_subtitle_result_contract(result)
 
 
+def execute_target_subtitle_translation(*args, **kwargs):
+    from gateway.app.services.hot_follow_translation_execution import (
+        execute_target_subtitle_translation as _execute,
+    )
+
+    return _execute(*args, **kwargs)
+
+
+async def _materialize_missing_target_subtitle_from_origin(
+    *,
+    task_id: str,
+    task: dict,
+    repo,
+    target_lang: str,
+):
+    if bool(task.get("target_subtitle_current")) and bool(task.get("target_subtitle_authoritative_source")):
+        return None
+    if not str(task.get("origin_srt_path") or "").strip():
+        return None
+    retry = bool(task.get("subtitle_translation_requested_at") or task.get("subtitle_translation_execution_ref"))
+    return await asyncio.to_thread(
+        execute_target_subtitle_translation,
+        task_id,
+        task,
+        repo=repo,
+        target_lang=target_lang,
+        retry=retry,
+    )
+
+
 async def _hydrate_raw_from_url(
     *,
     task_id: str,
@@ -962,6 +992,28 @@ async def run_subtitles_step(req: SubtitlesRequest):
             target_subtitle_authoritative=target_subtitle_authoritative,
             target_subtitle_required=not helper_only_preserve_route,
         )
+        if (
+            not helper_only_preserve_route
+            and origin_key
+            and (translation_incomplete or not target_subtitle_authoritative)
+        ):
+            latest_task = repo.get(req.task_id) or task_before
+            execution_result = await _materialize_missing_target_subtitle_from_origin(
+                task_id=req.task_id,
+                task=latest_task,
+                repo=repo,
+                target_lang=req.target_lang,
+            )
+            if execution_result is not None and isinstance(result, dict):
+                result = {
+                    **result,
+                    "mm_srt": execution_result.translated_text,
+                    "translation_incomplete": False,
+                }
+                qa = dict(result.get("translation_qa") or {})
+                qa["complete"] = True
+                result["translation_qa"] = qa
+                _update_pipeline_config(req.task_id, {"translation_incomplete": "false"})
         logger.info(
             "SUB2_DONE",
             extra={

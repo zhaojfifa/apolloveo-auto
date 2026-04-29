@@ -306,8 +306,36 @@ def test_translation_execution_owner_dispatches_and_materializes(monkeypatch, tm
     assert saved["subtitle_translation_retry_count"] == 0
     assert saved["target_subtitle_current"] is True
     assert saved["target_subtitle_authoritative_source"] is True
+    assert (tmp_path / "vi.srt").exists()
+    assert "Xin chao" in (tmp_path / "vi.srt").read_text(encoding="utf-8")
     assert result.materialized is True
     assert "Xin chao" in result.translated_text
+
+
+def test_translation_execution_requires_origin_srt(monkeypatch):
+    task_id = "hf-translation-no-origin"
+    repo = _Repo({"task_id": task_id, "kind": "hot_follow", "target_lang": "vi"})
+
+    monkeypatch.setattr(translation_execution, "hf_load_origin_subtitles_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(
+        translation_execution,
+        "hf_load_normalized_source_text",
+        lambda *_args, **_kwargs: "1\n00:00:00,000 --> 00:00:02,000\n你好\n",
+    )
+
+    try:
+        translation_execution.build_target_subtitle_from_origin(
+            task_id,
+            repo.get(task_id),
+            repo=repo,
+            target_lang="vi",
+            translate_segments_fn=lambda segments, target_lang: {1: "Xin chao"},
+        )
+    except Exception as exc:
+        assert getattr(exc, "status_code", None) == 400
+        assert exc.detail["reason"] == "origin_subtitle_missing"
+    else:
+        raise AssertionError("expected missing origin.srt to block translation")
 
 
 def test_translation_execution_retry_advances_counter_and_execution_ref(monkeypatch, tmp_path):
