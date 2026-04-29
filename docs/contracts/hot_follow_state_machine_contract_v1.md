@@ -1,13 +1,136 @@
 # Hot Follow State Machine Contract v1
 
-Date: 2026-04-22
-Status: Draft for Phase 2 contract-driven upgrade
+Date: 2026-04-29
+Status: Active Hot Follow first-line process contract
 
 ## Purpose
 
-This draft separates execution state, artifact state, current-attempt state,
-and presentation state so Hot Follow can stop encoding publish/workbench truth
-as router-local condition chains.
+This contract separates route classification, artifact facts,
+authority/currentness/legal attempt state, pipeline process state, and
+presentation state so Hot Follow stops encoding publish/workbench truth as
+router-local condition chains.
+
+Baseline reference:
+
+- `HotFollow-ContractDriven-Baseline-Freeze01`
+
+Runtime owner:
+
+- `gateway/app/services/hot_follow_process_state.py`
+
+Compatibility wrappers may remain, but semantic ownership is in the process
+state reducer.
+
+## Canonical Process Layers
+
+### Layer 0 Route / Lane Classification
+
+Owner:
+
+- `reduce_hot_follow_process_state()`
+
+Canonical states:
+
+- `voice_led_tts_route`
+  - speech/source-text-led content
+  - target subtitle is required
+  - dub and compose depend on authoritative/current target subtitle
+- `no_dub_no_tts_route`
+  - explicit no-dub/no-TTS route
+  - target subtitle is not required for dubbing
+  - compose may proceed through a no-TTS route when compose input is ready
+- `voice_led_plus_preserved_source_audio_route`
+  - source audio preserve route
+  - no TTS voiceover is required for compose
+  - target subtitle is not a dub prerequisite unless the reducer selects the
+    TTS route
+
+Rule:
+
+- a task belongs to exactly one canonical route state at a time
+- downstream code may consume this route state but may not independently
+  reinterpret the lane
+
+### Layer 1 Artifact Facts
+
+Facts are existence/metadata only:
+
+- raw/source video exists
+- origin subtitle/source parse exists
+- target subtitle artifact exists
+- TTS voiceover artifact exists
+- final output exists/freshness inputs exist
+- helper translate output is pending/resolved/unavailable
+
+Facts do not imply process terminal state.
+
+### Layer 2 Authority / Currentness / Legality
+
+Owner:
+
+- `reduce_hot_follow_process_state()`
+
+Derived states:
+
+- subtitle:
+  - `subtitle_not_required_for_route`
+  - `subtitle_source_missing`
+  - `subtitle_source_available`
+  - `target_subtitle_translation_waiting_retryable`
+  - `target_subtitle_authoritative_current`
+  - `subtitle_terminal_failure`
+  - `subtitle_skipped_terminal`
+- dub/audio:
+  - `dub_not_required_for_route`
+  - `dub_waiting_for_target_subtitle`
+  - `dub_ready_current`
+  - `dub_stale_after_subtitle_change`
+  - `dub_retryable_failure`
+  - `dub_terminal_failure`
+- compose:
+  - `compose_not_allowed_waiting_subtitle`
+  - `compose_not_allowed_waiting_audio`
+  - `compose_allowed_ready`
+  - `compose_running`
+  - `compose_done`
+  - `compose_failed_retryable`
+  - `compose_failed_terminal`
+
+Rules:
+
+- `subtitles=done` is legal on `voice_led_tts_route` only when
+  `target_subtitle_authoritative_current` is true
+- `subtitles=skipped` is legal only on a canonical no-dub/no-TTS or preserved
+  source-audio route selected by the reducer
+- audio artifact existence alone does not imply `dub_ready_current`
+- compose legality consumes route + subtitle process + dub process only
+
+### Layer 3 Pipeline Step State Machine
+
+Pipeline rows consume Layer 2:
+
+- subtitles step maps from subtitle process state
+- dub step maps from dub/audio process state
+- compose step maps from compose process state and ready-gate final freshness
+
+Layer 3 may not promote partial artifacts into terminal success.
+
+### Layer 4 Presentation / Advisory
+
+Workbench, publish, task detail, operator summary, and advisory consume Layer 2
+and Layer 3. They may expose compatibility aliases, but they may not create a
+new route, readiness, or currentness interpretation.
+
+## Forbidden Combinations
+
+The reducer makes these combinations illegal:
+
+- `voice_led_tts_route` with `subtitles=skipped/no_dub_route_terminal`
+- target subtitle authority/currentness false while subtitles or dub are treated
+  as ready/current
+- audio failed plus artifact-exists treated as current-ready while subtitle
+  translation remains unresolved
+- no-dub/no-TTS compose allowed while subtitle step remains unresolved running
 
 ## Layer Separation
 

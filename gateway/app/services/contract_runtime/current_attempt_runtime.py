@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from gateway.app.services.hot_follow_process_state import reduce_hot_follow_process_state
+
 
 @dataclass(frozen=True)
 class HotFollowComposeRoute:
@@ -328,6 +330,38 @@ def _route_should_stay_tts(
 
 
 def selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
+    existing_process = state.get("hot_follow_process_state") or state.get("process_state")
+    if isinstance(existing_process, dict) and existing_process.get("selected_compose_route"):
+        route_name = str(existing_process.get("selected_compose_route") or "tts_replace_route").strip()
+        compose_input = existing_process.get("compose_input") if isinstance(existing_process.get("compose_input"), dict) else {}
+        return {
+            "name": route_name,
+            "compose_allowed": bool(existing_process.get("compose_allowed")),
+            "compose_route_allowed": bool(existing_process.get("compose_allowed")),
+            "compose_input_ready": bool(existing_process.get("compose_input_ready")),
+            "compose_input_mode": str(existing_process.get("compose_input_mode") or "").strip(),
+            "compose_input_reason": str(existing_process.get("compose_reason") or "").strip(),
+            "compose_execute_allowed": bool(existing_process.get("compose_execute_allowed")),
+            "blocked_reason": "" if existing_process.get("compose_allowed") else str(existing_process.get("compose_allowed_reason") or "route_not_allowed").strip(),
+            "no_tts_compose_allowed": bool(existing_process.get("no_tts_compose_allowed")),
+            "no_dub_compose_allowed": bool(existing_process.get("no_dub_compose_allowed")),
+        }
+    process_state = reduce_hot_follow_process_state(task=task, state=state)
+    route_name = str(process_state.get("selected_compose_route") or "tts_replace_route").strip()
+    return {
+        "name": route_name,
+        "compose_allowed": bool(process_state.get("compose_allowed")),
+        "compose_route_allowed": bool(process_state.get("compose_allowed")),
+        "compose_input_ready": bool(process_state.get("compose_input_ready")),
+        "compose_input_mode": str(process_state.get("compose_input_mode") or "").strip(),
+        "compose_input_reason": str(process_state.get("compose_reason") or "").strip(),
+        "compose_execute_allowed": bool(process_state.get("compose_execute_allowed")),
+        "blocked_reason": "" if process_state.get("compose_allowed") else str(process_state.get("compose_allowed_reason") or "route_not_allowed").strip(),
+        "no_tts_compose_allowed": bool(process_state.get("no_tts_compose_allowed")),
+        "no_dub_compose_allowed": bool(process_state.get("no_dub_compose_allowed")),
+    }
+
+def _legacy_selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
     rules = _runtime_boundary_rules(task)
     artifact_facts = state.get("artifact_facts") if isinstance(state.get("artifact_facts"), dict) else {}
     compose_input = artifact_facts.get("compose_input") if isinstance(artifact_facts.get("compose_input"), dict) else {}
@@ -688,12 +722,40 @@ def build_hot_follow_current_attempt_summary(
         and (final_stale_reason or compose_reason_norm != "ready")
     )
     compose_execute_allowed = bool(route_allowed and compose_input_ready)
+    process_state = reduce_hot_follow_process_state(
+        task={},
+        voice_state=voice_state,
+        subtitle_lane=subtitle_lane,
+        artifact_facts=artifacts,
+        dub_status=dub_status,
+        compose_status=compose_status_norm,
+        composed_reason=compose_reason_norm,
+        final_stale_reason=final_stale_reason,
+        no_dub=no_dub,
+        no_dub_compose_allowed=no_dub_compose_allowed,
+    )
+    selected_route = str(process_state.get("selected_compose_route") or selected_route or "tts_replace_route")
+    route_allowed = bool(process_state.get("compose_allowed"))
+    compose_input_ready = bool(process_state.get("compose_input_ready"))
+    compose_execute_allowed = bool(process_state.get("compose_execute_allowed"))
+    no_tts_route = selected_route in {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"}
+    no_dub_route_terminal = bool(process_state.get("subtitle_terminal_state") == "no_dub_route_terminal")
+    if str(process_state.get("selected_compose_route") or "") == "tts_replace_route":
+        dub_status_norm = str(process_state.get("dub_step_status") or dub_status_norm).strip()
+    translation_waiting_retryable = bool(process_state.get("subtitle_translation_waiting_retryable"))
+    retriable_dub_failure = bool(process_state.get("retriable_dub_failure"))
+    tts_lane_expected = bool(process_state.get("tts_lane_expected"))
+    requires_redub = bool(process_state.get("requires_redub"))
+    requires_recompose = bool(process_state.get("requires_recompose"))
+    compose_reason_norm = str(process_state.get("compose_reason") or compose_reason_norm)
+    compose_status_norm = str(process_state.get("compose_step_status") or compose_status_norm)
+
     return {
         "dub_status": dub_status_norm,
-        "audio_ready": audio_ready,
-        "audio_ready_reason": str(voice_state.get("audio_ready_reason") or "").strip() or "unknown",
-        "dub_current": bool(voice_state.get("dub_current")),
-        "dub_current_reason": str(voice_state.get("dub_current_reason") or "").strip() or "unknown",
+        "audio_ready": bool(process_state.get("audio_ready")),
+        "audio_ready_reason": str(process_state.get("audio_ready_reason") or voice_state.get("audio_ready_reason") or "").strip() or "unknown",
+        "dub_current": bool(process_state.get("dub_current")),
+        "dub_current_reason": str(process_state.get("dub_current_reason") or voice_state.get("dub_current_reason") or "").strip() or "unknown",
         "requested_voice": str(voice_state.get("requested_voice") or "").strip() or None,
         "resolved_voice": str(voice_state.get("resolved_voice") or "").strip() or None,
         "actual_provider": str(voice_state.get("actual_provider") or "").strip() or None,
@@ -724,7 +786,7 @@ def build_hot_follow_current_attempt_summary(
                 else ("compose_exec_failed_terminal" if compose_status_norm in {"failed", "error"} else None)
             )
         ),
-        "compose_allowed_reason": "ready" if route_allowed else route_reason,
+        "compose_allowed_reason": str(process_state.get("compose_allowed_reason") or ("ready" if route_allowed else route_reason)),
         "subtitle_empty_terminal": subtitle_empty_terminal,
         "no_dub_route_terminal": no_dub_route_terminal,
         "tts_lane_expected": tts_lane_expected,
@@ -743,18 +805,15 @@ def build_hot_follow_current_attempt_summary(
         "helper_translate_terminal": bool(artifacts.get("helper_translate_terminal")),
         "helper_translate_warning_only": bool(artifacts.get("helper_translate_warning_only")),
         "subtitle_terminal_state": (
-            "helper_translate_failed_terminal"
-            if helper_translate_failed
-            else (
-                "subtitle_translation_waiting_retryable"
-                if translation_waiting_retryable
-                else (
-                    "no_dub_route_terminal"
-                if no_dub_route_terminal
+            process_state.get("subtitle_terminal_state")
+            or (
+                "helper_translate_failed_terminal"
+                if helper_translate_failed
                 else ("subtitle_empty_terminal" if subtitle_empty_terminal else None)
-                )
             )
         ),
+        "process_state": process_state,
+        "hot_follow_process_state": process_state,
         "requires_redub": requires_redub,
         "requires_recompose": requires_recompose,
         "current_subtitle_source": str(subtitle_lane.get("actual_burn_subtitle_source") or "").strip() or None,

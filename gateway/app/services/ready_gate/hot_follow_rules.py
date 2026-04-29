@@ -133,7 +133,6 @@ def _extract_subtitle_artifact_exists(task: dict, state: dict) -> bool:
     return bool(
         (subs.get("subtitle_artifact_exists") and target_source)
         or target_source
-        or task.get("mm_srt_path")
     )
 
 
@@ -143,6 +142,11 @@ def _extract_subtitle_ready(task: dict, state: dict) -> bool:
     Preserves the hint-priority pattern from original L172-181.
     """
     subs = _d(state.get("subtitles"))
+    process = _d(state.get("hot_follow_process_state"))
+    if process.get("subtitle_required") is False:
+        return False
+    if process.get("target_subtitle_authoritative_current") is not None:
+        return bool(process.get("target_subtitle_authoritative_current"))
     hint = subs.get("subtitle_ready")
     if hint is not None:
         return bool(hint)

@@ -633,10 +633,10 @@ def test_tts_replace_route_missing_voiceover_blocks_only_tts_route():
 
 
 def test_non_tts_route_dub_terminal_states_do_not_stay_pending_or_running():
-    for dub_status, no_dub_reason, expected in (
-        ("running", None, "absent"),
-        ("pending", "dub_input_empty", "empty"),
-        ("skipped", None, "skipped"),
+    for dub_status, no_dub_reason, expected, compose_allowed, no_tts_allowed in (
+        ("running", None, "absent", True, True),
+        ("pending", "dub_input_empty", "pending", False, False),
+        ("skipped", None, "skipped", True, True),
     ):
         current_attempt = build_hot_follow_current_attempt_summary(
             voice_state={
@@ -658,8 +658,8 @@ def test_non_tts_route_dub_terminal_states_do_not_stay_pending_or_running():
         )
 
         assert current_attempt["dub_status"] == expected
-        assert current_attempt["compose_allowed"] is True
-        assert current_attempt["no_tts_compose_allowed"] is True
+        assert current_attempt["compose_allowed"] is compose_allowed
+        assert current_attempt["no_tts_compose_allowed"] is no_tts_allowed
 
 
 def test_operator_summary_projects_terminal_blocked_and_no_dub_attempts():

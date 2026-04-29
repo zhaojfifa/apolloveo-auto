@@ -3,6 +3,7 @@ from gateway.app.services.contract_runtime.current_attempt_runtime import (
     selected_route_from_state,
 )
 from gateway.app.services import task_view_presenters
+from gateway.app.services.hot_follow_process_state import reduce_hot_follow_process_state
 from gateway.app.services.task_view_helpers import hot_follow_terminal_no_dub_projection
 from gateway.app.services.task_view_projection import hf_pipeline_state
 from gateway.app.services.task_view_workbench_contract import _subtitles_section
@@ -176,6 +177,100 @@ def test_retry_subtitles_pipeline_done_is_demoted_without_target_authority():
     assert status != "done"
     assert status == "running"
     assert summary == "subtitle_missing"
+
+
+def test_process_machine_voice_led_forbids_skipped_subtitles_while_translation_waits():
+    process = reduce_hot_follow_process_state(
+        state={
+            "artifact_facts": {
+                "compose_input": _compose_input(),
+                "audio_lane": {"no_tts": True, "source_audio_preserved": False, "bgm_configured": False},
+            },
+            "audio": {
+                "audio_ready": False,
+                "audio_ready_reason": "waiting_for_target_subtitle_translation",
+                "no_dub": True,
+                "no_dub_reason": "target_subtitle_empty",
+            },
+            "subtitles": {
+                "subtitle_ready": False,
+                "subtitle_ready_reason": "waiting_for_target_subtitle_translation",
+                "target_subtitle_current": False,
+                "target_subtitle_authoritative_source": False,
+                "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+                "parse_source_text": "1\n00:00:00,000 --> 00:00:02,000\nvoice led source\n",
+                "helper_translate_output_state": "helper_output_pending",
+            },
+        }
+    )
+
+    assert process["lane_state"] == "voice_led_tts_route"
+    assert process["selected_compose_route"] == "tts_replace_route"
+    assert process["subtitle_process_state"] == "target_subtitle_translation_waiting_retryable"
+    assert process["subtitle_step_status"] == "pending"
+    assert process["dub_process_state"] == "dub_waiting_for_target_subtitle"
+    assert process["compose_process_state"] == "compose_not_allowed_waiting_subtitle"
+
+
+def test_process_machine_no_dub_compose_terminalizes_subtitle_and_dub():
+    process = reduce_hot_follow_process_state(
+        state={
+            "artifact_facts": {
+                "compose_input": _compose_input(),
+                "audio_lane": {"no_tts": True, "source_audio_preserved": False, "bgm_configured": False},
+                "selected_compose_route": {"name": "no_tts_compose_route"},
+            },
+            "audio": {
+                "audio_ready": False,
+                "no_dub": True,
+                "no_dub_compose_allowed": True,
+                "no_dub_reason": "compose_no_tts",
+            },
+            "subtitles": {
+                "subtitle_ready": False,
+                "target_subtitle_current": False,
+                "target_subtitle_authoritative_source": False,
+            },
+        }
+    )
+
+    assert process["lane_state"] == "no_dub_no_tts_route"
+    assert process["subtitle_process_state"] == "subtitle_skipped_terminal"
+    assert process["subtitle_step_status"] == "skipped"
+    assert process["dub_process_state"] == "dub_not_required_for_route"
+    assert process["compose_process_state"] == "compose_allowed_ready"
+
+
+def test_process_machine_audio_artifact_does_not_override_subtitle_waiting():
+    process = reduce_hot_follow_process_state(
+        state={
+            "artifact_facts": {
+                "compose_input": _compose_input(),
+                "audio_lane": {"tts_voiceover_exists": True, "no_tts": False},
+            },
+            "audio": {
+                "status": "failed",
+                "audio_ready": False,
+                "audio_ready_reason": "waiting_for_target_subtitle_translation",
+                "dub_current": False,
+                "voiceover_url": "/v1/tasks/example/audio",
+            },
+            "subtitles": {
+                "subtitle_ready": False,
+                "target_subtitle_current": False,
+                "target_subtitle_authoritative_source": False,
+                "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+                "parse_source_text": "source",
+                "helper_translate_output_state": "helper_output_pending",
+            },
+        },
+        dub_status="failed",
+    )
+
+    assert process["lane_state"] == "voice_led_tts_route"
+    assert process["subtitle_process_state"] == "target_subtitle_translation_waiting_retryable"
+    assert process["dub_process_state"] == "dub_waiting_for_target_subtitle"
+    assert process["compose_process_state"] == "compose_not_allowed_waiting_subtitle"
 
 
 def test_url_lane_authority_true_success_transitions_coherently_to_tts_ready():

@@ -539,7 +539,7 @@ def test_helper_translate_failure_with_saved_target_subtitle_stays_helper_scoped
         ),
     )
 
-    assert advisory["recommended_next_action"] == "refresh_dub"
+    assert advisory["recommended_next_action"] == "retry_or_inspect_dub"
     assert advisory["recommended_next_action"] != "compose_no_tts"
     assert advisory["id"] != "hf_advisory_helper_translate_failed"
 
@@ -888,6 +888,13 @@ def test_hot_follow_advisory_noop_preserves_workbench_payload(monkeypatch):
         "helper_translate_failed_voice_led": False,
         "helper_translate_error_reason": None,
         "helper_translate_error_message": None,
+        "helper_translate_status": "helper_output_unavailable",
+        "helper_translate_output_state": "helper_output_unavailable",
+        "helper_translate_provider_health": "provider_ok",
+        "helper_translate_composite_state": None,
+        "helper_translate_retryable": False,
+        "helper_translate_terminal": False,
+        "helper_translate_warning_only": False,
         "pack_exists": False,
         "pack_url": None,
         "compose_input": {

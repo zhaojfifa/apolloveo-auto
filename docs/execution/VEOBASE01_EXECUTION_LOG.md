@@ -3097,3 +3097,90 @@ Behavior change:
 - limited to authoritative subtitle commit ordering, route reduction ordering,
   recovered-error scrub ordering, and stale no-dub/no-tts residue suppression
   for the reviewed URL instability class
+
+---
+
+## 2026-04-29 — Hot Follow process state machine closure
+
+Reading Declaration:
+
+- required authority:
+  - `CURRENT_ENGINEERING_FOCUS.md`
+  - `README.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `apolloveo_current_architecture_and_state_baseline.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+- baseline reference:
+  - `HotFollow-ContractDriven-Baseline-Freeze01`
+- current implementation owners inspected:
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+  - `gateway/app/services/hot_follow_route_state.py`
+  - `gateway/app/services/hot_follow_subtitle_authority.py`
+  - `gateway/app/services/hot_follow_subtitle_currentness.py`
+  - `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+  - `gateway/app/services/voice_state.py`
+  - `gateway/app/services/task_view_projection.py`
+  - `gateway/app/services/task_view_presenters.py`
+  - `gateway/app/routers/hot_follow_api.py`
+  - direct helpers: `gateway/app/services/subtitle_helpers.py`,
+    `gateway/app/services/ready_gate/hot_follow_rules.py`
+
+Scope:
+
+- Hot Follow first production-line process/state-machine closure only
+- no provider feature work
+- no new line work
+- no UI redesign
+
+Contract update:
+
+- `docs/contracts/hot_follow_state_machine_contract_v1.md` is now the active
+  Hot Follow first-line process contract.
+- Canonical layers are route/lane classification, artifact facts,
+  authority/currentness/legal attempt state, pipeline process state, and
+  presentation/advisory.
+
+Runtime changes:
+
+- Added `gateway/app/services/hot_follow_process_state.py` as the canonical
+  reducer for:
+  - route/lane classification
+  - subtitle process state
+  - dub/audio process state
+  - compose process state and legality
+- `current_attempt_runtime.py` now delegates route/current-attempt process
+  meaning to the canonical reducer and exposes the reducer output as
+  `hot_follow_process_state`.
+- `ready_gate/hot_follow_rules.py` consumes canonical process route/currentness
+  instead of treating `mm_srt_path` as enough subtitle readiness evidence.
+- `status_policy/hot_follow_state.py` applies canonical subtitle/dub/compose
+  process states back to pipeline/presentation rows.
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_process_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/status_policy/hot_follow_state.py gateway/app/services/ready_gate/hot_follow_rules.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_state_commit_contract.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`
+  - result: 37 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_vi_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_does_not_hydrate_timing_only_target_artifact -q`
+  - result: 3 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -k "source_lane_failure or compose_refreshes_live_vi_subtitle_currentness or validate_inputs_uses_live_vi_subtitle_currentness" -q`
+  - result: 4 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`
+  - result: 18 passed
+
+Behavior change:
+
+- voice-led helper-pending/source-available tasks remain
+  `voice_led_tts_route` and cannot present subtitle skipped/no-dub terminal
+  state
+- no-dub/no-TTS tasks get canonical skipped/not-required subtitle and dub states
+  instead of unresolved running/pending subtitle work
+- stale `target_subtitle_empty` / `dub_input_empty` no-dub residue no longer
+  preserves no-TTS compose allowance when current subtitle truth requires the
+  voice-led TTS lane
