@@ -189,6 +189,15 @@ def hf_deliverables(
     origin_key = task_key(task, "origin_srt_path")
     mm_key = task_key(task, "mm_srt_path")
     subtitle_lane = subtitle_lane_loader(task_id, task)
+    origin_subtitle_exists = bool(
+        origin_key
+        and (
+            object_exists_fn(str(origin_key))
+            or str(subtitle_lane.get("raw_source_text") or "").strip()
+            or str(subtitle_lane.get("normalized_source_text") or "").strip()
+            or str(subtitle_lane.get("parse_source_text") or "").strip()
+        )
+    )
     target_subtitle_exists = bool(subtitle_lane.get("subtitle_artifact_exists"))
     audio_asset = current_voiceover_asset_loader(task_id, task, settings_obj)
     audio_key = str(audio_asset.get("key") or "").strip() or None
@@ -245,9 +254,9 @@ def hf_deliverables(
             "origin_subtitle",
             "origin.srt",
             origin_key,
-            task_endpoint_loader(task_id, "origin") if origin_key and object_exists_fn(origin_key) else None,
-            signed_op_url_loader(task_id, "origin_srt") if origin_key and object_exists_fn(origin_key) else None,
-            deliverable_state_loader(task, origin_key, "subtitles_status"),
+            task_endpoint_loader(task_id, "origin") if origin_subtitle_exists else None,
+            signed_op_url_loader(task_id, "origin_srt") if origin_subtitle_exists else None,
+            "done" if origin_subtitle_exists else deliverable_state_loader(task, origin_key, "subtitles_status"),
         ),
         _entry(
             "subtitle",

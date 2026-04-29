@@ -4,10 +4,41 @@ from gateway.app.services.hot_follow_workbench_presenter import build_hot_follow
 from gateway.app.services.hot_follow_workbench_presenter import build_hot_follow_current_attempt_summary
 from gateway.app.services.hot_follow_workbench_presenter import build_hot_follow_operator_summary
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
+from gateway.app.services.task_view_projection import hf_deliverables
 
 
 def _deliverable_url(_task_id: str, _task: dict, _kind: str) -> str | None:
     return None
+
+
+def test_origin_subtitle_deliverable_uses_subtitle_fact_truth_when_step_failed():
+    deliverables = hf_deliverables(
+        "hf-origin-truth",
+        {
+            "task_id": "hf-origin-truth",
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "origin_srt_path": "deliver/tasks/hf-origin-truth/origin.srt",
+            "subtitles_status": "failed",
+        },
+        subtitle_lane_loader=lambda *_args, **_kwargs: {
+            "raw_source_text": "1\n00:00:00,000 --> 00:00:02,000\n你好\n",
+            "parse_source_text": "1\n00:00:00,000 --> 00:00:02,000\n你好\n",
+            "subtitle_artifact_exists": False,
+        },
+        current_voiceover_asset_loader=lambda *_args, **_kwargs: {"exists": False, "key": None},
+        object_exists_fn=lambda _key: False,
+        task_endpoint_loader=lambda task_id, kind: f"/v1/tasks/{task_id}/{kind}",
+        signed_op_url_loader=lambda task_id, kind: f"/op/dl/{task_id}?kind={kind}",
+        download_url_loader=lambda _key: None,
+    )
+
+    origin = next(row for row in deliverables if row["kind"] == "origin_subtitle")
+    target = next(row for row in deliverables if row["kind"] == "subtitle")
+    assert origin["state"] == "done"
+    assert origin["status"] == "done"
+    assert origin["open_url"] == "/v1/tasks/hf-origin-truth/origin"
+    assert target["state"] == "failed"
 
 
 def test_artifact_facts_formalize_blocked_compose_input_without_policy_decision():

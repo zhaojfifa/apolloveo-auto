@@ -3683,3 +3683,60 @@ Behavior change:
 - The bad live shape `origin.srt exists + subtitle step ran + vi.srt pending +
   all execution/materialization facts null` is no longer a valid result for the
   normal voice-led subtitles step path.
+
+---
+
+## 2026-04-29 — Hot Follow target SRT dual-path correction
+
+Reading Declaration:
+
+- `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+- `docs/contracts/hot_follow_target_subtitle_translation_subflow_contract_v1.md`
+- `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- focused implementation:
+  - `gateway/app/services/hot_follow_translation_execution.py`
+  - `gateway/app/services/hot_follow_translation_subflow.py`
+  - `gateway/app/services/hot_follow_subtitle_authority.py`
+  - `gateway/app/services/steps_v1.py`
+  - `gateway/app/routers/hot_follow_api.py`
+  - `gateway/app/services/task_view_projection.py`
+- evidence honored:
+  - `884fe6ecfb0a`
+  - `5c9c177fbca4`
+
+Root cause:
+
+- Auto translation now executes, but provider retryable failure still made
+  target SRT production look blocked on Gemini.
+- Manual target subtitle save already had the right operational shape but was
+  not modeled as a first-class fallback materialization path in subflow facts
+  and projections.
+
+Runtime change:
+
+- Auto path remains unchanged on success: origin SRT translates and materializes
+  target SRT as authoritative/current.
+- Retryable provider failure now exposes fallback materialization as allowed:
+  retry auto translation or save manual target subtitle.
+- Authoritative target subtitle save stamps materialization time and production
+  path, clears helper failure, writes `vi.srt`, and becomes current truth.
+- Origin subtitle deliverable state now follows subtitle source/artifact truth
+  rather than falling back to failed subtitle step status when origin text/key
+  evidence exists.
+
+Validation:
+
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_translation_subflow.py gateway/app/services/tests/test_steps_v1_subtitles_step.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -k 'not slow'`
+  - result: 52 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_tasks_subtitle_upload_paths.py gateway/app/services/tests/test_hot_follow_subtitle_binding.py -k 'subtitle or translate'`
+  - result: 51 passed
+- `python3.11 -m py_compile gateway/app/services/hot_follow_subtitle_authority.py gateway/app/services/hot_follow_translation_subflow.py gateway/app/services/task_view_projection.py gateway/app/routers/hot_follow_api.py`
+  - result: passed
+- `git diff --check`
+  - result: passed
+
+Behavior change:
+
+- Gemini 429/provider exhaustion no longer means target SRT production is
+  blocked-only. Operator-produced target subtitle save is a legitimate
+  materialization path for `vi.srt` and downstream dub/compose truth.

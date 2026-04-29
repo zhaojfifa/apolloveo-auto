@@ -264,10 +264,26 @@ def reduce_target_subtitle_translation_subflow(
             )
         )
     )
+    fallback_materialization_allowed = bool(
+        not authoritative_current
+        and state
+        in {
+            "translation_output_pending_retryable",
+            "translation_output_received_unmaterialized",
+            "translation_materialization_failed_retryable",
+            "translation_materialization_failed_terminal",
+            "translation_not_started",
+            "target_subtitle_stale_after_edit",
+        }
+    )
     operator_action = {
         "translation_requested": "wait_for_provider_or_retry",
         "translation_inflight": "wait_for_provider_or_retry",
-        "translation_output_pending_retryable": "wait_for_provider_or_retry",
+        "translation_output_pending_retryable": (
+            "retry_auto_translation_or_save_manual_target_subtitle"
+            if _n(facts.get("helper_provider_health")) == "provider_retryable_failure"
+            else "wait_for_provider_or_retry"
+        ),
         "translation_output_received_unmaterialized": "retry_materialization_or_save_manual_target_subtitle",
         "translation_materialization_failed_retryable": "retry_materialization_or_save_manual_target_subtitle",
         "translation_materialization_failed_terminal": "manual_target_subtitle_required",
@@ -289,6 +305,7 @@ def reduce_target_subtitle_translation_subflow(
         "authoritative_current": bool(authoritative_current),
         "materialized": bool(facts.get("target_subtitle_materialized")),
         "manual_override_current": state == "manual_target_subtitle_override_current",
+        "fallback_materialization_allowed": bool(fallback_materialization_allowed),
         "blocking_reason": blocking_reason,
         "operator_action": operator_action,
     }

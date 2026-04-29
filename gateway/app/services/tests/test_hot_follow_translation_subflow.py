@@ -153,6 +153,27 @@ def test_translation_subflow_terminal_manual_override_and_not_required():
     assert not_required["state"] == "translation_not_required_for_route"
 
 
+def test_retryable_provider_failure_allows_manual_fallback_materialization():
+    subflow = reduce_target_subtitle_translation_subflow(
+        facts={
+            "origin_subtitle_exists": True,
+            "helper_translation_requested": True,
+            "helper_translation_status": "failed",
+            "helper_provider_health": "provider_retryable_failure",
+            "helper_error_reason": "helper_translate_provider_exhausted",
+            "target_subtitle_materialized": False,
+            "target_subtitle_current": False,
+            "target_subtitle_authoritative_source": False,
+        },
+        lane_state="voice_led_tts_route",
+    )
+
+    assert subflow["state"] == "translation_output_pending_retryable"
+    assert subflow["retryable"] is True
+    assert subflow["fallback_materialization_allowed"] is True
+    assert subflow["operator_action"] == "retry_auto_translation_or_save_manual_target_subtitle"
+
+
 def test_process_reducer_consumes_translation_subflow_for_blocking_reason():
     process = reduce_hot_follow_process_state(
         state={
@@ -183,6 +204,34 @@ def test_process_reducer_consumes_translation_subflow_for_blocking_reason():
     assert process["subtitle_translation_waiting_retryable"] is True
     assert process["dub_process_state"] == "dub_waiting_for_target_subtitle"
     assert process["compose_execute_allowed"] is False
+
+
+def test_process_reducer_consumes_manual_fallback_target_truth_for_dub():
+    process = reduce_hot_follow_process_state(
+        task={"kind": "hot_follow", "target_lang": "vi"},
+        state={
+            "artifact_facts": {
+                "compose_input": _compose_input(),
+                "audio_lane": {"no_tts": False, "source_audio_preserved": False, "bgm_configured": False},
+            },
+            "audio": {"audio_ready": False, "audio_ready_reason": "audio_not_ready"},
+            "subtitles": {
+                "subtitle_ready": True,
+                "subtitle_artifact_exists": True,
+                "target_subtitle_current": True,
+                "target_subtitle_authoritative_source": True,
+                "manual_override_updated_at": "2026-04-29T00:00:02+00:00",
+                "edited_text": "1\n00:00:00,000 --> 00:00:02,000\nXin chao\n",
+                "srt_text": "1\n00:00:00,000 --> 00:00:02,000\nXin chao\n",
+            },
+        },
+    )
+
+    assert process["subtitle_process_state"] == "target_subtitle_authoritative_current"
+    assert process["target_subtitle_translation_state"] == "manual_target_subtitle_override_current"
+    assert process["dub_process_state"] != "dub_waiting_for_target_subtitle"
+    assert process["tts_lane_expected"] is True
+    assert process["requires_redub"] is True
 
 
 def test_ready_gate_and_top_level_process_share_translation_blocking_reason():

@@ -80,6 +80,7 @@ Derived contract fields:
 - `terminal`
 - `authoritative_current`
 - `materialized`
+- `fallback_materialization_allowed`
 - `blocking_reason`
 - `operator_action`
 
@@ -93,7 +94,9 @@ Rules:
   not provider pending. It is `translation_output_received_unmaterialized` or a
   materialization failure state.
 - Provider pending or retryable provider failure without materialized target
-  subtitle is retryable waiting, not terminal line failure.
+  subtitle is retryable waiting for the auto path, not terminal line failure.
+- Retryable provider failure must also allow fallback target subtitle
+  materialization through operator-produced target subtitle save.
 - Terminal state requires explicit terminal helper/provider evidence or a
   terminal materialization reason.
 - Route-not-required state is legal only when the canonical process reducer

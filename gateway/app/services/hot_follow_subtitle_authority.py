@@ -170,15 +170,18 @@ def persist_hot_follow_authoritative_target_subtitle(
             },
         )
 
+    timestamp = (now_fn or (lambda: datetime.now(timezone.utc).isoformat()))()
     updates: dict[str, Any] = {
         "subtitles_status": "ready",
         "subtitles_error": None,
         "subtitles_error_reason": None,
         "last_step": "subtitles",
         "mm_srt_path": synced_key or task.get("mm_srt_path"),
-        "subtitles_override_updated_at": (now_fn or (lambda: datetime.now(timezone.utc).isoformat()))(),
+        "subtitles_override_updated_at": timestamp,
         "subtitles_override_mode": text_mode,
         "subtitles_content_hash": content_hash_fn(text),
+        "subtitle_translation_materialized_at": task.get("subtitle_translation_materialized_at") or timestamp,
+        "target_subtitle_production_path": text_mode,
         "compose_status": "pending",
         "compose_error": None,
         "compose_error_reason": None,

@@ -1100,6 +1100,69 @@ def test_translate_subtitles_source_lane_rejects_normalized_source_without_origi
     assert uploads == []
 
 
+def test_manual_target_save_materializes_vi_srt_after_provider_exhaustion(monkeypatch, tmp_path):
+    task_id = "hf-manual-fallback"
+    uploads: list[tuple[str, str]] = []
+    repo = _Repo(
+        {
+            "task_id": task_id,
+            "kind": "hot_follow",
+            "target_lang": "vi",
+            "subtitle_helper_status": "failed",
+            "subtitle_helper_error_reason": "helper_translate_provider_exhausted",
+            "subtitle_helper_provider": "gemini",
+            "subtitle_translation_execution_ref": "auto-failed",
+            "subtitle_translation_requested_at": "2026-04-29T00:00:00+00:00",
+            "subtitle_translation_last_polled_at": "2026-04-29T00:00:01+00:00",
+            "subtitle_translation_failed_at": "2026-04-29T00:00:01+00:00",
+            "subtitle_translation_retry_count": 1,
+            "subtitles_status": "failed",
+            "target_subtitle_current": False,
+            "target_subtitle_authoritative_source": False,
+            "target_subtitle_current_reason": "helper_translate_provider_exhausted",
+            "dub_status": "pending",
+        }
+    )
+
+    class _Workspace:
+        def __init__(self, _task_id: str, target_lang: str | None = None):
+            assert _task_id == task_id
+            assert target_lang == "vi"
+            self.mm_srt_path = tmp_path / task_id / "vi.srt"
+
+    def _fake_upload(_task, local_path, artifact_name, task_id=None, **_kwargs):
+        uploads.append((artifact_name, Path(local_path).read_text(encoding="utf-8")))
+        return f"deliver/tasks/{task_id}/{artifact_name}"
+
+    override_path = tmp_path / task_id / "override.srt"
+    monkeypatch.setattr(hf_router, "Workspace", _Workspace)
+    monkeypatch.setattr(hf_router, "object_exists", lambda _key: False)
+    monkeypatch.setattr(hf_router, "object_head", lambda _key: None)
+    monkeypatch.setattr(hf_router, "media_meta_from_head", lambda _meta: (0, None))
+    monkeypatch.setattr(hf_router, "_hf_subtitles_override_path", lambda _task_id: override_path)
+    monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "1\n00:00:00,000 --> 00:00:02,000\n你好\n")
+    monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(hf_router, "_srt_to_txt", lambda text: "Xin chao fallback")
+    monkeypatch.setattr(hf_router, "upload_task_artifact", _fake_upload)
+
+    payload = hf_router.HotFollowSubtitlesRequest(
+        srt_text="1\n00:00:00,000 --> 00:00:02,000\nXin chao fallback\n"
+    )
+    data = hf_router.patch_hot_follow_subtitles(task_id, payload, repo=repo)
+    saved = repo.get(task_id) or {}
+
+    assert uploads[0][0] == "vi.srt"
+    assert "Xin chao fallback" in uploads[0][1]
+    assert (tmp_path / task_id / "vi.srt").exists()
+    assert saved["mm_srt_path"] == f"deliver/tasks/{task_id}/vi.srt"
+    assert saved["target_subtitle_current"] is True
+    assert saved["target_subtitle_authoritative_source"] is True
+    assert saved["subtitle_helper_status"] == "resolved"
+    assert saved["subtitle_translation_materialized_at"]
+    assert saved["target_subtitle_production_path"] == "manual_fallback_target_subtitle"
+    assert data["subtitles"]["srt_text"].strip().endswith("Xin chao fallback")
+
+
 def test_subtitle_lane_marks_preserved_source_audio_parse_as_helper_only(monkeypatch):
     store = {
         "deliver/tasks/hf-preserve-source/origin.srt": b"1\n00:00:00,000 --> 00:00:02,000\nlyric source line\n",

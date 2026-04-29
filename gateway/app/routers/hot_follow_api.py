@@ -484,15 +484,18 @@ def _hf_save_authoritative_target_subtitle(
         write_override_fn=lambda saved_text: _hf_subtitles_override_path(task_id).parent.mkdir(parents=True, exist_ok=True)
         or _hf_subtitles_override_path(task_id).write_text(saved_text, encoding="utf-8"),
         content_hash_fn=_hf_subtitle_content_hash,
-        extra_updates=_hf_empty_dub_recovery_updates(
-            task_id,
-            task,
-            text,
-            {
-                "target_subtitle_current": True,
-                "target_subtitle_current_reason": "ready",
-            },
-        ),
+        extra_updates={
+            "target_subtitle_production_path": "manual_fallback_target_subtitle",
+            **_hf_empty_dub_recovery_updates(
+                task_id,
+                task,
+                text,
+                {
+                    "target_subtitle_current": True,
+                    "target_subtitle_current_reason": "ready",
+                },
+            ),
+        },
         resolve_helper_state=bool(str(text or "").strip()),
     )
 
