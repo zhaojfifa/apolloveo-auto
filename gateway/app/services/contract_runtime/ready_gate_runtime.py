@@ -55,6 +55,9 @@ def _apply_route_truth(
         return blocking_runtime.canonicalize(value)
 
     gate_result["selected_compose_route"] = route_name
+    gate_result["route_decision_owner"] = route.get("route_decision_owner")
+    gate_result["route_decision_source"] = route.get("route_decision_source")
+    gate_result["route_stage_action"] = route.get("route_stage_action")
     gate_result["compose_allowed"] = compose_allowed
     gate_result["compose_route_allowed"] = compose_route_allowed
     gate_result["compose_input_ready"] = compose_input_ready
