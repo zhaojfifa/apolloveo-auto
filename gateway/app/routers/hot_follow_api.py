@@ -85,7 +85,10 @@ from gateway.app.services.media_helpers import (
     update_pipeline_probe as _update_pipeline_probe,
     upload_task_bgm_impl as _upload_task_bgm_impl,
 )
-from gateway.app.services.hot_follow_media_policy import hot_follow_media_input_policy
+from gateway.app.services.hot_follow_media_policy import (
+    hot_follow_local_upload_source_selection_guard,
+    hot_follow_media_input_policy,
+)
 from gateway.app.services.task_view_helpers import (
     backfill_compose_done_if_final_ready as _backfill_compose_done_if_final_ready,
     build_translation_qa_summary as _build_translation_qa_summary,
@@ -139,6 +142,7 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
 )
 from gateway.app.services.hot_follow_helper_translation import helper_translate_lane_state
 from gateway.app.services.hot_follow_subtitle_authority import (
+    helper_translation_telemetry_updates,
     persist_hot_follow_authoritative_target_subtitle,
 )
 from gateway.app.services.hot_follow_helper_translation import (
@@ -486,10 +490,7 @@ def _hf_save_authoritative_target_subtitle(
             task_id,
             task,
             text,
-            {
-                "target_subtitle_current": True,
-                "target_subtitle_current_reason": "ready",
-            },
+            {},
         ),
         resolve_helper_state=bool(str(text or "").strip()),
     )
@@ -513,56 +514,15 @@ def _hf_source_subtitle_translation_failure_updates(
     source_text: str,
     target_lang: str,
 ) -> dict:
-    updates = helper_translate_failure_updates(
-        detail,
-        input_text=source_text,
-        target_lang=target_lang,
+    return helper_translation_telemetry_updates(
+        task_id,
+        task,
+        helper_updates=helper_translate_failure_updates(
+            detail,
+            input_text=source_text,
+            target_lang=target_lang,
+        ),
     )
-    if _hf_authoritative_target_subtitle_current(task_id, task):
-        lane = _hf_subtitle_lane_state(task_id, task)
-        updates.update(
-            {
-                "subtitles_status": "ready",
-                "subtitles_error": None,
-                "subtitles_error_reason": None,
-                "target_subtitle_current": True,
-                "target_subtitle_current_reason": str(
-                    lane.get("target_subtitle_current_reason") or "ready"
-                ),
-                "error_message": None,
-                "error_reason": None,
-            }
-        )
-        updates.update(
-            _hf_empty_dub_recovery_updates(
-                task_id,
-                task,
-                str(lane.get("edited_text") or ""),
-                {
-                    "target_subtitle_current": True,
-                    "target_subtitle_current_reason": str(
-                        lane.get("target_subtitle_current_reason") or "ready"
-                    ),
-                },
-            )
-        )
-        return updates
-    reason = str(detail.get("reason") or "helper_translate_failed").strip()
-    message = str(detail.get("message") or reason).strip()
-    updates.update(
-        {
-            "subtitles_status": "failed",
-            "subtitles_error": message,
-            "subtitles_error_reason": reason,
-            "target_subtitle_current": False,
-            "target_subtitle_current_reason": reason,
-            "compose_ready": False,
-            "publish_ready": False,
-            "error_message": message,
-            "error_reason": reason,
-        }
-    )
-    return updates
 
 
 def _hf_translate_source_subtitle_lane(task_id: str, task: dict, *, target_lang: str, repo) -> tuple[str, dict]:
@@ -1430,6 +1390,20 @@ def create_hot_follow_task_local_upload(
     source_lang_norm = str(source_lang or "zh").strip().lower()
     if source_lang_norm not in {"zh", "en"}:
         raise HTTPException(status_code=400, detail="unsupported source language")
+    source_audio_policy_norm = normalize_source_audio_policy(source_audio_policy)
+    source_guard = hot_follow_local_upload_source_selection_guard(
+        filename=file.filename,
+        title=task_title,
+        source_audio_policy=source_audio_policy_norm,
+    )
+    if not source_guard.get("allow", True):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "reason": source_guard.get("reason"),
+                "message": source_guard.get("message"),
+            },
+        )
 
     task_id = uuid4().hex[:12]
     max_bytes = media_policy.max_upload_size_bytes
@@ -1475,10 +1449,10 @@ def create_hot_follow_task_local_upload(
                     "source_language_hint": source_lang_norm,
                     "process_mode": str(process_mode or "fast_clone"),
                     "publish_account": str(publish_account or "default"),
-                    "source_audio_policy": normalize_source_audio_policy(source_audio_policy),
+                    "source_audio_policy": source_audio_policy_norm,
                     "bgm_strategy": (
                         "keep"
-                        if normalize_source_audio_policy(source_audio_policy) == "preserve"
+                        if source_audio_policy_norm == "preserve"
                         else "replace"
                     ),
                 },

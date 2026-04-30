@@ -834,7 +834,7 @@ def test_translate_subtitles_source_lane_persists_full_target_srt(monkeypatch, t
     assert saved.get("dub_skip_reason") is None
 
 
-def test_translate_subtitles_source_lane_failure_persists_subtitle_authority_failure(monkeypatch, tmp_path):
+def test_translate_subtitles_source_lane_failure_records_helper_telemetry_only(monkeypatch, tmp_path):
     task_id = "hf-source-lane-provider-failure"
     source_srt = "1\n00:00:00,000 --> 00:00:02,000\n你好\n"
     repo = _Repo(
@@ -878,12 +878,12 @@ def test_translate_subtitles_source_lane_failure_persists_subtitle_authority_fai
     assert saved["subtitle_helper_error_reason"] == "helper_translate_provider_exhausted"
     assert saved["subtitle_helper_provider"] == "gemini"
     assert saved["subtitle_helper_input_text"] == source_srt.strip()
-    assert saved["subtitles_status"] == "failed"
-    assert saved["subtitles_error_reason"] == "helper_translate_provider_exhausted"
-    assert saved["target_subtitle_current"] is False
-    assert saved["target_subtitle_current_reason"] == "helper_translate_provider_exhausted"
-    assert saved["compose_ready"] is False
-    assert saved["publish_ready"] is False
+    assert saved["subtitles_status"] == "running"
+    assert "subtitles_error_reason" not in saved
+    assert "target_subtitle_current" not in saved
+    assert "target_subtitle_current_reason" not in saved
+    assert "compose_ready" not in saved
+    assert "publish_ready" not in saved
 
     lane = hf_router._hf_subtitle_lane_state(task_id, saved)
     assert lane["helper_translate_failed"] is True
@@ -920,6 +920,7 @@ def test_translate_subtitles_source_lane_failure_preserves_current_target_subtit
             "mm_srt_path": target_srt,
             "subtitles_status": "failed",
             "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
             "target_subtitle_current_reason": "ready",
             "dub_status": "skipped",
             "dub_skip_reason": "target_subtitle_empty",
@@ -957,17 +958,16 @@ def test_translate_subtitles_source_lane_failure_preserves_current_target_subtit
     saved = repo.get(task_id) or {}
     assert saved["subtitle_helper_status"] == "failed"
     assert saved["subtitle_helper_error_reason"] == "helper_translate_provider_exhausted"
-    assert saved["subtitles_status"] == "ready"
-    assert saved["subtitles_error"] is None
-    assert saved["subtitles_error_reason"] is None
+    assert saved["subtitles_status"] == "failed"
     assert saved["target_subtitle_current"] is True
+    assert saved["target_subtitle_authoritative_source"] is True
     assert saved["target_subtitle_current_reason"] == "ready"
     assert saved["publish_ready"] is True
-    assert saved["dub_status"] == "pending"
-    assert saved.get("dub_skip_reason") is None
+    assert saved["dub_status"] == "skipped"
+    assert saved.get("dub_skip_reason") == "target_subtitle_empty"
     pipeline = parse_pipeline_config(saved.get("pipeline_config"))
-    assert "no_dub" not in pipeline
-    assert "dub_skip_reason" not in pipeline
+    assert pipeline["no_dub"] == "true"
+    assert pipeline["dub_skip_reason"] == "target_subtitle_empty"
 
 
 def test_translate_subtitles_source_lane_uses_normalized_source_srt_when_origin_key_empty(monkeypatch, tmp_path):

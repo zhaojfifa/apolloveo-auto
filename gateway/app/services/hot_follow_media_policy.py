@@ -111,6 +111,40 @@ def hot_follow_media_input_policy() -> HotFollowMediaInputPolicy:
     )
 
 
+def hot_follow_local_upload_source_selection_guard(
+    *,
+    filename: str | None,
+    title: str | None,
+    source_audio_policy: str | None,
+) -> dict[str, Any]:
+    """Block obvious lyric/BGM assets from being selected as preserved source audio."""
+    policy = str(source_audio_policy or "").strip().lower()
+    if policy != "preserve":
+        return {"allow": True, "reason": None}
+    label = f"{filename or ''} {title or ''}".lower()
+    lyric_bgm_markers = (
+        "lyric",
+        "lyrics",
+        "karaoke",
+        "bgm",
+        "music",
+        "instrumental",
+        "歌词",
+        "字幕歌",
+        "卡拉ok",
+        "伴奏",
+        "配乐",
+        "音乐",
+    )
+    if any(marker in label for marker in lyric_bgm_markers):
+        return {
+            "allow": False,
+            "reason": "local_upload_lyric_bgm_source_audio_misselection",
+            "message": "Local lyric/BGM material cannot be selected as preserved source audio for Hot Follow dubbing.",
+        }
+    return {"allow": True, "reason": None}
+
+
 def hot_follow_compose_scale_expr(policy: HotFollowMediaInputPolicy | None = None) -> str:
     """Return orientation-aware 720p-1080p-band derive scaling for FFmpeg."""
     current = policy or hot_follow_media_input_policy()

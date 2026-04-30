@@ -3,7 +3,9 @@ from __future__ import annotations
 from gateway.app.services.hot_follow_workbench_presenter import build_hot_follow_artifact_facts
 from gateway.app.services.hot_follow_workbench_presenter import build_hot_follow_current_attempt_summary
 from gateway.app.services.hot_follow_workbench_presenter import build_hot_follow_operator_summary
+from gateway.app.services.hot_follow_media_policy import hot_follow_local_upload_source_selection_guard
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
+from gateway.app.services.voice_state import hf_dub_matches_current_subtitle
 
 
 def _deliverable_url(_task_id: str, _task: dict, _kind: str) -> str | None:
@@ -212,6 +214,88 @@ def test_route_local_tts_expected_when_subtitle_ready_without_voiceover():
     assert "voiceover_missing" in state["ready_gate"]["blocking"]
 
 
+def test_origin_subtitle_alone_never_promotes_target_subtitle_or_compose_ready():
+    state = compute_hot_follow_state(
+        {"task_id": "hf-origin-only", "kind": "hot_follow"},
+        {
+            "task_id": "hf-origin-only",
+            "final": {"exists": True, "fresh": True},
+            "subtitles": {
+                "subtitle_artifact_exists": True,
+                "subtitle_ready": True,
+                "actual_burn_subtitle_source": "origin.srt",
+                "target_subtitle_current": False,
+                "target_subtitle_authoritative_source": False,
+                "target_subtitle_current_reason": "subtitle_missing",
+                "parse_source_text": "1\n00:00:00,000 --> 00:00:01,000\nsource only\n",
+            },
+            "audio": {
+                "status": "done",
+                "audio_ready": True,
+                "audio_ready_reason": "ready",
+                "dub_current": True,
+                "voiceover_url": "/v1/tasks/hf-origin-only/audio_mm",
+            },
+            "artifact_facts": {
+                "final_exists": True,
+                "compose_input": {"mode": "direct", "ready": True, "blocked": False},
+                "audio_lane": {
+                    "tts_voiceover_exists": True,
+                    "source_audio_preserved": False,
+                    "bgm_configured": False,
+                    "no_tts": False,
+                },
+            },
+        },
+    )
+
+    assert state["ready_gate"]["subtitle_ready"] is False
+    assert state["ready_gate"]["compose_ready"] is False
+    assert "subtitle_not_ready" in state["ready_gate"]["blocking"]
+
+
+def test_helper_pending_is_not_subtitle_execution_fact():
+    current_attempt = build_hot_follow_current_attempt_summary(
+        voice_state={
+            "audio_ready": False,
+            "audio_ready_reason": "audio_missing",
+            "dub_current": False,
+        },
+        subtitle_lane={
+            "subtitle_ready": False,
+            "subtitle_artifact_exists": False,
+            "target_subtitle_current": False,
+            "target_subtitle_authoritative_source": False,
+            "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+            "parse_source_text": "source transcript",
+            "edited_text": "",
+            "srt_text": "",
+            "dub_input_text": "",
+            "helper_translate_output_state": "helper_output_pending",
+            "helper_translate_status": "helper_output_pending",
+        },
+        dub_status="pending",
+        compose_status="pending",
+        composed_reason="compose_not_done",
+        artifact_facts={
+            "helper_translate_output_state": "helper_output_pending",
+            "helper_translate_status": "helper_output_pending",
+            "compose_input": {"mode": "direct", "ready": True, "blocked": False},
+            "audio_lane": {
+                "tts_voiceover_exists": False,
+                "source_audio_preserved": False,
+                "bgm_configured": False,
+                "no_tts": True,
+            },
+        },
+    )
+
+    assert current_attempt["subtitle_translation_waiting_retryable"] is True
+    assert current_attempt["selected_compose_route"] == "tts_replace_route"
+    assert current_attempt["audio_ready"] is False
+    assert current_attempt["compose_execute_allowed"] is False
+
+
 def test_ready_gate_distinguishes_route_allowed_from_compose_execute_allowed():
     artifact_facts = build_hot_follow_artifact_facts(
         "hf-derive-failed-gate",
@@ -249,6 +333,81 @@ def test_ready_gate_distinguishes_route_allowed_from_compose_execute_allowed():
     assert gate["compose_execute_allowed"] is False
     assert gate["compose_reason"] == "compose_input_derive_failed"
     assert gate["blocking"] == ["compose_input_derive_failed"]
+
+
+def test_audio_revision_requires_authoritative_current_target_subtitle():
+    assert hf_dub_matches_current_subtitle(
+        {
+            "target_subtitle_current": None,
+            "target_subtitle_authoritative_source": None,
+        }
+    ) == (False, "target_subtitle_not_authoritative")
+
+
+def test_manual_target_subtitle_save_invalidates_stale_dub_revision():
+    matches, reason = hf_dub_matches_current_subtitle(
+        {
+            "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
+            "target_subtitle_current_reason": "ready",
+            "subtitles_content_hash": "HASH_NEW",
+            "dub_source_subtitles_content_hash": "HASH_OLD",
+            "subtitles_override_updated_at": "2026-04-30T01:00:00+00:00",
+            "dub_source_subtitle_updated_at": "2026-04-30T00:00:00+00:00",
+        }
+    )
+
+    assert matches is False
+    assert reason == "dub_stale_after_subtitles"
+
+
+def test_compose_requires_current_vi_subtitle_and_current_audio():
+    state = compute_hot_follow_state(
+        {"task_id": "hf-compose-formal", "kind": "hot_follow"},
+        {
+            "task_id": "hf-compose-formal",
+            "final": {"exists": True, "fresh": True},
+            "subtitles": {
+                "subtitle_artifact_exists": True,
+                "subtitle_ready": True,
+                "target_subtitle_current": True,
+                "target_subtitle_authoritative_source": True,
+                "actual_burn_subtitle_source": "vi.srt",
+            },
+            "audio": {
+                "status": "done",
+                "audio_ready": False,
+                "audio_ready_reason": "dub_stale_after_subtitles",
+                "dub_current": False,
+                "voiceover_url": "/v1/tasks/hf-compose-formal/audio_mm",
+            },
+            "artifact_facts": {
+                "final_exists": True,
+                "compose_input": {"mode": "direct", "ready": True, "blocked": False},
+                "audio_lane": {
+                    "tts_voiceover_exists": True,
+                    "source_audio_preserved": False,
+                    "bgm_configured": False,
+                    "no_tts": False,
+                },
+            },
+        },
+    )
+
+    assert state["ready_gate"]["subtitle_ready"] is True
+    assert state["ready_gate"]["audio_ready"] is False
+    assert state["ready_gate"]["compose_ready"] is False
+
+
+def test_local_upload_lyric_bgm_guard_blocks_preserve_source_audio():
+    decision = hot_follow_local_upload_source_selection_guard(
+        filename="sample-lyrics-bgm.mp4",
+        title="operator upload",
+        source_audio_policy="preserve",
+    )
+
+    assert decision["allow"] is False
+    assert decision["reason"] == "local_upload_lyric_bgm_source_audio_misselection"
 
 
 def test_preserve_source_route_allowed_without_tts_voiceover():

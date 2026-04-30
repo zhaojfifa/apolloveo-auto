@@ -271,8 +271,16 @@ def reduce_hot_follow_process_state(
     route_allowed = False
     route_reason = "route_not_allowed"
     if route == "tts_replace_route":
-        route_allowed = bool(audio_ready)
-        route_reason = "ready" if route_allowed else _s(audio.get("audio_ready_reason") or "audio_not_ready")
+        route_allowed = bool(target_ready and audio_ready)
+        route_reason = (
+            "ready"
+            if route_allowed
+            else (
+                _s(target_reason or "subtitle_not_ready")
+                if not target_ready
+                else _s(audio.get("audio_ready_reason") or "audio_not_ready")
+            )
+        )
     elif route == "preserve_source_route":
         route_allowed = source_audio_preserved
         route_reason = "ready" if route_allowed else "source_audio_not_preserved"

@@ -122,35 +122,29 @@ def _extract_audio_ready(task: dict, state: dict) -> bool:
 
 
 def _extract_subtitle_artifact_exists(task: dict, state: dict) -> bool:
-    """Current target subtitle artifact exists.
-
-    Parse/source subtitles are helper evidence only. They must not satisfy
-    target-subtitle readiness when explicit subtitle truth is absent.
-    """
+    """Current target subtitle artifact exists by Subtitle Stage truth only."""
     subs = _d(state.get("subtitles"))
-    actual_source = str(subs.get("actual_burn_subtitle_source") or "").strip().lower()
-    target_source = bool(actual_source and actual_source not in {"origin.srt", "source.srt"})
     return bool(
-        (subs.get("subtitle_artifact_exists") and target_source)
-        or target_source
+        subs.get("subtitle_artifact_exists")
+        and subs.get("target_subtitle_authoritative_source")
+        and subs.get("target_subtitle_current")
     )
 
 
 def _extract_subtitle_ready(task: dict, state: dict) -> bool:
-    """Subtitle readiness: hint override OR subtitle_artifact_exists.
-
-    Preserves the hint-priority pattern from original L172-181.
-    """
+    """Subtitle readiness is authoritative/current target subtitle truth only."""
     subs = _d(state.get("subtitles"))
     process = _d(state.get("hot_follow_process_state"))
     if process.get("subtitle_required") is False:
         return False
     if process.get("target_subtitle_authoritative_current") is not None:
         return bool(process.get("target_subtitle_authoritative_current"))
-    hint = subs.get("subtitle_ready")
-    if hint is not None:
-        return bool(hint)
-    return _extract_subtitle_artifact_exists(task, state)
+    return bool(
+        subs.get("subtitle_ready")
+        and subs.get("target_subtitle_current")
+        and subs.get("target_subtitle_authoritative_source")
+        and _extract_subtitle_artifact_exists(task, state)
+    )
 
 
 def _extract_no_dub(task: dict, state: dict) -> bool:
