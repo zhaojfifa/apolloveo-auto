@@ -13,6 +13,21 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
     has_semantic_target_subtitle_text,
 )
 from gateway.app.services.status_policy.service import policy_upsert
+from gateway.app.utils.pipeline_config import parse_pipeline_config, pipeline_config_to_storage
+
+
+SUBTITLE_STAGE_OWNER = "hot_follow_subtitle_stage_v1"
+SUBTITLE_STAGE_TRUTH_FIELDS = {
+    "origin_subtitle_artifact_exists",
+    "target_subtitle_artifact_exists",
+    "target_subtitle_materialized",
+    "target_subtitle_authoritative_source",
+    "target_subtitle_current",
+    "target_subtitle_current_reason",
+    "subtitles_status",
+    "origin_srt_path",
+    "mm_srt_path",
+}
 
 
 @dataclass(frozen=True)
@@ -84,6 +99,82 @@ def evaluate_hot_follow_subtitle_authority(
     )
 
 
+def _recovered_subtitle_commit_scrub_updates(task: dict[str, Any]) -> dict[str, Any]:
+    updates: dict[str, Any] = {
+        "subtitles_error_reason": None,
+    }
+    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
+    stale_no_dub_reason = str(
+        pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
+    ).strip().lower()
+    if stale_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
+        pipeline_config.pop("no_dub", None)
+        pipeline_config.pop("dub_skip_reason", None)
+        updates["pipeline_config"] = pipeline_config_to_storage(pipeline_config)
+        updates["dub_skip_reason"] = None
+        if str(task.get("dub_status") or "").strip().lower() == "skipped":
+            updates["dub_status"] = "pending"
+    if str(task.get("subtitle_helper_status") or "").strip().lower() == "failed":
+        updates.update(helper_translate_resolved_updates())
+    return updates
+
+
+def _target_path_updates(target_lang: str, key: str | None) -> dict[str, Any]:
+    updates = {"mm_srt_path": key}
+    lang = str(target_lang or "").strip().lower()
+    if lang:
+        updates[f"{lang}_srt_path"] = key
+    return updates
+
+
+def _subtitle_stage_truth_updates(
+    *,
+    origin_key: str | None,
+    target_key: str | None,
+    target_materialized: bool,
+    decision: SubtitleAuthorityDecision,
+    status: str,
+    target_lang: str,
+) -> dict[str, Any]:
+    updates: dict[str, Any] = {
+        "subtitle_stage_owner": SUBTITLE_STAGE_OWNER,
+        "origin_srt_path": origin_key,
+        "origin_subtitle_artifact_exists": bool(origin_key),
+        "target_subtitle_artifact_exists": bool(target_key),
+        "target_subtitle_materialized": bool(target_materialized and target_key),
+        "target_subtitle_authoritative_source": bool(
+            decision.target_currentness.get("target_subtitle_authoritative_source")
+        ),
+        "target_subtitle_current": bool(decision.target_currentness.get("target_subtitle_current")),
+        "target_subtitle_current_reason": decision.reason,
+        "subtitles_status": status,
+    }
+    updates.update(_target_path_updates(target_lang, target_key))
+    return updates
+
+
+def _reject_external_subtitle_truth_updates(updates: dict[str, Any] | None) -> dict[str, Any]:
+    """Keep non-owner extension updates from writing subtitle-stage truth."""
+    if not updates:
+        return {}
+    return {
+        key: value
+        for key, value in dict(updates).items()
+        if key not in SUBTITLE_STAGE_TRUTH_FIELDS and not str(key).endswith("_srt_path")
+    }
+
+
+def helper_translation_telemetry_updates(
+    task_id: str,
+    task: dict[str, Any],
+    *,
+    helper_updates: dict[str, Any],
+) -> dict[str, Any]:
+    """Helper execution telemetry never writes subtitle business truth."""
+    _ = task_id, task
+    return _reject_external_subtitle_truth_updates(helper_updates)
+
+
 def persist_hot_follow_authoritative_target_subtitle(
     task_id: str,
     task: dict[str, Any],
@@ -145,26 +236,44 @@ def persist_hot_follow_authoritative_target_subtitle(
             },
         )
 
+    materialized_at = (now_fn or (lambda: datetime.now(timezone.utc).isoformat()))()
     updates: dict[str, Any] = {
-        "subtitles_status": "ready",
         "subtitles_error": None,
+        "subtitles_error_reason": None,
         "last_step": "subtitles",
-        "mm_srt_path": synced_key or task.get("mm_srt_path"),
-        "subtitles_override_updated_at": (now_fn or (lambda: datetime.now(timezone.utc).isoformat()))(),
+        "subtitles_override_updated_at": materialized_at,
         "subtitles_override_mode": text_mode,
         "subtitles_content_hash": content_hash_fn(text),
+        "subtitle_stage_action": "manual_target_subtitle_materialize",
+        "subtitle_stage_materialized_at": materialized_at,
         "compose_status": "pending",
         "compose_error": None,
         "compose_error_reason": None,
         "error_message": None,
         "error_reason": None,
-        "target_subtitle_current": True,
-        "target_subtitle_current_reason": persisted.reason,
+        "mm_audio_key": None,
+        "mm_audio_path": None,
+        "audio_sha256": None,
+        "dub_source_subtitles_content_hash": None,
+        "dub_source_subtitle_updated_at": None,
     }
+    if str(task.get("dub_status") or "").strip().lower() in {"ready", "done", "success", "completed", "skipped"}:
+        updates["dub_status"] = "pending"
+    updates.update(
+        _subtitle_stage_truth_updates(
+            origin_key=task.get("origin_srt_path"),
+            target_key=synced_key or task.get("mm_srt_path"),
+            target_materialized=True,
+            decision=persisted,
+            status="ready",
+            target_lang=target_lang,
+        )
+    )
+    updates.update(_recovered_subtitle_commit_scrub_updates(task))
     if resolve_helper_state:
         updates.update(helper_translate_resolved_updates())
     if extra_updates:
-        updates.update(extra_updates)
+        updates.update(_reject_external_subtitle_truth_updates(extra_updates))
     return policy_upsert(repo, task_id, task, updates, step="subtitles")
 
 
@@ -201,42 +310,65 @@ def finalize_hot_follow_subtitles_step(
         and target_subtitle_required
         and any(has_semantic_target_subtitle_text(text) for text in source_texts)
     )
+    target_key = target_subtitle_key if target_subtitle_authoritative else None
+    status = "failed"
+    if decision.accepted:
+        status = "ready"
+    elif translation_waiting_retryable:
+        status = "pending"
+    elif not target_subtitle_required:
+        status = "ready"
+        decision = SubtitleAuthorityDecision(
+            accepted=False,
+            reason="preserve_source_route_no_target_subtitle_required",
+            message=_reason_message("preserve_source_route_no_target_subtitle_required"),
+            target_currentness={
+                **decision.target_currentness,
+                "target_subtitle_current": False,
+                "target_subtitle_current_reason": "preserve_source_route_no_target_subtitle_required",
+                "target_subtitle_authoritative_source": False,
+            },
+        )
     updates: dict[str, Any] = {
-        "origin_srt_path": origin_key,
-        "mm_srt_path": target_subtitle_key if target_subtitle_authoritative else None,
         "last_step": "subtitles",
         "subtitles_key": subtitles_key,
         "subtitle_structure_path": subtitles_key,
-        "target_subtitle_current": bool(decision.target_currentness.get("target_subtitle_current")),
-        "target_subtitle_current_reason": decision.reason,
     }
+    updates.update(
+        _subtitle_stage_truth_updates(
+            origin_key=origin_key,
+            target_key=target_key,
+            target_materialized=bool(decision.accepted),
+            decision=decision,
+            status=status,
+            target_lang=target_lang,
+        )
+    )
     if decision.accepted:
         updates.update(
             {
-                "subtitles_status": "ready",
                 "subtitles_error": None,
+                "subtitles_error_reason": None,
+                "error_message": None,
+                "error_reason": None,
             }
         )
+        updates.update(_recovered_subtitle_commit_scrub_updates(task))
     elif translation_waiting_retryable:
         updates.update(
             {
-                "subtitles_status": "pending",
                 "subtitles_error": "subtitle translation not ready yet; waiting for retryable translation resolution",
             }
         )
     elif not target_subtitle_required:
         updates.update(
             {
-                "subtitles_status": "ready",
                 "subtitles_error": None,
-                "target_subtitle_current": False,
-                "target_subtitle_current_reason": "preserve_source_route_no_target_subtitle_required",
             }
         )
     else:
         updates.update(
             {
-                "subtitles_status": "failed",
                 "subtitles_error": decision.message,
             }
         )

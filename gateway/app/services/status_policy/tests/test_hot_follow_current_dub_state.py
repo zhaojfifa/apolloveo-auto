@@ -817,6 +817,45 @@ def test_mm_voice_state_invalidates_stale_dub_after_subtitle_edit(monkeypatch):
     assert state["dub_matches_current_subtitle"] is False
 
 
+def test_url_lane_authority_false_dub_comparator_is_not_ready(monkeypatch):
+    monkeypatch.setattr(tasks_router, "get_settings", _settings)
+    _patch_voice_storage(
+        monkeypatch,
+        lambda _key: True,
+        lambda _key: {"ContentLength": "4096", "Content-Type": "audio/mpeg"},
+        lambda _meta: (4096, "audio/mpeg"),
+    )
+
+    task = {
+        "task_id": "hf-url-authority-false-dub",
+        "kind": "hot_follow",
+        "target_lang": "vi",
+        "dub_status": "done",
+        "target_subtitle_current": False,
+        "target_subtitle_current_reason": "target_subtitle_not_authoritative",
+        "target_subtitle_authoritative_source": False,
+        "subtitles_content_hash": "HASH_A",
+        "dub_source_subtitles_content_hash": "HASH_A",
+        "mm_audio_key": "deliver/tasks/hf-url-authority-false-dub/voiceover/audio_mm.dry.mp3",
+        "mm_audio_provider": "azure-speech",
+        "mm_audio_voice_id": "vi-VN-HoaiMyNeural",
+        "config": {
+            "tts_requested_voice": "vi_female_1",
+            "tts_resolved_voice": "vi-VN-HoaiMyNeural",
+            "tts_provider": "azure-speech",
+            "tts_voiceover_key": "deliver/tasks/hf-url-authority-false-dub/voiceover/audio_mm.dry.mp3",
+        },
+    }
+
+    state = tasks_router._collect_voice_execution_state(task, _settings())
+
+    assert state["deliverable_audio_done"] is True
+    assert state["dub_matches_current_subtitle"] is False
+    assert state["dub_subtitle_reason"] == "target_subtitle_not_authoritative"
+    assert state["dub_subtitle_reason"] != "ready"
+    assert state["audio_ready"] is False
+
+
 def test_mm_voice_state_invalidates_stale_dub_after_speed_change(monkeypatch):
     monkeypatch.setattr(tasks_router, "get_settings", _settings)
     _patch_voice_storage(

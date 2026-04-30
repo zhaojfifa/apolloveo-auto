@@ -614,6 +614,69 @@ def test_subtitles_pipeline_state_distinguishes_no_subtitles_and_translation_inc
     assert vi_summary == "translation_incomplete"
 
 
+def test_subtitles_pipeline_state_does_not_promote_done_on_origin_only():
+    # URL-lane regression: persisted L1 is pending, source-language parse exists,
+    # but target subtitle is not authoritative/current. Projection must not
+    # promote pending -> done off origin_srt_path alone.
+    status, _summary = steps_v1_hot_follow_pipeline_state(
+        {
+            "subtitles_status": "pending",
+            "origin_srt_path": "tasks/abc/subs/origin.srt",
+            "target_subtitle_current": False,
+            "target_subtitle_authoritative_source": False,
+            "target_subtitle_current_reason": "target_subtitle_source_mismatch",
+        }
+    )
+    assert status == "pending"
+
+
+def test_subtitles_pipeline_state_does_not_promote_done_on_mm_srt_only():
+    # mm.srt may exist as a partial/non-authoritative artifact. Without L3 truth
+    # asserting authoritative+current, projection must stay pending.
+    status, _summary = steps_v1_hot_follow_pipeline_state(
+        {
+            "subtitles_status": "pending",
+            "mm_srt_path": "tasks/abc/subs/vi.srt",
+            "target_subtitle_current": False,
+            "target_subtitle_authoritative_source": False,
+        }
+    )
+    assert status == "pending"
+
+
+def test_subtitles_pipeline_state_promotes_done_when_authoritative_and_current():
+    # When L3 truth says target subtitle is authoritative and current,
+    # projection may promote pending -> done.
+    status, _summary = steps_v1_hot_follow_pipeline_state(
+        {
+            "subtitles_status": "pending",
+            "origin_srt_path": "tasks/abc/subs/origin.srt",
+            "mm_srt_path": "tasks/abc/subs/vi.srt",
+            "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
+            "target_subtitle_current_reason": "ready",
+        }
+    )
+    assert status == "done"
+
+
+def test_subtitles_pipeline_state_translation_incomplete_stays_pending():
+    # Defensive: even if L3 currentness flags are accidentally true,
+    # translation_waiting derived from pipeline_config keeps the projection pending.
+    status, summary = steps_v1_hot_follow_pipeline_state(
+        {
+            "subtitles_status": "pending",
+            "origin_srt_path": "tasks/abc/subs/origin.srt",
+            "mm_srt_path": "tasks/abc/subs/vi.srt",
+            "target_subtitle_current": True,
+            "target_subtitle_authoritative_source": True,
+            "pipeline_config": {"translation_incomplete": "true"},
+        }
+    )
+    assert status == "pending"
+    assert summary == "translation_incomplete"
+
+
 def _fake_generate_subtitles(
     base: Path,
     task_id: str,

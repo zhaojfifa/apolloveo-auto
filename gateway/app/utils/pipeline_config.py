@@ -32,6 +32,11 @@ _EXTRA_KEYS = {
     "parse_source_role",
     "parse_source_authoritative_for_target",
     "target_subtitle_authoritative",
+    "max_upload_size_mb",
+    "quality_tier_default",
+    "target_output_band",
+    "prefer_source_quality_preservation",
+    "oversize_handling_policy",
 }
 
 

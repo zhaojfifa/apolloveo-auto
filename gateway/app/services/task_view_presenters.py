@@ -239,8 +239,10 @@ def hf_rerun_presentation_state(
     final_info: dict[str, Any] | None,
     historical_final: dict[str, Any] | None,
     dub_status: str | None,
+    current_attempt: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     voice = voice_state or {}
+    l3_current_attempt = current_attempt or {}
     refs = get_contract_runtime_refs(task)
     projection_runtime = (
         get_projection_rules_runtime(refs.projection_rules_ref)
@@ -264,7 +266,7 @@ def hf_rerun_presentation_state(
             "final_updated_at": final_updated_at,
         },
         "current_attempt": {
-            "dub_status": str(dub_status or "").strip().lower() or "never",
+            "dub_status": str(l3_current_attempt.get("dub_status") or dub_status or "").strip().lower() or "never",
             "audio_ready": bool(voice.get("audio_ready")),
             "audio_ready_reason": str(voice.get("audio_ready_reason") or "").strip() or "unknown",
             "dub_current": bool(voice.get("dub_current")),
@@ -518,7 +520,7 @@ def _build_hot_follow_authoritative_state(
     payload["final_fresh"] = bool(projection["composed"].get("final_fresh"))
     artifact_facts, current_attempt, operator_summary = presentation_aggregates_loader(
         task_id,
-        task,
+        projection["task_runtime"],
         final_info=projection["final_info"],
         historical_final=projection["historical_final"],
         persisted_audio=projection["persisted_audio"],
@@ -540,6 +542,7 @@ def _build_hot_follow_authoritative_state(
         projection["final_info"],
         projection["historical_final"],
         projection["dub_state"],
+        current_attempt=current_attempt,
     )
     return task, projection, state_computer(task_runtime, payload)
 
@@ -548,6 +551,8 @@ def _publish_hub_deliverables(
     task_id: str,
     task: dict[str, Any],
     authoritative_state: dict[str, Any],
+    *,
+    deliverable_url_loader=deliverable_url,
 ) -> dict[str, Any]:
     deliverables: dict[str, Any] = {}
     for row in authoritative_state.get("deliverables") or []:
@@ -561,8 +566,9 @@ def _publish_hub_deliverables(
         url = row.get("url") or row.get("open_url") or row.get("download_url")
         if not url:
             continue
+        item_label = str(row.get("label") or row.get("title") or label)
         item = {
-            "label": label,
+            "label": item_label,
             "url": url,
             "open_url": row.get("open_url") or row.get("url"),
             "download_url": row.get("download_url"),
@@ -571,15 +577,27 @@ def _publish_hub_deliverables(
             item["status"] = row.get("status")
             item["state"] = row.get("state")
         deliverables[key] = item
+        if kind == "subtitle":
+            target_lang = public_target_lang(task.get("target_lang") or task.get("content_lang") or "")
+            if target_lang and target_lang != "mm":
+                deliverables[f"{target_lang}_srt"] = dict(item)
 
-    for key, label in (
-        ("mm_txt", "mm.txt"),
-        ("edit_bundle_zip", "scenes_bundle.zip"),
-    ):
-        download_url = deliverable_url(task_id, task, key)
+    subtitles = authoritative_state.get("subtitles") if isinstance(authoritative_state.get("subtitles"), dict) else {}
+    target_subtitle_ready = bool(
+        subtitles.get("target_subtitle_current")
+        and subtitles.get("target_subtitle_authoritative_source")
+        and subtitles.get("subtitle_ready")
+    )
+    extra_derived_artifacts = []
+    if target_subtitle_ready:
+        extra_derived_artifacts.append(("mm_txt", "mm.txt"))
+    extra_derived_artifacts.append(("edit_bundle_zip", "scenes_bundle.zip"))
+
+    for key, label in extra_derived_artifacts:
+        download_url = deliverable_url_loader(task_id, task, key)
         open_url = None
         if key == "edit_bundle_zip":
-            open_url = deliverable_url(task_id, task, key)
+            open_url = deliverable_url_loader(task_id, task, key)
         if not download_url and not open_url:
             continue
         item = {"label": label, "url": download_url or open_url}
@@ -614,15 +632,21 @@ def _build_hot_follow_publish_surface_payload(
     copy_bundle_builder=_build_copy_bundle,
     sop_markdown_builder=_publish_sop_markdown,
     download_code_loader=download_code,
+    deliverable_url_loader=deliverable_url,
 ) -> dict[str, Any]:
-    deliverables = _publish_hub_deliverables(task_id, task, authoritative_state)
+    deliverables = _publish_hub_deliverables(
+        task_id,
+        task,
+        authoritative_state,
+        deliverable_url_loader=deliverable_url_loader,
+    )
     final_preview_url = resolve_final_url_loader(task_id, authoritative_state)
     if final_preview_url:
         final_item = dict(deliverables.get("final_mp4") or {"label": "final.mp4"})
         final_item["url"] = final_preview_url
         final_item["open_url"] = final_preview_url
         if not final_item.get("download_url"):
-            final_item["download_url"] = deliverable_url(task_id, task, "final_mp4")
+            final_item["download_url"] = deliverable_url_loader(task_id, task, "final_mp4")
         deliverables["final_mp4"] = final_item
 
     short_code = download_code_loader(task_id)

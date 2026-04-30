@@ -78,6 +78,50 @@ Current supported source-language scope for local upload remains intentionally n
 - Chinese
 - English
 
+### 4.1 Media Input Quality Policy
+
+Hot Follow media input quality is owned by the runtime policy mirror:
+
+- `gateway/app/services/hot_follow_media_policy.py`
+
+Frozen fields:
+
+- `max_upload_size_mb`: `300`
+- `accepted_input_types`: `video/mp4`, `video/quicktime`, `video/x-matroska`
+- `quality_tier_default`: `source_preserving_720p_1080p`
+- `target_output_band`: `720p_1080p`
+- `prefer_source_quality_preservation`: `true`
+- `oversize_handling_policy`:
+  `preserve_original_and_derive_runtime_safe_compose_asset`
+
+Contract rule:
+
+- upload ingress size limit, runtime-safe compose input, and final output
+  quality target are separate semantics
+- router ingress enforces the 300MB ceiling
+- compose runtime may derive a safe processing asset before merge
+- the original source artifact remains preserved as raw input
+- final output policy remains 720p-1080p oriented where source quality allows
+
+### 4.2 Subtitle Style Policy
+
+Hot Follow burned-subtitle defaults are owned by the same narrow policy module,
+not by caller-local magic constants.
+
+Frozen fields:
+
+- `subtitle_style_profile`: `hot_follow_compact_default`
+- font scaling owner: `HotFollowSubtitleStyleProfile.font_size`
+- line height / spacing owner: `HotFollowSubtitleStyleProfile.line_spacing`
+- safe margin behavior: `preserve_existing_bottom_safe_area`
+
+Contract rule:
+
+- default subtitles should be visibly smaller / more compact than the previous
+  production default
+- profile names and runtime policy own the raw render values
+- operator-facing surfaces do not receive raw font-size controls in this slice
+
 ## 5. Deliverable Profile Reference
 
 Hot Follow deliverables are frozen as:

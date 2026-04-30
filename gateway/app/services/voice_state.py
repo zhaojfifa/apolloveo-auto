@@ -34,11 +34,22 @@ DRY_TTS_KEY_SUFFIX = "/voiceover/audio_mm.dry.mp3"
 # ── Helpers (alphabetical by call-chain depth) ───────────────────────────────
 
 def hf_dub_matches_current_subtitle(task: dict) -> tuple[bool, str]:
+    target_current = task.get("target_subtitle_current")
+    target_authoritative = task.get("target_subtitle_authoritative_source")
+    if target_current is not True or target_authoritative is not True:
+        reason = str(task.get("target_subtitle_current_reason") or "").strip()
+        if not reason or reason == "ready":
+            reason = "target_subtitle_not_authoritative"
+        return False, reason
     current_hash = str(task.get("subtitles_content_hash") or "").strip() or None
     dub_hash = str(task.get("dub_source_subtitles_content_hash") or "").strip() or None
     current_updated_at = str(task.get("subtitles_override_updated_at") or "").strip() or None
     dub_updated_at = str(task.get("dub_source_subtitle_updated_at") or "").strip() or None
+    if current_hash and not dub_hash:
+        return False, "dub_stale_after_subtitles"
     if current_hash and dub_hash and current_hash != dub_hash:
+        return False, "dub_stale_after_subtitles"
+    if current_updated_at and not dub_updated_at:
         return False, "dub_stale_after_subtitles"
     if current_updated_at and dub_updated_at and current_updated_at != dub_updated_at:
         return False, "dub_stale_after_subtitles"

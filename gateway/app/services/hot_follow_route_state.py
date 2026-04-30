@@ -108,11 +108,16 @@ def build_hot_follow_artifact_facts(
     subtitle_payload = subtitle_lane or {}
     pack_payload = scene_pack or {}
     subtitle_exists = bool(subtitle_payload.get("subtitle_artifact_exists"))
+    subtitle_recovered = bool(
+        subtitle_payload.get("subtitle_ready")
+        and subtitle_payload.get("target_subtitle_current")
+        and subtitle_payload.get("target_subtitle_authoritative_source")
+    )
     subtitle_url = deliverable_url(task_id, task, "mm_srt") if subtitle_exists else None
     pack_url = deliverable_url(task_id, task, "pack_zip") or pack_payload.get("download_url")
     compose_input = _compose_input_facts(task)
     audio_lane = _audio_lane_facts(task, audio_payload)
-    helper_translate_failed = bool(subtitle_payload.get("helper_translate_failed"))
+    helper_translate_failed = bool(subtitle_payload.get("helper_translate_failed")) and not subtitle_recovered
     helper_translate_failed_voice_led = bool(
         helper_translate_failed
         and (
@@ -142,6 +147,10 @@ def build_hot_follow_artifact_facts(
                 "subtitle_ready_reason": subtitle_payload.get("subtitle_ready_reason"),
                 "target_subtitle_current_reason": subtitle_payload.get("target_subtitle_current_reason"),
                 "target_subtitle_authoritative_source": bool(subtitle_payload.get("target_subtitle_authoritative_source")),
+                "target_subtitle_current": bool(subtitle_payload.get("target_subtitle_current")),
+                "primary_editable_text": subtitle_payload.get("primary_editable_text"),
+                "edited_text": subtitle_payload.get("edited_text"),
+                "srt_text": subtitle_payload.get("srt_text"),
                 "parse_source_text": subtitle_payload.get("parse_source_text"),
                 "raw_source_text": subtitle_payload.get("raw_source_text"),
                 "normalized_source_text": subtitle_payload.get("normalized_source_text"),
@@ -166,8 +175,8 @@ def build_hot_follow_artifact_facts(
         "helper_translate_output_state": subtitle_payload.get("helper_translate_output_state"),
         "helper_translate_provider_health": subtitle_payload.get("helper_translate_provider_health"),
         "helper_translate_composite_state": subtitle_payload.get("helper_translate_composite_state"),
-        "helper_translate_error_reason": subtitle_payload.get("helper_translate_error_reason"),
-        "helper_translate_error_message": subtitle_payload.get("helper_translate_error_message"),
+        "helper_translate_error_reason": None if subtitle_recovered else subtitle_payload.get("helper_translate_error_reason"),
+        "helper_translate_error_message": None if subtitle_recovered else subtitle_payload.get("helper_translate_error_message"),
         "helper_translate_retryable": bool(subtitle_payload.get("helper_translate_retryable")),
         "helper_translate_terminal": bool(subtitle_payload.get("helper_translate_terminal")),
         "helper_translate_warning_only": bool(subtitle_payload.get("helper_translate_warning_only")),

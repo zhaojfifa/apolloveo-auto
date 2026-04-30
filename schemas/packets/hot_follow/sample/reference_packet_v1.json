@@ -1,0 +1,44 @@
+{
+  "line_id": "hot_follow",
+  "packet_version": "v1",
+  "generic_refs": [
+    {"ref_id": "g_input", "path": "docs/contracts/factory_input_contract_v1.md", "version": "v1"},
+    {"ref_id": "g_scene_plan", "path": "docs/contracts/factory_scene_plan_contract_v1.md", "version": "v1"},
+    {"ref_id": "g_audio_plan", "path": "docs/contracts/factory_audio_plan_contract_v1.md", "version": "v1"},
+    {"ref_id": "g_language_plan", "path": "docs/contracts/factory_language_plan_contract_v1.md", "version": "v1"},
+    {"ref_id": "g_delivery", "path": "docs/contracts/factory_delivery_contract_v1.md", "version": "v1"}
+  ],
+  "line_specific_refs": [
+    {
+      "ref_id": "hot_follow_scene_plan",
+      "path": "docs/contracts/hot_follow_line_contract.md",
+      "version": "v1",
+      "binds_to": ["g_scene_plan"]
+    }
+  ],
+  "binding": {
+    "worker_profile_ref": "hot_follow_worker_v1",
+    "deliverable_profile_ref": "hot_follow_delivery_v1",
+    "asset_sink_profile_ref": "hot_follow_assets_v1",
+    "capability_plan": [
+      {"kind": "understanding"},
+      {"kind": "subtitles", "language_hint": "en"},
+      {"kind": "dub", "language_hint": "en"},
+      {"kind": "pack"}
+    ]
+  },
+  "evidence": {
+    "reference_line": "hot_follow",
+    "reference_evidence_path": "docs/contracts/hot_follow_line_contract.md",
+    "validator_report_path": "docs/execution/evidence/hot_follow_reference_packet_validation_v1.md",
+    "ready_state": "ready"
+  },
+  "metadata": {
+    "created_at": "2026-04-25",
+    "created_by": "p2_pre_unlock_wave",
+    "notes": "Hot Follow reference green baseline; not for runtime onboarding."
+  },
+  "line_specific_objects": {
+    "hot_follow_scene_plan": {"camera_lock": true, "delta_only": true}
+  }
+}

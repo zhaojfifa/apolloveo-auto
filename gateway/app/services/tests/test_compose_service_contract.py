@@ -15,6 +15,10 @@ from gateway.app.services.compose_service import (
     HotFollowComposeRequestContract,
     _ComposeInputs,
 )
+from gateway.app.services.hot_follow_media_policy import (
+    hot_follow_compose_scale_expr,
+    hot_follow_media_input_policy,
+)
 from gateway.app.services.worker_gateway import WorkerExecutionMode, WorkerResult
 
 
@@ -149,6 +153,35 @@ def test_large_local_compose_input_derives_safe_video_before_merge(tmp_path, mon
     assert commands[0][1] == "derive_compose_input"
     assert "-map" in commands[0][0]
     assert "force_divisible_by=2" in commands[0][0][commands[0][0].index("-vf") + 1]
+    assert "1920,1080" in commands[0][0][commands[0][0].index("-vf") + 1]
+    assert "-crf" in commands[0][0]
+    assert commands[0][0][commands[0][0].index("-crf") + 1] == "21"
+
+
+def test_hot_follow_media_policy_freezes_300mb_ingress_and_720p_1080p_target():
+    policy = hot_follow_media_input_policy()
+
+    assert policy.max_upload_size_mb == 300
+    assert policy.max_upload_size_bytes == 300 * 1024 * 1024
+    assert policy.target_output_band == "720p_1080p"
+    assert policy.prefer_source_quality_preservation is True
+    assert policy.accepts_filename("source.mov") is True
+    assert policy.accepts_filename("source.gif") is False
+    assert "1920,1080" in hot_follow_compose_scale_expr(policy)
+
+
+def test_720p_1080p_band_input_does_not_derive_by_pixels_alone():
+    assert CompositionService._should_derive_safe_compose_input(
+        {"task_id": "hf-1080p-ok", "pipeline_config": {"ingest_mode": "local"}},
+        ComposeInputProfile(
+            size_bytes=80 * 1024 * 1024,
+            duration_sec=20.0,
+            width=1920,
+            height=1080,
+            bit_rate=6_000_000,
+            pix_fmt="yuv420p",
+        ),
+    ) is False
 
 
 def test_workdir_space_guard_blocks_before_heavy_compose(monkeypatch, tmp_path):

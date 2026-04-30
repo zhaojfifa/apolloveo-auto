@@ -53,6 +53,8 @@ or active architecture decisions.
 | Contract-driven state baseline | `docs/contracts/contract_driven_four_layer_state_baseline_v1.md` |
 | Workbench response | `docs/contracts/workbench_hub_response.contract.md` |
 | Runtime assembly rules | `docs/contracts/production_line_runtime_assembly_rules_v1.md` |
+| Factory contract-object baseline | `docs/contracts/factory_input_contract_v1.md` |
+| Factory line template | `docs/architecture/factory_line_template_design_v1.md` |
 | Status ownership | `docs/contracts/status_ownership_matrix.md` |
 | Runtime execution log | `docs/execution/VEOBASE01_EXECUTION_LOG.md` |
 | VeoBase01 ADR | `docs/adr/ADR-VEOBASE01-LINE-STATE-CONTRACT.md` |
@@ -106,6 +108,21 @@ Read `docs/contracts/line_contract.schema.json`,
 `docs/architecture/VEOBASE01_RECONSTRUCTION_BASELINE.md`. Skills are advisory
 readers, workers are execution resources, deliverable profiles declare accepted
 outputs, and asset sinks are downstream of accepted deliverable truth.
+
+### Factory-Level Contract Object Design
+
+Read `docs/reviews/HOT_FOLLOW_CURRENT_BRANCH_FINAL_ACCEPTANCE_FREEZE.md`,
+`docs/contracts/factory_input_contract_v1.md`,
+`docs/contracts/factory_content_structure_contract_v1.md`,
+`docs/contracts/factory_scene_plan_contract_v1.md`,
+`docs/contracts/factory_audio_plan_contract_v1.md`,
+`docs/contracts/factory_language_plan_contract_v1.md`,
+`docs/contracts/factory_delivery_contract_v1.md`, and
+`docs/architecture/factory_line_template_design_v1.md`.
+
+Use this path only for contract/design work above the frozen Hot Follow
+baseline. It does not authorize new-line runtime onboarding or scenario runtime
+implementation.
 
 ### New-Line Onboarding Preparation
 
@@ -196,5 +213,8 @@ A new production line may not be implemented until these gates pass:
 6. Business regression validation has passed for the existing Hot Follow line.
 7. Router/service ownership boundaries are stable enough that the new line does
    not copy router orchestration drift.
-8. A new-line onboarding packet is complete, but remains blocked until a later
+8. Hot Follow remains frozen as the first contract-driven production-line
+   baseline while factory-level contract objects and line-template design are
+   lifted above it.
+9. A new-line onboarding packet is complete, but remains blocked until a later
    implementation PR explicitly lifts the gate.

@@ -86,7 +86,18 @@ def hf_pipeline_state(
         summary = "origin/mm subtitles"
         if hf_subtitle_terminal_success(subtitle_lane):
             return "done", "ready"
-        if status == "pending" and not translation_waiting and (task.get("origin_srt_path") or task.get("mm_srt_path")):
+        target_subtitle_current = bool(task.get("target_subtitle_current"))
+        target_subtitle_authoritative_source = bool(task.get("target_subtitle_authoritative_source"))
+        if status in {"done", "ready", "success", "completed"} and not (
+            target_subtitle_current and target_subtitle_authoritative_source
+        ):
+            status = "pending"
+        if (
+            status == "pending"
+            and not translation_waiting
+            and target_subtitle_current
+            and target_subtitle_authoritative_source
+        ):
             status = "done"
         if status == "failed" and translation_waiting:
             status = "pending"
@@ -424,6 +435,10 @@ def build_hot_follow_workbench_projection(
     normalized_source_text = normalized_source_text_loader(task_id, task_runtime)
     subtitles_step_done = str(subtitles_state).strip().lower() in {"done", "ready", "success", "completed", "failed", "error"}
     route_state = dual_channel_state_loader(task_id, task_runtime, subtitle_lane, subtitles_step_done=subtitles_step_done)
+    task_runtime["route_state"] = route_state
+    task_runtime["content_mode"] = route_state.get("content_mode")
+    task_runtime["speech_detected"] = bool(route_state.get("speech_detected"))
+    task_runtime["speech_confidence"] = route_state.get("speech_confidence")
     audio_cfg = audio_config_loader(task_runtime)
     voice_state = voice_execution_state_loader(task_runtime, settings_obj)
     no_dub, no_dub_reason, _ = hot_follow_terminal_no_dub_projection(
@@ -434,7 +449,9 @@ def build_hot_follow_workbench_projection(
         voice_state=voice_state,
     )
     no_dub_compose_allowed = bool(
-        no_dub and str(no_dub_reason or "").strip().lower() in {"target_subtitle_empty", "dub_input_empty"}
+        no_dub
+        and str(no_dub_reason or "").strip().lower()
+        in {"target_subtitle_empty", "dub_input_empty", "source_audio_preserved_no_tts", "bgm_only_no_tts", "compose_no_tts"}
     )
     persisted_audio = persisted_audio_state_loader(task_id, task_runtime)
     target_lang_internal = normalize_target_lang(task_runtime.get("target_lang") or task_runtime.get("content_lang") or "mm")

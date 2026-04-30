@@ -2175,6 +2175,415 @@ Next action:
 - move upward into factory-level contract objects and line-template design
 - do not reopen Hot Follow internals unless a new acceptance regression is
   found against this frozen baseline
+
+## 2026-04-24 - Hot Follow baseline freeze tag, VeoBase01 alignment, and factory-layer lift
+
+Source-of-truth docs used:
+
+- `docs/reviews/HOT_FOLLOW_CURRENT_BRANCH_FINAL_ACCEPTANCE_FREEZE.md`
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Part 1 - frozen baseline tag:
+
+- source branch: `VeoBase01-subtitle-authority-contract-correction`
+- frozen baseline commit SHA: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+- tag name: `HotFollow-ContractDriven-Baseline-Freeze01`
+- tag SHA: `4d271022cef1bfe94b3e0a33cb4a429a6ab25d36`
+- tag target commit SHA: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+- tag type: annotated
+- remote push:
+  - `origin` updated with the new tag
+
+Part 2 - VeoBase01 alignment:
+
+- local `VeoBase01` SHA before alignment: `7e2e56b873f59537bf6d33a51b854343631bca63`
+- remote `origin/VeoBase01` SHA before alignment: `7e2e56b873f59537bf6d33a51b854343631bca63`
+- alignment method used: `git checkout VeoBase01` + `git merge --ff-only VeoBase01-subtitle-authority-contract-correction`
+- accepted lineage preserved: yes
+- history rewrite used: no
+- local `VeoBase01` SHA after alignment: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+- remote `origin/VeoBase01` updated: yes
+- remote `origin/VeoBase01` SHA after alignment: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+- `main` touched in this pass: no
+
+Part 3 - Hot Follow freeze write-back:
+
+- Hot Follow is now recorded as the first frozen contract-driven
+  production-line baseline
+- further Hot Follow internal work is paused unless a new acceptance regression
+  appears
+- next work is explicitly routed upward into factory-level contract objects and
+  line-template design
+
+Part 4 - factory-layer docs created on `VeoBase01`:
+
+- `docs/execution/HOT_FOLLOW_BASELINE_FREEZE_AND_VEOBASE01_ALIGNMENT.md`
+- `docs/contracts/factory_input_contract_v1.md`
+- `docs/contracts/factory_content_structure_contract_v1.md`
+- `docs/contracts/factory_scene_plan_contract_v1.md`
+- `docs/contracts/factory_audio_plan_contract_v1.md`
+- `docs/contracts/factory_language_plan_contract_v1.md`
+- `docs/contracts/factory_delivery_contract_v1.md`
+- `docs/architecture/factory_line_template_design_v1.md`
+
+Index update:
+
+- `docs/ENGINEERING_INDEX.md`
+  - added factory contract-object baseline authority entries
+  - added a task-oriented reading path for factory-level contract object design
+  - updated the new-line gate to keep work at the factory-contract/template
+    layer while Hot Follow stays frozen
+
+Validation:
+
+- `git diff --check`
+  - result: passed
+- authority path existence checks:
+  - `test -f docs/reviews/HOT_FOLLOW_CURRENT_BRANCH_FINAL_ACCEPTANCE_FREEZE.md`
+  - `test -f docs/execution/HOT_FOLLOW_BASELINE_FREEZE_AND_VEOBASE01_ALIGNMENT.md`
+  - `test -f docs/contracts/factory_input_contract_v1.md`
+  - `test -f docs/contracts/factory_content_structure_contract_v1.md`
+  - `test -f docs/contracts/factory_scene_plan_contract_v1.md`
+  - `test -f docs/contracts/factory_audio_plan_contract_v1.md`
+  - `test -f docs/contracts/factory_language_plan_contract_v1.md`
+  - `test -f docs/contracts/factory_delivery_contract_v1.md`
+  - `test -f docs/architecture/factory_line_template_design_v1.md`
+  - result: passed
+
+Conflict-resolution note:
+
+- no code/doc conflict resolution was required during VeoBase01 alignment
+- alignment was a pure fast-forward to the accepted frozen baseline
+
+Acceptance:
+
+- annotated freeze tag created and pushed
+- `VeoBase01` now contains the accepted frozen Hot Follow baseline
+- accepted lineage was preserved by fast-forward only
+- Hot Follow is now frozen as the first production-line sample
+- next work has moved upward one layer into factory-level contract objects and
+  line-template design only
+
+## 2026-04-24 - main alignment to accepted VeoBase01 baseline and factory discussion branch start
+
+Source-of-truth docs used:
+
+- `docs/reviews/HOT_FOLLOW_CURRENT_BRANCH_FINAL_ACCEPTANCE_FREEZE.md`
+- this execution log
+
+Before-state:
+
+- current branch before alignment: `VeoBase01`
+- local `main` SHA before alignment: `7687ba9aaeaae3ac5f55d37c3d511aff37cabc9f`
+- remote `origin/main` SHA before alignment: `7687ba9aaeaae3ac5f55d37c3d511aff37cabc9f`
+- local `VeoBase01` SHA before alignment: `093a6e2dfb5abeb1bfd1600eebfd75a00359873d`
+- remote `origin/VeoBase01` SHA before alignment: `093a6e2dfb5abeb1bfd1600eebfd75a00359873d`
+- accepted tag name: `HotFollow-ContractDriven-Baseline-Freeze01`
+- accepted tag SHA: `4d271022cef1bfe94b3e0a33cb4a429a6ab25d36`
+- accepted tag target SHA: `2bfef16053c5f97b85b044de3a28a367eca26fbc`
+
+Part 2 - main alignment:
+
+- alignment source: `VeoBase01`
+- alignment method used: `git checkout main` + `git merge --ff-only VeoBase01`
+- history rewrite used: no
+- `main` SHA after alignment: `093a6e2dfb5abeb1bfd1600eebfd75a00359873d`
+- remote `origin/main` updated: yes
+- remote `origin/main` SHA after alignment: `093a6e2dfb5abeb1bfd1600eebfd75a00359873d`
+- freeze tag changed: no
+- `VeoBase01` contents changed for alignment: no
+
+Part 3 - fresh discussion branch:
+
+- branch name: `factory-contract-objects-discussion-v1`
+- branch base: updated `main`
+- branch created from SHA: `093a6e2dfb5abeb1bfd1600eebfd75a00359873d`
+- remote branch pushed: yes
+
+Part 4 - write-back:
+
+- execution note created:
+  - `docs/execution/MAIN_ALIGNMENT_AND_FACTORY_DISCUSSION_BRANCH_START.md`
+- execution log updated
+- `docs/ENGINEERING_INDEX.md` did not require a further discoverability update
+  because the factory-level contract-object design path was already added in
+  the prior baseline pass
+
+Current active scope:
+
+- accepted Hot Follow freeze tag remains unchanged
+- `main` is aligned to the accepted `VeoBase01` baseline
+- next active branch is `factory-contract-objects-discussion-v1`
+- next work is factory-level contract discussion only
+- runtime onboarding for the next line remains blocked
+
+Validation:
+
+- `git diff --check`
+  - result: passed
+- branch/commit/tag verification:
+  - `git rev-parse main`
+  - `git rev-parse origin/main`
+  - `git rev-parse VeoBase01`
+  - `git rev-parse origin/VeoBase01`
+  - `git rev-parse HotFollow-ContractDriven-Baseline-Freeze01`
+  - `git rev-parse HotFollow-ContractDriven-Baseline-Freeze01^{}`
+  - result: verified
+- authority path existence checks:
+  - `test -f docs/execution/MAIN_ALIGNMENT_AND_FACTORY_DISCUSSION_BRANCH_START.md`
+  - `test -f docs/execution/VEOBASE01_EXECUTION_LOG.md`
+  - result: passed
+
+Acceptance:
+
+- lineage preserved
+- branch drift reduced by aligning `main` to accepted `VeoBase01`
+- discussion moved upward into factory-level contract scope
+- frozen Hot Follow internals remain closed in this pass
+
+## 2026-04-24 - product-driven factory alignment pass for Matrix Script, Digital Anchor, and frozen Hot Follow
+
+Branch:
+
+- `factory-contract-objects-discussion-v1`
+
+Reading Declaration:
+
+1. Root indexes read first:
+   - `README.md`
+   - `ENGINEERING_CONSTRAINTS_INDEX.md`
+2. Docs indexes read second:
+   - `docs/README.md`
+   - `docs/ENGINEERING_INDEX.md`
+3. Minimum task-specific authority files selected from indexes:
+   - `docs/contracts/engineering_reading_contract_v1.md`
+   - `docs/architecture/factory_four_layer_architecture_baseline_v1.md`
+   - `docs/contracts/production_line_runtime_assembly_rules_v1.md`
+   - `docs/contracts/factory_input_contract_v1.md`
+   - `docs/contracts/factory_content_structure_contract_v1.md`
+   - `docs/contracts/factory_scene_plan_contract_v1.md`
+   - `docs/contracts/factory_audio_plan_contract_v1.md`
+   - `docs/contracts/factory_language_plan_contract_v1.md`
+   - `docs/contracts/factory_delivery_contract_v1.md`
+   - `docs/architecture/factory_line_template_design_v1.md`
+   - `docs/contracts/script_video_planning_contract.md`
+   - `docs/contracts/action_replica_planning_assets_contract.md`
+   - `docs/reviews/review_jellyfish_importability_for_factory.md`
+   - `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md`
+   - `docs/reviews/HOT_FOLLOW_CURRENT_BRANCH_FINAL_ACCEPTANCE_FREEZE.md`
+4. Why these files were sufficient:
+   - this pass is a product-driven factory alignment pass above the frozen Hot
+     Follow sample
+   - Matrix Script line truth is represented by the script-video planning
+     contract and the script-driven planning review path
+   - Digital Anchor line truth is represented by the action-replica planning
+     asset contract and the digital-human planning review path
+   - Hot Follow is used only as the frozen production-line reference sample
+5. Missing-authority handling:
+   - no indexed authority file was missing
+   - no new product doc was created in this pass; write-back stays in the
+     execution log only
+
+Execution scope:
+
+- raise contract architecture one level higher without starting runtime
+  onboarding
+- map product flow to architecture layers, UI surfaces, and backend domains
+- define tool integration as backend capability supply rather than front-end
+  model selection
+- define the Broll asset-library vs tool-backend boundary
+- produce one implementation backlog split by:
+  - factory-generic
+  - line-specific
+  - runtime-policy
+  - tool-supply
+  - asset-supply
+  - platform capabilities
+
+Scenario alignment baseline:
+
+- Matrix Script Line:
+  - treated as a script-driven, result-oriented matrix production line
+  - authoritative upstream truth is the script planning chain:
+    script -> segment -> shot -> candidate asset -> linked asset -> delivery
+  - `docs/contracts/script_video_planning_contract.md` is the current product
+    truth proxy
+- Digital Anchor Line:
+  - treated as a script-driven personal-anchor production line
+  - authoritative upstream truth is the role/scene binding chain:
+    script/plan -> identity -> role binding -> shot binding -> language/audio
+    plan -> delivery
+  - `docs/contracts/action_replica_planning_assets_contract.md` is the current
+    product truth proxy
+- Hot Follow:
+  - remains the frozen reference line
+  - contributes the accepted four-layer runtime sample, delivery precedence,
+    and workbench/publish truth-path discipline
+  - no Hot Follow internal reopening is allowed in this pass
+
+### Execution Alignment Summary
+
+Contract architecture must now be raised one level above the current
+factory-object set.
+
+The next abstraction layer is not “another line contract” and not “runtime
+onboarding”. It is the factory product packet that binds:
+
+- input contract
+- content structure contract
+- scene plan contract
+- audio plan contract
+- language plan contract
+- delivery contract
+- line template bindings
+
+into one product-facing packet that a line must provide before runtime work is
+allowed.
+
+Debt-reduction path:
+
+1. keep Hot Follow frozen as the runtime reference line
+2. stop treating front-end workbench payloads as the place where line product
+   concepts are discovered
+3. lift Matrix Script and Digital Anchor product logic into contract-object
+   packets first
+4. define backend domains that can consume those packets without putting tool
+   choice, asset browsing, or route policy into routers/UI
+5. only after those packet and domain boundaries are explicit, allow line
+   runtime onboarding discussion
+
+Product flow to architecture-layer mapping:
+
+- Layer 1 production-line contract:
+  - declares which line is active and which packet bindings it requires
+- Layer 2 state/projection:
+  - interprets artifact truth, route truth, language/audio currentness, and
+    delivery readiness from packet-driven rules
+- Layer 3 surface/execution:
+  - exposes workbench and delivery center surfaces and dispatches services that
+    consume packet-driven rules
+
+Product flow to UI-surface mapping:
+
+- intake/create surface:
+  - factory input contract
+- planning/workbench surface:
+  - content structure, scene plan, language plan, audio plan
+- candidate confirmation/editor surface:
+  - Matrix Script candidate/link flow
+  - Digital Anchor identity/role/shot binding flow
+- delivery center:
+  - factory delivery contract
+- operator-facing publish/final review:
+  - ready-gate and delivery outputs derived from authoritative state, not
+    planning drafts
+
+Backend integration rule:
+
+- tool registry -> capability adapters -> routing policy -> worker execution
+- front end must not select raw model/provider as product runtime logic
+- front end may select product intent, quality tier, or line options
+- backend resolves that into tools/capabilities and execution routing
+
+Broll and tool boundary:
+
+- Broll asset library is asset supply:
+  - reusable references, candidate assets, linked assets, file-usage indexes,
+    asset availability, licensing/usage metadata
+- tool backend is capability supply:
+  - text analysis, script planning, image generation, speech, dubbing, motion,
+    composition, retrieval, ranking
+- neither Broll nor tool backend should own task/workbench business truth
+- line runtime consumes both through contracts and supply adapters
+
+Additional platform capabilities required for a true video factory:
+
+- factory packet validator before runtime onboarding
+- capability registry and adapter governance
+- asset-supply index and usage tracing
+- product-intent to capability-routing policy layer
+- versioned workbench/delivery response models
+- line conformance and packet completeness checks
+- execution/provenance tracing across planning, asset linking, and delivery
+
+### Implementation Backlog
+
+A. factory-generic
+
+- define one factory packet envelope that groups the six contract objects as
+  one pre-runtime onboarding requirement
+- add packet completeness and contract cross-reference validation
+- define factory-level product flow vocabulary shared by Matrix Script and
+  Digital Anchor without copying Hot Follow runtime residue
+- define versioned surface response contracts for intake, planning, and
+  delivery center
+
+B. line-specific
+
+- Matrix Script line:
+  - bind script planning draft, shot candidate flow, and result-oriented
+    delivery profile into one line packet
+- Digital Anchor line:
+  - bind identity/role/shot planning, speaker/language/audio expectations, and
+    personal-anchor delivery profile into one line packet
+- Hot Follow:
+  - no new internal work; retain only as frozen reference sample
+
+C. runtime-policy
+
+- formalize packet-to-line-template binding rules
+- formalize which packet fields become L2 facts, which become L3 route
+  decisions, and which remain L4-only planning/presentation inputs
+- define runtime onboarding gate checks that prove a new line is packet-complete
+  before any router/service runtime work starts
+- define ready-gate selection and delivery precedence rules as line policy, not
+  UI or router heuristics
+
+D. tool-supply
+
+- create/strengthen backend domains for:
+  - capability registry
+  - capability adapters
+  - routing policy
+  - worker execution envelope
+  - provider/model/settings governance
+- remove product dependence on front-end model selection
+- expose product-level intent knobs only, with backend resolution to tools
+
+E. asset-supply
+
+- create/strengthen backend domains for:
+  - Broll/reference asset library
+  - candidate vs linked asset confirmation
+  - file-usage / scope indexing
+  - asset availability / provenance / usage metadata
+- keep asset supply distinct from task/workbench truth and from tool capability
+  supply
+
+F. platform capabilities
+
+- packet validation service
+- line conformance tests
+- versioned response schemas for workbench and delivery center
+- provenance tracing from planning draft to linked assets to accepted delivery
+- operator confirmation hooks that remain contract-driven
+- cross-line policy observability and execution audit views
+
+Validation:
+
+- `git diff --check`
+  - result: passed
+
+Acceptance:
+
+- contract architecture is now aligned one layer higher than the current
+  factory object set
+- Matrix Script and Digital Anchor are both mapped as script-driven planning
+  lines without starting runtime onboarding
+- tool integration is aligned to backend capability supply
+- Broll is aligned to asset supply
+- Hot Follow remains frozen and unopened in this pass
+
 ## 2026-04-24 Hot Follow First-Attempt Subtitle-Authority Stabilization
 
 Context:
@@ -2513,3 +2922,425 @@ Part 4 - VeoBase02 gate result:
 - workbench/current-attempt/artifact-facts agreement held on the checked truth
   set
 - `VeoBase02` accepted as the new verification authority branch
+
+## 2026-04-25 Factory Abstraction Closeout For Veo 2.0 Preparation
+
+Branch:
+
+- `VeoBase02-clean-tag-verify`
+
+Base SHA:
+
+- `8e06351f53e8801980da83e66ab158578ecdba91`
+
+Reading declaration:
+
+- phase 0 index-first:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+  - `docs/README.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `docs/contracts/engineering_reading_contract_v1.md`
+- phase 1 Hot Follow frozen authority:
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/hot_follow_state_flow_v1.md`
+  - `docs/contracts/hot_follow_state_table_v1.md`
+  - `docs/contracts/hot_follow_forbidden_invariants_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/architecture/line_contracts/hot_follow_line.yaml`
+- phase 2 factory abstraction reference:
+  - branch-local fallback read from `factory-contract-objects-discussion-v1`:
+    - `docs/contracts/factory_input_contract_v1.md`
+    - `docs/contracts/factory_content_structure_contract_v1.md`
+    - `docs/contracts/factory_scene_plan_contract_v1.md`
+    - `docs/contracts/factory_audio_plan_contract_v1.md`
+    - `docs/contracts/factory_language_plan_contract_v1.md`
+    - `docs/contracts/factory_delivery_contract_v1.md`
+    - `docs/architecture/factory_line_template_design_v1.md`
+- supporting authority selected through the indexes:
+  - `docs/architecture/factory_four_layer_architecture_baseline_v1.md`
+  - `docs/contracts/production_line_runtime_assembly_rules_v1.md`
+  - `docs/contracts/workbench_hub_response.contract.md`
+
+Why this authority set was sufficient:
+
+- the pass was limited to factory contract-object closeout, runtime boundary
+  closeout, workbench abstraction closeout, and line-template closeout
+- verified Hot Follow runtime truth was already frozen on this branch, so the
+  abstraction work only needed the Hot Follow packet plus the exact
+  branch-local factory contract references
+- no runtime rewrite or new-line onboarding was in scope
+
+Scope:
+
+- docs-only factory abstraction closeout
+- no new business line
+- no UI redesign
+- no broad Hot Follow bug-fixing reopen
+
+Created documents:
+
+- `docs/contracts/factory_input_contract_v1.md`
+- `docs/contracts/factory_content_structure_contract_v1.md`
+- `docs/contracts/factory_scene_plan_contract_v1.md`
+- `docs/contracts/factory_audio_plan_contract_v1.md`
+- `docs/contracts/factory_language_plan_contract_v1.md`
+- `docs/contracts/factory_delivery_contract_v1.md`
+- `docs/architecture/factory_line_template_design_v1.md`
+- `docs/architecture/factory_runtime_boundary_design_v1.md`
+- `docs/architecture/factory_workbench_mapping_v1.md`
+
+Updated documents:
+
+- `docs/execution/VEOBASE01_EXECUTION_LOG.md`
+
+Closeout results:
+
+- Hot Follow is now described through factory-level input, content structure,
+  language, audio, scene-plan, and delivery contract objects
+- Hot Follow runtime ownership is now stated as a factory boundary set instead
+  of an implicit router-file shape
+- workbench/product surfaces are now described as seven generic operator zones
+  consuming L2/L3 truth and L4 projection only
+- line onboarding is now described as filling one factory line-template
+  checklist instead of starting from code branches
+
+Validation:
+
+- `git diff --check`
+  - result: passed
+
+Behavior change:
+
+- none; authority closeout only
+
+---
+
+## 2026-04-26 — Hot Follow URL state commit repair
+
+Reading Declaration:
+
+- phase 0 authority:
+  - `README.md`
+  - `ENGINEERING_CONSTRAINTS_INDEX.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `docs/contracts/engineering_reading_contract_v1.md`
+- phase 1 Hot Follow authority:
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/architecture/line_contracts/hot_follow_line.yaml`
+  - `docs/reviews/HOT_FOLLOW_URL_STATE_INSTABILITY_REVIEW_v1.md`
+- phase 2 repair scope:
+  - `gateway/app/services/hot_follow_subtitle_authority.py`
+  - `gateway/app/services/hot_follow_subtitle_currentness.py`
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+  - `gateway/app/services/task_view_helpers.py`
+  - `gateway/app/services/task_view_projection.py`
+  - `gateway/app/services/task_view_presenters.py`
+  - `gateway/app/services/steps_v1.py`
+  - `gateway/app/routers/hot_follow_api.py`
+- direct delegated route/presentation paths:
+  - `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+  - `gateway/app/services/contract_runtime/ready_gate_runtime.py`
+  - `gateway/app/services/subtitle_helpers.py`
+  - `gateway/app/services/hot_follow_route_state.py`
+  - `gateway/app/services/task_view_workbench_contract.py`
+  - `gateway/app/services/hot_follow_workbench_presenter.py`
+
+Scope:
+
+- contract-driven repair for the Hot Follow URL instability class only
+- no provider adapter change
+- no factory abstraction change
+- no UI redesign
+- no new line behavior
+
+Contract added:
+
+- `docs/contracts/hot_follow_state_commit_contract_v1.md`
+
+Runtime changes:
+
+- authoritative subtitle success now publishes `target_subtitle_authoritative_source=true`,
+  clears subtitle/helper error residue, and scrubs stale
+  `target_subtitle_empty` / `dub_input_empty` no-dub residue as part of the
+  recovered subtitle commit update bundle
+- route reduction now treats visible target subtitle text before full authority
+  commit as waiting/intermediate, not as permission to project
+  `no_tts_compose_route`
+- L4 subtitle presentation clears `subtitles.error` and helper failure aliases
+  after subtitle status/currentness/authoritative-source truth has recovered
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_subtitle_authority.py gateway/app/services/task_view_helpers.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/hot_follow_route_state.py gateway/app/services/task_view_workbench_contract.py gateway/app/services/tests/test_hot_follow_state_commit_contract.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_state_commit_contract.py -q`
+  - result: 6 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_translation_incomplete_does_not_project_stale_empty_no_dub gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_ready_gate_backfills_compose_when_current_final_is_fresh gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_vi_currentness_blocks_false_done_states -q`
+  - result: 3 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_manual_subtitle_save_clears_helper_translate_failure gateway/app/services/tests/test_hot_follow_skills_advisory.py::test_helper_translate_failure_with_saved_target_subtitle_stays_helper_scoped -q`
+  - result: 2 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_source_audio_policy_persistence.py gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+  - result: 12 passed
+
+Behavior change:
+
+- limited to authoritative subtitle commit ordering, route reduction ordering,
+  recovered-error scrub ordering, and stale no-dub/no-tts residue suppression
+  for the reviewed URL instability class
+
+---
+
+## 2026-04-29 — Hot Follow process state machine closure
+
+Reading Declaration:
+
+- required authority:
+  - `CURRENT_ENGINEERING_FOCUS.md`
+  - `README.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `apolloveo_current_architecture_and_state_baseline.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+- baseline reference:
+  - `HotFollow-ContractDriven-Baseline-Freeze01`
+- current implementation owners inspected:
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+  - `gateway/app/services/hot_follow_route_state.py`
+  - `gateway/app/services/hot_follow_subtitle_authority.py`
+  - `gateway/app/services/hot_follow_subtitle_currentness.py`
+  - `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+  - `gateway/app/services/voice_state.py`
+  - `gateway/app/services/task_view_projection.py`
+  - `gateway/app/services/task_view_presenters.py`
+  - `gateway/app/routers/hot_follow_api.py`
+  - direct helpers: `gateway/app/services/subtitle_helpers.py`,
+    `gateway/app/services/ready_gate/hot_follow_rules.py`
+
+Scope:
+
+- Hot Follow first production-line process/state-machine closure only
+- no provider feature work
+- no new line work
+- no UI redesign
+
+Contract update:
+
+- `docs/contracts/hot_follow_state_machine_contract_v1.md` is now the active
+  Hot Follow first-line process contract.
+- Canonical layers are route/lane classification, artifact facts,
+  authority/currentness/legal attempt state, pipeline process state, and
+  presentation/advisory.
+
+Runtime changes:
+
+- Added `gateway/app/services/hot_follow_process_state.py` as the canonical
+  reducer for:
+  - route/lane classification
+  - subtitle process state
+  - dub/audio process state
+  - compose process state and legality
+- `current_attempt_runtime.py` now delegates route/current-attempt process
+  meaning to the canonical reducer and exposes the reducer output as
+  `hot_follow_process_state`.
+- `ready_gate/hot_follow_rules.py` consumes canonical process route/currentness
+  instead of treating `mm_srt_path` as enough subtitle readiness evidence.
+- `status_policy/hot_follow_state.py` applies canonical subtitle/dub/compose
+  process states back to pipeline/presentation rows.
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/services/hot_follow_process_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/status_policy/hot_follow_state.py gateway/app/services/ready_gate/hot_follow_rules.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_state_commit_contract.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`
+  - result: 37 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_vi_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_does_not_hydrate_timing_only_target_artifact -q`
+  - result: 3 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -k "source_lane_failure or compose_refreshes_live_vi_subtitle_currentness or validate_inputs_uses_live_vi_subtitle_currentness" -q`
+  - result: 4 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`
+  - result: 18 passed
+
+Behavior change:
+
+- voice-led helper-pending/source-available tasks remain
+  `voice_led_tts_route` and cannot present subtitle skipped/no-dub terminal
+  state
+- no-dub/no-TTS tasks get canonical skipped/not-required subtitle and dub states
+  instead of unresolved running/pending subtitle work
+- stale `target_subtitle_empty` / `dub_input_empty` no-dub residue no longer
+  preserves no-TTS compose allowance when current subtitle truth requires the
+  voice-led TTS lane
+
+---
+
+## 2026-04-29 — Hot Follow state-machine consumer demotion
+
+Reading Declaration:
+
+- required authority:
+  - `CURRENT_ENGINEERING_FOCUS.md`
+  - `README.md`
+  - `docs/ENGINEERING_INDEX.md`
+  - `apolloveo_current_architecture_and_state_baseline.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- execution baseline:
+  - prior `VEOBASE01_EXECUTION_LOG.md` state-machine closure entry
+- baseline reference:
+  - `HotFollow-ContractDriven-Baseline-Freeze01`
+- implementation owners inspected:
+  - `gateway/app/services/hot_follow_process_state.py`
+  - `gateway/app/routers/hot_follow_api.py`
+  - `gateway/app/services/subtitle_helpers.py`
+  - `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+
+Scope:
+
+- Hot Follow state-machine consumer demotion only
+- no canonical state-machine redesign
+- no provider behavior change
+- no UI redesign
+- no new production-line work
+
+Runtime changes:
+
+- `hot_follow_api.py` subtitle-lane and dual-channel wrappers now delegate to
+  `subtitle_helpers` service consumers instead of retaining copied semantic
+  lane/state derivation.
+- `subtitle_helpers.py` now attaches `hot_follow_process_state` from
+  `reduce_hot_follow_process_state()` and emits
+  `current_subtitle_source` / `actual_burn_subtitle_source` from reducer output.
+- `subtitle_helpers.hf_dual_channel_state()` consumes reducer lane state when
+  present, leaving its legacy heuristic path as a compatibility fallback for
+  callers that do not provide process state.
+- `current_attempt_runtime.py` now prefers the reducer-owned
+  `current_subtitle_source`.
+- `hot_follow_process_state.py` now emits canonical subtitle source aliases
+  only when target subtitle authority/currentness is satisfied.
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/subtitle_helpers.py gateway/app/services/hot_follow_process_state.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/status_policy/hot_follow_state.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+  - result: 45 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_state_commit_contract.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`
+  - result: 37 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_vi_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_does_not_hydrate_timing_only_target_artifact -q`
+  - result: 3 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+  - result: 10 passed
+
+Behavior change:
+
+- router compatibility wrappers no longer independently decide subtitle lane or
+  dual-channel route semantics
+- subtitle helper compatibility output is now pinned to canonical process
+  reducer state for route/subtitle source semantics
+- no-dub/no-TTS skipped-terminal subtitle semantics are verified as reducer
+  output, not router/helper reinterpretation
+- non-empty no-dub reasons such as `subtitle_led` do not gain no-TTS compose
+  legality unless the reducer sees an allowed no-dub compose reason or explicit
+  no-dub compose allowance
+
+---
+
+## 2026-04-29 — Hot Follow route classification and subtitle-ingestion stabilization
+
+Reading Declaration:
+
+- required authority:
+  - `CURRENT_ENGINEERING_FOCUS.md`
+  - `apolloveo_current_architecture_and_state_baseline.md`
+  - `docs/contracts/four_layer_state_contract.md`
+  - `docs/contracts/status_ownership_matrix.md`
+  - `docs/contracts/HOT_FOLLOW_RUNTIME_CONTRACT.md`
+  - `docs/contracts/hot_follow_line_contract.md`
+  - `docs/contracts/hot_follow_ready_gate.yaml`
+  - `docs/contracts/hot_follow_projection_rules_v1.md`
+  - `docs/contracts/hot_follow_state_machine_contract_v1.md`
+- current branch context:
+  - consumer-demotion changes in `hot_follow_api.py` and
+    `subtitle_helpers.py`
+- sample evidence:
+  - `8372fbaa402f` snapshot A contradictory no-dub/no-TTS route despite
+    voice-led evidence
+  - `8372fbaa402f` snapshot B coherent voice-led helper-pending waiting state
+- focused owners inspected:
+  - `gateway/app/services/hot_follow_process_state.py`
+  - `gateway/app/services/hot_follow_route_state.py`
+  - `gateway/app/services/subtitle_helpers.py`
+  - `gateway/app/services/task_view_projection.py`
+  - `gateway/app/services/task_view_presenters.py`
+  - `gateway/app/services/contract_runtime/current_attempt_runtime.py`
+  - `gateway/app/services/status_policy/hot_follow_state.py`
+  - `gateway/app/routers/hot_follow_api.py`
+
+Scope:
+
+- route classification and subtitle-ingestion waiting stabilization only
+- no provider work
+- no UI redesign
+- no broad Hot Follow refactor
+- no push/merge in this wave
+
+Runtime changes:
+
+- `reduce_hot_follow_process_state()` now treats stable voice-led evidence
+  (`content_mode=voice_led`, `speech_detected=true`, or
+  `source_audio_lane=speech_primary/mixed_audio`) as a blocker against weak
+  no-dub/no-TTS route selection.
+- Origin/source subtitle presence now keeps the process in
+  `voice_led_tts_route` instead of allowing stale `target_subtitle_empty` /
+  `dub_input_empty` no-dub residue to terminalize subtitles.
+- Helper-pending plus origin/source text remains
+  `target_subtitle_translation_waiting_retryable`, with dub and compose waiting
+  on target subtitle translation.
+- The workbench projection now carries computed route evidence into the
+  aggregation path so the reducer sees the same voice/source facts as L4.
+- Explicit selected no-TTS routes with no voice/source evidence remain legal,
+  preserving the no-dub path where there is true route-valid evidence.
+
+Validation:
+
+- `python3.11 -m py_compile gateway/app/routers/hot_follow_api.py gateway/app/services/subtitle_helpers.py gateway/app/services/hot_follow_process_state.py gateway/app/services/task_view_projection.py gateway/app/services/task_view_presenters.py gateway/app/services/contract_runtime/current_attempt_runtime.py gateway/app/services/status_policy/hot_follow_state.py`
+  - result: passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_state_commit_contract.py gateway/app/services/tests/test_hot_follow_artifact_facts.py -q`
+  - result: 40 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_subtitle_binding.py -q`
+  - result: 45 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_subtitle_only_compose.py -q`
+  - result: 10 passed
+- `python3.11 -m pytest gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_vi_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_myanmar_currentness_blocks_false_done_states gateway/app/services/status_policy/tests/test_hot_follow_workbench_hub_ready_gate.py::test_hot_follow_workbench_does_not_hydrate_timing_only_target_artifact -q`
+  - result: 3 passed
+- `python3.11 -m pytest gateway/app/services/tests/test_hot_follow_skills_advisory.py -q`
+  - result: 18 passed
+
+Behavior change:
+
+- a `8372fbaa402f`-style voice-led URL payload with missing target subtitle no
+  longer flips into `no_dub_no_tts_route`
+- origin/source subtitle plus helper pending stays in one bounded translation
+  waiting chain
+- no skipped subtitle terminal or compose-ready projection is emitted for
+  voice-led target-SRT waiting states

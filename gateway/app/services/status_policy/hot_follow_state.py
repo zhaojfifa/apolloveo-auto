@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from gateway.app.services.contract_runtime.ready_gate_runtime import evaluate_contract_ready_gate
+from gateway.app.services.hot_follow_process_state import reduce_hot_follow_process_state
 
 
 def _as_dict(value: Any) -> Dict[str, Any]:
@@ -175,6 +176,10 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
     compose_exec_failed = bool(gate_result.get("compose_exec_failed_terminal"))
     historical_exists = bool((_as_dict(state.get("historical_final"))).get("exists"))
     current_attempt = _as_dict(state.get("current_attempt"))
+    process_state = _as_dict(current_attempt.get("hot_follow_process_state") or current_attempt.get("process_state") or state.get("hot_follow_process_state"))
+    if not process_state:
+        process_state = reduce_hot_follow_process_state(state=state)
+    state["hot_follow_process_state"] = process_state
     waiting_retryable = bool(
         current_attempt.get("subtitle_translation_waiting_retryable")
         or (
@@ -186,6 +191,18 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
             and not bool(gate_result.get("no_dub"))
         )
     )
+    no_dub_route_terminal = bool(
+        process_state.get("subtitle_terminal_state") == "no_dub_route_terminal"
+        or current_attempt.get("no_dub_route_terminal")
+        or (
+            bool(gate_result.get("no_dub"))
+            and bool(gate_result.get("no_dub_compose_allowed"))
+            and str(gate_result.get("selected_compose_route") or "").strip()
+            in {"preserve_source_route", "bgm_only_route", "no_tts_compose_route"}
+        )
+    )
+    if no_dub_route_terminal and not bool(gate_result.get("subtitle_ready")):
+        gate_result["subtitle_ready_reason"] = "no_dub_route_terminal"
 
     compose = dict(_as_dict(state.get("compose")))
     last = dict(_as_dict(compose.get("last")))
@@ -210,6 +227,29 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
     state["compose"] = compose
 
     pipeline = list(_as_list(state.get("pipeline")))
+    process_step_status = {
+        "subtitles": process_state.get("subtitle_step_status"),
+        "dub": process_state.get("dub_step_status"),
+        "compose": process_state.get("compose_step_status"),
+    }
+    process_step_message = {
+        "subtitles": process_state.get("subtitle_process_state"),
+        "dub": process_state.get("dub_process_state"),
+        "compose": process_state.get("compose_process_state"),
+    }
+    for step in pipeline:
+        if not isinstance(step, dict):
+            continue
+        key = str(step.get("key") or "").strip().lower()
+        status = process_step_status.get(key)
+        if not status:
+            continue
+        step["status"] = status
+        step["state"] = status
+        if status not in {"failed", "blocked"}:
+            step["error"] = None
+        if process_step_message.get(key):
+            step["message"] = process_step_message[key]
     for step in pipeline:
         if not isinstance(step, dict):
             continue
@@ -230,6 +270,24 @@ def _apply_gate_side_effects(state: Dict[str, Any], gate_result: Dict[str, Any])
         elif compose_input_derive_failed or compose_exec_failed:
             step["error"] = gate_result.get("compose_input_reason") or gate_result.get("compose_reason")
     state["pipeline"] = pipeline
+
+    if no_dub_route_terminal:
+        subtitles = dict(_as_dict(state.get("subtitles")))
+        subtitles["status"] = "skipped"
+        subtitles["state"] = "skipped"
+        subtitles["subtitle_ready_reason"] = "no_dub_route_terminal"
+        state["subtitles"] = subtitles
+        for step in pipeline:
+            if not isinstance(step, dict):
+                continue
+            if str(step.get("key") or "").strip().lower() != "subtitles":
+                continue
+            step["status"] = "skipped"
+            step["state"] = "skipped"
+            step["error"] = None
+            step["message"] = "no_dub_route_terminal"
+            break
+        state["pipeline"] = pipeline
 
     if isinstance(state.get("deliverables"), list):
         for item in state.get("deliverables") or []:

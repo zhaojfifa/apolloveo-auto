@@ -23,7 +23,7 @@ from gateway.app.core.logging_config import configure_logging
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
 from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
-from gateway.app.routers import admin_publish, admin_tools as admin_tools_router, publish as publish_router, tasks as tasks_router
+from gateway.app.routers import admin_publish, admin_tools as admin_tools_router, matrix_script_panel_debug, publish as publish_router, tasks as tasks_router
 from gateway.app.routers import hot_follow_ui as hot_follow_ui_router
 from gateway.app.routers.hot_follow_api import hot_follow_api_router
 from gateway.app.routers.api_tools import router as tools_api_router
@@ -179,6 +179,7 @@ app.include_router(admin_publish.router, tags=["admin"])
 app.include_router(admin_tools_router.router)
 app.include_router(v17_pack_router)
 app.include_router(hot_follow_ui_router.router)
+app.include_router(matrix_script_panel_debug.router)
 if get_settings().enable_apollo_avatar:
     from gateway.app.routers.apollo_avatar import router as apollo_avatar_router
 

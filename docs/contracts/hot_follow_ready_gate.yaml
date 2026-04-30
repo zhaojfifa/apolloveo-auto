@@ -60,9 +60,8 @@ runtime_rules:
       requires:
         - final_exists
         - final_fresh
-      unless_any:
+        - subtitle_ready
         - audio_ready
-        - no_dub
     - name: publish_ready
       requires:
         - compose_ready

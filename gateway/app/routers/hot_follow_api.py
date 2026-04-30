@@ -85,6 +85,10 @@ from gateway.app.services.media_helpers import (
     update_pipeline_probe as _update_pipeline_probe,
     upload_task_bgm_impl as _upload_task_bgm_impl,
 )
+from gateway.app.services.hot_follow_media_policy import (
+    hot_follow_local_upload_source_selection_guard,
+    hot_follow_media_input_policy,
+)
 from gateway.app.services.task_view_helpers import (
     backfill_compose_done_if_final_ready as _backfill_compose_done_if_final_ready,
     build_translation_qa_summary as _build_translation_qa_summary,
@@ -138,6 +142,7 @@ from gateway.app.services.hot_follow_subtitle_currentness import (
 )
 from gateway.app.services.hot_follow_helper_translation import helper_translate_lane_state
 from gateway.app.services.hot_follow_subtitle_authority import (
+    helper_translation_telemetry_updates,
     persist_hot_follow_authoritative_target_subtitle,
 )
 from gateway.app.services.hot_follow_helper_translation import (
@@ -146,9 +151,11 @@ from gateway.app.services.hot_follow_helper_translation import (
     sanitize_helper_translate_error,
 )
 from gateway.app.services.subtitle_helpers import (
+    hf_dual_channel_state as _svc_hf_dual_channel_state,
     hf_done_like as _svc_hf_done_like,
     hf_parse_artifact_ready as _svc_hf_parse_artifact_ready,
     hf_state_from_status as _svc_hf_state_from_status,
+    hf_subtitle_lane_state as _svc_hf_subtitle_lane_state,
 )
 from gateway.app.services.task_view import (
     build_hot_follow_publish_hub as _svc_build_hot_follow_publish_hub,
@@ -483,10 +490,7 @@ def _hf_save_authoritative_target_subtitle(
             task_id,
             task,
             text,
-            {
-                "target_subtitle_current": True,
-                "target_subtitle_current_reason": "ready",
-            },
+            {},
         ),
         resolve_helper_state=bool(str(text or "").strip()),
     )
@@ -510,56 +514,15 @@ def _hf_source_subtitle_translation_failure_updates(
     source_text: str,
     target_lang: str,
 ) -> dict:
-    updates = helper_translate_failure_updates(
-        detail,
-        input_text=source_text,
-        target_lang=target_lang,
+    return helper_translation_telemetry_updates(
+        task_id,
+        task,
+        helper_updates=helper_translate_failure_updates(
+            detail,
+            input_text=source_text,
+            target_lang=target_lang,
+        ),
     )
-    if _hf_authoritative_target_subtitle_current(task_id, task):
-        lane = _hf_subtitle_lane_state(task_id, task)
-        updates.update(
-            {
-                "subtitles_status": "ready",
-                "subtitles_error": None,
-                "subtitles_error_reason": None,
-                "target_subtitle_current": True,
-                "target_subtitle_current_reason": str(
-                    lane.get("target_subtitle_current_reason") or "ready"
-                ),
-                "error_message": None,
-                "error_reason": None,
-            }
-        )
-        updates.update(
-            _hf_empty_dub_recovery_updates(
-                task_id,
-                task,
-                str(lane.get("edited_text") or ""),
-                {
-                    "target_subtitle_current": True,
-                    "target_subtitle_current_reason": str(
-                        lane.get("target_subtitle_current_reason") or "ready"
-                    ),
-                },
-            )
-        )
-        return updates
-    reason = str(detail.get("reason") or "helper_translate_failed").strip()
-    message = str(detail.get("message") or reason).strip()
-    updates.update(
-        {
-            "subtitles_status": "failed",
-            "subtitles_error": message,
-            "subtitles_error_reason": reason,
-            "target_subtitle_current": False,
-            "target_subtitle_current_reason": reason,
-            "compose_ready": False,
-            "publish_ready": False,
-            "error_message": message,
-            "error_reason": reason,
-        }
-    )
-    return updates
 
 
 def _hf_translate_source_subtitle_lane(task_id: str, task: dict, *, target_lang: str, repo) -> tuple[str, dict]:
@@ -909,176 +872,16 @@ def _hf_dub_input_text(task_id: str, task: dict) -> str:
 
 
 def _hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
-    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-    raw_source_text = _hf_load_origin_subtitles_text(task)
-    normalized_source_text = _hf_load_normalized_source_text(task_id, task)
-    edited_text = _hf_load_subtitles_text(task_id, task)
-    srt_text = edited_text or ""
-    target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
-    expected_key = _hf_task_target_subtitle_key(task, target_lang) or _task_key(task, "mm_srt_path")
-    composed_key = str(task.get("final_source_subtitle_storage_key") or "").strip() or None
-    actual_burn_subtitle_source = (
-        Path(composed_key).name
-        if composed_key
-        else (_hf_expected_subtitle_filename(target_lang) if expected_key else None)
-    )
-    local_target_path = _hf_local_target_subtitle_path(task_id, target_lang)
-    subtitle_artifact_physical_exists = bool(
-        (expected_key and object_exists(str(expected_key)))
-        or (local_target_path and local_target_path.exists())
-    )
-    target_text_has_semantics = has_semantic_target_subtitle_text(edited_text)
-    subtitle_artifact_exists = bool(subtitle_artifact_physical_exists and target_text_has_semantics)
-    primary_editable_text = edited_text if target_text_has_semantics else ""
-    target_currentness = _hf_target_subtitle_currentness_state(
-        task,
-        target_lang=target_lang,
-        raw_source_text=raw_source_text or "",
-        normalized_source_text=normalized_source_text or "",
-        edited_text=edited_text or "",
-        subtitle_artifact_exists=subtitle_artifact_exists,
-        expected_key=expected_key,
-    )
-    subtitle_ready = bool(target_currentness.get("target_subtitle_current"))
-    subtitle_ready_reason = str(
-        target_currentness.get("target_subtitle_current_reason")
-        or ("ready" if subtitle_ready else "subtitle_missing")
-    )
-    explicit_target_reason = str(task.get("target_subtitle_current_reason") or "").strip()
-    translation_waiting = bool(
-        not subtitle_ready
-        and (
-            str(target_currentness.get("target_subtitle_current_reason") or "").strip() == "target_subtitle_translation_incomplete"
-            or explicit_target_reason == "target_subtitle_translation_incomplete"
-            or str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true"
-        )
-        and str(normalized_source_text or raw_source_text or "").strip()
-    )
-    helper_lane = helper_translate_lane_state(
-        task,
-        translation_waiting=translation_waiting,
-        helper_source_text=normalized_source_text or raw_source_text,
-        helper_output_consumed=bool(
-            target_currentness.get("target_subtitle_current")
-            and target_currentness.get("target_subtitle_authoritative_source")
-            and str(task.get("subtitle_helper_translated_text") or "").strip()
-        ),
-    )
-    helper_translate_failed = bool(helper_lane.get("failed"))
-    helper_translate_error_reason = helper_lane.get("reason")
-    helper_translate_error_message = helper_lane.get("message")
-    if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
-        subtitle_ready_reason = (
-            "waiting_for_target_subtitle_translation"
-            if explicit_target_reason == "target_subtitle_translation_incomplete" and translation_waiting
-            else explicit_target_reason
-        )
-    elif translation_waiting:
-        subtitle_ready_reason = "waiting_for_target_subtitle_translation"
-    elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
-        subtitle_ready_reason = helper_translate_error_reason or "helper_translate_failed"
-    target_subtitle_current_reason = str(target_currentness.get("target_subtitle_current_reason") or subtitle_ready_reason)
-    if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
-        target_subtitle_current_reason = explicit_target_reason
-    elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
-        target_subtitle_current_reason = subtitle_ready_reason
-    dub_input_text = edited_text if subtitle_ready else ""
-    helper_source_text = normalized_source_text or raw_source_text
-    parse_source_role = (
-        str(pipeline_config.get("parse_source_role") or "").strip()
-        or ("subtitle_source_helper" if str(helper_source_text or "").strip() else "none")
-    )
-    parse_source_authoritative_for_target = (
-        str(pipeline_config.get("parse_source_authoritative_for_target") or "")
-        .strip()
-        .lower()
-        == "true"
-    )
-    return {
-        "raw_source_text": raw_source_text or "",
-        "normalized_source_text": normalized_source_text or "",
-        "parse_source_text": helper_source_text or "",
-        "parse_source_role": parse_source_role if str(helper_source_text or "").strip() else "none",
-        "parse_source_authoritative_for_target": parse_source_authoritative_for_target,
-        "edited_text": primary_editable_text,
-        "srt_text": primary_editable_text,
-        "primary_editable_text": primary_editable_text,
-        "primary_editable_format": "srt",
-        "dub_input_text": dub_input_text,
-        "dub_input_format": "srt" if _hf_is_srt_text(dub_input_text) else "plain_text",
-        "dub_input_source": "target_subtitle" if dub_input_text else None,
-        "actual_burn_subtitle_source": actual_burn_subtitle_source,
-        "subtitle_artifact_exists": bool(subtitle_artifact_exists),
-        "subtitle_ready": bool(subtitle_ready),
-        "subtitle_ready_reason": subtitle_ready_reason,
-        "target_subtitle_current": bool(target_currentness.get("target_subtitle_current")),
-        "target_subtitle_current_reason": target_subtitle_current_reason,
-        "target_subtitle_authoritative_source": bool(target_currentness.get("target_subtitle_authoritative_source")),
-        "target_subtitle_source_copy": bool(target_currentness.get("target_subtitle_source_copy")),
-        "helper_translate_status": helper_lane.get("status"),
-        "helper_translate_output_state": helper_lane.get("output_state"),
-        "helper_translate_provider_health": helper_lane.get("provider_health"),
-        "helper_translate_composite_state": helper_lane.get("composite_state"),
-        "helper_translate_failed": helper_translate_failed,
-        "helper_translate_error_reason": helper_translate_error_reason,
-        "helper_translate_error_message": helper_translate_error_message,
-        "helper_translate_provider": helper_lane.get("provider"),
-        "helper_translate_visibility": helper_lane.get("visibility"),
-        "helper_translate_retryable": bool(helper_lane.get("retryable")),
-        "helper_translate_terminal": bool(helper_lane.get("terminal")),
-        "helper_translate_warning_only": bool(helper_lane.get("warning_only")),
-        "helper_translate_input_text": helper_lane.get("input_text"),
-        "helper_translate_translated_text": helper_lane.get("translated_text"),
-        "helper_translate_target_lang": helper_lane.get("target_lang"),
-    }
+    return _svc_hf_subtitle_lane_state(task_id, task)
 
 
 def _hf_dual_channel_state(task_id: str, task: dict, subtitle_lane: dict[str, Any] | None = None, *, subtitles_step_done: bool = True) -> dict[str, Any]:
-    lane = subtitle_lane or _hf_subtitle_lane_state(task_id, task)
-    pipeline_config = parse_pipeline_config(task.get("pipeline_config"))
-    raw_text = str(lane.get("raw_source_text") or "")
-    normalized_text = str(lane.get("normalized_source_text") or "")
-    has_text = bool(normalized_text.strip() or raw_text.strip())
-    no_subtitles = pipeline_config.get("no_subtitles") == "true"
-    title_hint = str(task.get("title") or "").lower()
-    speech_detected = has_text and not no_subtitles
-    speech_confidence = "high" if speech_detected else "none"
-    subtitle_stream = pipeline_config.get("subtitle_stream") == "true"
-    onscreen_text_detected = bool(subtitle_stream or (not speech_detected and has_text))
-    onscreen_text_density = "high" if onscreen_text_detected and len(normalized_text.strip() or raw_text.strip()) >= 20 else ("low" if onscreen_text_detected else "none")
-    # When subtitle extraction is still running and no text has been found yet,
-    # do NOT conclude "silent_candidate" — speech detection is indeterminate.
-    # Default to "voice_led" (standard dubbing path) until subtitles step completes.
-    subtitle_still_pending = not subtitles_step_done and not has_text and not no_subtitles
-    if speech_detected:
-        content_mode = "voice_led"
-    elif subtitle_still_pending:
-        content_mode = "voice_led"
-        speech_detected = True
-        speech_confidence = "pending"
-    elif onscreen_text_detected:
-        content_mode = "subtitle_led"
-    else:
-        content_mode = "silent_candidate"
-    _silent_kw_raw = getattr(get_settings(), "hot_follow_silent_keywords", "") or "asmr,无人声,涂抹音"
-    _silent_keywords = [k.strip().lower() for k in _silent_kw_raw.split(",") if k.strip()]
-    if any(kw in title_hint for kw in _silent_keywords):
-        speech_detected = False
-        speech_confidence = "none"
-        content_mode = "silent_candidate" if not onscreen_text_detected else "subtitle_led"
-    recommended_path = (
-        "Voice dubbing"
-        if content_mode == "voice_led"
-        else ("OCR subtitle translation candidate" if content_mode == "subtitle_led" else "Manual text input required")
+    return _svc_hf_dual_channel_state(
+        task_id,
+        task,
+        subtitle_lane,
+        subtitles_step_done=subtitles_step_done,
     )
-    return {
-        "speech_detected": bool(speech_detected),
-        "speech_confidence": speech_confidence,
-        "onscreen_text_detected": bool(onscreen_text_detected),
-        "onscreen_text_density": onscreen_text_density,
-        "content_mode": content_mode,
-        "recommended_path": recommended_path,
-    }
 
 
 def _hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -1235,6 +1038,7 @@ def _hf_rerun_presentation_state(
     final_info: dict[str, Any] | None,
     historical_final: dict[str, Any] | None,
     dub_status: str | None,
+    current_attempt: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return _svc_hf_rerun_presentation_state(
         task,
@@ -1242,6 +1046,7 @@ def _hf_rerun_presentation_state(
         final_info,
         historical_final,
         dub_status,
+        current_attempt=current_attempt,
     )
 
 
@@ -1577,17 +1382,31 @@ def create_hot_follow_task_local_upload(
     if not file or not file.filename:
         raise HTTPException(status_code=400, detail="file is required")
 
+    media_policy = hot_follow_media_input_policy()
     ext = Path(file.filename).suffix.lower()
-    if ext not in {".mp4", ".mov", ".mkv"}:
+    if ext not in set(media_policy.accepted_extensions):
         raise HTTPException(status_code=400, detail="unsupported file type")
 
     source_lang_norm = str(source_lang or "zh").strip().lower()
     if source_lang_norm not in {"zh", "en"}:
         raise HTTPException(status_code=400, detail="unsupported source language")
+    source_audio_policy_norm = normalize_source_audio_policy(source_audio_policy)
+    source_guard = hot_follow_local_upload_source_selection_guard(
+        filename=file.filename,
+        title=task_title,
+        source_audio_policy=source_audio_policy_norm,
+    )
+    if not source_guard.get("allow", True):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "reason": source_guard.get("reason"),
+                "message": source_guard.get("message"),
+            },
+        )
 
     task_id = uuid4().hex[:12]
-    max_mb = int(os.getenv("MAX_LOCAL_UPLOAD_MB", "200"))
-    max_bytes = max_mb * 1024 * 1024
+    max_bytes = media_policy.max_upload_size_bytes
     raw_file_path = raw_path(task_id)
     _save_upload_to_paths(
         upload=file,
@@ -1619,15 +1438,26 @@ def create_hot_follow_task_local_upload(
             "auto_start": bool(auto_start),
             "pipeline_config": _merge_probe_into_pipeline_config(
                 {
-            "ingest_mode": "local",
-            "source_language_hint": source_lang_norm,
-            "process_mode": str(process_mode or "fast_clone"),
-            "publish_account": str(publish_account or "default"),
-            "source_audio_policy": normalize_source_audio_policy(source_audio_policy),
-            "bgm_strategy": "keep" if normalize_source_audio_policy(source_audio_policy) == "preserve" else "replace",
-        },
-        probe,
-    ),
+                    "ingest_mode": "local",
+                    "max_upload_size_mb": str(media_policy.max_upload_size_mb),
+                    "quality_tier_default": media_policy.quality_tier_default,
+                    "target_output_band": media_policy.target_output_band,
+                    "prefer_source_quality_preservation": (
+                        "true" if media_policy.prefer_source_quality_preservation else "false"
+                    ),
+                    "oversize_handling_policy": media_policy.oversize_handling_policy,
+                    "source_language_hint": source_lang_norm,
+                    "process_mode": str(process_mode or "fast_clone"),
+                    "publish_account": str(publish_account or "default"),
+                    "source_audio_policy": source_audio_policy_norm,
+                    "bgm_strategy": (
+                        "keep"
+                        if source_audio_policy_norm == "preserve"
+                        else "replace"
+                    ),
+                },
+                probe,
+            ),
         }
     )
     task_payload = {

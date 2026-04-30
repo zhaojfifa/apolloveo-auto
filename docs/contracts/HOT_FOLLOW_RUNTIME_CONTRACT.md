@@ -101,6 +101,30 @@
 - path/query/form/body 参数
 - repo 中的 task 记录
 
+Hot Follow local media ingress is governed by the line-owned media input
+policy in `gateway/app/services/hot_follow_media_policy.py`.
+
+Current media input contract:
+
+- `max_upload_size_mb`: `300`
+- `accepted_input_types`: `video/mp4`, `video/quicktime`, `video/x-matroska`
+- `quality_tier_default`: `source_preserving_720p_1080p`
+- `target_output_band`: `720p_1080p`
+- `prefer_source_quality_preservation`: `true`
+- `oversize_handling_policy`:
+  `preserve_original_and_derive_runtime_safe_compose_asset`
+
+Ingress, runtime processing, and output semantics are intentionally separate:
+
+- ingress accepts controlled local upload up to 300MB at
+  `POST /api/hot_follow/tasks/local_upload`
+- the original uploaded source is preserved as the task raw artifact
+- compose may derive a runtime-safe MP4 input when size, bitrate, or pixel
+  profile exceeds the Hot Follow compose-safe policy
+- final output should remain source-preserving inside the 720p-1080p target
+  band where the source allows, rather than collapsing to a lower fixed
+  resolution
+
 ### 4.2 Service 输入
 
 - `CompositionService.compose(task_id, task, subtitle_resolver, subtitle_only_check)`
@@ -117,6 +141,29 @@ service 当前不直接承担：
 - compose 路径当前输出：更新 task 所需的 dict
 - state 路径当前输出：带 `ready_gate` 的状态 dict
 - workbench / publish hub 当前输出：router 聚合后的大 dict
+
+Compose success persists the applied media quality policy in
+`compose_output_quality_policy`. Runtime-safe input decisions are persisted in
+`compose_input_policy` as direct, derived-ready, blocked, or derive-failed
+facts.
+
+### 4.4 Subtitle Style Profile
+
+Hot Follow burned subtitles are governed by
+`gateway/app/services/hot_follow_media_policy.py`, not by scattered raw font
+size constants.
+
+Default subtitle style profile:
+
+- `subtitle_style_profile`: `hot_follow_compact_default`
+- font scaling owner: `HotFollowSubtitleStyleProfile.font_size`
+- line height / spacing owner: `HotFollowSubtitleStyleProfile.line_spacing`
+- safe margin owner: `HotFollowSubtitleStyleProfile.safe_margin_behavior`
+- safe margin behavior: `preserve_existing_bottom_safe_area`
+
+Current default profile is intentionally more compact than the previous
+production default while preserving existing bottom safe-area behavior and
+two-line wrapping policy for Chinese, Myanmar/Burmese, English, and Vietnamese.
 
 ## 5. 当前做 / 当前不做
 

@@ -35,6 +35,15 @@ def test_allow_subtitle_only_compose_for_silent_hot_follow(monkeypatch):
         "_hf_load_subtitles_text",
         lambda _task_id, _task: "1\n00:00:00,000 --> 00:00:02,000\n字幕版测试\n",
     )
+    monkeypatch.setattr(subtitle_helpers_module, "object_exists", lambda _key: True)
+    monkeypatch.setattr(subtitle_helpers_module, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers_module, "hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(subtitle_helpers_module, "hf_load_normalized_source_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(
+        subtitle_helpers_module,
+        "hf_load_subtitles_text",
+        lambda _task_id, _task: "1\n00:00:00,000 --> 00:00:02,000\n字幕版测试\n",
+    )
     task = {
         "task_id": "hf_silent",
         "kind": "hot_follow",
@@ -55,6 +64,15 @@ def test_do_not_allow_subtitle_only_compose_for_voice_led_hot_follow(monkeypatch
         "_hf_load_subtitles_text",
         lambda _task_id, _task: "1\n00:00:00,000 --> 00:00:02,000\n标准口播测试\n",
     )
+    monkeypatch.setattr(subtitle_helpers_module, "object_exists", lambda _key: True)
+    monkeypatch.setattr(subtitle_helpers_module, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers_module, "hf_load_origin_subtitles_text", lambda _task: "标准口播测试")
+    monkeypatch.setattr(subtitle_helpers_module, "hf_load_normalized_source_text", lambda _task_id, _task: "标准口播测试")
+    monkeypatch.setattr(
+        subtitle_helpers_module,
+        "hf_load_subtitles_text",
+        lambda _task_id, _task: "1\n00:00:00,000 --> 00:00:02,000\n标准口播测试\n",
+    )
     task = {
         "task_id": "hf_voice",
         "kind": "hot_follow",
@@ -70,6 +88,11 @@ def test_allow_no_dub_empty_target_subtitle_compose_even_without_subtitle_ready(
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
     monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
     monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(subtitle_helpers_module, "object_exists", lambda _key: False)
+    monkeypatch.setattr(subtitle_helpers_module, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers_module, "hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(subtitle_helpers_module, "hf_load_normalized_source_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(subtitle_helpers_module, "hf_load_subtitles_text", lambda _task_id, _task: "")
     task = {
         "task_id": "hf_empty_dub",
         "kind": "hot_follow",
@@ -109,6 +132,11 @@ def test_workbench_projects_empty_dub_as_skipped_not_failed(monkeypatch):
     monkeypatch.setattr(hf_router, "_hf_load_origin_subtitles_text", lambda _task: "")
     monkeypatch.setattr(hf_router, "_hf_load_normalized_source_text", lambda _task_id, _task: "")
     monkeypatch.setattr(hf_router, "_hf_load_subtitles_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(subtitle_helpers_module, "object_exists", lambda _key: False)
+    monkeypatch.setattr(subtitle_helpers_module, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers_module, "hf_load_origin_subtitles_text", lambda _task: "")
+    monkeypatch.setattr(subtitle_helpers_module, "hf_load_normalized_source_text", lambda _task_id, _task: "")
+    monkeypatch.setattr(subtitle_helpers_module, "hf_load_subtitles_text", lambda _task_id, _task: "")
     monkeypatch.setattr(
         hf_router,
         "_collect_voice_execution_state",
