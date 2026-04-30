@@ -345,9 +345,6 @@ def selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
             "blocked_reason": "" if existing_process.get("compose_allowed") else str(existing_process.get("compose_allowed_reason") or "route_not_allowed").strip(),
             "no_tts_compose_allowed": bool(existing_process.get("no_tts_compose_allowed")),
             "no_dub_compose_allowed": bool(existing_process.get("no_dub_compose_allowed")),
-            "route_decision_owner": existing_process.get("route_decision_owner"),
-            "route_decision_source": existing_process.get("route_decision_source"),
-            "route_stage_action": existing_process.get("route_stage_action"),
         }
     process_state = reduce_hot_follow_process_state(task=task, state=state)
     route_name = str(process_state.get("selected_compose_route") or "tts_replace_route").strip()
@@ -362,9 +359,6 @@ def selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
         "blocked_reason": "" if process_state.get("compose_allowed") else str(process_state.get("compose_allowed_reason") or "route_not_allowed").strip(),
         "no_tts_compose_allowed": bool(process_state.get("no_tts_compose_allowed")),
         "no_dub_compose_allowed": bool(process_state.get("no_dub_compose_allowed")),
-        "route_decision_owner": process_state.get("route_decision_owner"),
-        "route_decision_source": process_state.get("route_decision_source"),
-        "route_stage_action": process_state.get("route_stage_action"),
     }
 
 def _legacy_selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
@@ -769,10 +763,6 @@ def build_hot_follow_current_attempt_summary(
         "compose_reason": compose_reason_norm,
         "final_stale_reason": final_stale_reason or None,
         "selected_compose_route": selected_route,
-        "route_decision_owner": process_state.get("route_decision_owner"),
-        "route_decision_source": process_state.get("route_decision_source"),
-        "route_stage_action": process_state.get("route_stage_action"),
-        "route_stage_action_reason": process_state.get("route_stage_action_reason"),
         "compose_allowed": route_allowed,
         "compose_route_allowed": route_allowed,
         "compose_input_ready": compose_input_ready,

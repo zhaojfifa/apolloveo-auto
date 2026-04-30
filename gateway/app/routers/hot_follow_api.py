@@ -89,10 +89,6 @@ from gateway.app.services.hot_follow_media_policy import (
     hot_follow_local_upload_source_selection_guard,
     hot_follow_media_input_policy,
 )
-from gateway.app.services.hot_follow_route_authority import (
-    SWITCH_LOCAL_TO_TTS_SUBTITLE_FLOW,
-    materialize_local_tts_subtitle_route_action,
-)
 from gateway.app.services.task_view_helpers import (
     backfill_compose_done_if_final_ready as _backfill_compose_done_if_final_ready,
     build_translation_qa_summary as _build_translation_qa_summary,
@@ -239,11 +235,6 @@ class ComposePlanPatchRequest(BaseModel):
     freeze_tail_enabled: bool | None = None
     freeze_tail_cap_sec: int | None = None
     cleanup_mode: str | None = None
-
-
-class HotFollowRouteStageActionRequest(BaseModel):
-    action: str
-    reason: str | None = None
 
 
 def _hf_helper_translate_request_fingerprint(
@@ -1589,34 +1580,6 @@ def get_hot_follow_workbench_hub(
     repo=Depends(get_task_repository),
 ):
     return _service_build_hot_follow_workbench_hub(task_id, repo=repo)
-
-
-@hot_follow_api_router.post("/hot_follow/tasks/{task_id}/route_stage_action")
-def post_hot_follow_route_stage_action(
-    task_id: str,
-    payload: HotFollowRouteStageActionRequest,
-    repo=Depends(get_task_repository),
-):
-    task = repo.get(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    action = str(payload.action or "").strip()
-    if action != SWITCH_LOCAL_TO_TTS_SUBTITLE_FLOW:
-        raise HTTPException(status_code=422, detail="unsupported route stage action")
-    try:
-        updated = materialize_local_tts_subtitle_route_action(
-            repo,
-            task_id,
-            task,
-            reason=payload.reason,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return {
-        "task_id": task_id,
-        "action": action,
-        "task": _task_to_detail(updated),
-    }
 
 
 @hot_follow_api_router.patch("/hot_follow/tasks/{task_id}/audio_config")

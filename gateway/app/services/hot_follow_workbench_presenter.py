@@ -110,9 +110,5 @@ def build_hot_follow_operator_summary(
         "last_successful_output_available": last_successful_output_available,
         "current_attempt_failed": current_attempt_failed,
         "show_previous_final_as_primary": show_previous_final_as_primary,
-        "selected_compose_route": current_attempt.get("selected_compose_route"),
-        "route_decision_owner": current_attempt.get("route_decision_owner"),
-        "route_decision_source": current_attempt.get("route_decision_source"),
-        "route_stage_action": current_attempt.get("route_stage_action"),
         "recommended_next_action": recommended_next_action,
     }

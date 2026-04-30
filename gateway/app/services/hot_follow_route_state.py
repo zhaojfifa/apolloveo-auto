@@ -193,10 +193,6 @@ def build_hot_follow_artifact_facts(
         "audio_lane": audio_lane,
         "audio_lane_mode": audio_lane["mode"],
         "tts_voiceover_exists": bool(audio_lane["tts_voiceover_exists"]),
-        "hot_follow_route_decision_owner": task.get("hot_follow_route_decision_owner"),
-        "hot_follow_route_stage_action": task.get("hot_follow_route_stage_action"),
-        "hot_follow_route_stage_action_reason": task.get("hot_follow_route_stage_action_reason"),
-        "hot_follow_route_target": task.get("hot_follow_route_target"),
         "selected_compose_route": {
             "name": selected_route,
             "required_artifacts": route.required_artifacts,

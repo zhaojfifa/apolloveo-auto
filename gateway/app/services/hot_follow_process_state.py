@@ -19,7 +19,6 @@ TTS_FAILURE_REASONS = {
     "tts_failed_timeout",
     "tts_failed_cancelled",
 }
-ROUTE_DECISION_OWNER = "hot_follow_route_decision_v1"
 
 
 def _d(value: Any) -> dict[str, Any]:
@@ -52,22 +51,6 @@ def _is_tts_failure(value: Any) -> bool:
         or reason.startswith("tts_")
         or "empty_or_invalid_audio" in reason
     )
-
-
-def _formal_route_target(task: dict[str, Any], state: dict[str, Any], artifact_facts: dict[str, Any]) -> str:
-    owner = _s(
-        task.get("hot_follow_route_decision_owner")
-        or state.get("hot_follow_route_decision_owner")
-        or artifact_facts.get("hot_follow_route_decision_owner")
-    )
-    target = _s(
-        task.get("hot_follow_route_target")
-        or state.get("hot_follow_route_target")
-        or artifact_facts.get("hot_follow_route_target")
-    )
-    if owner == ROUTE_DECISION_OWNER and target in {"tts_replace_route", "preserve_source_route"}:
-        return target
-    return ""
 
 
 def _compose_input_state(artifact_facts: dict[str, Any]) -> tuple[dict[str, Any], bool, bool, bool, str]:
@@ -198,7 +181,6 @@ def reduce_hot_follow_process_state(
         and source_available
     )
     voice_led_evidence = _voice_led_route_evidence(task=task, state=state, artifact_facts=artifacts)
-    formal_route_target = _formal_route_target(task, state, artifacts)
 
     audio_ready = bool(audio.get("audio_ready"))
     voiceover_exists = bool(
@@ -235,13 +217,7 @@ def reduce_hot_follow_process_state(
 
     route = _s(selected.get("name"))
     lane = "voice_led_tts_route"
-    if formal_route_target == "tts_replace_route":
-        route = "tts_replace_route"
-        lane = "voice_led_tts_route"
-    elif formal_route_target == "preserve_source_route":
-        route = "preserve_source_route"
-        lane = "voice_led_plus_preserved_source_audio_route"
-    elif audio_ready or voiceover_exists or translation_waiting or visible_target_pending:
+    if audio_ready or voiceover_exists or translation_waiting or visible_target_pending:
         route = "tts_replace_route"
         lane = "voice_led_tts_route"
     elif explicit_no_dub_allowed and _s(selected.get("name")) in NO_TTS_ROUTES:
@@ -393,10 +369,6 @@ def reduce_hot_follow_process_state(
 
     return {
         "version": "hot_follow_process_state_v1",
-        "route_decision_owner": ROUTE_DECISION_OWNER,
-        "route_stage_action": _s(task.get("hot_follow_route_stage_action") or state.get("hot_follow_route_stage_action")) or None,
-        "route_stage_action_reason": _s(task.get("hot_follow_route_stage_action_reason") or state.get("hot_follow_route_stage_action_reason")) or None,
-        "route_decision_source": "formal_stage_action" if formal_route_target else "reduced_from_l2_l3_truth",
         "lane_state": lane,
         "selected_compose_route": route,
         "route_allowed": route_allowed,
