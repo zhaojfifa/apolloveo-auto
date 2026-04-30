@@ -299,8 +299,16 @@ def test_manual_target_subtitle_save_materializes_vi_and_current_truth(monkeypat
         {
             "task_id": task_id,
             "kind": "hot_follow",
+            "source_type": "local_upload",
             "target_lang": "vi",
             "origin_srt_path": f"deliver/tasks/{task_id}/subs/origin.srt",
+            "subtitles_status": "failed",
+            "subtitles_error_reason": "helper_translate_provider_exhausted",
+            "subtitle_helper_status": "failed",
+            "subtitle_helper_error_reason": "helper_translate_provider_exhausted",
+            "subtitle_helper_provider": "gemini",
+            "target_subtitle_current": False,
+            "target_subtitle_authoritative_source": False,
             "pipeline_config": {"translation_incomplete": "true"},
         }
     )
@@ -342,6 +350,8 @@ def test_manual_target_subtitle_save_materializes_vi_and_current_truth(monkeypat
     assert saved["target_subtitle_authoritative_source"] is True
     assert saved["target_subtitle_current"] is True
     assert saved["target_subtitle_current_reason"] == "ready"
+    assert saved["subtitle_helper_status"] == "resolved"
+    assert saved["subtitle_helper_error_reason"] is None
     assert parse_pipeline_config(saved["pipeline_config"])["translation_incomplete"] == "false"
 
 

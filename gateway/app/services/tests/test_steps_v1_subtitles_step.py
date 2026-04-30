@@ -640,6 +640,21 @@ def test_run_dub_step_does_not_skip_translation_incomplete_first_attempt_as_empt
     assert "pipeline_config" not in updates[-1]
 
 
+def test_dub_translation_blocker_yields_to_authoritative_target_subtitle_truth():
+    assert (
+        steps_v1._unresolved_translation_lane_blocks_empty_dub(
+            {
+                "pipeline_config": {"translation_incomplete": "true"},
+                "target_subtitle_current": True,
+                "target_subtitle_authoritative_source": True,
+                "target_subtitle_current_reason": "ready",
+            },
+            "1\n00:00:00,000 --> 00:00:02,000\nsource text\n",
+        )
+        is False
+    )
+
+
 def test_subtitles_pipeline_state_distinguishes_no_subtitles_and_translation_incomplete():
     no_subtitles_status, no_subtitles_summary = steps_v1_hot_follow_pipeline_state(
         {

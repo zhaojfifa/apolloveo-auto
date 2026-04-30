@@ -654,6 +654,8 @@ def _skip_empty_dub(req: DubRequest, reason: str, provider: str | None, current_
 
 def _unresolved_translation_lane_blocks_empty_dub(task: dict | None, source_text: str | None) -> bool:
     task_obj = task if isinstance(task, dict) else {}
+    if bool(task_obj.get("target_subtitle_current")) and bool(task_obj.get("target_subtitle_authoritative_source")):
+        return False
     pipeline_config = parse_pipeline_config(task_obj.get("pipeline_config"))
     target_reason = str(task_obj.get("target_subtitle_current_reason") or "").strip()
     translation_unresolved = bool(
