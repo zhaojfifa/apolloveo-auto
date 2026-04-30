@@ -24,6 +24,16 @@ class SubtitleAuthorityDecision:
     target_currentness: dict[str, object]
 
 
+@dataclass(frozen=True)
+class SubtitleProductionFacts:
+    origin_subtitle_artifact_exists: bool
+    target_subtitle_artifact_exists: bool
+    target_subtitle_materialized: bool
+    target_subtitle_current: bool
+    target_subtitle_current_reason: str
+    target_subtitle_authoritative_source: bool
+
+
 def _reason_message(reason: str) -> str:
     messages = {
         "subtitle_missing": "权威目标字幕缺失，不能记录为字幕成功。",
@@ -85,6 +95,37 @@ def evaluate_hot_follow_subtitle_authority(
     )
 
 
+def _subtitle_production_facts(
+    *,
+    origin_key: str | None,
+    target_key: str | None,
+    decision: SubtitleAuthorityDecision,
+    target_subtitle_authoritative: bool,
+) -> SubtitleProductionFacts:
+    target_materialized = bool(decision.accepted and target_key and target_subtitle_authoritative)
+    return SubtitleProductionFacts(
+        origin_subtitle_artifact_exists=bool(origin_key),
+        target_subtitle_artifact_exists=target_materialized,
+        target_subtitle_materialized=target_materialized,
+        target_subtitle_current=bool(decision.target_currentness.get("target_subtitle_current"))
+        if target_materialized
+        else False,
+        target_subtitle_current_reason=decision.reason,
+        target_subtitle_authoritative_source=bool(target_materialized),
+    )
+
+
+def _subtitle_production_fact_updates(facts: SubtitleProductionFacts) -> dict[str, Any]:
+    return {
+        "origin_subtitle_artifact_exists": facts.origin_subtitle_artifact_exists,
+        "target_subtitle_artifact_exists": facts.target_subtitle_artifact_exists,
+        "target_subtitle_materialized": facts.target_subtitle_materialized,
+        "target_subtitle_current": facts.target_subtitle_current,
+        "target_subtitle_current_reason": facts.target_subtitle_current_reason,
+        "target_subtitle_authoritative_source": facts.target_subtitle_authoritative_source,
+    }
+
+
 def _recovered_subtitle_commit_scrub_updates(task: dict[str, Any]) -> dict[str, Any]:
     updates: dict[str, Any] = {
         "subtitles_error_reason": None,
@@ -94,13 +135,19 @@ def _recovered_subtitle_commit_scrub_updates(task: dict[str, Any]) -> dict[str, 
     stale_no_dub_reason = str(
         pipeline_config.get("dub_skip_reason") or task.get("dub_skip_reason") or ""
     ).strip().lower()
+    pipeline_changed = False
+    if str(pipeline_config.get("translation_incomplete") or "").strip().lower() == "true":
+        pipeline_config["translation_incomplete"] = "false"
+        pipeline_changed = True
     if stale_no_dub_reason in {"target_subtitle_empty", "dub_input_empty"}:
         pipeline_config.pop("no_dub", None)
         pipeline_config.pop("dub_skip_reason", None)
-        updates["pipeline_config"] = pipeline_config_to_storage(pipeline_config)
+        pipeline_changed = True
         updates["dub_skip_reason"] = None
         if str(task.get("dub_status") or "").strip().lower() == "skipped":
             updates["dub_status"] = "pending"
+    if pipeline_changed:
+        updates["pipeline_config"] = pipeline_config_to_storage(pipeline_config)
     if str(task.get("subtitle_helper_status") or "").strip().lower() == "failed":
         updates.update(helper_translate_resolved_updates())
     return updates
@@ -167,13 +214,25 @@ def persist_hot_follow_authoritative_target_subtitle(
             },
         )
 
+    updated_at = (now_fn or (lambda: datetime.now(timezone.utc).isoformat()))()
+    manual_facts = SubtitleProductionFacts(
+        origin_subtitle_artifact_exists=bool(
+            task.get("origin_srt_path")
+            or task.get("origin_subtitle_artifact_exists")
+        ),
+        target_subtitle_artifact_exists=True,
+        target_subtitle_materialized=True,
+        target_subtitle_current=True,
+        target_subtitle_current_reason=persisted.reason,
+        target_subtitle_authoritative_source=True,
+    )
     updates: dict[str, Any] = {
         "subtitles_status": "ready",
         "subtitles_error": None,
         "subtitles_error_reason": None,
         "last_step": "subtitles",
         "mm_srt_path": synced_key or task.get("mm_srt_path"),
-        "subtitles_override_updated_at": (now_fn or (lambda: datetime.now(timezone.utc).isoformat()))(),
+        "subtitles_override_updated_at": updated_at,
         "subtitles_override_mode": text_mode,
         "subtitles_content_hash": content_hash_fn(text),
         "compose_status": "pending",
@@ -181,10 +240,10 @@ def persist_hot_follow_authoritative_target_subtitle(
         "compose_error_reason": None,
         "error_message": None,
         "error_reason": None,
-        "target_subtitle_current": True,
-        "target_subtitle_current_reason": persisted.reason,
-        "target_subtitle_authoritative_source": True,
+        "target_subtitle_materialized_at": updated_at,
+        "target_subtitle_production_path": text_mode,
     }
+    updates.update(_subtitle_production_fact_updates(manual_facts))
     updates.update(_recovered_subtitle_commit_scrub_updates(task))
     if resolve_helper_state:
         updates.update(helper_translate_resolved_updates())
@@ -226,22 +285,29 @@ def finalize_hot_follow_subtitles_step(
         and target_subtitle_required
         and any(has_semantic_target_subtitle_text(text) for text in source_texts)
     )
+    facts = _subtitle_production_facts(
+        origin_key=origin_key,
+        target_key=target_subtitle_key,
+        decision=decision,
+        target_subtitle_authoritative=target_subtitle_authoritative,
+    )
     updates: dict[str, Any] = {
         "origin_srt_path": origin_key,
         "mm_srt_path": target_subtitle_key if target_subtitle_authoritative else None,
         "last_step": "subtitles",
         "subtitles_key": subtitles_key,
         "subtitle_structure_path": subtitles_key,
-        "target_subtitle_current": bool(decision.target_currentness.get("target_subtitle_current")),
-        "target_subtitle_current_reason": decision.reason,
     }
+    updates.update(_subtitle_production_fact_updates(facts))
     if decision.accepted:
+        now = datetime.now(timezone.utc).isoformat()
         updates.update(
             {
                 "subtitles_status": "ready",
                 "subtitles_error": None,
                 "subtitles_error_reason": None,
-                "target_subtitle_authoritative_source": True,
+                "target_subtitle_materialized_at": now,
+                "target_subtitle_production_path": "auto_translation",
                 "error_message": None,
                 "error_reason": None,
             }

@@ -77,6 +77,10 @@ def test_run_subtitles_step_consumes_result_contract_for_myanmar(monkeypatch, tm
     final_update = repo.get(req.task_id)
     assert final_update["subtitles_status"] == "ready"
     assert final_update["subtitles_error"] is None
+    assert final_update["origin_subtitle_artifact_exists"] is True
+    assert final_update["target_subtitle_artifact_exists"] is True
+    assert final_update["target_subtitle_materialized"] is True
+    assert final_update["target_subtitle_authoritative_source"] is True
     assert final_update["target_subtitle_current"] is True
     assert final_update["target_subtitle_current_reason"] == "ready"
     assert generate_kwargs[-1]["parse_source_mode"] == "raw_video_audio"
@@ -150,6 +154,10 @@ def test_run_subtitles_step_marks_vi_translation_incomplete_without_step_error(m
     final_update = repo.get(req.task_id)
     assert final_update["subtitles_status"] == "pending"
     assert "waiting" in final_update["subtitles_error"]
+    assert final_update["origin_subtitle_artifact_exists"] is True
+    assert final_update["target_subtitle_artifact_exists"] is False
+    assert final_update["target_subtitle_materialized"] is False
+    assert final_update["target_subtitle_authoritative_source"] is False
     assert final_update["target_subtitle_current"] is False
     assert final_update["target_subtitle_current_reason"] == "target_subtitle_translation_incomplete"
     assert pipeline_updates[-1]["translation_incomplete"] == "true"
