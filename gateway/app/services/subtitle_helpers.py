@@ -468,6 +468,11 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         )
         and str(normalized_source_text or raw_source_text or "").strip()
     )
+    manual_target_subtitle_required = (
+        str(pipeline_config.get("manual_target_subtitle_required") or "").strip().lower() == "true"
+    )
+    if manual_target_subtitle_required:
+        translation_waiting = False
     helper_lane = helper_translate_lane_state(
         task,
         translation_waiting=translation_waiting,
@@ -486,7 +491,19 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         and not subtitle_ready
         and str(normalized_source_text or raw_source_text or "").strip()
     )
-    if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
+    empty_translation_execution = bool(
+        translation_waiting
+        and helper_lane.get("output_state") == "helper_output_unavailable"
+        and helper_lane.get("provider_health") == "provider_ok"
+        and not helper_lane.get("provider")
+        and not helper_lane.get("input_text")
+        and not helper_lane.get("translated_text")
+    )
+    if manual_target_subtitle_required and not subtitle_ready and not target_text_has_semantics:
+        subtitle_ready_reason = "manual_target_subtitle_required"
+    elif empty_translation_execution and not subtitle_ready and not target_text_has_semantics:
+        subtitle_ready_reason = "manual_target_subtitle_required"
+    elif explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
         subtitle_ready_reason = (
             "waiting_for_target_subtitle_translation"
             if explicit_target_reason == "target_subtitle_translation_incomplete" and translation_waiting
@@ -497,7 +514,11 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
     elif helper_translate_failed and not subtitle_ready and not target_text_has_semantics:
         subtitle_ready_reason = helper_translate_error_reason or "helper_translate_failed"
     target_subtitle_current_reason = str(target_currentness.get("target_subtitle_current_reason") or subtitle_ready_reason)
-    if explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
+    if manual_target_subtitle_required and not subtitle_ready and not target_text_has_semantics:
+        target_subtitle_current_reason = "manual_target_subtitle_required"
+    elif empty_translation_execution and not subtitle_ready and not target_text_has_semantics:
+        target_subtitle_current_reason = "manual_target_subtitle_required"
+    elif explicit_target_reason and explicit_target_reason not in {"ready", "unknown"} and not subtitle_ready and not target_text_has_semantics:
         target_subtitle_current_reason = explicit_target_reason
     elif helper_translate_pending:
         target_subtitle_current_reason = "target_subtitle_translation_incomplete"
@@ -542,6 +563,7 @@ def hf_subtitle_lane_state(task_id: str, task: dict) -> dict[str, Any]:
         "target_subtitle_current_reason": target_subtitle_current_reason,
         "target_subtitle_authoritative_source": bool(target_currentness.get("target_subtitle_authoritative_source")),
         "target_subtitle_source_copy": bool(target_currentness.get("target_subtitle_source_copy")),
+        "manual_target_subtitle_required": bool(manual_target_subtitle_required or empty_translation_execution),
         "helper_translate_status": helper_lane.get("status"),
         "helper_translate_output_state": helper_lane.get("output_state"),
         "helper_translate_provider_health": helper_lane.get("provider_health"),

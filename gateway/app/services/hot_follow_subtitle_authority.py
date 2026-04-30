@@ -237,6 +237,11 @@ def finalize_hot_follow_subtitles_step(
         and target_subtitle_required
         and any(has_semantic_target_subtitle_text(text) for text in source_texts)
     )
+    manual_target_subtitle_required = bool(
+        target_subtitle_required
+        and not target_subtitle_authoritative
+        and any(has_semantic_target_subtitle_text(text) for text in source_texts)
+    )
     updates: dict[str, Any] = {
         "origin_srt_path": origin_key,
         "mm_srt_path": target_subtitle_key if target_subtitle_authoritative else None,
@@ -263,6 +268,17 @@ def finalize_hot_follow_subtitles_step(
             }
         )
         updates.update(_recovered_subtitle_commit_scrub_updates(task))
+    elif manual_target_subtitle_required:
+        updates.update(
+            {
+                "subtitles_status": "pending",
+                "subtitles_error": "local upload source looks lyric/BGM-like; manual target subtitle is required before dubbing",
+                "subtitles_error_reason": "manual_target_subtitle_required",
+                "target_subtitle_authoritative_source": False,
+                "target_subtitle_current": False,
+                "target_subtitle_current_reason": "manual_target_subtitle_required",
+            }
+        )
     elif translation_waiting_retryable:
         updates.update(
             {

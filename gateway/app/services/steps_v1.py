@@ -47,6 +47,9 @@ from gateway.app.services.hot_follow_subtitle_authority import (
 from gateway.app.services.hot_follow_subtitle_currentness import (
     has_semantic_target_subtitle_text,
 )
+from gateway.app.services.hot_follow_subtitle_source_guard import (
+    local_upload_requires_manual_subtitle_first,
+)
 from gateway.app.services.subtitles import generate_subtitles
 from gateway.app.services.source_audio_policy import source_audio_policy_from_task
 from gateway.app.services.steps_text_support import (
@@ -912,6 +915,24 @@ async def run_subtitles_step(req: SubtitlesRequest):
         _update_pipeline_config(req.task_id, updates)
         origin_text, normalized_origin_text, mm_text, translation_qa_payload = _subtitle_result_contract(result)
         target_text_semantic = has_semantic_target_subtitle_text(mm_text)
+        manual_subtitle_first = local_upload_requires_manual_subtitle_first(
+            task_before,
+            normalized_origin_text or origin_text,
+        )
+        if manual_subtitle_first:
+            target_subtitle_authoritative = False
+            translation_incomplete = True
+            _update_pipeline_config(
+                req.task_id,
+                {
+                    "parse_source_role": "lyric_bgm_manual_subtitle_source",
+                    "parse_source_authoritative_for_target": "false",
+                    "target_subtitle_authoritative": "false",
+                    "translation_incomplete": "true",
+                    "manual_target_subtitle_required": "true",
+                    "source_not_suitable_for_auto_dub": "lyric_bgm_like_local_upload",
+                },
+            )
 
         workspace = Workspace(req.task_id, target_lang=req.target_lang)
         subtitle_filename = hot_follow_subtitle_filename(req.target_lang)

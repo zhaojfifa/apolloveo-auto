@@ -118,6 +118,18 @@ def helper_translate_lane_state(
     has_source = bool(str(helper_source_text or "").strip())
     input_text = str(task.get("subtitle_helper_input_text") or "").strip() or None
     translated_text = str(task.get("subtitle_helper_translated_text") or "").strip() or None
+    has_execution_evidence = bool(
+        provider
+        or input_text
+        or translated_text
+        or str(task.get("subtitle_helper_requested_at") or "").strip()
+        or str(task.get("subtitle_helper_updated_at") or "").strip()
+        or str(task.get("subtitle_helper_failed_at") or "").strip()
+        or str(task.get("translation_execution_ref") or "").strip()
+        or str(task.get("helper_requested_at") or "").strip()
+        or str(task.get("last_polled_at") or "").strip()
+        or str(task.get("helper_responded_at") or "").strip()
+    )
 
     if status in _HELPER_TERMINAL_FAILURE_STATES or (
         status in _HELPER_RETRYABLE_FAILURE_STATES and reason in _HELPER_TERMINAL_REASONS
@@ -132,7 +144,7 @@ def helper_translate_lane_state(
         output_state = _HELPER_OUTPUT_RESOLVED
     elif provider_health != _HELPER_PROVIDER_OK:
         output_state = _HELPER_OUTPUT_UNAVAILABLE
-    elif status in _HELPER_PENDING_STATES or (translation_waiting and has_source):
+    elif (status in _HELPER_PENDING_STATES or (translation_waiting and has_source)) and has_execution_evidence:
         output_state = _HELPER_OUTPUT_PENDING
     else:
         output_state = _HELPER_OUTPUT_UNAVAILABLE

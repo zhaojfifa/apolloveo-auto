@@ -3,7 +3,11 @@ from gateway.app.services.hot_follow_helper_translation import helper_translate_
 
 def test_helper_translate_lane_state_distinguishes_pending_temporary_terminal_and_not_involved():
     pending = helper_translate_lane_state(
-        {},
+        {
+            "subtitle_helper_status": "pending",
+            "subtitle_helper_provider": "gemini",
+            "subtitle_helper_input_text": "voice led transcript",
+        },
         translation_waiting=True,
         helper_source_text="voice led transcript",
     )
@@ -58,6 +62,22 @@ def test_helper_translate_lane_state_distinguishes_pending_temporary_terminal_an
     assert not_involved["provider_health"] == "provider_ok"
     assert not_involved["visibility"] == "no_helper_used"
     assert not_involved["failed"] is False
+
+
+def test_helper_translate_lane_state_does_not_fake_empty_pending_work():
+    empty_pending = helper_translate_lane_state(
+        {},
+        translation_waiting=True,
+        helper_source_text="voice led transcript",
+    )
+
+    assert empty_pending["status"] == "helper_output_unavailable"
+    assert empty_pending["output_state"] == "helper_output_unavailable"
+    assert empty_pending["provider"] is None
+    assert empty_pending["input_text"] is None
+    assert empty_pending["translated_text"] is None
+    assert empty_pending["visibility"] == "no_helper_used"
+    assert empty_pending["retryable"] is False
 
 
 def test_helper_translate_lane_state_supports_resolved_output_with_retryable_provider_warning():
