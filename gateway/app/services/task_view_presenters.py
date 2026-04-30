@@ -21,6 +21,7 @@ from gateway.app.services.contract_runtime import (
 from gateway.app.services.hot_follow_skills_advisory import (
     maybe_build_hot_follow_advisory,
 )
+from gateway.app.services.hot_follow_translation_pending import hot_follow_translation_waiting_diagnostic
 from gateway.app.services.hot_follow_workbench_presenter import (
     build_hot_follow_artifact_facts,
     build_hot_follow_current_attempt_summary,
@@ -863,6 +864,9 @@ def build_hot_follow_workbench_hub(
             state_computer=state_computer,
         )
     payload = _apply_hot_follow_projection_runtime(task, payload, surface="workbench")
+    diagnostics = dict(payload.get("diagnostics") or {})
+    diagnostics["translation_waiting"] = hot_follow_translation_waiting_diagnostic(task)
+    payload["diagnostics"] = diagnostics
     apply_ready_gate_compose_projection(payload)
     attach_task_aliases(payload, task, task_id)
     payload["line"] = line_binding_loader(task).to_payload()

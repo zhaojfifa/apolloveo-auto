@@ -190,6 +190,7 @@ def persist_hot_follow_authoritative_target_subtitle(
     content_hash_fn: Callable[[str | None], str | None],
     extra_updates: dict[str, Any] | None = None,
     resolve_helper_state: bool = False,
+    subtitle_stage_action: str = "manual_target_subtitle_materialize",
     now_fn: Callable[[], str] | None = None,
 ) -> dict[str, Any]:
     decision = evaluate_hot_follow_subtitle_authority(
@@ -244,7 +245,7 @@ def persist_hot_follow_authoritative_target_subtitle(
         "subtitles_override_updated_at": materialized_at,
         "subtitles_override_mode": text_mode,
         "subtitles_content_hash": content_hash_fn(text),
-        "subtitle_stage_action": "manual_target_subtitle_materialize",
+        "subtitle_stage_action": subtitle_stage_action,
         "subtitle_stage_materialized_at": materialized_at,
         "compose_status": "pending",
         "compose_error": None,

@@ -89,6 +89,14 @@ from gateway.app.services.hot_follow_media_policy import (
     hot_follow_local_upload_source_selection_guard,
     hot_follow_media_input_policy,
 )
+from gateway.app.services.hot_follow_flow_actions import (
+    LOCAL_PRESERVE_TO_SUBTITLE_DUB_FLOW,
+    MATERIALIZE_TARGET_SUBTITLE_FROM_ORIGIN,
+    TargetSubtitleMaterializationFailure,
+    local_preserve_to_subtitle_dub_flow,
+    materialize_target_subtitle_from_origin,
+)
+from gateway.app.services.hot_follow_translation_pending import hot_follow_translation_waiting_diagnostic
 from gateway.app.services.task_view_helpers import (
     backfill_compose_done_if_final_ready as _backfill_compose_done_if_final_ready,
     build_translation_qa_summary as _build_translation_qa_summary,
@@ -235,6 +243,14 @@ class ComposePlanPatchRequest(BaseModel):
     freeze_tail_enabled: bool | None = None
     freeze_tail_cap_sec: int | None = None
     cleanup_mode: str | None = None
+
+
+class HotFollowMaterializeTargetSubtitleRequest(BaseModel):
+    expected_origin_key: str | None = None
+
+
+class HotFollowLocalPreserveToSubtitleDubRequest(BaseModel):
+    reason: str | None = None
 
 
 def _hf_helper_translate_request_fingerprint(
@@ -574,16 +590,31 @@ def _hf_translate_source_subtitle_lane(task_id: str, task: dict, *, target_lang:
         idx = int(seg.get("index") or 0)
         seg[target_lang] = str(translations.get(idx) or seg.get("origin") or "").strip()
     translated_text = segments_to_srt(segments, target_lang)
-    saved_task = _hf_save_authoritative_target_subtitle(
-        task_id,
-        task,
-        text=translated_text,
-        text_mode="source_subtitle_lane_translation",
-        repo=repo,
-    )
+    try:
+        saved_task = materialize_target_subtitle_from_origin(
+            task_id,
+            task,
+            repo=repo,
+            origin_text=source_text,
+            target_lang=target_lang,
+            expected_origin_key=task.get("origin_srt_path"),
+            expected_subtitle_source=_hf_expected_subtitle_filename(target_lang),
+            translate_origin_srt_fn=lambda _origin_text, _target_lang: translated_text,
+            persist_artifact_fn=lambda saved_text: _hf_sync_saved_target_subtitle_artifact(task_id, task, saved_text),
+            write_override_fn=lambda saved_text: _hf_subtitles_override_path(task_id).parent.mkdir(parents=True, exist_ok=True)
+            or _hf_subtitles_override_path(task_id).write_text(saved_text, encoding="utf-8"),
+            content_hash_fn=_hf_subtitle_content_hash,
+        )
+    except TargetSubtitleMaterializationFailure as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "action": MATERIALIZE_TARGET_SUBTITLE_FROM_ORIGIN,
+                "reason": exc.code,
+                "message": exc.message,
+            },
+        ) from exc
     return translated_text, saved_task
-
-
 
 def _hf_state_from_status(value: Any) -> str:
     return _svc_hf_state_from_status(value)
@@ -1579,7 +1610,95 @@ def get_hot_follow_workbench_hub(
     task_id: str,
     repo=Depends(get_task_repository),
 ):
-    return _service_build_hot_follow_workbench_hub(task_id, repo=repo)
+    payload = _service_build_hot_follow_workbench_hub(task_id, repo=repo)
+    task = repo.get(task_id) or {}
+    diagnostics = dict(payload.get("diagnostics") or {})
+    diagnostics["translation_waiting"] = hot_follow_translation_waiting_diagnostic(task)
+    payload["diagnostics"] = diagnostics
+    return payload
+
+
+def _translate_origin_srt_for_materialization(origin_text: str, target_lang: str) -> str:
+    segments = _parse_srt_to_segments(origin_text)
+    if not segments:
+        return ""
+    translations = translate_segments_with_gemini(segments=segments, target_lang=target_lang)
+    for seg in segments:
+        idx = int(seg.get("index") or 0)
+        seg[target_lang] = str(translations.get(idx) or "").strip()
+    return segments_to_srt(segments, target_lang)
+
+
+@hot_follow_api_router.post("/hot_follow/tasks/{task_id}/materialize_target_subtitle_from_origin")
+def post_hot_follow_materialize_target_subtitle_from_origin(
+    task_id: str,
+    payload: HotFollowMaterializeTargetSubtitleRequest | None = None,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    target_lang = hot_follow_internal_lang(task.get("target_lang") or task.get("content_lang") or "mm")
+    origin_text = _hf_load_origin_subtitles_text(task)
+    try:
+        saved = materialize_target_subtitle_from_origin(
+            task_id,
+            task,
+            repo=repo,
+            origin_text=origin_text,
+            target_lang=target_lang,
+            expected_origin_key=(payload.expected_origin_key if payload else None),
+            expected_subtitle_source=_hf_expected_subtitle_filename(target_lang),
+            translate_origin_srt_fn=_translate_origin_srt_for_materialization,
+            persist_artifact_fn=lambda saved_text: _hf_sync_saved_target_subtitle_artifact(task_id, task, saved_text),
+            write_override_fn=lambda saved_text: _hf_subtitles_override_path(task_id).parent.mkdir(parents=True, exist_ok=True)
+            or _hf_subtitles_override_path(task_id).write_text(saved_text, encoding="utf-8"),
+            content_hash_fn=_hf_subtitle_content_hash,
+        )
+    except TargetSubtitleMaterializationFailure as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "action": MATERIALIZE_TARGET_SUBTITLE_FROM_ORIGIN,
+                "reason": exc.code,
+                "message": exc.message,
+            },
+        ) from exc
+    return {
+        "task_id": task_id,
+        "action": MATERIALIZE_TARGET_SUBTITLE_FROM_ORIGIN,
+        "target_lang": public_target_lang(target_lang),
+        "target_subtitle_current": bool(saved.get("target_subtitle_current")),
+        "target_subtitle_current_reason": saved.get("target_subtitle_current_reason"),
+        "target_subtitle_key": saved.get("mm_srt_path"),
+    }
+
+
+@hot_follow_api_router.post("/hot_follow/tasks/{task_id}/local_preserve_to_subtitle_dub_flow")
+def post_hot_follow_local_preserve_to_subtitle_dub_flow(
+    task_id: str,
+    payload: HotFollowLocalPreserveToSubtitleDubRequest | None = None,
+    repo=Depends(get_task_repository),
+):
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    try:
+        updated = local_preserve_to_subtitle_dub_flow(
+            repo,
+            task_id,
+            task,
+            reason=payload.reason if payload else None,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {
+        "task_id": task_id,
+        "action": LOCAL_PRESERVE_TO_SUBTITLE_DUB_FLOW,
+        "target_subtitle_materialization_action": updated.get("target_subtitle_materialization_action"),
+        "target_subtitle_materialization_status": updated.get("target_subtitle_materialization_status"),
+        "task": _task_to_detail(updated),
+    }
 
 
 @hot_follow_api_router.patch("/hot_follow/tasks/{task_id}/audio_config")
