@@ -237,6 +237,11 @@ def finalize_hot_follow_subtitles_step(
         and target_subtitle_required
         and any(has_semantic_target_subtitle_text(text) for text in source_texts)
     )
+    target_subtitle_creation_required = bool(
+        target_subtitle_required
+        and any(has_semantic_target_subtitle_text(text) for text in source_texts)
+        and not target_subtitle_key
+    )
     updates: dict[str, Any] = {
         "origin_srt_path": origin_key,
         "mm_srt_path": target_subtitle_key if target_subtitle_authoritative else None,
@@ -263,6 +268,17 @@ def finalize_hot_follow_subtitles_step(
             }
         )
         updates.update(_recovered_subtitle_commit_scrub_updates(task))
+    elif target_subtitle_creation_required and not target_subtitle_authoritative:
+        updates.update(
+            {
+                "subtitles_status": "pending",
+                "subtitles_error": "target subtitle artifact is required before dubbing",
+                "subtitles_error_reason": "subtitle_missing",
+                "target_subtitle_authoritative_source": False,
+                "target_subtitle_current": False,
+                "target_subtitle_current_reason": "subtitle_missing",
+            }
+        )
     elif translation_waiting_retryable:
         updates.update(
             {

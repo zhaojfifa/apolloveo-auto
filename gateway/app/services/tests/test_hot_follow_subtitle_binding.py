@@ -556,6 +556,40 @@ def test_subtitle_lane_preserves_translation_incomplete_reason_over_generic_miss
     assert lane["dub_input_text"] == ""
 
 
+def test_url_empty_helper_pending_projects_missing_target_not_fake_provider_work(monkeypatch):
+    origin_srt = "1\n00:00:00,000 --> 00:00:02,000\nhello from source\n"
+
+    monkeypatch.setattr(subtitle_helpers, "object_exists", lambda _key: False)
+    monkeypatch.setattr(subtitle_helpers, "get_object_bytes", lambda _key: origin_srt.encode("utf-8"))
+    monkeypatch.setattr(subtitle_helpers, "task_base_dir", lambda _task_id: Path("/tmp") / _task_id)
+    monkeypatch.setattr(subtitle_helpers, "hf_load_origin_subtitles_text", lambda _task: origin_srt)
+    monkeypatch.setattr(subtitle_helpers, "hf_load_normalized_source_text", lambda *_args, **_kwargs: origin_srt)
+
+    lane = hf_router._hf_subtitle_lane_state(
+        "hf-url-empty-helper-pending",
+        {
+            "task_id": "hf-url-empty-helper-pending",
+            "kind": "hot_follow",
+            "source_url": "https://example.test/video",
+            "target_lang": "vi",
+            "origin_srt_path": "deliver/tasks/hf-url-empty-helper-pending/subs/origin.srt",
+            "pipeline_config": {"translation_incomplete": "true"},
+            "target_subtitle_current": False,
+            "target_subtitle_current_reason": "target_subtitle_translation_incomplete",
+        },
+    )
+
+    assert lane["helper_translate_status"] == "helper_output_unavailable"
+    assert lane["helper_translate_output_state"] == "helper_output_unavailable"
+    assert lane["helper_translate_provider"] is None
+    assert lane["helper_translate_input_text"] is None
+    assert lane["helper_translate_translated_text"] is None
+    assert lane["subtitle_ready"] is False
+    assert lane["subtitle_ready_reason"] == "subtitle_missing"
+    assert lane["target_subtitle_current_reason"] == "subtitle_missing"
+    assert lane["dub_input_text"] == ""
+
+
 def test_sync_saved_target_subtitle_artifact_refuses_semantically_empty_srt(monkeypatch):
     monkeypatch.setattr(hf_router, "upload_task_artifact", lambda *_args, **_kwargs: pytest.fail("empty target subtitle must not upload"))
     monkeypatch.setattr(hf_router, "object_exists", lambda _key: True)

@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -117,6 +118,59 @@ def _truthy_env(name: str, default: str = "1") -> bool:
 
 def _subtitle_result_contract(result: dict | None) -> tuple[str, str, str, dict[str, object]]:
     return _svc_subtitle_result_contract(result)
+
+
+_SRT_TIMECODE_RE = re.compile(r"\d{2}:\d{2}:\d{2}[,.]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[,.]\d{3}")
+_LYRIC_BGM_HINTS = {
+    "chorus",
+    "verse",
+    "refrain",
+    "lyrics",
+    "lyric",
+    "singing",
+    "song",
+    "la la",
+    "na na",
+    "oh oh",
+}
+
+
+def _is_local_upload_task(task: dict | None) -> bool:
+    task_obj = task if isinstance(task, dict) else {}
+    pipeline_config = parse_pipeline_config(task_obj.get("pipeline_config"))
+    source_type = str(task_obj.get("source_type") or "").strip().lower()
+    ingest_mode = str(pipeline_config.get("ingest_mode") or "").strip().lower()
+    return source_type in {"local", "local_upload", "upload"} or ingest_mode in {"local", "local_upload"}
+
+
+def _subtitle_body_lines(text: str | None) -> list[str]:
+    lines: list[str] = []
+    for raw in str(text or "").splitlines():
+        line = raw.strip()
+        if not line or line.isdigit() or _SRT_TIMECODE_RE.search(line):
+            continue
+        lines.append(line)
+    return lines
+
+
+def _looks_like_lyric_bgm_source(text: str | None) -> bool:
+    lines = _subtitle_body_lines(text)
+    if not lines:
+        return False
+    lowered = "\n".join(lines).lower()
+    if any(hint in lowered for hint in _LYRIC_BGM_HINTS):
+        return True
+    if len(lines) < 4:
+        return False
+    normalized = [re.sub(r"\W+", " ", line.lower()).strip() for line in lines]
+    normalized = [line for line in normalized if line]
+    repeated = len(normalized) - len(set(normalized))
+    if repeated / max(len(normalized), 1) >= 0.25:
+        return True
+    word_counts = [len(line.split()) for line in normalized]
+    avg_words = sum(word_counts) / max(len(word_counts), 1)
+    sentence_like = sum(1 for line in lines if line.endswith((".", "?", "!", "。", "？", "！")))
+    return bool(repeated > 0 and avg_words <= 7 and sentence_like / max(len(lines), 1) < 0.25)
 
 
 async def _hydrate_raw_from_url(
@@ -912,6 +966,23 @@ async def run_subtitles_step(req: SubtitlesRequest):
         _update_pipeline_config(req.task_id, updates)
         origin_text, normalized_origin_text, mm_text, translation_qa_payload = _subtitle_result_contract(result)
         target_text_semantic = has_semantic_target_subtitle_text(mm_text)
+        lyric_bgm_local_source = bool(
+            _is_local_upload_task(task_before)
+            and _looks_like_lyric_bgm_source(normalized_origin_text or origin_text)
+        )
+        if lyric_bgm_local_source:
+            target_subtitle_authoritative = False
+            translation_incomplete = False
+            _update_pipeline_config(
+                req.task_id,
+                {
+                    "parse_source_role": "lyric_bgm_source",
+                    "parse_source_authoritative_for_target": "false",
+                    "target_subtitle_authoritative": "false",
+                    "translation_incomplete": "false",
+                    "source_not_suitable_for_auto_dub": "lyric_bgm_like_local_upload",
+                },
+            )
 
         workspace = Workspace(req.task_id, target_lang=req.target_lang)
         subtitle_filename = hot_follow_subtitle_filename(req.target_lang)

@@ -132,6 +132,68 @@ def test_run_subtitles_step_materializes_vi_srt_and_authoritative_truth(monkeypa
     assert final_update["target_subtitle_current_reason"] == "ready"
 
 
+def test_local_upload_lyric_source_does_not_auto_authorize_spoken_dub_path(monkeypatch, tmp_path):
+    pipeline_updates: list[dict] = []
+    uploaded_artifacts: list[str] = []
+    repo = _FakeRepo({"source_type": "local", "target_lang": "vi"})
+
+    async def _generate_subtitles(**kwargs):
+        workspace = _FakeWorkspace(tmp_path, kwargs["task_id"], kwargs["target_lang"])
+        origin_text = (
+            "1\n00:00:00,000 --> 00:00:02,000\nChorus: we dance all night\n\n"
+            "2\n00:00:02,000 --> 00:00:04,000\nChorus: we dance all night\n\n"
+            "3\n00:00:04,000 --> 00:00:06,000\nOh oh, we dance all night\n"
+        )
+        target_text = "1\n00:00:00,000 --> 00:00:02,000\nĐiệp khúc: chúng ta nhảy cả đêm\n"
+        workspace.origin_srt_path.write_text(origin_text, encoding="utf-8")
+        workspace.mm_srt_path.write_text(target_text, encoding="utf-8")
+        workspace.segments_json.write_text(json.dumps({"scenes": []}), encoding="utf-8")
+        return {
+            "task_id": kwargs["task_id"],
+            "origin_srt": origin_text,
+            "origin_normalized_srt": origin_text,
+            "mm_srt": target_text,
+            "translation_qa": {"complete": True},
+            "translation_incomplete": False,
+            "stream_probe": {"has_audio": True, "has_subtitle_stream": False},
+            "parse_source_mode": kwargs["parse_source_mode"],
+            "parse_source_role": "subtitle_source_helper",
+            "parse_source_authoritative_for_target": True,
+            "target_subtitle_authoritative": True,
+        }
+
+    monkeypatch.setattr(
+        steps_v1,
+        "Workspace",
+        lambda task_id, target_lang=None: _FakeWorkspace(tmp_path, task_id, target_lang),
+    )
+    monkeypatch.setattr(steps_v1, "generate_subtitles", _generate_subtitles)
+    monkeypatch.setattr(steps_v1, "_update_task", lambda _task_id, **kwargs: repo.upsert(_task_id, kwargs))
+    monkeypatch.setattr(steps_v1, "_update_pipeline_config", lambda _task_id, payload: pipeline_updates.append(dict(payload)))
+    monkeypatch.setattr(
+        steps_v1,
+        "_upload_artifact",
+        lambda task_id, _path, artifact_name: uploaded_artifacts.append(artifact_name)
+        or f"deliver/tasks/{task_id}/{artifact_name}",
+    )
+    monkeypatch.setattr(steps_v1, "deliver_dir", lambda: tmp_path / "deliver")
+    monkeypatch.setattr(steps_v1, "relative_to_workspace", lambda path: str(path))
+    monkeypatch.setattr(steps_v1, "get_task_repository", lambda: repo)
+
+    req = SubtitlesRequest(task_id="hf-local-lyric", target_lang="vi", force=True, translate=True)
+    asyncio.run(steps_v1.run_subtitles_step(req))
+
+    final_update = repo.get(req.task_id)
+    assert "subs/origin.srt" in uploaded_artifacts
+    assert "subs/vi.srt" not in uploaded_artifacts
+    assert final_update["subtitles_status"] == "pending"
+    assert final_update["subtitles_error_reason"] == "subtitle_missing"
+    assert final_update["target_subtitle_current"] is False
+    assert final_update["target_subtitle_authoritative_source"] is False
+    assert pipeline_updates[-1]["source_not_suitable_for_auto_dub"] == "lyric_bgm_like_local_upload"
+    assert pipeline_updates[-1]["target_subtitle_authoritative"] == "false"
+
+
 def test_clear_no_dub_pipeline_flags_removes_stale_skip_marker(monkeypatch, tmp_path):
     repo = _MutableFakeRepo(
         {
