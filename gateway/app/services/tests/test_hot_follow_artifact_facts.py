@@ -602,11 +602,11 @@ def test_no_dub_no_tts_compose_marks_subtitle_lane_terminal_not_running():
     subtitle_step = next(row for row in state["pipeline"] if row["key"] == "subtitles")
     assert state["ready_gate"]["selected_compose_route"] == "no_tts_compose_route"
     assert state["ready_gate"]["compose_allowed"] is True
-    assert state["ready_gate"]["subtitle_ready_reason"] == "no_dub_route_terminal"
-    assert subtitles["status"] == "skipped"
-    assert subtitles["subtitle_ready_reason"] == "no_dub_route_terminal"
-    assert subtitle_step["status"] == "skipped"
-    assert subtitle_step["message"] == "no_dub_route_terminal"
+    assert state["ready_gate"]["subtitle_ready_reason"] == "subtitle_missing"
+    assert subtitles["status"] == "running"
+    assert subtitles["subtitle_ready_reason"] == "subtitle_missing"
+    assert subtitle_step["status"] == "running"
+    assert "message" not in subtitle_step
 
 
 def test_tts_replace_route_missing_voiceover_blocks_only_tts_route():

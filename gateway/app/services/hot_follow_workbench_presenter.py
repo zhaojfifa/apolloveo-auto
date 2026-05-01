@@ -107,6 +107,11 @@ def build_hot_follow_operator_summary(
     else:
         recommended_next_action = "当前尚无可用成片，请先确保字幕和配音链路完成后再合成。"
     return {
+        "selected_compose_route": current_attempt.get("selected_compose_route"),
+        "compose_allowed": bool(current_attempt.get("compose_allowed")),
+        "subtitle_required": bool(current_attempt.get("subtitle_required")),
+        "dub_current": bool(current_attempt.get("dub_current")),
+        "pending_class": current_attempt.get("pending_class"),
         "last_successful_output_available": last_successful_output_available,
         "current_attempt_failed": current_attempt_failed,
         "show_previous_final_as_primary": show_previous_final_as_primary,
