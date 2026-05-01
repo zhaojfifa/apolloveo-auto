@@ -16,6 +16,93 @@ class HotFollowComposeRoute:
     blocked_conditions: tuple[str, ...]
 
 
+FORMAL_HOT_FOLLOW_ROUTES = {"tts_replace_route", "preserve_source_route"}
+
+
+@dataclass(frozen=True)
+class HotFollowRouteTruth:
+    route: str
+    source: str
+    reason: str | None = None
+    event_id: str | None = None
+
+
+@dataclass(frozen=True)
+class HotFollowCurrentAttempt:
+    contract_version: str
+    selected_compose_route: str
+    route_allowed: bool
+    route_allowed_reason: str
+    subtitle_required: bool
+    subtitle_process_state: str
+    subtitle_ready: bool
+    subtitle_ready_reason: str
+    target_subtitle_authoritative_current: bool
+    target_subtitle_source: str | None
+    dub_process_state: str
+    audio_ready: bool
+    audio_ready_reason: str
+    dub_current: bool
+    dub_current_reason: str
+    compose_input_ready: bool
+    compose_allowed: bool
+    compose_route_allowed: bool
+    compose_execute_allowed: bool
+    compose_reason: str
+    compose_allowed_reason: str
+    requires_redub: bool
+    requires_recompose: bool
+    final_fresh: bool
+    final_stale_reason: str | None
+    route_truth_source: str
+    route_truth_reason: str | None
+    route_event_id: str | None
+    pending_class: str
+    blocking: tuple[str, ...]
+    helper_translate_status: str | None = None
+    helper_translate_output_state: str | None = None
+    helper_translate_provider_health: str | None = None
+    helper_translate_warning_only: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "contract_version": self.contract_version,
+            "selected_compose_route": self.selected_compose_route,
+            "route_allowed": self.route_allowed,
+            "route_allowed_reason": self.route_allowed_reason,
+            "subtitle_required": self.subtitle_required,
+            "subtitle_process_state": self.subtitle_process_state,
+            "subtitle_ready": self.subtitle_ready,
+            "subtitle_ready_reason": self.subtitle_ready_reason,
+            "target_subtitle_authoritative_current": self.target_subtitle_authoritative_current,
+            "target_subtitle_source": self.target_subtitle_source,
+            "dub_process_state": self.dub_process_state,
+            "audio_ready": self.audio_ready,
+            "audio_ready_reason": self.audio_ready_reason,
+            "dub_current": self.dub_current,
+            "dub_current_reason": self.dub_current_reason,
+            "compose_input_ready": self.compose_input_ready,
+            "compose_allowed": self.compose_allowed,
+            "compose_route_allowed": self.compose_route_allowed,
+            "compose_execute_allowed": self.compose_execute_allowed,
+            "compose_reason": self.compose_reason,
+            "compose_allowed_reason": self.compose_allowed_reason,
+            "requires_redub": self.requires_redub,
+            "requires_recompose": self.requires_recompose,
+            "final_fresh": self.final_fresh,
+            "final_stale_reason": self.final_stale_reason,
+            "route_truth_source": self.route_truth_source,
+            "route_truth_reason": self.route_truth_reason,
+            "route_event_id": self.route_event_id,
+            "pending_class": self.pending_class,
+            "blocking": list(self.blocking),
+            "helper_translate_status": self.helper_translate_status,
+            "helper_translate_output_state": self.helper_translate_output_state,
+            "helper_translate_provider_health": self.helper_translate_provider_health,
+            "helper_translate_warning_only": self.helper_translate_warning_only,
+        }
+
+
 HOT_FOLLOW_COMPOSE_ROUTES: dict[str, HotFollowComposeRoute] = {
     "tts_replace_route": HotFollowComposeRoute(
         name="tts_replace_route",
@@ -105,6 +192,71 @@ _DEFAULT_RUNTIME_BOUNDARY_RULES: dict[str, Any] = {
 
 def _norm(value: Any) -> str:
     return str(value or "").strip().lower()
+
+
+def _dict(value: Any) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _clean(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _route_from_command(command: str) -> str:
+    if command == "enter_tts_replace_route":
+        return "tts_replace_route"
+    if command == "enter_preserve_source_route":
+        return "preserve_source_route"
+    return ""
+
+
+def _route_truth_from_mapping(value: Any, *, source: str) -> HotFollowRouteTruth | None:
+    data = _dict(value)
+    if not data:
+        return None
+    route = _clean(data.get("route") or data.get("target_route") or data.get("selected_compose_route"))
+    if not route:
+        route = _route_from_command(_clean(data.get("command")))
+    if route not in FORMAL_HOT_FOLLOW_ROUTES:
+        return None
+    return HotFollowRouteTruth(
+        route=route,
+        source=source,
+        reason=_clean(data.get("reason") or data.get("route_reason")) or None,
+        event_id=_clean(data.get("event_id") or data.get("id")) or None,
+    )
+
+
+def read_hot_follow_route_truth(
+    *,
+    task: dict[str, Any] | None = None,
+    state: dict[str, Any] | None = None,
+    artifact_facts: dict[str, Any] | None = None,
+) -> HotFollowRouteTruth | None:
+    task_obj = _dict(task)
+    state_obj = _dict(state)
+    artifacts = _dict(artifact_facts)
+    candidates: tuple[tuple[str, Any], ...] = (
+        ("state.route_truth", state_obj.get("route_truth")),
+        ("state.route_event", state_obj.get("route_event")),
+        ("state.latest_route_event", state_obj.get("latest_route_event")),
+        ("state.current_route_event", state_obj.get("current_route_event")),
+        ("task.route_truth", task_obj.get("route_truth")),
+        ("task.route_event", task_obj.get("route_event")),
+        ("task.latest_route_event", task_obj.get("latest_route_event")),
+        ("task.current_route_event", task_obj.get("current_route_event")),
+        ("artifact_facts.route_truth", artifacts.get("route_truth")),
+        ("artifact_facts.route_event", artifacts.get("route_event")),
+        ("artifact_facts.latest_route_event", artifacts.get("latest_route_event")),
+    )
+    for source, candidate in candidates:
+        truth = _route_truth_from_mapping(candidate, source=source)
+        if truth is not None:
+            return truth
+    selected = _dict(artifacts.get("selected_compose_route"))
+    if selected and _clean(selected.get("route_truth_source") or selected.get("contract_version")):
+        return _route_truth_from_mapping(selected, source="artifact_facts.selected_compose_route")
+    return None
 
 
 def _is_tts_failure_reason(value: Any) -> bool:
@@ -312,6 +464,213 @@ def terminal_dub_lane_state(
     return status
 
 
+def _compose_input_from_artifacts(artifacts: dict[str, Any]) -> tuple[bool, bool, bool, str, str]:
+    compose_input = _dict(artifacts.get("compose_input"))
+    mode = _norm(compose_input.get("mode") or artifacts.get("compose_input_mode"))
+    ready = bool(
+        compose_input.get("ready")
+        or artifacts.get("compose_input_ready")
+        or mode in {"direct", "derived_ready"}
+    )
+    blocked = bool(compose_input.get("blocked") or artifacts.get("compose_input_blocked") or mode == "blocked")
+    derive_failed = bool(
+        compose_input.get("derive_failed")
+        or artifacts.get("compose_input_derive_failed")
+        or mode == "derive_failed"
+    )
+    reason = _clean(
+        compose_input.get("failure_code")
+        or artifacts.get("compose_input_failure_code")
+        or compose_input.get("reason")
+        or artifacts.get("compose_input_reason")
+        or mode
+        or "compose_input_not_ready"
+    )
+    return ready, blocked, derive_failed, reason, mode
+
+
+def _subtitle_source_available(subtitle_lane: dict[str, Any]) -> bool:
+    return bool(
+        _clean(subtitle_lane.get("parse_source_text"))
+        or _clean(subtitle_lane.get("raw_source_text"))
+        or _clean(subtitle_lane.get("normalized_source_text"))
+        or subtitle_lane.get("origin_subtitle_exists")
+        or subtitle_lane.get("source_subtitle_exists")
+    )
+
+
+def _target_subtitle_ready(subtitle_lane: dict[str, Any]) -> bool:
+    return bool(
+        subtitle_lane.get("subtitle_ready")
+        and subtitle_lane.get("target_subtitle_current")
+        and subtitle_lane.get("target_subtitle_authoritative_source")
+    )
+
+
+def _subtitle_process_state(route: str, subtitle_lane: dict[str, Any]) -> tuple[bool, bool, str, str]:
+    if route == "preserve_source_route":
+        return False, False, "subtitle_not_required_for_route", "preserve_source_route"
+    target_ready = _target_subtitle_ready(subtitle_lane)
+    if target_ready:
+        return True, True, "target_subtitle_authoritative_current", "ready"
+    status = _norm(subtitle_lane.get("status") or subtitle_lane.get("subtitles_status"))
+    reason = _clean(
+        subtitle_lane.get("target_subtitle_current_reason")
+        or subtitle_lane.get("subtitle_ready_reason")
+        or subtitle_lane.get("reason")
+    )
+    if status in {"running", "processing"}:
+        return True, False, "target_subtitle_materialization_running", reason or "running"
+    if reason in {
+        "target_subtitle_translation_incomplete",
+        "waiting_for_target_subtitle_translation",
+        "helper_output_pending",
+        "helper_translate_pending",
+    }:
+        return True, False, "target_subtitle_materialization_stale_pending", reason
+    if _subtitle_source_available(subtitle_lane):
+        return True, False, "subtitle_source_available", reason or "target_subtitle_missing"
+    if status in {"failed", "error"}:
+        return True, False, "subtitle_terminal_failure", reason or "subtitle_failed"
+    return True, False, "subtitle_source_missing", reason or "subtitle_missing"
+
+
+def build_hot_follow_current_attempt(
+    *,
+    route_truth: HotFollowRouteTruth,
+    artifact_facts: dict[str, Any] | None,
+    subtitle_lane: dict[str, Any] | None,
+    voice_state: dict[str, Any] | None,
+    dub_status: str | None,
+    compose_status: str | None,
+    composed_reason: str | None,
+    final_stale_reason: str | None = None,
+) -> HotFollowCurrentAttempt:
+    artifacts = _dict(artifact_facts)
+    subtitles = _dict(subtitle_lane)
+    voice = _dict(voice_state)
+    audio_lane = _dict(artifacts.get("audio_lane"))
+    route = route_truth.route if route_truth.route in FORMAL_HOT_FOLLOW_ROUTES else "tts_replace_route"
+
+    subtitle_required, subtitle_ready, subtitle_state, subtitle_reason = _subtitle_process_state(route, subtitles)
+    compose_input_ready, compose_blocked, compose_derive_failed, compose_input_reason, _compose_input_mode = _compose_input_from_artifacts(artifacts)
+
+    source_audio_preserved = bool(audio_lane.get("source_audio_preserved"))
+    tts_audio_ready = bool(voice.get("audio_ready"))
+    tts_dub_current = bool(voice.get("dub_current", tts_audio_ready)) and tts_audio_ready
+    audio_ready = tts_audio_ready if route == "tts_replace_route" else source_audio_preserved
+    audio_ready_reason = (
+        _clean(voice.get("audio_ready_reason") or ("ready" if tts_audio_ready else "audio_not_ready"))
+        if route == "tts_replace_route"
+        else ("ready" if source_audio_preserved else "source_audio_not_preserved")
+    )
+
+    route_allowed = route in FORMAL_HOT_FOLLOW_ROUTES
+    route_reason = "ready" if route_allowed else "unknown_route"
+    if route == "preserve_source_route" and not source_audio_preserved:
+        route_allowed = False
+        route_reason = "source_audio_not_preserved"
+
+    dub_status_norm = _norm(dub_status or voice.get("status")) or "absent"
+    if route == "preserve_source_route":
+        dub_state = "dub_not_required_for_route"
+        dub_current = False
+        dub_current_reason = "dub_not_required_for_route"
+    elif not subtitle_ready:
+        dub_state = "dub_waiting_for_target_subtitle"
+        dub_current = False
+        dub_current_reason = "waiting_for_target_subtitle"
+    elif tts_dub_current:
+        dub_state = "dub_ready_current"
+        dub_current = True
+        dub_current_reason = _clean(voice.get("dub_current_reason") or "ready")
+    elif dub_status_norm in {"running", "processing"}:
+        dub_state = "dub_running"
+        dub_current = False
+        dub_current_reason = "dub_running"
+    elif dub_status_norm in {"failed", "error"} or _is_tts_failure_reason(voice.get("audio_ready_reason")):
+        dub_state = "dub_retryable_failure"
+        dub_current = False
+        dub_current_reason = _clean(voice.get("dub_current_reason") or voice.get("audio_ready_reason") or "dub_retryable_failure")
+    else:
+        dub_state = "dub_waiting_for_target_subtitle" if not subtitle_ready else "dub_missing"
+        dub_current = False
+        dub_current_reason = _clean(voice.get("dub_current_reason") or voice.get("audio_ready_reason") or "audio_not_ready")
+
+    if compose_blocked:
+        compose_allowed = False
+        compose_reason = compose_input_reason or "compose_input_blocked"
+    elif compose_derive_failed:
+        compose_allowed = False
+        compose_reason = compose_input_reason or "compose_input_derive_failed"
+    elif not route_allowed:
+        compose_allowed = False
+        compose_reason = route_reason
+    elif route == "tts_replace_route" and not subtitle_ready:
+        compose_allowed = False
+        compose_reason = subtitle_reason or "subtitle_not_ready"
+    elif route == "tts_replace_route" and not dub_current:
+        compose_allowed = False
+        compose_reason = dub_current_reason or "dub_not_current"
+    else:
+        compose_allowed = True
+        compose_reason = "ready"
+
+    compose_execute_allowed = bool(compose_allowed and compose_input_ready)
+    final_fresh = bool(final_stale_reason is None and artifacts.get("final_exists") and _norm(composed_reason) == "ready")
+    requires_redub = bool(route == "tts_replace_route" and subtitle_ready and not dub_current)
+    requires_recompose = bool(compose_allowed and compose_input_ready and not final_fresh and _norm(compose_status) != "running")
+    blocking: list[str] = []
+    if not compose_allowed:
+        blocking.append(compose_reason)
+    elif not compose_input_ready:
+        blocking.append(compose_input_reason or "compose_input_not_ready")
+    pending_class = "none"
+    if subtitle_state.endswith("_running") or dub_state == "dub_running" or _norm(compose_status) in {"running", "processing"}:
+        pending_class = "running"
+    elif subtitle_state.endswith("_stale_pending"):
+        pending_class = "stale_waiting_without_progress"
+    elif blocking:
+        pending_class = "blocked_action_required"
+
+    return HotFollowCurrentAttempt(
+        contract_version="hot_follow_current_attempt_contract_v1",
+        selected_compose_route=route,
+        route_allowed=route_allowed,
+        route_allowed_reason=route_reason,
+        subtitle_required=subtitle_required,
+        subtitle_process_state=subtitle_state,
+        subtitle_ready=subtitle_ready,
+        subtitle_ready_reason=subtitle_reason,
+        target_subtitle_authoritative_current=subtitle_ready,
+        target_subtitle_source=_clean(subtitles.get("actual_burn_subtitle_source")) or None,
+        dub_process_state=dub_state,
+        audio_ready=audio_ready,
+        audio_ready_reason=audio_ready_reason,
+        dub_current=dub_current,
+        dub_current_reason=dub_current_reason,
+        compose_input_ready=compose_input_ready,
+        compose_allowed=compose_allowed,
+        compose_route_allowed=compose_allowed,
+        compose_execute_allowed=compose_execute_allowed,
+        compose_reason=compose_reason if compose_execute_allowed or not compose_input_ready else compose_reason,
+        compose_allowed_reason="ready" if compose_allowed else compose_reason,
+        requires_redub=requires_redub,
+        requires_recompose=requires_recompose,
+        final_fresh=final_fresh,
+        final_stale_reason=final_stale_reason,
+        route_truth_source=route_truth.source,
+        route_truth_reason=route_truth.reason,
+        route_event_id=route_truth.event_id,
+        pending_class=pending_class,
+        blocking=tuple(blocking),
+        helper_translate_status=artifacts.get("helper_translate_status"),
+        helper_translate_output_state=artifacts.get("helper_translate_output_state"),
+        helper_translate_provider_health=artifacts.get("helper_translate_provider_health"),
+        helper_translate_warning_only=bool(artifacts.get("helper_translate_warning_only")),
+    )
+
+
 def _route_should_stay_tts(
     *,
     route_name: str,
@@ -330,6 +689,49 @@ def _route_should_stay_tts(
 
 
 def selected_route_from_state(task: dict, state: dict) -> dict[str, Any]:
+    current_attempt = state.get("current_attempt")
+    if (
+        isinstance(current_attempt, dict)
+        and current_attempt.get("selected_compose_route")
+        and "compose_allowed" in current_attempt
+    ):
+        route_name = str(current_attempt.get("selected_compose_route") or "tts_replace_route").strip()
+        return {
+            "name": route_name,
+            "compose_allowed": bool(current_attempt.get("compose_allowed")),
+            "compose_route_allowed": bool(current_attempt.get("compose_route_allowed", current_attempt.get("compose_allowed"))),
+            "compose_input_ready": bool(current_attempt.get("compose_input_ready")),
+            "compose_input_mode": str(current_attempt.get("compose_input_mode") or "").strip(),
+            "compose_input_reason": str(current_attempt.get("compose_reason") or "").strip(),
+            "compose_execute_allowed": bool(current_attempt.get("compose_execute_allowed")),
+            "blocked_reason": "" if current_attempt.get("compose_allowed") else str(current_attempt.get("compose_allowed_reason") or "route_not_allowed").strip(),
+            "no_tts_compose_allowed": bool(current_attempt.get("no_tts_compose_allowed")),
+            "no_dub_compose_allowed": bool(current_attempt.get("no_dub_compose_allowed")),
+        }
+    route_truth = read_hot_follow_route_truth(task=task, state=state, artifact_facts=_dict(state.get("artifact_facts")))
+    if route_truth is not None:
+        attempt = build_hot_follow_current_attempt(
+            route_truth=route_truth,
+            artifact_facts=_dict(state.get("artifact_facts")),
+            subtitle_lane=_dict(state.get("subtitles")),
+            voice_state=_dict(state.get("audio")),
+            dub_status=str(_dict(state.get("audio")).get("status") or task.get("dub_status") or ""),
+            compose_status=str(state.get("compose_status") or task.get("compose_status") or ""),
+            composed_reason=str(state.get("composed_reason") or task.get("composed_reason") or ""),
+            final_stale_reason=state.get("final_stale_reason") or task.get("final_stale_reason"),
+        ).to_dict()
+        return {
+            "name": attempt["selected_compose_route"],
+            "compose_allowed": bool(attempt["compose_allowed"]),
+            "compose_route_allowed": bool(attempt["compose_route_allowed"]),
+            "compose_input_ready": bool(attempt["compose_input_ready"]),
+            "compose_input_mode": str(attempt.get("compose_input_mode") or "").strip(),
+            "compose_input_reason": str(attempt.get("compose_reason") or "").strip(),
+            "compose_execute_allowed": bool(attempt["compose_execute_allowed"]),
+            "blocked_reason": "" if attempt["compose_allowed"] else str(attempt.get("compose_allowed_reason") or "route_not_allowed").strip(),
+            "no_tts_compose_allowed": bool(attempt.get("no_tts_compose_allowed")),
+            "no_dub_compose_allowed": bool(attempt.get("no_dub_compose_allowed")),
+        }
     existing_process = state.get("hot_follow_process_state") or state.get("process_state")
     if isinstance(existing_process, dict) and existing_process.get("selected_compose_route"):
         route_name = str(existing_process.get("selected_compose_route") or "tts_replace_route").strip()
@@ -526,6 +928,108 @@ def build_hot_follow_current_attempt_summary(
     no_dub: bool = False,
     no_dub_compose_allowed: bool = False,
 ) -> dict[str, Any]:
+    artifacts = artifact_facts or {}
+    route_truth = read_hot_follow_route_truth(artifact_facts=artifacts)
+    if route_truth is not None:
+        attempt = build_hot_follow_current_attempt(
+            route_truth=route_truth,
+            artifact_facts=artifacts,
+            subtitle_lane=subtitle_lane,
+            voice_state=voice_state,
+            dub_status=dub_status,
+            compose_status=compose_status,
+            composed_reason=composed_reason,
+            final_stale_reason=final_stale_reason,
+        )
+        payload = attempt.to_dict()
+        route = payload["selected_compose_route"]
+        no_tts_route = route == "preserve_source_route"
+        dub_status_out = (
+            "skipped"
+            if payload["dub_process_state"] == "dub_not_required_for_route"
+            else (
+                "done"
+                if payload["dub_process_state"] == "dub_ready_current"
+                else (
+                    "running"
+                    if payload["dub_process_state"] == "dub_running"
+                    else ("failed" if payload["dub_process_state"] == "dub_retryable_failure" else "pending")
+                )
+            )
+        )
+        compose_status_norm = _norm(compose_status) or "never"
+        if payload["compose_execute_allowed"] and compose_status_norm not in {"running", "processing"}:
+            compose_status_norm = "pending"
+        if payload["final_fresh"]:
+            compose_status_norm = "done"
+        process_state = {
+            "version": "hot_follow_current_attempt_contract_v1",
+            "selected_compose_route": route,
+            "route_allowed": payload["route_allowed"],
+            "route_allowed_reason": payload["route_allowed_reason"],
+            "subtitle_required": payload["subtitle_required"],
+            "subtitle_process_state": payload["subtitle_process_state"],
+            "subtitle_step_status": "done" if payload["subtitle_ready"] else ("skipped" if no_tts_route else "pending"),
+            "subtitle_terminal_state": "no_dub_route_terminal" if no_tts_route else None,
+            "subtitle_translation_waiting_retryable": payload["pending_class"] == "stale_waiting_without_progress",
+            "target_subtitle_authoritative_current": payload["target_subtitle_authoritative_current"],
+            "dub_process_state": payload["dub_process_state"],
+            "dub_step_status": dub_status_out,
+            "audio_ready": payload["audio_ready"],
+            "audio_ready_reason": payload["audio_ready_reason"],
+            "dub_current": payload["dub_current"],
+            "dub_current_reason": payload["dub_current_reason"],
+            "compose_process_state": "compose_allowed_ready" if payload["compose_allowed"] else "compose_not_allowed",
+            "compose_step_status": compose_status_norm,
+            "compose_allowed": payload["compose_allowed"],
+            "compose_input_ready": payload["compose_input_ready"],
+            "compose_execute_allowed": payload["compose_execute_allowed"],
+            "compose_allowed_reason": payload["compose_allowed_reason"],
+            "compose_reason": payload["compose_reason"],
+            "no_tts_compose_allowed": no_tts_route and payload["compose_allowed"],
+            "no_dub_compose_allowed": no_tts_route and payload["compose_allowed"],
+            "no_dub": no_tts_route,
+            "no_dub_reason": "source_audio_preserved_no_tts" if no_tts_route else None,
+            "requires_redub": payload["requires_redub"],
+            "requires_recompose": payload["requires_recompose"],
+            "current_subtitle_source": payload["target_subtitle_source"],
+        }
+        payload.update(
+            {
+                "dub_status": dub_status_out,
+                "requested_voice": str(voice_state.get("requested_voice") or "").strip() or None,
+                "resolved_voice": str(voice_state.get("resolved_voice") or "").strip() or None,
+                "actual_provider": str(voice_state.get("actual_provider") or "").strip() or None,
+                "compose_status": compose_status_norm,
+                "final_stale_reason": final_stale_reason or None,
+                "no_tts_compose_allowed": no_tts_route and payload["compose_allowed"],
+                "no_dub_compose_allowed": no_tts_route and payload["compose_allowed"],
+                "compose_blocked_terminal": bool(_compose_input_from_artifacts(artifacts)[1]),
+                "compose_input_derive_failed_terminal": bool(_compose_input_from_artifacts(artifacts)[2]),
+                "compose_input_blocked_terminal": bool(_compose_input_from_artifacts(artifacts)[1]),
+                "compose_exec_failed_terminal": _norm(compose_status) in {"failed", "error"},
+                "compose_terminal_state": None,
+                "subtitle_empty_terminal": False,
+                "no_dub_route_terminal": no_tts_route,
+                "tts_lane_expected": route == "tts_replace_route" and payload["subtitle_ready"],
+                "retriable_dub_failure": payload["dub_process_state"] == "dub_retryable_failure",
+                "current_attempt_failure_class": "retriable_dub_failure" if payload["dub_process_state"] == "dub_retryable_failure" else None,
+                "subtitle_translation_waiting_retryable": payload["pending_class"] == "stale_waiting_without_progress",
+                "helper_translate_composite_state": artifacts.get("helper_translate_composite_state"),
+                "helper_translate_failed": False,
+                "helper_translate_failed_voice_led": False,
+                "helper_translate_error_reason": artifacts.get("helper_translate_error_reason"),
+                "helper_translate_error_message": artifacts.get("helper_translate_error_message"),
+                "helper_translate_retryable": bool(artifacts.get("helper_translate_retryable")),
+                "helper_translate_terminal": bool(artifacts.get("helper_translate_terminal")),
+                "subtitle_terminal_state": process_state["subtitle_terminal_state"],
+                "process_state": process_state,
+                "hot_follow_process_state": process_state,
+                "current_subtitle_source": payload["target_subtitle_source"],
+            }
+        )
+        return payload
+
     rules = _runtime_boundary_rules({})
     artifacts = artifact_facts or {}
     compose_status_norm = _norm(compose_status) or "never"

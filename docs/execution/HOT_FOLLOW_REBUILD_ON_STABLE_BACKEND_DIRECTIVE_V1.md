@@ -1,7 +1,7 @@
 # HOT_FOLLOW_REBUILD_ON_STABLE_BACKEND_DIRECTIVE_V1
 
 Status: Approved for execution  
-Target branch: `VeoBase03`  
+Target branch: `VeoReBuild01`
 Execution mode: Contract-first, wave-based rebuild  
 Decision baseline: Rebuild on stable backend service layer; reject both another patch round and a full-scratch rebuild.
 
@@ -21,6 +21,50 @@ This is a controlled rebuild that:
 - proceeds in verifiable waves with explicit stop/go gates
 
 If this directive is not followed as written, the rebuild is considered out of contract.
+
+---
+
+## 1A. Index-First Wave 0 Governance
+
+Wave 0 must start from the repo engineering-rule and business/document indexes. This directive is not standalone authority.
+
+Engineering-rule entrypoints must be read first:
+
+- `ENGINEERING_CONSTRAINTS_INDEX.md`
+- `ENGINEERING_RULES.md`
+- `ENGINEERING_STATUS.md`
+- `PROJECT_RULES.md`
+
+Business/document entrypoints must be read second:
+
+- `docs/ENGINEERING_INDEX.md`
+- `docs/README.md`
+- `docs/contracts/`
+- `docs/architecture/`
+- `docs/product/`
+- `docs/design/`
+- `docs/runbooks/`
+- `docs/sop/hot_follow/`
+
+Wave 0 cannot be accepted unless all of the following are frozen and linked back to governing source files:
+
+1. Engineering Rule Index.
+2. Business Rule Index.
+3. Route event contract.
+4. CurrentAttempt contract.
+5. Surface consumption contract.
+6. Preserved vs rebuilt component inventory.
+7. Wave 0 freeze note / go-no-go for Wave 1.
+
+Frozen Wave 0 documents:
+
+- `docs/execution/hot_follow_rebuild_engineering_rule_index_v1.md`
+- `docs/execution/hot_follow_rebuild_business_rule_index_v1.md`
+- `docs/contracts/hot_follow_route_event_contract_v1.md`
+- `docs/contracts/hot_follow_current_attempt_contract_v1.md`
+- `docs/contracts/hot_follow_surface_consumption_contract_v1.md`
+- `docs/execution/hot_follow_rebuild_component_inventory_v1.md`
+- `docs/execution/hot_follow_wave0_freeze_note_v1.md`
 
 ---
 
@@ -174,24 +218,41 @@ Implementation must proceed in the following waves and may not skip ahead.
 Freeze rebuild boundary, contracts, and execution order before runtime changes.
 
 ### Scope
+- read engineering-rule entrypoints first
+- read business/document entrypoints second
 - create and freeze this directive
+- create Engineering Rule Index
+- create Business Rule Index
 - create route event contract
 - create CurrentAttempt contract
 - create surface consumption contract
 - define preserved vs rebuilt component inventory
+- write Wave 0 freeze note / go-no-go for Wave 1
 
 ### Deliverables
 - `docs/execution/HOT_FOLLOW_REBUILD_ON_STABLE_BACKEND_DIRECTIVE_V1.md`
-- route event contract doc
-- CurrentAttempt contract doc
-- surface response contract mapping note
+- `docs/execution/hot_follow_rebuild_engineering_rule_index_v1.md`
+- `docs/execution/hot_follow_rebuild_business_rule_index_v1.md`
+- `docs/contracts/hot_follow_route_event_contract_v1.md`
+- `docs/contracts/hot_follow_current_attempt_contract_v1.md`
+- `docs/contracts/hot_follow_surface_consumption_contract_v1.md`
+- `docs/execution/hot_follow_rebuild_component_inventory_v1.md`
+- `docs/execution/hot_follow_wave0_freeze_note_v1.md`
 
 ### Acceptance
+- engineering-rule entrypoints read and cited
+- business/document entrypoints read and cited
+- Engineering Rule Index frozen
+- Business Rule Index frozen
+- route event contract frozen
+- CurrentAttempt contract frozen
+- surface consumption contract frozen
 - preserved backend inventory listed
 - rebuilt components listed
 - frozen business paths listed
 - event-sourced route rule frozen
 - wave order frozen
+- no runtime behavior changed
 
 ### Stop rule
 No Wave 1 work starts until Wave 0 is frozen.
@@ -373,13 +434,15 @@ Each wave report must include:
 
 Codex must execute in this exact order:
 
-1. write/freeze directive and contract docs
-2. implement Wave 1
-3. validate Wave 1
-4. implement Wave 2
-5. validate Wave 2
-6. implement Wave 3 parallel router shrink + scenario validation
-7. produce final go/no-go report
+1. read engineering-rule entrypoints
+2. read business/document entrypoints
+3. write/freeze directive, index-derived Wave 0 docs, and contract docs
+4. implement Wave 1
+5. validate Wave 1
+6. implement Wave 2
+7. validate Wave 2
+8. implement Wave 3 parallel router shrink + scenario validation
+9. produce final go/no-go report
 
 Codex must not:
 - add extra scope
