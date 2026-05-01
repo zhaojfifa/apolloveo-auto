@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ line_label }}当前接通版本 - ShortVideo</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <style>
+    :root { color-scheme: light; }
+    body { margin:0; padding:16px; background:#f3f4f6; color:#111827; font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    .page { max-width: 920px; margin: 0 auto; }
+    .card { background:#fff; border:1px solid #e5e7eb; border-radius:14px; padding:18px; box-shadow:0 1px 2px rgba(15,23,42,.06); }
+    .stack { display:grid; gap:14px; }
+    .badge { display:inline-flex; width:max-content; border-radius:999px; background:#fef3c7; color:#92400e; padding:4px 10px; font-size:12px; font-weight:700; }
+    .muted { color:#64748b; line-height:1.6; }
+    .actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+    .btn-primary, .btn-secondary { border-radius:10px; padding:10px 14px; font-weight:700; text-decoration:none; }
+    .btn-primary { background:#2563eb; color:#fff; border:1px solid #2563eb; }
+    .btn-secondary { background:#fff; color:#111827; border:1px solid #d1d5db; }
+    code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:1px 5px; }
+  </style>
+</head>
+<body>
+  <div class="page" data-role="temporary-connected-line" data-line-id="{{ line_id }}" data-page-role="{{ page_role }}">
+    {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
+    {% set topbar_title = line_label %}
+    {% set topbar_subtitle = "当前为接通版本，后续会进入正式产线入口优化" %}
+    {% set topbar_nav = [
+      {"label": "任务", "href": "/tasks" ~ ui_q, "active": false},
+      {"label": "工具", "href": "/tools/hub" ~ ui_q, "active": false}
+    ] %}
+    {% set topbar_actions = [
+      {"label": "返回新建任务", "href": "/tasks/newtasks" ~ ui_q, "primary": false},
+      {"label": "返回任务看板", "href": "/tasks" ~ ui_q, "primary": false}
+    ] %}
+    {% include "_topbar.html" %}
+
+    <main class="stack">
+      <section class="card">
+        <span class="badge">当前接通版本</span>
+        <h1>{{ next_label }}</h1>
+        <p class="muted">
+          这是 <code>{{ line_id }}</code> 的临时连接入口，用于先保证运营可见链路从新建任务、任务页、工作台到发布页可达。
+          当前页面不承载最终产线能力，不新增运行时真相，也不替代后续正式 create-entry 优化。
+        </p>
+        <p class="muted">
+          未来替换点：{{ future_replace }}。
+        </p>
+      </section>
+
+      <section class="card">
+        <h2>当前链路</h2>
+        <p class="muted">
+          新建任务 → {{ line_label }}临时入口 → 任务页筛选 → {{ line_label }}临时工作台 → {{ line_label }}临时发布页。
+        </p>
+        <div class="actions">
+          <a class="btn-secondary" href="{{ board_href }}{{ '&ui_locale=' ~ ui_locale if ui_locale else '' }}">进入任务页</a>
+          <a class="btn-primary" href="{{ workbench_href }}{{ '?ui_locale=' ~ ui_locale if ui_locale else '' }}">进入工作台</a>
+          <a class="btn-secondary" href="{{ delivery_href }}{{ '?ui_locale=' ~ ui_locale if ui_locale else '' }}">进入发布页</a>
+        </div>
+      </section>
+
+      {% if page_role == "workbench" %}
+        <section class="card">
+          <h2>工作台说明</h2>
+          <p class="muted">当前为 placeholder workbench，只声明线别和连通状态，不发明字段真相、任务状态或交付真相。</p>
+          <div class="actions">
+            <a class="btn-primary" href="{{ delivery_href }}{{ '?ui_locale=' ~ ui_locale if ui_locale else '' }}">前往发布页</a>
+          </div>
+        </section>
+      {% elif page_role == "delivery" %}
+        <section class="card">
+          <h2>发布页说明</h2>
+          <p class="muted">当前为 placeholder delivery，只说明该线发布入口已接通；正式交付能力以后续产线实现为准。</p>
+          <div class="actions">
+            <a class="btn-secondary" href="{{ workbench_href }}{{ '?ui_locale=' ~ ui_locale if ui_locale else '' }}">返回工作台</a>
+          </div>
+        </section>
+      {% endif %}
+    </main>
+  </div>
+  <script src="/static/js/i18n_v185.js"></script>
+</body>
+</html>

@@ -532,6 +532,70 @@ async def tasks_newtasks(request: Request) -> HTMLResponse:
     )
 
 
+_TEMP_CONNECTED_LINES = {
+    "matrix_script": {
+        "label": "矩阵脚本",
+        "next_label": "矩阵脚本当前接通版本",
+        "future_replace": "正式 Matrix Script create-entry route",
+    },
+    "digital_anchor": {
+        "label": "数字人IP",
+        "next_label": "数字人IP当前接通版本",
+        "future_replace": "正式 Digital Anchor create-entry route",
+    },
+}
+
+
+def _temporary_connected_line_context(line_id: str, page_role: str) -> dict:
+    line = _TEMP_CONNECTED_LINES.get(line_id)
+    if not line:
+        raise HTTPException(status_code=404, detail="Temporary connected line not found")
+    return {
+        "line_id": line_id,
+        "line_label": line["label"],
+        "next_label": line["next_label"],
+        "page_role": page_role,
+        "future_replace": line["future_replace"],
+        "create_href": f"/tasks/connect/{line_id}/new",
+        "board_href": f"/tasks?kind={line_id}",
+        "workbench_href": f"/tasks/connect/{line_id}/workbench",
+        "delivery_href": f"/tasks/connect/{line_id}/publish",
+    }
+
+
+@pages_router.get("/tasks/connect/{line_id}/new", response_class=HTMLResponse)
+async def temporary_connected_create_entry(request: Request, line_id: str) -> HTMLResponse:
+    """Render a temporary connected create entry for lines awaiting formal create routes."""
+
+    return render_template(
+        request=request,
+        name="tasks_connected_placeholder.html",
+        ctx=_temporary_connected_line_context(line_id, "create"),
+    )
+
+
+@pages_router.get("/tasks/connect/{line_id}/workbench", response_class=HTMLResponse)
+async def temporary_connected_workbench(request: Request, line_id: str) -> HTMLResponse:
+    """Render a temporary connected workbench placeholder."""
+
+    return render_template(
+        request=request,
+        name="tasks_connected_placeholder.html",
+        ctx=_temporary_connected_line_context(line_id, "workbench"),
+    )
+
+
+@pages_router.get("/tasks/connect/{line_id}/publish", response_class=HTMLResponse)
+async def temporary_connected_delivery(request: Request, line_id: str) -> HTMLResponse:
+    """Render a temporary connected delivery placeholder."""
+
+    return render_template(
+        request=request,
+        name="tasks_connected_placeholder.html",
+        ctx=_temporary_connected_line_context(line_id, "delivery"),
+    )
+
+
 @pages_router.get("/tasks/apollo-avatar/new", response_class=HTMLResponse)
 async def tasks_apollo_avatar_new(request: Request) -> HTMLResponse:
     settings = get_settings()

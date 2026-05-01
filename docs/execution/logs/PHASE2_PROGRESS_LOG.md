@@ -624,3 +624,70 @@ Red lines preserved:
   the existing Burmese / Vietnamese scope
 
 Evidence: `docs/execution/evidence/new_tasks_line_first_surface_wiring_v1.md`
+
+## Surface Connect-First Routing
+
+Date: 2026-05-01
+
+This node ran the narrow connect-first wave. Hot Follow was attached to its
+formal route chain, while Matrix Script and Digital Anchor received explicit
+temporary connected paths so the operator-visible flow is reachable without
+using disabled legacy routes or debug panels.
+
+Files changed:
+
+- `gateway/app/routers/tasks.py`
+- `gateway/app/templates/tasks_connected_placeholder.html`
+- `gateway/app/templates/tasks_newtasks.html`
+- `gateway/app/services/tests/test_new_tasks_surface.py`
+- `docs/execution/evidence/new_tasks_line_first_surface_wiring_v1.md`
+- `docs/execution/logs/PHASE2_PROGRESS_LOG.md`
+- `docs/execution/apolloveo_2_0_evidence_index_v1.md`
+
+Final New Tasks card targets:
+
+- 数字人IP (`digital_anchor`) -> `/tasks/connect/digital_anchor/new`
+- 热点跟拍 (`hot_follow`) -> `/tasks/hot/new`
+- 矩阵脚本 (`matrix_script`) -> `/tasks/connect/matrix_script/new`
+- 基础剪辑 (`baseline`) -> `/tasks/baseline/new`
+
+Formal vs temporary:
+
+- `hot_follow`: formal chain `/tasks/hot/new?ui_locale=zh` ->
+  `/tasks/{task_id}` (`hot_follow_workbench.html`) ->
+  `/tasks/{task_id}/publish` (`hot_follow_publish.html`)
+- `matrix_script`: temporary connected chain
+  `/tasks/connect/matrix_script/new?ui_locale=zh` ->
+  `/tasks/connect/matrix_script/workbench?ui_locale=zh` ->
+  `/tasks/connect/matrix_script/publish?ui_locale=zh`
+- `digital_anchor`: temporary connected chain
+  `/tasks/connect/digital_anchor/new?ui_locale=zh` ->
+  `/tasks/connect/digital_anchor/workbench?ui_locale=zh` ->
+  `/tasks/connect/digital_anchor/publish?ui_locale=zh`
+- `baseline`: compatibility chain via `/tasks/baseline/new?ui_locale=zh`
+
+Placeholder rules:
+
+- temporary pages visibly say "当前接通版本"
+- temporary pages identify the line id and page role
+- temporary pages do not claim final production-line capability
+- temporary pages do not introduce task truth or deliverable truth
+
+Tests:
+
+- `python3.11 -m pytest gateway/app/services/tests/test_new_tasks_surface.py gateway/app/services/tests/test_task_router_presenters.py -q`
+  -> **38 passed**
+
+Red lines preserved:
+
+- no New Tasks layout redesign
+- no Board redesign
+- no Workbench architecture redesign
+- no Delivery redesign
+- no B-roll work
+- no packet/schema/runtime truth change
+- no provider/model/vendor/engine exposure
+- no language logic change
+- no Platform Runtime Assembly
+
+Evidence: `docs/execution/evidence/new_tasks_line_first_surface_wiring_v1.md`

@@ -1,16 +1,19 @@
-# Evidence: New Tasks Strict Card Link Correction v1
+# Evidence: Surface Connect-First Routing v1
 
 Date: 2026-05-01
-Scope: New Tasks entry surface only
+Scope: New Tasks routing + temporary connected paths for incomplete lines
 
 ## What Changed
 
-Restored `/tasks/newtasks` to the original card-based visual/layout baseline
-and corrected the primary card targets so no New Tasks card points at disabled
-legacy scene routes.
+Ran the narrow connect-first wave. Hot Follow now uses its existing formal
+create entry, while Matrix Script and Digital Anchor use explicit temporary
+connected paths until their formal create-entry routes are commissioned.
+Baseline remains on the existing compatibility entry.
 
 Files changed:
 
+- `gateway/app/routers/tasks.py`
+- `gateway/app/templates/tasks_connected_placeholder.html`
 - `gateway/app/templates/tasks_newtasks.html`
 - `gateway/app/services/tests/test_new_tasks_surface.py`
 
@@ -22,7 +25,7 @@ Files changed:
 - Legacy `/tasks/avatar/new` and `/tasks/apollo-avatar/new` are not used by
   primary New Tasks cards.
 
-## Surface Contract
+## New Tasks Card Mapping
 
 `/tasks/newtasks` is selection-only, keeps the original New Tasks card visual
 baseline (`wizard-wrap`, `wizard-card`, `icon-box`, Tailwind grid, original
@@ -30,10 +33,23 @@ topbar and bottom guidance rhythm), and renders four card entries:
 
 | Visible label | Internal id | Active target |
 | --- | --- | --- |
-| 数字人IP | `digital_anchor` | `/tasks/new?line=digital_anchor` |
-| 热点跟拍 | `hot_follow` | `/tasks/new?line=hot_follow` |
-| 矩阵脚本 | `matrix_script` | `/tasks/new?line=matrix_script` |
-| 基础剪辑 | `baseline` | `/tasks/new?line=baseline` |
+| 数字人IP | `digital_anchor` | `/tasks/connect/digital_anchor/new` |
+| 热点跟拍 | `hot_follow` | `/tasks/hot/new` |
+| 矩阵脚本 | `matrix_script` | `/tasks/connect/matrix_script/new` |
+| 基础剪辑 | `baseline` | `/tasks/baseline/new` |
+
+## Formal vs Temporary Connected
+
+| Line | Status | Create / entry | Workbench | Delivery |
+| --- | --- | --- | --- | --- |
+| `hot_follow` | Formal | `/tasks/hot/new?ui_locale=zh` | `/tasks/{task_id}` -> `hot_follow_workbench.html` | `/tasks/{task_id}/publish` -> `hot_follow_publish.html` |
+| `matrix_script` | Temporary connected | `/tasks/connect/matrix_script/new?ui_locale=zh` | `/tasks/connect/matrix_script/workbench?ui_locale=zh` | `/tasks/connect/matrix_script/publish?ui_locale=zh` |
+| `digital_anchor` | Temporary connected | `/tasks/connect/digital_anchor/new?ui_locale=zh` | `/tasks/connect/digital_anchor/workbench?ui_locale=zh` | `/tasks/connect/digital_anchor/publish?ui_locale=zh` |
+| `baseline` | Compatibility | `/tasks/baseline/new?ui_locale=zh` | `/tasks/{task_id}` fallback workbench | `/tasks/{task_id}/publish` fallback delivery |
+
+The temporary connected page clearly labels itself as "当前接通版本" and states
+that it does not represent final production-line capability or introduce task /
+delivery truth.
 
 The page preserves:
 
@@ -68,7 +84,7 @@ python3.11 -m pytest gateway/app/services/tests/test_new_tasks_surface.py gatewa
 Result:
 
 ```text
-35 passed
+38 passed
 ```
 
 Coverage:
@@ -78,20 +94,24 @@ Coverage:
   line ids
 - New Tasks has no workbench-like form, target-language inputs, helper
   textarea, or envelope counters
-- every visible card uses `/tasks/new?line=<line_id>` as the active create
-  target
-- `/tasks/new?line=digital_anchor`, `/tasks/new?line=hot_follow`,
-  `/tasks/new?line=matrix_script`, and `/tasks/new?line=baseline` load the
-  active create template and do not return `ApolloAvatar is disabled`
+- Hot Follow card targets `/tasks/hot/new`, which renders
+  `hot_follow_new.html`
+- Hot Follow task workbench and delivery resolve to `hot_follow_workbench.html`
+  and `hot_follow_publish.html`
+- Matrix Script and Digital Anchor temporary create / workbench / delivery
+  paths load and identify the correct line id and page role
+- Digital Anchor no longer lands on `/tasks/avatar/new` and does not return
+  `ApolloAvatar is disabled`
 - original visual baseline classes remain present and the semi-custom
   `line-card` / `newtasks-header` / `page-shell` variant is absent
 
 ## Red Lines
 
-- New Tasks change only.
 - No Board redesign.
-- No Workbench implementation changed.
-- No Delivery implementation changed.
+- Workbench change limited to temporary connected placeholder routes for
+  Matrix Script and Digital Anchor.
+- Delivery change limited to temporary connected placeholder routes for
+  Matrix Script and Digital Anchor.
 - No Hot Follow panel implementation changed.
 - No B-roll implementation changed.
 - No packet/schema change.
