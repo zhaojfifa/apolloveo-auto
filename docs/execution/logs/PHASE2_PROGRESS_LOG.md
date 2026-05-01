@@ -519,16 +519,19 @@ Result:
   Runtime Assembly, W2.2/W2.3, or provider/model/vendor surface exposure is
   unlocked by this product-freeze step.
 
-## New Tasks Line-First Surface Wiring
+## New Tasks Card-Based Line Entry Rollback
 
 Date: 2026-05-01
 
-This node retargeted the active `/tasks/newtasks` operator-visible surface
-from the legacy scene wizard to the frozen line-first New Tasks design. Scope
-was limited to New Tasks only.
+This node rolled back `/tasks/newtasks` from the semi-workbench intake form
+to a card-based line selection page, then aligned the active `/tasks` Board
+taxonomy with the same line vocabulary. Scope was limited to Board taxonomy
+and New Tasks entry consistency.
 
 Files changed:
 
+- `gateway/app/services/task_semantics.py`
+- `gateway/app/templates/tasks.html`
 - `gateway/app/templates/tasks_newtasks.html`
 - `gateway/app/services/tests/test_new_tasks_surface.py`
 - `docs/execution/evidence/new_tasks_line_first_surface_wiring_v1.md`
@@ -537,16 +540,19 @@ Files changed:
 
 What changed:
 
-- `/tasks/newtasks` now renders the three frozen production line entries:
-  `hot_follow`, `matrix_script`, `digital_anchor`.
-- The active template is line-first and shows line-specific intake fields plus
-  read-only envelope completeness counters.
-- The legacy scene-wizard links `/tasks/avatar/new`, `/tasks/hot/new`, and
-  `/tasks/baseline/new` were removed from the primary New Tasks page.
+- `/tasks/newtasks` is card-based selection only again.
+- New Tasks renders four entries: 热点跟拍 (`hot_follow`), 矩阵脚本
+  (`matrix_script`), 数字人IP (`digital_anchor`), 基础剪辑 (`baseline`).
+- Workbench-like inline fields, target-language controls, helper translation
+  textarea, envelope counters, and `generic_refs` / `line_specific_refs`
+  display were removed from New Tasks.
+- `/tasks` line tabs and task-card labels now use the same active taxonomy:
+  全部场景 / 热点跟拍 / 矩阵脚本 / 数字人IP / 基础剪辑.
 - `/tasks` continues to link its top-right new-task action to
   `/tasks/newtasks`.
-- `/tasks/new` remains a compatibility path and was not made the primary
-  operator-visible New Tasks page.
+- `/tasks/new`, `/tasks/avatar/new`, `/tasks/hot/new`, and
+  `/tasks/baseline/new` remain compatibility / next-step paths and do not
+  define the primary operator-visible taxonomy.
 
 Tests:
 
@@ -555,7 +561,7 @@ Tests:
 
 Red lines preserved:
 
-- no Board change
+- Board change limited to line taxonomy/filter labels
 - no Workbench change
 - no Delivery change
 - no Hot Follow panel change
@@ -563,5 +569,7 @@ Red lines preserved:
 - no provider/model/vendor controls
 - no packet/schema change
 - no Platform Runtime Assembly
+- no language-system redesign; target-language behavior remains limited to
+  the existing Burmese / Vietnamese scope
 
 Evidence: `docs/execution/evidence/new_tasks_line_first_surface_wiring_v1.md`

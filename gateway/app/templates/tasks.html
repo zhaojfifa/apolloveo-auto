@@ -37,12 +37,18 @@
       </div>
     </header>
 
-    <div class="filter-console">
-      <div class="scene-tabs">
-        <button class="scene-tab" data-scene="all" data-active="true">{{ t("tasks.filter.scene.all") }}</button>
-        <button class="scene-tab" data-scene="avatar">{{ t("tasks.filter.scene.avatar") }}</button>
-        <button class="scene-tab" data-scene="hot_follow">{{ t("tasks.filter.scene.hot_follow") }}</button>
-        <button class="scene-tab" data-scene="baseline">{{ t("tasks.filter.scene.baseline") }}</button>
+    {% set line_taxonomy = [
+      {"id": "all", "label": "全部场景"},
+      {"id": "hot_follow", "label": "热点跟拍"},
+      {"id": "matrix_script", "label": "矩阵脚本"},
+      {"id": "digital_anchor", "label": "数字人IP"},
+      {"id": "baseline", "label": "基础剪辑"}
+    ] %}
+    <div class="filter-console" data-role="board-line-taxonomy">
+      <div class="scene-tabs" data-role="board-line-tabs">
+        {% for line in line_taxonomy %}
+          <button class="scene-tab" data-line="{{ line.id }}" data-active="{{ 'true' if line.id == 'all' else 'false' }}">{{ line.label }}</button>
+        {% endfor %}
       </div>
       <div class="status-legend">
         <span class="status-legend__label">状态</span>
@@ -68,16 +74,25 @@
         {% set cover = it.cover_url or it.cover or it.cover_head or it.thumb_url or "" %}
         {% set platform = it.platform or it.source_platform or it.site or "-" %}
         {% set created = it.created_label or it.created_at or it.created_time or it.created or "" %}
-        {% set scene_raw = (it.kind or it.category or it.scene or "baseline") | lower %}
-        {% if it.scene_label_key %}
-          {% set scene_label = t(it.scene_label_key) %}
-        {% elif "avatar" in scene_raw %}
-          {% set scene_label = t("tasks.filter.scene.avatar") %}
-        {% elif "hot" in scene_raw %}
-          {% set scene_label = t("tasks.filter.scene.hot_follow") %}
-        {% else %}
-          {% set scene_label = t("tasks.filter.scene.baseline") %}
+        {% set line_raw = it.scene_key or it.line_id or it.kind or it.category or it.scene or it.platform or it.category_key or "baseline" %}
+        {% set line_id = line_raw | lower %}
+        {% if line_id == "apollo_avatar" or line_id == "apollo-avatar" or line_id == "avatar" %}
+          {% set line_id = "digital_anchor" %}
+        {% elif line_id == "matrix-script" %}
+          {% set line_id = "matrix_script" %}
+        {% elif line_id == "digital-anchor" %}
+          {% set line_id = "digital_anchor" %}
+        {% elif "hot" in line_id or "follow" in line_id %}
+          {% set line_id = "hot_follow" %}
+        {% elif line_id not in ["hot_follow", "matrix_script", "digital_anchor", "baseline"] %}
+          {% set line_id = "baseline" %}
         {% endif %}
+        {% set line_match = namespace(label="基础剪辑") %}
+        {% for line in line_taxonomy %}
+          {% if line.id == line_id %}
+            {% set line_match.label = line.label %}
+          {% endif %}
+        {% endfor %}
         {% set status_value = it.filter_status or it.status or "unknown" %}
         {% if status_value == "done" %}
           {% set status_label = t("tasks.filter.status.done") %}
@@ -96,7 +111,7 @@
           {% set badge_class = "badge-gray" %}
         {% endif %}
         {% set bucket_value = it.board_bucket or "ready" %}
-        <div class="task-card task-row" data-scene="{{ it.scene_key or scene_raw }}" data-status="{{ status_value }}" data-bucket="{{ bucket_value }}">
+        <div class="task-card task-row" data-line="{{ line_id }}" data-status="{{ status_value }}" data-bucket="{{ bucket_value }}">
           <div class="task-card__left">
             {% if cover %}
               <img class="task-card__cover" src="{{ cover }}" alt="cover" />
@@ -111,7 +126,7 @@
                 <span>ID: {{ task_id }}</span>
               </div>
               <div class="task-card__meta">
-                <span class="task-pill">{{ scene_label }}</span>
+                <span class="task-pill" data-role="board-line-label">{{ line_match.label }}</span>
                 {% if created %}
                   <span title="{{ it.created_at or created }}">{{ created }}</span>
                 {% endif %}
@@ -183,16 +198,16 @@
       const rows = Array.from(document.querySelectorAll(".task-row"));
       let shown = 0;
       const curStatus = document.querySelector(".status-item[data-active='true']")?.dataset.status || "all";
-      const curScene = document.querySelector(".scene-tab[data-active='true']")?.dataset.scene || "all";
+      const curLine = document.querySelector(".scene-tab[data-active='true']")?.dataset.line || "all";
       const curBucket = document.querySelector(".bucket-item[data-active='true']")?.dataset.bucket || "all";
       rows.forEach((r) => {
         const rs = r.getAttribute("data-status") || "other";
-        const rc = r.getAttribute("data-scene") || "baseline";
+        const rl = r.getAttribute("data-line") || "baseline";
         const rb = r.getAttribute("data-bucket") || "ready";
         const okStatus = (curStatus === "all") ? true : (rs === curStatus);
-        const okScene = (curScene === "all") ? true : (rc === curScene);
+        const okLine = (curLine === "all") ? true : (rl === curLine);
         const okBucket = (curBucket === "all") ? true : (rb === curBucket);
-        const show = okStatus && okScene && okBucket;
+        const show = okStatus && okLine && okBucket;
         r.style.display = show ? "" : "none";
         if (show) shown++;
       });

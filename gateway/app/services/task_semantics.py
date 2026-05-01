@@ -19,8 +19,12 @@ def _scene_key(task: dict) -> str:
         or task.get("category_key")
         or ""
     )
+    if "digital_anchor" in kind or "digital-anchor" in kind:
+        return "digital_anchor"
+    if "matrix_script" in kind or "matrix-script" in kind:
+        return "matrix_script"
     if "apollo_avatar" in kind or "apollo-avatar" in kind or "avatar" in kind:
-        return "avatar"
+        return "digital_anchor"
     if "hot" in kind or "follow" in kind:
         return "hot_follow"
     return "baseline"
