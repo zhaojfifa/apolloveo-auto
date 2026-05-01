@@ -518,3 +518,50 @@ Result:
   consumption. No UI truth ownership, packet/schema redesign, Platform
   Runtime Assembly, W2.2/W2.3, or provider/model/vendor surface exposure is
   unlocked by this product-freeze step.
+
+## New Tasks Line-First Surface Wiring
+
+Date: 2026-05-01
+
+This node retargeted the active `/tasks/newtasks` operator-visible surface
+from the legacy scene wizard to the frozen line-first New Tasks design. Scope
+was limited to New Tasks only.
+
+Files changed:
+
+- `gateway/app/templates/tasks_newtasks.html`
+- `gateway/app/services/tests/test_new_tasks_surface.py`
+- `docs/execution/evidence/new_tasks_line_first_surface_wiring_v1.md`
+- `docs/execution/logs/PHASE2_PROGRESS_LOG.md`
+- `docs/execution/apolloveo_2_0_evidence_index_v1.md`
+
+What changed:
+
+- `/tasks/newtasks` now renders the three frozen production line entries:
+  `hot_follow`, `matrix_script`, `digital_anchor`.
+- The active template is line-first and shows line-specific intake fields plus
+  read-only envelope completeness counters.
+- The legacy scene-wizard links `/tasks/avatar/new`, `/tasks/hot/new`, and
+  `/tasks/baseline/new` were removed from the primary New Tasks page.
+- `/tasks` continues to link its top-right new-task action to
+  `/tasks/newtasks`.
+- `/tasks/new` remains a compatibility path and was not made the primary
+  operator-visible New Tasks page.
+
+Tests:
+
+- `python3.11 -m pytest gateway/app/services/tests/test_new_tasks_surface.py -q`
+  → **3 passed**
+
+Red lines preserved:
+
+- no Board change
+- no Workbench change
+- no Delivery change
+- no Hot Follow panel change
+- no B-roll change
+- no provider/model/vendor controls
+- no packet/schema change
+- no Platform Runtime Assembly
+
+Evidence: `docs/execution/evidence/new_tasks_line_first_surface_wiring_v1.md`

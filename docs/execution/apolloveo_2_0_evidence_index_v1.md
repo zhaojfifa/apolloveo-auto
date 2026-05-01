@@ -155,6 +155,7 @@ Status: P2 pre-execution evidence index
 | Phase 3B Operator-Visible Surfaces — UI / Presenter Minimal Wiring evidence | `docs/execution/evidence/operator_visible_surfaces_phase_3b_ui_presenter_wiring_v1.md` |
 | B-roll / Asset Supply — Product Freeze authority | `docs/product/broll_asset_supply_freeze_v1.md` |
 | B-roll / Asset Supply — Product Freeze evidence | `docs/execution/evidence/broll_asset_supply_product_freeze_v1.md` |
+| New Tasks — Line-First Surface Wiring evidence | `docs/execution/evidence/new_tasks_line_first_surface_wiring_v1.md` |
 
 ## Current Known Evidence Gaps
 
