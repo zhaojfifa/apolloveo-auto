@@ -1,6 +1,6 @@
-# Surface 4 — B-roll / Asset Supply (Low-fi v1 — DRAFT)
+# Surface 4 — B-roll / Asset Supply (Low-fi v1 — FROZEN)
 
-> **Status: low-fi-draft pending product field freeze.** Layout and contract boundaries below are stable enough for review; the filter taxonomy, promote target semantics, and license/source policy are explicitly enumerated as open questions for the next freeze pass.
+> **Status: product-frozen for B-roll wiring.** Layout and contract boundaries remain as designed. Product decisions are now frozen by `docs/product/broll_asset_supply_freeze_v1.md`; any non-frozen future expansion is explicitly marked deferred below.
 
 Implements `ApolloVeo_Operator_Visible_Surfaces_v1.md` §5.5. Operator-visible asset supply page corresponding to the Asset Library, **not** to the task-area's file-attachment view. Asset and Artifact remain strictly separated.
 
@@ -52,7 +52,20 @@ First-batch supported `asset_type` values (per §5.5):
 
 ### B. Search / filter bar
 
-Per §5.5.B. Filter facets (subject to product freeze — see open questions): `line`, `topic`, `style`, `language`, `role_id`, `scene`, `variation_axis`, `quality_threshold`. The bar emits filter intent only; the asset list re-projects from the library response.
+Per §5.5.B and `docs/product/broll_asset_supply_freeze_v1.md` §1.
+Frozen first-class facets: `line`, `topic`, `style`, `language`, `role_id`,
+`scene`, `variation_axis`, `quality_threshold`.
+
+- `line`: closed line ids `hot_follow`, `matrix_script`, `digital_anchor`; multi-select; operator-visible.
+- `topic`: product taxonomy tags from Asset Library metadata; multi-select; operator-visible.
+- `style`: controlled style tags from Asset Library metadata; multi-select; operator-visible.
+- `language`: public language codes used by product surfaces; multi-select; operator-visible.
+- `role_id`: opaque role catalog ids; multi-select; operator-visible only when role-capable assets are in result scope.
+- `scene`: controlled scene taxonomy ids; multi-select; operator-visible.
+- `variation_axis`: controlled Matrix Script axis ids; multi-select; operator-visible only when Matrix Script/template assets are in result scope.
+- `quality_threshold`: minimum quality bucket `any`, `>=0.6`, `>=0.75`, `>=0.9`; single-select; operator-visible.
+
+The bar emits filter intent only; the asset list re-projects from the library response. Operators cannot create new facet values from this page.
 
 ### C. Detail drawer
 
@@ -65,8 +78,8 @@ Per §5.5.D, with strict UI-emits-intent-only semantics:
 | Action | UI role | Truth boundary |
 |---|---|---|
 | Reference into task | Routes to New Tasks pre-populated with this asset's reference | New Tasks owns packet creation; B-roll only carries the asset_id forward. |
-| Promote intent | Posts a promote request | Promote is owned by L2 ingestion / asset sink; UI never writes the new asset object. The button surfaces success/failure as a read-only mirror of the resulting library state. |
-| Mark reusable / canonical | Placeholder per §5.5.D — emits intent only, may be admin-gated | Admin/governance ownership; UI never authors the canonical flag. |
+| Promote intent | Posts an async review-gated promote request to create a new asset | Promote is owned by the asset promote boundary; UI never writes the new asset object. The button surfaces request status only (`submitted` / `under_review` / `accepted` / `rejected`). |
+| Mark reusable / canonical | Emits request intent only; state change is admin-only | Admin/governance ownership; UI never authors reusable or canonical flags. |
 | Link to template / role | Emits link intent | Linkage is stored against the asset library object; UI does not synthesize the linkage. |
 
 ## Per-line usage (informational only)
@@ -99,20 +112,33 @@ Per §5.5 page red lines:
 | Tags / facets | asset metadata / tags | Filter facets read from the library's metadata schema. |
 | Provenance / quality / usage | asset provenance + quality + usage fields | Read-only view. |
 | Reference-into-task action | New Tasks intake (Hot Follow / Matrix Script / Digital Anchor `reference_assets[]`) | B-roll page does not create the packet. |
-| Promote action | promote flow boundary owned by L2 ingestion | UI emits intent; library object is authored downstream. |
+| Promote action | async review-gated asset promote boundary | UI emits intent; Asset Library object is authored downstream after review. |
 | Available-to-lines display | asset library object's line-allowlist | Read-only. |
 
-## Notes / Known Deferrals — open questions for product freeze
+## Frozen Product Decisions
 
-1. **Filter taxonomy**: which axes are first-class? §5.5.B lists 8 facets; freeze the canonical set and their value vocabularies before engineering wires the filter API.
-2. **Promote target semantics**: does Promote attach to an existing asset (versioning) or seed a new asset object? Does Promote require admin review (§5.7 mentions asset promote audit) or can it ship asynchronously?
-3. **License / source / reuse policy fields**: what fields are mandatory on every asset? what `source` / `license` enums are in scope this round?
-4. **Canonical / reusable marking**: is this a single boolean, a workflow (proposed → canonical), or admin-only? §5.5.D marks it as a placeholder.
-5. **Asset detail action set beyond Promote**: archive, deprecate, supersede — all currently out of scope; should they be admin-only (§5.7) or never operator-visible?
-6. **Artifact → Asset boundary mechanics**: §2.3 and §5.5 require strict separation; the precise hand-off contract for promote should be confirmed before this page is wired.
-7. **Reference-into-task pre-population**: which fields of the New Tasks form get pre-filled per `asset_type`? (e.g., `role_ref` → Digital Anchor role binding).
+Authority: `docs/product/broll_asset_supply_freeze_v1.md`.
 
-Until these are frozen, this page should be treated as a structural skeleton suitable for IA/UX review but not for engineering wiring of the action area.
+1. **Filter taxonomy**: all eight candidate facets are first-class for the first wiring pass: `line`, `topic`, `style`, `language`, `role_id`, `scene`, `variation_axis`, `quality_threshold`. All except `quality_threshold` allow multi-select. All are operator-visible, with `role_id` and `variation_axis` hidden by context when not applicable.
+2. **Promote target semantics**: Promote creates a new asset through an async review-gated promote intent. It does not version an existing asset in this round. Operator receives request status, not immediate reusable asset truth.
+3. **License / source / reuse policy fields**: mandatory fields, `source` enum, `license` enum, and `reuse_policy` enum are frozen in the product freeze doc. Reuse restriction is operator-visible as read-only policy; raw license/audit/internal-risk fields are admin-only.
+4. **Canonical / reusable marking**: admin-only state with operator-visible read-only badges. Canonical is not equal to reusable; every canonical asset must be reusable, but reusable assets need not be canonical.
+5. **Detail actions**: `archive`, `deprecate`, `supersede`, `unlink`, and `replace_preview` are not operator-visible actions. They move to the backend/admin management control page.
+6. **Artifact -> Asset hand-off**: UI can initiate promote intent only. Admin/review-gated promote creates a new Asset Library object; artifact remains in Artifact Store and keeps task/delivery ownership.
+7. **Reference-into-task pre-population**: mapping table is frozen in the product freeze doc, including `role_ref`, `reference_video`, `template`, `variation_axis`, `background`, `broll`, `product_shot`, `scene_pack_ref`, and `audio_ref`.
+
+## Deferred Items
+
+Deferred beyond this product freeze and not required for first B-roll wiring:
+
+- Facet value administration UI.
+- Bulk asset import.
+- Bulk promote.
+- Asset versioning as the primary promote path.
+- Operator-side archive / deprecate / supersede / unlink / replace-preview.
+- Provider/tool/runtime metadata on the asset surface.
+
+No deferred item may be treated as implicit wiring scope.
 
 ---
 
@@ -124,7 +150,7 @@ Phase 2 outputs:
 2. [Workbench core low-fi](surface_workbench_lowfi_v1.md) — extended with the four named generic panels (`content_structure` / `scene_plan` / `audio_plan` / `language_plan`), L2 artifact-facts strip, L3 attempt/gate/advisory strip, single line-specific slot serving all three lines.
 3. [Delivery center low-fi](surface_delivery_center_lowfi_v1.md) — extended with explicit Final / Required / Optional / Publish Action zoning, manifest+metadata display, publish feedback visibility, derived-publish-gate-driven enablement.
 4. [Hot Follow line panel low-fi](panel_hot_follow_subtitle_authority_lowfi_v1.md) — new file completing the line-panel set alongside the Matrix Script and Digital Anchor panels.
-5. This file — B-roll / Asset Supply low-fi (draft).
+5. This file — B-roll / Asset Supply low-fi (product-frozen).
 
 ### Ready for evaluation review
 
@@ -133,13 +159,13 @@ Phase 2 outputs:
 - Delivery zoning with Optional non-blocking guarantee.
 - Hot Follow line panel structure (subtitle authority / current source / dub-compose legality / helper explanation).
 
-### Pending product field freeze
+### Product field freeze
 
-- B-roll filter taxonomy (which facets are first-class, what enums each takes).
-- B-roll promote target semantics (versioning vs. new asset, admin gating).
-- B-roll license / source / reuse policy field set.
-- B-roll canonical / reusable marking workflow.
-- Reference-into-task pre-population mapping per `asset_type`.
+- B-roll filter taxonomy is frozen in `docs/product/broll_asset_supply_freeze_v1.md`.
+- B-roll promote target semantics are frozen as async review-gated create-new-asset intent.
+- B-roll license / source / reuse policy field set is frozen.
+- B-roll canonical / reusable marking is frozen as admin-only state with operator-visible read-only badges.
+- Reference-into-task pre-population mapping per `asset_type` is frozen.
 
 ### Pending engineering wiring confirmation
 
@@ -158,4 +184,3 @@ Phase 2 outputs:
 - Optional / Scene Pack items never block publish.
 - All three line-specific panels mount inside the unified Workbench skeleton, not as standalone pages.
 - Asset and Artifact stores remain strictly separated.
-

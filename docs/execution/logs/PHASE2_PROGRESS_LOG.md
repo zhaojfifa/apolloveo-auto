@@ -450,3 +450,71 @@ What remains blocked:
   carry packets today, so `panel_kind=None` is the natural empty result
 
 Evidence: `docs/execution/evidence/operator_visible_surfaces_phase_3b_ui_presenter_wiring_v1.md`
+
+## B-roll / Asset Supply Product Freeze
+
+Date: 2026-05-01
+
+This node completed the product-freeze pass for the B-roll / Asset Supply
+surface. No B-roll wiring, UI implementation, runtime truth, packet/schema
+change, or Platform Runtime Assembly work was started.
+
+Files read:
+
+- `docs/design/ApolloVeo_Operator_Visible_Surfaces_v1.md`
+- `docs/design/broll_asset_supply_lowfi_v1.md`
+- `docs/reviews/architect_phase2_lowfi_review_v1.md`
+- `docs/reviews/operator_visible_surface_wiring_feasibility_v1.md`
+- `docs/product/asset_supply_matrix_v1.md`
+- `docs/architecture/apolloveo_2_0_top_level_business_flow_v1.md`
+- `docs/execution/logs/PHASE2_PROGRESS_LOG.md`
+- `docs/execution/apolloveo_2_0_evidence_index_v1.md`
+
+Files created:
+
+- `docs/product/broll_asset_supply_freeze_v1.md`
+- `docs/execution/evidence/broll_asset_supply_product_freeze_v1.md`
+
+Files updated:
+
+- `docs/design/broll_asset_supply_lowfi_v1.md`
+- `docs/execution/logs/PHASE2_PROGRESS_LOG.md`
+- `docs/execution/apolloveo_2_0_evidence_index_v1.md`
+
+Frozen product decisions:
+
+- Filter taxonomy keeps all eight first-class facets for first B-roll
+  wiring: `line`, `topic`, `style`, `language`, `role_id`, `scene`,
+  `variation_axis`, `quality_threshold`; all except `quality_threshold`
+  allow multi-select.
+- Promote semantics are async review-gated create-new-asset intent. The
+  operator receives request status, not immediate reusable asset truth.
+- Mandatory license/source/reuse fields and the `source`, `license`, and
+  `reuse_policy` enums are frozen.
+- Canonical/reusable marking is admin-only state with operator-visible
+  read-only badges. Canonical is not equal to reusable.
+- Detail actions `archive`, `deprecate`, `supersede`, `unlink`, and
+  `replace_preview` move to the admin management control page and are not
+  operator-visible B-roll actions.
+- Artifact-to-asset hand-off is explicit promote intent only; Asset Library
+  creation happens after review and never mutates the source artifact.
+- Reference-into-task pre-population mapping is frozen for `role_ref`,
+  `reference_video`, `template`, `variation_axis`, `background`, `broll`,
+  `product_shot`, `scene_pack_ref`, and `audio_ref`.
+
+Deferred:
+
+- facet value administration UI
+- bulk asset import
+- bulk promote
+- asset versioning as the primary promote path
+- operator-side archive/deprecate/supersede/unlink/replace-preview
+- provider/tool/runtime metadata on the asset surface
+
+Result:
+
+- B-roll wiring may open next after review acceptance of the freeze, but only
+  under a fresh commissioning instruction and only as projection/intent
+  consumption. No UI truth ownership, packet/schema redesign, Platform
+  Runtime Assembly, W2.2/W2.3, or provider/model/vendor surface exposure is
+  unlocked by this product-freeze step.

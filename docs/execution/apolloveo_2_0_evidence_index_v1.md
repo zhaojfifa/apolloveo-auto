@@ -153,6 +153,8 @@ Status: P2 pre-execution evidence index
 | Phase 3B Operator-Visible Surfaces — UI / Presenter Minimal Wiring implementation | `gateway/app/services/operator_visible_surfaces/wiring.py` |
 | Phase 3B Operator-Visible Surfaces — UI / Presenter Minimal Wiring tests | `tests/contracts/operator_visible_surfaces/test_wiring.py` |
 | Phase 3B Operator-Visible Surfaces — UI / Presenter Minimal Wiring evidence | `docs/execution/evidence/operator_visible_surfaces_phase_3b_ui_presenter_wiring_v1.md` |
+| B-roll / Asset Supply — Product Freeze authority | `docs/product/broll_asset_supply_freeze_v1.md` |
+| B-roll / Asset Supply — Product Freeze evidence | `docs/execution/evidence/broll_asset_supply_product_freeze_v1.md` |
 
 ## Current Known Evidence Gaps
 
