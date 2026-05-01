@@ -143,6 +143,13 @@ Status: P2 pre-execution evidence index
 | Digital Anchor Second Production Line — Phase D.1 (Publish Feedback Closure Write-Back) — tests | `tests/contracts/digital_anchor/test_publish_feedback_closure_phase_d1.py` |
 | skills/worker/planning ADR | `docs/adr/ADR-phase2-skills-worker-planning.md` |
 | task router decomposition ADR | `docs/adr/ADR-task-router-decomposition.md` |
+| Phase 2 Operator-Visible Surfaces — frozen requirements v1 | `docs/design/ApolloVeo_Operator_Visible_Surfaces_v1.md` |
+| Phase 2 Operator-Visible Surfaces — Architect CONDITIONAL PASS review | `docs/reviews/architect_phase2_lowfi_review_v1.md` |
+| Phase 2 Operator-Visible Surfaces — Engineering wiring feasibility memo | `docs/reviews/operator_visible_surface_wiring_feasibility_v1.md` |
+| Phase 2 Operator-Visible Surfaces — Engineering wiring feasibility evidence | `docs/execution/evidence/operator_visible_surface_wiring_feasibility_v1.md` |
+| Phase 3A Operator-Visible Surfaces — Minimal Wiring implementation | `gateway/app/services/operator_visible_surfaces/projections.py` |
+| Phase 3A Operator-Visible Surfaces — Minimal Wiring tests | `tests/contracts/operator_visible_surfaces/test_projections.py` |
+| Phase 3A Operator-Visible Surfaces — Minimal Wiring evidence | `docs/execution/evidence/operator_visible_surfaces_phase_3a_minimal_wiring_v1.md` |
 
 ## Current Known Evidence Gaps
 
