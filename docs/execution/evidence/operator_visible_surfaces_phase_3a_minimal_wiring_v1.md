@@ -19,8 +19,12 @@ Files added:
 - `tests/contracts/operator_visible_surfaces/__init__.py`
 - `tests/contracts/operator_visible_surfaces/test_projections.py`
 
-No existing files were modified. The three additive projections derive
-from data already produced by:
+Existing documentation indexes were updated to record this Phase 3A evidence:
+
+- `docs/execution/logs/PHASE2_PROGRESS_LOG.md`
+- `docs/execution/apolloveo_2_0_evidence_index_v1.md`
+
+The three additive projections derive from data already produced by:
 
 - `gateway/app/services/contract_runtime/ready_gate_runtime.py`
   (`ready_gate.publish_ready`, `ready_gate.compose_ready`,
