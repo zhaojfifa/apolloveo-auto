@@ -261,6 +261,23 @@
       </div>
     </div>
 <div class="tab-panel" id="tab-deliverables">
+      <div class="card" data-role="operator-publish-gate-strip">
+        <div class="section-title">
+          <h2>Publish gate</h2>
+          <div class="secondary">Single derived gate. Optional items never block this.</div>
+        </div>
+        <div class="copy-row" style="gap:12px;">
+          <span data-role="operator-publish-gate" id="op-publish-gate">—</span>
+          <span data-role="operator-publish-gate-reason" id="op-publish-gate-reason" class="muted"></span>
+        </div>
+        <div class="copy-row" style="gap:12px; margin-top:8px;">
+          <strong>Last publish status:</strong>
+          <span data-role="operator-publish-status" id="op-publish-status">not_published</span>
+          <span data-role="operator-publish-channel" id="op-publish-channel" class="muted"></span>
+          <a data-role="operator-publish-url" id="op-publish-url" href="#" target="_blank" rel="noopener" style="display:none;">link</a>
+          <span data-role="operator-published-at" id="op-published-at" class="muted"></span>
+        </div>
+      </div>
       <div class="card">
         <div class="section-title">
           <h2>{{ t("publish.deliverables.title") }}</h2>
@@ -499,6 +516,28 @@ function resolveLang(serverLang) {
       if (publishedEl) publishedEl.checked = published;
     }
 
+    function renderOperatorSurfaces(ops) {
+      const delivery = (ops && ops.delivery) || {};
+      const mirror = delivery.publish_status_mirror || {};
+      const gateEl = document.getElementById("op-publish-gate");
+      const gateReasonEl = document.getElementById("op-publish-gate-reason");
+      if (gateEl) gateEl.textContent = delivery.publish_gate ? "open" : "blocked";
+      if (gateReasonEl) gateReasonEl.textContent = delivery.publish_gate_head_reason || "";
+      setText("op-publish-status", mirror.publish_status || "not_published");
+      setText("op-publish-channel", mirror.publish_channel ? `· ${mirror.publish_channel}` : "");
+      setText("op-published-at", mirror.last_published_at ? `· ${mirror.last_published_at}` : "");
+      const urlEl = document.getElementById("op-publish-url");
+      if (urlEl) {
+        if (mirror.publish_url) {
+          urlEl.href = mirror.publish_url;
+          urlEl.style.display = "";
+        } else {
+          urlEl.removeAttribute("href");
+          urlEl.style.display = "none";
+        }
+      }
+    }
+
     function copyTextFromElement(el) {
       if (!el) return;
       let text = "";
@@ -549,6 +588,7 @@ function resolveLang(serverLang) {
       renderCopyBundle(data.copy_bundle || {});
       await fillCaptionFallback(data.copy_bundle || {});
       renderArchive(data.archive || {});
+      renderOperatorSurfaces(data.operator_surfaces || {});
       const editLink = document.getElementById("edit-bundle-link");
       if (editLink && data.deliverables && data.deliverables.edit_bundle_zip) {
         editLink.href = data.deliverables.edit_bundle_zip.url;

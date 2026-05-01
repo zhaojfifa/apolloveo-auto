@@ -204,6 +204,86 @@
       </div>
     </div>
 
+    {% set ops = (task_json.operator_surfaces or {}) %}
+    {% set ops_board = (ops.board or {}) %}
+    {% set ops_workbench_panel = ((ops.workbench or {}).line_specific_panel or {}) %}
+    {% set ops_delivery = (ops.delivery or {}) %}
+    {% set ops_hot_follow_panel = (ops.hot_follow_panel or {}) %}
+    <div class="panel" data-role="operator-surface-strip">
+      <div class="section-title">
+        <h2>Operator surface</h2>
+        <div class="secondary">Read-only projection — no UI-authored truth.</div>
+      </div>
+      <div class="meta-grid">
+        <div class="meta-item">
+          <strong>L3 publish gate</strong>
+          <span data-role="operator-publish-gate">
+            {{ "open" if ops_delivery.publish_gate else "blocked" }}
+            {% if ops_delivery.publish_gate_head_reason %}
+              · <span data-role="operator-publish-gate-reason">{{ ops_delivery.publish_gate_head_reason }}</span>
+            {% endif %}
+          </span>
+        </div>
+        <div class="meta-item">
+          <strong>Board bucket</strong>
+          <span data-role="operator-board-bucket">
+            {% if ops_board.publishable %}publishable{% elif ops_board.head_reason %}blocked · {{ ops_board.head_reason }}{% else %}ready{% endif %}
+          </span>
+        </div>
+        <div class="meta-item">
+          <strong>Line panel</strong>
+          <span data-role="operator-line-panel-kind">{{ ops_workbench_panel.panel_kind or "—" }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" data-role="operator-line-specific-panel" data-panel-kind="{{ ops_workbench_panel.panel_kind or '' }}">
+      <div class="section-title">
+        <h2>Line-specific panel</h2>
+        <div class="secondary">Mounted only via packet <code>line_specific_refs[]</code>. Workbench never invents truth.</div>
+      </div>
+      {% if ops_workbench_panel.panel_kind %}
+        <div class="muted">Panel kind: <strong>{{ ops_workbench_panel.panel_kind }}</strong></div>
+        <ul class="muted" style="margin:6px 0 0 18px;">
+          {% for ref in (ops_workbench_panel.refs or []) %}
+            <li><code>{{ ref.ref_id }}</code></li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="muted">No <code>line_specific_refs[]</code> on this packet — slot remains empty.</div>
+      {% endif %}
+    </div>
+
+    {% if ops_hot_follow_panel.mounted %}
+      <div class="panel" data-role="operator-hot-follow-panel">
+        <div class="section-title">
+          <h2>Hot Follow panel</h2>
+          <div class="secondary">Subtitle authority · dub/compose legality · helper explanation. Read-only.</div>
+        </div>
+        <div class="meta-grid">
+          <div class="meta-item">
+            <strong>Subtitle authority</strong>
+            <span>{{ task_json.subtitle_authority_label or task_json.target_subtitle_current_reason or "—" }}</span>
+          </div>
+          <div class="meta-item">
+            <strong>Subtitle source</strong>
+            <span>{{ task_json.subtitle_source or task_json.subtitle_lane_source or "—" }}</span>
+          </div>
+          <div class="meta-item">
+            <strong>Dub / compose legality</strong>
+            <span>
+              {% if task_json.compose_status %}{{ task_json.compose_status }}{% else %}—{% endif %}
+              {% if task_json.dub_current is defined %} · dub_current={{ task_json.dub_current }}{% endif %}
+            </span>
+          </div>
+          <div class="meta-item">
+            <strong>Helper</strong>
+            <span class="muted">This panel explains truth only; it never authors truth.</span>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
     <div class="panel">
       <div class="section-title">
         <h2>{{ t("workbench.deliverables") }}</h2>

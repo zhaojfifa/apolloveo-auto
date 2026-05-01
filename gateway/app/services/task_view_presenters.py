@@ -608,6 +608,30 @@ def _apply_hot_follow_projection_runtime(
     return apply_projection_runtime(dict(payload), surface=surface, projection_runtime=runtime)
 
 
+def _operator_surfaces_for_publish_hub(
+    task: dict[str, Any],
+    authoritative_state: dict[str, Any],
+) -> dict[str, Any]:
+    """Phase 3B Delivery projection. Additive, read-only.
+
+    Lazy import keeps the projection module out of every cold import path
+    of this presenter (the wiring layer pulls in the full projection
+    package).
+    """
+    from gateway.app.services.operator_visible_surfaces import (
+        build_operator_surfaces_for_publish_hub,
+    )
+
+    # publish_feedback_closure is task-side truth not currently materialized
+    # on the hot_follow task surface; pass None until the closure mirror is
+    # plumbed in. The mirror returns the empty `not_published` shape.
+    return build_operator_surfaces_for_publish_hub(
+        task=task,
+        authoritative_state=authoritative_state,
+        publish_feedback_closure=None,
+    )
+
+
 def _build_hot_follow_publish_surface_payload(
     task_id: str,
     task: dict[str, Any],
@@ -671,6 +695,10 @@ def _build_hot_follow_publish_surface_payload(
             "publish_url": task.get("publish_url") or "-",
             "published_at": task.get("published_at") or "-",
         },
+        # Phase 3B operator-visible surface projection. Single derived
+        # publish gate + read-only publish-status mirror. Optional items
+        # never reach this gate (enumerated separately on `deliverables`).
+        "operator_surfaces": _operator_surfaces_for_publish_hub(task, authoritative_state),
     }
 
 

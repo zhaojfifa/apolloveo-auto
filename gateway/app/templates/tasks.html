@@ -51,6 +51,13 @@
         <button class="status-item" data-status="done"><span class="status-dot status-dot--green"></span>{{ t("tasks.filter.status.done") }}</button>
         <button class="status-item" data-status="attention"><span class="status-dot status-dot--red"></span>{{ t("tasks.filter.status.attention") }}</button>
       </div>
+      <div class="bucket-legend" data-role="operator-board-buckets">
+        <span class="bucket-legend__label">Bucket</span>
+        <button class="bucket-item" data-bucket="all" data-active="true">All</button>
+        <button class="bucket-item" data-bucket="blocked">Blocked</button>
+        <button class="bucket-item" data-bucket="ready">Ready</button>
+        <button class="bucket-item" data-bucket="publishable">Publishable</button>
+      </div>
     </div>
     <div class="text-sm text-gray-500 mt-2" id="boardMessage">{{ t("tasks.filtered_n", n=(items|length)) }}</div>
 
@@ -88,7 +95,8 @@
           {% set status_label = t("status.unknown") %}
           {% set badge_class = "badge-gray" %}
         {% endif %}
-        <div class="task-card task-row" data-scene="{{ it.scene_key or scene_raw }}" data-status="{{ status_value }}">
+        {% set bucket_value = it.board_bucket or "ready" %}
+        <div class="task-card task-row" data-scene="{{ it.scene_key or scene_raw }}" data-status="{{ status_value }}" data-bucket="{{ bucket_value }}">
           <div class="task-card__left">
             {% if cover %}
               <img class="task-card__cover" src="{{ cover }}" alt="cover" />
@@ -120,6 +128,10 @@
           </div>
           <div class="task-card__right">
             <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
+            <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}" data-role="operator-bucket">{{ bucket_value }}</span>
+            {% if it.head_reason %}
+              <span class="task-badge badge-red" data-role="operator-head-reason" title="{{ it.head_reason }}">{{ it.head_reason }}</span>
+            {% endif %}
             <div class="task-actions">
               {% if it.download_class %}
                 <a href="{{ it.pack_download_href }}" target="_blank" rel="noopener" class="btn-primary">
@@ -172,12 +184,15 @@
       let shown = 0;
       const curStatus = document.querySelector(".status-item[data-active='true']")?.dataset.status || "all";
       const curScene = document.querySelector(".scene-tab[data-active='true']")?.dataset.scene || "all";
+      const curBucket = document.querySelector(".bucket-item[data-active='true']")?.dataset.bucket || "all";
       rows.forEach((r) => {
         const rs = r.getAttribute("data-status") || "other";
         const rc = r.getAttribute("data-scene") || "baseline";
+        const rb = r.getAttribute("data-bucket") || "ready";
         const okStatus = (curStatus === "all") ? true : (rs === curStatus);
         const okScene = (curScene === "all") ? true : (rc === curScene);
-        const show = okStatus && okScene;
+        const okBucket = (curBucket === "all") ? true : (rb === curBucket);
+        const show = okStatus && okScene && okBucket;
         r.style.display = show ? "" : "none";
         if (show) shown++;
       });
@@ -205,6 +220,7 @@
     document.addEventListener("DOMContentLoaded", () => {
       bindTabs(".status-item");
       bindTabs(".scene-tab");
+      bindTabs(".bucket-item");
       applyFilters();
     });
   </script>
