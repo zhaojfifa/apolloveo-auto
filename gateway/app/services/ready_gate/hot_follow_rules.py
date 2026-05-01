@@ -38,6 +38,30 @@ def _d(v: Any) -> Dict[str, Any]:
     return v if isinstance(v, dict) else {}
 
 
+def _current_attempt(state: dict) -> dict[str, Any]:
+    return _d(state.get("current_attempt"))
+
+
+def _has_current_attempt(state: dict) -> bool:
+    attempt = _current_attempt(state)
+    return bool(
+        attempt.get("contract_version") == "hot_follow_current_attempt_contract_v1"
+        and attempt.get("selected_compose_route")
+    )
+
+
+def _attempt_bool(state: dict, key: str) -> bool:
+    attempt = _current_attempt(state)
+    return bool(attempt.get(key)) if _has_current_attempt(state) else False
+
+
+def _attempt_reason(state: dict, key: str, missing: str) -> str:
+    attempt = _current_attempt(state)
+    if not _has_current_attempt(state):
+        return missing
+    return str(attempt.get(key) or missing).strip()
+
+
 # ---------------------------------------------------------------------------
 # Signal extract functions
 # ---------------------------------------------------------------------------
@@ -68,6 +92,8 @@ def _extract_final_fresh(task: dict, state: dict) -> bool:
     A stale final (composed before the latest subtitle save or re-dub) is NOT
     fresh and must not be counted as a valid compose output for the gate.
     """
+    if _has_current_attempt(state):
+        return bool(_current_attempt(state).get("final_fresh"))
     final = _d(state.get("final"))
     # Explicit stale_reason on the state or on final_info → not fresh.
     if state.get("final_stale_reason") or final.get("stale_reason"):
@@ -82,6 +108,8 @@ def _extract_final_fresh(task: dict, state: dict) -> bool:
 
 def _extract_audio_done(task: dict, state: dict) -> bool:
     """audio_status in {"done","ready","success","completed"}."""
+    if _has_current_attempt(state):
+        return _attempt_bool(state, "audio_ready")
     audio = _d(state.get("audio"))
     status = str(audio.get("status") or task.get("dub_status") or "").strip().lower()
     return status in {"done", "ready", "success", "completed"}
@@ -89,6 +117,10 @@ def _extract_audio_done(task: dict, state: dict) -> bool:
 
 def _extract_voiceover_exists(task: dict, state: dict) -> bool:
     """Current TTS voiceover URL exists on the audio truth surface."""
+    if _has_current_attempt(state):
+        attempt = _current_attempt(state)
+        route = str(attempt.get("selected_compose_route") or "").strip()
+        return route == "preserve_source_route" or bool(attempt.get("audio_ready"))
     audio = _d(state.get("audio"))
     return bool(
         audio.get("dub_preview_url")
@@ -99,6 +131,10 @@ def _extract_voiceover_exists(task: dict, state: dict) -> bool:
 
 def _extract_tts_voice_valid(task: dict, state: dict) -> bool:
     """TTS voice is set and not a sentinel value."""
+    if _has_current_attempt(state):
+        attempt = _current_attempt(state)
+        route = str(attempt.get("selected_compose_route") or "").strip()
+        return route == "preserve_source_route" or bool(attempt.get("audio_ready"))
     audio = _d(state.get("audio"))
     tts_voice = str(audio.get("tts_voice") or task.get("voice_id") or "").strip()
     return bool(tts_voice and tts_voice not in {"-", "none", "null"})
@@ -110,6 +146,8 @@ def _extract_audio_ready(task: dict, state: dict) -> bool:
     Raw compatibility artifact keys are intentionally ignored here. Source audio,
     uploaded BGM, or stale generic audio references must not satisfy dub truth.
     """
+    if _has_current_attempt(state):
+        return _attempt_bool(state, "audio_ready")
     audio = _d(state.get("audio"))
     hint = audio.get("audio_ready")
     if hint is not None:
@@ -127,6 +165,11 @@ def _extract_subtitle_artifact_exists(task: dict, state: dict) -> bool:
     Parse/source subtitles are helper evidence only. They must not satisfy
     target-subtitle readiness when explicit subtitle truth is absent.
     """
+    if _has_current_attempt(state):
+        attempt = _current_attempt(state)
+        if attempt.get("subtitle_required") is False:
+            return False
+        return bool(attempt.get("target_subtitle_authoritative_current") or attempt.get("subtitle_ready"))
     subs = _d(state.get("subtitles"))
     actual_source = str(subs.get("actual_burn_subtitle_source") or "").strip().lower()
     target_source = bool(actual_source and actual_source not in {"origin.srt", "source.srt"})
@@ -141,6 +184,11 @@ def _extract_subtitle_ready(task: dict, state: dict) -> bool:
 
     Preserves the hint-priority pattern from original L172-181.
     """
+    if _has_current_attempt(state):
+        attempt = _current_attempt(state)
+        if attempt.get("subtitle_required") is False:
+            return False
+        return bool(attempt.get("target_subtitle_authoritative_current") or attempt.get("subtitle_ready"))
     subs = _d(state.get("subtitles"))
     process = _d(state.get("hot_follow_process_state"))
     if process.get("subtitle_required") is False:
@@ -155,25 +203,37 @@ def _extract_subtitle_ready(task: dict, state: dict) -> bool:
 
 def _extract_no_dub(task: dict, state: dict) -> bool:
     """Raw no_dub flag (before override application)."""
+    if _has_current_attempt(state):
+        route_name = str(_current_attempt(state).get("selected_compose_route") or "").strip()
+        return route_name == "preserve_source_route"
     audio = _d(state.get("audio"))
     return bool(audio.get("no_dub")) or _extract_no_tts_compose_allowed(task, state)
 
 
 def _extract_compose_blocked(task: dict, state: dict) -> bool:
+    if _has_current_attempt(state):
+        attempt = _current_attempt(state)
+        return not bool(attempt.get("compose_allowed")) and bool(attempt.get("blocking"))
     route = selected_route_from_state(task, state)
     return bool(route.get("blocked_reason")) and route.get("blocked_reason") == _reason_compose_blocked(task, state)
 
 
 def _extract_compose_allowed(task: dict, state: dict) -> bool:
+    if _has_current_attempt(state):
+        return _attempt_bool(state, "compose_allowed")
     return bool(selected_route_from_state(task, state).get("compose_allowed"))
 
 
 def _extract_no_tts_compose_allowed(task: dict, state: dict) -> bool:
+    if _has_current_attempt(state):
+        return str(_current_attempt(state).get("selected_compose_route") or "").strip() == "preserve_source_route" and _attempt_bool(state, "compose_allowed")
     return bool(selected_route_from_state(task, state).get("no_tts_compose_allowed"))
 
 
 def _extract_no_dub_compose_allowed(task: dict, state: dict) -> bool:
     """No-dub mode may bypass subtitle/audio blockers for final compose input checks."""
+    if _has_current_attempt(state):
+        return _extract_no_tts_compose_allowed(task, state)
     return bool(selected_route_from_state(task, state).get("no_dub_compose_allowed"))
 
 
@@ -183,6 +243,11 @@ def _extract_no_dub_compose_allowed(task: dict, state: dict) -> bool:
 
 
 def _reason_subtitle_ready(task: dict, state: dict) -> str:
+    if _has_current_attempt(state):
+        attempt = _current_attempt(state)
+        if attempt.get("subtitle_required") is False:
+            return "subtitle_not_required_for_route"
+        return _attempt_reason(state, "subtitle_ready_reason", "subtitle_not_ready")
     subs = _d(state.get("subtitles"))
     explicit = subs.get("subtitle_ready_reason")
     if explicit:
@@ -191,6 +256,8 @@ def _reason_subtitle_ready(task: dict, state: dict) -> str:
 
 
 def _reason_audio_ready(task: dict, state: dict) -> str:
+    if _has_current_attempt(state):
+        return _attempt_reason(state, "audio_ready_reason", "audio_not_ready")
     audio = _d(state.get("audio"))
     explicit = audio.get("audio_ready_reason")
     if explicit:
@@ -199,6 +266,9 @@ def _reason_audio_ready(task: dict, state: dict) -> str:
 
 
 def _reason_no_dub(task: dict, state: dict) -> str:
+    if _has_current_attempt(state):
+        route_name = str(_current_attempt(state).get("selected_compose_route") or "").strip()
+        return "source_audio_preserved_no_tts" if route_name == "preserve_source_route" else ""
     audio = _d(state.get("audio"))
     explicit = str(audio.get("no_dub_reason") or "").strip()
     if explicit:
@@ -214,6 +284,10 @@ def _reason_no_dub(task: dict, state: dict) -> str:
 
 
 def _reason_compose_blocked(task: dict, state: dict) -> str:
+    if _has_current_attempt(state):
+        attempt = _current_attempt(state)
+        blocking = attempt.get("blocking") if isinstance(attempt.get("blocking"), list) else []
+        return str((blocking[0] if blocking else None) or attempt.get("compose_reason") or "compose_not_allowed").strip()
     artifact_facts = _d(state.get("artifact_facts"))
     compose_input = _d(artifact_facts.get("compose_input"))
     return str(
@@ -224,11 +298,16 @@ def _reason_compose_blocked(task: dict, state: dict) -> str:
 
 
 def _reason_compose_allowed(task: dict, state: dict) -> str:
+    if _has_current_attempt(state):
+        attempt = _current_attempt(state)
+        return str(attempt.get("compose_allowed_reason") or attempt.get("compose_reason") or "route_not_allowed").strip()
     route = selected_route_from_state(task, state)
     return str(route.get("blocked_reason") or "route_not_allowed").strip()
 
 
 def _reason_selected_route(task: dict, state: dict) -> str:
+    if _has_current_attempt(state):
+        return str(_current_attempt(state).get("selected_compose_route") or "tts_replace_route").strip()
     return str(selected_route_from_state(task, state).get("name") or "tts_replace_route").strip()
 
 

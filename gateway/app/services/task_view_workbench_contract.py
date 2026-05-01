@@ -429,14 +429,18 @@ def attach_task_aliases(payload: dict[str, Any], task: dict[str, Any], task_id: 
 
 def apply_ready_gate_compose_projection(payload: dict[str, Any]) -> None:
     ready_gate = payload.get("ready_gate") if isinstance(payload.get("ready_gate"), dict) else {}
-    compose_allowed = bool(ready_gate.get("compose_allowed"))
+    current_attempt = payload.get("current_attempt") if isinstance(payload.get("current_attempt"), dict) else {}
+    compose_allowed = bool(
+        current_attempt.get("compose_allowed")
+        if "compose_allowed" in current_attempt
+        else ready_gate.get("compose_allowed")
+    )
     compose_allowed_reason = str(
-        ready_gate.get("compose_allowed_reason")
+        current_attempt.get("compose_allowed_reason")
+        or current_attempt.get("compose_reason")
+        or ready_gate.get("compose_allowed_reason")
         or ready_gate.get("compose_reason")
         or "route_not_allowed"
     )
     payload["compose_allowed"] = compose_allowed
     payload["compose_allowed_reason"] = compose_allowed_reason
-    if isinstance(payload.get("ready_gate"), dict):
-        payload["ready_gate"]["compose_allowed"] = compose_allowed
-        payload["ready_gate"]["compose_allowed_reason"] = compose_allowed_reason
