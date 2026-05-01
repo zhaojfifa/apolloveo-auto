@@ -77,3 +77,103 @@
 | Reference badge | `evidence.reference_line` | `$defs.evidence.properties.reference_line.const` |
 
 **Authority Rule**: Delivery Center is a *view*, not an *author*. If a field is not present in the resolved contract objects, the Delivery Center renders nothing — it never fabricates a row.
+
+---
+
+## Extension — Final / Required / Optional / Publish zoning
+
+> Tightens the Delivery Center to match `ApolloVeo_Operator_Visible_Surfaces_v1.md` §5.4. Splits the page into four explicit zones plus a manifest/metadata display block and a publish-feedback visibility block. Optional items never block publish. Publish action is enabled only by a derived publish gate.
+
+### Page Goal
+
+Result-oriented surface: show the Final Video, list Required Deliverables, separate Optional / Non-blocking items as visually subordinate, and render Publish Action with derived-gate-driven enablement only. The page never invents publishability, never authors deliverable truth, and never offers vendor/model/provider controls.
+
+### Extended low-fi layout
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│  DELIVERY — <line> · <packet_version>      Gate: ●ready                    │
+├────────────────────────────────────────────────────────────────────────────┤
+│  A. FINAL VIDEO                                                             │
+│  ─────────────                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │   [ video preview ]                                                  │  │
+│  │   final.mp4 · resolution · duration · language                       │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+├────────────────────────────────────────────────────────────────────────────┤
+│  B. REQUIRED DELIVERABLES (gate publish)                                    │
+│  ──────────────────────────                                                 │
+│   · subtitle track(s)        ✓                                              │
+│   · audio track(s)           ✓                                              │
+│   · metadata projection      ✓                                              │
+│   · manifest                 ✓                                              │
+│   · per-line required items  ✓ / pending                                   │
+├────────────────────────────────────────────────────────────────────────────┤
+│  C. OPTIONAL / NON-BLOCKING (never gate publish — visually subordinate)     │
+│  ──────────────────────────                                                 │
+│   · scene_pack    ◐ partial   (does NOT block publish)                      │
+│   · helper exports                                                          │
+│   · variation attribution exports                                           │
+├────────────────────────────────────────────────────────────────────────────┤
+│  D. PUBLISH ACTION                                                          │
+│  ────────────────                                                           │
+│   Publish gate: ● enabled  (Final ✓ + Required ✓)                           │
+│   [ Publish ]                                                               │
+│   Why disabled? — surfaces the head reason from the publish gate, never UI- │
+│   composed.                                                                 │
+├────────────────────────────────────────────────────────────────────────────┤
+│  MANIFEST / METADATA DISPLAY (read-only)                                    │
+│  ────────────────────────────                                               │
+│   manifest: [view JSON]   metadata_projection: [view JSON]                  │
+├────────────────────────────────────────────────────────────────────────────┤
+│  PUBLISH FEEDBACK VISIBILITY (read-only mirror of L4 publish status)        │
+│  ────────────────────────────                                               │
+│   last publish: 2026-04-30T12:31Z · status: success · channel: <...>        │
+│   variation attribution (matrix_script): see line panel                     │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Zone semantics
+
+| Zone | Source | Gating role |
+|---|---|---|
+| A. Final Video | `factory_delivery_contract` → final video item | Required for publish — without it, publish gate is off. |
+| B. Required Deliverables | `factory_delivery_contract` required items + per-line required outputs | All must resolve before publish gate can flip on. |
+| C. Optional / Non-blocking | `factory_delivery_contract` optional items (`scene_pack`, helper exports, attribution exports) | **Never** affect publish gate; visually subordinate styling. |
+| D. Publish Action | derived publish gate (read-only projection) | Button enablement is a pure projection, never UI-computed. |
+| Manifest / metadata block | `manifest`, `metadata_projection` | Display only, no edit. |
+| Publish feedback block | L4 publish status mirror | Read-only — UI never authors publish outcome. |
+
+### Publish gate rule
+
+The Publish button is enabled iff the gateway-exposed derived publish gate evaluates to true. The Delivery Center does not assemble that boolean from individual checkmarks — it consumes the projection. The "Why disabled?" hint is the head reason returned by the publish gate, rendered verbatim.
+
+### Optional non-blocking — hard rule
+
+Optional items render with subordinate styling (smaller, grayed) and never appear in the Required list. The publish gate does not consider them. This is the visual enforcement of the §5.4 red line that Scene Pack is explicitly non-blocking.
+
+### Line-specific feedback
+
+| Line | Publish feedback specifics rendered here |
+|---|---|
+| Hot Follow | Final + subtitles + dubbed audio + pack; current attempt vs. historical successful delivery deltas surfaced (link to Workbench). |
+| Matrix Script | Multi-variation final list with `attribution_id` per row; publish feedback per variation. |
+| Digital Anchor | Multi-language version list, `role_usage` / `scene_usage` / `language_usage`, delivery pack + manifest. |
+
+### Extended Contract Mapping
+
+| UI element | Contract object |
+|---|---|
+| Final Video | `factory_delivery_contract` final item |
+| Required Deliverables list | `factory_delivery_contract` required items |
+| Optional / Non-blocking list | `factory_delivery_contract` optional items |
+| Publish gate / button enablement | derived publish gate (gateway projection) |
+| Manifest display | `manifest` |
+| Metadata display | `metadata_projection` |
+| Publish feedback | L4 publish status (read-only mirror) |
+
+### Notes / Known Deferrals
+- **Publish target picker**: not in scope. The publish action posts to whatever channel the line's delivery contract resolves to.
+- **Publish retry / unpublish controls**: deferred — out of §5.4 scope.
+- **Variation attribution surfacing in Matrix Script**: detailed view lives in the line panel; Delivery Center shows per-row `attribution_id` only.
+- **Wiring of derived publish gate**: needs engineering confirmation that the gateway exposes a single projected boolean + head reason; otherwise Publish Action zone renders disabled with a "publish gate not yet wired" notice.

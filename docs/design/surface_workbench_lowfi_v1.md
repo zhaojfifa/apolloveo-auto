@@ -94,3 +94,107 @@ The Workbench **does not author** `ready_state` transitions. It renders the curr
 | Validator open | `evidence.validator_report_path` | `$defs.evidence.properties.validator_report_path` |
 
 **Discipline**: Workbench has zero local state machine. Every visible status is a render of `evidence.ready_state` plus per-capability content read from `capability_plan[]` and `line_specific_refs[]`.
+
+---
+
+## Extension — four generic panels, L2/L3 strips, line-specific slot
+
+> Tightens the Workbench skeleton to match `ApolloVeo_Operator_Visible_Surfaces_v1.md` §5.3. Names the four generic panels explicitly, adds a top L2 artifact-facts strip and right-rail L3 strip, and confirms the single line-specific mount slot used by all three lines.
+
+### Page Goal
+
+Single execution shell for any open packet. Renders four generic panels driven by the four generic factory contracts, a fact strip from L2, an attempt/gate/advisory strip from L3, and one line-specific side panel chosen from `line_specific_refs[]`.
+
+### Extended low-fi layout
+
+```
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  WORKBENCH — <line> · <packet_version>     Gate: ●ready  Ref: hot_follow ✓   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  L2 ARTIFACT FACTS STRIP  (read-only)                                         │
+│  final ✓ · subtitle ✓ · audio ✓ · pack ◐ · manifest ✓                         │
+├────────────────────┬────────────────────────────────┬────────────────────────┤
+│ CAPABILITY SPINE   │  ACTIVE GENERIC PANEL          │ LINE-SPECIFIC SLOT     │
+│ ──────────────     │  ───────────────────────       │ ─────────────────       │
+│ ▣ understanding    │  one of:                       │ matrix_script →        │
+│ ▣ variation        │   · content_structure          │   variation panel      │
+│ ▢ subtitles        │   · scene_plan                 │ digital_anchor →       │
+│ ▢ dub (optional)   │   · audio_plan                 │   role/speaker panel   │
+│ ▢ pack (optional)  │   · language_plan              │ hot_follow →           │
+│                    │  contract-shaped controls only │   subtitle authority   │
+│                    │  no provider/model/vendor UI   │   panel                │
+│                    │                                │                        │
+│                    │                                │ L3 STRIP (right-rail)  │
+│                    │                                │ ───────────────        │
+│                    │                                │ current_attempt: a07   │
+│                    │                                │ gate: ready            │
+│                    │                                │ advisory: —            │
+├────────────────────┴────────────────────────────────┴────────────────────────┤
+│  EVIDENCE STRIP   reference_line: hot_follow   validator_report: [open]      │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Four generic panels
+
+| Panel | Backing contract | Notes |
+|---|---|---|
+| `content_structure` | `factory_content_structure_contract` | Hook / Body / CTA structure, slot pack pointers. Read-mostly. |
+| `scene_plan` | `factory_scene_plan_contract` | Scene template assembly, role/scene binding hints. Pack content non-blocking. |
+| `audio_plan` | `factory_audio_plan_contract` | Speaker plan, dub kind, lip-sync constraints. |
+| `language_plan` | `factory_language_plan_contract` | Per-language scope, subtitle/dub matrix. |
+
+Each panel is a contract-shaped read/edit view. None of them author truth; edits propagate as proposed packet patches that the gateway validates.
+
+### L2 artifact facts strip (top)
+
+Strict projection of L2 artifact facts: presence chips for `final`, `subtitle`, `audio`, `pack`, `manifest`. Source: gateway L2 facts payload — never recomputed by UI. Optional artifacts (`pack`) render with a subordinate marker and never gate downstream affordances.
+
+### L3 current attempt / gate / advisory strip (right-rail)
+
+The only place where attempt-level state renders. Fields:
+
+| Field | Source |
+|---|---|
+| `current_attempt` id | L3 `current_attempt.id` |
+| `gate` chip | L3 `current_attempt.gate_state` (also surfaced in header for ambient awareness) |
+| `advisory` text | L3 `current_attempt.advisory` (read-only) |
+| `requires_redub` / `requires_recompose` | L3 boolean flags, surfaced as inline notes only |
+
+The strip never authors any of these values; if a field is absent on the L3 payload, the row renders blank.
+
+### Line-specific side-panel slot
+
+Single mount point on the right column. Content is selected by `line_specific_refs[].ref_id`:
+
+| `line_id` | `ref_id` resolved | Panel mounted |
+|---|---|---|
+| `matrix_script` | `matrix_script_variation_matrix` / `matrix_script_slot_pack` | [Matrix Script Variation Panel](panel_matrix_script_variation_lowfi_v1.md) |
+| `digital_anchor` | `digital_anchor_role_pack` / `digital_anchor_speaker_plan` | [Digital Anchor Role/Speaker Panel](panel_digital_anchor_role_speaker_lowfi_v1.md) |
+| `hot_follow` | `hot_follow_subtitle_authority` / `hot_follow_dub_compose_legality` | [Hot Follow Subtitle Authority Panel](panel_hot_follow_subtitle_authority_lowfi_v1.md) |
+
+The slot is always exactly one panel — no tabs, no side-by-side line panels, no second-line bleed-in. Any other `line_id` in the future plugs into this same slot.
+
+### Non-blocking guarantee (re-affirmed)
+
+- `pack` and any other `required: false` capability never gate other capabilities or the publish projection.
+- The L2 strip shows `pack` presence but never raises a blocker; the gate badge does not change because `pack` is incomplete.
+
+### Extended Contract Mapping
+
+| UI element | Contract object |
+|---|---|
+| Generic panel: content_structure | `factory_content_structure_contract` |
+| Generic panel: scene_plan | `factory_scene_plan_contract` |
+| Generic panel: audio_plan | `factory_audio_plan_contract` |
+| Generic panel: language_plan | `factory_language_plan_contract` |
+| L2 strip presence chips | L2 artifact facts (`final`, `subtitle`, `audio`, `pack`, `manifest`) |
+| L3 strip fields | `current_attempt.{id, gate_state, advisory, requires_redub, requires_recompose}` |
+| Line-specific slot mount | `line_specific_refs[]` resolved by `ref_id` |
+| Header gate badge | `evidence.ready_state` |
+| Reference baseline | `evidence.reference_line` + `evidence.reference_evidence_path` |
+
+### Notes / Known Deferrals
+- **Re-run / regenerate affordances**: design exposes them only when L3 marks the attempt as stale (`requires_redub` / `requires_recompose`). Wiring deferred to engineering confirmation.
+- **Line switcher**: not provided. A Workbench instance is bound to one `line_id`; switching means navigating back to the Board.
+- **Comparison view** (current attempt vs. historical): deferred. The L2 strip shows historical artifact presence, the L3 strip shows current attempt — comparison is design-deferred.
+- **Asset library access**: explicitly not provided in Workbench. Operators bounce to the B-roll / Asset page.
