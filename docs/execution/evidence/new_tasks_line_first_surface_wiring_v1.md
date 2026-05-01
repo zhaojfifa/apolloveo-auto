@@ -1,18 +1,16 @@
-# Evidence: New Tasks Card-Based Line Entry Rollback v1
+# Evidence: New Tasks Strict Card Link Correction v1
 
 Date: 2026-05-01
-Scope: Board taxonomy + New Tasks entry surface only
+Scope: New Tasks entry surface only
 
 ## What Changed
 
-Rolled back `/tasks/newtasks` from the semi-workbench intake form to the
-original card-based entry layout, then aligned the active Board taxonomy with
-the same line vocabulary.
+Restored `/tasks/newtasks` to the original card-based visual/layout baseline
+and corrected the primary card targets so no New Tasks card points at disabled
+legacy scene routes.
 
 Files changed:
 
-- `gateway/app/services/task_semantics.py`
-- `gateway/app/templates/tasks.html`
 - `gateway/app/templates/tasks_newtasks.html`
 - `gateway/app/services/tests/test_new_tasks_surface.py`
 
@@ -21,20 +19,21 @@ Files changed:
 - Current route target: `gateway/app/routers/tasks.py::tasks_newtasks`
 - Current template target: `gateway/app/templates/tasks_newtasks.html`
 - `/tasks` primary "new task" link remains `/tasks/newtasks`
-- Legacy `/tasks/new`, `/tasks/avatar/new`, `/tasks/hot/new`, and
-  `/tasks/baseline/new` remain compatibility / next-step paths only; they do
-  not define primary operator-visible taxonomy.
+- Legacy `/tasks/avatar/new` and `/tasks/apollo-avatar/new` are not used by
+  primary New Tasks cards.
 
 ## Surface Contract
 
-`/tasks/newtasks` is selection-only and renders four card entries:
+`/tasks/newtasks` is selection-only, keeps the original New Tasks card visual
+baseline (`wizard-wrap`, `wizard-card`, `icon-box`, Tailwind grid, original
+topbar and bottom guidance rhythm), and renders four card entries:
 
-| Visible label | Internal id |
-| --- | --- |
-| 热点跟拍 | `hot_follow` |
-| 矩阵脚本 | `matrix_script` |
-| 数字人IP | `digital_anchor` |
-| 基础剪辑 | `baseline` |
+| Visible label | Internal id | Active target |
+| --- | --- | --- |
+| 数字人IP | `digital_anchor` | `/tasks/new?line=digital_anchor` |
+| 热点跟拍 | `hot_follow` | `/tasks/new?line=hot_follow` |
+| 矩阵脚本 | `matrix_script` | `/tasks/new?line=matrix_script` |
+| 基础剪辑 | `baseline` | `/tasks/new?line=baseline` |
 
 The page preserves:
 
@@ -55,16 +54,6 @@ Removed from New Tasks:
 - `generic_refs` / `line_specific_refs` display
 - contract/debug style hints
 
-Board taxonomy now uses the same vocabulary:
-
-| Visible label | Internal id |
-| --- | --- |
-| 全部场景 | `all` |
-| 热点跟拍 | `hot_follow` |
-| 矩阵脚本 | `matrix_script` |
-| 数字人IP | `digital_anchor` |
-| 基础剪辑 | `baseline` |
-
 No provider/model/vendor controls are present. No language-plan, subtitle,
 dub, helper translation, or skill-driven language logic changed.
 
@@ -73,27 +62,34 @@ dub, helper translation, or skill-driven language logic changed.
 Command:
 
 ```bash
-python3.11 -m pytest gateway/app/services/tests/test_new_tasks_surface.py -q
+python3.11 -m pytest gateway/app/services/tests/test_new_tasks_surface.py gateway/app/services/tests/test_task_router_presenters.py -q
 ```
 
 Result:
 
 ```text
-3 passed
+35 passed
 ```
 
 Coverage:
 
 - `/tasks` template links to `/tasks/newtasks`
-- Board tabs and task labels use the unified line taxonomy
 - `/tasks/newtasks` route renders the active card-based template with the four
   line ids
 - New Tasks has no workbench-like form, target-language inputs, helper
   textarea, or envelope counters
+- every visible card uses `/tasks/new?line=<line_id>` as the active create
+  target
+- `/tasks/new?line=digital_anchor`, `/tasks/new?line=hot_follow`,
+  `/tasks/new?line=matrix_script`, and `/tasks/new?line=baseline` load the
+  active create template and do not return `ApolloAvatar is disabled`
+- original visual baseline classes remain present and the semi-custom
+  `line-card` / `newtasks-header` / `page-shell` variant is absent
 
 ## Red Lines
 
-- Board change limited to active line taxonomy/filter labels.
+- New Tasks change only.
+- No Board redesign.
 - No Workbench implementation changed.
 - No Delivery implementation changed.
 - No Hot Follow panel implementation changed.

@@ -64,15 +64,21 @@ def test_newtasks_template_is_selection_only_not_workbench_like():
     template = (TEMPLATE_DIR / "tasks_newtasks.html").read_text(encoding="utf-8")
 
     assert "/tasks/newtasks" in (TEMPLATE_DIR / "tasks.html").read_text(encoding="utf-8")
-    assert "line-card" in template
+    assert "wizard-wrap" in template
+    assert "wizard-card" in template
+    assert "icon-box" in template
+    assert "text-4xl font-bold tracking-tight" in template
+    assert "grid grid-cols-1 gap-6 md:grid-cols-3" in template
+    assert "shadow-sm ring-1 ring-gray-200" in template
+    assert "rounded-2xl p-6" in template
+    assert "uppercase tracking-wide" in template
     assert "开始创建" in template
-    assert "使用提示" in template
+    assert 't("tasks.wizard.hint_title")' in template
     assert "tasks.scene.avatar" not in template
     assert "tasks.scene.hot" not in template
     assert "tasks.scene.baseline" not in template
     assert ">AVATAR<" not in template
     assert ">HOT<" not in template
-    assert ">BASELINE<" not in template
     assert "target_language" not in template
     assert "helper_translation" not in template
     assert "generic_refs" not in template
@@ -80,3 +86,43 @@ def test_newtasks_template_is_selection_only_not_workbench_like():
     assert "Envelope completeness" not in template
     assert "<input" not in template
     assert "<textarea" not in template
+    assert "line-card" not in template
+    assert "newtasks-header" not in template
+    assert "page-shell" not in template
+
+
+def test_newtasks_card_links_target_active_create_route():
+    template = (TEMPLATE_DIR / "tasks_newtasks.html").read_text(encoding="utf-8")
+
+    expected_targets = {
+        "digital_anchor": "/tasks/new?line=digital_anchor",
+        "hot_follow": "/tasks/new?line=hot_follow",
+        "matrix_script": "/tasks/new?line=matrix_script",
+        "baseline": "/tasks/new?line=baseline",
+    }
+    for line_id, href in expected_targets.items():
+        assert f'data-line-id="{line_id}"' in template
+        assert f'href="{href}' in template
+
+    assert "/tasks/avatar/new" not in template
+    assert "/tasks/apollo-avatar/new" not in template
+    assert "/tasks/hot/new" not in template
+    assert "/tasks/baseline/new" not in template
+
+
+def test_newtasks_card_targets_load_without_disabled_avatar(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "off")
+
+    def fake_render_template(*, request, name, ctx=None, status_code=200, headers=None):
+        assert name == "tasks_new.html"
+        return HTMLResponse(content=f"loaded:{name}", status_code=status_code, headers=headers)
+
+    monkeypatch.setattr(tasks_router, "render_template", fake_render_template)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    for line_id in ("digital_anchor", "hot_follow", "matrix_script", "baseline"):
+        response = client.get(f"/tasks/new?line={line_id}&ui_locale=zh")
+
+        assert response.status_code == 200
+        assert "loaded:tasks_new.html" in response.text
+        assert "ApolloAvatar is disabled" not in response.text

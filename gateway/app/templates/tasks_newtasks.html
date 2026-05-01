@@ -3,183 +3,180 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>新建任务 - ShortVideo</title>
+    <title>{{ t("tasks.wizard.page_title") }}</title>
 
+    <!-- Keep consistent with the rest of v185 UI -->
     <link rel="stylesheet" href="/static/i18n.css" />
     <link rel="stylesheet" href="/static/css/ui_v185.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
-      :root { color-scheme: light; }
-      body {
-        margin: 0;
-        background: #f3f4f6;
-        color: #111827;
-        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      }
-      .page-shell {
-        max-width: 1120px;
-        margin: 0 auto;
-        padding: 16px;
-      }
-      .newtasks-header {
-        margin: 24px 0 18px;
-      }
-      .newtasks-header h1 {
-        margin: 0;
-        font-size: 2rem;
-        line-height: 1.15;
-      }
-      .newtasks-header p {
-        margin: 8px 0 0;
-        color: #64748b;
-      }
-      .line-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 14px;
-      }
-      .line-card {
-        display: flex;
-        min-height: 220px;
-        flex-direction: column;
-        justify-content: space-between;
-        gap: 14px;
-        padding: 16px;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        background: #fff;
-        color: inherit;
-        text-decoration: none;
-        box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-      }
-      .line-card:hover {
-        border-color: #94a3b8;
-        box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
-      }
-      .line-card__top {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-      }
-      .line-card__label {
-        font-size: 1.25rem;
-        font-weight: 800;
-      }
-      .line-card__id {
-        width: max-content;
-        border: 1px solid #cbd5e1;
-        border-radius: 999px;
-        padding: 3px 9px;
-        background: #f8fafc;
-        color: #334155;
-        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-        font-size: 0.78rem;
-      }
-      .line-card__desc {
-        color: #475569;
-        line-height: 1.55;
-      }
-      .line-card__action {
-        color: #1d4ed8;
-        font-weight: 800;
-      }
-      .guidance {
-        margin-top: 18px;
-        padding: 16px;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        background: #fff;
-      }
-      .guidance h2 {
-        margin: 0;
-        font-size: 1rem;
-      }
-      .guidance ul {
-        margin: 10px 0 0;
-        padding-left: 18px;
-        color: #475569;
-      }
-      .guidance li + li {
-        margin-top: 6px;
-      }
-      @media (max-width: 980px) {
-        .line-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-      @media (max-width: 620px) {
-        .line-grid {
-          grid-template-columns: 1fr;
-        }
-      }
+      /* Small, page-scoped polish (avoid global impact) */
+      .wizard-wrap { max-width: 1100px; }
+      .wizard-card { border-radius: 16px; }
+      .wizard-card:hover { transform: translateY(-2px); }
+      .wizard-card .icon-box { width: 56px; height: 56px; border-radius: 14px; display:flex; align-items:center; justify-content:center; }
+      .wizard-card .cta { display:inline-flex; align-items:center; gap:10px; font-weight:600; }
+      .wizard-card .divider { height:1px; background: rgba(17,24,39,0.10); }
     </style>
   </head>
 
-  <body>
-    <div class="page-shell" data-role="operator-new-tasks" data-surface="card-line-selection">
+  <body class="bg-gray-50 text-gray-900">
+    <div class="page" data-role="operator-new-tasks" data-surface="card-line-selection">
       {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
-      {% set topbar_title = "新建任务" %}
-      {% set topbar_subtitle = "先选择产线，再进入对应的下一步流程" %}
+      {# Topbar (reuse existing component) #}
+      {% set topbar_title = t("tasks.wizard.header_title") %}
+      {% set topbar_subtitle = t("tasks.wizard.header_subtitle") %}
       {% set topbar_nav = [
-        {"label": "任务", "href": "/tasks" ~ ui_q, "active": true},
-        {"label": "工具", "href": "/tools/hub" ~ ui_q, "active": false}
+        {"label": t("common.tasks"), "href": "/tasks" ~ ui_q, "active": true},
+        {"label": t("common.tools"), "href": "/tools/hub" ~ ui_q, "active": false}
       ] %}
       {% set topbar_actions = [
-        {"label": "返回任务看板", "href": "/tasks" ~ ui_q, "primary": false}
+        {"label": t("common.back_task_board"), "href": "/tasks" ~ ui_q, "primary": false}
       ] %}
       {% include "_topbar.html" %}
 
-      <header class="newtasks-header">
-        <h1>新建任务</h1>
-        <p>请选择要进入的产线。这里仅负责入口选择，具体编辑、校对和运行操作在对应工作台中完成。</p>
-      </header>
+      <main class="mx-auto wizard-wrap px-6 py-8">
+        <header class="mb-8">
+          <h1 class="text-4xl font-bold tracking-tight">{{ t("tasks.wizard.title") }}</h1>
+          <p class="mt-3 text-base text-gray-600">请选择要进入的产线。这里仅负责入口选择，具体编辑、校对和运行操作在对应工作台中完成。</p>
+        </header>
 
-      <main>
-        <section class="line-grid" aria-label="产线选择">
-          <a class="line-card" href="/tasks/hot/new{{ ui_q }}" data-line-id="hot_follow">
-            <div class="line-card__top">
-              <div class="line-card__label">热点跟拍</div>
-              <div class="line-card__id">hot_follow</div>
-              <div class="line-card__desc">用于参考视频驱动的快速跟拍任务，下一步进入热点跟拍创建流程。</div>
+        <section class="grid grid-cols-1 gap-6 md:grid-cols-3" aria-label="task line wizard">
+          <!-- Digital Anchor -->
+          <a href="/tasks/new?line=digital_anchor{{ '&ui_locale=' ~ ui_locale if ui_locale else '' }}"
+             data-line-id="digital_anchor"
+             class="wizard-card group block bg-white shadow-sm ring-1 ring-gray-200 transition-all duration-150 hover:shadow-md hover:ring-gray-300 p-6">
+            <div class="icon-box bg-purple-50 ring-1 ring-purple-200 text-purple-700">
+              <!-- User-Astronaut (simple inline svg) -->
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2a4 4 0 0 0-4 4v1a4 4 0 0 0 8 0V6a4 4 0 0 0-4-4Z" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M5 22v-2a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
             </div>
-            <div class="line-card__action">开始创建</div>
+
+            <div class="mt-5">
+              <h3 class="text-2xl font-semibold">数字人IP</h3>
+              <div class="mt-1 text-sm font-medium text-gray-500 uppercase tracking-wide">DIGITAL_ANCHOR</div>
+              <p class="mt-4 text-gray-700 leading-relaxed">
+                用于角色、口播、场景和语言输出相关任务，下一步进入数字人IP创建流程。
+              </p>
+            </div>
+
+            <div class="mt-6 divider"></div>
+
+            <div class="mt-4">
+              <span class="cta text-purple-700 group-hover:text-purple-800">
+                开始创建
+                <span aria-hidden="true">→</span>
+              </span>
+            </div>
           </a>
 
-          <a class="line-card" href="/tasks/new?line=matrix_script{{ '&ui_locale=' ~ ui_locale if ui_locale else '' }}" data-line-id="matrix_script">
-            <div class="line-card__top">
-              <div class="line-card__label">矩阵脚本</div>
-              <div class="line-card__id">matrix_script</div>
-              <div class="line-card__desc">用于脚本变体、矩阵运营和批量试错任务，下一步进入该产线的任务流程。</div>
+          <!-- Hot Follow -->
+          <a href="/tasks/new?line=hot_follow{{ '&ui_locale=' ~ ui_locale if ui_locale else '' }}"
+             data-line-id="hot_follow"
+             class="wizard-card group block bg-white shadow-sm ring-1 ring-gray-200 transition-all duration-150 hover:shadow-md hover:ring-gray-300 p-6">
+            <div class="icon-box bg-orange-50 ring-1 ring-orange-200 text-orange-700">
+              <!-- Fire -->
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 22c4 0 7-3 7-7 0-3-2-5-4-7 0 3-2 4-3 4-1 0-2-1-2-3-2 2-4 4-4 7 0 4 3 6 6 6Z"
+                      stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              </svg>
             </div>
-            <div class="line-card__action">开始创建</div>
+
+            <div class="mt-5">
+              <h3 class="text-2xl font-semibold">热点跟拍</h3>
+              <div class="mt-1 text-sm font-medium text-gray-500 uppercase tracking-wide">HOT_FOLLOW</div>
+              <p class="mt-4 text-gray-700 leading-relaxed">
+                用于参考视频驱动的快速跟拍任务，下一步进入热点跟拍创建流程。
+              </p>
+            </div>
+
+            <div class="mt-6 divider"></div>
+
+            <div class="mt-4">
+              <span class="cta text-orange-700 group-hover:text-orange-800">
+                开始创建
+                <span aria-hidden="true">→</span>
+              </span>
+            </div>
           </a>
 
-          <a class="line-card" href="/tasks/avatar/new{{ ui_q }}" data-line-id="digital_anchor">
-            <div class="line-card__top">
-              <div class="line-card__label">数字人IP</div>
-              <div class="line-card__id">digital_anchor</div>
-              <div class="line-card__desc">用于角色、口播、场景和语言输出相关任务，下一步进入数字人创建流程。</div>
+          <!-- Matrix Script -->
+          <a href="/tasks/new?line=matrix_script{{ '&ui_locale=' ~ ui_locale if ui_locale else '' }}"
+             data-line-id="matrix_script"
+             class="wizard-card group block bg-white shadow-sm ring-1 ring-gray-200 transition-all duration-150 hover:shadow-md hover:ring-gray-300 p-6">
+            <div class="icon-box bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700">
+              <!-- Matrix grid -->
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z"
+                      stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+              </svg>
             </div>
-            <div class="line-card__action">开始创建</div>
+
+            <div class="mt-5">
+              <h3 class="text-2xl font-semibold">矩阵脚本</h3>
+              <div class="mt-1 text-sm font-medium text-gray-500 uppercase tracking-wide">MATRIX_SCRIPT</div>
+              <p class="mt-4 text-gray-700 leading-relaxed">
+                用于脚本变体、矩阵运营和批量试错任务，下一步进入矩阵脚本任务流程。
+              </p>
+            </div>
+
+            <div class="mt-6 divider"></div>
+
+            <div class="mt-4">
+              <span class="cta text-emerald-700 group-hover:text-emerald-800">
+                开始创建
+                <span aria-hidden="true">→</span>
+              </span>
+            </div>
           </a>
 
-          <a class="line-card" href="/tasks/baseline/new{{ ui_q }}" data-line-id="baseline">
-            <div class="line-card__top">
-              <div class="line-card__label">基础剪辑</div>
-              <div class="line-card__id">baseline</div>
-              <div class="line-card__desc">用于兼容的基础剪辑任务入口，不替代矩阵脚本或数字人IP产线。</div>
+          <!-- Baseline -->
+          <a href="/tasks/new?line=baseline{{ '&ui_locale=' ~ ui_locale if ui_locale else '' }}"
+             data-line-id="baseline"
+             class="wizard-card group block bg-white shadow-sm ring-1 ring-gray-200 transition-all duration-150 hover:shadow-md hover:ring-gray-300 p-6">
+            <div class="icon-box bg-blue-50 ring-1 ring-blue-200 text-blue-700">
+              <!-- Scissors -->
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M4 7a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M4 17a3 3 0 1 0 6 0 3 3 0 0 0-6 0Z" stroke="currentColor" stroke-width="1.6"/>
+                <path d="M10 8l10-6M10 16l10 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
             </div>
-            <div class="line-card__action">开始创建</div>
+
+            <div class="mt-5">
+              <h3 class="text-2xl font-semibold">基础剪辑</h3>
+              <div class="mt-1 text-sm font-medium text-gray-500 uppercase tracking-wide">BASELINE</div>
+              <p class="mt-4 text-gray-700 leading-relaxed">
+                用于兼容的基础剪辑任务入口，不替代矩阵脚本或数字人IP产线。
+              </p>
+            </div>
+
+            <div class="mt-6 divider"></div>
+
+            <div class="mt-4">
+              <span class="cta text-blue-700 group-hover:text-blue-800">
+                开始创建
+                <span aria-hidden="true">→</span>
+              </span>
+            </div>
           </a>
         </section>
 
-        <section class="guidance" aria-label="使用提示">
-          <h2>使用提示</h2>
-          <ul>
-            <li>任务看板负责筛选和路由任务，新建任务页只负责选择产线入口。</li>
-            <li>产线内部的编辑、字段填写、校对和运行操作，请在对应的下一步流程或工作台中完成。</li>
-            <li>页面可见说明使用中文；产线编号和路由参数保留英文，便于系统识别。</li>
-          </ul>
+        <section class="mt-10 bg-white shadow-sm ring-1 ring-gray-200 rounded-2xl p-6">
+          <div class="flex items-start gap-3">
+            <div class="mt-1 text-yellow-600" aria-hidden="true"></div>
+            <div>
+              <div class="font-semibold text-gray-900">{{ t("tasks.wizard.hint_title") }}</div>
+              <ul class="mt-3 list-disc pl-5 text-gray-700 space-y-2">
+                <li>任务看板负责筛选和路由任务，新建任务页只负责选择产线入口。</li>
+                <li>产线内部的编辑、字段填写、校对和运行操作，请在对应的下一步流程或工作台中完成。</li>
+                <li>页面可见说明使用中文；产线编号和路由参数保留英文，便于系统识别。</li>
+              </ul>
+            </div>
+          </div>
         </section>
       </main>
     </div>

@@ -568,6 +568,57 @@ Red lines preserved:
 - no B-roll change
 - no provider/model/vendor controls
 - no packet/schema change
+
+## New Tasks Strict Card Link Correction
+
+Date: 2026-05-01
+
+This node corrected the active `/tasks/newtasks` page only. It restored the
+original New Tasks card visual/layout baseline and fixed the primary card links
+so no visible card routes into disabled legacy scene paths.
+
+Files changed:
+
+- `gateway/app/templates/tasks_newtasks.html`
+- `gateway/app/services/tests/test_new_tasks_surface.py`
+- `docs/execution/evidence/new_tasks_line_first_surface_wiring_v1.md`
+- `docs/execution/logs/PHASE2_PROGRESS_LOG.md`
+- `docs/execution/apolloveo_2_0_evidence_index_v1.md`
+
+What changed:
+
+- `/tasks/newtasks` again uses the original `wizard-wrap` / `wizard-card` /
+  `icon-box` visual structure, original title spacing, original card border /
+  radius / shadow weight, original CTA rhythm, and original bottom guidance
+  section style.
+- New Tasks remains card-grid selection only and does not contain inline forms,
+  target-language inputs, helper translation textareas, envelope counters, or
+  generic/line-specific ref displays.
+- Visible cards are 数字人IP (`digital_anchor`), 热点跟拍 (`hot_follow`),
+  矩阵脚本 (`matrix_script`), and 基础剪辑 (`baseline`).
+- Card targets are now:
+  - 数字人IP -> `/tasks/new?line=digital_anchor`
+  - 热点跟拍 -> `/tasks/new?line=hot_follow`
+  - 矩阵脚本 -> `/tasks/new?line=matrix_script`
+  - 基础剪辑 -> `/tasks/new?line=baseline`
+- `/tasks/avatar/new`, `/tasks/apollo-avatar/new`, `/tasks/hot/new`, and
+  `/tasks/baseline/new` are not used as primary New Tasks card targets.
+
+Tests:
+
+- `python3.11 -m pytest gateway/app/services/tests/test_new_tasks_surface.py gateway/app/services/tests/test_task_router_presenters.py -q`
+  -> **35 passed**
+
+Red lines preserved:
+
+- no Board redesign
+- no Workbench change
+- no Delivery change
+- no Hot Follow panel change
+- no B-roll change
+- no provider/model/vendor controls
+- no packet/schema/runtime change
+- no language logic change
 - no Platform Runtime Assembly
 - no language-system redesign; target-language behavior remains limited to
   the existing Burmese / Vietnamese scope
