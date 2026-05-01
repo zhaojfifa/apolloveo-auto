@@ -169,6 +169,8 @@ from gateway.app.services.task_view import (
     safe_collect_hot_follow_workbench_ui as _svc_safe_collect_hot_follow_workbench_ui,
 )
 from gateway.app.services.voice_service import (
+    hf_screen_text_candidate_summary as _svc_hf_screen_text_candidate_summary,
+    hf_source_audio_lane_summary as _svc_hf_source_audio_lane_summary,
     hf_source_audio_semantics,
     maybe_run_hot_follow_lipsync_stub as _svc_maybe_run_hot_follow_lipsync_stub,
 )
@@ -925,85 +927,14 @@ def _hf_dual_channel_state(task_id: str, task: dict, subtitle_lane: dict[str, An
 
 
 def _hf_source_audio_lane_summary(task: dict, route_state: dict[str, Any] | None = None) -> dict[str, Any]:
-    route = route_state or {}
-    source_audio_policy = source_audio_policy_from_task(task)
-    content_mode = str(route.get("content_mode") or "").strip().lower()
-    speech_detected = bool(route.get("speech_detected"))
-    title_hint = str(task.get("title") or "").strip().lower()
-    has_bgm_hint = any(token in title_hint for token in ("bgm", "音乐", "配乐", "商品", "展示"))
-
-    if content_mode == "silent_candidate":
-        return {
-            "source_audio_lane": "silent_candidate",
-            "source_audio_lane_reason": "未检测到稳定人声，建议优先字幕驱动。",
-            "source_audio_policy": source_audio_policy,
-            "speech_presence": "none",
-            "bgm_presence": "possible" if has_bgm_hint else "unknown",
-            "audio_mix_mode": "silent_or_fx",
-        }
-    if content_mode == "subtitle_led":
-        return {
-            "source_audio_lane": "music_or_text_led",
-            "source_audio_lane_reason": "画面文字线索更强，当前素材更像字幕或画面驱动。",
-            "source_audio_policy": source_audio_policy,
-            "speech_presence": "low",
-            "bgm_presence": "possible",
-            "audio_mix_mode": "text_led",
-        }
-    if speech_detected and has_bgm_hint:
-        return {
-            "source_audio_lane": "mixed_audio",
-            "source_audio_lane_reason": "检测到人声，同时素材特征显示可能带明显配乐。",
-            "source_audio_policy": source_audio_policy,
-            "speech_presence": "high",
-            "bgm_presence": "possible",
-            "audio_mix_mode": "speech_plus_bgm",
-        }
-    if speech_detected:
-        return {
-            "source_audio_lane": "speech_primary",
-            "source_audio_lane_reason": "检测到稳定人声，适合标准配音替换路径。",
-            "source_audio_policy": source_audio_policy,
-            "speech_presence": "high",
-            "bgm_presence": "low",
-            "audio_mix_mode": "speech_primary",
-        }
-    return {
-        "source_audio_lane": "unknown",
-        "source_audio_lane_reason": "当前音频结构信息不足，建议先检查来源字幕和原视频。",
-        "source_audio_policy": source_audio_policy,
-        "speech_presence": "unknown",
-        "bgm_presence": "unknown",
-        "audio_mix_mode": "unknown",
-    }
+    return _svc_hf_source_audio_lane_summary(task, route_state)
 
 
 def _hf_screen_text_candidate_summary(
     subtitle_lane: dict[str, Any] | None = None,
     route_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    lane = subtitle_lane or {}
-    route = route_state or {}
-    normalized = str(lane.get("normalized_source_text") or "").strip()
-    raw = str(lane.get("raw_source_text") or "").strip()
-    content_mode = str(route.get("content_mode") or "").strip().lower()
-    onscreen = bool(route.get("onscreen_text_detected"))
-    density = str(route.get("onscreen_text_density") or "").strip().lower() or "none"
-
-    candidate_text = normalized or raw
-    if not candidate_text or (not onscreen and content_mode != "subtitle_led"):
-        return {
-            "screen_text_candidate": "",
-            "screen_text_candidate_source": None,
-            "screen_text_candidate_confidence": "none",
-            "screen_text_candidate_mode": "unavailable",
-        }
-    return {
-        "screen_text_candidate": candidate_text,
-        "screen_text_candidate_source": "normalized_source" if normalized else "source_text",
-        "screen_text_candidate_confidence": density if density in {"high", "low"} else "low",
-        "screen_text_candidate_mode": "subtitle_led" if content_mode == "subtitle_led" else "assisted_candidate",
-    }
+    return _svc_hf_screen_text_candidate_summary(subtitle_lane, route_state)
 
 
 
