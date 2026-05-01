@@ -1,0 +1,26 @@
+"""Operator-visible surface projections (Phase 3A minimal wiring).
+
+This package contains the additive read-only projections that the four
+operator-visible surfaces (Board, Workbench, Delivery, Hot Follow panel)
+consume. It does not own truth, mutate the packet, or write into L2/L3.
+
+Scope is bound by `docs/reviews/operator_visible_surface_wiring_feasibility_v1.md`:
+B-roll surfaces are explicitly out of scope until product freeze.
+"""
+from .projections import (
+    PANEL_REF_DISPATCH,
+    derive_board_publishable,
+    derive_delivery_publish_gate,
+    derive_delivery_publish_status_mirror,
+    resolve_line_specific_panel,
+    sanitize_operator_payload,
+)
+
+__all__ = [
+    "PANEL_REF_DISPATCH",
+    "derive_board_publishable",
+    "derive_delivery_publish_gate",
+    "derive_delivery_publish_status_mirror",
+    "resolve_line_specific_panel",
+    "sanitize_operator_payload",
+]

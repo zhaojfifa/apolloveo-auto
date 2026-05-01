@@ -233,3 +233,110 @@ Outstanding:
 
 - onboarding gate (`onboarding_gate.py`) consumption of these reports is still pending
 - line-specific contracts under `docs/contracts/matrix_script/` and `docs/contracts/digital_anchor/` are referenced by the samples but not yet authored — currently unblocked because R1 only resolves `generic_refs[]`; will become a blocker when E3-derived line-specific path resolution is tightened
+
+## Operator-Visible Surface Wiring Feasibility Memo (Phase 2 Low-fi CONDITIONAL PASS follow-up)
+
+Date: 2026-05-01
+
+This node completed (diagnosis only — no code, no UI wiring, no schema change):
+
+- read the five Phase-2 low-fi design docs (`ApolloVeo_Operator_Visible_Surfaces_v1.md`, `surface_task_area_lowfi_v1.md`, `surface_workbench_lowfi_v1.md`, `surface_delivery_center_lowfi_v1.md`, `panel_hot_follow_subtitle_authority_lowfi_v1.md`) and the Architect CONDITIONAL PASS (`docs/reviews/architect_phase2_lowfi_review_v1.md`)
+- inspected current gateway / projector / delivery / workbench / packet code: `ready_gate_runtime.py`, `current_attempt_runtime.py`, `status_policy/hot_follow_state.py`, `task_view_presenters.py`, `task_view_workbench_contract.py`, `matrix_script/delivery_binding.py`, `matrix_script/workbench_variation_surface.py`, `digital_anchor/delivery_binding.py`, `packet/validator.py`, and packet schemas under `schemas/packets/`
+- verified the three Engineering Wiring Confirmation items from the review against actual code paths (line-anchored)
+- shipped the wiring feasibility memo: `docs/reviews/operator_visible_surface_wiring_feasibility_v1.md`
+- shipped the diagnosis evidence: `docs/execution/evidence/operator_visible_surface_wiring_feasibility_v1.md`
+- updated the evidence index: `docs/execution/apolloveo_2_0_evidence_index_v1.md`
+
+Verdict (per memo §1):
+
+- Board `blocked` / `ready` rendering, validator head-reason verbatim chip, Workbench four-panel skeleton + L2 facts strip + L3 `current_attempt` strip + `line_specific_refs[]` mount, Delivery Final / Required / Optional zoning, Hot Follow line panel mount, and operator-payload hygiene → **Ready now** at the backend projection layer
+- Board `publishable` bucket boolean, single derived Delivery publish gate, Delivery last-publish-status mirror → **Additive-fixable** as derived projections over existing `ready_gate.*`, `factory_delivery_contract.deliverables[]`, and task-side publish-feedback closure records — no packet truth, no four-layer authority, no truth ownership change
+- B-roll wiring → **Out of scope** until product freezes the seven open B-roll questions (`docs/design/broll_asset_supply_lowfi_v1.md`)
+
+Scope boundary (hard stop honored):
+
+- no UI implementation
+- no field implementation
+- no B-roll wiring
+- no packet / line closure / four-layer truth change
+- no L4 derived state written back into L2/L3
+- design hold preserved; Phase 3 wiring not started
+
+Outstanding (blocking next commissioning step):
+
+- product freeze of the seven B-roll open questions per `docs/reviews/architect_phase2_lowfi_review_v1.md` §"Product Freeze Items"
+- next commissioning instruction before any code lands against the Recommended Minimal Wiring Path in §7 of the memo
+
+## Operator-Visible Surfaces Phase 3A — Minimal Wiring
+
+Date: 2026-05-01
+
+This node completed the minimal additive-projection wiring authorized by
+the wiring feasibility memo. No truth moved, no packet mutation, no UI
+implementation, no B-roll wiring.
+
+Files added:
+
+- `gateway/app/services/operator_visible_surfaces/__init__.py`
+- `gateway/app/services/operator_visible_surfaces/projections.py`
+- `tests/contracts/operator_visible_surfaces/__init__.py`
+- `tests/contracts/operator_visible_surfaces/test_projections.py`
+
+No existing files modified.
+
+Projection-gap closure landed (per memo §5):
+
+- Gap A1 — `derive_board_publishable(ready_gate)` projects per-packet
+  `publishable` boolean + `head_reason` from `ready_gate.*` only
+- Gap A2 — `derive_delivery_publish_gate(ready_gate, l2_facts)` projects
+  a single Delivery `publish_gate` from `ready_gate.publish_ready` /
+  `compose_ready` / `blocking[]` + L2 `final.exists` / `final_stale_reason`;
+  optional items (scene_pack, pack_zip, edit_bundle_zip, helper /
+  attribution exports) are excluded by construction
+- Gap A3 — `derive_delivery_publish_status_mirror(closure)` reads only the
+  task-side `publish_feedback_closure_v1` (matrix_script aggregate or
+  digital_anchor flat) and never returns a packet field
+
+Workbench mount resolver:
+
+- `resolve_line_specific_panel(packet)` + `PANEL_REF_DISPATCH` enum cover
+  the six frozen ref_ids (matrix_script_variation_matrix,
+  matrix_script_slot_pack, digital_anchor_role_pack,
+  digital_anchor_speaker_plan, hot_follow_subtitle_authority,
+  hot_follow_dub_compose_legality); ref payloads are sanitized through
+  `sanitize_operator_payload(...)` before reaching the operator surface
+
+Combined entry: `project_operator_surfaces(...)` returns the four surface
+payloads (Board / Workbench / Delivery / Hot Follow panel) in one call.
+
+Tests:
+
+- `python3 -m pytest tests/contracts/operator_visible_surfaces/ -q` →
+  **28 passed in 0.03s**
+- `python3 -m pytest tests/contracts/ -q` → **158 passed in 0.29s**
+  (no regression)
+
+Red lines verified:
+
+- no provider / model / vendor / engine / raw_provider_route in operator
+  payload — `FORBIDDEN_OPERATOR_KEYS` enforced at surface boundary as
+  defense-in-depth on top of validator R3
+  (`gateway/app/services/packet/validator.py:202`)
+- no UI-authored truth — Workbench mount returns `panel_kind=None` when
+  no known ref_id is present
+- no packet truth mutation — module is read-only
+- no publish-status written onto packet envelope — mirror reads task-side
+  closure only (`docs/contracts/status_ownership_matrix.md:39`)
+- optional items never block publish — asserted by
+  `test_optional_items_never_block_publish_gate`
+- no B-roll wiring
+
+What remains blocked:
+
+- B-roll Action Area + B-roll filter API — still gated on product freeze
+  of the seven open questions
+  (`docs/reviews/architect_phase2_lowfi_review_v1.md` §"Product Freeze Items")
+- Phase 3B (UI wiring) — not started; consumer wiring of
+  `project_operator_surfaces(...)` into live presenter/API response shape
+  is deferred until next commissioning instruction
+- evidence: `docs/execution/evidence/operator_visible_surfaces_phase_3a_minimal_wiring_v1.md`
