@@ -318,8 +318,89 @@ def test_build_tasks_page_rows_preserves_board_payload_shape(monkeypatch):
             "preview_url": None,
             "ui_lang": "",
             "selected_tool_ids": ["a", "b"],
+            # Phase 3B: additive operator-visible Board projection.
+            "publishable": False,
+            "head_reason": None,
+            "board_bucket": "ready",
         }
     ]
+
+
+def test_build_tasks_page_rows_attaches_operator_visible_board_projection(monkeypatch):
+    """Phase 3B: rows expose `publishable` / `head_reason` / `board_bucket`
+    derived from `ready_gate`. Authority cited:
+    `gateway/app/services/operator_visible_surfaces/projections.py`.
+    """
+    monkeypatch.setattr(
+        presenters,
+        "compute_hot_follow_state",
+        lambda _task, base_state: dict(base_state or {}),
+    )
+    rows = build_tasks_page_rows(
+        [
+            {
+                "task_id": "ready-1",
+                "platform": "hot_follow",
+                "category_key": "hot_follow",
+                "ready_gate": {
+                    "publish_ready": True,
+                    "compose_ready": True,
+                    "blocking": [],
+                },
+            },
+            {
+                "task_id": "blocked-1",
+                "platform": "hot_follow",
+                "category_key": "hot_follow",
+                "ready_gate": {
+                    "publish_ready": False,
+                    "compose_ready": True,
+                    "blocking": ["final_missing"],
+                },
+            },
+        ],
+        kind_norm="hot_follow",
+        pack_path_for_list=lambda _task: None,
+        normalize_selected_tool_ids=lambda value: list(value or []),
+    )
+    by_id = {r["task_id"]: r for r in rows}
+    assert by_id["ready-1"]["publishable"] is True
+    assert by_id["ready-1"]["board_bucket"] == "publishable"
+    assert by_id["ready-1"]["head_reason"] is None
+    assert by_id["blocked-1"]["publishable"] is False
+    assert by_id["blocked-1"]["board_bucket"] == "blocked"
+    assert by_id["blocked-1"]["head_reason"] == "final_missing"
+
+
+def test_build_task_workbench_task_json_attaches_operator_surfaces():
+    """Phase 3B: workbench task_json carries `operator_surfaces` shape so the
+    template can render the L3 strip + line-specific panel slot.
+    """
+    detail = _make_detail()
+    task = {
+        "task_id": "t1",
+        "ready_gate": {
+            "publish_ready": True,
+            "compose_ready": True,
+            "blocking": [],
+        },
+        "final": {"exists": True},
+        "final_stale_reason": None,
+        "line_specific_refs": [{"ref_id": "hot_follow_subtitle_authority"}],
+    }
+    out = build_task_workbench_task_json(
+        task,
+        detail,
+        paths={},
+        workbench_kind="default",
+        settings=object(),
+    )
+    surfaces = out["operator_surfaces"]
+    assert set(surfaces.keys()) == {"board", "workbench", "delivery", "hot_follow_panel"}
+    assert surfaces["board"]["publishable"] is True
+    assert surfaces["delivery"]["publish_gate"] is True
+    assert surfaces["workbench"]["line_specific_panel"]["panel_kind"] == "hot_follow"
+    assert surfaces["hot_follow_panel"]["mounted"] is True
 
 
 def test_build_task_summaries_page_does_not_project_hot_follow_ready_from_final_key_only():

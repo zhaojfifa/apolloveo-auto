@@ -12,15 +12,25 @@ from .projections import (
     derive_board_publishable,
     derive_delivery_publish_gate,
     derive_delivery_publish_status_mirror,
+    project_operator_surfaces,
     resolve_line_specific_panel,
     sanitize_operator_payload,
+)
+from .wiring import (
+    build_board_row_projection,
+    build_operator_surfaces_for_publish_hub,
+    build_operator_surfaces_for_workbench,
 )
 
 __all__ = [
     "PANEL_REF_DISPATCH",
+    "build_board_row_projection",
+    "build_operator_surfaces_for_publish_hub",
+    "build_operator_surfaces_for_workbench",
     "derive_board_publishable",
     "derive_delivery_publish_gate",
     "derive_delivery_publish_status_mirror",
+    "project_operator_surfaces",
     "resolve_line_specific_panel",
     "sanitize_operator_payload",
 ]

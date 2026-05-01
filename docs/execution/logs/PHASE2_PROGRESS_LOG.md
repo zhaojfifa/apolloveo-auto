@@ -340,3 +340,113 @@ What remains blocked:
   `project_operator_surfaces(...)` into live presenter/API response shape
   is deferred until next commissioning instruction
 - evidence: `docs/execution/evidence/operator_visible_surfaces_phase_3a_minimal_wiring_v1.md`
+
+## Operator-Visible Surfaces Phase 3B — UI / Presenter Minimal Wiring
+
+Date: 2026-05-01
+
+This node wired the Phase 3A projection module into live presenter / API
+/ template surfaces for Board, Workbench, Delivery, and the Hot Follow
+panel. Strictly additive: no truth moved, no packet mutation, no IA
+redesign, no B-roll wiring.
+
+Files added:
+
+- `gateway/app/services/operator_visible_surfaces/wiring.py` —
+  presenter-side adapter mapping existing task / authoritative-state
+  shapes onto the projection module's inputs
+- `tests/contracts/operator_visible_surfaces/test_wiring.py` —
+  11 wiring-layer cases (board row, workbench bundle, publish-hub bundle,
+  packet-envelope fallback, vendor-key sanitisation)
+
+Files modified:
+
+- `gateway/app/services/operator_visible_surfaces/__init__.py` —
+  re-exports the wiring helpers
+- `gateway/app/services/task_router_presenters.py` — adds `publishable`,
+  `head_reason`, and `board_bucket` to each Board row, and attaches
+  `operator_surfaces` to `task_json` for Workbench
+- `gateway/app/services/task_view_presenters.py` — attaches
+  `operator_surfaces` to the Hot Follow publish-hub payload
+- `gateway/app/templates/tasks.html` — Board bucket legend (All /
+  Blocked / Ready / Publishable), per-row bucket badge + head-reason
+  chip, bucket filter wired into existing `applyFilters()` JS
+- `gateway/app/templates/task_workbench.html` — operator surface strip
+  (L3 publish-gate, board bucket, line-panel kind), additive
+  line-specific panel mount slot, Hot Follow right-rail panel mount
+  (subtitle authority / source / dub-compose legality / helper)
+- `gateway/app/templates/task_publish_hub.html` — publish-gate strip
+  with publish-status mirror (status / channel / link / last_published_at)
+  and a `renderOperatorSurfaces(data.operator_surfaces || {})` consumer
+- `gateway/app/services/tests/test_task_router_presenters.py` —
+  augments existing `test_build_tasks_page_rows_preserves_board_payload_shape`
+  to assert the additive Board projection keys, plus two new presenter
+  cases for Board projection and Workbench `operator_surfaces`
+
+What is now live (operator surfaces consume Phase 3A projections):
+
+- **Board** — `publishable` boolean + `head_reason` chip + `board_bucket`
+  enum land on every Board row; UI gains a Blocked / Ready / Publishable
+  filter; bucket and head-reason badges render per row.
+- **Workbench** — `task_json.operator_surfaces` carries the full
+  `project_operator_surfaces(...)` shape; template renders the L3
+  publish-gate strip, the line-specific panel mount slot (driven only by
+  `line_specific_refs[]`), and the Hot Follow right-rail panel when
+  `panel_kind == "hot_follow"`.
+- **Delivery** — publish-hub payload carries
+  `operator_surfaces.delivery.{publish_gate, publish_gate_head_reason,
+  publish_status_mirror}` plus the same line-specific panel resolver
+  shape; template renders the single derived publish-gate and the
+  read-only publish-status mirror; existing Final / Required / Optional
+  zoning continues to come from the existing deliverables contract.
+- **Hot Follow panel** — explained-only right-rail surface mounted via
+  the same Workbench resolver when a `hot_follow_subtitle_authority` /
+  `hot_follow_dub_compose_legality` ref is present on the packet; never
+  authors truth.
+
+Tests:
+
+- `python3.11 -m pytest tests/contracts/operator_visible_surfaces/ -q`
+  → **39 passed** (28 Phase 3A + 11 Phase 3B wiring cases)
+- `python3.11 -m pytest tests/contracts/ -q` → **169 passed**
+  (no regression vs Phase 3A's 158)
+- `python3.11 -m pytest gateway/app/services/tests/test_task_router_presenters.py -q`
+  → **all green** (existing presenter regression preserved; +2 new cases)
+
+Red lines preserved:
+
+- no provider / model / vendor / engine / raw_provider_route in any
+  operator-visible payload — projection's `sanitize_operator_payload`
+  remains the boundary; wiring layer adds no new keys
+- no UI-authored truth — Workbench mount slot is empty when no known
+  `line_specific_refs[]` ref is present; templates render projection
+  output only
+- no packet truth mutation — wiring helper takes Mappings and returns
+  new dicts; never mutates inputs
+- no publish-status written onto packet envelope — Delivery mirror is
+  derived from task-side closure (currently passed as `None` since the
+  closure is not materialised on the live Hot Follow task surface yet;
+  mirror returns the empty `not_published` shape and remains read-only)
+- no recomputation of gate / current-attempt truth in UI — templates
+  display projection output only
+- optional items never block publish — gate excludes them by
+  construction, asserted by `test_publish_hub_bundle_optional_items_never_block_gate`
+- no B-roll wiring — no B-roll surfaces, no B-roll Action Area, no
+  B-roll filter API in this wave
+- no new page tree, no Matrix Script / Digital Anchor / Hot Follow
+  truth redesign, no W2.2 / W2.3 / third production line expansion
+
+What remains blocked:
+
+- B-roll Action Area + B-roll filter API — still gated on product
+  freeze of the seven open questions
+- Platform Runtime Assembly — explicitly not started per directive
+- Wiring of the live `publish_feedback_closure` into the Delivery
+  mirror — pass-through path is in place but the closure is not yet
+  surfaced on the Hot Follow task; the mirror returns the empty
+  `not_published` shape until that materialisation lands
+- Live mounting of Matrix Script / Digital Anchor line-specific panels
+  via real packets — mount resolver works; production tasks do not
+  carry packets today, so `panel_kind=None` is the natural empty result
+
+Evidence: `docs/execution/evidence/operator_visible_surfaces_phase_3b_ui_presenter_wiring_v1.md`

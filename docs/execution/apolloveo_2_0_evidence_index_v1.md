@@ -150,6 +150,9 @@ Status: P2 pre-execution evidence index
 | Phase 3A Operator-Visible Surfaces — Minimal Wiring implementation | `gateway/app/services/operator_visible_surfaces/projections.py` |
 | Phase 3A Operator-Visible Surfaces — Minimal Wiring tests | `tests/contracts/operator_visible_surfaces/test_projections.py` |
 | Phase 3A Operator-Visible Surfaces — Minimal Wiring evidence | `docs/execution/evidence/operator_visible_surfaces_phase_3a_minimal_wiring_v1.md` |
+| Phase 3B Operator-Visible Surfaces — UI / Presenter Minimal Wiring implementation | `gateway/app/services/operator_visible_surfaces/wiring.py` |
+| Phase 3B Operator-Visible Surfaces — UI / Presenter Minimal Wiring tests | `tests/contracts/operator_visible_surfaces/test_wiring.py` |
+| Phase 3B Operator-Visible Surfaces — UI / Presenter Minimal Wiring evidence | `docs/execution/evidence/operator_visible_surfaces_phase_3b_ui_presenter_wiring_v1.md` |
 
 ## Current Known Evidence Gaps
 

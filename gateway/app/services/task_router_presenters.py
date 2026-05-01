@@ -11,6 +11,10 @@ from gateway.app.services.hot_follow_runtime_bridge import (
     compat_hot_follow_operational_defaults,
     compat_hot_follow_task_status_shape,
 )
+from gateway.app.services.operator_visible_surfaces import (
+    build_board_row_projection,
+    build_operator_surfaces_for_workbench,
+)
 from gateway.app.services.status_policy.hot_follow_state import compute_hot_follow_state
 
 logger = logging.getLogger(__name__)
@@ -174,6 +178,20 @@ def build_tasks_page_rows(
             row["final_video_key"] = row["final_video_key"] or final_payload.get("key")
             if bool(payload.get("composed_ready")) and not str(row["compose_status"] or "").strip():
                 row["compose_status"] = "done"
+        # Phase 3B: Board-bucket projection. Additive — derives `publishable`
+        # and `head_reason` from existing `ready_gate`. Authority cited:
+        # `gateway/app/services/operator_visible_surfaces/projections.py`
+        # (`derive_board_publishable`).
+        board_proj = build_board_row_projection(row)
+        row["publishable"] = bool(board_proj.get("publishable"))
+        row["head_reason"] = board_proj.get("head_reason")
+        # Bucket helper for the Board UI: blocked / ready / publishable.
+        if row["publishable"]:
+            row["board_bucket"] = "publishable"
+        elif row["head_reason"]:
+            row["board_bucket"] = "blocked"
+        else:
+            row["board_bucket"] = "ready"
         rows.append(row)
     return rows
 
@@ -383,6 +401,15 @@ def build_task_workbench_task_json(
     ):
         task_json.update(hot_follow_operational_defaults())
         task_json.update(hot_follow_ui_collector(task, settings))
+    # Phase 3B: Workbench-side operator-visible surface bundle. Additive,
+    # read-only. Drives the L3 publish-gate strip, the line-specific panel
+    # mount, and the Hot Follow right-rail panel mount. The Hot Follow
+    # collector above already populated `task_json["ready_gate"]` and the
+    # final/final_stale_reason facts that the projection consumes.
+    task_json["operator_surfaces"] = build_operator_surfaces_for_workbench(
+        task=task,
+        authoritative_state=task_json,
+    )
     return task_json
 
 
