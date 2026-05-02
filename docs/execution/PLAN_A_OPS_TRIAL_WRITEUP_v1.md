@@ -1,14 +1,19 @@
 # Plan A · Operations Trial Coordination Write-up v1
 
-Date: 2026-05-02
+Date: 2026-05-02 (initial static pass); 2026-05-03 (Matrix Script Plan A trial corrections §8.A / §8.B / §8.C / §8.D landed — see §11 addendum)
 Wave: ApolloVeo 2.0 Operator-Visible Surface Validation Wave (a.k.a. "Operations Upgrade Alignment Wave")
-Status: Plan A trial-coordination & static verification write-up. **Documentation only. No code, no UI, no runtime change.**
+Status: Plan A trial-coordination & static verification write-up. **Documentation only. No code, no UI, no runtime change.** The static-pass body (§1–§10) reflects the deployed branch as of 2026-05-02. A §11 addendum captures the Matrix Script Plan A trial corrections that landed 2026-05-02 → 2026-05-03 (§8.A / §8.B / §8.C / §8.D); coordinators MUST read both the static-pass body and the §11 addendum before briefing operators on Matrix Script samples.
 Authority:
-- [docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md) (frozen operator trial brief; this report exercises §7.1 sample plan and §8 risk list)
+- [docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md) (frozen operator trial brief; this report exercises §7.1 sample plan and §8 risk list — note: the brief was extended on 2026-05-03 with §0.1 Matrix Script Trial Sample Validity and §11.1 trial-correction history; this write-up's §11 addendum mirrors that extension)
 - [docs/reviews/operations_upgrade_gap_review_and_ops_plan_v1.md](../reviews/operations_upgrade_gap_review_and_ops_plan_v1.md) (gap review v1)
+- [docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md](../reviews/matrix_script_trial_blocker_and_realign_review_v1.md) (Matrix Script Plan A trial blocker + realign review; §8.A / §8.B / §8.C / §8.D items now all PASS)
 - [docs/execution/PLAN_BCD_CONTRACT_FREEZE_EXECUTION_LOG_v1.md](PLAN_BCD_CONTRACT_FREEZE_EXECUTION_LOG_v1.md) (Plan B/C/D contract freeze, gate PASS)
+- [docs/execution/MATRIX_SCRIPT_A_REF_SHAPE_GUARD_EXECUTION_LOG_v1.md](MATRIX_SCRIPT_A_REF_SHAPE_GUARD_EXECUTION_LOG_v1.md) (§8.A — landed; PASS)
+- [docs/execution/MATRIX_SCRIPT_B_DISPATCH_CONFIRMATION_EXECUTION_LOG_v1.md](MATRIX_SCRIPT_B_DISPATCH_CONFIRMATION_EXECUTION_LOG_v1.md) (§8.B — confirmed; PASS)
+- [docs/execution/MATRIX_SCRIPT_C_PHASE_B_AUTHORING_EXECUTION_LOG_v1.md](MATRIX_SCRIPT_C_PHASE_B_AUTHORING_EXECUTION_LOG_v1.md) (§8.C — landed; PASS)
+- [docs/execution/MATRIX_SCRIPT_D_OPERATOR_BRIEF_CORRECTION_EXECUTION_LOG_v1.md](MATRIX_SCRIPT_D_OPERATOR_BRIEF_CORRECTION_EXECUTION_LOG_v1.md) (§8.D — operator brief correction landed; PASS)
 - [docs/architecture/ApolloVeo_2.0_Operator_Visible_Surface_Validation_Wave_指挥单_v1.md](../architecture/ApolloVeo_2.0_Operator_Visible_Surface_Validation_Wave_指挥单_v1.md)
-- Newly frozen contract set landed in PR #79 / commit `54ede3b`; Plan A brief landed in PR #80 / commit `6052014`.
+- Newly frozen contract set landed in PR #79 / commit `54ede3b`; Plan A brief landed in PR #80 / commit `6052014`. Matrix Script trial blocker landed in PR #82 / commit `2ec6198`. §8.A landed in PR #83 / commit `f6125aa`. §8.B confirmed in PR #84 / commit `970b4dc`. §8.C landed at commit `9f25b89`. §8.D landed at this update.
 
 ## 0. Scope Disclaimer (binding)
 
@@ -209,4 +214,52 @@ This section is intentionally empty in this static pass.
 - **Capability Expansion:** **BLOCKED**
 - **Frontend patching:** **BLOCKED**
 
-End of Plan A trial-coordination write-up.
+End of Plan A trial-coordination write-up (initial static pass, 2026-05-02).
+
+## 11. Matrix Script Plan A Trial Corrections — Addendum (2026-05-03)
+
+This addendum captures the Matrix Script Plan A trial corrections that landed after the initial static pass above. The §1–§10 body is unchanged on its own terms; this addendum is the post-correction overlay coordinators MUST apply when briefing operators on Matrix Script samples.
+
+### 11.1 Why the original Matrix Script trial sample was invalid
+
+Per [docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md](../reviews/matrix_script_trial_blocker_and_realign_review_v1.md) §1, the prior Matrix Script trial sample was **invalid trial evidence** for two distinct reasons:
+
+1. **Entry-form discipline gap (now closed by §8.A).** The form accepted a free `<textarea>` for `source_script_ref` with no ref-shape validation; an operator could paste raw script body text where the contract requires an opaque ref. The payload-builder then carried that body verbatim into `source_url` and `packet.config.entry.source_script_ref`, violating `task_entry_contract_v1` semantics and the no-body-embedding rule of `slot_pack_contract_v1`.
+2. **Empty packet truth (now closed by §8.C).** The payload-builder seeded `packet.line_specific_refs[]` only with **pointers to the contract docs**; no Phase B authoring/planning capability existed to convert `source_script_ref` into populated `axes[] / cells[] / slots[]` deltas. The Phase B render surface had nothing to render.
+
+### 11.2 Trial corrections — landed status
+
+| Item | Status | Authority | Evidence |
+| ---- | ------ | --------- | -------- |
+| §8.A — Entry-form ref-shape guard | **PASS** (landed `f6125aa`, 2026-05-02) | Blocker review §8.A | `MATRIX_SCRIPT_A_REF_SHAPE_GUARD_EXECUTION_LOG_v1.md` |
+| §8.B — Workbench panel dispatch confirmation | **PASS** (confirmed `970b4dc`, 2026-05-03; no narrow fix required) | Blocker review §8.B | `MATRIX_SCRIPT_B_DISPATCH_CONFIRMATION_EXECUTION_LOG_v1.md` |
+| §8.C — Phase B deterministic authoring (Option C1) | **PASS** (landed `9f25b89`, 2026-05-03) | Blocker review §8.C | `MATRIX_SCRIPT_C_PHASE_B_AUTHORING_EXECUTION_LOG_v1.md` |
+| §8.D — Operator brief correction | **PASS** (landed this update, 2026-05-03) | Blocker review §8.D | `MATRIX_SCRIPT_D_OPERATOR_BRIEF_CORRECTION_EXECUTION_LOG_v1.md` |
+
+### 11.3 Static-pass overlay — what changed for Matrix Script
+
+The §3 / §4 / §5 / §6 / §9 rows in this write-up that mention Matrix Script remain factually correct on the deployed-branch surfaces they describe. The following additions overlay them:
+
+- **§3.1 row "Matrix Script `/tasks/matrix-script/new` accepts a closed entry set"** is still PASS, **and** §8.A's `_validate_source_script_ref_shape` guard now additionally rejects body-text input on `source_script_ref` (multi-line, whitespace-bearing, overlong, or unrecognised-scheme values) with `HTTP 400` before the payload-builder runs. Coordinator can verify by attempting a body-text POST in a non-operator environment — expect 400.
+- **§3.1 row "Workbench Phase B variation surface renders read-only"** is still PASS as a contract claim, **and** §8.B confirms the dispatch end-to-end on a fresh contract-clean sample (`panel_kind="matrix_script"`, projection `matrix_script_workbench_variation_surface_v1` attached, `data-role="matrix-script-variation-panel"` rendered, empty-fallback messages absent). §8.C populates real authored axes / cells / slots so the panel renders real inspectable truth instead of empty fallback. The "read-only" boundary is unchanged.
+- **§3.2 row "Matrix Script Delivery binding artifact lookup is not implemented"** is still PASS — the five `not_implemented_phase_c` placeholder rows remain. §8.A / §8.B / §8.C did not promote, mutate, or expand the Delivery Center boundary; it stays inspect-only this wave.
+- **§4 Sample 3 (Matrix Script — small variation plan)** is now refined: the operator-facing brief at §6.2 of [docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md) and §7.1 sample 3 are the binding operator instructions. The `2 axes × 4 slots` shorthand from this write-up's original §4 has been superseded by §8.C's deterministic authoring (3 canonical axes — `tone` / `audience` / `length` — and `variation_target_count` cells with one slot per cell).
+- **§5 Risk watch — operator empty-panel observation:** if a Matrix Script task workbench shows the empty-fallback messages, the operator is looking at a pre-§8.A invalid sample. **Pause that observation as evidence**, brief operator on §6.2 / §0.1 of the trial brief, and create a fresh sample. Do not file a bug — §8.A's PASS gate explicitly does not retrofit existing rows.
+- **§5 Risk watch — Matrix Script via legacy connect path:** the formal create-entry alignment wave removed Matrix Script from `_TEMP_CONNECTED_LINES`. If a task is still reachable via `/tasks/connect/matrix_script/new`, file as a regression and use the formal `/tasks/matrix-script/new` POST.
+
+### 11.4 Coordinator action items added by §8.D
+
+- Brief operators on §0.1 of the trial brief (binding sample-validity rule) before any Matrix Script session.
+- Confirm samples queued for the trial wave were created via the formal `/tasks/matrix-script/new` POST (under §8.A's guard) and carry populated Phase B deltas (3 canonical axes, `variation_target_count` cells, one slot per cell).
+- For any task created before 2026-05-02 (§8.A's land date), assume invalid until proven otherwise — verify `packet.config.entry.source_script_ref` is opaque and `line_specific_refs[*].delta` is populated; if either fails, discard from trial evidence.
+- Continue to enforce the §2.1 hide/disable guards, §2.2 explanation 口径, and §2.3 per-line runbook from the original static pass; §8.D does not relax any of those.
+
+### 11.5 Final corrected coordinator judgment
+
+- **Plan A Matrix Script brief corrected:** YES (this addendum + the Plan A brief's §0.1 / §3 / §6 / §7 / §8 / §11.1 / §12 updates).
+- **Old invalid Matrix Script sample remains invalid:** YES — §8.A does not retrofit; §0.1 of the trial brief and §11.1 above codify the rule.
+- **Fresh corrected Matrix Script retry sample fully briefed:** YES — §6.2 sample profile, §7.1 sample 3, and §0.1 sample-validity criteria together specify exactly what counts as a fresh contract-clean sample.
+- **Ready for Matrix Script retry sample creation:** YES — operations team may proceed with §7.1 sample 3 / 4 / 5 once §11.4 action items are completed.
+- **Live-trial readiness for Matrix Script:** **CONDITIONAL** (unchanged) — coordinator executes §2.1 / §2.2 / §2.3 of this write-up plus §11.4 of this addendum, then operations team appends live-run results in §8.
+
+End of §8.D operator brief correction addendum (2026-05-03).
