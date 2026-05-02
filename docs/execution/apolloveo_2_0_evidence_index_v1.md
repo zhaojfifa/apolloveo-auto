@@ -159,6 +159,11 @@ Status: P2 pre-execution evidence index
 | B-roll / Asset Supply — Product Freeze authority | `docs/product/broll_asset_supply_freeze_v1.md` |
 | B-roll / Asset Supply — Product Freeze evidence | `docs/execution/evidence/broll_asset_supply_product_freeze_v1.md` |
 | Surface Connect-First Routing evidence | `docs/execution/evidence/new_tasks_line_first_surface_wiring_v1.md` |
+| Matrix Script Workbench Panel Integration — evidence | `docs/execution/evidence/matrix_script_workbench_panel_integration_v1.md` |
+| Matrix Script Workbench Panel Integration — wiring implementation | `gateway/app/services/operator_visible_surfaces/wiring.py` |
+| Matrix Script Workbench Panel Integration — template implementation | `gateway/app/templates/task_workbench.html` |
+| Matrix Script Workbench Panel Integration — tests | `tests/contracts/operator_visible_surfaces/test_wiring.py` |
+| Matrix Script Operator-Visible Slice — merge / signoff note (Phase A + Phase B + state-sync only; NOT Phase C / Phase D) | `docs/execution/evidence/matrix_script_operator_visible_slice_merge_note_v1.md` |
 
 ## Current Known Evidence Gaps
 

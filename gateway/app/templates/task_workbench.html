@@ -254,6 +254,195 @@
       {% endif %}
     </div>
 
+    {% if ops_workbench_panel.panel_kind == "matrix_script" %}
+      {% set ms_surface = ((ops.workbench or {}).matrix_script_variation_surface or {}) %}
+      {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
+      {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
+      {% set ms_slot_detail = (ms_surface.slot_detail_surface or {}) %}
+      {% set ms_attribution = (ms_surface.attribution_refs or {}) %}
+      {% set ms_feedback = (ms_surface.publish_feedback_projection or {}) %}
+      {% set ms_axes = (ms_variation_plan.axes or []) %}
+      {% set ms_cells = (ms_variation_plan.cells or []) %}
+      {% set ms_slots = (ms_copy_bundle.slots or []) %}
+      {% set ms_slot_index = {} %}
+      {% for slot in ms_slots %}{% if ms_slot_index.update({slot.slot_id: slot}) %}{% endif %}{% endfor %}
+      <div class="panel" data-role="matrix-script-variation-panel">
+        <div class="section-title">
+          <h2>Matrix Script — Variation Panel</h2>
+          <div class="secondary">
+            Read-only projection of
+            <code>matrix_script_workbench_variation_surface_v1</code>.
+            Source: <code>line_specific_refs[].delta</code>. No vendor / model / provider controls.
+          </div>
+        </div>
+
+        <h3 style="margin:12px 0 6px;">Axes</h3>
+        {% if ms_axes %}
+          <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">axis_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">kind</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">values</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">required</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for axis in ms_axes %}
+                <tr>
+                  <td style="padding:6px; border-bottom:1px solid #f1f5f9;"><code>{{ axis.axis_id }}</code></td>
+                  <td style="padding:6px; border-bottom:1px solid #f1f5f9;">{{ axis.kind }}</td>
+                  <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                    {% if axis.values is mapping %}
+                      min={{ axis.values.min }} · max={{ axis.values.max }} · step={{ axis.values.step }}
+                    {% elif axis.values is iterable and axis.values is not string %}
+                      {{ axis.values | join(" · ") }}
+                    {% else %}
+                      {{ axis.values }}
+                    {% endif %}
+                  </td>
+                  <td style="padding:6px; border-bottom:1px solid #f1f5f9;">{{ "yes" if axis.is_required else "no" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="muted">No axes resolved on this packet.</div>
+        {% endif %}
+
+        <h3 style="margin:16px 0 6px;">Cells × Slots</h3>
+        {% if ms_cells %}
+          <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">cell_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">axis selections</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">script_slot</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for cell in ms_cells %}
+                {% set slot = ms_slot_index.get(cell.script_slot_ref) %}
+                <tr>
+                  <td style="padding:6px; border-bottom:1px solid #f1f5f9;"><code>{{ cell.cell_id }}</code></td>
+                  <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                    {% for axis_id, val in (cell.axis_selections or {}).items() %}
+                      <span class="info-pill" style="margin-right:4px;">{{ axis_id }}={{ val }}</span>
+                    {% endfor %}
+                  </td>
+                  <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                    {% if slot %}
+                      <code>{{ cell.script_slot_ref }}</code>
+                    {% elif cell.script_slot_ref %}
+                      <code>{{ cell.script_slot_ref }}</code>
+                      <span class="muted t-secondary"> · unresolved</span>
+                    {% else %}
+                      <span class="muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td style="padding:6px; border-bottom:1px solid #f1f5f9;">{{ cell.notes or "" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <div class="muted">No cells resolved on this packet.</div>
+        {% endif %}
+
+        <h3 style="margin:16px 0 6px;">Slot detail</h3>
+        <div class="muted t-secondary" style="margin-bottom:6px;">
+          Join: <code>{{ ms_slot_detail.join_rule or "variation_plan.cells[].script_slot_ref == copy_bundle.slots[].slot_id" }}</code>
+        </div>
+        {% if ms_slots %}
+          {% for slot in ms_slots %}
+            <details class="panel" style="margin:6px 0; padding:10px;">
+              <summary><code>{{ slot.slot_id }}</code> · binds_cell_id=<code>{{ slot.binds_cell_id }}</code> · length_hint={{ slot.length_hint }}</summary>
+              <div class="meta-grid" style="margin-top:8px;">
+                <div class="meta-item">
+                  <strong>language_scope.source</strong>
+                  <span>{{ (slot.language_scope or {}).source_language or "—" }}</span>
+                </div>
+                <div class="meta-item">
+                  <strong>language_scope.target</strong>
+                  <span>
+                    {% set target = (slot.language_scope or {}).target_language %}
+                    {% if target is iterable and target is not string %}
+                      {{ target | join(", ") }}
+                    {% else %}
+                      {{ target or "—" }}
+                    {% endif %}
+                  </span>
+                </div>
+                <div class="meta-item">
+                  <strong>body_ref</strong>
+                  <span><code>{{ slot.body_ref or "—" }}</code></span>
+                </div>
+              </div>
+            </details>
+          {% endfor %}
+        {% else %}
+          <div class="muted">No slots resolved on this packet.</div>
+        {% endif %}
+
+        <h3 style="margin:16px 0 6px;">Attribution refs</h3>
+        <div class="meta-grid">
+          <div class="meta-item">
+            <strong>generic_refs</strong>
+            <span>
+              {% for ref in (ms_attribution.generic_refs or []) %}
+                <span class="info-pill" style="margin-right:4px;"><code>{{ ref.ref_id }}</code>@{{ ref.version }}</span>
+              {% else %}—{% endfor %}
+            </span>
+          </div>
+          <div class="meta-item">
+            <strong>line_specific_refs</strong>
+            <span>
+              {% for ref in (ms_attribution.line_specific_refs or []) %}
+                <span class="info-pill" style="margin-right:4px;"><code>{{ ref.ref_id }}</code>@{{ ref.version }}</span>
+              {% else %}—{% endfor %}
+            </span>
+          </div>
+          <div class="meta-item">
+            <strong>capability_plan</strong>
+            <span>
+              {% for cap in (ms_attribution.capability_plan or []) %}
+                <span class="info-pill" style="margin-right:4px;">{{ cap.kind }}{% if cap.mode %}·{{ cap.mode }}{% endif %}{% if cap.required %}·required{% endif %}</span>
+              {% else %}—{% endfor %}
+            </span>
+          </div>
+          <div class="meta-item">
+            <strong>worker_profile_ref</strong>
+            <span><code>{{ ms_attribution.worker_profile_ref or "—" }}</code></span>
+          </div>
+        </div>
+
+        <h3 style="margin:16px 0 6px;">Publish feedback projection</h3>
+        <div class="meta-grid">
+          <div class="meta-item">
+            <strong>reference_line</strong>
+            <span>{{ ms_feedback.reference_line or "—" }}</span>
+          </div>
+          <div class="meta-item">
+            <strong>validator_report</strong>
+            <span>
+              {% if ms_feedback.validator_report_path %}
+                <code>{{ ms_feedback.validator_report_path }}</code>
+              {% else %}—{% endif %}
+            </span>
+          </div>
+          <div class="meta-item">
+            <strong>ready_state</strong>
+            <span>{{ ms_feedback.ready_state or "—" }}</span>
+          </div>
+          <div class="meta-item">
+            <strong>feedback_writeback</strong>
+            <span class="muted">{{ ms_feedback.feedback_writeback or "not_implemented_phase_b" }}</span>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
     {% if ops_hot_follow_panel.mounted %}
       <div class="panel" data-role="operator-hot-follow-panel">
         <div class="section-title">
