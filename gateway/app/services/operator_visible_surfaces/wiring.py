@@ -26,6 +26,10 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Optional
 
+from gateway.app.services.matrix_script.workbench_variation_surface import (
+    project_workbench_variation_surface,
+)
+
 from .projections import (
     derive_board_publishable,
     derive_delivery_publish_gate,
@@ -35,23 +39,44 @@ from .projections import (
 )
 
 
-def _packet_view(task: Mapping[str, Any]) -> dict[str, Any]:
-    """Extract the minimal packet view the projection module needs.
+_PACKET_PASSTHROUGH_KEYS = (
+    "line_id",
+    "packet_version",
+    "binding",
+    "evidence",
+    "generic_refs",
+    "metadata",
+)
 
-    Tasks today rarely carry a full factory packet; the projection
-    resolver only requires `line_specific_refs`. Fall back to an empty
-    list so the resolver returns ``panel_kind=None`` cleanly.
+
+def _packet_view(task: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract the packet view the projection modules need.
+
+    The line-specific resolver only requires `line_specific_refs`. The
+    Matrix Script workbench variation projection additionally consumes
+    `binding`, `evidence`, `generic_refs`, and packet identity. We surface
+    those fields when the task carries an attached `packet` envelope so
+    the projection has authoritative inputs; otherwise the projection
+    falls back to empty deltas cleanly.
     """
     if not isinstance(task, Mapping):
         return {"line_specific_refs": []}
+    envelope: Mapping[str, Any] = (
+        task.get("packet") if isinstance(task.get("packet"), Mapping) else {}
+    )
     refs = task.get("line_specific_refs")
     if not isinstance(refs, list):
-        envelope = task.get("packet")
-        if isinstance(envelope, Mapping):
-            refs = envelope.get("line_specific_refs")
+        refs = envelope.get("line_specific_refs") if envelope else None
     if not isinstance(refs, list):
         refs = []
-    return {"line_specific_refs": list(refs)}
+    view: dict[str, Any] = {"line_specific_refs": list(refs)}
+    for key in _PACKET_PASSTHROUGH_KEYS:
+        value = task.get(key)
+        if value is None and envelope:
+            value = envelope.get(key)
+        if value is not None:
+            view[key] = value
+    return view
 
 
 def _l2_facts_from_state(
@@ -107,12 +132,24 @@ def build_operator_surfaces_for_workbench(
     ready_gate = state.get("ready_gate") if isinstance(state.get("ready_gate"), Mapping) else (
         task.get("ready_gate") if isinstance(task.get("ready_gate"), Mapping) else {}
     )
-    return project_operator_surfaces(
+    packet_view = _packet_view(task)
+    bundle = project_operator_surfaces(
         ready_gate=ready_gate or {},
         l2_facts=_l2_facts_from_state(state, task),
-        packet=_packet_view(task),
+        packet=packet_view,
         publish_feedback_closure=publish_feedback_closure,
     )
+    # Phase B: when the Workbench mounts the Matrix Script line-specific
+    # panel, attach the formal `matrix_script_workbench_variation_surface_v1`
+    # projection so the panel renders axes / cells / slot detail / attribution
+    # refs from authoritative packet truth. The projection is a pure read of
+    # `line_specific_refs[].delta` and never mutates packet truth.
+    workbench_panel = bundle.get("workbench", {}).get("line_specific_panel", {}) or {}
+    if workbench_panel.get("panel_kind") == "matrix_script":
+        bundle["workbench"]["matrix_script_variation_surface"] = (
+            project_workbench_variation_surface(packet_view)
+        )
+    return bundle
 
 
 def build_operator_surfaces_for_publish_hub(

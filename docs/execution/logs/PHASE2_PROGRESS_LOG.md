@@ -1,5 +1,56 @@
 # Phase-2 Progress Log
 
+## Matrix Script Workbench Panel Integration
+
+Date: 2026-05-02
+
+Merge scope fence: this entry, together with the accompanying merge note
+(`docs/execution/evidence/matrix_script_operator_visible_slice_merge_note_v1.md`),
+covers Matrix Script Phase A formal create-entry alignment + Phase B
+workbench panel integration + state-sync only. It does NOT include Phase C
+Delivery Binding rendering, Phase D publish-feedback write-back, Digital
+Anchor, Hot Follow, B-roll, or any Board / New Tasks layout redesign.
+
+This node ran the narrow Matrix Script Workbench panel-integration alignment
+wave. The line-specific panel slot in the existing Workbench now consumes the
+already-frozen Phase B projection
+(`gateway.app.services.matrix_script.workbench_variation_surface.project_workbench_variation_surface`)
+and renders variation matrix axes, cells × slots, slot detail, attribution
+refs, and the read-only publish-feedback projection. The generic Workbench
+skeleton, all other lines, and route taxonomy were not touched.
+
+Files changed:
+
+- `gateway/app/services/operator_visible_surfaces/wiring.py`
+- `gateway/app/templates/task_workbench.html`
+- `tests/contracts/operator_visible_surfaces/test_wiring.py`
+- `docs/execution/evidence/matrix_script_workbench_panel_integration_v1.md`
+- `docs/execution/logs/PHASE2_PROGRESS_LOG.md`
+- `docs/execution/apolloveo_2_0_evidence_index_v1.md`
+
+Tests:
+
+- `python3 -m pytest tests/contracts/matrix_script/ tests/contracts/operator_visible_surfaces/ -q`
+  -> **79 passed**
+
+Red lines preserved:
+
+- no Hot Follow change
+- no Digital Anchor change
+- no B-roll change
+- no Board / New Tasks change
+- no Matrix Script create-entry change
+- no route taxonomy change
+- no presenter / router behavior change
+- no packet / schema redesign
+- no provider / model / vendor / engine exposure
+- no delivery binding rendering, manifest, or metadata authoring
+- no publish feedback write-back
+- no Workbench state-machine change
+- optional capabilities (`pack`, `dub`) remain non-blocking
+
+Evidence: `docs/execution/evidence/matrix_script_workbench_panel_integration_v1.md`
+
 ## Phase-2 Milestone Closure
 
 Date: 2026-04-07
