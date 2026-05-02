@@ -135,6 +135,12 @@ Status: P2 pre-execution evidence index
 | Matrix Script Plan A Trial Correction §8.A — tests | `gateway/app/services/tests/test_matrix_script_source_script_ref_shape.py` |
 | Matrix Script Plan A Trial Correction §8.B (Workbench Panel Dispatch Confirmation) — execution log | `docs/execution/MATRIX_SCRIPT_B_DISPATCH_CONFIRMATION_EXECUTION_LOG_v1.md` |
 | Matrix Script Plan A Trial Correction §8.B — tests | `gateway/app/services/tests/test_matrix_script_workbench_dispatch.py` |
+| Matrix Script Plan A Trial Correction §8.C (Phase B Truth Population — Deterministic Authoring) — execution log | `docs/execution/MATRIX_SCRIPT_C_PHASE_B_AUTHORING_EXECUTION_LOG_v1.md` |
+| Matrix Script Plan A Trial Correction §8.C — contract addendum | `docs/contracts/matrix_script/task_entry_contract_v1.md` |
+| Matrix Script Plan A Trial Correction §8.C — implementation (planner) | `gateway/app/services/matrix_script/phase_b_authoring.py` |
+| Matrix Script Plan A Trial Correction §8.C — implementation (wire-up) | `gateway/app/services/matrix_script/create_entry.py` |
+| Matrix Script Plan A Trial Correction §8.C — planner unit + contract conformance tests | `tests/contracts/matrix_script/test_phase_b_authoring_phase_c.py` |
+| Matrix Script Plan A Trial Correction §8.C — end-to-end HTTP-boundary tests | `gateway/app/services/tests/test_matrix_script_phase_b_authoring.py` |
 | Digital Anchor Second Production Line Wave — execution log | `docs/execution/DIGITAL_ANCHOR_SECOND_PRODUCTION_LINE_LOG.md` |
 | Digital Anchor Second Production Line — Phase A (Task / Role Entry) — contract | `docs/contracts/digital_anchor/task_entry_contract_v1.md` |
 | Digital Anchor Second Production Line — Phase A (Task / Role Entry) — evidence | `docs/execution/evidence/digital_anchor_phase_a_task_entry_v1.md` |
