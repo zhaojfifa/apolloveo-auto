@@ -68,7 +68,42 @@ current_attempt:
   requires_recompose: boolean
   final_fresh: boolean
   final_stale_reason: string|null
+  final_provenance: current|historical
 ```
+
+### `final_provenance` Field (Plan D Amendment, 2026-05-02)
+
+Cross-references `docs/reviews/operations_upgrade_gap_review_and_ops_plan_v1.md`
+§10.3 + §13 Plan D and `docs/contracts/publish_readiness_contract_v1.md`.
+
+`final_provenance` is a **required L3 field** with the closed enum
+`{current, historical}`:
+
+- `current` — the resolved final artifact is the output of the current
+  attempt (current route + current subtitle + current dub + current compose
+  inputs). UI may render it as the current truth.
+- `historical` — a final artifact exists, but it predates a change in the
+  current attempt's inputs (e.g. subtitle re-translated since this final was
+  composed; route changed; dub re-issued). UI MUST render it tagged as
+  "historical / may be replaced" per the Workbench L2/L3 display rule in
+  `docs/design/ApolloVeo_Operator_Visible_Surfaces_v1.md` §228.
+
+Producer rule: `final_provenance` is computed by the single L3 CurrentAttempt
+producer (per §"Producer Rule" below) from `final_exists`, `final_fresh`,
+`requires_recompose`, `requires_redub`, and the route/subtitle/dub current-vs-
+stale comparisons. UI MUST consume the field; UI MUST NOT compute it from
+timestamps.
+
+Consumer rule: the unified Plan D `publish_readiness_contract_v1` consumes this
+field (when `final_provenance="historical"`, `head_reason` is
+`final_provenance_historical`). The Plan B Matrix Script
+`result_packet_binding_artifact_lookup_contract_v1` reuses the same enum on its
+`ArtifactHandle.provenance` output.
+
+Per-line analogues: Matrix Script and Digital Anchor delivery binding contracts
+adopt the same `final_provenance` enum on their respective L3 outputs (see the
+gap review §13 Plan D2 replication directive). The enum is defined here once
+and reused verbatim across lines; donor or runtime modules MUST NOT widen it.
 
 ## Allowed Subtitle Process States
 
