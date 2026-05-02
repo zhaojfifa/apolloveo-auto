@@ -155,6 +155,57 @@ On any rejection the entry surface raises the existing entry-validation error ty
 
 The closed scheme set is exhaustive at v1; widening it requires a re-version of this contract. Narrowing it is permitted only if no live trial sample relies on the removed scheme.
 
+## Phase B deterministic authoring (addendum, 2026-05-03)
+
+Authority: `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` §8.C (Option C1 — minimal real Phase B authoring).
+
+The Plan A trial wave requires the Phase B workbench variation panel to render real resolvable axes / cells / slots for any fresh contract-clean Matrix Script sample. To meet that requirement without re-versioning `variation_matrix_contract_v1`, `slot_pack_contract_v1`, or `packet_v1` — and without introducing any provider / model / vendor / engine control — Phase B authoring runs **synchronously inside `build_matrix_script_task_payload`** at task-creation time. The authoring step is implemented at `gateway/app/services/matrix_script/phase_b_authoring.py::derive_phase_b_deltas(entry, task_id)`.
+
+### Pinned axes
+
+The authoring step always emits the three canonical axes named by the Mapping note above. Values are pinned for v1 trial reproducibility:
+
+| `axis_id`  | `kind`        | `values`                                | `is_required` |
+| ---------- | ------------- | --------------------------------------- | ------------- |
+| `tone`     | `categorical` | `["formal", "casual", "playful"]`       | `true`        |
+| `audience` | `enum`        | `["b2b", "b2c", "internal"]`            | `true`        |
+| `length`   | `range`       | `{"min": 30, "max": 120, "step": 15}`   | `false`       |
+
+`axis_kind_set = ["categorical", "range", "enum"]` exactly. `slot_kind_set = ["primary", "alternate", "fallback"]` exactly. Both kind sets remain the closed sets pinned by `variation_matrix_contract_v1` §"Closed sets" and `slot_pack_contract_v1` §"Closed sets" — Phase B authoring does not widen them.
+
+### Cell ↔ slot pairing
+
+For `i ∈ [0, entry.variation_target_count)`:
+
+- `cell_id = "cell_{i+1:03d}"`, `slot_id = "slot_{i+1:03d}"`.
+- `cells[i].script_slot_ref == slots[i].slot_id` (round-trip lower bound).
+- `slots[i].binds_cell_id == cells[i].cell_id` (round-trip upper bound).
+- `cells[i].axis_selections = {"tone": TONES[i % 3], "audience": AUDIENCES[(i // 3) % 3], "length": LENGTH_PICKS[i % 7]}` where `LENGTH_PICKS = [30, 45, 60, 75, 90, 105, 120]` is the closed step-aligned walk over `length` axis values. The 9 × 7 = 63 distinct tuples cover the validated `variation_target_count` range `[1, 12]` with all `axis_selections` distinct.
+- `slots[i].slot_kind = "primary"` (closed-set member; default per `slot_pack_contract_v1` §"Delta fields").
+
+### Body ref shape
+
+`slots[i].body_ref = "content://matrix-script/{task_id}/slot/{slot_id}"` is **opaque** and derived from `task_id` and `slot_id` only. It MUST NOT embed body text, MUST NOT carry the operator-supplied `source_script_ref`, and MUST use the `content` scheme from the §"Source script ref shape (addendum, 2026-05-02)" closed scheme set. The body-text-embedding ban from `slot_pack_contract_v1` §"Forbidden" is upheld by construction.
+
+### Determinism
+
+`derive_phase_b_deltas(entry, task_id)` is a pure function: no clock, no randomness, no env reads, no IO. Same `(entry, task_id)` produces the same deltas. The function does not mutate `entry` (which is a frozen dataclass) and does not write into the task repository.
+
+### Hint consumption (out of scope this addendum)
+
+Optional entry hints (`audience_hint`, `tone_hint`, `length_hint`) are mapped to Phase B authoring scaffolds by the §"Mapping note" above, but the Plan A trial wave's deterministic seed **does not yet consume them**. Plan E real-authoring may bias the rotation by hints without re-versioning this contract.
+
+### Removal path
+
+This deterministic seed is the Plan A trial wave's narrow Phase B authoring capability. Plan E may replace or extend `derive_phase_b_deltas` with a richer planner; such a replacement does not require re-versioning this contract so long as the pinned axes / kind sets / pairing rule / opaque-`body_ref` invariant remain honoured.
+
+### Out of scope
+
+- `g_lang` token alphabet — this addendum uses whatever ISO-639 short codes the §"Entry field set" already accepts (currently `mm`, `vi`); pinning the alphabet is a separate review against `factory_language_plan_contract_v1`.
+- The Phase B render surface (`workbench_variation_surface_contract_v1`) — unchanged.
+- Phase C delivery binding and Phase D publish-feedback closure — unchanged.
+- Provider / model / vendor / engine selection — forbidden at all phases (validator R3).
+
 ## Acceptance (Phase A)
 
 Phase A is green only when:

@@ -7,12 +7,16 @@ onto the existing task repository shape without creating packet truth.
 from __future__ import annotations
 
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 from uuid import uuid4
 
 from fastapi import HTTPException
 
+from gateway.app.services.matrix_script.phase_b_authoring import (
+    derive_phase_b_deltas,
+)
 from gateway.app.task_repo_utils import normalize_task_payload
 
 
@@ -201,6 +205,7 @@ def build_matrix_script_entry(
 
 def build_matrix_script_task_payload(entry: MatrixScriptCreateEntry) -> dict[str, Any]:
     task_id = uuid4().hex[:12]
+    variation_delta, slot_delta = derive_phase_b_deltas(entry, task_id)
     language_scope = {
         "source_language": entry.source_language,
         "target_language": [entry.target_language],
@@ -263,12 +268,14 @@ def build_matrix_script_task_payload(entry: MatrixScriptCreateEntry) -> dict[str
                     "path": "docs/contracts/matrix_script/variation_matrix_contract_v1.md",
                     "version": "v1",
                     "binds_to": ["factory_input_contract_v1"],
+                    "delta": variation_delta,
                 },
                 {
                     "ref_id": "matrix_script_slot_pack",
                     "path": "docs/contracts/matrix_script/slot_pack_contract_v1.md",
                     "version": "v1",
                     "binds_to": ["factory_language_plan_contract_v1"],
+                    "delta": slot_delta,
                 },
             ],
         },
@@ -278,12 +285,14 @@ def build_matrix_script_task_payload(entry: MatrixScriptCreateEntry) -> dict[str
                 "path": "docs/contracts/matrix_script/variation_matrix_contract_v1.md",
                 "version": "v1",
                 "binds_to": ["factory_input_contract_v1"],
+                "delta": deepcopy(variation_delta),
             },
             {
                 "ref_id": "matrix_script_slot_pack",
                 "path": "docs/contracts/matrix_script/slot_pack_contract_v1.md",
                 "version": "v1",
                 "binds_to": ["factory_language_plan_contract_v1"],
+                "delta": deepcopy(slot_delta),
             },
         ],
     }

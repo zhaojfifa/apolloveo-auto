@@ -253,6 +253,45 @@ strictly non-overlapping; each phase is reviewable independently.
 - Hard stop: after Phase D.1, do not auto-start Digital Anchor. Wait for
   Matrix Script line signoff and explicit next instruction.
 
+### Plan A Trial Correction §8.C — Phase B Truth Population (Deterministic Authoring)
+
+- Date: 2026-05-03
+- Status: implementation green; ready for signoff
+- Authority: `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` §8.C; `docs/contracts/matrix_script/task_entry_contract_v1.md` (with §"Phase B deterministic authoring (addendum, 2026-05-03)" landed in this change); `docs/contracts/matrix_script/variation_matrix_contract_v1.md`; `docs/contracts/matrix_script/slot_pack_contract_v1.md`; `docs/contracts/matrix_script/packet_v1.md`; `docs/contracts/matrix_script/workbench_variation_surface_contract_v1.md`
+- Execution log: `docs/execution/MATRIX_SCRIPT_C_PHASE_B_AUTHORING_EXECUTION_LOG_v1.md`
+- Path: Option C1 (minimal real Phase B authoring). Option C2 (fixture-LS-delta policy) explicitly rejected — wave authority does not require a stub, and the entry contract's existing Mapping note (entry → packet) had already pre-specified the C1 mapping.
+- Code / docs:
+  - `gateway/app/services/matrix_script/phase_b_authoring.py` (NEW — pure deterministic planner exporting `derive_phase_b_deltas(entry, task_id) -> tuple[dict, dict]`; canonical axes `tone`/`audience`/`length`; index-aligned 1-to-1 cell↔slot pairing; opaque `body_ref` template `content://matrix-script/{task_id}/slot/{slot_id}`; no IO, no clock, no randomness)
+  - `gateway/app/services/matrix_script/create_entry.py` (UPDATED — `from copy import deepcopy`; import `derive_phase_b_deltas`; call once inside `build_matrix_script_task_payload`; populate `delta` on both LS1 and LS2 in the packet mirror and the top-level mirror)
+  - `docs/contracts/matrix_script/task_entry_contract_v1.md` (UPDATED — appended §"Phase B deterministic authoring (addendum, 2026-05-03)" pinning the canonical axes, kind sets, pairing rule, body_ref template, determinism statement, and Plan E removal path)
+  - `tests/contracts/matrix_script/test_phase_b_authoring_phase_c.py` (NEW — 27-case planner unit + contract conformance suite: axes pinned, kind sets closed, cardinality matches `variation_target_count` for k ∈ {1, 2, 4, 9, 12}, round-trip resolution at k ∈ {1, 4, 12}, axis-selection drawn from declared values, all 12 cells distinct at k=12, opaque body_ref shape, slot defaults, language scope, no forbidden state/vendor/donor field, deterministic output, no entry mutation, no aliasing across calls, projector consumes authored delta verbatim)
+  - `gateway/app/services/tests/test_matrix_script_phase_b_authoring.py` (NEW — 11-case end-to-end HTTP-boundary suite: POST persists populated deltas on both mirrors; round-trip resolves through persisted packet; projector consumes authored delta; rendered HTML carries cell/slot ids, axis ids, value tokens; empty-fallback messages absent; cardinality at k=1 and k=12; slot language_scope carries entry's `mm`/`vi`; §8.A guard regression; §8.B dispatch regression; render context attaches variation surface)
+  - `docs/execution/MATRIX_SCRIPT_C_PHASE_B_AUTHORING_EXECUTION_LOG_v1.md` (NEW — this row)
+- What this correction adds:
+  - Synchronous deterministic Phase B authoring step at task-creation time. Given a valid `MatrixScriptCreateEntry` and the create-entry-assigned `task_id`, the planner emits populated `variation_matrix.delta` (`axis_kind_set` + 3 canonical axes + `variation_target_count` cells) and `slot_pack.delta` (`slot_kind_set` + per-cell slots).
+  - Round-trip integrity by construction: `cells[i].script_slot_ref == slots[i].slot_id` and `slots[i].binds_cell_id == cells[i].cell_id` for every `i ∈ [0, variation_target_count)`. 1-to-1 pairing also satisfies `slot_pack_contract_v1` §"Cross-binding rules" "A slot MAY be referenced by at most one cell".
+  - Body refs stay opaque per `slot_pack_contract_v1` §"Forbidden": `body_ref = "content://matrix-script/{task_id}/slot/{slot_id}"` derives from `task_id` and `slot_id` only — never embeds body text, never piggybacks on the operator-supplied `source_script_ref`.
+  - Contract addendum on `task_entry_contract_v1.md` pins the canonical axes (`tone` categorical, `audience` enum, `length` range with `{min: 30, max: 120, step: 15}`), kind sets, pairing rule, body_ref template, determinism statement, and explicit Plan E removal path. The addendum is additive: the closed entry-field set, mapping note, line-truth/operator-hint rule, deferral table, and §8.A source-ref-shape addendum are unchanged.
+- What this correction does NOT add:
+  - no Phase B authoring surface in the workbench (Phase B render remains read-only per `workbench_variation_surface_contract_v1`);
+  - no operator brief correction (§8.D);
+  - no Phase D publish-feedback closure write-back (still contract-only via Plan B B3);
+  - no Phase C delivery binding work (Matrix Script Delivery Center remains inspect-only with `not_implemented_phase_c` placeholders);
+  - no schema / sample / packet re-version;
+  - no template / projector / router change;
+  - no widening of `PANEL_REF_DISPATCH`;
+  - no `g_lang` token alphabet pinning;
+  - no consumption of optional entry hints (`audience_hint`, `tone_hint`, `length_hint`) — addendum names this as permitted Plan E future work;
+  - no Hot Follow / Digital Anchor / Runtime Assembly / Capability Expansion entry;
+  - no provider / model / vendor / engine controls;
+  - no Plan E gated items (B4 result_packet_binding, D1 publish_readiness, D2 final_provenance, D3 panel-dispatch-as-contract-object, D4 advisory producer);
+  - no second production line onboarding;
+  - no Asset Library / promote (Plan C C1–C3) work.
+- Validation: 27/27 planner unit + contract conformance cases pass; 11/11 end-to-end HTTP-boundary cases pass; 193/193 cases pass across §8.A + §8.B + §8.C + matrix_script contracts + operator-visible-surface contracts + guardrails. Pre-existing environment limitation (`test_op_download_proxy_uses_attachment_redirect_for_final_video`) reproduces on baseline `970b4dc` without §8.C edits — confirmed unrelated.
+- Live render evidence: fresh contract-clean Matrix Script sample (`task_id=b224f07d2c5a`, `variation_target_count=4`, `target_language=mm`) renders `cell_001..cell_004`, `slot_001..slot_004`, canonical axis ids `tone`/`audience`/`length`, and tone/audience value tokens in the rendered HTML. Empty-fallback messages (`"No axes resolved on this packet"`, `"No cells resolved on this packet"`, `"No slots resolved on this packet"`) absent.
+- Old invalid sample: NOT used as evidence; the prior sample remains invalid per the blocker review §9.
+- Final gate: §8.C PASS; fresh corrected Matrix Script sample possible YES; Phase B truth populated YES; cells↔slots round-trip resolves YES; mounted variation surface renders real inspectable data YES; packet truth aligned to frozen contracts YES; old invalid sample reusable NO; ready for Matrix Script retry sample creation YES.
+
 ### Plan A Trial Correction §8.B — Workbench Panel Dispatch Confirmation
 
 - Date: 2026-05-03
