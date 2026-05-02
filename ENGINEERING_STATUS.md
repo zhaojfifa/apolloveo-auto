@@ -23,6 +23,7 @@ Factory Alignment Review Gate Active
 ## Current Completion
 
 - Matrix Script Plan A trial correction §8.A landed: server-side ref-shape guard on `source_script_ref` rejects pasted script body and any non-reference payload before the formal Matrix Script payload is built; operator-facing input mirrors the closed accepted shape via `pattern` / `maxlength`; `task_entry_contract_v1` carries an addendum pinning the closed scheme set; trial sample created before §8.A is still invalid evidence per the blocker review §9
+- Matrix Script Plan A trial correction §8.B confirmed (no narrow fix required): a fresh contract-clean Matrix Script sample created via the formal POST reaches the Phase B variation workbench surface — `resolve_line_specific_panel(packet)` returns `panel_kind="matrix_script"`, `wiring.py` attaches the `matrix_script_workbench_variation_surface_v1` projection, and `task_workbench.html` mounts the Matrix Script Variation Panel section with the contract projection name, both seeded ref_ids, and no empty-slot fallback; per-line dispatch is via `panel_kind` mounting inside the shared shell, not via per-line templates
 - Hot Follow Skills MVP v0 closure remains frozen
 - Hot Follow cleanup line is now near closure, not fully closed
 - Myanmar target subtitles now use the same source-copy / translation-incomplete currentness discipline as Vietnamese

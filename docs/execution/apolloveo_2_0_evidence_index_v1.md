@@ -133,6 +133,8 @@ Status: P2 pre-execution evidence index
 | Matrix Script Plan A Trial Correction §8.A — implementation | `gateway/app/services/matrix_script/create_entry.py` |
 | Matrix Script Plan A Trial Correction §8.A — operator-facing input | `gateway/app/templates/matrix_script_new.html` |
 | Matrix Script Plan A Trial Correction §8.A — tests | `gateway/app/services/tests/test_matrix_script_source_script_ref_shape.py` |
+| Matrix Script Plan A Trial Correction §8.B (Workbench Panel Dispatch Confirmation) — execution log | `docs/execution/MATRIX_SCRIPT_B_DISPATCH_CONFIRMATION_EXECUTION_LOG_v1.md` |
+| Matrix Script Plan A Trial Correction §8.B — tests | `gateway/app/services/tests/test_matrix_script_workbench_dispatch.py` |
 | Digital Anchor Second Production Line Wave — execution log | `docs/execution/DIGITAL_ANCHOR_SECOND_PRODUCTION_LINE_LOG.md` |
 | Digital Anchor Second Production Line — Phase A (Task / Role Entry) — contract | `docs/contracts/digital_anchor/task_entry_contract_v1.md` |
 | Digital Anchor Second Production Line — Phase A (Task / Role Entry) — evidence | `docs/execution/evidence/digital_anchor_phase_a_task_entry_v1.md` |

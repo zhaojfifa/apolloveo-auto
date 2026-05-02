@@ -253,6 +253,32 @@ strictly non-overlapping; each phase is reviewable independently.
 - Hard stop: after Phase D.1, do not auto-start Digital Anchor. Wait for
   Matrix Script line signoff and explicit next instruction.
 
+### Plan A Trial Correction §8.B — Workbench Panel Dispatch Confirmation
+
+- Date: 2026-05-03
+- Status: confirmation green; no narrow fix required
+- Authority: `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` §8.B; `docs/contracts/workbench_panel_dispatch_contract_v1.md`; `docs/contracts/matrix_script/workbench_variation_surface_contract_v1.md`
+- Execution log: `docs/execution/MATRIX_SCRIPT_B_DISPATCH_CONFIRMATION_EXECUTION_LOG_v1.md`
+- Code / docs:
+  - `gateway/app/services/tests/test_matrix_script_workbench_dispatch.py` (NEW — 4-case end-to-end suite using a fresh, contract-clean post-§8.A sample; asserts redirect target, persisted dispatch inputs, resolver `panel_kind`, and rendered Phase B variation panel markup)
+  - `docs/execution/MATRIX_SCRIPT_B_DISPATCH_CONFIRMATION_EXECUTION_LOG_v1.md` (NEW — this row)
+- What this confirmation proves:
+  - GET `/tasks/{task_id}` for `kind=matrix_script` lands on `task_workbench.html` (the shared shell). Per-line dispatch is via `panel_kind` mounting inside the shared shell, not via per-line template files (per `workbench_panel_dispatch_contract_v1`, which pins `(ref_id → panel_kind)` only).
+  - `resolve_line_specific_panel(packet)` returns `panel_kind="matrix_script"` and surfaces both `matrix_script_variation_matrix` and `matrix_script_slot_pack` for a fresh contract-clean sample.
+  - `wiring.py` attaches the formal `matrix_script_workbench_variation_surface_v1` projection when the panel mounts as `matrix_script`.
+  - The rendered HTML contains `data-role="matrix-script-variation-panel"`, `data-panel-kind="matrix_script"`, the projection name, both ref_ids, and the operator-visible "Matrix Script — Variation Panel" heading; the empty-slot fallback message is absent.
+  - The blocker-review row #2 ("Workbench is still the generic engineering shell") is dispatch-correct on contract-clean samples; the prior operator observation conflated upstream contamination (§8.A's pasted body text) and empty LS deltas (§8.C's authoring gap) with a dispatch defect.
+- What this confirmation does NOT add:
+  - no per-line workbench template (dispatch remains panel-mount inside the shared shell);
+  - no widening of `PANEL_REF_DISPATCH`;
+  - no Phase B authoring capability (§8.C remains the binding precondition for *populated* axes / cells / slots);
+  - no operator brief correction (§8.D);
+  - no Hot Follow / Digital Anchor change;
+  - no provider / model / vendor / engine controls;
+  - no packet / schema / sample re-version.
+- Old invalid sample: NOT used as evidence; the prior sample remains invalid per the blocker review §9.
+- Final gate: §8.B PASS; workbench route confirmed YES; Phase B variation surface mounted YES; ready for §8.C YES.
+
 ### Plan A Trial Correction §8.A — Source Script Ref Shape Guard
 
 - Date: 2026-05-02
