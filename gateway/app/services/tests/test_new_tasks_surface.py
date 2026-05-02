@@ -99,7 +99,7 @@ def test_newtasks_card_links_target_active_create_route():
     expected_targets = {
         "digital_anchor": "/tasks/connect/digital_anchor/new",
         "hot_follow": "/tasks/hot/new",
-        "matrix_script": "/tasks/connect/matrix_script/new",
+        "matrix_script": "/tasks/matrix-script/new",
         "baseline": "/tasks/baseline/new",
     }
     for line_id, href in expected_targets.items():
@@ -124,12 +124,28 @@ def test_newtasks_temporary_connected_card_targets_load_without_disabled_avatar(
     monkeypatch.setattr(tasks_router, "render_template", fake_render_template)
     client = TestClient(app, raise_server_exceptions=False)
 
-    for line_id in ("digital_anchor", "matrix_script"):
+    for line_id in ("digital_anchor",):
         response = client.get(f"/tasks/connect/{line_id}/new?ui_locale=zh")
 
         assert response.status_code == 200
         assert f"loaded:tasks_connected_placeholder.html:{line_id}:create" in response.text
         assert "ApolloAvatar is disabled" not in response.text
+
+
+def test_matrix_script_newtasks_target_uses_formal_create_entry(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "off")
+
+    def fake_render_template(*, request, name, ctx=None, status_code=200, headers=None):
+        assert name == "matrix_script_new.html"
+        return HTMLResponse(content=f"loaded:{name}", status_code=status_code, headers=headers)
+
+    monkeypatch.setattr(tasks_router, "render_template", fake_render_template)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = client.get("/tasks/matrix-script/new?ui_locale=zh")
+
+    assert response.status_code == 200
+    assert "loaded:matrix_script_new.html" in response.text
 
 
 def test_hot_follow_newtasks_target_uses_formal_create_entry(monkeypatch):
@@ -165,7 +181,7 @@ def test_temporary_connected_lines_expose_workbench_and_delivery(monkeypatch):
     monkeypatch.setattr(tasks_router, "render_template", fake_render_template)
     client = TestClient(app, raise_server_exceptions=False)
 
-    for line_id in ("matrix_script", "digital_anchor"):
+    for line_id in ("digital_anchor",):
         workbench = client.get(f"/tasks/connect/{line_id}/workbench?ui_locale=zh")
         delivery = client.get(f"/tasks/connect/{line_id}/publish?ui_locale=zh")
 
@@ -173,6 +189,96 @@ def test_temporary_connected_lines_expose_workbench_and_delivery(monkeypatch):
         assert delivery.status_code == 200
         assert f"{line_id} workbench 当前接通版本" in workbench.text
         assert f"{line_id} delivery 当前接通版本" in delivery.text
+
+
+def test_matrix_script_temporary_create_is_removed_from_primary_path(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "off")
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = client.get("/tasks/connect/matrix_script/new?ui_locale=zh")
+
+    assert response.status_code == 404
+
+
+def test_matrix_script_formal_template_is_create_entry_only():
+    template = (TEMPLATE_DIR / "matrix_script_new.html").read_text(encoding="utf-8")
+
+    assert 'data-role="matrix-script-create-entry"' in template
+    assert 'data-line-id="matrix_script"' in template
+    for field in (
+        "topic",
+        "source_script_ref",
+        "source_language",
+        "target_language",
+        "target_platform",
+        "variation_target_count",
+        "audience_hint",
+        "tone_hint",
+        "length_hint",
+        "product_ref",
+        "operator_notes",
+    ):
+        assert f'name="{field}"' in template
+    assert "/debug/panels" not in template
+    assert "vendor_id" not in template
+    assert "model_id" not in template
+    assert "provider_id" not in template
+    assert "engine_id" not in template
+    assert "digital_anchor" not in template
+
+
+def test_matrix_script_form_post_creates_task_and_redirects_to_workbench(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "off")
+
+    created = {}
+
+    class _Repo:
+        def create(self, payload):
+            created.update(payload)
+            return payload
+
+        def get(self, task_id):
+            if created.get("task_id") == task_id:
+                return dict(created)
+            return None
+
+    app.dependency_overrides[get_task_repository] = lambda: _Repo()
+    client = TestClient(app, raise_server_exceptions=False)
+
+    try:
+        response = client.post(
+            "/tasks/matrix-script/new",
+            data={
+                "topic": "新品矩阵脚本",
+                "source_script_ref": "content://matrix-script/source/001",
+                "source_language": "zh",
+                "target_language": "mm",
+                "target_platform": "TikTok",
+                "variation_target_count": "4",
+                "audience_hint": "新用户",
+                "tone_hint": "直接",
+                "length_hint": "15秒",
+                "product_ref": "SKU-001",
+                "operator_notes": "入口备注",
+            },
+            follow_redirects=False,
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/tasks/{created['task_id']}?created=matrix_script"
+    assert created["kind"] == "matrix_script"
+    assert created["category_key"] == "matrix_script"
+    assert created["platform"] == "matrix_script"
+    assert created["source_url"] == "content://matrix-script/source/001"
+    assert created["config"]["entry"]["topic"] == "新品矩阵脚本"
+    assert created["config"]["next_surfaces"]["workbench"] == f"/tasks/{created['task_id']}"
+    assert created["config"]["next_surfaces"]["delivery"] == f"/tasks/{created['task_id']}/publish"
+    assert {ref["ref_id"] for ref in created["line_specific_refs"]} == {
+        "matrix_script_variation_matrix",
+        "matrix_script_slot_pack",
+    }
 
 
 def test_hot_follow_task_chain_uses_formal_workbench_and_delivery(monkeypatch):

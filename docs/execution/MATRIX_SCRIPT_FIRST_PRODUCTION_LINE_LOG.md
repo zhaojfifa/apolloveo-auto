@@ -252,3 +252,37 @@ strictly non-overlapping; each phase is reviewable independently.
   - no debug-panel mutation.
 - Hard stop: after Phase D.1, do not auto-start Digital Anchor. Wait for
   Matrix Script line signoff and explicit next instruction.
+
+### Formal Create-Entry Alignment — Matrix Script Only
+
+- Date: 2026-05-02
+- Status: implementation green; awaiting review/signoff
+- Evidence: `docs/execution/evidence/matrix_script_formal_create_entry_alignment_v1.md`
+- Code / docs:
+  - `gateway/app/services/matrix_script/create_entry.py` (NEW — Matrix Script create-entry payload builder)
+  - `gateway/app/routers/tasks.py` (UPDATED — formal Matrix Script GET/POST create route; Matrix removed from temporary connected create map)
+  - `gateway/app/templates/matrix_script_new.html` (NEW — formal Matrix Script create-entry page)
+  - `gateway/app/templates/tasks_newtasks.html` (UPDATED — Matrix Script card targets formal route)
+  - `gateway/app/services/tests/test_new_tasks_surface.py` (UPDATED — route, form, redirect, and temporary-path assertions)
+  - `docs/execution/evidence/matrix_script_formal_create_entry_alignment_v1.md` (NEW — this wave evidence)
+- What this wave adds:
+  - formal Matrix Script create-entry route at `/tasks/matrix-script/new`;
+  - closed Matrix Script create-input form matching `task_entry_contract_v1`;
+  - repository task payload with `kind/category_key/platform=matrix_script`;
+  - Matrix `line_specific_refs[]` seed so the existing workbench line panel can mount;
+  - task creation redirect to `/tasks/{task_id}`;
+  - existing delivery transition remains `/tasks/{task_id}/publish`.
+- What this wave removes from the primary path:
+  - `/tasks/connect/matrix_script/new` is no longer a valid Matrix Script create-entry path.
+- What this wave does NOT add:
+  - no Digital Anchor implementation;
+  - no Hot Follow change;
+  - no Board redesign;
+  - no Delivery redesign;
+  - no B-roll;
+  - no packet/schema redesign;
+  - no provider / model / vendor / engine controls;
+  - no `/debug/panels/...` operator entry;
+  - no language logic change or target-language expansion.
+- Hard stop: complete Matrix Script only. Do not auto-start Digital Anchor.
+  Wait for review/signoff.

@@ -251,6 +251,12 @@ from gateway.app.services.task_router_actions import (  # noqa: E402
     TaskRouterActionPorts,
     register_task_router_action_ports,
 )
+from gateway.app.services.matrix_script.create_entry import (  # noqa: E402
+    MATRIX_SCRIPT_CREATE_ROUTE,
+    MATRIX_SCRIPT_LINE_ID,
+    build_matrix_script_entry,
+    build_matrix_script_task_payload,
+)
 from gateway.app.services.voice_state import (  # noqa: E402
     DRY_TTS_CONFIG_KEY as _DRY_TTS_CONFIG_KEY,
     DRY_TTS_ROLE as _DRY_TTS_ROLE,
@@ -533,11 +539,6 @@ async def tasks_newtasks(request: Request) -> HTMLResponse:
 
 
 _TEMP_CONNECTED_LINES = {
-    "matrix_script": {
-        "label": "矩阵脚本",
-        "next_label": "矩阵脚本当前接通版本",
-        "future_replace": "正式 Matrix Script create-entry route",
-    },
     "digital_anchor": {
         "label": "数字人IP",
         "next_label": "数字人IP当前接通版本",
@@ -594,6 +595,59 @@ async def temporary_connected_delivery(request: Request, line_id: str) -> HTMLRe
         name="tasks_connected_placeholder.html",
         ctx=_temporary_connected_line_context(line_id, "delivery"),
     )
+
+
+@pages_router.get(MATRIX_SCRIPT_CREATE_ROUTE, response_class=HTMLResponse)
+async def tasks_matrix_script_new(request: Request) -> HTMLResponse:
+    """Render the formal Matrix Script create-entry page."""
+
+    return render_template(
+        request=request,
+        name="matrix_script_new.html",
+        ctx={"features": get_features()},
+    )
+
+
+@pages_router.post(MATRIX_SCRIPT_CREATE_ROUTE)
+async def create_matrix_script_task(
+    topic: str = Form(...),
+    source_script_ref: str = Form(...),
+    source_language: str = Form(...),
+    target_language: str = Form(...),
+    target_platform: str = Form(...),
+    variation_target_count: str = Form(...),
+    audience_hint: str | None = Form(default=None),
+    tone_hint: str | None = Form(default=None),
+    length_hint: str | None = Form(default=None),
+    product_ref: str | None = Form(default=None),
+    operator_notes: str | None = Form(default=None),
+    repo=Depends(get_task_repository),
+) -> RedirectResponse:
+    """Create a Matrix Script task from the formal line-specific entry."""
+
+    entry = build_matrix_script_entry(
+        topic=topic,
+        source_script_ref=source_script_ref,
+        source_language=source_language,
+        target_language=target_language,
+        target_platform=target_platform,
+        variation_target_count=variation_target_count,
+        audience_hint=audience_hint,
+        tone_hint=tone_hint,
+        length_hint=length_hint,
+        product_ref=product_ref,
+        operator_notes=operator_notes,
+    )
+    task_payload = build_matrix_script_task_payload(entry)
+    repo.create(task_payload)
+    task_id = str(task_payload["task_id"])
+    stored_task = repo.get(task_id)
+    if not stored_task:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Task persistence failed for task_id={task_id}",
+        )
+    return RedirectResponse(url=f"/tasks/{task_id}?created={MATRIX_SCRIPT_LINE_ID}", status_code=303)
 
 
 @pages_router.get("/tasks/apollo-avatar/new", response_class=HTMLResponse)

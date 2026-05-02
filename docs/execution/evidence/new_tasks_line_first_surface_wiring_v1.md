@@ -3,6 +3,11 @@
 Date: 2026-05-01
 Scope: New Tasks routing + temporary connected paths for incomplete lines
 
+Supersession note (2026-05-02): Matrix Script has since been promoted from
+temporary connected create entry to formal create entry at
+`/tasks/matrix-script/new`. Digital Anchor remains temporary connected. See
+`docs/execution/evidence/matrix_script_formal_create_entry_alignment_v1.md`.
+
 ## What Changed
 
 Ran the narrow connect-first wave. Hot Follow now uses its existing formal

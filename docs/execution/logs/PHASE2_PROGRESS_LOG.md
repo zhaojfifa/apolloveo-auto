@@ -634,6 +634,11 @@ formal route chain, while Matrix Script and Digital Anchor received explicit
 temporary connected paths so the operator-visible flow is reachable without
 using disabled legacy routes or debug panels.
 
+Supersession note (2026-05-02): Matrix Script has since been promoted to the
+formal create-entry route `/tasks/matrix-script/new`; only Digital Anchor
+remains on the temporary connected create path. See
+`docs/execution/evidence/matrix_script_formal_create_entry_alignment_v1.md`.
+
 Files changed:
 
 - `gateway/app/routers/tasks.py`
