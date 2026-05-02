@@ -41,6 +41,54 @@ and optional derivative outputs.
 - delivery center must consume shared authoritative truth instead of inventing a
   second readiness path
 
+## Per-Deliverable Required / Blocking Fields (Plan D Amendment)
+
+Every deliverable row in a line's delivery binding MUST carry the following two
+explicit fields, in addition to its `kind`:
+
+- `required: boolean` — true when the line cannot reach `ready` without this
+  deliverable kind being declared and reachable; false when the deliverable is
+  optional. Mirrors the `required` column in
+  `docs/product/asset_supply_matrix_v1.md` §"Matrix · line-produced
+  deliverables".
+- `blocking_publish: boolean` — true when this deliverable's absence or
+  staleness contributes to `ready_gate.blocking[]` and therefore prevents the
+  unified `publish_readiness_contract_v1` consumer from emitting
+  `publishable=true`. Optional derivatives (scene_pack, archive, pack_zip, etc.)
+  MUST carry `blocking_publish=false`.
+
+Validator rules:
+
+- A row with `required=true` MAY carry either `blocking_publish=true` or
+  `blocking_publish=false` depending on the line's policy (e.g. subtitle bundle
+  may be required for delivery completeness yet not block publish in some line
+  policies). The mapping is line-specific and is owned by the line's delivery
+  binding contract; this generic contract pins the field shape only.
+- A row with `required=false` MUST carry `blocking_publish=false`. A row that is
+  not required cannot block publish.
+- Surfaces (Board / Workbench / Delivery) MUST consume the `blocking_publish`
+  field via the unified `publish_readiness_contract_v1` projection rather than
+  re-derive blocking semantics from `kind`.
+
+## Scene-Pack Non-Blocking Rule (Explicit; Plan C Amendment)
+
+Per the gap review §10.4 and Plan C §C4: scene-pack non-blocking is **explicit
+contract truth**, not implicit absence. Every line packet MUST satisfy:
+
+- `scene_pack_blocking_allowed: false` — declared at the delivery contract
+  layer (this section). Any line packet that asserts `blocking_publish=true` on
+  a deliverable row whose `kind` is `scene_pack` (or any descendant kind such
+  as `scene_pack_ref`) fails validation.
+- The `scene_pack` row, when present in a line's delivery binding, MUST carry
+  `required=false` AND `blocking_publish=false`.
+- The packet validator MUST reject any line packet that adds `scene_pack` to
+  `ready_gate.blocking[]`.
+
+This rule is normative across all lines (Hot Follow, Matrix Script, Digital
+Anchor) and applies to any future line. Adding a new derivative kind that
+should follow scene-pack semantics requires an additive amendment to this
+contract; donor or runtime modules MUST NOT bypass the rule.
+
 ## Relation To Four-Layer State
 
 - L1: publish/pack/scenes steps report execution only

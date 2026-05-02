@@ -515,6 +515,26 @@ Later intention:
 - express these rule contracts in editable contract objects rather than hardcoded
   Python branches
 
+## Scene-Pack Non-Blocking Rule (Explicit; Plan C Amendment, 2026-05-02)
+
+Cross-references `docs/contracts/factory_delivery_contract_v1.md` §"Scene-Pack
+Non-Blocking Rule" and the gap review at
+`docs/reviews/operations_upgrade_gap_review_and_ops_plan_v1.md` §10.4.
+
+For Hot Follow specifically:
+
+- `scene_pack_pending` is enumerated as `non_blocking` in this rules file (the
+  advisory taxonomy carries no scene-pack blocker).
+- `scene_pack` MUST NOT appear in `ready_gate.blocking[]` — this is now
+  explicit, not implicit by absence.
+- The factory delivery contract's `scene_pack_blocking_allowed: false` is
+  binding for Hot Follow at the projection layer; any future projection rule
+  change that would route a scene-pack signal into `blocking[]` is a contract
+  violation and MUST fail validation.
+
+This amendment converts the previously-implicit rule into explicit contract
+truth so a future line cannot silently regress the convention.
+
 ## How This Reduces Silicon-Parallel Drift
 
 - It gives each surface the same projection inputs, so publish/workbench stop
