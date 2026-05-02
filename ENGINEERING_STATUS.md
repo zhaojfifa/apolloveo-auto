@@ -22,6 +22,7 @@ Factory Alignment Review Gate Active
 
 ## Current Completion
 
+- Matrix Script Plan A trial correction §8.A landed: server-side ref-shape guard on `source_script_ref` rejects pasted script body and any non-reference payload before the formal Matrix Script payload is built; operator-facing input mirrors the closed accepted shape via `pattern` / `maxlength`; `task_entry_contract_v1` carries an addendum pinning the closed scheme set; trial sample created before §8.A is still invalid evidence per the blocker review §9
 - Hot Follow Skills MVP v0 closure remains frozen
 - Hot Follow cleanup line is now near closure, not fully closed
 - Myanmar target subtitles now use the same source-copy / translation-incomplete currentness discipline as Vietnamese
