@@ -253,6 +253,32 @@ strictly non-overlapping; each phase is reviewable independently.
 - Hard stop: after Phase D.1, do not auto-start Digital Anchor. Wait for
   Matrix Script line signoff and explicit next instruction.
 
+### Plan A Trial Correction §8.A — Source Script Ref Shape Guard
+
+- Date: 2026-05-02
+- Status: implementation green; ready for signoff
+- Authority: `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` §8.A
+- Execution log: `docs/execution/MATRIX_SCRIPT_A_REF_SHAPE_GUARD_EXECUTION_LOG_v1.md`
+- Code / docs:
+  - `gateway/app/services/matrix_script/create_entry.py` (UPDATED — `_validate_source_script_ref_shape`, `SOURCE_SCRIPT_REF_ACCEPTED_SCHEMES`, `SOURCE_SCRIPT_REF_MAX_LENGTH`)
+  - `gateway/app/templates/matrix_script_new.html` (UPDATED — `<textarea>` replaced with `<input type="text">` constrained by `pattern` and `maxlength`; helper text forbids body paste)
+  - `docs/contracts/matrix_script/task_entry_contract_v1.md` (UPDATED — §"Source script ref shape (addendum, 2026-05-02)" pinning the closed scheme set)
+  - `gateway/app/services/tests/test_matrix_script_source_script_ref_shape.py` (NEW — 23-case suite: rejection branches, accepted shapes, payload-builder regression, HTTP boundary, template wiring)
+  - `docs/execution/MATRIX_SCRIPT_A_REF_SHAPE_GUARD_EXECUTION_LOG_v1.md` (NEW — this row)
+- What this correction adds:
+  - Server-side ref-shape guard for `source_script_ref` running before `build_matrix_script_task_payload`. Closed accepted shapes: URI with closed scheme (`content`, `task`, `asset`, `ref`, `s3`, `gs`, `https`, `http`) or bare token id (`^[A-Za-z0-9][A-Za-z0-9._\-:/]{3,}$`). Envelope: single line, no whitespace, ≤512 chars.
+  - Operator-facing input shape mirrors the server guard via `pattern` and `maxlength`; helper text explicitly forbids pasting body text.
+  - Contract addendum pins the closed scheme set as exhaustive at v1.
+- What this correction does NOT add:
+  - no Phase B authoring capability (§8.C remains the binding precondition for trial evidence);
+  - no panel-dispatch route trace (§8.B);
+  - no operator brief correction (§8.D);
+  - no Digital Anchor implementation (Plan B B1 / B2 still gated to Plan E);
+  - no Hot Follow change;
+  - no provider / model / vendor / engine controls;
+  - no packet / schema / sample re-version.
+- Final gate: §8.A PASS; current sample reusable NO; ready for §8.B YES.
+
 ### Formal Create-Entry Alignment — Matrix Script Only
 
 - Date: 2026-05-02

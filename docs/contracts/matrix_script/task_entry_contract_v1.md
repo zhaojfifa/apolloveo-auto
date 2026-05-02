@@ -131,6 +131,30 @@ Mapping discipline:
 - `binding.capability_plan[]`, `binding.worker_profile_ref`, `binding.deliverable_profile_ref`, `binding.asset_sink_profile_ref` are **NOT** populated from the entry surface. They are static for the Matrix Script line per `docs/contracts/matrix_script/packet_v1.md` §Capability plan and §Binding profiles.
 - `evidence.ready_state` is **NOT** writable from the entry surface. `ready_state` is one-way projection from validator output (`docs/design/surface_task_area_lowfi_v1.md` §Gate Truth Rule).
 
+## Source script ref shape (addendum, 2026-05-02)
+
+Authority: `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` §8.A.
+
+`source_script_ref` is an opaque reference handle. The entry surface MUST reject any value that carries script body text, document prose, or any other non-reference payload. The server-side guard at `gateway/app/services/matrix_script/create_entry.py` enforces the closed shape declared here; the operator-facing input at `gateway/app/templates/matrix_script_new.html` mirrors the same shape via `pattern` / `maxlength`.
+
+A submitted value is accepted only when it matches one of the two closed shapes below.
+
+1. **URI with closed scheme.** Scheme prefix from the closed set followed by `://` and at least one non-whitespace character.
+   - Closed scheme set: `content`, `task`, `asset`, `ref`, `s3`, `gs`, `https`, `http`.
+   - Example: `content://matrix-script/source/001`.
+2. **Bare token id.** `^[A-Za-z0-9][A-Za-z0-9._\-:/]{3,}$`. No whitespace, no embedded scheme separator (`://`). Used for short opaque content storage handles or external system ids.
+   - Example: `MS-SRC-2026-04-001`.
+
+Independent of the shape match, the value MUST also satisfy:
+
+- single line (no `\n` or `\r`);
+- no whitespace anywhere;
+- length ≤ 512 characters.
+
+On any rejection the entry surface raises the existing entry-validation error type (HTTP 400) with a localised message that names the field and the constraint. The rejection MUST happen before `build_matrix_script_task_payload` runs, so the payload-builder never sees body text.
+
+The closed scheme set is exhaustive at v1; widening it requires a re-version of this contract. Narrowing it is permitted only if no live trial sample relies on the removed scheme.
+
 ## Acceptance (Phase A)
 
 Phase A is green only when:

@@ -7,6 +7,7 @@ Factory Alignment Review Gate Active
 ## Current Main Line
 
 - active architecture gate from `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md`
+- Plan A trial correction set from `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` (item §8.A landed; §8.B / §8.C / §8.D still required before a fresh Matrix Script trial sample is authorized)
 - execution-path migration only under the current factory alignment gate
 - live provider / media validation for Hot Follow Burmese (`my`) and Vietnamese (`vi`)
 - action replica planning-to-runtime binding preparation without reopening Phase-2 foundation refactors
