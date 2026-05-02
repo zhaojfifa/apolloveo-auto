@@ -253,6 +253,35 @@ strictly non-overlapping; each phase is reviewable independently.
 - Hard stop: after Phase D.1, do not auto-start Digital Anchor. Wait for
   Matrix Script line signoff and explicit next instruction.
 
+### Plan A Trial Correction §8.D — Operator Brief Correction (Documentation-only)
+
+- Date: 2026-05-03
+- Status: documentation correction green; ready for signoff
+- Authority: `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` §8.D; `docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md` (operator-facing trial brief — corrected by this change); `docs/execution/PLAN_A_OPS_TRIAL_WRITEUP_v1.md` (trial coordination write-up — extended by an §11 §8.D addendum); `docs/execution/MATRIX_SCRIPT_A_REF_SHAPE_GUARD_EXECUTION_LOG_v1.md` (§8.A — landed); `docs/execution/MATRIX_SCRIPT_B_DISPATCH_CONFIRMATION_EXECUTION_LOG_v1.md` (§8.B — confirmed); `docs/execution/MATRIX_SCRIPT_C_PHASE_B_AUTHORING_EXECUTION_LOG_v1.md` (§8.C — landed)
+- Execution log: `docs/execution/MATRIX_SCRIPT_D_OPERATOR_BRIEF_CORRECTION_EXECUTION_LOG_v1.md`
+- Doc changes:
+  - `docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md` (UPDATED — added §0.1 binding "Matrix Script Trial Sample Validity (post-§8.A / §8.B / §8.C)" rule; refreshed authority list with §8.A / §8.B / §8.C / §8.D execution logs and the trial blocker review; corrected §3.1 Matrix Script row, §3.2 create-entry / Workbench / Delivery rows, §3.3 inspect-only list, §5.2 Workbench explanation 口径 with empty-fallback coordinator note, §6.2 Matrix Script line-by-line guidance, §7.1 first-wave samples, §7.2 samples-to-avoid; expanded §8 risk list with five new Matrix Script-specific rows; added §11.1 trial-corrections landed-history block; corrected §12 Final Readiness Conclusion with §8.A / §8.B / §8.C / §8.D PASS rows and condition #6 binding samples to §0.1)
+  - `docs/execution/PLAN_A_OPS_TRIAL_WRITEUP_v1.md` (UPDATED — refreshed front-matter date / status / authority list; appended §11 "Matrix Script Plan A Trial Corrections — Addendum (2026-05-03)" with §11.1 why-original-was-invalid, §11.2 trial-corrections landed-status table, §11.3 static-pass overlay for Matrix Script rows, §11.4 coordinator action items, §11.5 final corrected coordinator judgment)
+  - `docs/execution/MATRIX_SCRIPT_D_OPERATOR_BRIEF_CORRECTION_EXECUTION_LOG_v1.md` (NEW — this row)
+- What this correction adds:
+  - operator-facing documentation now reflects the accepted §8.A / §8.B / §8.C results: old broken sample remains invalid evidence; fresh corrected sample must be post-§8.A contract-clean, must use the formal `/tasks/matrix-script/new` POST, has real Phase B truth (axes / cells / slots) per §8.C, mounts the Matrix Script Phase B variation panel per §8.B; Matrix Script workbench is now inspectable for real packet truth
+  - explicit valid vs invalid Matrix Script trial sample criteria pinned in the operator brief §0.1
+  - explicit risk-list coverage for old-sample reuse, body-text paste, empty-fallback observation, deterministic-axes misreport, legacy-path submission, and panel-authoring expectation
+  - inspect-only / contract-only boundaries preserved verbatim: Matrix Script Delivery Center stays inspect-only with `not_implemented_phase_c` placeholder rows by Plan A §3.2 and Plan B B4; Matrix Script Phase D.1 publish-feedback closure surface stays as already shipped per `publish_feedback_closure_contract_v1`
+- What this correction does NOT add:
+  - no runtime behavior change — no `.py`, no `.html`, no schema, no sample, no contract, no template, no test edits
+  - no contract change — no edits to any `docs/contracts/**` file (including the §8.A and §8.C addenda already on `task_entry_contract_v1`)
+  - no `PANEL_REF_DISPATCH` widening; no schema / sample / packet re-version
+  - no §8.A / §8.B / §8.C reopening; no workbench redesign
+  - no Hot Follow / Digital Anchor scope reopening; no Runtime Assembly / Capability Expansion entry
+  - no provider / model / vendor / engine controls
+  - no Plan E gated items (B4, D1, D2, D3, D4, Digital Anchor B1 / B2 / B3 implementation)
+  - no second production line onboarding; no Asset Library / promote (Plan C C1–C3) work
+  - no live-trial execution (operations team appends live-run results to `PLAN_A_OPS_TRIAL_WRITEUP_v1.md` §8 separately)
+- Validation: documentation-only change; per `ENGINEERING_RULES.md` §10 there is no runtime regression to run; the §8.A / §8.B / §8.C suites remain green on baseline `9f25b89` and are not affected (no code edited); cross-checks recorded in §4.2 of the §8.D execution log confirm the brief consumes §8.A's accepted scheme set verbatim, §8.B's captured render markers verbatim, §8.C's deterministic axes / cells / slots / `body_ref` template verbatim, the Plan B B4 inspect-only Delivery Center boundary, and the Phase D.1 closure surface boundary.
+- Old invalid sample: NOT used as evidence; the prior sample remains invalid per the blocker review §9 and §8.A's PASS gate; §8.D codifies this rule in the operator brief §0.1, §6.2, §7.2, §8.
+- Final gate: §8.D PASS; Plan A Matrix Script brief corrected YES; old invalid sample remains invalid YES; fresh corrected Matrix Script retry sample fully briefed YES; ready for Matrix Script retry sample creation YES.
+
 ### Plan A Trial Correction §8.C — Phase B Truth Population (Deterministic Authoring)
 
 - Date: 2026-05-03
