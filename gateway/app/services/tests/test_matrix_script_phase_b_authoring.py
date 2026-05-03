@@ -44,6 +44,7 @@ from gateway.app.routers import tasks as tasks_router
 from gateway.app.services.matrix_script.phase_b_authoring import (
     AUDIENCES,
     LENGTH_PICKS,
+    LENGTH_RANGE,
     TONES,
 )
 
@@ -232,6 +233,74 @@ def test_get_workbench_renders_real_axes_cells_slots(monkeypatch):
     assert "No cells resolved on this packet" not in body
     assert "No slots resolved on this packet" not in body
     assert "No `line_specific_refs[]` on this packet" not in body
+
+    # §8.G regression: the dict-method bound-callable repr leaked when
+    # the template wrote ``axis.values`` (Jinja attribute access resolved
+    # to ``dict.values`` before falling back to the ``"values"`` key).
+    # The fix uses ``axis["values"]`` item access; assert the broken repr
+    # is absent anywhere in the body.
+    assert "<built-in method values" not in body
+
+
+# --- §3.G Axes-table renders human-readable axis values -----------
+
+
+def test_axes_table_renders_human_readable_values(monkeypatch):
+    """§8.G regression: the Axes table values column must render the
+    actual axis values (``formal``/``casual``/``playful`` for tone,
+    ``b2b``/``b2c``/``internal`` for audience, ``min=…/max=…/step=…``
+    for length), not the dict's bound ``values()`` method repr.
+
+    Scoped to the axes-table region between the ``<h3>Axes</h3>``
+    heading and the ``<h3>Cells × Slots</h3>`` heading so cell-level
+    ``axis_selections`` (which also surface tone/audience tokens
+    elsewhere on the page) cannot mask a broken axes-row render.
+    """
+    monkeypatch.setenv("AUTH_MODE", "off")
+    repo = _InMemoryRepo()
+    app.dependency_overrides[get_task_repository] = lambda: repo
+    client = TestClient(app, raise_server_exceptions=False)
+    try:
+        task_id = _post_fresh_sample(client, variation_target_count=4)
+        response = client.get(
+            f"/tasks/{task_id}",
+            params={"created": "matrix_script"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200, response.text
+    body = response.text
+
+    axes_heading = '<h3 style="margin:12px 0 6px;">Axes</h3>'
+    cells_heading = '<h3 style="margin:16px 0 6px;">Cells × Slots</h3>'
+    assert axes_heading in body, "Axes heading missing from rendered HTML"
+    assert cells_heading in body, "Cells × Slots heading missing from rendered HTML"
+    axes_start = body.index(axes_heading)
+    axes_end = body.index(cells_heading, axes_start)
+    axes_region = body[axes_start:axes_end]
+
+    # Tone (categorical) — every value renders inside the axes table.
+    for tone in TONES:
+        assert tone in axes_region, (
+            f"tone value {tone!r} missing from axes table region"
+        )
+
+    # Audience (enum) — every value renders inside the axes table.
+    for aud in AUDIENCES:
+        assert aud in axes_region, (
+            f"audience value {aud!r} missing from axes table region"
+        )
+
+    # Length (range) — the mapping branch must render
+    # min/max/step from the dict, not the bound ``values()`` method repr.
+    assert f"min={LENGTH_RANGE['min']}" in axes_region
+    assert f"max={LENGTH_RANGE['max']}" in axes_region
+    assert f"step={LENGTH_RANGE['step']}" in axes_region
+
+    # Negative: the broken Jinja attribute-vs-item access bug is gone.
+    assert "<built-in method values" not in axes_region
+    assert "<built-in method values" not in body
 
 
 # --- §4. Cardinality at boundaries ----------------------------------

@@ -144,6 +144,10 @@ Status: P2 pre-execution evidence index
 | Matrix Script Plan A Trial Correction §8.D (Operator Brief Correction — documentation only) — execution log | `docs/execution/MATRIX_SCRIPT_D_OPERATOR_BRIEF_CORRECTION_EXECUTION_LOG_v1.md` |
 | Matrix Script Plan A Trial Correction §8.D — corrected operator brief | `docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md` |
 | Matrix Script Plan A Trial Correction §8.D — corrected coordinator write-up | `docs/execution/PLAN_A_OPS_TRIAL_WRITEUP_v1.md` |
+| Matrix Script Follow-up Blocker Review v1 (§8.E / §8.F / §8.G) — review | `docs/reviews/matrix_script_followup_blocker_review_v1.md` |
+| Matrix Script Plan A Trial Correction §8.G (Phase B Panel Render Correctness — narrow template fix) — execution log | `docs/execution/MATRIX_SCRIPT_G_RENDER_CORRECTNESS_EXECUTION_LOG_v1.md` |
+| Matrix Script Plan A Trial Correction §8.G — implementation (template) | `gateway/app/templates/task_workbench.html` |
+| Matrix Script Plan A Trial Correction §8.G — regression test (axes-table-scoped) | `gateway/app/services/tests/test_matrix_script_phase_b_authoring.py` |
 | Digital Anchor Second Production Line Wave — execution log | `docs/execution/DIGITAL_ANCHOR_SECOND_PRODUCTION_LINE_LOG.md` |
 | Digital Anchor Second Production Line — Phase A (Task / Role Entry) — contract | `docs/contracts/digital_anchor/task_entry_contract_v1.md` |
 | Digital Anchor Second Production Line — Phase A (Task / Role Entry) — evidence | `docs/execution/evidence/digital_anchor_phase_a_task_entry_v1.md` |

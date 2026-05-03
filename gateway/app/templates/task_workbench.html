@@ -293,12 +293,13 @@
                   <td style="padding:6px; border-bottom:1px solid #f1f5f9;"><code>{{ axis.axis_id }}</code></td>
                   <td style="padding:6px; border-bottom:1px solid #f1f5f9;">{{ axis.kind }}</td>
                   <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
-                    {% if axis.values is mapping %}
-                      min={{ axis.values.min }} · max={{ axis.values.max }} · step={{ axis.values.step }}
-                    {% elif axis.values is iterable and axis.values is not string %}
-                      {{ axis.values | join(" · ") }}
+                    {% set axis_values = axis["values"] %}
+                    {% if axis_values is mapping %}
+                      min={{ axis_values["min"] }} · max={{ axis_values["max"] }} · step={{ axis_values["step"] }}
+                    {% elif axis_values is iterable and axis_values is not string %}
+                      {{ axis_values | join(" · ") }}
                     {% else %}
-                      {{ axis.values }}
+                      {{ axis_values }}
                     {% endif %}
                   </td>
                   <td style="padding:6px; border-bottom:1px solid #f1f5f9;">{{ "yes" if axis.is_required else "no" }}</td>
