@@ -1,18 +1,29 @@
-"""Matrix Script delivery binding projection + B4 artifact lookup.
+"""Matrix Script delivery binding projection + B4 artifact lookup + PR-3 zoning.
 
 Phase C: read-only projection from a Matrix Script packet instance to the
 delivery-center binding surface. No publish feedback write-back, no provider
 routing, no packet mutation.
 
-Plan E phase 1 (Item E.MS.1) adds the B4 artifact-lookup function per
+Plan E phase 1 (Item E.MS.1) added the B4 artifact-lookup function per
 ``docs/contracts/matrix_script/result_packet_binding_artifact_lookup_contract_v1.md``
-and replaces the five ``not_implemented_phase_c`` placeholder rows with calls
+and replaced the five ``not_implemented_phase_c`` placeholder rows with calls
 to that lookup. The lookup is a pure projection of packet truth — it never
 performs I/O, never mutates the packet, never fabricates handles, and never
 raises. When the packet does not yet carry the truth required to resolve a
 row (notably L3 ``final_provenance`` from Plan D D2, which remains forbidden
 in this Plan E phase per the gate spec §4.2), the lookup returns the
 contract sentinel ``artifact_lookup_unresolved``.
+
+Plan E phase 1 / PR-3 (Item E.MS.3) extends every Matrix Script delivery row
+with the explicit ``required`` + ``blocking_publish`` zoning fields per the
+Plan C amendment to ``docs/contracts/factory_delivery_contract_v1.md``
+§"Per-Deliverable Required / Blocking Fields (Plan D Amendment)" and pins
+``scene_pack`` rows to ``required=false`` + ``blocking_publish=false`` per
+§"Scene-Pack Non-Blocking Rule (Explicit; Plan C Amendment)" — independent
+of any line capability flag. The validator invariant
+``required=false ⇒ blocking_publish=false`` is enforced defensively by
+``_clamp_blocking_publish`` so a malformed line policy can never assert a
+non-required row as blocking.
 """
 from __future__ import annotations
 
@@ -26,6 +37,13 @@ CAPABILITY_DUB_REF_ID = "capability:dub"
 CAPABILITY_PACK_REF_ID = "capability:pack"
 
 ARTIFACT_LOOKUP_UNRESOLVED = "artifact_lookup_unresolved"
+
+# Per Plan C amendment to docs/contracts/factory_delivery_contract_v1.md
+# §"Scene-Pack Non-Blocking Rule": every line MUST emit the scene_pack
+# deliverable row as required=false AND blocking_publish=false, independent
+# of any capability_plan flag. The packet validator rejects any line that
+# asserts blocking_publish=true on a scene_pack row.
+SCENE_PACK_BLOCKING_ALLOWED = False
 
 _VALID_PROVENANCE = ("current", "historical")
 _CLOSED_REF_IDS = (
@@ -151,6 +169,16 @@ def _read_l3_final_provenance(
     return None
 
 
+def _clamp_blocking_publish(*, required: bool, blocking_publish: bool) -> bool:
+    """Enforce the validator invariant from ``factory_delivery_contract_v1.md``
+    §"Per-Deliverable Required / Blocking Fields" — a row with ``required=false``
+    MUST carry ``blocking_publish=false``. Defensive: clamps to False rather than
+    relying on every caller to honour the rule.
+    """
+
+    return bool(blocking_publish) if bool(required) else False
+
+
 def _derive_freshness(
     packet: Mapping[str, Any], ref_id: str, locator: Any
 ) -> str:
@@ -216,11 +244,28 @@ def project_delivery_binding(packet: Mapping[str, Any]) -> Dict[str, Any]:
     deliverable_profile_ref = binding.get("deliverable_profile_ref")
     asset_sink_profile_ref = binding.get("asset_sink_profile_ref")
 
+    # Matrix Script line policy for the Plan C amendment fields per
+    # factory_delivery_contract_v1.md §"Per-Deliverable Required / Blocking Fields":
+    #
+    # - variation_manifest / slot_bundle: structural deliverables; both required
+    #   and blocking_publish are True (these are core Matrix Script outputs).
+    # - subtitle_bundle / audio_preview: required follows the line capability
+    #   plan; blocking_publish mirrors required for Matrix Script (when the
+    #   capability is required, its absence blocks publish).
+    # - scene_pack: HARDCODED required=False, blocking_publish=False per the
+    #   §"Scene-Pack Non-Blocking Rule" (Plan C amendment) — independent of the
+    #   pack capability flag. The validator invariant from the same contract
+    #   ("required=false ⇒ blocking_publish=false") is enforced defensively by
+    #   _clamp_blocking_publish on every row below.
+    subtitles_required = bool(subtitles.get("required", False))
+    dub_required = bool(dub.get("required", False))
+
     deliverables = [
         {
             "deliverable_id": "matrix_script_variation_manifest",
             "kind": "variation_manifest",
             "required": True,
+            "blocking_publish": _clamp_blocking_publish(required=True, blocking_publish=True),
             "source_ref_id": VARIATION_REF_ID,
             "profile_ref": deliverable_profile_ref,
             "artifact_lookup": artifact_lookup(packet, VARIATION_REF_ID, None),
@@ -229,6 +274,7 @@ def project_delivery_binding(packet: Mapping[str, Any]) -> Dict[str, Any]:
             "deliverable_id": "matrix_script_slot_bundle",
             "kind": "script_slot_bundle",
             "required": True,
+            "blocking_publish": _clamp_blocking_publish(required=True, blocking_publish=True),
             "source_ref_id": SLOT_PACK_REF_ID,
             "profile_ref": deliverable_profile_ref,
             "artifact_lookup": artifact_lookup(packet, SLOT_PACK_REF_ID, None),
@@ -236,7 +282,10 @@ def project_delivery_binding(packet: Mapping[str, Any]) -> Dict[str, Any]:
         {
             "deliverable_id": "matrix_script_subtitle_bundle",
             "kind": "subtitle_bundle",
-            "required": bool(subtitles.get("required", False)),
+            "required": subtitles_required,
+            "blocking_publish": _clamp_blocking_publish(
+                required=subtitles_required, blocking_publish=subtitles_required
+            ),
             "source_ref_id": SLOT_PACK_REF_ID,
             "profile_ref": deliverable_profile_ref,
             "artifact_lookup": artifact_lookup(packet, CAPABILITY_SUBTITLES_REF_ID, None),
@@ -244,15 +293,26 @@ def project_delivery_binding(packet: Mapping[str, Any]) -> Dict[str, Any]:
         {
             "deliverable_id": "matrix_script_audio_preview",
             "kind": "audio_preview",
-            "required": bool(dub.get("required", False)),
+            "required": dub_required,
+            "blocking_publish": _clamp_blocking_publish(
+                required=dub_required, blocking_publish=dub_required
+            ),
             "source_ref_id": "capability:dub",
             "profile_ref": deliverable_profile_ref,
             "artifact_lookup": artifact_lookup(packet, CAPABILITY_DUB_REF_ID, None),
         },
         {
+            # Scene-Pack Non-Blocking Rule (Plan C amendment): scene_pack is
+            # always required=False AND blocking_publish=False, regardless of
+            # the line's pack capability. Reading `pack` is intentionally
+            # decoupled here — the row's zoning is owned by the contract, not
+            # the per-task capability plan.
             "deliverable_id": "matrix_script_scene_pack",
             "kind": "scene_pack",
-            "required": bool(pack.get("required", False)),
+            "required": False,
+            "blocking_publish": _clamp_blocking_publish(
+                required=False, blocking_publish=SCENE_PACK_BLOCKING_ALLOWED
+            ),
             "source_ref_id": "capability:pack",
             "profile_ref": deliverable_profile_ref,
             "artifact_lookup": artifact_lookup(packet, CAPABILITY_PACK_REF_ID, None),
