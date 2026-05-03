@@ -253,6 +253,45 @@ strictly non-overlapping; each phase is reviewable independently.
 - Hard stop: after Phase D.1, do not auto-start Digital Anchor. Wait for
   Matrix Script line signoff and explicit next instruction.
 
+### Plan A Trial Correction §8.E — Workbench Shell Suppression (Pure Shell-Suppression Execution Step)
+
+- Date: 2026-05-03
+- Status: implementation green; ready for signoff
+- Authority: `docs/reviews/matrix_script_followup_blocker_review_v1.md` §5 (§8.E — Workbench Shell Suppression), §8 (Recommended Ordering — §8.E lands second after §8.G), §9 (Gate Recommendation — §8.E READY); `docs/contracts/workbench_panel_dispatch_contract_v1.md` (with §"Shared shell neutrality (addendum, 2026-05-03)" landed in this change); `docs/contracts/matrix_script/workbench_variation_surface_contract_v1.md` (frozen Phase B projection contract — unchanged); `docs/execution/MATRIX_SCRIPT_G_RENDER_CORRECTNESS_EXECUTION_LOG_v1.md` (§8.G — landed); `docs/execution/MATRIX_SCRIPT_C_PHASE_B_AUTHORING_EXECUTION_LOG_v1.md` (§8.C — landed); `docs/execution/MATRIX_SCRIPT_B_DISPATCH_CONFIRMATION_EXECUTION_LOG_v1.md` (§8.B — confirmed); `docs/execution/MATRIX_SCRIPT_A_REF_SHAPE_GUARD_EXECUTION_LOG_v1.md` (§8.A — landed); `docs/execution/MATRIX_SCRIPT_D_OPERATOR_BRIEF_CORRECTION_EXECUTION_LOG_v1.md` (§8.D — landed)
+- Execution log: `docs/execution/MATRIX_SCRIPT_E_SHELL_SUPPRESSION_EXECUTION_LOG_v1.md`
+- Code / docs:
+  - `gateway/app/templates/task_workbench.html` (EDIT — four whitelist `{% if task.kind == "hot_follow" %}` gates added around the Hot Follow-only template regions: (1) subtitle-track meta row + pipeline summary meta-item, (2) Deliverables panel + Scenes section panel, (3) Publish hub + Steps + Debug logs panels, (4) inline Hot Follow JS state machine; the i18n runtime `<script src="/static/js/i18n_v185.js">` is left ungated as a global runtime; the `{% set pipeline = ... %}` declarations are left ungated for harmlessness; the matrix_script panel block at lines 257-445 is unchanged and still renders correctly with §8.G's axes-table fix)
+  - `docs/contracts/workbench_panel_dispatch_contract_v1.md` (EDIT — additive §"Shared shell neutrality (addendum, 2026-05-03)" appended: declares the shared shell line-neutral; line-specific stage controls render only inside the matched panel block; per-line templates `hot_follow_workbench.html` and `task_workbench_apollo_avatar.html` are unaffected; capability flags deferred; closed dispatch map / `panel_kind` enum / `ref_id` set / closed-by-default rule / resolver shape / forbidden list all stand verbatim)
+  - `gateway/app/services/tests/test_matrix_script_phase_b_authoring.py` (EDIT — new 14th case `test_matrix_script_workbench_does_not_render_hot_follow_shell_controls`: POSTs a fresh contract-clean Matrix Script sample, GETs the workbench, strips `<script>` blocks before assertion (so the inlined global `window.__I18N__` translation payload does not mask the visible-shell test), asserts a closed list of 28 forbidden Hot Follow control tokens — pipeline summary `whisper+gemini`/`auto-fallback`, stage DOM ids `id="btn-parse"`/`id="btn-dub"`/`id="btn-pack"`/`id="btn-subtitles"`/`id="btn-scenes"`/`id="hard-subtitles-toggle"`/`id="voice-id"`/`id="dub-provider"`/`id="parse-status"`/`id="dub-status"`/`id="pack-status"`/`id="subs-status"`/`id="audio-preview"`/`id="debug-panel"`, Burmese deliverables `mm.srt`/`mm.txt`/`origin.srt`/`mm_audio`/`/v1/tasks/`, and Hot Follow i18n labels `workbench.deliverables`/`workbench.scenes_section`/`workbench.publish_hub`/`workbench.steps`/`workbench.step.parse`/`workbench.step.dub`/`workbench.step.pack`/`workbench.step.subtitles`/`workbench.meta.subtitle_track`/`workbench.meta.pipeline`/`workbench.logs` — are absent in the visible HTML; positively anchors the matrix_script panel mount markers `data-role="matrix-script-variation-panel"` and `data-panel-kind="matrix_script"` so the negative assertions cannot pass on an empty render)
+  - `docs/execution/MATRIX_SCRIPT_E_SHELL_SUPPRESSION_EXECUTION_LOG_v1.md` (NEW — this row)
+- What this correction adds:
+  - shared workbench shell now suppresses Hot Follow stage cards / pipeline summary / Burmese deliverable strip / dub-engine selectors / subtitle-track meta row / publish-hub CTA / debug-logs panel / Hot Follow JS state machine on `kind != "hot_follow"`; the operator-visible result on `GET /tasks/{task_id}?created=matrix_script` is now "the shared shell + the Matrix Script Phase B variation panel" with no Hot Follow controls bleeding through (the original mixed-shell defect documented in follow-up review §3 / `task_id=415ea379ebc6` is resolved);
+  - additive contract clarification on `workbench_panel_dispatch_contract_v1` declaring shell-shell neutrality, so the next line onboarding (Digital Anchor at Plan E) inherits the same gating discipline without ambiguity;
+  - end-to-end regression test that asserts a closed token list of Hot Follow controls is absent in the visible HTML on a fresh matrix_script sample, scoped to the visible HTML region (script blocks stripped) so the global i18n translation payload does not mask the test;
+  - shared-shell architecture preserved: per-panel mount inside a shared shell remains the correct design per `workbench_panel_dispatch_contract_v1`; no per-line workbench template introduced for matrix_script.
+- What this correction does NOT add:
+  - no `workbench_registry.py` change — the `default → task_workbench.html` mapping is unchanged;
+  - no per-line workbench template files for `matrix_script` / `digital_anchor`;
+  - no capability flags (`shell_capabilities.has_dub_flow`, etc.) — the whitelist form `kind == "hot_follow"` is the simpler, lower-risk implementation per review §5;
+  - no change to `hot_follow_workbench.html` or `task_workbench_apollo_avatar.html`;
+  - no §8.F scheme tightening — `https`/`http` remain in the §8.A accepted-scheme set; opaque-ref discipline tightening scoped to §8.F follow-up (BLOCKED on authority decision);
+  - no §8.D operator brief re-correction — §8.H is the natural successor once §8.E / §8.F / §8.G all land;
+  - no Phase B planner / projector / router / wire-up change;
+  - no schema / sample / packet re-version;
+  - no `PANEL_REF_DISPATCH` widening; no §8.B dispatch logic change;
+  - no §8.G axes-table change — the Jinja item-access fix lives inside the matrix_script panel block and is unaffected by §8.E gating;
+  - no provider / model / vendor / engine controls;
+  - no Hot Follow / Digital Anchor scope reopening;
+  - no Runtime Assembly / Capability Expansion entry;
+  - no second production line onboarding;
+  - no Asset Library / promote (Plan C C1–C3) work;
+  - no Plan E gated items (B4, D1, D2, D3, D4) implementation;
+  - no CSS-only suppression — review §9 hard red line is observed: suppression is in the Jinja render path, asserted by the regression test;
+  - no panel-readability re-check — that was §8.G's concern; §8.E is shell-suppression only.
+- Validation: 13/13 §8.C end-to-end suite cases pass after the §8.E gates and new test (11 §8.C prior + §8.G axes-table + §8.E suppression); 195/195 cases pass across §8.A's 23, §8.B's 4, §8.C's planner-unit 27 + end-to-end (now 13), `test_workbench_variation_phase_b`, the operator-visible-surface contracts, and guardrails. 166/166 workbench-keyword tests pass (Hot Follow per-line workbench unaffected; Apollo Avatar workbench unaffected). Live render evidence on a fresh contract-clean sample (`task_id=2df7c79311a6`, `variation_target_count=4`, `target_language=mm`, `source_script_ref=content://matrix-script/source/8e-evidence-001`) confirms: matrix_script panel mount + §8.G axes table all PRESENT in visible HTML; all 21 closed-list Hot Follow tokens (pipeline summary, stage DOM ids, Burmese deliverables, Hot Follow i18n labels) all ABSENT in visible HTML. Pre-existing environment limitation `test_op_download_proxy_uses_attachment_redirect_for_final_video` recorded in §8.A / §8.B / §8.C / §8.G logs is unaffected (template + test edit only).
+- Old invalid sample: NOT used as evidence; the prior pre-§8.A sample remains invalid; §8.E's evidence is on a fresh post-§8.A / §8.B / §8.C / §8.D / §8.G sample.
+- Final gate: §8.E PASS; Hot Follow controls suppressed on matrix_script YES; matrix_script panel mount preserved YES; Hot Follow per-line workbench unaffected YES; Apollo Avatar per-line workbench unaffected YES; ready for §8.F YES (with §8.F still BLOCKED on Options F1/F2/F3 authority decision); §8.A / §8.B / §8.C / §8.D / §8.G not retracted (additive only); ops trial retry remains BLOCKED until §8.F also lands per the follow-up review §9 ordering.
+
 ### Plan A Trial Correction §8.G — Phase B Panel Render Correctness (Narrow Template Fix)
 
 - Date: 2026-05-03

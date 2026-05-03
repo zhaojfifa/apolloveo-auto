@@ -122,3 +122,42 @@ This contract is green when:
 - `docs/contracts/matrix_script/slot_pack_contract_v1.md`
 - `gateway/app/services/operator_visible_surfaces/projections.py` (read-only reference)
 - `docs/reviews/operations_upgrade_gap_review_and_ops_plan_v1.md`
+
+## Shared shell neutrality (addendum, 2026-05-03)
+
+Authority: `docs/reviews/matrix_script_followup_blocker_review_v1.md` §5
+(§8.E — Workbench Shell Suppression).
+
+The dispatch map above governs `(ref_id → panel_kind)` mounting only.
+The shared workbench shell that hosts the mounted panel is **line-neutral**:
+the shell MUST NOT render line-specific stage controls, deliverable
+strips, pipeline summaries, dub-engine selectors, voice picks, subtitle-
+track meta rows, or per-line publish-flow CTAs alongside a panel of a
+different `panel_kind`. Line-specific controls render only inside the
+panel block selected by `panel_kind` (and only inside that block).
+
+This rule:
+
+- is presentation-layer discipline; it does not widen the closed map,
+  add a new `ref_id`, add a new `panel_kind`, or change resolver shape;
+- is asserted at the template surface (`gateway/app/templates/task_workbench.html`,
+  the shared/default workbench shell); the implementation gates each
+  Hot Follow-only template region with a whitelist predicate
+  `{% if task.kind == "hot_follow" %}` so non-Hot-Follow tasks see the
+  stripped shared shell (header card + operator surface + line-panel
+  slot + the matched panel block);
+- is a non-binding pointer for the per-line workbench templates that
+  already exist (`hot_follow_workbench.html`,
+  `task_workbench_apollo_avatar.html`): each per-line template owns
+  its own line-specific shell and is unaffected by this rule;
+- does NOT introduce per-line workbench template files for new lines;
+  per `workbench_panel_dispatch_contract_v1` the per-panel mount
+  inside a shared shell is the correct design;
+- does NOT introduce capability flags
+  (`shell_capabilities.has_dub_flow`, etc.) in this wave; the whitelist
+  form `kind == "hot_follow"` is the simpler, lower-risk implementation
+  approved by the follow-up blocker review §5.
+
+This addendum is **additive**. The closed dispatch map (six pairs), the
+closed `panel_kind` enum, the closed `ref_id` set, the closed-by-default
+rule, the resolver shape, and the forbidden list are unchanged.

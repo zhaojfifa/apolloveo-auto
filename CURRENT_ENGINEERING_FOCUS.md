@@ -8,7 +8,7 @@ Factory Alignment Review Gate Active
 
 - active architecture gate from `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md`
 - Plan A trial correction set from `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` complete (items §8.A, §8.B, §8.C, and §8.D all PASS; the fresh corrected Matrix Script trial sample is now fully briefed and the operations team may proceed with §7.1 sample creation per `docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md`)
-- Matrix Script follow-up blocker review v1 from `docs/reviews/matrix_script_followup_blocker_review_v1.md` accepted as current authority; §8.G (Phase B panel render correctness) PASS; §8.E (workbench shell line-conditional rendering) and §8.F (opaque-ref discipline) remain follow-ups; ops trial retry stays BLOCKED until §8.E and §8.F land and §8.H operator brief re-correction completes the chain
+- Matrix Script follow-up blocker review v1 from `docs/reviews/matrix_script_followup_blocker_review_v1.md` accepted as current authority; §8.G (Phase B panel render correctness) and §8.E (workbench shell line-conditional rendering) PASS; §8.F (opaque-ref discipline, BLOCKED on Options F1/F2/F3 authority decision) remains the last in-wave follow-up; ops trial retry stays BLOCKED until §8.F lands and §8.H operator brief re-correction completes the chain
 - execution-path migration only under the current factory alignment gate
 - live provider / media validation for Hot Follow Burmese (`my`) and Vietnamese (`vi`)
 - action replica planning-to-runtime binding preparation without reopening Phase-2 foundation refactors

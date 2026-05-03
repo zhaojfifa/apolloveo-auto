@@ -166,6 +166,14 @@
         <div class="meta-item"><strong>{{ t("workbench.meta.account") }}</strong><span>{{ task.account_id or '-' }}</span></div>
         <div class="meta-item"><strong>{{ t("workbench.meta.category") }}</strong><span>{{ task.category_key or '-' }}</span></div>
         <div class="meta-item"><strong>{{ t("workbench.meta.language") }}</strong><span>{{ task.content_lang or '-' }}</span></div>
+        {% set pipeline = task.pipeline_config or {} %}
+        {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
+        {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
+        {% set ingest_mode = pipeline.get("ingest_mode") %}
+        {% set subtitle_stream = pipeline.get("subtitle_stream") %}
+        {% set clean_generated = pipeline.get("clean_video_generated") %}
+        {% set hard_subtitles = pipeline.get("has_hard_subtitles") %}
+        {% if task.kind == "hot_follow" %}
         <div class="meta-item">
           <strong>{{ t("workbench.meta.subtitle_track") }}</strong>
           <span>
@@ -183,14 +191,8 @@
             {% endif %}
           </span>
         </div>
-        {% set pipeline = task.pipeline_config or {} %}
-        {% set subtitles_mode = pipeline.get("subtitles_mode", "whisper+gemini") %}
-        {% set dub_mode = pipeline.get("dub_mode", "auto-fallback") %}
-        {% set ingest_mode = pipeline.get("ingest_mode") %}
-        {% set subtitle_stream = pipeline.get("subtitle_stream") %}
-        {% set clean_generated = pipeline.get("clean_video_generated") %}
-        {% set hard_subtitles = pipeline.get("has_hard_subtitles") %}
         <div class="meta-item"><strong>{{ t("workbench.meta.pipeline") }}</strong><span>{{ t("tasks.subtitles") }}: {{ subtitles_mode }} · {{ t("tasks.dub") }}: {{ dub_mode }}</span></div>
+        {% endif %}
         <div class="meta-item"><strong>{{ t("workbench.meta.status") }}</strong><span>{{ task.status }}</span></div>
         <div class="meta-item"><strong>{{ t("workbench.meta.created") }}</strong><span>{{ task.created_at }}</span></div>
         <div class="meta-item">
@@ -474,6 +476,7 @@
       </div>
     {% endif %}
 
+    {% if task.kind == "hot_follow" %}
     <div class="panel">
       <div class="section-title">
         <h2>{{ t("workbench.deliverables") }}</h2>
@@ -546,8 +549,9 @@
         </div>
       </div>
     </div>
+    {% endif %}
 
-    
+    {% if task.kind == "hot_follow" %}
     <div class="panel">
       <div class="section-title">
         <h2>{{ t("workbench.publish_hub") }}</h2>
@@ -702,9 +706,11 @@
         </div>
       </div>
     </details>
+    {% endif %}
   </div>
 
   <script src="/static/js/i18n_v185.js"></script>
+  {% if task.kind == "hot_follow" %}
   <script>
     window.__FEATURES__ = {{ features | tojson | safe }};
     window.currentTask = {{ task_json | tojson | safe }};
@@ -1466,5 +1472,6 @@
       });
     }
   </script>
+  {% endif %}
 </body>
 </html>

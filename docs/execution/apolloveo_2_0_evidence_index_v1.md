@@ -148,6 +148,10 @@ Status: P2 pre-execution evidence index
 | Matrix Script Plan A Trial Correction §8.G (Phase B Panel Render Correctness — narrow template fix) — execution log | `docs/execution/MATRIX_SCRIPT_G_RENDER_CORRECTNESS_EXECUTION_LOG_v1.md` |
 | Matrix Script Plan A Trial Correction §8.G — implementation (template) | `gateway/app/templates/task_workbench.html` |
 | Matrix Script Plan A Trial Correction §8.G — regression test (axes-table-scoped) | `gateway/app/services/tests/test_matrix_script_phase_b_authoring.py` |
+| Matrix Script Plan A Trial Correction §8.E (Workbench Shell Suppression — pure shell-suppression execution step) — execution log | `docs/execution/MATRIX_SCRIPT_E_SHELL_SUPPRESSION_EXECUTION_LOG_v1.md` |
+| Matrix Script Plan A Trial Correction §8.E — implementation (template gates) | `gateway/app/templates/task_workbench.html` |
+| Matrix Script Plan A Trial Correction §8.E — contract addendum (shared shell neutrality) | `docs/contracts/workbench_panel_dispatch_contract_v1.md` |
+| Matrix Script Plan A Trial Correction §8.E — regression test (visible-shell suppression) | `gateway/app/services/tests/test_matrix_script_phase_b_authoring.py` |
 | Digital Anchor Second Production Line Wave — execution log | `docs/execution/DIGITAL_ANCHOR_SECOND_PRODUCTION_LINE_LOG.md` |
 | Digital Anchor Second Production Line — Phase A (Task / Role Entry) — contract | `docs/contracts/digital_anchor/task_entry_contract_v1.md` |
 | Digital Anchor Second Production Line — Phase A (Task / Role Entry) — evidence | `docs/execution/evidence/digital_anchor_phase_a_task_entry_v1.md` |
