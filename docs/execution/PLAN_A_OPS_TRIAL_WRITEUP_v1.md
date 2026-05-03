@@ -176,20 +176,88 @@ Coordinator monitors for the brief §8 risk list during operator sessions. The w
 4. The Plan D D3 `PANEL_REF_DISPATCH` map matches the contract verbatim — closed-by-default rule observed at `projections.py:268-270`.
 5. The R3 forbidden-key sanitization is in place at `projections.py:36` and is the load-bearing guard for the operator boundary; coordinator should not relax it.
 
-## 8. Live-Run Section (placeholder for ops team)
+## 8. Live-Run Section (live evidence appended / partial closeout state for ops team)
 
 The operations team appends live-run results below once §3 of the brief is executed. Each entry should record:
 
 ```
+### 8.x Partial live evidence — Matrix Script Sample 3 contract/projection baseline slice only
+
 - date / window:
+  2026-05-03 10:00–10:11
+
 - coordinator:
+  Jackie
+
 - operators:
-- samples run (with task ids):
-- abort triggers fired (none / list):
-- regressions filed (none / list):
-- per-surface notes (Task Area / Workbench / Delivery Center):
+  sunny
+
+- sample covered:
+  Sample 3 — Matrix Script fresh contract-clean small variation plan (partial slice only)
+
+- task_id:
+  7a407e8d00a9
+
+- entry path used:
+  /tasks/newtasks → Matrix Script card → /tasks/matrix-script/new → create and enter workbench
+
+- entry parameters observed:
+  target_language: vi
+  variation_target_count: 4
+  topic: 越南已经有人用AI赚钱了
+  source_script_ref: content://matrix-script/source/vn-ai-money-001
+  target_platform: tiktok
+
+- evidence observed:
+  [x] formal /tasks/matrix-script/new entry path usable on deployed environment
+  [x] opaque-ref transitional convention accepted
+  [x] target_language enum accepted with vi
+  [x] task created successfully and real task_id issued
+  [x] Matrix Script line-specific workbench panel mounted
+  [x] projection name aligned to matrix_script_workbench_variation_surface_v1
+  [x] axes rendered human-readably (tone / audience / length)
+  [x] 4 cells rendered (cell_001..cell_004)
+  [x] 4 slots rendered (slot_001..slot_004)
+  [x] slot detail rendered and cell↔slot binding visible
+  [x] no Hot Follow stage cards / pipeline summary / Burmese strip visible on the Matrix Script workbench
+  [x] task visible on /tasks board
+  [x] board card shows matrix_script task in processing state and board bucket ready
+  [x] workbench operator surface shows L3 publish gate blocked · final_missing
+  [x] Matrix Script delivery / publish-feedback area remains inspect-only this wave
+
+- per-surface notes:
+  Task Area:
+    Matrix Script entry surface is reachable from /tasks/newtasks and create-entry succeeds with a formal opaque ref.
+
+  Workbench:
+    Matrix Script variation panel is mounted and readable.
+    This observation proves contract/projection alignment only; it does not prove operator-workspace completion.
+
+  Delivery Center:
+    No final deliverable observed in this sample.
+    Publish gate remained blocked · final_missing.
+    Delivery/publish-feedback remains inspect-only / placeholder-level for this wave.
+
 - gate-condition deltas:
-```
+  Digital Anchor card was still visibly present on /tasks/newtasks during this observation.
+  Therefore this observation MUST NOT be treated as full valid Plan A completion evidence unless the coordinator confirms the §12 hide/disable condition and records that decision explicitly.
+
+- regressions / observations:
+  Observation only:
+  Board-level "ready" wording may be operator-confusing when the Matrix Script workbench still shows blocked · final_missing.
+
+- limitation statement:
+  This entry records only a partial live slice for Matrix Script Sample 3.
+  It does NOT claim:
+  - full Sample 3 completion
+  - full Plan A completion
+  - §12 condition certification
+  - operator-workspace completion
+  - delivery-loop completion
+  - Plan E unblock
+
+- coordinator initials + timestamp:
+  Jackie / 2026-05-03 10:11
 
 This section is intentionally empty in this static pass.
 
@@ -202,6 +270,16 @@ This section is intentionally empty in this static pass.
 
 ## 10. Final Statement
 
+At the current state of Plan A evidence:
+
+- Hot Follow is the operational baseline line for ApolloVeo 2.0.
+- Matrix Script has established contract/projection/state baseline evidence in deployed environment and becomes the next line to be pushed toward operator-facing implementation.
+- Digital Anchor remains inspect-only and contract-aligned in this wave; no operator submission is authorized.
+
+This means the project is advancing exactly in the intended 2.0 sequence:
+line-first, platform-later.
+The current record is therefore sufficient to support the next implementation planning step,
+but not yet to declare full Plan A completion or to unblock Plan E.
 - **Plan A document created:** done (this report; brief at [docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md)).
 - **Authority read:** brief, gap review, Plan B/C/D execution log, frozen contracts, deployed-branch surfaces.
 - **Trial-safe scope confirmed:** Hot Follow end-to-end; Matrix Script except Delivery binding; Digital Anchor inspect-only.
@@ -318,3 +396,7 @@ In addition to the §11.4 action items (which remain in force):
 - **Live-trial readiness for Matrix Script:** **CONDITIONAL** — coordinator executes §2.1 / §2.2 / §2.3 of this write-up plus §11.4 of the prior addendum and §12.4 of this addendum; operations team appends live-run results in §8 of the write-up (the §8 placeholder remains empty in this static pass).
 
 End of §8.E / §8.F / §8.G / §8.H operator brief follow-up correction addendum (2026-05-03).
+
+Coordinator note:
+This observation is retained as deployed-environment baseline evidence for Matrix Script Sample 3 only.
+It is valid as contract/projection baseline evidence, but not yet sufficient as full Plan A wave-completion evidence.
