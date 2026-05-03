@@ -303,6 +303,141 @@ def test_axes_table_renders_human_readable_values(monkeypatch):
     assert "<built-in method values" not in body
 
 
+# --- §3.E Shared shell suppresses Hot Follow controls on matrix_script -
+
+
+def test_matrix_script_workbench_does_not_render_hot_follow_shell_controls(
+    monkeypatch,
+):
+    """§8.E regression: the shared workbench shell must not render Hot
+    Follow stage cards / pipeline summary / dub-engine selectors /
+    Burmese-specific deliverable rows / subtitle-track meta row when
+    ``task.kind != "hot_follow"``.
+
+    The check is a closed token list drawn from the follow-up blocker
+    review v1 §5 ("Required correction type") — every token is a
+    visible Hot Follow control. The Matrix Script Phase B variation
+    panel and the generic operator surface strip remain mounted (and
+    are asserted by the dispatch / render context cases above), so the
+    operator-visible result is "the shared shell + the Matrix Script
+    panel" with **no** Hot Follow controls bleeding through.
+
+    Scope note: ``<script>`` blocks are stripped before assertion
+    because the shared topbar inlines the global ``window.__I18N__``
+    translation dictionary, and that dictionary necessarily contains
+    Hot Follow string keys (``workbench.mm_audio`` → "Burmese audio",
+    etc.). Those keys are not operator-visible controls — they are
+    JavaScript translation strings — so the regression scope is the
+    **visible HTML body**, not the inlined translation payload.
+    """
+    import re
+
+    monkeypatch.setenv("AUTH_MODE", "off")
+    repo = _InMemoryRepo()
+    app.dependency_overrides[get_task_repository] = lambda: repo
+    client = TestClient(app, raise_server_exceptions=False)
+    try:
+        task_id = _post_fresh_sample(client, variation_target_count=4)
+        response = client.get(
+            f"/tasks/{task_id}",
+            params={"created": "matrix_script"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200, response.text
+    body = response.text
+
+    # The Matrix Script panel still mounts (kept here as a positive
+    # anchor so the negative assertions below cannot pass on an empty
+    # render).
+    assert 'data-role="matrix-script-variation-panel"' in body
+    assert 'data-panel-kind="matrix_script"' in body
+
+    # Strip <script>...</script> blocks so the inlined i18n payload
+    # (window.__I18N__) and the matrix_script-side currentTask dump
+    # (window.currentTask, but only inside Hot Follow gate now) don't
+    # mask the test of the visible HTML surface.
+    visible_html = re.sub(
+        r"<script\b[^>]*>.*?</script>",
+        "",
+        body,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+
+    # Hot Follow pipeline summary tokens — the labels visible on the
+    # original mixed render.
+    forbidden_pipeline_tokens = (
+        "whisper+gemini",
+        "auto-fallback",
+    )
+
+    # Hot Follow stage cards — the parse / subtitle / dub / pack DOM ids
+    # that anchor the Hot Follow steps panel.
+    forbidden_stage_dom = (
+        'id="btn-parse"',
+        'id="btn-dub"',
+        'id="btn-pack"',
+        'id="btn-subtitles"',
+        'id="btn-scenes"',
+        'id="hard-subtitles-toggle"',
+        'id="voice-id"',
+        'id="dub-provider"',
+        'id="parse-status"',
+        'id="dub-status"',
+        'id="pack-status"',
+        'id="subs-status"',
+        'id="audio-preview"',
+        'id="debug-panel"',
+    )
+
+    # Hot Follow deliverable strip — Burmese-specific deliverable
+    # filenames and download endpoints.
+    forbidden_deliverables = (
+        "mm.srt",
+        "mm.txt",
+        "origin.srt",
+        "mm_audio",
+        "/v1/tasks/",
+    )
+
+    for token in forbidden_pipeline_tokens:
+        assert token not in visible_html, (
+            f"Hot Follow pipeline token {token!r} leaked into matrix_script visible render"
+        )
+    for token in forbidden_stage_dom:
+        assert token not in visible_html, (
+            f"Hot Follow stage DOM {token!r} leaked into matrix_script visible render"
+        )
+    for token in forbidden_deliverables:
+        assert token not in visible_html, (
+            f"Hot Follow deliverable token {token!r} leaked into matrix_script visible render"
+        )
+
+    # Workbench i18n keys for the Hot Follow stage / deliverable / publish
+    # / debug sections — none of these labels should resolve in the
+    # visible HTML. They are still present in the inlined translation
+    # payload (which is the responsibility of the i18n bundle, not
+    # the workbench shell), so we assert against ``visible_html`` only.
+    forbidden_i18n_labels = (
+        "workbench.deliverables",
+        "workbench.scenes_section",
+        "workbench.publish_hub",
+        "workbench.steps",
+        "workbench.step.parse",
+        "workbench.step.dub",
+        "workbench.step.pack",
+        "workbench.step.subtitles",
+        "workbench.meta.subtitle_track",
+        "workbench.meta.pipeline",
+        "workbench.logs",
+    )
+    for token in forbidden_i18n_labels:
+        assert token not in visible_html, (
+            f"Hot Follow i18n label {token!r} leaked into matrix_script visible render"
+        )
+
+
 # --- §4. Cardinality at boundaries ----------------------------------
 
 
