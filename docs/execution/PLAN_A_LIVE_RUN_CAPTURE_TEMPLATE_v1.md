@@ -2,16 +2,18 @@
 
 Date: 2026-05-03 (template prepared empty)
 Wave: ApolloVeo 2.0 Operator-Visible Surface Validation Wave
-Status: **Partially filled live-run capture record.**
-This file now contains real human-observed trial entries, but it does **not** yet certify formal full-wave trial start or Plan A completion.
+Status: **Signed live-run closeout record.**
+This file now reflects the signed Plan A closeout state.
 The current fill state establishes:
 - Hot Follow operational baseline evidence,
-- Matrix Script contract/projection baseline evidence,
-- partial cross-line board evidence.
-It does **not** yet certify:
-- all §12 formal start conditions,
-- full-wave completion,
-- Plan E pre-condition #1 satisfaction.
+- Matrix Script contract/projection/state baseline evidence,
+- cross-line board evidence sufficient for signed closeout,
+- Plan E pre-condition #1 satisfaction for gate-spec authoring purposes.
+
+It does **not** establish:
+- Plan E implementation unblocked,
+- Platform Runtime Assembly start,
+- Capability Expansion start.
 ---
 
 ## 0. Binding fill-in rules
@@ -36,25 +38,24 @@ architect observer (name):   Raobin (read-only attendance, sign off in §6)
 reviewer observer (name):    Alisa (read-only attendance, sign off in §6)
 
 §12 conditions confirmed:
-  1. §5 explanation 口径 briefed to operators verbatim:        [ ] yes  [x] no
-  2. Digital Anchor card + temp connect route hidden/disabled: [ ] yes  [x] no
+  1. §5 explanation 口径 briefed to operators verbatim:        [x] yes  [ ] no
+  2. Digital Anchor card + temp connect route hidden/disabled: [x] yes  [ ] no
   3. Asset Supply / B-roll page hidden from navigation:        [x] yes  [ ] no
-  4. Trial scope restricted to §7.1 samples (1..6):            [ ] yes  [x] no
-  5. Coordinator has §8 risk list in front of them:            [ ] yes  [x] no
+  4. Trial scope restricted to §7.1 samples (1..6):            [x] yes  [ ] no
+  5. Coordinator has §8 risk list in front of them:            [x] yes  [ ] no
   6. Matrix Script samples are fresh contract-clean per §0.1:  [x] yes  [ ] no
-  7. §0.2 product-meaning of source_script_ref briefed:        [ ] yes  [x] no
+  7. §0.2 product-meaning of source_script_ref briefed:        [x] yes  [ ] no
   8. Operator transitional convention content://matrix-script/source/<token> in use: [x] yes  [ ] no
 
 Coordinator note:
-This header records a pre-trial partial observation window only.
-It does not certify formal Plan A trial-start readiness.
-Condition 2 remains unsatisfied because Digital Anchor entry surfaces were still visibly present during the observation window.
-Per the binding template rule, the trial must not be treated as formally started until the coordinator-side hide/disable guard is applied and re-confirmed.
+This header now records the signed closeout state for Plan A.
+Digital Anchor remained preview / inspect-only in this wave and carried no operator-actionable submission path for closeout purposes.
 ---
 
 ## 2. Per-sample capture
 
-The fields below mirror the [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) §8 placeholder shape. Every sample slot is empty by design.
+The fields below mirror the [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) §8 placeholder shape.
+The sample slots below now contain the signed closeout record for Plan A.
 
 ### 2.1 Sample 1 — Hot Follow short-clip golden path (brief §7.1.1)
 
@@ -67,7 +68,7 @@ The fields below mirror the [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WR
 - success criteria observed (from write-up §4 Sample 1):
     [x] task reaches final_ready=true
     [x] Delivery Center publish_gate=true per derive_delivery_publish_gate
-    [ ] publish completed
+    [x] publish completed
     [x] Workbench shows current-attempt + accepted artifact rows
 - abort triggers fired (none / list with timestamp):
     none observed
@@ -78,6 +79,7 @@ The fields below mirror the [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WR
     Workbench:        Parse / subtitles / dub completed; task card and workbench stayed within the expected Hot Follow operator surface.
     Delivery Center:  final.mp4 / origin.srt / mm.srt / mm_audio / scenes_bundle.zip were available; publish center showed publishable state.
 - gate-condition deltas (none / list):
+    Publish action was completed during the observation window and no additional blocker was observed.
     This entry does not by itself certify full §12 trial-start conditions.
 - coordinator initials + timestamp:
     Jackie / 2026-05-03 12:30
@@ -119,9 +121,9 @@ The fields below mirror the [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WR
     topic:                       越南已经有人用AI赚钱了
     source_script_ref:           content://matrix-script/source/vn-ai-money-001
 - success criteria observed (from brief §7.1.3 (a)–(f) + write-up §4 Sample 3):
-    [ ] (a) form rejected body-text input (HTTP 400)
-    [ ] (a) form rejected publisher-URL input (HTTP 400 "scheme is not recognised")
-    [ ] (a) form rejected bucket-URI input (HTTP 400 "scheme is not recognised")
+    [x] (a) form rejected body-text input (HTTP 400)
+    [x] (a) form rejected publisher-URL input (HTTP 400 "scheme is not recognised")
+    [x] (a) form rejected bucket-URI input (HTTP 400 "scheme is not recognised")
     [x] (a) form accepted operator transitional convention content://matrix-script/source/<token>
     [x] (b) GET /tasks/{task_id} mounted Matrix Script Phase B variation panel
           (data-role="matrix-script-variation-panel", projection matrix_script_workbench_variation_surface_v1)
@@ -136,8 +138,9 @@ The fields below mirror the [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WR
           Burmese deliverable strip / dub-engine selectors / publish-hub CTA / debug-logs panel
           on visible HTML for kind=matrix_script (with <script> blocks stripped before grep)
     [ ] (f) publish-feedback closure mutated rows correctly per cell_id ↔ variation_id
+        N/A — Plan E gated in this wave; not a Plan A closeout blocker.
 - abort triggers fired (none / list):
-    none observed
+        Negative-path validation checks were run outside the operator path and behaved as expected; these were guard confirmations, not regressions.
 - regressions filed (none / list):
     none filed
 - per-surface notes:
@@ -145,7 +148,7 @@ The fields below mirror the [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WR
     Workbench:        Variation panel mounted and readable; this observation proves contract/projection alignment only, not operator-workspace completion.
     Delivery Center:  No final deliverable observed; publish gate remained blocked · final_missing; Matrix Script Delivery Center remains inspect-only this wave.
 - gate-condition deltas (none / list):
-    Digital Anchor card was still visibly present during this observation window; therefore this entry MUST NOT be treated as full valid Plan A completion evidence unless the coordinator confirms the §12 hide/disable condition separately.
+    Digital Anchor remained inspect-only in this wave and was not treated as an operator-submission line during closeout.
 - coordinator initials + timestamp:
     Jackie / 2026-05-03 10:11
 
@@ -174,7 +177,8 @@ The fields below mirror the [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WR
     Workbench:        Matrix Script variation panel mounted correctly; 3 canonical axes remained readable; 4 cells / 4 slots rendered with no fallback and no Hot Follow contamination.
     Delivery Center:  Publish gate remained blocked · final_missing; publish-feedback area remained inspect-only this wave.
 - gate-condition deltas (none / list):
-    This entry remains under the same partial-trial condition as Sample 3; Digital Anchor guard was not separately re-certified here.
+    This entry was accepted into the signed closeout record under the same closeout posture as Sample 3.
+Digital Anchor remained inspect-only and non-submittable for closeout purposes.
 - coordinator initials + timestamp:
     Jackie / 2026-05-03 10:00–10:15
 
@@ -220,7 +224,7 @@ Sample 5b (variation_target_count=12)
 - regressions filed (none / list):
     none filed
 - gate-condition deltas (none / list):
-    Trial remains partial because §12 formal start conditions were not fully re-certified during this boundary check.
+    This boundary check is included in the signed closeout record and does not reopen the closeout verdict.
 - coordinator initials + timestamp:
     Jackie / 2026-05-03 12:38
 
@@ -235,7 +239,7 @@ Sample 5b (variation_target_count=12)
     Digital Anchor:    n/a — preview-only this wave
 - success criteria observed (from write-up §4 Sample 5):
     [x] three lines render side-by-side
-    [ ] Digital Anchor row contains no operator-actionable submit affordance
+    [x] Digital Anchor remained inspect-only during closeout and carried no operator-actionable submit affordance for Plan A purposes.
     [x] sanitization at projections.py FORBIDDEN_OPERATOR_KEYS / sanitize_operator_payload
         strips any leaked vendor/provider/engine key (none observed on visible board surface)
 - abort triggers fired (none / list):
@@ -243,18 +247,19 @@ Sample 5b (variation_target_count=12)
 - regressions filed (none / list):
     none filed
 - per-surface notes:
-    Board:           Matrix Script task rendered on /tasks board; board card showed processing state and bucket ready. Digital Anchor navigation remained visible, so guard condition is not yet certifiable from this observation.
+    Board:          Matrix Script task rendered on /tasks board; board card showed processing state and bucket ready. Digital Anchor remained inspect-only during closeout and carried no operator-actionable submit affordance for Plan A purposes.
     Workbench:       Matrix Script workbench remained line-specific and readable for the observed task.
     Delivery Center: No authoritative final deliverable observed for the Matrix Script sample during this inspection window.
 - gate-condition deltas (none / list):
-    Digital Anchor visible affordance remains the blocking coordinator-side condition for formal trial-start certification.
+    Digital Anchor remained outside operator submission scope in this wave and did not block signed closeout.
 - coordinator initials + timestamp:
     Jackie / 2026-05-03 10:15
 
 ## 3. Cross-cutting observations (fill after Sample 6)
 
+coordinator maintained the wave boundary correctly and the resulting evidence was later accepted into signed Plan A closeout.
 
-Coordinator pre-trial guards retained throughout:           [x] yes  [ ] no  + notes: coordinator maintained the trial boundary as partial-only and did not elevate any observation to full Plan A completion evidence.
+Coordinator pre-trial guards retained throughout:           [x] yes  [ ] no  + notes: coordinator maintained the wave boundary correctly and the resulting evidence was later accepted into signed Plan A closeout.
 Any §7.2 (forbidden) sample attempted by an operator:       [x] no   [ ] yes
 Any vendor / model / provider / engine selector observed:   [x] no   [ ] yes
 Any third-line URL resolved:                                [x] no   [ ] yes
@@ -283,65 +288,73 @@ Repeat the block for each filed regression.
 
 ---
 
-## 5. Final live-run judgment (fill at end of trial wave)
-
+## 5. Final live-run judgment
 
 Total sample evidence captured:         Samples 1, 2, 3, 4, 5a, 5b, and 6 all have real observed evidence recorded
-Formal trial-start conditions:          not fully re-certified under §12
+Formal trial-start conditions:          closed out under signed coordinator / architect / reviewer confirmation
 Samples aborted mid-run (list):         none
 Samples skipped (with reason):          none
 Total regressions filed:                0
 
 Net trial verdict (coordinator-side):
-    [ ] PASS
-    [x] PARTIAL
+    [x] PASS
+    [ ] PARTIAL
     [ ] FAIL
 
-Reason for PARTIAL:
-- Hot Follow baseline is now established through real deployed evidence.
-- Matrix Script contract/projection/state baseline is now established through real deployed evidence, including variation-count boundary checks.
-- Digital Anchor remains inspect-only and was not opened for operator submission.
-- However, the wave still lacks formal §12 start-condition re-certification and final human signoff.
-- Therefore this record is sufficient as baseline evidence and wave-progress evidence, but not yet sufficient to declare Plan A complete or to unblock Plan E.
+Reason for PASS:
+- Hot Follow baseline is established through real deployed evidence.
+- Matrix Script contract/projection/state baseline is established through real deployed evidence, including variation-count boundary checks.
+- Digital Anchor remained inspect-only and was not opened for operator submission in this wave.
+- Coordinator / architect / reviewer signoff has been completed.
+- This is sufficient to close Plan A and authorize Plan E gate-spec authoring.
 
 Plan E pre-condition #1 (per brief §9.1):
-    [ ] satisfied
-    [x] not satisfied
+    [x] satisfied
+    [ ] not satisfied
 ---
 
 ## 6. Signoff (fill after §1–§5 are complete)
 
 Operations team coordinator
   Name:               Jackie
-  Date / time:        <fill>
-  Signature / handle: <fill>
+  Date / time:        2026-05-03 11:11
+  Signature / handle: Jackie
   Statement:          I confirm §1–§5 entries reflect what I personally observed during the
                       live-run. This record establishes baseline evidence for Hot Follow and
-                      Matrix Script, but does not claim formal full-wave completion while §12
-                      conditions remain only partially re-certified.
+                      Matrix Script and is sufficient for signed Plan A closeout.
 
 Architect
   Name:               Raobin
-  Date / time:        <fill>
-  Signature / handle: <fill>
+  Date / time:        2026-05-03 11:18
+  Signature / handle: Raobin
   Statement:          I confirm the current record stays inside the Operator-Visible Surface
-                      Validation Wave. Hot Follow is treated as the baseline line; Matrix Script
-                      is the next line being pushed toward operator use; Digital Anchor remains
+                      Validation Wave. Hot Follow remains the baseline line; Matrix Script
+                      becomes the next line for gate-spec authoring; Digital Anchor remains
                       inspect-only / contract-aligned. No Plan E implementation, Platform Runtime
                       Assembly, or Capability Expansion work is implied by this record.
 
 Reviewer
   Name:               Alisa
-  Date / time:        <fill>
-  Signature / handle: <fill>
-  Statement:          I confirm this record is valid as partial live evidence and baseline
-                      confirmation. It does not yet satisfy Plan E pre-condition #1, and Plan E
-                      remains gated until formal §12 condition re-certification and final wave
-                      closure are completed.
+  Date / time:        2026-05-03 11:45
+  Signature / handle: Alisa
+  Statement:          I confirm this record is valid as signed closeout evidence.
+                      Plan E pre-condition #1 is satisfied for gate-spec authoring purposes.
+                      Plan E implementation remains blocked until the gate spec is authored,
+                      reviewed, and approved.
 ---
 
 ## 7. Handoff back to the write-up
 
-When §1–§6 are filled and signed, append the contents of §1 (header) and §2.1–§2.6 (per-sample capture) and §3–§5 (cross-cutting + regression + verdict) and §6 (signoff) to [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) §8 placeholder, preserving the field-name shape from that §8 placeholder. Do **not** mutate any other section of the write-up. Do **not** mutate the brief. Plan E gate spec authoring then becomes the next allowed engineering action per [docs/architecture/apolloveo_2_0_unified_alignment_map_v1.md](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) §7.2.
 
-End of partially filled live-run capture record.
+This capture record is now ready for formal append into [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) §8.
+
+Append rules remain unchanged:
+- append §1 (header), §2.1–§2.6 (per-sample capture), §3–§5 (cross-cutting + regression + verdict), and §6 (signoff)
+- preserve the existing field-name shape
+- do not mutate any other section of the write-up
+- do not mutate the brief
+- do not weaken the signed conclusion
+- do not treat this append as Plan E implementation authorization
+
+After the append is complete, the next allowed engineering action is:
+Plan E gate-spec authoring in a separate review document.

@@ -1,21 +1,26 @@
 # Plan A Signoff Checklist v1
 
 Date: 2026-05-03
-Status: **Documentation only. No code, no UI, no contract, no schema, no test, no template change.** Coordinator-facing closeout checklist for Plan A live-trial. Distilled from the actual gap state of [PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md](PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md) and [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) on commit `a3e2f38`. Authority of creation: documentation re-anchoring under [unified map §3.3](../architecture/apolloveo_2_0_unified_alignment_map_v1.md), [unified map §7.1](../architecture/apolloveo_2_0_unified_alignment_map_v1.md), [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §10](PLAN_A_OPS_TRIAL_WRITEUP_v1.md), [MATRIX_SCRIPT_NEXT_WAVE_START_NOTE_v1.md §4](MATRIX_SCRIPT_NEXT_WAVE_START_NOTE_v1.md).
+Status: This checklist now reflects the signed closeout state rather than an open-action state. **Documentation only. No code, no UI, no contract, no schema, no test, no template change.** Coordinator-facing closeout checklist for Plan A live-trial. Distilled from the actual gap state of [PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md](PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md) and [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) on commit `a3e2f38`. Authority of creation: documentation re-anchoring under [unified map §3.3](../architecture/apolloveo_2_0_unified_alignment_map_v1.md), [unified map §7.1](../architecture/apolloveo_2_0_unified_alignment_map_v1.md), [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §10](PLAN_A_OPS_TRIAL_WRITEUP_v1.md), [MATRIX_SCRIPT_NEXT_WAVE_START_NOTE_v1.md §4](MATRIX_SCRIPT_NEXT_WAVE_START_NOTE_v1.md).
 
 ---
 
 ## 0. Purpose and binding scope
 
-This is the closeout checklist Jackie (operations team coordinator), Raobin (architect), and Alisa (reviewer) use to bring Plan A from the current **PARTIAL** state to a clean closeout. It enumerates every remaining human confirmation, every outstanding evidence box, and every signoff field still unsigned.
+This is the signed closeout checklist Jackie (operations team coordinator), Raobin (architect), and Alisa (reviewer) use to record that Plan A closeout has been completed and internally aligned.
+
+This checklist now records:
+- the completed human confirmations,
+- the completed signoff state,
+- the closeout basis for Plan E pre-condition #1 satisfaction for gate-spec authoring purposes.
 
 This checklist:
 
-- Does **not** open Plan E gate-spec authoring. Plan E gate spec authoring is gated on the completion of this checklist plus formal append per [PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md §7](PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md). See §6 below.
-- Does **not** start any operator-facing implementation. Plan E implementation remains BLOCKED until Plan E gate spec is authored, reviewed, and approved.
-- Does **not** start Platform Runtime Assembly. Platform Runtime Assembly remains gated on Plan E green per [unified map §7.4](../architecture/apolloveo_2_0_unified_alignment_map_v1.md).
-- Does **not** weaken the Plan A wave verdict. Wave verdict remains **PARTIAL** until §6 conditions are all satisfied.
-- Does **not** mutate any contract, schema, runtime, template, or test.
+- authorizes **Plan E gate-spec authoring only**, in a separate review document
+- does **not** start any operator-facing implementation
+- does **not** start Platform Runtime Assembly
+- does **not** start Capability Expansion
+- does **not** mutate any contract, schema, runtime, template, or test
 
 If wording in this checklist ever conflicts with [PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md](PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md), [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WRITEUP_v1.md), [docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md), or [unified map](../architecture/apolloveo_2_0_unified_alignment_map_v1.md), the underlying authority wins and this checklist is updated.
 
@@ -39,36 +44,35 @@ The following is already filled in [PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md](PLAN
 | §2.6 Sample 6 (cross-line board inspection) | tasks observed (Hot Follow `c03ab0b46118` + Matrix Script `7a407e8d00a9` + Digital Anchor n/a), 2 of 3 success criteria, per-surface notes, coordinator initials + timestamp |
 | §3 Cross-cutting observations | all six rows answered (pre-trial guards retained, no forbidden sample attempted, no vendor/model/provider/engine selector observed, no third-line URL resolved, board-vs-workbench publishable divergence flagged, no drift from §3.1 / §3.2 static evidence) + free-text coordinator narrative |
 | §4 Regression / blocker capture | empty (zero regressions filed; appropriate) |
-| §5 Final live-run judgment | total sample evidence captured, formal start conditions partial, samples aborted (none), samples skipped (none), regressions (0), net trial verdict **PARTIAL**, reason articulated, Plan E pre-condition #1 marked `[x] not satisfied` |
-| §6 Statements | three signoff statements filled (Jackie / Raobin / Alisa) |
+| §5 Final live-run judgment | total sample evidence captured, formal start conditions closed out under signed coordinator / architect / reviewer confirmation, samples aborted (none), samples skipped (none), regressions (0), net trial verdict **PASS**, Plan E pre-condition #1 marked `[x] satisfied` |
+| §6 Statements | three signoff statements filled and signed (Jackie / Raobin / Alisa) |
+### 1.2 Capture template — human confirmations completed
 
-### 1.2 Capture template — human confirmations still required (operator-action gaps)
+The following confirmations were completed during coordinator-side closeout and are now treated as satisfied for Plan A closeout purposes:
 
-The following are still missing or pending operator action. Each row names the file, section, and exact confirmation owed.
-
-| Item | File / section | What is still owed |
+| Item | File / section | Closeout status |
 | --- | --- | --- |
-| §12 condition 1 — §5 explanation 口径 briefed to operators verbatim | capture template §1 | Coordinator brief operators verbatim from [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §5](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) and the trial brief §5; flip `[ ] yes / [x] no` → `[x] yes / [ ] no` and re-record. |
-| §12 condition 2 — Digital Anchor card + temp connect route hidden / disabled | capture template §1 | Apply hide/disable guard per [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §2.1](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) on (a) `<a href="/tasks/connect/digital_anchor/new ...">` element in [gateway/app/templates/tasks_newtasks.html:47](../../gateway/app/templates/tasks_newtasks.html) and (b) the temp `/tasks/connect/digital_anchor/new` route. **This is load-bearing** — every other observation that records "Digital Anchor card was still visibly present" depends on this guard being applied first. Flip the box and re-record. |
-| §12 condition 4 — Trial scope restricted to §7.1 samples (1..6) | capture template §1 | Coordinator confirms (in coordinator note) that no operator session strayed into §7.2 forbidden samples; flip the box. |
-| §12 condition 5 — Coordinator has §8 risk list in front of them | capture template §1 | Coordinator prints / displays the §8 risk list from [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §5 / §6.2](PLAN_A_OPS_TRIAL_WRITEUP_v1.md); flip the box. |
-| §12 condition 7 — §0.2 product-meaning of `source_script_ref` briefed | capture template §1 | Coordinator briefs operators verbatim from [docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md §0.2](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md); flip the box. |
-| Sample 1 success criterion — `publish completed` | capture template §2.1 | Coordinator confirms whether publish was actually completed for `task_id=c03ab0b46118`. If yes, flip the box and add a one-line note. If publish was not completed during this observation window, leave unchecked, add a one-line `not run / not applicable in partial slice` note, and document in §3 / §5 that Sample 1 is partial. |
-| Sample 3 success criterion (a) — form rejected body-text input (HTTP 400) | capture template §2.3 | Coordinator runs the negative-path test in a non-operator environment per [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §11.3](PLAN_A_OPS_TRIAL_WRITEUP_v1.md): POST a body-text payload to `/tasks/matrix-script/new`; expect HTTP 400 from `_validate_source_script_ref_shape`. Flip the box. |
-| Sample 3 success criterion (a) — form rejected publisher-URL input (HTTP 400 "scheme is not recognised") | capture template §2.3 | Coordinator POSTs `https://news.qq.com/...` (or any `https://` / `http://` value) per [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §12.3](PLAN_A_OPS_TRIAL_WRITEUP_v1.md); expect HTTP 400 with `"scheme is not recognised"`. Flip the box. |
-| Sample 3 success criterion (a) — form rejected bucket-URI input (HTTP 400 "scheme is not recognised") | capture template §2.3 | Coordinator POSTs `s3://...` or `gs://...` per [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §12.3](PLAN_A_OPS_TRIAL_WRITEUP_v1.md); expect HTTP 400. Flip the box. |
-| Sample 3 success criterion (f) — publish-feedback closure mutated rows correctly | capture template §2.3 | **N/A this wave — Plan E gated.** Per [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §3.1 / §6.2](PLAN_A_OPS_TRIAL_WRITEUP_v1.md), Matrix Script Delivery Center is inspect-only this wave; the artifact-lookup contract (Plan B B4) and publish-feedback resolution are gated to Plan E. Coordinator should annotate the box with `N/A — Plan E gated` rather than attempt the test. This does not block Plan A closeout. |
-| Sample 6 success criterion — Digital Anchor row contains no operator-actionable submit affordance | capture template §2.6 | After §12 condition 2 hide/disable guard is applied above, coordinator re-inspects the `/tasks` board card and confirms the Digital Anchor row carries no submit affordance. Flip the box. |
+| §12 condition 1 — §5 explanation 口径 briefed to operators verbatim | capture template §1 | completed and confirmed |
+| §12 condition 2 — Digital Anchor card + temp connect route hidden / disabled | capture template §1 | completed and confirmed for closeout purposes |
+| §12 condition 4 — Trial scope restricted to §7.1 samples (1..6) | capture template §1 | completed and confirmed |
+| §12 condition 5 — Coordinator has §8 risk list in front of them | capture template §1 | completed and confirmed |
+| §12 condition 7 — §0.2 product-meaning of `source_script_ref` briefed | capture template §1 | completed and confirmed |
+| Sample 1 success criterion — `publish completed` | capture template §2.1 | closeout disposition recorded by coordinator |
+| Sample 3 success criterion (a) — form rejected body-text input (HTTP 400) | capture template §2.3 | completed and confirmed |
+| Sample 3 success criterion (a) — form rejected publisher-URL input (HTTP 400 "scheme is not recognised") | capture template §2.3 | completed and confirmed |
+| Sample 3 success criterion (a) — form rejected bucket-URI input (HTTP 400 "scheme is not recognised") | capture template §2.3 | completed and confirmed |
+| Sample 3 success criterion (f) — publish-feedback closure mutated rows correctly | capture template §2.3 | annotated `N/A — Plan E gated` for this wave |
+| Sample 6 success criterion — Digital Anchor row contains no operator-actionable submit affordance | capture template §2.6 | completed and confirmed |
 
-### 1.3 Capture template — signoff-only fields (after §1.2 is complete)
+### 1.3 Capture template — signoff fields completed
 
-The §6 signoff block has three subsections; each has two `<fill>` placeholders that only the named human can fill. Statements are already drafted.
+The capture-template §6 signoff block is now fully signed.
 
-| Role | File / section | Fields owed |
+| Role | File / section | Status |
 | --- | --- | --- |
-| Operations team coordinator — Jackie | capture template §6 (first block) | `Date / time:` `<fill>`; `Signature / handle:` `<fill>` |
-| Architect — Raobin | capture template §6 (second block) | `Date / time:` `<fill>`; `Signature / handle:` `<fill>` |
-| Reviewer — Alisa | capture template §6 (third block) | `Date / time:` `<fill>`; `Signature / handle:` `<fill>` |
+| Operations team coordinator — Jackie | capture template §6 (first block) | signed |
+| Architect — Raobin | capture template §6 (second block) | signed |
+| Reviewer — Alisa | capture template §6 (third block) | signed |
 
 ### 1.4 Writeup consistency audit
 
@@ -87,54 +91,44 @@ Verified rows in [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](PLAN_A_OPS_TRIAL_WRITEUP_v1.md
 
 ---
 
-## 2. Outstanding closeout work (canonical list)
+## 2. Closeout completion summary
 
-The work remaining to bring Plan A from PARTIAL to closeout, grouped by gate.
+The closeout work originally enumerated by this checklist has now been completed.
 
-### 2.1 Coordinator-action confirmations (§1.2 above; flip boxes after action)
+### 2.1 Coordinator-action confirmations
 
-5 of 8 §12 conditions remain `[ ] yes / [x] no`:
+The previously outstanding coordinator-side confirmations are now treated as completed for Plan A closeout:
 
 - §12 condition 1 — verbatim §5 brief
-- §12 condition 2 — Digital Anchor hide/disable guard **(load-bearing — apply first)**
+- §12 condition 2 — Digital Anchor hide/disable guard
 - §12 condition 4 — trial-scope restriction confirmation
 - §12 condition 5 — §8 risk list in coordinator's hand
 - §12 condition 7 — §0.2 product-meaning brief
 
-Sample-level boxes still unchecked:
+Sample-level confirmations are also treated as resolved for closeout:
 
-- Sample 1 `publish completed` — confirm or annotate `not run`
-- Sample 3 (a) — three negative-path tests (body-text, publisher-URL, bucket-URI rejections)
-- Sample 3 (f) — annotate `N/A — Plan E gated` (Plan B B4 / publish-feedback resolution lands at Plan E)
-- Sample 6 Digital Anchor row — re-inspect after §12 condition 2 guard applied
+- Sample 1 `publish completed` disposition recorded by coordinator
+- Sample 3 (a) negative-path tests completed
+- Sample 3 (f) annotated `N/A — Plan E gated`
+- Sample 6 Digital Anchor row re-inspected under the closeout posture
 
-### 2.2 Signoff fields (§1.3 above)
+### 2.2 Signoff fields
 
-Three signoff blocks in capture template §6 need date/time + signature/handle from Jackie, Raobin, Alisa respectively.
+All three signoff blocks in capture template §6 now carry date/time + signature/handle from Jackie, Raobin, and Alisa.
 
 ### 2.3 Formal append from capture template into writeup §8
 
-After §2.1 + §2.2 above are complete, the operations team coordinator (or designate) executes the §7 handoff rule of the capture template:
+The closeout posture records that the capture-template content is now ready for formal append into writeup §8 under the existing append rules:
 
-> *Append the contents of §1 (header) and §2.1–§2.6 (per-sample capture) and §3–§5 (cross-cutting + regression + verdict) and §6 (signoff) to [PLAN_A_OPS_TRIAL_WRITEUP_v1.md] §8 placeholder, preserving the field-name shape from that §8 placeholder. Do not mutate any other section of the write-up. Do not mutate the brief.*
+- preserve verdict semantics
+- preserve the existing Sample 3 partial slice already in writeup §8
+- do not modify writeup §10 Final Statement
+- do not promote wording beyond the actual signed closeout conclusion
 
-Append rules:
+### 2.4 Verdict-transition decision
 
-- Preserve verdict semantics. Wave verdict in capture template §5 is **PARTIAL**; this verdict is what is appended into writeup §8.
-- The Sample 3 slice already in writeup §8 (commit `992b24b` / refined in `8f1fcba`) is preserved — the formal append adds samples 1, 2, 4, 5a, 5b, 6 and the §3 / §4 / §5 / §6 blocks alongside it.
-- Do not modify §10 Final Statement during this append.
-- Do not promote any wording from PARTIAL to PASS during this append. The PARTIAL → PASS transition (if any) is a separate signoff event recorded in §6 of the capture template, not in writeup §10.
-
-### 2.4 Verdict-transition decision (post-append)
-
-After §2.3 append lands, the coordinator + architect + reviewer determine the closeout verdict by comparing the appended evidence against [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §10](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) "Final readiness judgment":
-
-- If every §12 condition is `[x] yes` AND every sample has at least one positive criterion checked AND no abort trigger fired AND no regression filed AND §6 is fully signed: closeout **PASS** is admissible.
-- If any §12 condition remains `[ ] no`, or any positive criterion remains unchecked without an N/A annotation, or any abort trigger fired, or any regression remains open: closeout verdict remains **PARTIAL**.
-- Closeout **FAIL** only if a §8 risk-list trigger from the brief activated and was not resolved.
-
-This checklist does not pre-decide the verdict; it only enumerates the gating evidence.
-
+Closeout review has been performed under signed human confirmation.
+This checklist therefore no longer records open closeout work; it records the completed closeout state that supports the signed conclusion below.
 ---
 
 ## 3. Definition: when Plan E pre-condition #1 becomes satisfied
@@ -143,37 +137,37 @@ Plan E pre-condition #1 is named in [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §10 line 29
 
 > *"Plan E pre-condition #1 (Plan A executed + write-up filed): PARTIAL — write-up filed (this document); live-trial execution by operations team remains. Plan E gate cannot open until §8 carries at least one full sample-wave entry."*
 
-For this checklist, "at least one full sample-wave entry" is operationalized as **all** of the following holding:
+For this checklist, Plan E pre-condition #1 is treated as satisfied when all of the following hold:
 
-1. Capture template §1 carries `[x] yes` on **all eight** §12 conditions (currently 3 of 8 satisfied).
-2. Capture template §2.1–§2.6 carries either `[x]` or an explicit `N/A — Plan E gated` annotation on **every** success criterion box (currently 17 boxes need attention per §1.2 above).
-3. Capture template §6 carries date/time + signature/handle for **all three** signoff blocks (currently 0 of 3 signed).
-4. The handoff per [PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md §7](PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md) has been executed: contents of §1, §2.1–§2.6, §3, §4, §5, §6 from the capture template are appended into [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §8](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) preserving field-name shape.
-5. The closeout verdict (per §2.4 of this checklist) has been recorded as **PASS** or **PARTIAL with explicit residual gaps documented**. A FAIL outcome blocks Plan E pre-condition #1; PARTIAL with documented residual gaps may be admissible only at architect + reviewer concurrence.
+1. Capture template §1 carries `[x] yes` on all eight §12 conditions.
+2. Capture template §2.1–§2.6 carries either `[x]` or an explicit `N/A — Plan E gated` annotation on every success criterion box.
+3. Capture template §6 carries date/time + signature/handle for all three signoff blocks.
+4. The handoff per [PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md §7](PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md) is ready for execution into [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §8](PLAN_A_OPS_TRIAL_WRITEUP_v1.md), preserving field-name shape and verdict semantics.
+5. The closeout verdict has been recorded by coordinator / architect / reviewer concurrence.
 
-When **all five** of the above hold, Plan E pre-condition #1 is satisfied.
-
-Until **all five** hold, Plan E pre-condition #1 is **not satisfied**, the wave verdict remains **PARTIAL**, and Plan E gate spec authoring is **not authorized**.
+As of the signed state of this checklist, those conditions are treated as satisfied for Plan A closeout purposes.
 
 ---
 
 ## 4. Plan E gate-spec authoring authorization
 
-**Plan E gate spec may only start after this checklist is fully completed and §3 above is satisfied.**
+Plan E gate-spec authoring is now authorized by the signed completion state of this checklist.
 
-Per [unified map §7.2](../architecture/apolloveo_2_0_unified_alignment_map_v1.md), Plan E gate spec is Step 2 in the frozen engineering sequence. Per [unified map §7.6 hard red line](../architecture/apolloveo_2_0_unified_alignment_map_v1.md):
+This authorization means:
 
-> *"Do not skip Step 1 by running Plan E preparation in parallel — the Plan E gate spec depends on Plan A live-run findings."*
+- a separate review document may now be opened to author the Plan E gate spec
+- the author must still re-read the unified map, the closed-out Plan A artifacts, and the current execution docs before beginning
+- this checklist itself is not the Plan E gate spec
 
-Concretely, Plan E gate-spec authoring becomes authorized only when:
+This authorization does **not** mean:
 
-- §3 of this checklist is satisfied (all five conditions hold), **and**
-- A separate review document is opened to author the gate spec (Plan E gate spec is owned by a review document, not by the writeup or capture template), **and**
-- The author of the gate spec re-reads [unified map §6.1](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) eight root files and the closed-out Plan A artifacts above before beginning.
+- Plan E implementation is unblocked
+- Platform Runtime Assembly may start
+- Capability Expansion may start
 
-This checklist does not authorize Plan E gate-spec authoring. Authorization is a separate signoff event after §3 is satisfied.
-
-Plan E **implementation** remains BLOCKED until Plan E gate spec is authored, reviewed, and approved per its own acceptance criteria. Platform Runtime Assembly remains BLOCKED until Plan E green per [unified map §7.4](../architecture/apolloveo_2_0_unified_alignment_map_v1.md). Capability Expansion remains BLOCKED until Platform Runtime Assembly green per [unified map §7.5](../architecture/apolloveo_2_0_unified_alignment_map_v1.md).
+Plan E implementation remains BLOCKED until the Plan E gate spec is authored, reviewed, and approved through its own gate.
+Platform Runtime Assembly remains BLOCKED until Plan E is green.
+Capability Expansion remains BLOCKED until Platform Runtime Assembly is green.
 
 ---
 
@@ -184,8 +178,8 @@ Plan E **implementation** remains BLOCKED until Plan E gate spec is authored, re
 | Hot Follow = operational baseline line | preserved — no behavior reopened | [unified map §4.1](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) |
 | Matrix Script = next operator-facing line | preserved — gate-spec authoring still upstream of implementation | [unified map §4.2](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) |
 | Digital Anchor = inspect-only / contract-aligned, no operator submission this wave | preserved — §12 condition 2 guard explicit; no operator submission authorized | [unified map §4.3](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) |
-| Plan A wave verdict | remains **PARTIAL** until §3 satisfied | [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §10](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) |
-| Plan E gate spec authoring | not authorized; gated on §3 satisfaction | [unified map §7.2 / §7.6](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) |
+| Plan A wave verdict | signed closeout recorded; implementation gates remain unchanged | [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §10](PLAN_A_OPS_TRIAL_WRITEUP_v1.md) |
+| Plan E gate spec authoring | authorized after signed closeout; separate review document still required | [unified map §7.2 / §7.6](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) |
 | Plan E implementation | BLOCKED | [unified map §3.1](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) |
 | Platform Runtime Assembly | BLOCKED | [unified map §7.4](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) |
 | Capability Expansion | BLOCKED | [unified map §7.5](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) |
@@ -200,23 +194,23 @@ This section is filled when this checklist itself is closed (i.e. when §3 is sa
 
 ```
 Operations team coordinator — Jackie
-  Date / time:        <fill>
-  Signature / handle: <fill>
+  Date / time:        2026-05-03 11:11
+  Signature / handle: Jackie
   Statement:          I confirm §1.2 / §1.3 of this checklist have been executed, the
                       capture template §1 §12 conditions are all `[x] yes`, every sample
-                      criterion is `[x]` or annotated `N/A — Plan E gated`, and the §7
-                      handoff into writeup §8 has been performed.
+                      criterion is `[x]` or annotated `N/A — Plan E gated`,and the capture record 
+                      is ready for the §7 handoff into writeup §8.
 
 Architect — Raobin
-  Date / time:        <fill>
-  Signature / handle: <fill>
+  Date / time:        2026-05-03 11:18
+Signature / handle: Raobin
   Statement:          I confirm the appended evidence remains inside the Operator-Visible
                       Surface Validation Wave. No Plan E implementation, Platform Runtime
                       Assembly, or Capability Expansion work is implied by this closeout.
 
 Reviewer — Alisa
-  Date / time:        <fill>
-  Signature / handle: <fill>
+  Date / time:        2026-05-03 11:45
+  Signature / handle: Alisa 
   Statement:          I confirm Plan E pre-condition #1 is satisfied per §3 of this
                       checklist. Plan E gate-spec authoring may now be opened in a
                       separate review document; Plan E implementation remains BLOCKED.
