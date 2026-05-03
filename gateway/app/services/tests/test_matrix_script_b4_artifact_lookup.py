@@ -255,16 +255,29 @@ def test_projection_emits_artifact_lookup_per_row(sample_packet: dict[str, Any])
 
 
 def test_projection_shape_unchanged_aside_from_lookup_value(sample_packet: dict[str, Any]) -> None:
-    """Acceptance §5: ``no other code site changes``. The top-level projection shape and
-    every row's non-``artifact_lookup`` fields must be byte-for-byte identical to the
-    pre-PR behavior of the delivery surface (which is what consumers downstream expect).
+    """Acceptance §5: PR-1 left the top-level projection shape and every row's
+    non-``artifact_lookup`` fields byte-for-byte identical to the pre-PR behavior.
+    PR-3 (Item E.MS.3) extends every row with the additive Plan C amendment
+    field ``blocking_publish`` per ``factory_delivery_contract_v1.md``
+    §"Per-Deliverable Required / Blocking Fields"; the closed key set on each
+    row is therefore extended by exactly one key.
     """
     surface = project_delivery_binding(sample_packet)
     rows = surface["delivery_pack"]["deliverables"]
+    expected_row_keys = {
+        "deliverable_id",
+        "kind",
+        "required",
+        "blocking_publish",
+        "source_ref_id",
+        "profile_ref",
+        "artifact_lookup",
+    }
     for row in rows:
-        assert {"deliverable_id", "kind", "required", "source_ref_id", "profile_ref", "artifact_lookup"} == set(
-            row.keys()
-        ), f"row {row['deliverable_id']} must keep the existing closed key set"
+        assert expected_row_keys == set(row.keys()), (
+            f"row {row['deliverable_id']} must carry the closed key set "
+            f"{sorted(expected_row_keys)} (PR-1 + PR-3)"
+        )
     # Top-level keys preserved.
     assert set(surface.keys()) == {
         "line_id",
