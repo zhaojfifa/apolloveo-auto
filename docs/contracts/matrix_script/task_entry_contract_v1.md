@@ -131,16 +131,16 @@ Mapping discipline:
 - `binding.capability_plan[]`, `binding.worker_profile_ref`, `binding.deliverable_profile_ref`, `binding.asset_sink_profile_ref` are **NOT** populated from the entry surface. They are static for the Matrix Script line per `docs/contracts/matrix_script/packet_v1.md` §Capability plan and §Binding profiles.
 - `evidence.ready_state` is **NOT** writable from the entry surface. `ready_state` is one-way projection from validator output (`docs/design/surface_task_area_lowfi_v1.md` §Gate Truth Rule).
 
-## Source script ref shape (addendum, 2026-05-02)
+## Source script ref shape (addendum, 2026-05-02; tightened by §8.F on 2026-05-03)
 
-Authority: `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` §8.A.
+Authority: `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` §8.A; `docs/reviews/matrix_script_followup_blocker_review_v1.md` §6 (§8.F — Opaque Ref Discipline vs Operator Usability) Option F1.
 
-`source_script_ref` is an opaque reference handle. The entry surface MUST reject any value that carries script body text, document prose, or any other non-reference payload. The server-side guard at `gateway/app/services/matrix_script/create_entry.py` enforces the closed shape declared here; the operator-facing input at `gateway/app/templates/matrix_script_new.html` mirrors the same shape via `pattern` / `maxlength`.
+`source_script_ref` is an opaque reference handle. The entry surface MUST reject any value that carries script body text, document prose, any publisher article URL, or any other non-reference payload. The server-side guard at `gateway/app/services/matrix_script/create_entry.py` enforces the closed shape declared here; the operator-facing input at `gateway/app/templates/matrix_script_new.html` mirrors the same shape via `pattern` / `maxlength`.
 
 A submitted value is accepted only when it matches one of the two closed shapes below.
 
-1. **URI with closed scheme.** Scheme prefix from the closed set followed by `://` and at least one non-whitespace character.
-   - Closed scheme set: `content`, `task`, `asset`, `ref`, `s3`, `gs`, `https`, `http`.
+1. **URI with closed opaque-by-construction scheme.** Scheme prefix from the closed set followed by `://` and at least one non-whitespace character.
+   - Closed scheme set: `content`, `task`, `asset`, `ref`. (No external web schemes.)
    - Example: `content://matrix-script/source/001`.
 2. **Bare token id.** `^[A-Za-z0-9][A-Za-z0-9._\-:/]{3,}$`. No whitespace, no embedded scheme separator (`://`). Used for short opaque content storage handles or external system ids.
    - Example: `MS-SRC-2026-04-001`.
@@ -154,6 +154,51 @@ Independent of the shape match, the value MUST also satisfy:
 On any rejection the entry surface raises the existing entry-validation error type (HTTP 400) with a localised message that names the field and the constraint. The rejection MUST happen before `build_matrix_script_task_payload` runs, so the payload-builder never sees body text.
 
 The closed scheme set is exhaustive at v1; widening it requires a re-version of this contract. Narrowing it is permitted only if no live trial sample relies on the removed scheme.
+
+### Opaque-by-construction discipline (§8.F tightening, 2026-05-03)
+
+Authority: `docs/reviews/matrix_script_followup_blocker_review_v1.md` §6 Option F1; `docs/execution/MATRIX_SCRIPT_F_OPAQUE_REF_DISCIPLINE_EXECUTION_LOG_v1.md`.
+
+Original §8.A accepted scheme set was `{content, task, asset, ref, s3, gs, https, http}`. §8.F tightens it to `{content, task, asset, ref}` — the four schemes the product owns the dereferencing path for. The dropped schemes were:
+
+- **`https` / `http`**: external web content. The product cannot dereference an arbitrary publisher URL to authored script content (web scraping is out of scope for this wave). The follow-up review §3 documented the live operator submitting `https://news.qq.com/rain/a/...` as a trigger case.
+- **`s3` / `gs`**: object-storage buckets. While "opaque by convention" (the product would own its own bucket), the entry surface has no enforceable mechanism to distinguish a product-owned bucket from a public / arbitrary one, and the §8.C `body_ref` template never emits `s3://` / `gs://`. Removing them aligns the closed set with the only schemes the product actually mints under Plan A.
+
+The four retained schemes are **opaque-by-construction inside the product**: the product (or a trial-wave operator-token convention, see below) is the sole authority that mints / interprets each scheme.
+
+### Operator transitional convention (Plan A trial wave only)
+
+Until Plan E lands an operator-facing minting / lookup service (Plan C C1, contract-frozen, gated), operators have no in-product way to obtain a `content://` / `task://` / `asset://` / `ref://` handle. For the Plan A trial wave the only supported operator-facing form is:
+
+```
+content://matrix-script/source/<token>
+```
+
+where `<token>` is operator-chosen, opaque to the product, and uniquely identifies the operator's script source within the operator's own bookkeeping. The product treats the entire ref as an opaque label: it never dereferences `<token>` to body content, never validates uniqueness across operators, and never reads back content by this handle. Operators are responsible for keeping their own mapping of `<token>` to wherever the source lives (private doc, internal page, working notes, etc.).
+
+This convention is **transitional**:
+
+- the convention is operator-discipline only — it is not a product feature;
+- it does not back-fit a content-mint endpoint, asset-library service, or any new operator-facing service into this wave (Plan C C1 / Plan E);
+- it produces refs that pass the §8.A guard's `content` scheme path and the §8.F tightened scheme set with no further changes;
+- the refs are interchangeable with §8.C's deterministically-authored `body_ref` template (`content://matrix-script/{task_id}/slot/{slot_id}`) at the contract level; both forms are opaque-by-construction `content://...` URIs;
+- removal path: when Plan E adds the in-product minting flow (Option F2 path), the convention is replaced by the minted handle. Operators are not asked to migrate existing handles; the convention is forward-compatible with whatever Plan E mints because the product never bound any meaning to `<token>` beyond opaqueness.
+
+### Why this is contract-tightening AND a usability adjustment
+
+The original §8.A addendum included `https` / `http` as a pragmatic allowance for operators who already had URLs on hand. The follow-up review §6 observed that this allowance defeats the contract intent ("opaque ref handle") because a publisher article URL is not opaque-by-construction in the product, and there is no documented dereference path for URL-shaped refs anywhere downstream. §8.F removes that pragmatic allowance and pins the operator transitional convention so the operator workflow remains usable in the Plan A trial without the contract intent slippage. Plan E (Option F2) is the proper resolution: a real operator-facing minting flow that owns the `content://` namespace.
+
+### Out of scope for §8.F
+
+- no in-product minting / lookup service (Plan C C1, gated to Plan E);
+- no `POST /assets/mint?kind=script_source` endpoint (Plan E Option F2);
+- no asset-library service expansion;
+- no operator brief refresh (the §8.D operator brief still reflects the pre-§8.F scheme set; the §8.H operator brief re-correction follow-up is the natural successor that re-aligns §3.2 / §6.2 / §7.1 with the §8.F tightened scheme set);
+- no `body_ref` template change (`content://matrix-script/{task_id}/slot/{slot_id}` from §8.C is unchanged and remains opaque-by-construction);
+- no `g_lang` token alphabet pinning (separate review);
+- no widening of the closed scheme set; future widening requires a contract re-version, not an addendum;
+- no Plan E gated items (B4 `result_packet_binding` URL-shaped-ref handling, D1 / D2 / D3 / D4) implementation;
+- no second production line onboarding.
 
 ## Phase B deterministic authoring (addendum, 2026-05-03)
 

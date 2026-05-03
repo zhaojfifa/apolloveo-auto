@@ -1,14 +1,23 @@
 """Server-side ref-shape guard for Matrix Script ``source_script_ref``.
 
-Authority: ``docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md``
-§8.A and the source-script-ref shape addendum in
-``docs/contracts/matrix_script/task_entry_contract_v1.md``.
+Authority:
+- ``docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md`` §8.A
+  (initial guard).
+- ``docs/reviews/matrix_script_followup_blocker_review_v1.md`` §6 Option F1
+  (§8.F tightening of the accepted-scheme set on 2026-05-03).
+- the source-script-ref shape addendum in
+  ``docs/contracts/matrix_script/task_entry_contract_v1.md`` (with the
+  §8.F tightening sub-section).
 
 The guard exists to stop operators from pasting prose / script body into the
-``source_script_ref`` field. The contract requires an opaque reference; the
-payload-builder must never see body text. These tests prove the guard at the
-service boundary and confirm the create-entry path still produces the formal
-Matrix Script payload when a contract-shaped ref is supplied.
+``source_script_ref`` field AND to enforce opaque-by-construction discipline:
+the closed accepted-scheme set is now ``{content, task, asset, ref}``;
+external web schemes (``https`` / ``http``) and bucket schemes (``s3`` /
+``gs``) are rejected because they are not opaque-by-construction inside the
+product. The payload-builder must never see body text and must never see a
+publisher article URL. These tests prove the guard at the service boundary
+and confirm the create-entry path still produces the formal Matrix Script
+payload when a contract-shaped opaque ref is supplied.
 """
 from __future__ import annotations
 
@@ -86,6 +95,57 @@ def test_unrecognised_scheme_is_rejected():
     assert "scheme is not recognised" in exc.value.detail
 
 
+# §8.F tightening: schemes dropped from the §8.A accepted set are now
+# rejected. The closed accepted set is `{content, task, asset, ref}`.
+@pytest.mark.parametrize(
+    "ref",
+    [
+        # External web schemes — the live trigger case from the follow-up
+        # blocker review §3.
+        "https://news.qq.com/rain/a/20260502A05LYM00",
+        "https://docs.internal.example.com/matrix-script/source-001",
+        "http://legacy.internal/scripts/12",
+        # Object-storage schemes — opaque by convention but not by
+        # construction inside the product.
+        "s3://bucket/matrix-script/source/001.json",
+        "gs://bucket/matrix-script/source/001.json",
+    ],
+)
+def test_section_f_dropped_schemes_are_now_rejected(ref):
+    """§8.F tightening: ``https`` / ``http`` / ``s3`` / ``gs`` were in the
+    §8.A accepted set but are not opaque-by-construction inside the
+    product, so §8.F drops them. The guard must reject these four schemes
+    with the same scheme-not-recognised branch the original §8.A guard
+    used for foreign schemes (e.g. ``ftp://``).
+    """
+    with pytest.raises(HTTPException) as exc:
+        build_matrix_script_entry(**_entry_kwargs(source_script_ref=ref))
+    assert exc.value.status_code == 400
+    assert "scheme is not recognised" in exc.value.detail
+
+
+def test_section_f_accepted_scheme_set_is_exactly_four_opaque_schemes():
+    """§8.F tightening: the closed accepted-scheme set is exactly the four
+    opaque-by-construction schemes ``content`` / ``task`` / ``asset`` /
+    ``ref``. ``https`` / ``http`` / ``s3`` / ``gs`` MUST NOT appear.
+    """
+    assert SOURCE_SCRIPT_REF_ACCEPTED_SCHEMES == ("content", "task", "asset", "ref")
+    for dropped in ("https", "http", "s3", "gs"):
+        assert dropped not in SOURCE_SCRIPT_REF_ACCEPTED_SCHEMES
+
+
+def test_section_f_transitional_convention_passes_guard():
+    """§8.F operator transitional convention: the only operator-facing
+    form supported during the Plan A trial wave is
+    ``content://matrix-script/source/<token>``. The guard must accept
+    this form (it is one instance of the ``content`` opaque-scheme path)
+    without any new code branch.
+    """
+    ref = "content://matrix-script/source/operator-token-001"
+    entry = build_matrix_script_entry(**_entry_kwargs(source_script_ref=ref))
+    assert entry.source_script_ref == ref
+
+
 def test_empty_string_is_still_rejected_as_required():
     with pytest.raises(HTTPException) as exc:
         build_matrix_script_entry(**_entry_kwargs(source_script_ref=""))
@@ -110,10 +170,6 @@ def test_short_token_below_minimum_length_is_rejected():
         "task://matrix-script/2026-05-02/sample-1",
         "asset://library/script/abc-123",
         "ref://operator-cache/seed-99",
-        "https://docs.internal.example.com/matrix-script/source-001",
-        "http://legacy.internal/scripts/12",
-        "s3://bucket/matrix-script/source/001.json",
-        "gs://bucket/matrix-script/source/001.json",
         "MS-SRC-2026-04-001",
         "matrix-script.source.001",
         "ABC123-XYZ.456",
@@ -125,7 +181,10 @@ def test_contract_shaped_refs_are_accepted(ref):
 
 
 def test_accepted_scheme_set_is_complete():
-    """Every documented scheme in the contract addendum must round-trip."""
+    """Every documented scheme in the contract addendum must round-trip.
+
+    Post-§8.F the closed accepted set is ``{content, task, asset, ref}``.
+    """
 
     for scheme in SOURCE_SCRIPT_REF_ACCEPTED_SCHEMES:
         ref = f"{scheme}://matrix-script/source/{scheme}-001"
@@ -253,7 +312,8 @@ def test_template_replaces_textarea_with_pattern_constrained_input():
     assert 'type="text"' in template
     assert 'maxlength="512"' in template
     assert "pattern=" in template
-    assert "content://matrix-script/source/001" in template
+    # The example placeholder uses the transitional convention shape.
+    assert "content://matrix-script/source/" in template
     assert "粘贴脚本文本" not in template
 
 
@@ -261,3 +321,38 @@ def test_template_helper_text_forbids_pasting_body():
     template = (TEMPLATE_DIR / "matrix_script_new.html").read_text(encoding="utf-8")
     assert "不要" in template
     assert "脚本正文" in template
+
+
+def test_template_pattern_is_tightened_to_section_f_scheme_set():
+    """§8.F regression: the operator-facing input pattern must mirror the
+    server-side guard's tightened scheme set. ``https?`` / ``s3`` / ``gs``
+    must not appear inside the pattern's URI alternation.
+    """
+    template = (TEMPLATE_DIR / "matrix_script_new.html").read_text(encoding="utf-8")
+    # The four opaque-by-construction schemes the server accepts.
+    assert "(?:content|task|asset|ref)://" in template
+    # The dropped schemes must not be in the URI alternation.
+    assert "|s3|" not in template
+    assert "|gs|" not in template
+    assert "|https?" not in template
+    assert "|http?" not in template
+
+
+def test_template_helper_text_documents_transitional_convention():
+    """§8.F regression: the operator brief embedded in the input helper
+    text must name the four accepted schemes, explicitly reject external
+    web URLs (``https`` / ``http``) and bucket schemes (``s3`` / ``gs``),
+    and pin the transitional ``content://matrix-script/source/<token>``
+    convention so operators have a concrete form to follow.
+    """
+    template = (TEMPLATE_DIR / "matrix_script_new.html").read_text(encoding="utf-8")
+    # Helper text names the four accepted scheme prefixes.
+    for scheme in ("content://", "task://", "asset://", "ref://"):
+        assert scheme in template, f"helper text missing scheme {scheme!r}"
+    # Helper text explicitly calls out the rejected scheme families.
+    assert "https://" in template and "http://" in template
+    assert "s3://" in template and "gs://" in template
+    assert "不接受" in template
+    # Transitional convention example for operator usability.
+    assert "content://matrix-script/source/&lt;token&gt;" in template
+    assert "&lt;token&gt;" in template
