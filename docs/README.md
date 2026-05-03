@@ -61,9 +61,11 @@ Read in this order:
 2. Docs indexes:
    - `docs/README.md`
    - `docs/ENGINEERING_INDEX.md`
-3. Reading contract:
+3. Unified alignment map (cross-cutting cognition; consume before drilling into per-bucket authority):
+   - `docs/architecture/apolloveo_2_0_unified_alignment_map_v1.md`
+4. Reading contract:
    - `docs/contracts/engineering_reading_contract_v1.md`
-4. Minimum task-specific authority files selected through
+5. Minimum task-specific authority files selected through
    `docs/ENGINEERING_INDEX.md`.
 
 The files in `docs/contracts/`, `docs/architecture/`, `docs/baseline/`,
