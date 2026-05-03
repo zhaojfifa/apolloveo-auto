@@ -20,6 +20,10 @@ Factory Alignment Review Gate Active
 - action replica planning-to-runtime binding preparation only when it does not bypass the new-line onboarding gate
 - scoped docs / runbook / verification maintenance tied to Phase-3 execution validation
 - docs / runbook / validation maintenance tied to Phase-2 controlled execution
+- Plan A live-trial completion — capture-template §6 coordinator / architect / reviewer signoff in `docs/execution/PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md` and formal append of samples 1, 2, 4, 5a, 5b, 6 evidence into `docs/execution/PLAN_A_OPS_TRIAL_WRITEUP_v1.md` §8 per the capture template's §7 handoff rule; this is the only wave-internal engineering action that satisfies Plan E pre-condition #1
+- documentation re-anchoring under `docs/architecture/apolloveo_2_0_unified_alignment_map_v1.md` §3.3 (the new next-wave engineering navigation anchor at `docs/execution/MATRIX_SCRIPT_NEXT_WAVE_START_NOTE_v1.md` is itself an instance; it does NOT unblock Plan E and does NOT start Platform Runtime Assembly)
+- evidence write-back on already-shipped corrections (no contract / runtime change)
+- W2.1 B1–B4 architect / reviewer signoff (paperwork only; implementation already green)
 
 ## Forbidden Work
 
