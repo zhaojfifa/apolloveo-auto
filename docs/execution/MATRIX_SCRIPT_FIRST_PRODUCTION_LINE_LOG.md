@@ -253,6 +253,97 @@ strictly non-overlapping; each phase is reviewable independently.
 - Hard stop: after Phase D.1, do not auto-start Digital Anchor. Wait for
   Matrix Script line signoff and explicit next instruction.
 
+### Plan A Trial Correction §8.G — Phase B Panel Render Correctness (Narrow Template Fix)
+
+- Date: 2026-05-03
+- Status: implementation green; ready for signoff
+- Authority: `docs/reviews/matrix_script_followup_blocker_review_v1.md` §7 (§8.G — Phase B Panel Render Correctness), §9 (Gate Recommendation — §8.G READY, land first); `docs/contracts/matrix_script/workbench_variation_surface_contract_v1.md` (frozen Phase B projection contract — unchanged); `docs/contracts/matrix_script/variation_matrix_contract_v1.md` (axes shape — unchanged); `docs/execution/MATRIX_SCRIPT_C_PHASE_B_AUTHORING_EXECUTION_LOG_v1.md` (§8.C — landed; planner output that this template renders); `docs/execution/MATRIX_SCRIPT_B_DISPATCH_CONFIRMATION_EXECUTION_LOG_v1.md` (§8.B — confirmed); `docs/execution/MATRIX_SCRIPT_A_REF_SHAPE_GUARD_EXECUTION_LOG_v1.md` (§8.A — landed); `docs/execution/MATRIX_SCRIPT_D_OPERATOR_BRIEF_CORRECTION_EXECUTION_LOG_v1.md` (§8.D — landed)
+- Execution log: `docs/execution/MATRIX_SCRIPT_G_RENDER_CORRECTNESS_EXECUTION_LOG_v1.md`
+- Code / docs:
+  - `gateway/app/templates/task_workbench.html` (EDIT — Jinja item-access fix in the Axes-table values cell inside the `panel_kind="matrix_script"` mount: hoist `{% set axis_values = axis["values"] %}`, replace every `axis.values…` with `axis_values…` so `is mapping` / `is iterable and not string` resolve against the actual list/dict instead of the dict's bound `values()` method; net 8 lines of edits, line count unchanged at 658)
+  - `gateway/app/services/tests/test_matrix_script_phase_b_authoring.py` (EDIT — new 12th case `test_axes_table_renders_human_readable_values` scoped to the axes-table HTML region between `<h3>Axes</h3>` and `<h3>Cells × Slots</h3>` so cell-level `axis_selections` cannot mask a broken row render; asserts tone values `formal`/`casual`/`playful`, audience values `b2b`/`b2c`/`internal`, and length range `min=30 · max=120 · step=15` all render inside the region; asserts the broken bound-method repr `<built-in method values` is absent inside the region and absent in the body; defensive `<built-in method values` negative also added to the existing `test_get_workbench_renders_real_axes_cells_slots` so any future regression of the same shape is caught by both tests; imports `LENGTH_RANGE` from the planner)
+  - `docs/execution/MATRIX_SCRIPT_G_RENDER_CORRECTNESS_EXECUTION_LOG_v1.md` (NEW — this row)
+- What this correction adds:
+  - Jinja attribute-vs-item access collision fixed at the template
+    level: `axis.values` previously resolved to the dict's bound
+    `values()` method (a callable that is neither `mapping` nor
+    `iterable`), so every axes row fell through the `else` branch and
+    rendered the bound-method repr `<built-in method values of dict
+    object at 0x…>` for `tone`, `audience`, and `length`. The fix
+    uses item access (`axis["values"]`) which returns the actual list
+    (categorical / enum) or dict (range), so the `is mapping` /
+    `is iterable and not string` branches resolve correctly: tone and
+    audience render their values joined by ` · `; length renders
+    `min=… · max=… · step=…` from the dict's keys.
+  - Axes-table-scoped regression test that closes the §8.C test escape
+    documented in the follow-up blocker review §4.3 (the prior §8.C
+    `test_get_workbench_renders_real_axes_cells_slots` only asserted
+    presence of tone/audience tokens *somewhere* in the body, which
+    passed because cell-level `axis_selections` like `tone=formal`
+    surface those tokens elsewhere on the page even when the axes table
+    itself is broken).
+- What this correction does NOT add:
+  - no contract change — no edits to `docs/contracts/matrix_script/**`
+    (including the §8.A and §8.C addenda on `task_entry_contract_v1`,
+    the `workbench_variation_surface_contract_v1`, the
+    `variation_matrix_contract_v1`, the `slot_pack_contract_v1`, and
+    `packet_v1`);
+  - no schema / sample / packet re-version;
+  - no Phase B planner change — `phase_b_authoring.py` is consumed
+    read-only;
+  - no projector change — `workbench_variation_surface.py` is consumed
+    read-only;
+  - no router change — `tasks.py` is not touched;
+  - no `PANEL_REF_DISPATCH` widening; no §8.B dispatch logic change;
+  - no §8.E shell-suppression change — Hot Follow stage cards /
+    pipeline summary / dub-engine selectors / Burmese deliverable rows
+    intentionally still rendered by the shared shell on
+    `kind=matrix_script` tasks; that operator-blocking shell defect
+    remains scoped to §8.E follow-up;
+  - no §8.F scheme tightening — `https`/`http` remain in the §8.A
+    accepted-scheme set; opaque-ref discipline tightening scoped to
+    §8.F follow-up;
+  - no §8.D operator brief re-correction — §8.H is the natural
+    successor once §8.E / §8.F / §8.G all land;
+  - no provider / model / vendor / engine controls;
+  - no Hot Follow / Digital Anchor scope reopening;
+  - no Runtime Assembly / Capability Expansion entry;
+  - no second production line onboarding;
+  - no Asset Library / promote (Plan C C1–C3) work;
+  - no Plan E gated items (B4, D1, D2, D3, D4) implementation;
+  - no template gating predicate (`task.kind == "hot_follow"`) — that
+    is §8.E's correction;
+  - no audit of `task_workbench.html` Hot Follow regions (§8.G's audit
+    is scoped to the matrix_script panel's own dict-method-collision
+    patterns; the only other `.values` / `.keys` / `.items` /
+    `.update` occurrences in the template are explicit method *calls*,
+    which work correctly).
+- Validation: 12/12 §8.C end-to-end suite cases pass after the §8.G
+  fix (11 prior + 1 new `test_axes_table_renders_human_readable_values`,
+  with the existing `test_get_workbench_renders_real_axes_cells_slots`
+  also tightened to assert `<built-in method values` is absent);
+  194/194 cases pass across §8.A's 23, §8.B's 4, §8.C's planner-unit
+  27 and end-to-end (now 12), `test_workbench_variation_phase_b`,
+  operator-visible-surface contracts, and guardrails. Live render
+  evidence on a fresh contract-clean sample (`task_id=6640deeeb1a6`,
+  `variation_target_count=4`, `target_language=mm`,
+  `source_script_ref=content://matrix-script/source/8g-evidence-001`)
+  confirms the axes-table region renders `formal · casual · playful`
+  for tone, `b2b · b2c · internal` for audience, `min=30 · max=120 ·
+  step=15` for length, and `<built-in method values` is absent in the
+  body. Pre-existing environment limitation
+  (`test_op_download_proxy_uses_attachment_redirect_for_final_video`)
+  recorded in §8.A / §8.B / §8.C logs is unaffected by §8.G (template
+  edit only).
+- Old invalid sample: NOT used as evidence; the prior pre-§8.A sample
+  remains invalid per the original blocker review §9 and the follow-up
+  review §1, §4.3, §9; §8.G's evidence is on a fresh post-§8.A /
+  §8.B / §8.C / §8.D sample.
+- Final gate: §8.G PASS; axes table readable YES; ready for §8.E YES;
+  §8.A / §8.B / §8.C / §8.D not retracted (additive only); ops trial
+  retry remains BLOCKED until §8.E and §8.F also land per the
+  follow-up review §9 ordering.
+
 ### Plan A Trial Correction §8.D — Operator Brief Correction (Documentation-only)
 
 - Date: 2026-05-03
