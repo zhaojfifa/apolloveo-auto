@@ -178,7 +178,7 @@ Coordinator monitors for the brief §8 risk list during operator sessions. The w
 
 ## 8. Live-Run Section (live evidence appended / partial closeout state for ops team)
 
-The operations team appends live-run results below once §3 of the brief is executed. Each entry should record:
+The operations team appends live-run results below as §3 of the brief is executed against the deployed branch. §8 currently carries the partial Matrix Script Sample 3 baseline slice only; the broader sample wave (1, 2, 4, 5a, 5b, 6) is captured in [PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md](PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md) §2.1–§2.6 awaiting §6 coordinator / architect / reviewer signoff before formal append into §8 per that template's §7 handoff rule. Each appended entry records:
 
 ```
 ### 8.x Partial live evidence — Matrix Script Sample 3 contract/projection baseline slice only
@@ -259,7 +259,7 @@ The operations team appends live-run results below once §3 of the brief is exec
 - coordinator initials + timestamp:
   Jackie / 2026-05-03 10:11
 
-This section is intentionally empty in this static pass.
+This Matrix Script Sample 3 partial baseline slice is the only wave entry currently appended to §8. Samples 1, 2, 4, 5a, 5b, 6 baseline evidence remains in [PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md](PLAN_A_LIVE_RUN_CAPTURE_TEMPLATE_v1.md) §2.1–§2.6 and is not formally appended here pending §6 capture-template signoff. The wave verdict therefore remains **PARTIAL**, Plan E pre-condition #1 (per §10) remains **not satisfied**, and Plan E remains **BLOCKED**.
 
 ## 9. Final Coordinator Judgment (post-static-pass)
 
