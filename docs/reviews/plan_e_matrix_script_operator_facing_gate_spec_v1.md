@@ -1,7 +1,7 @@
 # Plan E — Matrix Script Operator-Facing Implementation Gate Spec v1
 
 Date: 2026-05-03
-Status: **Documentation only. No code, no UI, no contract, no schema, no test, no template change. No file moves. No directory restructure.** This document is the formal gate specification for the next operator-visible implementation wave. It defines the only allowed implementation scope, the binding forbidden scope, the PR slicing plan, the acceptance evidence, and the preserved freezes for **Matrix Script operator-facing implementation only**. It does not authorize any code change by itself; an implementation PR may begin only after this gate spec is reviewed and approved through its own approval block (§10).
+Status: Gate-opening signoff completed on 2026-05-03 by Architect (Raobin) and Reviewer (Alisa). Entry condition E7 is now SATISFIED. Implementation remains limited to §3 allowed scope only.**Documentation only. No code, no UI, no contract, no schema, no test, no template change. No file moves. No directory restructure.** This document is the formal gate specification for the next operator-visible implementation wave. It defines the only allowed implementation scope, the binding forbidden scope, the PR slicing plan, the acceptance evidence, and the preserved freezes for **Matrix Script operator-facing implementation only**. It does not authorize any code change by itself; an implementation PR may begin only after this gate spec is reviewed and approved through its own approval block (§10).
 
 Authority of creation:
 
@@ -314,41 +314,40 @@ This Plan E phase preserves the following freezes. Each freeze is restated here 
 
 This Plan E phase implementation is BLOCKED until the following block is fully signed. Implementation PRs MUST cite this signed block in their PR body.
 
-```
 Architect — Raobin
-  Date / time:        <fill: yyyy-mm-dd hh:mm>
-  Signature / handle: <fill: Raobin>
-  Statement:          I confirm the §3 allowed scope is exhaustively bounded; the
-                      §4 forbidden scope is exhaustively listed; the §5 PR slicing
-                      plan respects ENGINEERING_RULES.md §1 / §3 / §4 / §6 / §10;
-                      the §6 acceptance evidence is verifiable; the §7 preserved
-                      freezes match the underlying authorities. I authorize
-                      Matrix Script operator-facing implementation under the
-                      bounds set by this gate spec only. No Digital Anchor
-                      implementation, no platform-wide expansion, no Platform
-                      Runtime Assembly is implied by this signoff.
+  Date / time:        2026-05-03 12:10
+  Signature / handle: Raobin
+  Statement:          I confirm the §3 allowed scope is exhaustively bounded to
+                      E.MS.1 / E.MS.2 / E.MS.3 only; the §4 forbidden scope is
+                      explicitly preserved; the §5 PR slicing plan is single-item,
+                      scope-fenced, regression-bounded, and independently revertable;
+                      the §6 acceptance evidence is verifiable; and the §7 preserved
+                      freezes remain binding. I authorize Matrix Script operator-facing
+                      implementation under this gate spec only. No Digital Anchor
+                      implementation, no Hot Follow behavior reopen, no platform-wide
+                      expansion, and no Platform Runtime Assembly are implied by this signoff.
 
 Reviewer — Alisa
-  Date / time:        <fill: yyyy-mm-dd hh:mm>
-  Signature / handle: <fill: Alisa>
+  Date / time:        2026-05-03 12:18
+  Signature / handle: Alisa
   Statement:          I confirm Plan E pre-condition #1 is satisfied per
-                      PLAN_A_SIGNOFF_CHECKLIST_v1.md §3 + §6 (signed 2026-05-03).
-                      I confirm the §3 / §4 split has no overlap. I authorize
-                      independent merge-gate review of Item E.MS.1 / E.MS.2 /
-                      E.MS.3 PRs against this gate spec; I will reject any PR
-                      that lands a §4 item or that breaks a §7 freeze. Plan E
-                      implementation gate is OPEN for the items in §3 only.
+                      PLAN_A_SIGNOFF_CHECKLIST_v1.md §3 + §6 and the signed
+                      Plan A closeout record. I confirm the §3 allowed scope and
+                      §4 forbidden scope have no overlap. I authorize independent
+                      merge-gate review of Item E.MS.1 / E.MS.2 / E.MS.3 PRs against
+                      this gate spec, and I will reject any PR that lands a §4 item
+                      or breaks a §7 freeze. Plan E implementation gate is OPEN
+                      for the items in §3 only.
 
 Operations team coordinator — Jackie
-  Date / time:        <fill: yyyy-mm-dd hh:mm>
-  Signature / handle: <fill: Jackie>
+  Date / time:        2026-05-03 12:25
+  Signature / handle: Jackie
   Statement:          I confirm the Plan A §2.1 hide guards remain in force in
-                      the trial environment for the duration of this Plan E
-                      phase. I will validate operator-visible deltas of Item
-                      E.MS.1 / E.MS.2 / E.MS.3 in the trial environment and
-                      append observations to the per-item execution logs and the
-                      aggregating PLAN_E_MATRIX_SCRIPT_PHASE_CLOSEOUT_v1.md.
-```
+                      the trial environment for the duration of this Plan E phase.
+                      I will validate operator-visible deltas of Item E.MS.1 /
+                      E.MS.2 / E.MS.3 in the trial environment and append observations
+                      to the per-item execution logs and the aggregating
+                      PLAN_E_MATRIX_SCRIPT_PHASE_CLOSEOUT_v1.md.
 
 The implementation PR-1 / PR-2 / PR-3 MAY open only after architect + reviewer signoff lines above are filled and committed in a documentation-only PR. The coordinator signoff is required for the closeout per §6 row A7, not for the gate opening.
 
