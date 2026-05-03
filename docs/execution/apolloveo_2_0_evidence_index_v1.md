@@ -152,6 +152,11 @@ Status: P2 pre-execution evidence index
 | Matrix Script Plan A Trial Correction §8.E — implementation (template gates) | `gateway/app/templates/task_workbench.html` |
 | Matrix Script Plan A Trial Correction §8.E — contract addendum (shared shell neutrality) | `docs/contracts/workbench_panel_dispatch_contract_v1.md` |
 | Matrix Script Plan A Trial Correction §8.E — regression test (visible-shell suppression) | `gateway/app/services/tests/test_matrix_script_phase_b_authoring.py` |
+| Matrix Script Plan A Trial Correction §8.F (Opaque Ref Discipline — Option F1 tightening) — execution log | `docs/execution/MATRIX_SCRIPT_F_OPAQUE_REF_DISCIPLINE_EXECUTION_LOG_v1.md` |
+| Matrix Script Plan A Trial Correction §8.F — implementation (server-side scheme tightening) | `gateway/app/services/matrix_script/create_entry.py` |
+| Matrix Script Plan A Trial Correction §8.F — operator-facing input + transitional convention helper | `gateway/app/templates/matrix_script_new.html` |
+| Matrix Script Plan A Trial Correction §8.F — contract addendum (opaque-by-construction discipline + transitional convention) | `docs/contracts/matrix_script/task_entry_contract_v1.md` |
+| Matrix Script Plan A Trial Correction §8.F — regression tests (rejected-scheme parametrize + transitional-convention positive case + HTML pattern + helper-text assertions) | `gateway/app/services/tests/test_matrix_script_source_script_ref_shape.py` |
 | Digital Anchor Second Production Line Wave — execution log | `docs/execution/DIGITAL_ANCHOR_SECOND_PRODUCTION_LINE_LOG.md` |
 | Digital Anchor Second Production Line — Phase A (Task / Role Entry) — contract | `docs/contracts/digital_anchor/task_entry_contract_v1.md` |
 | Digital Anchor Second Production Line — Phase A (Task / Role Entry) — evidence | `docs/execution/evidence/digital_anchor_phase_a_task_entry_v1.md` |

@@ -165,12 +165,13 @@
               type="text"
               required
               maxlength="512"
-              pattern="^(?:(?:content|task|asset|ref|s3|gs|https?)://\S+|[A-Za-z0-9][A-Za-z0-9._\-:/]{3,})$"
-              placeholder="content://matrix-script/source/001"
+              pattern="^(?:(?:content|task|asset|ref)://\S+|[A-Za-z0-9][A-Za-z0-9._\-:/]{3,})$"
+              placeholder="content://matrix-script/source/<your-token>"
               autocomplete="off"
               spellcheck="false"
             />
-            <p class="hint">仅填写不透明内容引用（如 <code>content://</code>、<code>task://</code>、<code>asset://</code>、绝对 URL 或令牌 ID）。<strong>不要</strong>把脚本正文粘贴进来——脚本正文由后续工作台阶段处理。</p>
+            <p class="hint">仅填写不透明引用：<code>content://</code>、<code>task://</code>、<code>asset://</code>、<code>ref://</code> 之一，或令牌 ID。<strong>不接受</strong>外部网页 URL（<code>https://</code> / <code>http://</code>）和对象存储桶（<code>s3://</code> / <code>gs://</code>）；这些不是产品内部可解析的不透明引用。<strong>不要</strong>把脚本正文粘贴进来——脚本正文由后续工作台阶段处理。</p>
+            <p class="hint">试运行期约定：在 Plan E 引入产品内部铸造（minting）流程之前，请按 <code>content://matrix-script/source/&lt;token&gt;</code> 形式填写，<code>&lt;token&gt;</code> 由你自行选取并在自己的笔记中维护与脚本来源的映射；产品不会去解析或读回 <code>&lt;token&gt;</code>。</p>
           </div>
 
           <div class="field">

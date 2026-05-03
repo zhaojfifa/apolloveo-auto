@@ -45,10 +45,15 @@ ALLOWED_TARGET_LANGUAGES = ("mm", "vi")
 
 # Closed scheme set for `source_script_ref` per
 # `docs/contracts/matrix_script/task_entry_contract_v1.md` §"Source script ref
-# shape (addendum)". The entry surface accepts an opaque reference only —
-# never script body text. Two accepted shapes:
+# shape (addendum)" + §8.F tightening (2026-05-03). The entry surface accepts
+# an opaque reference only — never script body text and never a publisher
+# article URL. Two accepted shapes:
 #
-#   1. URI with one of the closed schemes listed below.
+#   1. URI with one of the four opaque-by-construction schemes listed below.
+#      The product owns the dereferencing path for each scheme; external web
+#      content (https / http) and bucket schemes (s3 / gs) are NOT accepted
+#      under §8.F because they are not opaque-by-construction inside the
+#      product.
 #   2. Bare token id of bounded length, no whitespace, no embedded scheme.
 #
 # Rejection branches feed the existing entry-validation error type (HTTP 400)
@@ -59,10 +64,6 @@ SOURCE_SCRIPT_REF_ACCEPTED_SCHEMES = (
     "task",
     "asset",
     "ref",
-    "s3",
-    "gs",
-    "https",
-    "http",
 )
 _SOURCE_SCRIPT_REF_URI_PATTERN = re.compile(
     r"^(?:" + "|".join(SOURCE_SCRIPT_REF_ACCEPTED_SCHEMES) + r")://\S+$"
