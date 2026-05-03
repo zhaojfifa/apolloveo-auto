@@ -48,3 +48,7 @@ Factory Alignment Review Gate Active
 - do not reintroduce router-to-router coupling
 - do not let presentation drift away from artifact truth
 - do not let skills or workers become hidden truth writers
+
+## Cross-Cutting Cognition Map
+
+Default project orientation entry: `docs/architecture/apolloveo_2_0_unified_alignment_map_v1.md`. Read after the root indexes and the docs indexes, before drilling into per-bucket authority, to confirm wave / line / surface position and the frozen next engineering sequence. Authority of creation: `docs/reviews/apolloveo_2_0_unified_cognition_and_document_reanchoring_review_v1.md`.

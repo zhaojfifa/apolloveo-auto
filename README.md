@@ -12,8 +12,9 @@ ApolloVeo 当前是一个以成片交付为目标的 AI 内容生产工厂代码
 4. `docs/baseline/PROJECT_BASELINE_INDEX.md`
 5. `docs/reviews/2026-03-18-plus_factory_alignment_code_review.md`
 6. `docs/README.md`
-7. `ENGINEERING_STATUS.md`
-8. `CHANGELOG_STAGE.md`
+7. `docs/architecture/apolloveo_2_0_unified_alignment_map_v1.md` (cross-cutting cognition map; consume before drilling into per-bucket authority)
+8. `ENGINEERING_STATUS.md`
+9. `CHANGELOG_STAGE.md`
 
 ## Current Reality
 
@@ -30,7 +31,8 @@ Use index-first reading. Start with only:
 2. `ENGINEERING_CONSTRAINTS_INDEX.md`
 3. `docs/README.md`
 4. `docs/ENGINEERING_INDEX.md`
-5. `docs/contracts/engineering_reading_contract_v1.md`
+5. `docs/architecture/apolloveo_2_0_unified_alignment_map_v1.md`
+6. `docs/contracts/engineering_reading_contract_v1.md`
 
 Then classify the task through the indexes and read only the minimum
 task-specific authority files selected by that path. Do not begin engineering

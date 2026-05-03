@@ -86,3 +86,7 @@ Every PR must state:
 - what it fixes
 - what it does not fix
 - what remains follow-up
+
+## 12. Default Project Entry Map
+
+Before starting any engineering PR, after the root indexes and the docs indexes, consume `docs/architecture/apolloveo_2_0_unified_alignment_map_v1.md` to confirm the current wave, the affected line, the surface position, and the frozen next engineering sequence. The map is a navigation document; it does not replace contracts, reviews, architecture docs, wave 指挥单, execution logs, or the master plan — when its wording conflicts with any of those, the underlying authority wins.
