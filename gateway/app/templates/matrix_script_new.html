@@ -159,19 +159,32 @@
 
           <div class="field full">
             <label for="source_script_ref">源脚本引用 <span class="required">*</span></label>
-            <input
-              id="source_script_ref"
-              name="source_script_ref"
-              type="text"
-              required
-              maxlength="512"
-              pattern="^(?:(?:content|task|asset|ref)://\S+|[A-Za-z0-9][A-Za-z0-9._\-:/]{3,})$"
-              placeholder="content://matrix-script/source/<your-token>"
-              autocomplete="off"
-              spellcheck="false"
-            />
+            <div style="display:flex; gap:8px; align-items:stretch;">
+              <input
+                id="source_script_ref"
+                name="source_script_ref"
+                type="text"
+                required
+                maxlength="512"
+                pattern="^(?:(?:content|task|asset|ref)://\S+|[A-Za-z0-9][A-Za-z0-9._\-:/]{3,})$"
+                placeholder="content://matrix-script/source/<your-token>"
+                autocomplete="off"
+                spellcheck="false"
+                style="flex:1 1 auto;"
+              />
+              <button
+                type="button"
+                id="mint-source-script-ref"
+                class="btn-secondary"
+                data-mint-route="/tasks/matrix-script/source-script-refs/mint"
+                data-target-input="source_script_ref"
+                title="向产品请求一个新的不透明 content:// 句柄"
+                style="padding:8px 12px; white-space:nowrap;"
+              >铸造句柄</button>
+            </div>
             <p class="hint">仅填写不透明引用：<code>content://</code>、<code>task://</code>、<code>asset://</code>、<code>ref://</code> 之一，或令牌 ID。<strong>不接受</strong>外部网页 URL（<code>https://</code> / <code>http://</code>）和对象存储桶（<code>s3://</code> / <code>gs://</code>）；这些不是产品内部可解析的不透明引用。<strong>不要</strong>把脚本正文粘贴进来——脚本正文由后续工作台阶段处理。</p>
-            <p class="hint">试运行期约定：在 Plan E 引入产品内部铸造（minting）流程之前，请按 <code>content://matrix-script/source/&lt;token&gt;</code> 形式填写，<code>&lt;token&gt;</code> 由你自行选取并在自己的笔记中维护与脚本来源的映射；产品不会去解析或读回 <code>&lt;token&gt;</code>。</p>
+            <p class="hint"><strong>推荐方式（Plan E Option F2 已上线）</strong>：点击「铸造句柄」按钮，由产品分配一个全新的不透明 <code>content://matrix-script/source/&lt;product-minted-token&gt;</code> 句柄。产品拥有 <code>&lt;token&gt;</code> 的分配与唯一性。</p>
+            <p class="hint"><strong>过渡兼容</strong>：原 §8.F / §8.H 操作员自定 <code>&lt;token&gt;</code> 形式仍然接受（例如 <code>content://matrix-script/source/op-token-001</code>）；既有句柄无需迁移，因为它们与铸造句柄同属 <code>content://</code> 不透明方案集。<code>task://</code> / <code>asset://</code> / <code>ref://</code> 形式同样接受。</p>
           </div>
 
           <div class="field">
@@ -244,5 +257,52 @@
     </main>
   </div>
   <script src="/static/js/i18n_v185.js"></script>
+  <script>
+    // Plan E PR-2 / Item E.MS.2 — operator-facing minting affordance.
+    // Calls the matrix-script-scoped POST mint endpoint and populates the
+    // source_script_ref input with a freshly product-minted opaque handle.
+    // The minted handle is contract-equivalent to operator-discipline handles
+    // (both are content:// opaque-by-construction URIs) — no migration of
+    // existing samples is required.
+    (function () {
+      var btn = document.getElementById('mint-source-script-ref');
+      if (!btn) { return; }
+      btn.addEventListener('click', function () {
+        var route = btn.getAttribute('data-mint-route');
+        var targetId = btn.getAttribute('data-target-input');
+        var input = document.getElementById(targetId);
+        if (!route || !input) { return; }
+        var originalLabel = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '铸造中…';
+        fetch(route, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({})
+        })
+          .then(function (resp) {
+            if (!resp.ok) { throw new Error('mint http ' + resp.status); }
+            return resp.json();
+          })
+          .then(function (payload) {
+            if (payload && typeof payload.source_script_ref === 'string') {
+              input.value = payload.source_script_ref;
+              input.focus();
+            } else {
+              throw new Error('mint response missing source_script_ref');
+            }
+          })
+          .catch(function () {
+            // Quiet fallback — operator may type an operator-discipline handle
+            // instead. The transitional convention remains accepted.
+            input.placeholder = 'content://matrix-script/source/<your-token>';
+          })
+          .finally(function () {
+            btn.disabled = false;
+            btn.textContent = originalLabel;
+          });
+      });
+    })();
+  </script>
 </body>
 </html>

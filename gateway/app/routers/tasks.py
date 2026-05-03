@@ -257,6 +257,10 @@ from gateway.app.services.matrix_script.create_entry import (  # noqa: E402
     build_matrix_script_entry,
     build_matrix_script_task_payload,
 )
+from gateway.app.services.matrix_script.source_script_ref_minting import (  # noqa: E402
+    MATRIX_SCRIPT_MINT_ROUTE,
+    mint_source_script_ref,
+)
 from gateway.app.services.voice_state import (  # noqa: E402
     DRY_TTS_CONFIG_KEY as _DRY_TTS_CONFIG_KEY,
     DRY_TTS_ROLE as _DRY_TTS_ROLE,
@@ -648,6 +652,32 @@ async def create_matrix_script_task(
             detail=f"Task persistence failed for task_id={task_id}",
         )
     return RedirectResponse(url=f"/tasks/{task_id}?created={MATRIX_SCRIPT_LINE_ID}", status_code=303)
+
+
+@pages_router.post(MATRIX_SCRIPT_MINT_ROUTE)
+async def mint_matrix_script_source_script_ref(request: Request) -> JSONResponse:
+    """Mint a fresh ``content://matrix-script/source/<token>`` handle (Plan E PR-2 / E.MS.2).
+
+    Replaces the operator-discipline ``<token>`` convention pinned by §8.F /
+    §8.H of the trial brief with a product-owned minting flow per the
+    ``Operator-facing minting flow (Option F2 — addendum, 2026-05-04)``
+    sub-section on ``docs/contracts/matrix_script/task_entry_contract_v1.md``.
+    The route is matrix-script-scoped and JSON-only; no Hot Follow, Digital
+    Anchor, or cross-line surface is touched.
+    """
+
+    requested_by: object | None = None
+    try:
+        if request.headers.get("content-type", "").startswith("application/json"):
+            body = await request.json()
+            if isinstance(body, dict):
+                requested_by = body.get("requested_by")
+    except Exception:
+        # Body parsing problems collapse to "no requested_by"; the mint service
+        # never depends on body content for handle allocation.
+        requested_by = None
+    payload = mint_source_script_ref(requested_by=requested_by)
+    return JSONResponse(content=dict(payload))
 
 
 @pages_router.get("/tasks/apollo-avatar/new", response_class=HTMLResponse)

@@ -200,6 +200,75 @@ The original §8.A addendum included `https` / `http` as a pragmatic allowance f
 - no Plan E gated items (B4 `result_packet_binding` URL-shaped-ref handling, D1 / D2 / D3 / D4) implementation;
 - no second production line onboarding.
 
+### Operator-facing minting flow (Option F2 — addendum, 2026-05-04)
+
+Authority: `docs/reviews/plan_e_matrix_script_operator_facing_gate_spec_v1.md` §3.2 / §5.2 (Plan E PR-2 / Item E.MS.2). This sub-section is **additive**; it documents the in-product minting service that lands as part of the same PR. It does **not** replace, weaken, remove, or widen any prior rule on this contract — the `_validate_source_script_ref_shape` guard, the §8.F-tightened `SOURCE_SCRIPT_REF_ACCEPTED_SCHEMES = ("content", "task", "asset", "ref")` closed scheme set, the §0.2 product-meaning of `source_script_ref` (asset identity handle, not body input, not URL ingestion, not currently dereferenced), the §8.A body-text rejection, and the operator-discipline `<token>` transitional convention all remain in force unchanged.
+
+#### Endpoint
+
+```
+POST /tasks/matrix-script/source-script-refs/mint
+```
+
+Matrix-script-scoped JSON endpoint. No Hot Follow, no Digital Anchor, no cross-line surface is touched by this endpoint or by the service that backs it.
+
+#### Request envelope
+
+Empty body, OR a JSON object with one optional field:
+
+```
+{
+  "requested_by": "<operator-handle-string, optional>"
+}
+```
+
+- `requested_by` (optional, string): an operator-side record-keeping label only. The product does not dereference it, never returns it as packet truth, and never attaches it to the minted handle. Empty / non-string / oversize / non-printable values collapse to the empty string.
+
+#### Response envelope
+
+```
+{
+  "source_script_ref": "content://matrix-script/source/<token>",
+  "token":             "<token>",
+  "minted_at":         "2026-05-04T12:34:56+00:00",
+  "policy":            "operator_request_v1",
+  "requested_by":      "<sanitized requested_by, possibly empty>"
+}
+```
+
+- `source_script_ref`: the minted opaque handle, ready to submit verbatim to `/tasks/matrix-script/new` POST as the `source_script_ref` form field. The product **guarantees** that this value passes `_validate_source_script_ref_shape` with the §8.F-tightened scheme set; any future refactor of the token shape that would break the guard is rejected by the service's internal acceptance assertion.
+- `token`: the bare opaque token slug used inside the `content://matrix-script/source/` wrapper. The product owns its allocation; operators MUST treat it as opaque (no parsing, no dereferencing, no cross-task reuse semantics).
+- `minted_at`: an ISO-8601 UTC timestamp recording when the handle was minted. The product does not bind any meaning to this timestamp beyond audit display; downstream consumers MUST NOT use it as packet truth.
+- `policy`: a closed enum describing the minting policy in force. The starting set is `{operator_request_v1}`; future minting policies (e.g. batched provisioning, bulk import) require an additive sub-section on this contract.
+- `requested_by`: the sanitized operator note from the request, possibly empty.
+
+#### `<token>` allocation policy (`operator_request_v1`)
+
+- The product allocates `<token>` as a hex slug derived from a UUID4 and prefixed with the literal string `mint-`. The full token shape today is `mint-<16-hex-chars>`. The prefix is a coordinator-readability convenience; the product binds **no semantic meaning** to either the prefix or the slug — both remain opaque to every downstream consumer.
+- Allocation is per-request and stateless. The minting service does not persist allocations, does not perform uniqueness checks across requests, does not coordinate across operators, and does not back the handle with any catalog object inside the product. Two consecutive requests yield two distinct handles with high probability (UUID4 collision likelihood); operators MUST NOT rely on a stronger guarantee than that.
+- Allocation is a pure local function. The minting service does not perform I/O, does not call workers, does not call storage providers, does not resolve provider/vendor/model identifiers, and does not mutate any packet, task, or closure store. The contract surface is identical to the prior operator-discipline `<token>` flow — the only difference is that the product chooses `<token>` instead of the operator.
+
+#### Backward compatibility (binding)
+
+- Handles minted under the operator-discipline `<token>` convention pinned by §8.F / §8.H and §"Operator transitional convention (Plan A trial wave only)" above remain valid. Examples that continue to be accepted by `_validate_source_script_ref_shape`: `content://matrix-script/source/op-token-001`, `content://matrix-script/source/MS-SRC-2026-05-03-001`, `content://matrix-script/source/<your-id>`. The minting flow is **opt-in**; operators may continue to pick `<token>` themselves and submit the handle directly.
+- No operator migration of existing samples is required. Previously-submitted handles keep their values verbatim; nothing in this addendum back-fills, rewrites, or deprecates them.
+- The other three opaque-by-construction schemes (`task://`, `asset://`, `ref://`) remain accepted; the minting service mints into `content://` only because that is the scheme operators have been using under the transitional convention. Future minting policies for the other three schemes (if needed) require an additive sub-section, not a re-version.
+
+#### What this addendum does NOT do
+
+- Does NOT widen `SOURCE_SCRIPT_REF_ACCEPTED_SCHEMES` (the closed four-scheme set is unchanged).
+- Does NOT weaken `_validate_source_script_ref_shape` (the guard runs against the minted handle and against operator-supplied handles identically).
+- Does NOT introduce body-text input handling on `source_script_ref` or any other field (§8.A rejection still HTTP 400).
+- Does NOT introduce publisher-URL ingestion (§8.F rejection still HTTP 400 with `"scheme is not recognised"`).
+- Does NOT introduce bucket-URI ingestion (§8.F rejection still HTTP 400).
+- Does NOT introduce a Plan B B4 `result_packet_binding` URL-shaped-ref handling (Plan E PR-1 already landed B4 with sentinel discipline; this addendum does not extend B4).
+- Does NOT introduce an asset-library object service, promote intent service, asset-supply page, or any other cross-line operator-surface implementation (gate spec §4.2 forbidden in this Plan E phase).
+- Does NOT dereference the minted handle to body content. The product still does not currently dereference any handle (§0.2 product-meaning preserved).
+- Does NOT repurpose `source_script_ref` as a body-input field, publisher-URL ingestion field, or currently dereferenced content address (§0.2 preserved).
+- Does NOT change the §8.C deterministic Phase B authoring output (`body_ref = "content://matrix-script/{task_id}/slot/{slot_id}"` is unchanged; the minted `source_script_ref` is operator-facing only and is stored verbatim on the persisted task).
+- Does NOT touch any Hot Follow surface, any Digital Anchor surface, or any cross-line projection / advisory / publish_readiness / panel-dispatch surface (gate spec §4.1 / §4.2 / §4.4 preserved).
+- Does NOT start Platform Runtime Assembly or Capability Expansion (gate spec §7.5 preserved).
+
 ## Phase B deterministic authoring (addendum, 2026-05-03)
 
 Authority: `docs/reviews/matrix_script_trial_blocker_and_realign_review_v1.md` §8.C (Option C1 — minimal real Phase B authoring).
