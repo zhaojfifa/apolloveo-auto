@@ -207,7 +207,7 @@ Status: P2 pre-execution evidence index
 | Operator Capability Recovery PR-2 — promote lifecycle tests | `gateway/app/services/tests/test_asset_promote_lifecycle.py` |
 | Operator Capability Recovery PR-2 — surface-boundary integrity tests | `gateway/app/services/tests/test_asset_surface_boundary.py` |
 | Operator Capability Recovery PR-2 — operator-visible end-to-end submit tests (template integrity + HTTP via Starlette TestClient) | `gateway/app/services/tests/test_asset_surface_submit_end_to_end.py` |
-| Operator Capability Recovery PR-3 — execution log | `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR3_MATRIX_SCRIPT_WORKSPACE_EXECUTION_LOG_v1.md` |
+| Operator Capability Recovery PR-3 — execution log (MERGED 2026-05-04, PR #118, squash commit `d53da0f`) | `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR3_MATRIX_SCRIPT_WORKSPACE_EXECUTION_LOG_v1.md` |
 | Operator Capability Recovery PR-3 — Matrix Script closure binding service | `gateway/app/services/matrix_script/closure_binding.py` |
 | Operator Capability Recovery PR-3 — Matrix Script closure operator router | `gateway/app/routers/matrix_script_closure.py` |
 | Operator Capability Recovery PR-3 — publish-hub closure block + JS event form | `gateway/app/templates/task_publish_hub.html` (under `_ms_kind == "matrix_script"` gate) |
