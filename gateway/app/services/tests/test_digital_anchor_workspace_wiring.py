@@ -64,10 +64,14 @@ def test_publish_hub_bundle_with_no_closure_yields_empty_mirror():
 
 def test_publish_hub_bundle_consumes_closure_after_publish_writeback():
     task = _digital_anchor_task()
-    closure_binding.write_publish_closure_for_task(
+    role_id = task["packet"]["line_specific_refs"][0]["delta"]["roles"][0]["role_id"]
+    closure_binding.apply_writeback_event_for_task(
         task,
-        publish_status="published",
-        publish_url="https://example.test/da/wiring",
+        event_kind="publish_accepted",
+        row_scope="role",
+        row_id=role_id,
+        actor_kind="platform",
+        payload={"publish_url": "https://example.test/da/wiring"},
     )
     closure = closure_binding.get_closure_view_for_task(task["task_id"])
     bundle = build_operator_surfaces_for_publish_hub(
@@ -96,10 +100,14 @@ def test_workbench_bundle_attaches_role_speaker_surface():
 
 def test_publish_hub_bundle_does_not_carry_provider_identifiers():
     task = _digital_anchor_task()
-    closure_binding.write_publish_closure_for_task(
+    role_id = task["packet"]["line_specific_refs"][0]["delta"]["roles"][0]["role_id"]
+    closure_binding.apply_writeback_event_for_task(
         task,
-        publish_status="published",
-        publish_url="https://example.test/da",
+        event_kind="publish_accepted",
+        row_scope="role",
+        row_id=role_id,
+        actor_kind="platform",
+        payload={"publish_url": "https://example.test/da"},
     )
     closure = closure_binding.get_closure_view_for_task(task["task_id"])
     bundle = build_operator_surfaces_for_publish_hub(

@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 from uuid import uuid4
 
 from copy import deepcopy
@@ -208,8 +208,7 @@ def build_digital_anchor_entry(
     *,
     topic: Any,
     source_script_ref: Any,
-    source_language: Any,
-    target_language: Any,
+    language_scope: Any,
     role_profile_ref: Any,
     role_framing_hint: Any,
     output_intent: Any,
@@ -222,6 +221,14 @@ def build_digital_anchor_entry(
 ) -> DigitalAnchorCreateEntry:
     """Validate and assemble a closed Digital Anchor entry.
 
+    The ``language_scope`` argument MUST be a mapping with closed keys
+    ``{source_language, target_language}`` per
+    ``docs/contracts/digital_anchor/task_entry_contract_v1.md`` §"Entry
+    field set" (mirrored verbatim by the create-entry payload builder
+    contract). The builder rejects flat ``source_language`` /
+    ``target_language`` arguments at the type boundary — those are
+    sub-fields of ``language_scope``, not separate top-level inputs.
+
     Unknown fields supplied by the caller MUST be passed via
     ``extra_fields`` so the closed-set guard rejects them.
     """
@@ -233,14 +240,37 @@ def build_digital_anchor_entry(
                 detail=f"unknown fields are not supported: {unknown}",
             )
 
+    if not isinstance(language_scope, Mapping):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "language_scope must be a mapping with closed keys "
+                "{source_language, target_language}"
+            ),
+        )
+    unknown_scope = set(language_scope) - {"source_language", "target_language"}
+    if unknown_scope:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "language_scope has unknown sub-keys: "
+                f"{sorted(unknown_scope)}; expected exactly "
+                "{source_language, target_language}"
+            ),
+        )
+
     topic_clean = _validate_no_forbidden_substrings(_require(topic, "topic"), "topic")
     source_script_ref_clean = _validate_opaque_ref(
         _require(source_script_ref, "source_script_ref"),
         "source_script_ref",
         max_length=SOURCE_SCRIPT_REF_MAX_LENGTH,
     )
-    source_language_clean = _require(source_language, "language_scope.source_language").lower()
-    target_languages_clean = _coerce_target_languages(target_language)
+    source_language_clean = _require(
+        language_scope.get("source_language"), "language_scope.source_language"
+    ).lower()
+    target_languages_clean = _coerce_target_languages(
+        language_scope.get("target_language")
+    )
     role_profile_ref_clean = _validate_opaque_ref(
         _require(role_profile_ref, "role_profile_ref"),
         "role_profile_ref",

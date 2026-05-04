@@ -302,6 +302,189 @@ manager go/no-go and coordinator / architect / reviewer signoff. Per
 Global Action §3, **PR-5 may not start until PR-1 through PR-4 are
 merged and reviewed**. Claude stops after this PR-4 is opened.
 
+## 9.1 Reviewer-Fail Correction Pass (2026-05-04)
+
+The Codex/architect review of the initial PR-4 commit returned FAIL
+with three explicit findings. This section records the failure
+findings, the exact correction made, and residual risks after
+correction.
+
+### 9.1.1 Reviewer findings (FAIL)
+
+1. **Formal new-task route shape not aligned with the contract.** The
+   POST handler accepted flat ``source_language`` and ``target_language``
+   form parameters; the closed entry contract
+   (``task_entry_contract_v1.md`` §"Entry field set" + the create-entry
+   payload builder contract) requires a single structured
+   ``language_scope`` object with closed sub-keys
+   ``{source_language, target_language}``. The GET surface, the POST
+   handler signature, and the builder input were therefore disagreeing
+   on the contract shape.
+2. **Route-boundary unknown-field rejection missing.** The handler used
+   FastAPI ``Form(...)`` declarations. Unknown form keys submitted by a
+   client were silently ignored, not rejected — Phase B authoring
+   leaks (e.g. ``roles[]`` / ``segments[]``) or forbidden vendor
+   identifiers could be sent and not surfaced as HTTP 400. Closed-set
+   acceptance was enforced only on the builder layer, not on the route
+   itself.
+3. **D.1 publish-feedback write-back used the older D.0 vocabulary.**
+   The closure binding exposed ``write_publish_closure_for_task`` with
+   the closure-wide D.0 enum
+   ``{not_published, published, publish_failed, archived}``; the
+   operator-visible UI and the ``/publish-closure`` endpoint also wrote
+   to the closure-wide scalar ``publish_status`` field. This violates
+   ``publish_feedback_writeback_contract_v1.md`` §"Closed write-back
+   event set", which mandates a closed event_kind set
+   (``publish_attempted`` / ``publish_accepted`` / ``publish_rejected``
+   / ``publish_retracted`` / ``metrics_snapshot`` / ``operator_note``)
+   targeting per-row ``publish_status`` ∈ ``{pending, published,
+   failed, retracted}``. The older path was the active operator truth
+   path, not a deprecated holdover.
+
+### 9.1.2 Exact corrections made
+
+1. **Route shape aligned with contract**
+   ([gateway/app/routers/tasks.py](../../gateway/app/routers/tasks.py)
+   + [gateway/app/services/digital_anchor/create_entry.py](../../gateway/app/services/digital_anchor/create_entry.py)
+   + [gateway/app/templates/digital_anchor_new.html](../../gateway/app/templates/digital_anchor_new.html)).
+   Removed the flat ``source_language`` / ``target_language`` Form
+   declarations from the POST handler. The POST endpoint now reads the
+   raw request body (form-encoded or JSON), assembles a structured
+   ``language_scope`` mapping, and passes it to the builder under the
+   ``language_scope=`` keyword. The HTML form's two fields are renamed
+   to ``language_scope[source_language]`` and
+   ``language_scope[target_language]``. The builder validates
+   ``language_scope`` is a mapping with closed sub-keys
+   ``{source_language, target_language}`` and rejects unknown sub-keys
+   at the type boundary. The legacy flat ``source_language`` /
+   ``target_language`` keyword arguments are **removed** from
+   ``build_digital_anchor_entry``.
+2. **Route-boundary closed-set rejection**
+   ([gateway/app/routers/tasks.py](../../gateway/app/routers/tasks.py)
+   ``_digital_anchor_form_to_kwargs`` + ``_digital_anchor_json_to_kwargs``).
+   Both the form-encoded and JSON paths now compute the
+   submitted-key set and assert it is a subset of the contract-closed
+   key-set (``DIGITAL_ANCHOR_FORM_ALLOWED_KEYS`` /
+   ``DIGITAL_ANCHOR_ALLOWED_FIELDS``). Any extra key returns HTTP 400
+   with ``{"detail": "unknown fields are not supported: [...]"}``.
+   Closed-set rejection is now enforced at the route boundary in
+   addition to the builder layer.
+3. **D.1 write-back replaces the D.0 active path**
+   ([gateway/app/services/digital_anchor/publish_feedback_closure.py](../../gateway/app/services/digital_anchor/publish_feedback_closure.py)
+   + [gateway/app/services/digital_anchor/closure_binding.py](../../gateway/app/services/digital_anchor/closure_binding.py)
+   + [gateway/app/routers/digital_anchor_closure.py](../../gateway/app/routers/digital_anchor_closure.py)
+   + [gateway/app/templates/task_publish_hub.html](../../gateway/app/templates/task_publish_hub.html)
+   + [gateway/app/services/operator_visible_surfaces/projections.py](../../gateway/app/services/operator_visible_surfaces/projections.py)).
+   Added the D.1 closed enum constants
+   (``D1_EVENT_KINDS``, ``D1_PUBLISH_STATUS_VALUES``, ``D1_ROW_SCOPES``)
+   and a new service-layer function ``apply_writeback_event(closure,
+   packet, *, event_kind, row_scope, row_id, payload, actor_kind,
+   recorded_at, recorded_by)`` that mutates per-row ``publish_status``
+   on ``role_feedback[]`` / ``segment_feedback[]`` rows per the contract
+   table:
+
+   | event_kind | row publish_status |
+   | --- | --- |
+   | publish_attempted | pending |
+   | publish_accepted  | published (sets row.publish_url) |
+   | publish_rejected  | failed |
+   | publish_retracted | retracted |
+   | metrics_snapshot  | (appends to row.channel_metrics) |
+   | operator_note     | (records note in audit trail + row) |
+
+   The closure binding now exposes ``apply_writeback_event_for_task``
+   as the **active operator path**; the older
+   ``write_publish_closure_for_task`` is **removed** from the public
+   surface (no longer in ``__all__``, no longer importable from
+   ``gateway.app.services.digital_anchor``). The router replaces
+   ``POST /publish-closure`` with ``POST /events`` accepting the closed
+   D.1 body shape; the legacy endpoint returns 404. The publish-hub
+   template's old "scoped publish closure" form is replaced by a D.1
+   event form whose ``event_kind`` selector lists exactly the six
+   closed event kinds. ``derive_delivery_publish_status_mirror`` now
+   aggregates per-row ``publish_status`` for digital_anchor (mirror of
+   the matrix_script aggregation) instead of reading the closure-wide
+   D.0 scalar.
+
+### 9.1.3 Tests added / updated
+
+- ``test_digital_anchor_new_task_route_shape.py`` (NEW, 6 cases):
+  - ``test_form_post_with_language_scope_brackets_creates_task`` — proves
+    the route accepts ``language_scope[source_language]`` /
+    ``language_scope[target_language]`` and projects them into the
+    contract-shaped payload.
+  - ``test_json_post_with_nested_language_scope_creates_task`` — same
+    proof for the JSON content-type path.
+  - ``test_form_post_with_unknown_field_rejected`` — asserts HTTP 400
+    on any submitted form key outside the closed set.
+  - ``test_form_post_with_legacy_flat_language_field_rejected`` —
+    asserts the flat ``source_language`` / ``target_language`` form
+    keys are rejected at the route boundary.
+  - ``test_json_post_with_unknown_top_level_key_rejected`` — proves a
+    Phase B authoring leak (``roles=[]``) returns 400.
+  - ``test_json_post_with_unknown_language_scope_subkey_rejected``.
+- ``test_digital_anchor_create_entry.py`` (UPDATED): closed
+  ``language_scope`` mapping is now the only legal builder input;
+  added ``test_language_scope_must_be_mapping`` +
+  ``test_language_scope_unknown_subkey_rejected`` +
+  ``test_language_scope_target_language_accepts_list_or_csv``;
+  ``test_target_language_required`` retargeted onto the new shape.
+- ``test_digital_anchor_closure_binding.py`` (UPDATED): replaced D.0
+  ``test_publish_closure_writeback_status_enum`` /
+  ``test_publish_closure_unknown_status_rejected`` with five D.1 cases
+  (``publish_attempted`` → pending; ``publish_accepted`` → published +
+  url; ``publish_rejected`` → failed; ``publish_retracted`` →
+  retracted; ``metrics_snapshot`` appends row metrics) plus
+  ``test_d1_unknown_event_kind_rejected`` +
+  ``test_d1_actor_must_match_event_kind`` +
+  ``test_d1_old_write_publish_closure_for_task_no_longer_exported``
+  (proves the older API is no longer reachable from the
+  closure_binding public surface).
+- ``test_digital_anchor_closure_api.py`` (UPDATED): replaced
+  ``test_post_publish_closure_201`` with
+  ``test_post_d1_event_publish_accepted_201`` +
+  ``test_post_d1_event_unknown_field_rejected`` +
+  ``test_legacy_publish_closure_endpoint_removed`` (asserts the old
+  endpoint returns 404 / 405).
+- ``test_digital_anchor_workspace_wiring.py`` (UPDATED): the publish-
+  hub aggregation tests now drive the D.1 path (``publish_accepted``
+  on a role row) and assert the row-level aggregation surfaces
+  ``mirror.publish_status == "published"``.
+
+### 9.1.4 Tests after correction
+
+- New + updated DA suites: **47 PASS** (import-light) + **8 PASS** HTTP
+  (auto-skip if FastAPI not importable).
+- Adjacent regression (PR-1 / PR-2 / PR-3 / Hot Follow / Matrix Script
+  closure / asset suite / contract runtime / Hot Follow projection /
+  artifact facts / subtitle currentness / helper translation): **267
+  PASS**.
+- Aggregate (PR-4 correction + adjacent): **329 PASS / 0 FAIL** on
+  Python 3.9 import-light set; 16 skipped (HTTP cases on FastAPI-less
+  envs).
+
+### 9.1.5 Why each FAIL item is now closed
+
+| FAIL item | Closed by |
+| --- | --- |
+| (1) Route shape not aligned | Route reads raw form/JSON, assembles a contract-shaped ``language_scope`` mapping, and passes it as a single keyword argument to the builder. The flat ``source_language`` / ``target_language`` Form parameters are removed from the POST signature; the builder rejects them via the type boundary; the HTML form uses ``language_scope[source_language]`` / ``language_scope[target_language]``. New route-shape tests assert acceptance of the bracket-notation form keys and the JSON ``language_scope`` object. |
+| (2) Unknown-field rejection missing at route boundary | Both ``_digital_anchor_form_to_kwargs`` and ``_digital_anchor_json_to_kwargs`` compare submitted keys against ``DIGITAL_ANCHOR_FORM_ALLOWED_KEYS`` / ``DIGITAL_ANCHOR_ALLOWED_FIELDS`` and raise HTTP 400 on any unknown key. Tested at the route boundary with ``test_form_post_with_unknown_field_rejected``, ``test_form_post_with_legacy_flat_language_field_rejected``, ``test_json_post_with_unknown_top_level_key_rejected``, ``test_json_post_with_unknown_language_scope_subkey_rejected``. |
+| (3) D.1 write-back not the active path | New ``apply_writeback_event`` service function implements the D.1 closed event_kind set + per-row ``publish_status`` enum; new ``POST /events`` router endpoint is the active operator path; the older ``write_publish_closure_for_task`` is removed from the closure_binding public surface and the older ``/publish-closure`` endpoint is removed. Publish-hub UI replaced with the D.1 event form. ``derive_delivery_publish_status_mirror`` aggregates per-row D.1 ``publish_status`` for digital_anchor. Tested at the service layer (``test_d1_publish_attempted_sets_row_pending`` etc.), the HTTP layer (``test_post_d1_event_publish_accepted_201``), and the wiring layer (``test_publish_hub_bundle_consumes_closure_after_publish_writeback``). |
+
+### 9.1.6 Residual risks after correction
+
+- The D.0 closure-wide top-level ``publish_status`` field still exists
+  on the closure object (initialized ``"not_published"``). It is no
+  longer mutated by the active operator path; future schema cleanup
+  can remove it once no consumer reads it. ``apply_writeback_event``
+  never writes to it; ``derive_delivery_publish_status_mirror`` no
+  longer reads it for digital_anchor.
+- The D.1 ``operator_note`` event currently writes the note onto the
+  per-row scope (``role_feedback_note`` / ``audio_feedback_note``) and
+  also onto ``closure.operator_publish_notes`` for back-compat. Future
+  refactor can split these once the closure shape is re-versioned.
+- All other PR-4 residual risks from §8 carry forward unchanged.
+
 ## 10. References
 
 - Decision: `docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`

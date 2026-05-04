@@ -27,8 +27,13 @@ def _good_kwargs(**overrides):
     base = {
         "topic": "数字人 demo",
         "source_script_ref": "content://digital-anchor/source/abc-001",
-        "source_language": "en",
-        "target_language": "zh, mm",
+        # PR-4 reviewer-fix: contract-shaped `language_scope` mapping
+        # replaces the flat `source_language` / `target_language`
+        # arguments per `task_entry_contract_v1` §"Entry field set".
+        "language_scope": {
+            "source_language": "en",
+            "target_language": ["zh", "mm"],
+        },
         "role_profile_ref": "catalog://role_card/anchor_a_v1",
         "role_framing_hint": "half_body",
         "output_intent": "双语讲解短视频",
@@ -49,6 +54,40 @@ def test_required_fields_round_trip():
     assert entry.target_language == ("zh", "mm")
     assert entry.role_framing_hint == "half_body"
     assert entry.speaker_segment_count_hint == 2
+
+
+def test_language_scope_must_be_mapping():
+    """Reviewer-fix #1: builder rejects flat source/target_language args
+    and requires the contract-shaped `language_scope` mapping."""
+    bad = _good_kwargs(language_scope="not-a-mapping")
+    with pytest.raises(HTTPException):
+        build_digital_anchor_entry(**bad)
+
+
+def test_language_scope_unknown_subkey_rejected():
+    """Reviewer-fix #1: only `source_language` + `target_language` are
+    permitted as `language_scope` sub-keys."""
+    bad = _good_kwargs(
+        language_scope={
+            "source_language": "en",
+            "target_language": ["zh"],
+            "vendor_id": "tencent",
+        }
+    )
+    with pytest.raises(HTTPException) as exc:
+        build_digital_anchor_entry(**bad)
+    assert "language_scope" in exc.value.detail
+
+
+def test_language_scope_target_language_accepts_list_or_csv():
+    a = build_digital_anchor_entry(**_good_kwargs(
+        language_scope={"source_language": "en", "target_language": ["zh", "mm"]}
+    ))
+    b = build_digital_anchor_entry(**_good_kwargs(
+        language_scope={"source_language": "en", "target_language": "zh, mm"}
+    ))
+    assert a.target_language == ("zh", "mm")
+    assert b.target_language == ("zh", "mm")
 
 
 def test_payload_shape_matches_closed_output():
@@ -173,9 +212,13 @@ def test_extra_unknown_field_rejected():
 
 def test_target_language_required():
     with pytest.raises(HTTPException):
-        build_digital_anchor_entry(**_good_kwargs(target_language=""))
+        build_digital_anchor_entry(**_good_kwargs(
+            language_scope={"source_language": "en", "target_language": ""}
+        ))
     with pytest.raises(HTTPException):
-        build_digital_anchor_entry(**_good_kwargs(target_language=[]))
+        build_digital_anchor_entry(**_good_kwargs(
+            language_scope={"source_language": "en", "target_language": []}
+        ))
 
 
 def test_payload_does_not_carry_provider_identifiers():

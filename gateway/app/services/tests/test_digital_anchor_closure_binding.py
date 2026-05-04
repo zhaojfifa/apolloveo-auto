@@ -145,25 +145,116 @@ def test_segment_feedback_writeback():
     assert rows[0]["audio_feedback_note"] == "ok"
 
 
-def test_publish_closure_writeback_status_enum():
+def test_d1_publish_attempted_sets_row_pending():
+    """D.1 path is the active truth path; per-row publish_status uses
+    the closed enum {pending, published, failed, retracted}."""
     task = _digital_anchor_task()
-    result = closure_binding.write_publish_closure_for_task(
+    role = _role_ids(task["packet"])[0]
+    result = closure_binding.apply_writeback_event_for_task(
         task,
-        publish_status="published",
-        publish_url="https://example.test/da/1",
-        operator_publish_notes="published",
+        event_kind="publish_attempted",
+        row_scope="role",
+        row_id=role,
+        actor_kind="operator",
     )
     closure = result["closure"]
-    assert closure["publish_status"] == "published"
-    assert closure["publish_url"] == "https://example.test/da/1"
+    row = next(r for r in closure["role_feedback"] if r["role_id"] == role)
+    assert row["publish_status"] == "pending"
 
 
-def test_publish_closure_unknown_status_rejected():
+def test_d1_publish_accepted_sets_row_published_with_url():
     task = _digital_anchor_task()
+    segment = _segment_ids(task["packet"])[0]
+    result = closure_binding.apply_writeback_event_for_task(
+        task,
+        event_kind="publish_accepted",
+        row_scope="segment",
+        row_id=segment,
+        actor_kind="platform",
+        payload={"publish_url": "https://example.test/da/seg"},
+    )
+    closure = result["closure"]
+    row = next(r for r in closure["segment_feedback"] if r["segment_id"] == segment)
+    assert row["publish_status"] == "published"
+    assert row["publish_url"] == "https://example.test/da/seg"
+
+
+def test_d1_publish_rejected_sets_row_failed():
+    task = _digital_anchor_task()
+    role = _role_ids(task["packet"])[0]
+    result = closure_binding.apply_writeback_event_for_task(
+        task,
+        event_kind="publish_rejected",
+        row_scope="role",
+        row_id=role,
+        actor_kind="platform",
+    )
+    closure = result["closure"]
+    row = next(r for r in closure["role_feedback"] if r["role_id"] == role)
+    assert row["publish_status"] == "failed"
+
+
+def test_d1_publish_retracted_sets_row_retracted():
+    task = _digital_anchor_task()
+    role = _role_ids(task["packet"])[0]
+    result = closure_binding.apply_writeback_event_for_task(
+        task,
+        event_kind="publish_retracted",
+        row_scope="role",
+        row_id=role,
+        actor_kind="operator",
+    )
+    closure = result["closure"]
+    row = next(r for r in closure["role_feedback"] if r["role_id"] == role)
+    assert row["publish_status"] == "retracted"
+
+
+def test_d1_unknown_event_kind_rejected():
+    task = _digital_anchor_task()
+    role = _role_ids(task["packet"])[0]
     with pytest.raises(closure_binding.ClosureValidationError):
-        closure_binding.write_publish_closure_for_task(
-            task, publish_status="brand_new_state"
+        closure_binding.apply_writeback_event_for_task(
+            task,
+            event_kind="brand_new_kind",
+            row_scope="role",
+            row_id=role,
         )
+
+
+def test_d1_actor_must_match_event_kind():
+    """publish_accepted is platform-only; operator actor is rejected."""
+    task = _digital_anchor_task()
+    role = _role_ids(task["packet"])[0]
+    with pytest.raises(closure_binding.ClosureValidationError):
+        closure_binding.apply_writeback_event_for_task(
+            task,
+            event_kind="publish_accepted",
+            row_scope="role",
+            row_id=role,
+            actor_kind="operator",
+        )
+
+
+def test_d1_metrics_snapshot_appends_to_row_channel_metrics():
+    task = _digital_anchor_task()
+    role = _role_ids(task["packet"])[0]
+    closure_binding.apply_writeback_event_for_task(
+        task,
+        event_kind="metrics_snapshot",
+        row_scope="role",
+        row_id=role,
+        actor_kind="platform",
+        payload={"views": 100, "captured_at": "2026-05-04T12:00:00Z"},
+    )
+    closure = closure_binding.get_closure_view_for_task(task["task_id"])
+    row = next(r for r in closure["role_feedback"] if r["role_id"] == role)
+    assert row["channel_metrics"] and row["channel_metrics"][-1]["views"] == 100
+
+
+def test_d1_old_write_publish_closure_for_task_no_longer_exported():
+    """Reviewer-fix #3: the older D.0-style API must not be the active
+    operator path. It is removed from the closure_binding public surface."""
+    assert not hasattr(closure_binding, "write_publish_closure_for_task")
 
 
 def test_closure_does_not_mutate_packet():

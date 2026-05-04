@@ -16,9 +16,9 @@ from fastapi.responses import JSONResponse
 from gateway.app.deps import get_task_repository
 from gateway.app.services.digital_anchor.closure_binding import (
     ClosureValidationError,
+    apply_writeback_event_for_task,
     get_closure_view_for_task,
     get_or_create_for_task,
-    write_publish_closure_for_task,
     write_role_feedback_for_task,
     write_segment_feedback_for_task,
 )
@@ -157,27 +157,73 @@ async def post_segment_feedback_api(
     return JSONResponse(result, status_code=201)
 
 
-@api_router.post("/{task_id}/publish-closure")
-async def post_publish_closure_api(
+# Closed body shape for the D.1 events endpoint per
+# `docs/contracts/digital_anchor/publish_feedback_writeback_contract_v1.md`.
+# Unknown top-level keys are rejected at the route boundary; the closed
+# event_kind / row_scope / publish_status enums are enforced by the
+# closure-binding service layer.
+_D1_EVENT_BODY_KEYS = frozenset(
+    {
+        "event_kind",
+        "row_scope",
+        "row_id",
+        "actor_kind",
+        "recorded_by",
+        "recorded_at",
+        "payload",
+    }
+)
+
+
+@api_router.post("/{task_id}/events")
+async def post_writeback_event_api(
     task_id: str,
     request: Request,
     repo: ITaskRepository = Depends(get_task_repository),
 ) -> JSONResponse:
-    """Apply scoped publish closure fields + append one closure record."""
+    """Apply one Phase D.1 publish-feedback write-back event.
+
+    This endpoint is the **active operator path** for publish-state
+    mutations on Digital Anchor tasks (Recovery PR-4 reviewer-fail
+    correction §9.1.3). The older ``/publish-closure`` endpoint, which
+    accepted the D.0 enum
+    ``{not_published, published, publish_failed, archived}`` on a
+    closure-wide scalar field, is removed; D.1 events targeting a
+    specific row (role / segment) are the only legal write-back path.
+
+    Body shape (all keys closed; unknown keys → HTTP 400)::
+
+        {
+          "event_kind":  "publish_attempted" | "publish_accepted" |
+                         "publish_rejected" | "publish_retracted" |
+                         "metrics_snapshot" | "operator_note",
+          "row_scope":   "role" | "segment",
+          "row_id":      "<role_id> | <segment_id>",
+          "actor_kind":  "operator" | "platform" | "system",   # optional;
+                                                                # contract-derived
+          "recorded_at": "<ISO-8601>",                          # optional
+          "recorded_by": "<actor-id>",                          # optional
+          "payload":     { ... event-specific subfields ... }
+        }
+    """
     task = _resolve_task(repo, task_id)
     _ensure_digital_anchor(task)
     body = await _read_json(request)
+    unknown = sorted(set(body) - _D1_EVENT_BODY_KEYS)
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unknown_event_field:{unknown}",
+        )
     try:
-        result = write_publish_closure_for_task(
+        result = apply_writeback_event_for_task(
             task,
-            publish_status=body.get("publish_status", ""),
-            publish_url=body.get("publish_url"),
-            channel_metrics=body.get("channel_metrics"),
-            operator_publish_notes=body.get("operator_publish_notes"),
-            role_ids=body.get("role_ids"),
-            segment_ids=body.get("segment_ids"),
-            recorded_by=body.get("recorded_by", "operator"),
-            record_kind=body.get("record_kind", "publish_callback"),
+            event_kind=str(body.get("event_kind", "")),
+            row_scope=str(body.get("row_scope", "")),
+            row_id=str(body.get("row_id", "")),
+            payload=body.get("payload") if isinstance(body.get("payload"), Mapping) else None,
+            actor_kind=body.get("actor_kind"),
+            recorded_by=body.get("recorded_by"),
             recorded_at=body.get("recorded_at"),
         )
     except ClosureValidationError as exc:

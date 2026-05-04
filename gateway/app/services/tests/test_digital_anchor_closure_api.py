@@ -165,22 +165,64 @@ def test_post_segment_feedback_201():
     assert resp.status_code == 201, resp.text
 
 
-def test_post_publish_closure_201():
+def test_post_d1_event_publish_accepted_201():
+    """Reviewer-fix #3: D.1 events are the active truth path; the
+    older /publish-closure endpoint is replaced by /events."""
+    task = _digital_anchor_task()
+    client = _try_build_client(_StubRepo({task["task_id"]: task}))
+    if client is None:
+        pytest.skip("FastAPI TestClient not importable in this env.")
+    role = _role_ids(task["packet"])[0]
+    resp = client.post(
+        f"/api/digital-anchor/closures/{task['task_id']}/events",
+        json={
+            "event_kind": "publish_accepted",
+            "row_scope": "role",
+            "row_id": role,
+            "actor_kind": "platform",
+            "payload": {"publish_url": "https://example.test/da/r"},
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    closure = resp.json()["closure"]
+    row = next(r for r in closure["role_feedback"] if r["role_id"] == role)
+    assert row["publish_status"] == "published"
+    assert row["publish_url"] == "https://example.test/da/r"
+
+
+def test_post_d1_event_unknown_field_rejected():
+    """Route boundary closed-set: unknown body keys → HTTP 400."""
+    task = _digital_anchor_task()
+    client = _try_build_client(_StubRepo({task["task_id"]: task}))
+    if client is None:
+        pytest.skip("FastAPI TestClient not importable in this env.")
+    role = _role_ids(task["packet"])[0]
+    resp = client.post(
+        f"/api/digital-anchor/closures/{task['task_id']}/events",
+        json={
+            "event_kind": "publish_attempted",
+            "row_scope": "role",
+            "row_id": role,
+            "actor_kind": "operator",
+            "vendor_id": "tencent",  # forbidden + unknown key
+        },
+    )
+    assert resp.status_code == 400
+
+
+def test_legacy_publish_closure_endpoint_removed():
+    """The older D.0-style /publish-closure endpoint must be removed."""
     task = _digital_anchor_task()
     client = _try_build_client(_StubRepo({task["task_id"]: task}))
     if client is None:
         pytest.skip("FastAPI TestClient not importable in this env.")
     resp = client.post(
         f"/api/digital-anchor/closures/{task['task_id']}/publish-closure",
-        json={
-            "publish_status": "published",
-            "publish_url": "https://example.test/da",
-            "operator_publish_notes": "ok",
-        },
+        json={"publish_status": "published"},
     )
-    assert resp.status_code == 201, resp.text
-    closure = resp.json()["closure"]
-    assert closure["publish_status"] == "published"
+    # 404 or 405; either is acceptable, both prove the route is no
+    # longer registered as the active path.
+    assert resp.status_code in (404, 405)
 
 
 def test_post_event_rejects_forbidden_provider_keys():

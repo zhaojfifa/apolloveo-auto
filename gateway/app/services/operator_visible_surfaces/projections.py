@@ -156,6 +156,33 @@ def _matrix_script_aggregate_status(closure: Mapping[str, Any]) -> str:
     return "pending"
 
 
+def _digital_anchor_aggregate_status(closure: Mapping[str, Any]) -> str:
+    """Aggregate Phase D.1 per-row publish_status for Digital Anchor.
+
+    Per `digital_anchor/publish_feedback_writeback_contract_v1.md`,
+    publish_status lives on each `role_feedback[]` / `segment_feedback[]`
+    row from the closed enum {pending, published, failed, retracted}.
+    The closure-wide D.0 `publish_status` field is no longer the active
+    truth path; aggregating per-row gives operators a single mirror.
+    """
+    rows = list(closure.get("role_feedback") or []) + list(
+        closure.get("segment_feedback") or []
+    )
+    rows = [row for row in rows if row.get("publish_status")]
+    if not rows:
+        return "not_published"
+    statuses = {str(row.get("publish_status") or "pending") for row in rows}
+    if statuses == {"published"}:
+        return "published"
+    if "failed" in statuses:
+        return "failed"
+    if "retracted" in statuses and statuses <= {"retracted"}:
+        return "retracted"
+    if "pending" in statuses:
+        return "pending"
+    return "pending"
+
+
 def derive_delivery_publish_status_mirror(
     closure: Optional[Mapping[str, Any]],
 ) -> dict[str, Any]:
@@ -190,6 +217,22 @@ def derive_delivery_publish_status_mirror(
             None,
         )
         # Channel mirrored only when uniform across rows; else None.
+        channels = {
+            (cm.get("channel_id") if isinstance(cm, Mapping) else None)
+            for row in rows
+            for cm in (row.get("channel_metrics") or [])
+        }
+        channels.discard(None)
+        publish_channel = next(iter(channels)) if len(channels) == 1 else None
+    elif line_id == "digital_anchor":
+        publish_status = _digital_anchor_aggregate_status(closure_map)
+        rows = list(closure_map.get("role_feedback") or []) + list(
+            closure_map.get("segment_feedback") or []
+        )
+        publish_url = next(
+            (row.get("publish_url") for row in rows if row.get("publish_url")),
+            None,
+        )
         channels = {
             (cm.get("channel_id") if isinstance(cm, Mapping) else None)
             for row in rows

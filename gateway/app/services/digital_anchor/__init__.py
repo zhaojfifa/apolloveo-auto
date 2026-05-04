@@ -1,9 +1,9 @@
 """Digital Anchor line services."""
 
 from .closure_binding import (
+    apply_writeback_event_for_task,
     get_closure_view_for_task,
     get_or_create_for_task,
-    write_publish_closure_for_task,
     write_role_feedback_for_task,
     write_segment_feedback_for_task,
 )
@@ -29,6 +29,7 @@ __all__ = [
     "DIGITAL_ANCHOR_LINE_ID",
     "DigitalAnchorCreateEntry",
     "InMemoryClosureStore",
+    "apply_writeback_event_for_task",
     "build_digital_anchor_entry",
     "build_digital_anchor_task_payload",
     "create_closure",
@@ -37,7 +38,6 @@ __all__ = [
     "project_closure_view",
     "project_delivery_binding",
     "project_workbench_role_speaker_surface",
-    "write_publish_closure_for_task",
     "write_role_feedback_for_task",
     "write_segment_feedback_for_task",
 ]

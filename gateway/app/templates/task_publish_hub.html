@@ -488,28 +488,46 @@
             </div>
           </form>
 
-          <h3 style="margin:14px 0 6px;">scoped publish closure</h3>
-          <form id="da-publish-closure-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
+          <h3 style="margin:14px 0 6px;">D.1 publish 反馈写回（active path）</h3>
+          <div class="muted t-secondary" style="margin-bottom:6px;">
+            按 <code>publish_feedback_writeback_contract_v1</code> §"Closed write-back event set"。
+            事件按 <code>row_scope</code>(role/segment) + <code>row_id</code> 定位单行；
+            <code>publish_status</code> ∈ {pending, published, failed, retracted}。
+          </div>
+          <form id="da-d1-event-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
             <label class="field">
-              <span>publish_status</span>
-              <select name="publish_status" required>
-                <option value="not_published">not_published</option>
-                <option value="published">published</option>
-                <option value="publish_failed">publish_failed</option>
-                <option value="archived">archived</option>
+              <span>event_kind</span>
+              <select name="event_kind" id="da-d1-event-kind" required>
+                <option value="publish_attempted">publish_attempted（operator）</option>
+                <option value="publish_accepted">publish_accepted（platform）</option>
+                <option value="publish_rejected">publish_rejected（platform）</option>
+                <option value="publish_retracted">publish_retracted（operator）</option>
+                <option value="metrics_snapshot">metrics_snapshot（platform）</option>
+                <option value="operator_note">operator_note（operator）</option>
               </select>
             </label>
             <label class="field">
-              <span>publish_url</span>
+              <span>row_scope</span>
+              <select name="row_scope" required>
+                <option value="role">role</option>
+                <option value="segment">segment</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>row_id（role_id 或 segment_id）</span>
+              <input type="text" name="row_id" required />
+            </label>
+            <label class="field" data-role="da-d1-payload-publish-url">
+              <span>payload.publish_url（仅 publish_accepted）</span>
               <input type="url" name="publish_url" />
             </label>
-            <label class="field" style="grid-column: 1 / -1;">
-              <span>operator_publish_notes</span>
-              <textarea name="operator_publish_notes" rows="2"></textarea>
+            <label class="field" data-role="da-d1-payload-note" style="grid-column: 1 / -1; display:none;">
+              <span>payload.note（operator_note）</span>
+              <textarea name="note" rows="2"></textarea>
             </label>
             <div class="copy-row" style="grid-column: 1 / -1;">
-              <button type="submit" class="btn-primary">写入 publish closure</button>
-              <span id="da-publish-closure-status" class="muted"></span>
+              <button type="submit" class="btn-primary">写入 D.1 事件</button>
+              <span id="da-d1-event-status" class="muted"></span>
             </div>
           </form>
 
@@ -1104,8 +1122,9 @@ function resolveLang(serverLang) {
       const roleStatus = document.getElementById("da-role-feedback-status");
       const segmentForm = document.getElementById("da-segment-feedback-form");
       const segmentStatus = document.getElementById("da-segment-feedback-status");
-      const publishForm = document.getElementById("da-publish-closure-form");
-      const publishStatus = document.getElementById("da-publish-closure-status");
+      const d1Form = document.getElementById("da-d1-event-form");
+      const d1Status = document.getElementById("da-d1-event-status");
+      const d1EventKind = document.getElementById("da-d1-event-kind");
 
       async function refreshClosure() {
         try {
@@ -1177,10 +1196,55 @@ function resolveLang(serverLang) {
           postEvent(segmentForm, segmentStatus, "segment-feedback");
         });
       }
-      if (publishForm) {
-        publishForm.addEventListener("submit", (ev) => {
+      function syncD1FieldVisibility() {
+        const kind = (d1EventKind && d1EventKind.value) || "";
+        const urlField = block.querySelector('[data-role="da-d1-payload-publish-url"]');
+        const noteField = block.querySelector('[data-role="da-d1-payload-note"]');
+        if (urlField) urlField.style.display = kind === "publish_accepted" ? "" : "none";
+        if (noteField) noteField.style.display = kind === "operator_note" ? "" : "none";
+      }
+      if (d1EventKind) d1EventKind.addEventListener("change", syncD1FieldVisibility);
+      syncD1FieldVisibility();
+
+      if (d1Form) {
+        d1Form.addEventListener("submit", async (ev) => {
           ev.preventDefault();
-          postEvent(publishForm, publishStatus, "publish-closure");
+          const formData = new FormData(d1Form);
+          const eventKind = formData.get("event_kind") || "";
+          const body = {
+            event_kind: eventKind,
+            row_scope: formData.get("row_scope") || "",
+            row_id: formData.get("row_id") || "",
+            recorded_at: new Date().toISOString(),
+            payload: {},
+          };
+          if (eventKind === "publish_accepted") {
+            const url = formData.get("publish_url");
+            if (url) body.payload.publish_url = url;
+          } else if (eventKind === "operator_note") {
+            const note = formData.get("note");
+            if (note) body.payload.note = note;
+          }
+          if (d1Status) d1Status.textContent = "提交中…";
+          try {
+            const resp = await fetch(
+              `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}/events`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+              }
+            );
+            const respBody = await resp.json();
+            if (!resp.ok) {
+              if (d1Status) d1Status.textContent = "失败：" + (respBody.detail || resp.status);
+              return;
+            }
+            renderDigitalAnchorClosure(respBody && respBody.closure);
+            if (d1Status) d1Status.textContent = "已写入 record_id=" + (respBody.record_id || "—");
+          } catch (err) {
+            if (d1Status) d1Status.textContent = "失败：" + (err && err.message);
+          }
         });
       }
       refreshClosure();

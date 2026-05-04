@@ -92,12 +92,16 @@
           </div>
 
           <div class="field">
-            <label for="source_language">source_language（必填）</label>
-            <input type="text" id="source_language" name="source_language" required placeholder="en" />
+            <label for="language_scope_source_language">language_scope.source_language（必填）</label>
+            <input type="text" id="language_scope_source_language"
+                   name="language_scope[source_language]" required placeholder="en" />
+            <div class="help">归属 <code>language_scope</code> 闭合对象；route 边界仅接受
+              <code>language_scope[source_language]</code> / <code>language_scope[target_language]</code>。</div>
           </div>
           <div class="field">
-            <label for="target_language">target_language（必填，逗号分隔）</label>
-            <input type="text" id="target_language" name="target_language" required placeholder="zh, mm" />
+            <label for="language_scope_target_language">language_scope.target_language（必填，逗号分隔）</label>
+            <input type="text" id="language_scope_target_language"
+                   name="language_scope[target_language]" required placeholder="zh, mm" />
             <div class="help">由 <code>g_lang</code> 允许值约束；Phase B 才绑定到 role / segment。</div>
           </div>
 

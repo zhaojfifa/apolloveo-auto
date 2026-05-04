@@ -170,34 +170,43 @@ def write_segment_feedback_for_task(
     )
 
 
-def write_publish_closure_for_task(
+def apply_writeback_event_for_task(
     task: Mapping[str, Any],
     *,
-    publish_status: str,
-    publish_url: Optional[str] = None,
-    channel_metrics: Optional[Mapping[str, Any]] = None,
-    operator_publish_notes: Optional[str] = None,
-    role_ids: Optional[list[str]] = None,
-    segment_ids: Optional[list[str]] = None,
-    recorded_by: str = "operator",
-    record_kind: str = "publish_callback",
+    event_kind: str,
+    row_scope: str,
+    row_id: str,
+    payload: Optional[Mapping[str, Any]] = None,
+    actor_kind: Optional[str] = None,
+    recorded_by: Optional[str] = None,
     recorded_at: Optional[str] = None,
 ) -> Dict[str, Any]:
+    """Apply one Phase D.1 publish-feedback write-back event for a task.
+
+    This is the **active truth path** for publish-state mutations per
+    ``docs/contracts/digital_anchor/publish_feedback_writeback_contract_v1.md``.
+    The older D.0-style ``write_publish_closure_for_task`` (which set a
+    closure-wide ``publish_status`` from the
+    ``{not_published, published, publish_failed, archived}`` enum) is
+    removed from the operator path; the D.1 event vocabulary
+    (``publish_attempted`` / ``publish_accepted`` / ``publish_rejected``
+    / ``publish_retracted`` / ``metrics_snapshot`` / ``operator_note``)
+    targeting per-row ``publish_status`` ∈ ``{pending, published, failed,
+    retracted}`` is the only path operators may invoke.
+    """
     get_or_create_for_task(task)
     task_id = _task_id(task)
     with _LOCK:
         closure_id = _TASK_TO_CLOSURE[task_id]
-    return _STORE.write_publish_closure(
+    return _STORE.apply_writeback_event(
         closure_id,
         _packet_view(task),
-        publish_status=publish_status,
-        publish_url=publish_url,
-        channel_metrics=channel_metrics,
-        operator_publish_notes=operator_publish_notes,
-        role_ids=role_ids,
-        segment_ids=segment_ids,
+        event_kind=event_kind,
+        row_scope=row_scope,
+        row_id=row_id,
+        payload=payload,
+        actor_kind=actor_kind,
         recorded_by=recorded_by,
-        record_kind=record_kind,
         recorded_at=recorded_at,
     )
 
@@ -212,9 +221,9 @@ def reset_for_tests() -> None:
 __all__ = [
     "ClosureValidationError",
     "DIGITAL_ANCHOR_LINE_ID",
+    "apply_writeback_event_for_task",
     "get_closure_view_for_task",
     "get_or_create_for_task",
-    "write_publish_closure_for_task",
     "write_role_feedback_for_task",
     "write_segment_feedback_for_task",
 ]
