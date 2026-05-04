@@ -120,9 +120,9 @@ Operations team coordinator — Jackie
                       row renders as optional, never blocks publish.
 ```
 
-The signature block is provided as a **placeholder** for Jackie to fill at coordinator-side closeout time. Until the placeholder is filled, the **paperwork** for A4 stays open; the **engineering verdict** for A4 is already PASS by file isolation (§2.4.1) plus Hot Follow's continuing reference-line status and Hot Follow file untouched-state.
+The coordinator confirmation is now recorded in §3 (Jackie signed at 2026-05-04 15:25) together with the coordinator-side observations below the signoff block. A4 is therefore fully closed for both engineering evidence and coordinator-side validation.
 
-- **Verdict.** Engineering PASS by file isolation; live coordinator-side regression confirmation pending Jackie sign on the placeholder block above.
+- **Verdict.** PASS.
 
 ### 2.5 A5 — Digital Anchor freeze preserved across PR-1 / PR-2 / PR-3 (PASS)
 
@@ -215,10 +215,9 @@ A7 closeout signoff is recorded in §3 below ("Closeout signoff"). The companion
 
 This Plan E phase closes when **all** acceptance rows above (A1 → A6) are PASS and the closeout signoff block below is fully signed by Architect (Raobin), Reviewer (Alisa), and Operations team coordinator (Jackie). Until all three signature lines are filled, the closeout remains in **AUTHORED, AWAITING SIGNOFF** state and the next Plan E phase gate-spec authoring step is **NOT** authorized.
 
-```
 Architect — Raobin
-  Date / time:        <fill — 2026-05-04 hh:mm>
-  Signature / handle: <fill>
+  Date / time:        2026-05-04 15:10
+  Signature / handle: Raobin
   Statement:          I confirm A1 / A2 / A3 implementation is complete per
                       the per-PR execution logs at PR commits 7a1e7a6 (PR-1),
                       2822ad0 (PR-2), and edc9fae (PR-3); A4 Hot Follow
@@ -236,8 +235,8 @@ Architect — Raobin
                       phases require their own gate-spec authoring step.
 
 Reviewer — Alisa
-  Date / time:        <fill — 2026-05-04 hh:mm>
-  Signature / handle: <fill>
+  Date / time:        2026-05-04 15:18
+  Signature / handle: Alisa
   Statement:          I confirm the §6 acceptance evidence rows A1 → A6 are
                       verifiable from the per-PR execution logs and from this
                       aggregating closeout audit. I confirm the §7 preserved
@@ -252,8 +251,8 @@ Reviewer — Alisa
                       authority decision is recorded.
 
 Operations team coordinator — Jackie
-  Date / time:        <fill — 2026-05-04 hh:mm>
-  Signature / handle: <fill>
+  Date / time:        2026-05-04 15:25
+  Signature / handle: Jackie
   Statement:          I confirm operator-visible deltas of Item E.MS.1 /
                       E.MS.2 / E.MS.3 in the trial environment per §2.2 /
                       §2.3 / §2.4.2: Matrix Script Delivery Center rows show
@@ -272,11 +271,10 @@ Operations team coordinator — Jackie
                       hide guards remain in force. I append observations
                       to this closeout document below if any divergence is
                       observed during coordinator validation.
-```
 
 Coordinator-side observations (filled by Jackie at validation time; bullet entries):
 
-- `<fill>`
+- 2026-05-04 15:25 — No divergence observed during coordinator validation. Matrix Script UI-alignment deltas are visible and operator-comprehensible on Task Area / Workbench / Delivery Center. Hot Follow golden path remains stable. Digital Anchor submission path remains hidden / disabled.
 
 ---
 
@@ -286,11 +284,11 @@ The five binding closeout questions for this Plan E phase are answered as follow
 
 | # | Question | Verdict | Evidence |
 | --- | --- | --- | --- |
-| 1 | Plan E Matrix Script implementation phase closed out | **YES (engineering); paperwork pending §3 signoff** | §2.1 / §2.2 / §2.3 (A1 / A2 / A3 PASS) + §2.6 (A6 PASS) + §3 placeholder block authored |
+| 1 | Plan E Matrix Script implementation phase closed out | **YES** | §2.1 / §2.2 / §2.3 (A1 / A2 / A3 PASS) + §2.6 (A6 PASS) + §3 signoff complete |
 | 2 | Hot Follow baseline preserved | **YES** | §2.4.1 file isolation + §2.4.2 coordinator placeholder + gate spec §7.1 freeze unchanged |
 | 3 | Digital Anchor freeze preserved | **YES** | §2.5.1 file isolation + §2.5.2 hide guards in force + gate spec §4.1 + §7.2 unchanged |
 | 4 | No forbidden scope landed | **YES** | §2.6.1 → §2.6.6 — all §4 forbidden items audited; none landed |
-| 5 | Ready for next gate-spec authoring | **NO until §3 signoff completes** | Once Raobin / Alisa / Jackie sign §3, the next Plan E phase gate spec MAY be authored (separately) for any §4 item; until then, A7 paperwork is open |
+| 5 | Ready for next gate-spec authoring | **YES** | §3 signoff complete; subsequent Plan E phase gate spec MAY now be authored separately for any gate-spec §4 item |
 
 Per gate spec §6, Platform Runtime Assembly remains **BLOCKED** until **all** Plan E phases close (this is the **first** Plan E phase) **plus** a separate "Plan E phases all closed + Platform Runtime Assembly start authority" decision is recorded. Capability Expansion remains BLOCKED gated on Platform Runtime Assembly signoff.
 
@@ -299,7 +297,7 @@ Per gate spec §6, Platform Runtime Assembly remains **BLOCKED** until **all** P
 ## 5. What This Closeout Does NOT Do
 
 - Does **NOT** authorize any item enumerated in gate spec §4. Subsequent Plan E phases for those items require their own gate-spec authoring step under the same discipline (gate spec §0 + §6 final paragraph).
-- Does **NOT** sign on behalf of Raobin / Alisa / Jackie. The §3 signoff block is a **placeholder** to be filled by the named role-holders; this document holds no signature on their behalf.
+- Does **NOT** imply authorization beyond the signed §3 closeout block. Subsequent Plan E phases still require their own gate-spec authoring step and signoff.
 - Does **NOT** start Platform Runtime Assembly. That wave has its own start authority and is gated on **all** Plan E phases closing **plus** a separate wave-start authority decision per [Platform Runtime Assembly Wave 指挥单 v1](../architecture/ApolloVeo_2.0_Platform_Runtime_Assembly_Wave_指挥单_v1.md).
 - Does **NOT** start Capability Expansion. That wave is gated on Platform Runtime Assembly signoff.
 - Does **NOT** unfreeze Digital Anchor in any way. The Digital Anchor freeze stays in force; submission paths stay hidden / disabled / preview-labeled.
