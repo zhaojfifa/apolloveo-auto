@@ -304,6 +304,80 @@
           <h3 style="margin:14px 0 6px;" data-role="ms-delivery-history-label">历史成功 vs 当前尝试</h3>
           <div class="muted" data-role="ms-delivery-history-explanation"></div>
         </div>
+
+        {# Recovery PR-3: Matrix Script publish-feedback closure operator surface.
+           Per docs/contracts/matrix_script/publish_feedback_closure_contract_v1.md,
+           the closure is a separate ownership zone (Phase D); operator events flow
+           through POST /api/matrix-script/closures/{task_id}/events. Server-rendered
+           container + JS-driven row population from data.matrix_script_publish_feedback_closure. #}
+        <div class="card" id="matrix-script-closure-block"
+             data-role="matrix-script-closure" style="margin-top:10px;">
+          <div class="section-title">
+            <h2>Matrix Script · 发布反馈闭环</h2>
+            <div class="secondary">
+              每个 variation（cell_id）对应一行可操作的发布反馈记录。事件按 contract 走
+              <code>POST /api/matrix-script/closures/{task_id}/events</code>。所有写回均严格遵循
+              <code>matrix_script_publish_feedback_closure_v1</code> 的封闭枚举。
+            </div>
+          </div>
+          <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse; margin-top:8px;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">variation_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">publish_status</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">publish_url</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">last_event_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">action</th>
+              </tr>
+            </thead>
+            <tbody data-role="ms-closure-rows"></tbody>
+          </table>
+          <div class="muted" data-role="ms-closure-empty" style="display:none; margin-top:8px;">
+            尚未生成 closure 记录；点击下方 “初始化 closure” 即可基于当前 packet 创建。
+          </div>
+          <div class="copy-row" style="margin-top:8px; gap:8px;">
+            <button id="btn-ms-closure-init" type="button" class="btn-secondary">初始化 closure</button>
+            <span id="ms-closure-status" class="muted"></span>
+          </div>
+
+          <h3 style="margin:14px 0 6px;">触发事件</h3>
+          <form id="ms-closure-event-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
+            <label class="field">
+              <span>variation_id</span>
+              <select name="variation_id" id="ms-closure-variation-select" required></select>
+            </label>
+            <label class="field">
+              <span>event_kind</span>
+              <select name="event_kind" id="ms-closure-event-kind" required>
+                <option value="operator_publish">operator_publish</option>
+                <option value="operator_retract">operator_retract</option>
+                <option value="operator_note">operator_note</option>
+              </select>
+            </label>
+            <label class="field" data-role="ms-closure-publish-url-field">
+              <span>publish_url（仅 operator_publish）</span>
+              <input type="url" name="publish_url" id="ms-closure-publish-url" />
+            </label>
+            <label class="field" data-role="ms-closure-publish-status-field">
+              <span>publish_status</span>
+              <select name="publish_status" id="ms-closure-publish-status">
+                <option value="pending">pending</option>
+                <option value="retracted">retracted</option>
+              </select>
+            </label>
+            <label class="field" data-role="ms-closure-note-field" style="grid-column: 1 / -1; display:none;">
+              <span>operator_publish_notes（仅 operator_note）</span>
+              <textarea name="operator_publish_notes" id="ms-closure-notes" rows="2"></textarea>
+            </label>
+            <div class="copy-row" style="grid-column: 1 / -1;">
+              <button type="submit" class="btn-primary">提交事件</button>
+              <span id="ms-closure-event-status" class="muted"></span>
+            </div>
+          </form>
+
+          <h3 style="margin:14px 0 6px;">最近事件（append-only）</h3>
+          <ul data-role="ms-closure-events-recent" class="muted" style="margin:6px 0 0 18px;"></ul>
+        </div>
       {% endif %}
       <div class="card" data-role="operator-publish-gate-strip">
         <div class="section-title">
@@ -635,6 +709,190 @@ function resolveLang(serverLang) {
       if (publishedEl) publishedEl.checked = published;
     }
 
+    // Recovery PR-3: Matrix Script publish-feedback closure renderer.
+    // Reads only data.matrix_script_publish_feedback_closure; emits no
+    // provider/model/vendor/engine identifiers; submits events through the
+    // contract-backed POST /api/matrix-script/closures/{task_id}/events.
+    function renderMatrixScriptClosure(closure) {
+      const block = document.getElementById("matrix-script-closure-block");
+      if (!block) return;
+      const tbody = block.querySelector('[data-role="ms-closure-rows"]');
+      const emptyEl = block.querySelector('[data-role="ms-closure-empty"]');
+      const variationSelect = document.getElementById("ms-closure-variation-select");
+      const eventsEl = block.querySelector('[data-role="ms-closure-events-recent"]');
+      if (!closure || !closure.variation_feedback) {
+        if (tbody) tbody.innerHTML = "";
+        if (emptyEl) emptyEl.style.display = "";
+        if (variationSelect) variationSelect.innerHTML = "";
+        if (eventsEl) eventsEl.innerHTML = "";
+        return;
+      }
+      if (emptyEl) emptyEl.style.display = "none";
+      if (tbody) {
+        tbody.innerHTML = "";
+        (closure.variation_feedback || []).forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.dataset.variationId = row.variation_id || "";
+          const cells = [
+            row.variation_id || "—",
+            row.publish_status || "pending",
+            row.publish_url || "—",
+            row.last_event_id || "—",
+            "",
+          ];
+          cells.forEach((value, idx) => {
+            const td = document.createElement("td");
+            td.style.padding = "6px";
+            td.style.borderBottom = "1px solid #f1f5f9";
+            if (idx === 0 || idx === 3) {
+              const code = document.createElement("code");
+              code.textContent = value;
+              td.appendChild(code);
+            } else if (idx === 4) {
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "btn-secondary";
+              btn.textContent = "选择";
+              btn.addEventListener("click", () => {
+                if (variationSelect) variationSelect.value = row.variation_id || "";
+              });
+              td.appendChild(btn);
+            } else {
+              td.textContent = value;
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+      if (variationSelect) {
+        variationSelect.innerHTML = "";
+        (closure.variation_feedback || []).forEach((row) => {
+          const opt = document.createElement("option");
+          opt.value = row.variation_id || "";
+          opt.textContent = row.variation_id || "";
+          variationSelect.appendChild(opt);
+        });
+      }
+      if (eventsEl) {
+        eventsEl.innerHTML = "";
+        const records = (closure.feedback_closure_records || []).slice(-5).reverse();
+        records.forEach((record) => {
+          const li = document.createElement("li");
+          li.textContent =
+            (record.recorded_at || "—") +
+            " · " +
+            (record.event_kind || "—") +
+            " · variation=" +
+            (record.variation_id || "—") +
+            " · actor=" +
+            (record.actor_kind || "—");
+          eventsEl.appendChild(li);
+        });
+      }
+    }
+
+    function bindMatrixScriptClosureForm() {
+      const form = document.getElementById("ms-closure-event-form");
+      const initBtn = document.getElementById("btn-ms-closure-init");
+      const eventKindSelect = document.getElementById("ms-closure-event-kind");
+      const urlField = document.querySelector('[data-role="ms-closure-publish-url-field"]');
+      const statusField = document.querySelector('[data-role="ms-closure-publish-status-field"]');
+      const noteField = document.querySelector('[data-role="ms-closure-note-field"]');
+      const formStatusEl = document.getElementById("ms-closure-event-status");
+      const initStatusEl = document.getElementById("ms-closure-status");
+      if (!form) return;
+
+      function syncFieldVisibility() {
+        const kind = (eventKindSelect && eventKindSelect.value) || "";
+        if (urlField) urlField.style.display = kind === "operator_publish" ? "" : "none";
+        if (statusField) statusField.style.display = kind === "operator_publish" ? "" : "none";
+        if (noteField) noteField.style.display = kind === "operator_note" ? "" : "none";
+      }
+      if (eventKindSelect) eventKindSelect.addEventListener("change", syncFieldVisibility);
+      syncFieldVisibility();
+
+      async function refreshClosure() {
+        try {
+          const resp = await fetch(
+            `/api/matrix-script/closures/${encodeURIComponent(TASK_ID)}/peek`
+          );
+          if (!resp.ok) return;
+          const body = await resp.json();
+          renderMatrixScriptClosure(body && body.closure);
+        } catch (err) { /* presentation-only; never crash */ }
+      }
+
+      if (initBtn) {
+        initBtn.addEventListener("click", async () => {
+          if (initStatusEl) initStatusEl.textContent = "正在初始化…";
+          try {
+            const resp = await fetch(
+              `/api/matrix-script/closures/${encodeURIComponent(TASK_ID)}`
+            );
+            const body = await resp.json();
+            if (!resp.ok) {
+              if (initStatusEl) initStatusEl.textContent = "失败：" + (body.detail || resp.status);
+              return;
+            }
+            renderMatrixScriptClosure(body);
+            if (initStatusEl) initStatusEl.textContent = "已就绪";
+          } catch (err) {
+            if (initStatusEl) initStatusEl.textContent = "失败：" + (err && err.message);
+          }
+        });
+      }
+
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const kind = (eventKindSelect && eventKindSelect.value) || "";
+        const variationId = document.getElementById("ms-closure-variation-select").value;
+        if (!variationId) {
+          if (formStatusEl) formStatusEl.textContent = "请先选择 variation_id（点击表格中的 “选择”）";
+          return;
+        }
+        const event = {
+          event_kind: kind,
+          variation_id: variationId,
+          recorded_at: new Date().toISOString(),
+        };
+        if (kind === "operator_publish") {
+          const url = document.getElementById("ms-closure-publish-url").value || null;
+          const status = document.getElementById("ms-closure-publish-status").value || "pending";
+          event.payload = { publish_status: status };
+          if (url) event.payload.publish_url = url;
+        } else if (kind === "operator_note") {
+          const note = document.getElementById("ms-closure-notes").value || "";
+          event.payload = { operator_publish_notes: note };
+        } else if (kind === "operator_retract") {
+          event.payload = {};
+        }
+        if (formStatusEl) formStatusEl.textContent = "提交中…";
+        try {
+          const resp = await fetch(
+            `/api/matrix-script/closures/${encodeURIComponent(TASK_ID)}/events`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(event),
+            }
+          );
+          const body = await resp.json();
+          if (!resp.ok) {
+            if (formStatusEl) formStatusEl.textContent = "失败：" + (body.detail || resp.status);
+            return;
+          }
+          renderMatrixScriptClosure(body && body.closure);
+          if (formStatusEl) formStatusEl.textContent = "已写入 event_id=" + (body.event_id || "—");
+        } catch (err) {
+          if (formStatusEl) formStatusEl.textContent = "失败：" + (err && err.message);
+        }
+      });
+
+      // Initial fetch (no auto-create) so any pre-existing closure renders.
+      refreshClosure();
+    }
+
     function renderOperatorSurfaces(ops) {
       const delivery = (ops && ops.delivery) || {};
       const mirror = delivery.publish_status_mirror || {};
@@ -705,6 +963,7 @@ function resolveLang(serverLang) {
       setText("download-code", data.download_code || "-");
       renderDeliverables(data.deliverables || {});
       renderMatrixScriptDeliveryComprehension(data.matrix_script_delivery_comprehension || null);
+      renderMatrixScriptClosure(data.matrix_script_publish_feedback_closure || null);
       renderCopyBundle(data.copy_bundle || {});
       await fillCaptionFallback(data.copy_bundle || {});
       renderArchive(data.archive || {});
@@ -826,6 +1085,10 @@ function resolveLang(serverLang) {
     }
 
     document.addEventListener("DOMContentLoaded", () => {
+      // Recovery PR-3: bind the Matrix Script closure form once. The form
+      // surface only renders when the server emitted the gated container
+      // (task.kind == "matrix_script"); for other lines the call is a no-op.
+      try { bindMatrixScriptClosureForm(); } catch (err) { /* noop */ }
       const tabs = document.querySelectorAll(".tab-btn");
       const panels = document.querySelectorAll(".tab-panel");
       function activate(id) {

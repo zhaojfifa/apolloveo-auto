@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any
+from typing import Any, Mapping
 
 from gateway.app.config import get_settings
 from gateway.app.services.artifact_storage import object_exists
@@ -622,13 +622,32 @@ def _operator_surfaces_for_publish_hub(
         build_operator_surfaces_for_publish_hub,
     )
 
-    # publish_feedback_closure is task-side truth not currently materialized
-    # on the hot_follow task surface; pass None until the closure mirror is
-    # plumbed in. The mirror returns the empty `not_published` shape.
+    # Recovery PR-3: Matrix Script tasks read their persisted publish-feedback
+    # closure (if any) via the binding layer so `publish_status_mirror` becomes
+    # operator-meaningful for matrix_script. Hot Follow / Digital Anchor / other
+    # lines preserve the legacy `None` (empty `not_published` mirror) — the
+    # binding service is matrix_script-only and read-only at this seam.
+    closure: Mapping[str, Any] | None = None
+    kind = str(
+        task.get("kind") or task.get("category_key") or task.get("platform") or ""
+    ).strip().lower()
+    if kind == "matrix_script":
+        try:
+            from gateway.app.services.matrix_script.closure_binding import (
+                get_closure_view_for_task,
+            )
+
+            task_id = str(task.get("task_id") or task.get("id") or "")
+            if task_id:
+                closure = get_closure_view_for_task(task_id)
+        except Exception:
+            # Defense-in-depth: presenter must never crash the publish hub if
+            # the closure binding raises.
+            closure = None
     return build_operator_surfaces_for_publish_hub(
         task=task,
         authoritative_state=authoritative_state,
-        publish_feedback_closure=None,
+        publish_feedback_closure=closure,
     )
 
 
