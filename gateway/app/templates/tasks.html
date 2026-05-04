@@ -143,7 +143,7 @@
                   </span>
                   <span>&middot;</span>
                   <span data-role="ms-publishable-variation"
-                        {% if ms_owc and ms_owc.publishable_variation_count_value is not none %}title="可发布版本数 = 已 published 的变体数"{% else %}title="{{ ms_summary.publishable_variation_count_tooltip }}"{% endif %}>
+                        {% if ms_owc and ms_owc.publishable_variation_count_value is not none %}title="可发布版本数 = 已就绪可发布的变体数（来自统一 publish_readiness 判定，可发布 ≠ 已发布）"{% else %}title="{{ ms_summary.publishable_variation_count_tooltip }}"{% endif %}>
                     {{ ms_summary.publishable_variation_count_label }}：{% if ms_owc %}{{ ms_owc.publishable_variation_count_value }}{% elif ms_summary.publishable_variation_count_value is none %}—{% else %}{{ ms_summary.publishable_variation_count_value }}{% endif %}
                   </span>
                   <span>&middot;</span>
