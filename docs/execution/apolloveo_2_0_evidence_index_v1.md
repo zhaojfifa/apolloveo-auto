@@ -198,6 +198,11 @@ Status: P2 pre-execution evidence index
 | Matrix Script Operator-Visible Slice — merge / signoff note (Phase A + Phase B + state-sync only; NOT Phase C / Phase D) | `docs/execution/evidence/matrix_script_operator_visible_slice_merge_note_v1.md` |
 | Operator Capability Recovery — direction-correction decision | `docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md` |
 | Operator Capability Recovery — global action / Claude handoff | `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_GLOBAL_ACTION_v1.md` |
+| Operator Capability Recovery PR-1 — execution log (MERGED 2026-05-04, PR #114, squash commit `4c317c4`) | `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR1_PUBLISH_READINESS_EXECUTION_LOG_v1.md` |
+| Operator Capability Recovery PR-1 — unified publish_readiness producer | `gateway/app/services/operator_visible_surfaces/publish_readiness.py` |
+| Operator Capability Recovery PR-1 — L4 advisory emitter | `gateway/app/services/operator_visible_surfaces/advisory_emitter.py` |
+| Operator Capability Recovery PR-1 — producer / L3 emission tests | `gateway/app/services/tests/test_publish_readiness_unified_producer.py`, `gateway/app/services/tests/test_final_provenance_emission.py` |
+| Operator Capability Recovery PR-1 — surface-alignment integration tests | `gateway/app/services/tests/test_publish_readiness_surface_alignment.py` |
 
 ## Current Known Evidence Gaps
 
