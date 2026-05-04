@@ -183,6 +183,12 @@ def build_operator_surfaces_for_workbench(
     packet_view = _packet_view(task)
     l2_facts = _l2_facts_from_state(state, task)
     l3_current_attempt = _l3_current_attempt_from_state(state, task)
+    # PR-1 reviewer-fix #2: Workbench and Delivery MUST consume the same
+    # Matrix Script delivery rows. Extract via the same helper Delivery
+    # uses; an explicit `delivery_rows` argument overrides extraction
+    # only for tests / callers that synthesize rows directly.
+    if delivery_rows is None:
+        delivery_rows = _matrix_script_delivery_rows(packet_view)
     bundle = project_operator_surfaces(
         ready_gate=ready_gate or {},
         l2_facts=l2_facts,
@@ -241,7 +247,18 @@ def build_operator_surfaces_for_workbench(
 
 
 def _matrix_script_delivery_rows(packet_view: Mapping[str, Any]) -> list[dict[str, Any]] | None:
-    """Best-effort extraction of Matrix Script delivery binding rows.
+    """Extract Matrix Script delivery binding rows from authoritative shape.
+
+    PR-1 reviewer-fix #2: the Matrix Script delivery binding emits
+    ``{"surface": "matrix_script_delivery_binding_v1",
+        "delivery_pack": {"deliverables": [...]}, ...}`` per
+    [delivery_binding.py:328-336](../matrix_script/delivery_binding.py).
+    The previous read path used ``binding.get("deliverables")`` at the
+    top level — that key does not exist on the contract output, so rows
+    were silently dropped and unresolved required rows never reached the
+    unified producer. Fixed: read from
+    ``binding["delivery_pack"]["deliverables"]``, the authoritative
+    location.
 
     Returns ``None`` when the task is not Matrix Script or when the
     projection raises (defense-in-depth: presentation-layer must never
@@ -262,7 +279,12 @@ def _matrix_script_delivery_rows(packet_view: Mapping[str, Any]) -> list[dict[st
         binding = project_delivery_binding(packet_view)
     except Exception:
         return None
-    rows = binding.get("deliverables") if isinstance(binding, Mapping) else None
+    if not isinstance(binding, Mapping):
+        return None
+    delivery_pack = binding.get("delivery_pack")
+    if not isinstance(delivery_pack, Mapping):
+        return None
+    rows = delivery_pack.get("deliverables")
     if not isinstance(rows, list):
         return None
     return [row for row in rows if isinstance(row, Mapping)]

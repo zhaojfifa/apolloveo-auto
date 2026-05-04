@@ -344,6 +344,117 @@ exact correction made, and residual risks after correction.
   `derive_delivery_publish_gate`) remain in `projections.py` per
   ENGINEERING_RULES §7. Removal still queued for a later Recovery Wave PR.
 
+## 9.2 Second Reviewer-Fail Correction Pass (2026-05-04)
+
+The second Codex/architect review of the PR-1 correction pass returned
+FAIL with one narrow but load-bearing finding: the Matrix Script
+unresolved-required-rows scenario was not actually reaching the unified
+`compute_publish_readiness` path. The producer-isolated tests continued
+to pass because they synthesized rows directly; the surface-alignment
+test for Matrix Script was conditional (`if not publishable: ...`) and
+silently passed when no rows reached the producer.
+
+### 9.2.1 Reviewer finding (FAIL)
+
+`_matrix_script_delivery_rows()` in
+[`wiring.py`](../../gateway/app/services/operator_visible_surfaces/wiring.py)
+read `binding.get("deliverables")` at the top level of the delivery
+binding output. The authoritative shape from
+[`gateway/app/services/matrix_script/delivery_binding.py:328-336`](../../gateway/app/services/matrix_script/delivery_binding.py)
+places rows under `delivery_pack.deliverables`. The wrong key returned
+`None`; the producer was always called with `delivery_rows=None` for
+Matrix Script tasks; unresolved required rows therefore never reached
+the unified producer's `required_deliverable_*` head_reason path.
+
+A second latent bug surfaced once the read path was fixed: the
+producer's `_row_status()` helper read `row["artifact_lookup"]["status"]`,
+but real Matrix Script rows expose `artifact_lookup` either as the
+sentinel string `"artifact_lookup_unresolved"` or as the contract dict
+`{"artifact_ref", "freshness", "provenance"}` per
+[`result_packet_binding_artifact_lookup_contract_v1.md`](../contracts/matrix_script/result_packet_binding_artifact_lookup_contract_v1.md)
+— never with a `status` key. Real rows would have been treated as
+"unresolved" via the empty-status fallback (correct outcome by accident
+on unresolved rows) but resolved rows would also be misclassified.
+
+### 9.2.2 Exact code paths fixed
+
+1. **Read path** ([`wiring.py::_matrix_script_delivery_rows`](../../gateway/app/services/operator_visible_surfaces/wiring.py)):
+   - Before: `binding.get("deliverables")` → always `None` → producer
+     received no rows.
+   - After: `binding["delivery_pack"]["deliverables"]` — the
+     authoritative location per the Matrix Script delivery binding
+     contract output. Defensive type checks preserved.
+2. **Workbench / Delivery row parity** ([`wiring.py::build_operator_surfaces_for_workbench`](../../gateway/app/services/operator_visible_surfaces/wiring.py)):
+   - Before: only `build_operator_surfaces_for_publish_hub` extracted
+     Matrix Script rows; Workbench called the producer with
+     `delivery_rows=None` regardless of line.
+   - After: when `delivery_rows` argument is `None`, Workbench also
+     calls `_matrix_script_delivery_rows(packet_view)`, so both surfaces
+     receive identical rows for the same task state. An explicit
+     `delivery_rows` argument still wins for tests / callers that
+     synthesize rows.
+3. **Row status reader** ([`publish_readiness.py::_row_status`](../../gateway/app/services/operator_visible_surfaces/publish_readiness.py)):
+   - Now recognizes the contract sentinel string
+     `"artifact_lookup_unresolved"` → `"unresolved"`.
+   - Recognizes the contract dict shape: `artifact_ref` present →
+     `"resolved"`; absent → `"unresolved"`.
+   - Synthetic test shape (`artifact_lookup.status`) still honored for
+     test fixtures.
+
+### 9.2.3 New tests proving closure
+
+Added to [`test_publish_readiness_surface_alignment.py`](../../gateway/app/services/tests/test_publish_readiness_surface_alignment.py):
+
+1. **`test_alignment_matrix_script_blocking_required_row`** — converted
+   from a conditional check into an **unconditional** blocked-result
+   assertion. A Matrix Script packet with no resolved artifact handles
+   MUST produce `publishable=False` with `head_reason in
+   {required_deliverable_missing, required_deliverable_blocking}` on
+   BOTH Workbench and Delivery, and the legacy two-field shape on
+   Delivery + Workbench's overlaid `bundle.delivery` MUST agree. This
+   test would have failed against the broken read path.
+2. **`test_matrix_script_delivery_rows_reaches_producer_via_authoritative_path`**
+   — direct read-path guard. Asserts `_matrix_script_delivery_rows`
+   returns the same row count and the same required-kind set as
+   `project_delivery_binding(packet)["delivery_pack"]["deliverables"]`.
+   Future refactors that move the rows out of `delivery_pack` will fail
+   this test before they break the producer.
+
+### 9.2.4 Tests after second correction
+
+- Producer suite: **30/30 PASS** (unchanged from §9.1).
+- L3 emission suite: **5/5 PASS** (unchanged).
+- Surface-alignment suite: **18/18 PASS** (17 + 1 new read-path guard;
+  the Matrix Script blocking test is now unconditional and would fail
+  against the original bug).
+- Adjacent baseline: **137 PASS** (Hot Follow current_attempt wave1,
+  Matrix Script B4/zoning/comprehension/card summary, contract_runtime
+  projection rules, Hot Follow L4 wave2, artifact facts, subtitle
+  currentness, helper translation, line binding service).
+- Aggregate: **190 PASS / 0 FAIL** on Python 3.9 import-light set.
+
+### 9.2.5 Why the Matrix Script blocking-row blocker is now closed
+
+| Reviewer requirement | Closed by |
+| --- | --- |
+| `_matrix_script_delivery_rows` reads the authoritative shape | Read path corrected to `binding["delivery_pack"]["deliverables"]`. |
+| Workbench and Delivery receive the same Matrix Script rows | `build_operator_surfaces_for_workbench` now extracts via the same `_matrix_script_delivery_rows` helper Delivery uses. |
+| Unconditional integration test that fails unless unresolved required rows produce blocked | `test_alignment_matrix_script_blocking_required_row` hard-asserts `publishable=False` and `head_reason in {required_deliverable_missing, required_deliverable_blocking}` across Workbench + Delivery + their legacy two-field shapes. |
+| Verified across surfaces, not only producer-local logic | Test exercises `build_operator_surfaces_for_workbench` and `build_operator_surfaces_for_publish_hub` end-to-end. |
+
+### 9.2.6 Residual risks after second correction
+
+- The contract `artifact_lookup` dict's `freshness` / `provenance` are
+  not yet consumed by the producer's row-status reader. Per the
+  artifact_lookup contract, presence of `artifact_ref` is sufficient
+  for "resolved"; freshness/provenance are L3 truths covered separately
+  by the producer's `final_provenance` consumption. No drift risk in
+  PR-1; future Recovery PRs may tighten the row-status reader if the
+  contract grows row-level freshness gating.
+- All other residual risks from §9.1.5 carry forward unchanged
+  (cold Board L2 deferral, Hot Follow `current_attempt` not yet on
+  state, legacy thin wrappers retained per ENGINEERING_RULES §7).
+
 ## 10. References
 
 - Decision: `docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`

@@ -184,23 +184,82 @@ def _matrix_script_task_with_unresolved_required_row() -> tuple[dict, dict]:
 
 
 def test_alignment_matrix_script_blocking_required_row() -> None:
+    """PR-1 reviewer-fix #2 closure test: unconditional. A Matrix Script
+    packet with no resolved artifact handles MUST produce a blocked
+    publish_readiness through the unified producer path on BOTH the
+    Workbench and Delivery surfaces. Failure here means either:
+      (a) `_matrix_script_delivery_rows` is reading from the wrong key
+          on the delivery binding output (real bug fixed in this PR), or
+      (b) the producer's row-status reader does not understand the
+          contract `artifact_lookup` shape (also fixed in this PR).
+    """
     task, state = _matrix_script_task_with_unresolved_required_row()
     workbench = build_operator_surfaces_for_workbench(task=task, authoritative_state=state)
     delivery = build_operator_surfaces_for_publish_hub(task=task, authoritative_state=state)
 
-    # Matrix Script's per-row `required` zoning means publish is blocked at
-    # the producer level when an unresolved required row exists.
     workbench_pr = workbench["publish_readiness"]
     delivery_pr = delivery["publish_readiness"]
+
+    # Cross-surface agreement first.
     assert workbench_pr["publishable"] == delivery_pr["publishable"]
     assert workbench_pr["head_reason"] == delivery_pr["head_reason"]
     assert workbench_pr["head_reason"] in CLOSED_HEAD_REASON_ENUM
-    if not workbench_pr["publishable"]:
-        # The producer's required-row gating maps to the dedicated enum value.
-        assert workbench_pr["head_reason"] in {
-            "required_deliverable_missing",
-            "required_deliverable_blocking",
-        }
+
+    # Unconditional blocked-result assertion — this is the reviewer's
+    # explicit requirement: unresolved required rows MUST produce blocked.
+    assert workbench_pr["publishable"] is False, (
+        "Matrix Script unresolved required rows did not block publish via the "
+        "unified producer; check `_matrix_script_delivery_rows` read path."
+    )
+    assert delivery_pr["publishable"] is False
+    assert workbench_pr["head_reason"] in {
+        "required_deliverable_missing",
+        "required_deliverable_blocking",
+    }, (
+        f"Expected required-deliverable head_reason; got {workbench_pr['head_reason']!r}."
+    )
+
+    # Legacy two-field shape on Delivery agrees too.
+    assert delivery["publish_gate"] is False
+    assert delivery["publish_gate_head_reason"] == workbench_pr["head_reason"]
+    # Workbench's overlaid bundle.delivery agrees.
+    assert workbench["delivery"]["publish_gate"] is False
+    assert workbench["delivery"]["publish_gate_head_reason"] == workbench_pr["head_reason"]
+    assert workbench["board"]["publishable"] is False
+
+
+def test_matrix_script_delivery_rows_reaches_producer_via_authoritative_path() -> None:
+    """Direct read-path assertion: `_matrix_script_delivery_rows` returns
+    the same rows the delivery binding's `delivery_pack.deliverables`
+    list contains. Guards against future refactors that move the rows.
+    """
+    from gateway.app.services.matrix_script.delivery_binding import (
+        project_delivery_binding,
+    )
+    from gateway.app.services.operator_visible_surfaces.wiring import (
+        _matrix_script_delivery_rows,
+    )
+
+    task, _state = _matrix_script_task_with_unresolved_required_row()
+    packet = task["packet"]
+    binding = project_delivery_binding(packet)
+    expected_rows = binding["delivery_pack"]["deliverables"]
+    actual_rows = _matrix_script_delivery_rows(packet)
+
+    assert actual_rows is not None, (
+        "_matrix_script_delivery_rows returned None — read path is broken."
+    )
+    assert len(actual_rows) == len(expected_rows) > 0
+    # Every expected required row appears in what reaches the producer.
+    expected_required_kinds = sorted(
+        r["kind"] for r in expected_rows if r.get("required")
+    )
+    actual_required_kinds = sorted(
+        r["kind"] for r in actual_rows if r.get("required")
+    )
+    assert actual_required_kinds == expected_required_kinds
+    assert "variation_manifest" in actual_required_kinds
+    assert "script_slot_bundle" in actual_required_kinds
 
 
 def test_alignment_matrix_script_resolved_rows_publish() -> None:

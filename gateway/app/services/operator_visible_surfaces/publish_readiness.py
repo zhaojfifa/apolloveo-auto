@@ -128,16 +128,46 @@ def _is_scene_pack_kind(kind: str) -> bool:
 def _row_status(row: Mapping[str, Any]) -> str:
     """Read a deliverable row's resolved status if exposed.
 
-    Matrix Script delivery binding rows expose ``artifact_lookup.status``
-    today. Hot Follow does not surface zoning rows at all (rows=None or
-    empty), so this helper is best-effort. A row with no observable status
-    is treated as ``unresolved`` for the purpose of required-row gating.
+    Matrix Script delivery binding rows expose ``artifact_lookup`` per
+    `docs/contracts/matrix_script/result_packet_binding_artifact_lookup_contract_v1.md`:
+
+    - the sentinel string ``"artifact_lookup_unresolved"`` when no
+      artifact handle could be resolved (today's default until the L3
+      `final_provenance` emitter is plumbed into Matrix Script — see
+      Plan E B4 execution log);
+    - a mapping ``{"artifact_ref", "freshness", "provenance"}`` when an
+      artifact handle was resolved.
+
+    PR-1 reviewer-fix #2: the previous implementation only recognized
+    rows with ``artifact_lookup.status`` (a synthetic test shape). Real
+    Matrix Script rows have no ``status`` field — the producer therefore
+    treated every row as ``unresolved`` only via the empty-status
+    fallback, which masked the real-row blocking semantics. Fixed: read
+    the contract sentinel + handle dict shape directly.
+
+    Hot Follow does not surface zoning rows at all (rows=None or empty),
+    so this helper is best-effort. A row with no observable status is
+    treated as ``unresolved`` for the purpose of required-row gating.
     """
-    artifact_lookup = row.get("artifact_lookup") if isinstance(row, Mapping) else None
+    if not isinstance(row, Mapping):
+        return "unresolved"
+    artifact_lookup = row.get("artifact_lookup")
+    # Contract sentinel: explicit unresolved.
+    if isinstance(artifact_lookup, str):
+        norm = artifact_lookup.strip().lower()
+        if norm == "artifact_lookup_unresolved" or not norm:
+            return "unresolved"
+        return norm
     if isinstance(artifact_lookup, Mapping):
+        # Synthetic test shape: explicit `status` key wins.
         status = str(artifact_lookup.get("status") or "").strip().lower()
         if status:
             return status
+        # Authoritative Matrix Script handle: presence of `artifact_ref`
+        # means the handle was resolved per the artifact_lookup contract.
+        if str(artifact_lookup.get("artifact_ref") or "").strip():
+            return "resolved"
+        return "unresolved"
     direct = str(row.get("status") or "").strip().lower()
     return direct or "unresolved"
 
