@@ -183,6 +183,57 @@ Adjacent regression (no behavior change expected; verifies byte-isolation):
 - **Variation lane shows 0 rows for tasks with empty `line_specific_refs`**: the projection is correct (no cells = no variation rows), but operators may interpret the empty lane as "task is broken." The 8-stage badge surfaces 待配置 in this case to give operator context. Future copy refinement may add an explicit empty-state hint inside the lane block.
 - **`channel_metrics[].account_id` and `published_at` field names are not yet in the closed Phase D.0 contract**: today's closure shape exposes `channel_metrics[]` with the four numeric fields (`impressions`, `views`, `engagement_rate`, `completion_rate`) plus a `platform` enum. The publish lane projection therefore reads `account_id` and `published_at` defensively (returns `None` when missing). When OWC-MS PR-3 lands the multi-channel 回填 rendering it will need to resolve where these per-publish fields live; today's projection is forward-compatible (returns `None` rather than crashing).
 
+## 8.1 Reviewer-Fail Correction Pass (2026-05-05)
+
+The first OWC-MS PR-1 revision returned FAIL with two product-flow semantic mismatches:
+
+1. **可发布版本数 was sourced from closure ``publish_status == "published"`` rows**, conflating 已发布 (already published) with 可发布 (READY to publish). The two are distinct operator concepts; the gate spec's 可发布 field must come from the authoritative PR-1 unified `publish_readiness` producer surface.
+2. **已发布账号数 was sourced from distinct ``platform`` values across ``channel_metrics[]``**, which (a) referenced a non-existent field on the frozen Phase D.0 closure shape (``CHANNEL_METRICS_KEYS`` carries ``channel_id``, not ``platform``) and (b) conflated platform-level with account-level distinct counting. Matrix-operations semantics are account-level: a single platform may host multiple accounts and each is a distinct published account.
+
+### 8.1.1 Exact code-path corrections
+
+- **可发布版本数 (`gateway/app/services/matrix_script/task_area_convergence.py`)**:
+  - Added `_publishable_variation_count_from_board_bucket(row, cells)` which derives the count from the row's `board_bucket` field. `board_bucket` is set by `derive_board_publishable` in `gateway/app/services/operator_visible_surfaces/projections.py` (PR-1 unified producer wiring) over the same task's `ready_gate` truth. Semantics: when `board_bucket == "publishable"`, every variation cell on the task is publishable (count = number of cells); otherwise zero.
+  - `derive_matrix_script_full_card_summary` now binds `publishable_variation_count_value` to this helper (closure is no longer consulted for the publishable count). The closure-based `_published_variation_count` helper is preserved and is used only by `derive_matrix_script_eight_stage_state` to detect the 已回填 stage — that detection is correct because 已回填 is exactly the 已发布 state.
+- **已发布账号数 (`gateway/app/services/matrix_script/task_area_convergence.py`)**:
+  - `_published_channel_count` rewritten to read distinct `channel_id` values (the closed Phase D.0 field at `publish_feedback_closure.py::CHANNEL_METRICS_KEYS`) from `variation_feedback[].channel_metrics[]` snapshots, scoped to rows whose `publish_status == "published"`. Snapshots on pending / failed / retracted rows are excluded.
+- **Publish lane projection (same root cause; fixed for product-flow consistency)**: `derive_matrix_script_three_tier_lanes` previously read non-existent `platform` / `account_id` / `published_at` fields. Rewritten to read `channel_id` and `captured_at` directly from the frozen `CHANNEL_METRICS_KEYS`, scoped to `publish_status == "published"` rows, with per-variation per-channel deduplication.
+
+### 8.1.2 Tests added / updated
+
+- `test_full_summary_rebinds_publishable_variation_count_to_closure_published_count` (REPLACED) → new battery of six binding cases:
+  - `test_publishable_variation_count_reads_board_bucket_not_closure_published_status` — happy path with publishable bucket.
+  - `test_publishable_variation_count_zero_when_board_bucket_blocked` — blocked path zero.
+  - `test_publishable_variation_count_zero_when_board_bucket_ready_but_not_publishable` — in-flight ready bucket zero.
+  - `test_publishable_variation_count_does_not_consume_closure_published_rows` — anti-regression: closure with all variations published but `board_bucket=ready` ⇒ 可发布 count is still zero. **Enforces the 已发布 ≠ 可发布 distinction.**
+  - `test_publishable_variation_count_zero_when_no_closure_and_publishable_bucket_with_zero_cells` — edge case zero cells.
+  - `test_publishable_variation_count_independent_of_closure_existence` — same row + bucket yields same count whether closure exists or not.
+- `test_full_summary_published_channel_count_dedupes_across_variations` (REPLACED) → new battery of four binding cases:
+  - `test_full_summary_published_account_count_uses_account_level_distinct_channel_id` — four `channel_id` values across two platforms = 4 (account-level), not 3 (platform-level).
+  - `test_full_summary_published_account_count_dedupes_repeated_channel_id_snapshots` — repeated metrics_snapshot for the same account counts as 1.
+  - `test_full_summary_published_account_count_excludes_unpublished_variation_rows` — only `publish_status == "published"` rows contribute.
+  - `test_full_summary_published_account_count_zero_when_no_closure` — zero baseline.
+- `test_publish_lane_flattens_channel_metrics_per_variation_per_channel` (REPLACED) → `test_publish_lane_flattens_per_variation_per_published_account` enforcing account-level row count, with new sister test `test_publish_lane_excludes_unpublished_variation_rows` enforcing the publish-status filter.
+
+### 8.1.3 Tests after correction
+
+- New + corrected dedicated module: **45/45 PASS** (`test_matrix_script_task_area_convergence.py`).
+- Adjacent regression unchanged: **327/327 PASS**.
+- **Aggregate after correction: 372 PASS / 0 FAIL**.
+
+### 8.1.4 Why each FAIL item is now closed
+
+| FAIL item | Closed by |
+| --- | --- |
+| (1) 可发布版本数 must come from authoritative publish-readiness, not from already-published closure rows | New `_publishable_variation_count_from_board_bucket` helper consumes `board_bucket` (PR-1 unified producer surface) directly. Tests `test_publishable_variation_count_reads_board_bucket_not_closure_published_status` and `test_publishable_variation_count_does_not_consume_closure_published_rows` assert (a) the publishable count tracks `board_bucket == "publishable"` and (b) closure published rows do NOT cause the publishable count to rise. |
+| (2) 已发布账号数 must be account-level (distinct `channel_id`), not platform-level | `_published_channel_count` now reads `channel_id` from the closed Phase D.0 `CHANNEL_METRICS_KEYS` and scopes the count to `publish_status == "published"` rows. Tests `test_full_summary_published_account_count_uses_account_level_distinct_channel_id` (4 distinct accounts on 2 platforms = 4, not 3) and `test_full_summary_published_account_count_dedupes_repeated_channel_id_snapshots` and `test_full_summary_published_account_count_excludes_unpublished_variation_rows` assert the corrected semantic. |
+
+### 8.1.5 Residual risks after correction
+
+- **Per-variation publish-readiness verdicts are not yet available** in the four-layer state. The publishable count is therefore a coarse projection (all-or-nothing per task). When per-variation `ready_gate` / `l2_facts` truth lands on a future wave, `_publishable_variation_count_from_board_bucket` can be refined into a per-variation derivation without changing the field name or the template.
+- **`channel_id` semantic** is bound by the frozen Phase D.0 closure shape; if a future contract amendment splits `channel_id` into `platform` + `account_id`, the helper will need to update accordingly. Today the helper is correct against the current frozen contract.
+- All other residual risks from §8 carry forward unchanged.
+
 ## 9. Exact Statement of What Remains for the Next PR
 
 OWC-MS PR-2 — Matrix Script Workbench Five-Panel Convergence (MS-W3 + MS-W4 + MS-W5 + MS-W6) per `owc_ms_gate_spec_v1.md` §5. PR-2 may not start until this PR-1 is merged and reviewed. Claude stops after this PR-1 is opened.

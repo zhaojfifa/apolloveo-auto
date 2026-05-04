@@ -251,24 +251,48 @@ def test_publish_lane_is_empty_without_channel_metrics() -> None:
     assert out["lanes"][2]["rows"] == []
 
 
-def test_publish_lane_flattens_channel_metrics_per_variation_per_channel() -> None:
+def test_publish_lane_flattens_per_variation_per_published_account() -> None:
+    """Publish lane shows one row per (variation_id, channel_id) pair
+    where the variation row is in ``publish_status == "published"``.
+    Matrix-operations semantics are account-level — ``channel_id`` is
+    the closed Phase D.0 published account identifier."""
     row = _matrix_script_row(cells=["cell_a", "cell_b"])
     closure = create_closure(_packet(cell_ids=["cell_a", "cell_b"]))
     closure["variation_feedback"][0]["publish_status"] = "published"
     closure["variation_feedback"][0]["publish_url"] = "https://example.com/a"
     closure["variation_feedback"][0]["channel_metrics"] = [
-        {"platform": "tiktok", "account_id": "ig_a", "published_at": "2026-05-04T10:00:00Z"},
-        {"platform": "youtube", "account_id": "yt_a", "published_at": "2026-05-04T10:05:00Z"},
+        {"channel_id": "tiktok_acct_a", "captured_at": "2026-05-04T10:00:00Z"},
+        {"channel_id": "youtube_acct_a", "captured_at": "2026-05-04T10:05:00Z"},
     ]
     closure["variation_feedback"][1]["publish_status"] = "published"
     closure["variation_feedback"][1]["channel_metrics"] = [
-        {"platform": "tiktok", "account_id": "ig_b", "published_at": "2026-05-04T11:00:00Z"},
+        {"channel_id": "tiktok_acct_b", "captured_at": "2026-05-04T11:00:00Z"},
     ]
     out = derive_matrix_script_three_tier_lanes(row, closure=closure)
     publish_lane = out["lanes"][2]
     assert len(publish_lane["rows"]) == 3
-    platforms = sorted(r["platform"] for r in publish_lane["rows"])
-    assert platforms == ["tiktok", "tiktok", "youtube"]
+    channel_ids = sorted(r["channel_id"] for r in publish_lane["rows"])
+    # Two distinct accounts on tiktok + one on youtube — account-level distinct.
+    assert channel_ids == ["tiktok_acct_a", "tiktok_acct_b", "youtube_acct_a"]
+
+
+def test_publish_lane_excludes_unpublished_variation_rows() -> None:
+    """A pending / failed / retracted variation must not appear in the
+    publish lane even if it has channel_metrics snapshots."""
+    row = _matrix_script_row(cells=["cell_a", "cell_b"])
+    closure = create_closure(_packet(cell_ids=["cell_a", "cell_b"]))
+    closure["variation_feedback"][0]["publish_status"] = "published"
+    closure["variation_feedback"][0]["channel_metrics"] = [
+        {"channel_id": "tiktok_acct_a", "captured_at": "2026-05-04T10:00:00Z"},
+    ]
+    closure["variation_feedback"][1]["publish_status"] = "failed"
+    closure["variation_feedback"][1]["channel_metrics"] = [
+        {"channel_id": "youtube_acct_b", "captured_at": "2026-05-04T11:00:00Z"},
+    ]
+    out = derive_matrix_script_three_tier_lanes(row, closure=closure)
+    publish_lane = out["lanes"][2]
+    assert len(publish_lane["rows"]) == 1
+    assert publish_lane["rows"][0]["channel_id"] == "tiktok_acct_a"
 
 
 def test_three_tier_lanes_returns_empty_for_non_matrix_script() -> None:
@@ -304,23 +328,66 @@ def test_full_summary_preserves_pr_u1_keys() -> None:
         assert key in summary, f"missing PR-U1 key: {key}"
 
 
-def test_full_summary_rebinds_publishable_variation_count_to_closure_published_count() -> None:
-    row = _matrix_script_row()
-    closure = create_closure(_packet())
-    # zero published rows
-    out_zero = derive_matrix_script_full_card_summary(row, closure=closure)
-    assert out_zero["publishable_variation_count_value"] == 0
-    assert out_zero["publishable_variation_count_gated_by"] is None
-    # one published row
-    closure["variation_feedback"][0]["publish_status"] = "published"
-    out_one = derive_matrix_script_full_card_summary(row, closure=closure)
-    assert out_one["publishable_variation_count_value"] == 1
+def test_publishable_variation_count_reads_board_bucket_not_closure_published_status() -> None:
+    """可发布 means READY-to-publish, derived from the authoritative PR-1
+    unified publish_readiness producer surface (``board_bucket``). It
+    must NOT come from closure ``publish_status == "published"`` rows
+    — that is 已发布, a different operator concept."""
+    row = _matrix_script_row(cells=["a", "b", "c"], bucket="publishable")
+    summary = derive_matrix_script_full_card_summary(row, closure=None)
+    # All three variation cells are publishable from this task because
+    # the unified producer reports the task itself is publishable.
+    assert summary["publishable_variation_count_value"] == 3
 
 
-def test_full_summary_publishable_count_zero_when_no_closure() -> None:
-    row = _matrix_script_row()
+def test_publishable_variation_count_zero_when_board_bucket_blocked() -> None:
+    row = _matrix_script_row(cells=["a", "b"], bucket="blocked", head_reason="compose_ready_pending")
     summary = derive_matrix_script_full_card_summary(row, closure=None)
     assert summary["publishable_variation_count_value"] == 0
+
+
+def test_publishable_variation_count_zero_when_board_bucket_ready_but_not_publishable() -> None:
+    """``ready`` is the in-flight bucket; the unified producer has not
+    yet asserted publishable. Count must be zero."""
+    row = _matrix_script_row(cells=["a", "b"], bucket="ready")
+    summary = derive_matrix_script_full_card_summary(row, closure=None)
+    assert summary["publishable_variation_count_value"] == 0
+
+
+def test_publishable_variation_count_does_not_consume_closure_published_rows() -> None:
+    """Anti-regression: even when the closure has every variation
+    marked ``publish_status == "published"`` (i.e. all 已发布), if the
+    task's board_bucket is not publishable (e.g. final_stale, recompose
+    pending) the 可发布 count is still zero. 已发布 ≠ 可发布."""
+    row = _matrix_script_row(cells=["a", "b"], bucket="ready")
+    closure = create_closure(_packet(cell_ids=["a", "b"]))
+    closure["variation_feedback"][0]["publish_status"] = "published"
+    closure["variation_feedback"][1]["publish_status"] = "published"
+    summary = derive_matrix_script_full_card_summary(row, closure=closure)
+    assert summary["publishable_variation_count_value"] == 0
+
+
+def test_publishable_variation_count_zero_when_no_closure_and_publishable_bucket_with_zero_cells() -> None:
+    """Edge case: a publishable bucket with no variation cells means
+    zero publishable variations (count of cells is the upper bound)."""
+    row = _matrix_script_row(cells=[], bucket="publishable")
+    summary = derive_matrix_script_full_card_summary(row, closure=None)
+    assert summary["publishable_variation_count_value"] == 0
+
+
+def test_publishable_variation_count_independent_of_closure_existence() -> None:
+    """The publishable count is fully derived from board_bucket +
+    variation cells; closure is irrelevant. Same row + bucket should
+    yield the same count whether a closure exists or not."""
+    row = _matrix_script_row(cells=["a", "b"], bucket="publishable")
+    summary_no_closure = derive_matrix_script_full_card_summary(row, closure=None)
+    closure = create_closure(_packet(cell_ids=["a", "b"]))
+    summary_with_closure = derive_matrix_script_full_card_summary(row, closure=closure)
+    assert (
+        summary_no_closure["publishable_variation_count_value"]
+        == summary_with_closure["publishable_variation_count_value"]
+        == 2
+    )
 
 
 def test_full_summary_core_script_name_reads_source_script_ref() -> None:
@@ -336,20 +403,73 @@ def test_full_summary_core_script_name_none_when_ref_missing() -> None:
     assert summary["core_script_name_value"] is None
 
 
-def test_full_summary_published_channel_count_dedupes_across_variations() -> None:
+def test_full_summary_published_account_count_uses_account_level_distinct_channel_id() -> None:
+    """已发布账号数 is account-level (distinct ``channel_id``), NOT
+    platform-level. Two accounts on the same platform are TWO published
+    accounts in the matrix-operations semantic."""
     row = _matrix_script_row(cells=["cell_a", "cell_b"])
     closure = create_closure(_packet(cell_ids=["cell_a", "cell_b"]))
+    closure["variation_feedback"][0]["publish_status"] = "published"
     closure["variation_feedback"][0]["channel_metrics"] = [
-        {"platform": "tiktok", "account_id": "x"},
-        {"platform": "youtube", "account_id": "y"},
+        {"channel_id": "tiktok_acct_x", "captured_at": "2026-05-04T10:00:00Z"},
+        {"channel_id": "youtube_acct_y", "captured_at": "2026-05-04T10:05:00Z"},
     ]
+    closure["variation_feedback"][1]["publish_status"] = "published"
     closure["variation_feedback"][1]["channel_metrics"] = [
-        {"platform": "tiktok", "account_id": "z"},  # tiktok again - dedup
-        {"platform": "weibo", "account_id": "w"},
+        {"channel_id": "tiktok_acct_z", "captured_at": "2026-05-04T11:00:00Z"},  # different account on same platform
+        {"channel_id": "weibo_acct_w", "captured_at": "2026-05-04T11:05:00Z"},
     ]
     summary = derive_matrix_script_full_card_summary(row, closure=closure)
     assert summary["published_channel_count_label"] == "已发布账号数"
-    assert summary["published_channel_count_value"] == 3  # tiktok, youtube, weibo
+    # Four distinct channel_ids = four distinct published accounts.
+    # If the helper had counted distinct platforms it would have returned 3.
+    assert summary["published_channel_count_value"] == 4
+
+
+def test_full_summary_published_account_count_dedupes_repeated_channel_id_snapshots() -> None:
+    """Multiple metrics_snapshot events for the same published
+    ``channel_id`` count as ONE published account (not N)."""
+    row = _matrix_script_row(cells=["cell_a"])
+    closure = create_closure(_packet(cell_ids=["cell_a"]))
+    closure["variation_feedback"][0]["publish_status"] = "published"
+    closure["variation_feedback"][0]["channel_metrics"] = [
+        {"channel_id": "tiktok_acct_x", "captured_at": "2026-05-04T10:00:00Z"},
+        {"channel_id": "tiktok_acct_x", "captured_at": "2026-05-04T11:00:00Z"},  # same account, later snapshot
+        {"channel_id": "tiktok_acct_x", "captured_at": "2026-05-04T12:00:00Z"},
+    ]
+    summary = derive_matrix_script_full_card_summary(row, closure=closure)
+    assert summary["published_channel_count_value"] == 1
+
+
+def test_full_summary_published_account_count_excludes_unpublished_variation_rows() -> None:
+    """Account count must reflect actual published accounts. Snapshots
+    on rows whose ``publish_status`` is not ``"published"`` (pending,
+    failed, retracted) are excluded — those snapshots represent metrics
+    for a row that has not reached a published state, and the
+    operator's "已发布账号数" claim must not include them."""
+    row = _matrix_script_row(cells=["cell_a", "cell_b", "cell_c"])
+    closure = create_closure(_packet(cell_ids=["cell_a", "cell_b", "cell_c"]))
+    closure["variation_feedback"][0]["publish_status"] = "published"
+    closure["variation_feedback"][0]["channel_metrics"] = [
+        {"channel_id": "tiktok_acct_x", "captured_at": "2026-05-04T10:00:00Z"},
+    ]
+    closure["variation_feedback"][1]["publish_status"] = "failed"
+    closure["variation_feedback"][1]["channel_metrics"] = [
+        {"channel_id": "youtube_acct_y", "captured_at": "2026-05-04T11:00:00Z"},
+    ]
+    closure["variation_feedback"][2]["publish_status"] = "retracted"
+    closure["variation_feedback"][2]["channel_metrics"] = [
+        {"channel_id": "weibo_acct_w", "captured_at": "2026-05-04T12:00:00Z"},
+    ]
+    summary = derive_matrix_script_full_card_summary(row, closure=closure)
+    # Only the cell_a row is actually published — only its account counts.
+    assert summary["published_channel_count_value"] == 1
+
+
+def test_full_summary_published_account_count_zero_when_no_closure() -> None:
+    row = _matrix_script_row()
+    summary = derive_matrix_script_full_card_summary(row, closure=None)
+    assert summary["published_channel_count_value"] == 0
 
 
 def test_full_summary_best_version_intentionally_none_for_pr1() -> None:

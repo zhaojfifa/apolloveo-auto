@@ -26,15 +26,23 @@ Hard discipline (binding per OWC-MS gate spec §4):
 - No packet mutation; no projection mutation; no closure write-back.
 - No contract-shape change; ``review_zone`` enum and other OWC-MS
   PR-2 / PR-3 surfaces are explicitly out of scope.
-- The "publishable variation count" reads ``variation_feedback[]``
-  rows whose ``publish_status == "published"`` (Plan D.0 closure shape
-  field, frozen in
-  ``docs/contracts/matrix_script/publish_feedback_closure_contract_v1.md``).
-  When no closure exists yet the count is 0.
-- The "published channel count" reads distinct ``platform`` values
-  from ``variation_feedback[].channel_metrics[]``. The channel metrics
-  shape is the Phase D.0 contract; ``platform`` is bound by closed
-  taxonomy already enforced at ``apply_event``.
+- "可发布版本数" (publishable variation count) is derived from the
+  authoritative PR-1 unified ``publish_readiness`` producer via the
+  task's existing ``board_bucket`` field (computed by
+  ``derive_board_publishable`` in
+  ``gateway/app/services/operator_visible_surfaces/projections.py``).
+  When ``board_bucket == "publishable"`` every variation cell is
+  publishable from this task; otherwise zero. **可发布 means READY to
+  publish, not already published — the closure ``publish_status``
+  field is "已发布", a different operator concept.**
+- "已发布账号数" (published account count) reads distinct
+  ``channel_id`` values from ``variation_feedback[].channel_metrics[]``
+  on rows whose ``publish_status == "published"``. ``channel_id`` is
+  the closed Phase D.0 closure field that identifies the published
+  account; account-level distinct counting is the matrix-operations
+  semantic. Platform-level counting would conflate multiple accounts
+  on the same platform and is forbidden by the line's matrix
+  semantics.
 - "当前最佳版本" stays ``None`` in OWC-MS PR-1 — operator best-version
   selection lands in OWC-MS PR-2 (workbench D 校对区 with the additive
   ``review_zone`` enum on ``operator_note`` events). The template
@@ -175,6 +183,15 @@ def _source_script_ref_value(row: Mapping[str, Any]) -> Optional[str]:
 
 
 def _published_variation_count(closure: Optional[Mapping[str, Any]]) -> int:
+    """Count of ``variation_feedback[]`` rows in ``publish_status == "published"``.
+
+    Used by the 已回填 stage detection in
+    :func:`derive_matrix_script_eight_stage_state` — "backfilled" is the
+    operator-language stage for "the task has at least one published
+    variation," which is exactly 已发布 semantics. Do NOT use this
+    helper for the 可发布 (publishable / READY-to-publish) field;
+    that is :func:`_publishable_variation_count_from_board_bucket`.
+    """
     if not isinstance(closure, Mapping):
         return 0
     rows = closure.get("variation_feedback")
@@ -189,15 +206,68 @@ def _published_variation_count(closure: Optional[Mapping[str, Any]]) -> int:
     return count
 
 
+def _publishable_variation_count_from_board_bucket(
+    row: Mapping[str, Any], cells: Iterable[Mapping[str, Any]]
+) -> int:
+    """Derive 可发布版本数 from the authoritative PR-1 unified
+    ``publish_readiness`` producer surface (``board_bucket`` carries the
+    producer's verdict for the task).
+
+    Semantics:
+
+    - ``board_bucket == "publishable"`` ⇒ every variation cell on this
+      task is publishable from the line surface ⇒ count = number of
+      cells.
+    - Any other bucket (``ready`` / ``blocked``) ⇒ zero variations are
+      publishable yet ⇒ count = 0.
+
+    This is the line-honest answer over the existing four-layer state
+    in OWC-MS PR-1: today the Matrix Script delivery surface produces
+    task-level publishability rows; per-variation publishability would
+    require per-variation ``ready_gate`` / ``l2_facts`` truth, which is
+    not available in the four-layer state today and is not in scope for
+    OWC-MS PR-1 (gate spec §4.1 forbids new authoritative truth
+    sources). When per-variation truth lands on a future wave the
+    derivation can refine without changing the field.
+
+    Crucially, this helper NEVER reads closure ``publish_status`` —
+    closure publish_status carries 已发布 (already published) state,
+    which is a different operator concept from 可发布 (READY to
+    publish).
+    """
+    bucket = str(row.get("board_bucket") or "").strip().lower()
+    if bucket != "publishable":
+        return 0
+    return sum(1 for _ in cells)
+
+
 def _published_channel_count(closure: Optional[Mapping[str, Any]]) -> int:
+    """Count of distinct published accounts across the closure.
+
+    Reads ``channel_id`` (the closed Phase D.0 field at
+    ``CHANNEL_METRICS_KEYS``) from ``variation_feedback[].channel_metrics[]``
+    on rows whose ``publish_status == "published"``. The matrix
+    operations semantic for 已发布账号数 is account-level: a single
+    platform may host multiple accounts and each is a distinct
+    "published account". Counting distinct platforms would conflate
+    those accounts and is forbidden.
+
+    Snapshots on rows whose ``publish_status`` is not ``"published"``
+    (pending / failed / retracted) are excluded — those snapshots
+    represent metrics for a row that has not reached a published
+    state, and the operator's "已发布账号数" claim must reflect actual
+    published accounts.
+    """
     if not isinstance(closure, Mapping):
         return 0
     rows = closure.get("variation_feedback")
     if not isinstance(rows, list):
         return 0
-    channels: set[str] = set()
+    accounts: set[str] = set()
     for row in rows:
         if not isinstance(row, Mapping):
+            continue
+        if str(row.get("publish_status") or "").strip().lower() != "published":
             continue
         metrics = row.get("channel_metrics")
         if not isinstance(metrics, list):
@@ -205,10 +275,10 @@ def _published_channel_count(closure: Optional[Mapping[str, Any]]) -> int:
         for snapshot in metrics:
             if not isinstance(snapshot, Mapping):
                 continue
-            platform = snapshot.get("platform")
-            if isinstance(platform, str) and platform.strip():
-                channels.add(platform.strip())
-    return len(channels)
+            channel_id = snapshot.get("channel_id")
+            if isinstance(channel_id, str) and channel_id.strip():
+                accounts.add(channel_id.strip())
+    return len(accounts)
 
 
 def _last_generation_at(row: Mapping[str, Any]) -> Optional[str]:
@@ -358,26 +428,40 @@ def derive_matrix_script_three_tier_lanes(
             }
         )
 
+    # Publish lane reads the closed Phase D.0 closure shape directly:
+    # ``variation_feedback[].channel_metrics[]`` snapshots carry
+    # ``channel_id`` (the published account identifier) and
+    # ``captured_at`` (the snapshot time). Per matrix-operations
+    # semantics, account-level identification is authoritative; this
+    # lane therefore renders one row per (variation_id, channel_id)
+    # pair, scoped to rows whose ``publish_status == "published"``.
     publish_rows: list[dict[str, Any]] = []
     for fb in feedback_by_id.values():
         vid = str(fb.get("variation_id") or "")
         publish_url = fb.get("publish_url") if isinstance(fb.get("publish_url"), str) else None
         publish_status = str(fb.get("publish_status") or "").strip().lower() or "pending"
+        if publish_status != "published":
+            continue
         metrics = fb.get("channel_metrics")
         if not isinstance(metrics, list) or not metrics:
             continue
+        seen_pairs: set[tuple[str, str]] = set()
         for snapshot in metrics:
             if not isinstance(snapshot, Mapping):
                 continue
-            platform = snapshot.get("platform")
-            account = snapshot.get("account_id")
-            published_at = snapshot.get("published_at")
+            channel_id = snapshot.get("channel_id")
+            if not isinstance(channel_id, str) or not channel_id.strip():
+                continue
+            channel_id = channel_id.strip()
+            if (vid, channel_id) in seen_pairs:
+                continue
+            seen_pairs.add((vid, channel_id))
+            captured_at = snapshot.get("captured_at")
             publish_rows.append(
                 {
                     "variation_id": vid,
-                    "platform": str(platform) if isinstance(platform, str) else None,
-                    "account_id": str(account) if isinstance(account, str) else None,
-                    "published_at": str(published_at) if isinstance(published_at, str) else None,
+                    "channel_id": channel_id,
+                    "captured_at": str(captured_at) if isinstance(captured_at, str) else None,
                     "publish_url": publish_url,
                     "publish_status": publish_status,
                 }
@@ -419,13 +503,19 @@ def derive_matrix_script_full_card_summary(
     if not pr_u1:
         return {}
 
-    # OWC-MS PR-1 rebinds publishable_variation_count from the gated-by-D1
-    # sentinel to the contract-frozen closure-derived count. The PR-1
-    # unified publish_readiness producer is now live; the count of
-    # variation_feedback rows in publish_status == "published" is the
-    # operator-truthful answer.
-    published_count = _published_variation_count(closure)
-    pr_u1["publishable_variation_count_value"] = published_count
+    # OWC-MS PR-1 rebinds 可发布版本数 from the gated-by-D1 sentinel to
+    # the authoritative PR-1 unified publish_readiness producer surface
+    # (consumed via the row's `board_bucket` field, which is set by
+    # `derive_board_publishable` over the same task's `ready_gate`
+    # truth in `task_router_presenters.build_tasks_page_rows`).
+    #
+    # Semantic: 可发布 means READY to publish, NOT already published.
+    # The closure `publish_status == "published"` state is 已发布,
+    # which is a different operator concept and is surfaced via the
+    # 已回填 stage in `derive_matrix_script_eight_stage_state` instead.
+    cells = _variation_cells(row)
+    publishable_count = _publishable_variation_count_from_board_bucket(row, cells)
+    pr_u1["publishable_variation_count_value"] = publishable_count
     pr_u1["publishable_variation_count_gated_by"] = None
     pr_u1["publishable_variation_count_tooltip"] = None
 
@@ -486,6 +576,7 @@ __all__ = [
     "STAGE_GENERATING",
     "STAGE_PENDING_CONFIG",
     "STAGE_PUBLISHABLE",
+    "_publishable_variation_count_from_board_bucket",
     "derive_matrix_script_eight_stage_state",
     "derive_matrix_script_full_card_summary",
     "derive_matrix_script_full_card_summary_for_task",
