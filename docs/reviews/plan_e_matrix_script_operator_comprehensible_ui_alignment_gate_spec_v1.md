@@ -484,22 +484,21 @@ The implementation PRs MAY open only after architect + reviewer signoff lines ab
 
 ### 10.1 Closeout marker (filled at phase closeout)
 
-Closeout aggregating audit: `docs/execution/PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md` (authored at phase-close time).
+Closeout aggregating audit: [docs/execution/PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md](../execution/PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md) (authored 2026-05-04).
+
+Per the user-mandated narrowing of §5 PR-UA1 → PR-UA6 to PR-U1 (Task Area) / PR-U2 (Workbench) / PR-U3 (Delivery Center), the verdict table below is consolidated to the three landed slices. UA.1 / UA.2 / UA.3 / UA.4 / UA.5 / UA.6 acceptance is folded into UA1-A (Task Area scope) / UA2-A (Workbench scope) / UA3-A (Delivery Center scope) accordingly.
 
 | Acceptance row | Verdict | Evidence |
 | --- | --- | --- |
-| UA1-A — Item UA.1 entry-surface comprehension | `<fill at PR-UA1 land>` | `<execution log path; PR commit SHA>` |
-| UA2-A — Item UA.2 Workbench information hierarchy | `<fill at PR-UA2 land>` | `<execution log path; PR commit SHA>` |
-| UA3-A — Item UA.3 variation panel readability | `<fill at PR-UA3 land>` | `<execution log path; PR commit SHA>` |
-| UA4-A — Item UA.4 Delivery Center operator-language alignment | `<fill at PR-UA4 land>` | `<execution log path; PR commit SHA>` (final operator-language label strings recorded here) |
-| UA5-A — Item UA.5 publish-blocking explanation clarity | `<fill at PR-UA5 land>` | `<execution log path; PR commit SHA>` (final operator-language reason strings recorded here) |
-| UA6-A — Item UA.6 operator-action zoning / affordance clarity | `<fill at PR-UA6 land>` | `<execution log path; PR commit SHA>` |
-| HF-PRES — Hot Follow baseline preserved | `<fill at phase close>` | `<aggregating closeout doc path>` |
-| DA-PRES — Digital Anchor freeze preserved | `<fill at phase close>` | `<aggregating closeout doc path>` |
-| FORBID — No §4 forbidden item landed | `<fill at phase close>` | `<aggregating closeout doc path>` |
-| UA7 — Closeout signoff recorded | `<fill at phase close>` | `<aggregating closeout doc §"Closeout signoff">` |
+| UA1-A — Task Area comprehension landed | PASS | [PLAN_E_MATRIX_SCRIPT_UI_U1_TASK_AREA_COMPREHENSION_EXECUTION_LOG_v1.md](../execution/PLAN_E_MATRIX_SCRIPT_UI_U1_TASK_AREA_COMPREHENSION_EXECUTION_LOG_v1.md); merged at `9be6ed3` (PR #105) |
+| UA2-A — Workbench comprehension landed | PASS | [PLAN_E_MATRIX_SCRIPT_UI_U2_WORKBENCH_COMPREHENSION_EXECUTION_LOG_v1.md](../execution/PLAN_E_MATRIX_SCRIPT_UI_U2_WORKBENCH_COMPREHENSION_EXECUTION_LOG_v1.md); merged at `fadf546` (PR #106) |
+| UA3-A — Delivery Center comprehension landed | PASS | [PLAN_E_MATRIX_SCRIPT_UI_U3_DELIVERY_CENTER_COMPREHENSION_EXECUTION_LOG_v1.md](../execution/PLAN_E_MATRIX_SCRIPT_UI_U3_DELIVERY_CENTER_COMPREHENSION_EXECUTION_LOG_v1.md); merged at `024ee18` (PR #107) |
+| HF-PRES — Hot Follow baseline preserved | PASS by file isolation + template / panel_kind / kind gate boundaries; coordinator-side live regression confirmation placeholder open in closeout §2.4.2 awaiting Jackie sign | closeout §2.4 |
+| DA-PRES — Digital Anchor freeze preserved | PASS — no Digital Anchor file touched across the three PRs; Plan A §2.1 hide guards still in force | closeout §2.5 |
+| FORBID — No §4 forbidden item landed | PASS — full §4.1 → §4.11 audit recorded against merged tree at `024ee18` | closeout §2.6 |
+| UA7 — Closeout signoff recorded | AUTHORED, AWAITING SIGNOFF — placeholder block open for Raobin / Alisa / Jackie in closeout §3 | closeout §3 |
 
-Implementation phase status (this closeout marker, updated 2026-05-04 at gate-opening signoff): the gate spec is **AUTHORED + SIGNED OPEN** (Architect Raobin 2026-05-04 14:05; Reviewer Alisa 2026-05-04 14:18); implementation MAY proceed strictly within §3 once this signoff PR merges to `main`. Coordinator (Jackie) signoff remains intentionally `<fill>` because §10 binds the coordinator signoff to §6 row UA7 (closeout), not to gate-opening. First-phase A7 signoff status is **independent** and remains intentionally pending: this gate spec did not touch it and does not advance it.
+Implementation phase status (this closeout marker, updated 2026-05-04 at phase-close): the **engineering** for the Matrix Script operator-comprehensible UI alignment phase is complete; the **paperwork** for closeout is authored and awaits UA7 signoff in the closeout document §3. Subsequent Plan E phase gate-spec authoring for any §4 item is **not authorized** until UA7 signoff completes. **First-phase A7 signoff** at [PLAN_E_MATRIX_SCRIPT_PHASE_CLOSEOUT_v1.md §3](../execution/PLAN_E_MATRIX_SCRIPT_PHASE_CLOSEOUT_v1.md) status is **independent** and remains intentionally pending: this comprehension phase did not touch it. Platform Runtime Assembly remains BLOCKED until **all** Plan E phases close **plus** a separate wave-start authority decision is recorded.
 
 ---
 
