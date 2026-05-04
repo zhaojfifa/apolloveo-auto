@@ -60,7 +60,7 @@ Files updated alongside the new gate spec in this docs-only authoring step:
 
 | # | Question | Verdict | Evidence |
 | --- | --- | --- | --- |
-| 1 | next packet/onboarding gate spec authored | **YES** | [docs/reviews/plan_e_packet_schema_freeze_readiness_gate_spec_v1.md](../reviews/plan_e_packet_schema_freeze_readiness_gate_spec_v1.md) |
+| 1 | next packet/onboarding gate spec authored | **YES** | [docs/reviews/plan_e_packet_schema_freeze_readiness_gate_spec_v1.md](../reviews/plan_e_packet_schema_freeze_readiness_gate_spec_v1.md) (gate-opening signoff appended in §5 below on 2026-05-04 — Raobin 15:42; Alisa 15:55) |
 | 2 | Hot Follow baseline preserved | **YES** | new gate spec §4.3 + §7.1 + §8 explicitly preserve Hot Follow baseline; this authoring touches no Hot Follow file |
 | 3 | Digital Anchor freeze preserved | **YES** | new gate spec §3.2 + §4.2 + §7.2 + §8 explicitly preserve Digital Anchor freeze; this authoring touches no Digital Anchor file; RA.2 audits freeze posture and explicitly does not propose implementation |
 | 4 | ready for packet/schema slicing after signoff | **NO** at authoring time — readiness write-ups + aggregating verdict + RA7 closeout signoff must complete first; the next slicing gate spec is itself a separate authoring step gated on the aggregating readiness verdict and its own §10 approval | new gate spec §0 + §3.5 + §4.1 + §6 row RA-AGG / row RA7 + §8 row "Packet / schema slicing = BLOCKED" + §9 |
@@ -75,6 +75,41 @@ Additional preserved postures (per the user-mandated hard constraints):
 - **no Capability Expansion** — VERIFIED. New gate spec §4.5 + §8 explicitly preserve Capability Expansion gate; W2.2 / W2.3 / durable persistence / runtime API / third line stay BLOCKED.
 - **no vendor / model / provider controls** — VERIFIED. New gate spec §4.6 + §7.5 + §8 + RA.4 audit cell binds validator R3 verbatim; no vendor / model / provider / engine identifier authored anywhere in the gate spec or this execution log.
 - **no invented runtime truth fields** — VERIFIED. New gate spec §7.7 binds "no RA.* write-up asserts a runtime truth field, advisory taxonomy term, validator rule, envelope rule, capability kind, panel_kind value, ref_id value, asset-library kind / facet / license / reuse_policy / quality_threshold value, role_pack / speaker_plan field, deliverable kind, or zoning category not already present in the cited frozen authority". The readiness write-ups are pure description, not invention.
+
+---
+
+## 5. Step-1 gate-opening signoff (added 2026-05-04 in the docs-only signoff PR)
+
+Per the Plan E discipline (mirrored from the second-phase comprehension gate spec authoring sequence):
+
+- **Step 1** (this PR): docs-only PR that fills the §10 architect + reviewer signoffs of the readiness gate spec and updates the four files listed in the mission scope; coordinator-side closeout signoff stays intentionally pending (coordinator signoff binds §6 row RA7 closeout, not gate opening).
+- **Step 2**: this docs-only signoff PR merges to `main`.
+- **Step 3** (only after Step 2): readiness-phase write-up authoring opens, sliced into PR-RA1 / PR-RA2 / PR-RA3 / PR-RA4 (any order or in parallel) + PR-RA-AGG (strictly after).
+
+### 5.1 Files modified in this signoff PR
+
+- [docs/reviews/plan_e_packet_schema_freeze_readiness_gate_spec_v1.md](../reviews/plan_e_packet_schema_freeze_readiness_gate_spec_v1.md) — Status header flipped to "Gate-opening signoff completed on 2026-05-04 by Architect (Raobin) and Reviewer (Alisa). Entry condition R7 is now SATISFIED."; §2 row R7 verdict flipped from PENDING to SATISFIED with signoff timestamps; §10 architect + reviewer signoff lines filled with handles + timestamps + verbatim statements; §10 coordinator signoff line intentionally left as `<fill>` placeholder (coordinator signoff binds §6 row RA7 closeout, not gate opening); §8 posture rows for "Plan E readiness-phase gate spec" + "Plan E readiness-phase write-ups" updated to reflect gate-OPEN status.
+- This execution log — §4 row 1 evidence note updated to record signoff timestamps; this §5 step-1 gate-opening signoff section appended.
+- [ENGINEERING_STATUS.md](../../ENGINEERING_STATUS.md) — additive entry recording the gate-opening signoff and the consequent OPEN status of the readiness-phase write-up gate; first-phase A7 + second-phase UA7 closeout signoffs explicitly preserved as intentionally pending and not advanced.
+- [CURRENT_ENGINEERING_FOCUS.md](../../CURRENT_ENGINEERING_FOCUS.md) — Allowed Next Work entry updated to reflect the gate-OPEN status; Forbidden Work entry refreshed so the readiness-phase write-up authoring is no longer blocked by §10 signoff (forbidden-scope items from §4 of the readiness gate spec remain forbidden); first-phase A7 + second-phase UA7 closeout signoffs explicitly preserved as intentionally pending and independent.
+
+### 5.2 Files NOT modified in this signoff PR
+
+- Any code / UI / contract / runtime / schema / template / test file.
+- [docs/execution/PLAN_E_MATRIX_SCRIPT_PHASE_CLOSEOUT_v1.md](PLAN_E_MATRIX_SCRIPT_PHASE_CLOSEOUT_v1.md) — first-phase A7 signoff block at §3 stays placeholder.
+- [docs/execution/PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md](PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md) — second-phase UA7 signoff block at §3 stays placeholder.
+- [docs/reviews/plan_e_matrix_script_operator_facing_gate_spec_v1.md](../reviews/plan_e_matrix_script_operator_facing_gate_spec_v1.md), [docs/reviews/plan_e_matrix_script_operator_comprehensible_ui_alignment_gate_spec_v1.md](../reviews/plan_e_matrix_script_operator_comprehensible_ui_alignment_gate_spec_v1.md) — prior gate specs unchanged.
+- Any per-PR execution log under [docs/execution/](.) for first-phase or second-phase implementation PRs.
+- Any Plan A artifact.
+
+### 5.3 Step-1 final gate (per the user-mandated four-question check)
+
+| # | Question | Verdict |
+| --- | --- | --- |
+| 1 | readiness gate signoff PR opened | **YES** — docs-only PR opens against `main` carrying this signoff edit set |
+| 2 | Hot Follow baseline preserved | **YES** — no Hot Follow file touched in this PR; gate spec §4.3 + §7.1 binding |
+| 3 | Digital Anchor freeze preserved | **YES** — no Digital Anchor file touched in this PR; gate spec §4.2 + §7.2 binding; Plan A §2.1 hide guards still in force |
+| 4 | packet/schema slicing still blocked until gate lands + slicing gate exists | **YES** — readiness-phase write-up gate OPENS only on signoff-PR merge to `main`; even after RA.1 → RA-AGG land, packet/schema slicing remains BLOCKED until a separate slicing gate spec is authored against the RA-AGG verdict and signed off through its own approval block per readiness gate spec §0 + §3.5 + §4.1 + §8 |
 
 ---
 
