@@ -111,59 +111,115 @@
           {% set badge_class = "badge-gray" %}
         {% endif %}
         {% set bucket_value = it.board_bucket or "ready" %}
+        {% set ms_summary = it.matrix_script_card_summary or {} %}
         <div class="task-card task-row" data-line="{{ line_id }}" data-status="{{ status_value }}" data-bucket="{{ bucket_value }}">
-          <div class="task-card__left">
-            {% if cover %}
-              <img class="task-card__cover" src="{{ cover }}" alt="cover" />
-            {% else %}
-              <div class="task-card__cover"></div>
-            {% endif %}
-            <div class="task-card__info">
-              <div class="task-card__title">{{ title }}</div>
-              <div class="task-card__meta">
-                <span>{{ platform }}</span>
-                <span>&middot;</span>
-                <span>ID: {{ task_id }}</span>
-              </div>
-              <div class="task-card__meta">
-                <span class="task-pill" data-role="board-line-label">{{ line_match.label }}</span>
-                {% if created %}
-                  <span title="{{ it.created_at or created }}">{{ created }}</span>
-                {% endif %}
-              </div>
-              <div class="task-card__meta">
-                {% if it.show_pack_badge %}
-                  <span class="task-pill">{{ t(it.pack_badge_label_key) }}</span>
-                {% endif %}
-                {% if it.show_video_badge %}
-                  <span class="task-pill">{{ t("tasks.badge.video") }}</span>
-                {% endif %}
-              </div>
-            </div>
-          </div>
-          <div class="task-card__right">
-            <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
-            <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}" data-role="operator-bucket">{{ bucket_value }}</span>
-            {% if it.head_reason %}
-              <span class="task-badge badge-red" data-role="operator-head-reason" title="{{ it.head_reason }}">{{ it.head_reason }}</span>
-            {% endif %}
-            <div class="task-actions">
-              {% if it.download_class %}
-                <a href="{{ it.pack_download_href }}" target="_blank" rel="noopener" class="btn-primary">
-                  {{ t(it.download_label_key) }}
-                </a>
+          {% if line_id == "matrix_script" and ms_summary.is_matrix_script %}
+            {# PR-U1 Matrix Script Task Area comprehension block — operator-language fields + tri-state + explicit workbench/delivery actions. Gated to Matrix Script rows only; Hot Follow / Digital Anchor cards remain bytewise unchanged via the {% else %} branch below. #}
+            <div class="task-card__left" data-role="matrix-script-card-left">
+              {% if cover %}
+                <img class="task-card__cover" src="{{ cover }}" alt="cover" />
               {% else %}
-                <button class="btn-primary" disabled>
-                  {{ t(it.download_label_key) }}
-                </button>
+                <div class="task-card__cover"></div>
               {% endif %}
-              <a href="{{ it.primary_action_href }}" class="btn-secondary">{{ t("action.open_detail") }}</a>
-              <button class="btn-danger-link" data-action="delete" data-id="{{ task_id }}"
-                      onclick="deleteTask('{{ task_id }}'); return false;">
-                {{ t("action.delete") }}
-              </button>
+              <div class="task-card__info">
+                <div class="task-card__title">
+                  <span data-role="ms-subject-label">{{ ms_summary.subject_label }}</span>
+                  &middot;
+                  <span data-role="ms-subject-value">{{ ms_summary.subject_value or title }}</span>
+                </div>
+                <div class="task-card__meta">
+                  <span class="task-pill" data-role="board-line-label">{{ line_match.label }}</span>
+                  <span>ID: {{ task_id }}</span>
+                  {% if created %}
+                    <span title="{{ it.created_at or created }}">{{ created }}</span>
+                  {% endif %}
+                </div>
+                <div class="task-card__meta" data-role="ms-field-row">
+                  <span data-role="ms-current-variation">
+                    {{ ms_summary.current_variation_count_label }}：{{ ms_summary.current_variation_count_value }}
+                  </span>
+                  <span>&middot;</span>
+                  <span data-role="ms-publishable-variation"
+                        title="{{ ms_summary.publishable_variation_count_tooltip }}">
+                    {{ ms_summary.publishable_variation_count_label }}：{% if ms_summary.publishable_variation_count_value is none %}—{% else %}{{ ms_summary.publishable_variation_count_value }}{% endif %}
+                  </span>
+                  <span>&middot;</span>
+                  <span data-role="ms-current-blocker">
+                    {{ ms_summary.current_blocker_label }}：{{ ms_summary.current_blocker_value or "无" }}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
+            <div class="task-card__right" data-role="matrix-script-card-right">
+              <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
+              <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}"
+                    data-role="operator-bucket"
+                    data-bucket-language="zh">{{ ms_summary.tri_state_badge_label }}</span>
+              <div class="task-actions" data-role="ms-actions">
+                <a href="{{ ms_summary.workbench_action_href }}" class="btn-primary"
+                   data-role="ms-action-workbench">{{ ms_summary.workbench_action_label }}</a>
+                <a href="{{ ms_summary.delivery_action_href }}" class="btn-secondary"
+                   data-role="ms-action-delivery">{{ ms_summary.delivery_action_label }}</a>
+                <button class="btn-danger-link" data-action="delete" data-id="{{ task_id }}"
+                        onclick="deleteTask('{{ task_id }}'); return false;">
+                  {{ t("action.delete") }}
+                </button>
+              </div>
+            </div>
+          {% else %}
+            <div class="task-card__left">
+              {% if cover %}
+                <img class="task-card__cover" src="{{ cover }}" alt="cover" />
+              {% else %}
+                <div class="task-card__cover"></div>
+              {% endif %}
+              <div class="task-card__info">
+                <div class="task-card__title">{{ title }}</div>
+                <div class="task-card__meta">
+                  <span>{{ platform }}</span>
+                  <span>&middot;</span>
+                  <span>ID: {{ task_id }}</span>
+                </div>
+                <div class="task-card__meta">
+                  <span class="task-pill" data-role="board-line-label">{{ line_match.label }}</span>
+                  {% if created %}
+                    <span title="{{ it.created_at or created }}">{{ created }}</span>
+                  {% endif %}
+                </div>
+                <div class="task-card__meta">
+                  {% if it.show_pack_badge %}
+                    <span class="task-pill">{{ t(it.pack_badge_label_key) }}</span>
+                  {% endif %}
+                  {% if it.show_video_badge %}
+                    <span class="task-pill">{{ t("tasks.badge.video") }}</span>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="task-card__right">
+              <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
+              <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}" data-role="operator-bucket">{{ bucket_value }}</span>
+              {% if it.head_reason %}
+                <span class="task-badge badge-red" data-role="operator-head-reason" title="{{ it.head_reason }}">{{ it.head_reason }}</span>
+              {% endif %}
+              <div class="task-actions">
+                {% if it.download_class %}
+                  <a href="{{ it.pack_download_href }}" target="_blank" rel="noopener" class="btn-primary">
+                    {{ t(it.download_label_key) }}
+                  </a>
+                {% else %}
+                  <button class="btn-primary" disabled>
+                    {{ t(it.download_label_key) }}
+                  </button>
+                {% endif %}
+                <a href="{{ it.primary_action_href }}" class="btn-secondary">{{ t("action.open_detail") }}</a>
+                <button class="btn-danger-link" data-action="delete" data-id="{{ task_id }}"
+                        onclick="deleteTask('{{ task_id }}'); return false;">
+                  {{ t("action.delete") }}
+                </button>
+              </div>
+            </div>
+          {% endif %}
         </div>
       {% endfor %}
     </div>
