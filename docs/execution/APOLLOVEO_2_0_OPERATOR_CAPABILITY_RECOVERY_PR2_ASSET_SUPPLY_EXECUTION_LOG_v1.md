@@ -1,8 +1,14 @@
 # ApolloVeo 2.0 · Operator Capability Recovery · PR-2 Execution Log v1
 
 Date: 2026-05-04
-Status: Engineering complete on branch
-`claude/recovery-pr2-asset-supply-minimum`; PR opening pending.
+Status: **MERGED to `main` 2026-05-04T10:42:35Z** as squash commit
+[`4343bec`](https://github.com/zhaojfifa/apolloveo-auto/commit/4343bec)
+via [PR #116](https://github.com/zhaojfifa/apolloveo-auto/pull/116).
+Branch `claude/recovery-pr2-asset-supply-minimum` merged after one
+reviewer-fail correction pass (see §9.1: source enforcement, approval
+restriction, real submit form). Recovery wave remains open; PR-3
+(Matrix Script Operator Workspace Promotion) not yet started —
+requires explicit Codex hand-off per Global Action §3.
 Wave: ApolloVeo 2.0 Minimal Operator Capability Recovery.
 Decision authority: `docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`.
 Action authority: `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_GLOBAL_ACTION_v1.md` §5.
