@@ -112,9 +112,12 @@
         {% endif %}
         {% set bucket_value = it.board_bucket or "ready" %}
         {% set ms_summary = it.matrix_script_card_summary or {} %}
+        {% set ms_owc = it.matrix_script_task_area_convergence or {} %}
+        {% set ms_eight_stage = ms_owc.eight_stage or {} %}
+        {% set ms_lanes = ms_owc.lanes_view or {} %}
         <div class="task-card task-row" data-line="{{ line_id }}" data-status="{{ status_value }}" data-bucket="{{ bucket_value }}">
           {% if line_id == "matrix_script" and ms_summary.is_matrix_script %}
-            {# PR-U1 Matrix Script Task Area comprehension block — operator-language fields + tri-state + explicit workbench/delivery actions. Gated to Matrix Script rows only; Hot Follow / Digital Anchor cards remain bytewise unchanged via the {% else %} branch below. #}
+            {# PR-U1 Matrix Script Task Area comprehension block — operator-language fields + tri-state + explicit workbench/delivery actions. Gated to Matrix Script rows only; Hot Follow / Digital Anchor cards remain bytewise unchanged via the {% else %} branch below. OWC-MS PR-1 (MS-W1 + MS-W2) extends this block with the eight-stage badge, the four newly-converged operator-language fields, and the 脚本/变体/发布 three-tier lanes view; all extensions stay inside this matrix_script-gated branch. #}
             <div class="task-card__left" data-role="matrix-script-card-left">
               {% if cover %}
                 <img class="task-card__cover" src="{{ cover }}" alt="cover" />
@@ -140,18 +143,55 @@
                   </span>
                   <span>&middot;</span>
                   <span data-role="ms-publishable-variation"
-                        title="{{ ms_summary.publishable_variation_count_tooltip }}">
-                    {{ ms_summary.publishable_variation_count_label }}：{% if ms_summary.publishable_variation_count_value is none %}—{% else %}{{ ms_summary.publishable_variation_count_value }}{% endif %}
+                        {% if ms_owc and ms_owc.publishable_variation_count_value is not none %}title="可发布版本数 = 已 published 的变体数"{% else %}title="{{ ms_summary.publishable_variation_count_tooltip }}"{% endif %}>
+                    {{ ms_summary.publishable_variation_count_label }}：{% if ms_owc %}{{ ms_owc.publishable_variation_count_value }}{% elif ms_summary.publishable_variation_count_value is none %}—{% else %}{{ ms_summary.publishable_variation_count_value }}{% endif %}
                   </span>
                   <span>&middot;</span>
                   <span data-role="ms-current-blocker">
                     {{ ms_summary.current_blocker_label }}：{{ ms_summary.current_blocker_value or "无" }}
                   </span>
                 </div>
+                {% if ms_owc %}
+                  {# OWC-MS PR-1 MS-W2 — four newly-converged 8-field card rows. Read-only operator-language projection over existing row + closure truth. #}
+                  <div class="task-card__meta" data-role="ms-field-row-owc">
+                    <span data-role="ms-core-script-name">
+                      {{ ms_owc.core_script_name_label }}：{{ ms_owc.core_script_name_value or "—" }}
+                    </span>
+                    <span>&middot;</span>
+                    <span data-role="ms-published-channel-count">
+                      {{ ms_owc.published_channel_count_label }}：{{ ms_owc.published_channel_count_value }}
+                    </span>
+                    <span>&middot;</span>
+                    <span data-role="ms-best-version" title="{{ ms_owc.best_version_tooltip }}">
+                      {{ ms_owc.best_version_label }}：{% if ms_owc.best_version_value is none %}—{% else %}{{ ms_owc.best_version_value }}{% endif %}
+                    </span>
+                    <span>&middot;</span>
+                    <span data-role="ms-last-generated-at">
+                      {{ ms_owc.last_generated_at_label }}：{{ ms_owc.last_generated_at_value or "—" }}
+                    </span>
+                  </div>
+                  {% if ms_lanes and ms_lanes.lanes %}
+                    {# OWC-MS PR-1 MS-W1 — 脚本任务 / 变体任务 / 发布任务 three-tier lanes. Pure projection over packet + variation cells + closure publish events. #}
+                    <div class="task-card__meta" data-role="ms-three-tier-lanes">
+                      {% for lane in ms_lanes.lanes %}
+                        <div class="ms-lane" data-role="ms-lane-{{ lane.key }}">
+                          <span class="ms-lane__label">{{ lane.label }}</span>
+                          <span class="ms-lane__count" data-role="ms-lane-count">（{{ lane.rows | length }}）</span>
+                        </div>
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                {% endif %}
               </div>
             </div>
             <div class="task-card__right" data-role="matrix-script-card-right">
               <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
+              {% if ms_eight_stage and ms_eight_stage.stage_label %}
+                <span class="task-badge stage-badge stage-badge--{{ ms_eight_stage.stage }}"
+                      data-role="ms-eight-stage"
+                      data-stage="{{ ms_eight_stage.stage }}"
+                      data-stage-index="{{ ms_eight_stage.stage_index }}">{{ ms_eight_stage.stage_label }}</span>
+              {% endif %}
               <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}"
                     data-role="operator-bucket"
                     data-bucket-language="zh">{{ ms_summary.tri_state_badge_label }}</span>

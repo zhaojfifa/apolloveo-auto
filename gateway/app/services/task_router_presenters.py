@@ -14,6 +14,9 @@ from gateway.app.services.hot_follow_runtime_bridge import (
 from gateway.app.services.matrix_script.task_card_summary import (
     derive_matrix_script_task_card_summary,
 )
+from gateway.app.services.matrix_script.task_area_convergence import (
+    derive_matrix_script_full_card_summary_for_task,
+)
 from gateway.app.services.operator_visible_surfaces import (
     build_board_row_projection,
     build_operator_surfaces_for_workbench,
@@ -208,7 +211,23 @@ def build_tasks_page_rows(
                 t.get("packet", {}).get("line_specific_refs") if isinstance(t.get("packet"), dict) else None
             )
             row["config"] = t.get("config")
+            row["packet"] = t.get("packet")
+            row["updated_at"] = t.get("updated_at")
+            row["last_generated_at"] = t.get("last_generated_at")
+            row["archived"] = bool(t.get("archived"))
+            row["final"] = t.get("final")
             row["matrix_script_card_summary"] = derive_matrix_script_task_card_summary(row)
+            # OWC-MS PR-1 (MS-W1 + MS-W2) — Task Area three-tier lanes +
+            # eight-stage state + 8-field card. The full summary supersets
+            # the PR-U1 keys, so the template's PR-U1 spans render
+            # unchanged. Closure is read read-only via the closure binding
+            # (no lazy create on Task Area; closure write only happens
+            # through the publish-hub event router shipped by recovery PR-3).
+            # Authority: docs/reviews/owc_ms_gate_spec_v1.md §3 (MS-W1/W2);
+            # docs/product/matrix_script_product_flow_v1.md §§5.1–5.3.
+            row["matrix_script_task_area_convergence"] = (
+                derive_matrix_script_full_card_summary_for_task(row)
+            )
         rows.append(row)
     return rows
 
