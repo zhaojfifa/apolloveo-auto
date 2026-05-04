@@ -1,22 +1,23 @@
 # gateway/app/services/asset/
 
-**Status**: P1 implementation target (asset library + broll views + promote flow)
-**Authority**: Master Plan v1.0 §7 Asset Supply / Broll Roadmap; v1.1 Part IV.1
+**Status**: Operator Capability Recovery PR-2 — minimum operator capability landed (read-only library + closed-facet filter + opaque-ref handle + promote intent + closure mirror). Full DAM / upload / admin review UI deferred to a later wave.
+**Authority**: Master Plan v1.0 §7 Asset Supply / Broll Roadmap; v1.1 Part IV.1; ApolloVeo 2.0 Operator Capability Recovery Decision §4.1 + Global Action §5.
 
 ## Purpose
 
 Host directory for the asset supply domain:
 
-- Asset table (`asset` per Master Plan v1.0 §7.1)
-- List / filter / upload / fingerprint / index / tag operations
-- Promote flow (Artifact Store → Asset Library; explicit-only)
-- Broll library view (`asset.type = broll`)
+- Asset library object (closed metadata schema; PR-2 = seeded read-only)
+- List / filter (closed-facet) / opaque-reference operations
+- Promote intent submit + append-only closure mirror
+- Operator-visible Asset Supply / B-roll page (`/assets`)
 
 ## Consumes
 
-- `asset_supply_contract_v1.md` (to be authored in P1)
-- `promote_flow_contract_v1.md` (to be authored in P1)
-- Artifact Store outputs (read-only via promote_flow)
+- `docs/contracts/asset_library_object_contract_v1.md` (Plan C)
+- `docs/contracts/promote_request_contract_v1.md` (Plan C)
+- `docs/contracts/promote_feedback_closure_contract_v1.md` (Plan C)
+- Artifact handles (read-only via promote intent — never mutated)
 
 ## Does not
 
