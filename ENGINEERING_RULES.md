@@ -90,3 +90,17 @@ Every PR must state:
 ## 12. Default Project Entry Map
 
 Before starting any engineering PR, after the root indexes and the docs indexes, consume `docs/architecture/apolloveo_2_0_unified_alignment_map_v1.md` to confirm the current wave, the affected line, the surface position, and the frozen next engineering sequence. The map is a navigation document; it does not replace contracts, reviews, architecture docs, wave 指挥单, execution logs, or the master plan — when its wording conflicts with any of those, the underlying authority wins.
+
+## 13. Product-Flow Module Presence Rule
+
+When a line is under operator workflow convergence (Operator Workflow Convergence Wave / OWC, or any successor wave with the same convergence intent), every PR claiming operator-ready or trial-ready scope on that line MUST extend the line's operator surface block on `gateway/app/templates/tasks.html`, `gateway/app/templates/task_workbench.html`, and/or `gateway/app/templates/task_publish_hub.html` to expose the product-flow module the PR delivers. Service / projection / contract additive landings without surface convergence are by definition incomplete for an operator-ready claim and must be returned for surface convergence before merge.
+
+Authority surfaces that bind the module-presence check (consume the line-specific authority for the touched line; not all are cited per PR):
+
+- factory-wide abstract flow: `docs/architecture/apolloveo_2_0_top_level_business_flow_v1.md`
+- operator-visible surfaces: `docs/design/ApolloVeo_Operator_Visible_Surfaces_v1.md`
+- design handoff: `docs/handoffs/apolloveo_2_0_design_handoff_v1.md`
+- Matrix Script line-specific execution authority: `docs/product/matrix_script_product_flow_v1.md`
+- Digital Anchor line-specific execution authority: `docs/product/digital_anchor_product_flow_v1.md`
+
+Reviewer obligation: for every PR claiming convergence on one of those lines, the reviewer MUST open the relevant template branches and verify each module enumerated in the PR's scope is operator-visible. A PR that lands a service module + a wiring seam + a contract addendum but does not also extend the line's `tasks.html` / `task_workbench.html` / `task_publish_hub.html` operator block to expose the module is by definition incomplete and must be returned. This rule complements §6 (Contract-First) and §8 (Truth-Source); it does not relax either.

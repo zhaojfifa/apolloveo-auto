@@ -151,7 +151,17 @@ Inside P2 / P3 the live wave-charter sequence is: Multi-role Implementation 指�
 
 ### 3.1 Current wave
 
-**ApolloVeo 2.0 Operator-Visible Surface Validation Wave** (a.k.a. "Operations Upgrade Alignment Wave" — same authority under different names; merge clarified in [operations_upgrade_gap_review_and_ops_plan_v1.md](../reviews/operations_upgrade_gap_review_and_ops_plan_v1.md) §2).
+**ApolloVeo 2.0 Operator Workflow Convergence Wave (OWC)** — active mainline as of 2026-05-04. Strict ordering: **OWC-MS (Matrix Script first) → OWC-DA (Digital Anchor second) → trial re-entry review → Plan A live-trial → Platform Runtime Assembly Wave → Capability Expansion Gate Wave**. The wave closes the operator-workflow gap between contract-backed minimum capability (restored by Operator Capability Recovery Wave PR-1..PR-4 merged 2026-05-04) and product-flow-conformant operator surfaces (per the line-specific execution authorities at [docs/product/matrix_script_product_flow_v1.md](../product/matrix_script_product_flow_v1.md) and [docs/product/digital_anchor_product_flow_v1.md](../product/digital_anchor_product_flow_v1.md)).
+
+Wave authorities:
+
+- OWC-MS gate spec: [docs/reviews/owc_ms_gate_spec_v1.md](../reviews/owc_ms_gate_spec_v1.md) — eight modules MS-W1..MS-W8; PR slicing PR-1 / PR-2 / PR-3 / Closeout; §10 architect + reviewer signoff lines `<fill>` until docs-only signoff PR merges.
+- OWC-DA gate spec: [docs/reviews/owc_da_gate_spec_v1.md](../reviews/owc_da_gate_spec_v1.md) — nine modules DA-W1..DA-W9; PR slicing PR-1 / PR-2 / PR-3 / Closeout; §10 architect + reviewer signoff lines `<fill>`; additionally entry condition DA-E3 (OWC-MS Closeout MS-A1..MS-A8 PASS) must hold before OWC-DA PR-1 may open.
+- Engineering rule binding the convergence: [ENGINEERING_RULES.md](../../ENGINEERING_RULES.md) §13 Product-Flow Module Presence — no PR may claim operator-ready if only contract / projection / write-back landed without surface module presence.
+
+PR-5 NOT-READY rewrite (commit `da55a52` on the recovery branch — `fix(recovery-pr5): rewrite to NOT-READY decision + Product-Flow Enforcement Order`) is the cognitive anchor for OWC: minimum contract-backed capability is restored but operator workflow convergence on the line-specific surfaces is the remaining blocker; real operator trial remains NOT READY until OWC closes plus a separate trial re-entry review is authored and signed.
+
+Predecessor wave (CLOSED, substrate for OWC): **ApolloVeo 2.0 Operator-Visible Surface Validation Wave** (a.k.a. "Operations Upgrade Alignment Wave"; merge clarified in [operations_upgrade_gap_review_and_ops_plan_v1.md](../reviews/operations_upgrade_gap_review_and_ops_plan_v1.md) §2). Plan A static verification PASS; Plan A live-trial NOT executed (superseded by Operator Capability Recovery Wave); Operator Capability Recovery Wave PR-1..PR-4 all merged.
 
 Wave authority: [docs/architecture/ApolloVeo_2.0_Operator_Visible_Surface_Validation_Wave_指挥单_v1.md](ApolloVeo_2.0_Operator_Visible_Surface_Validation_Wave_指挥单_v1.md).
 
@@ -181,14 +191,19 @@ Successor waves (NOT STARTED):
 
 ### 3.2 Explicitly blocked in current wave
 
-Per [CURRENT_ENGINEERING_FOCUS.md](../../CURRENT_ENGINEERING_FOCUS.md), the gap review §13, the Operator-Visible Surface Validation Wave 指挥单 §7, the Capability Expansion Gate Wave 指挥单 §"红线", and Plan A §4:
+Per [CURRENT_ENGINEERING_FOCUS.md](../../CURRENT_ENGINEERING_FOCUS.md), [docs/reviews/owc_ms_gate_spec_v1.md](../reviews/owc_ms_gate_spec_v1.md) §4, [docs/reviews/owc_da_gate_spec_v1.md](../reviews/owc_da_gate_spec_v1.md) §4, the [Operator Capability Recovery Decision](../execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md), and the [Operator Capability Recovery Global Action](../execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_GLOBAL_ACTION_v1.md) red lines:
 
-- Platform Runtime Assembly entry
-- Capability Expansion (W2.2, W2.3, durable persistence, runtime API)
+- Plan A live-trial reopen (real operator trial remains NOT READY until OWC-MS Closeout + OWC-DA Closeout sign and a separate trial re-entry review is authored and signed)
+- Platform Runtime Assembly entry (gated on Plan A live-trial closeout)
+- Capability Expansion (W2.2, W2.3, durable persistence, runtime API; gated on Platform Runtime Assembly signoff)
 - Third production line commissioning
+- OWC-MS implementation (MS-W1..MS-W8) until OWC-MS gate spec §10 architect + reviewer signoff merges
+- OWC-DA implementation (DA-W1..DA-W9) until OWC-MS Closeout PASS + OWC-DA gate spec §10 architect + reviewer signoff merges
+- OWC-MS gate spec §4 forbidden scope (Matrix Script packet truth mutation; reopening §8.A–§8.H; widening canonical axes / `target_language` / `source_script_ref` accepted-scheme set; operator-driven Phase B authoring; Hot Follow file touch; Digital Anchor file touch; bundling MS-W* slices)
+- OWC-DA gate spec §4 forbidden scope (Digital Anchor packet truth mutation; `roles[]` / `segments[]` operator authoring; closed-enum widening beyond additive `review_zone`; reopening PR-4 reviewer-fail correction items; Hot Follow file touch; Matrix Script file touch; avatar platform / role catalog / scene catalog UI; bundling DA-W* slices)
 - Frontend patching beyond what is already shipped (no React/Vite full rebuild, no provider/model selector UI, no donor / supply concept exposure)
 - Hot Follow business reopening
-- Matrix Script / Digital Anchor closed-truth mutation
+- Matrix Script / Digital Anchor closed-truth mutation outside the additive `review_zone` enum on closure event payloads explicitly enumerated by OWC-MS MS-W5 / OWC-DA DA-W7
 - Provider / model / vendor / engine controls (validator R3 + design-handoff red line 6)
 - Donor namespace import (`from swiftcraft.*`)
 - Matrix Script §8.A → §8.H reopening
@@ -196,9 +211,16 @@ Per [CURRENT_ENGINEERING_FOCUS.md](../../CURRENT_ENGINEERING_FOCUS.md), the gap 
 
 ### 3.3 Explicitly allowed in current wave
 
-The wave-internal *only* allowed engineering action is:
+The wave-internal allowed engineering actions, in strict order, are:
 
-- **Plan A live-trial execution by operations team** (coordinator runs `§2.1` hide/disable + `§2.2` 口径 + `§2.3` per-line runbook + `§11.4` and `§12.4` action items per [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](../execution/PLAN_A_OPS_TRIAL_WRITEUP_v1.md); ops team appends live-run results to `§8` placeholder).
+1. **OWC authority/gate normalization PR (this map's parent docs PR)** — re-anchor CURRENT_ENGINEERING_FOCUS / ENGINEERING_STATUS / unified alignment map / ENGINEERING_RULES + author OWC-MS gate spec + OWC-DA gate spec + evidence index OWC rows. Does NOT open OWC-MS implementation. Documentation only.
+2. **OWC-MS gate spec §10 signoff PR** — docs-only PR filling architect (Raobin) + reviewer (Alisa) signoff lines on [docs/reviews/owc_ms_gate_spec_v1.md](../reviews/owc_ms_gate_spec_v1.md) §10. Does NOT open implementation; opens the implementation gate when merged.
+3. **OWC-MS implementation PRs** — exactly three PRs sequenced PR-1 (MS-W1 + MS-W2) → PR-2 (MS-W3..W6) → PR-3 (MS-W7 + MS-W8) per OWC-MS gate spec §5. Each opens only after the predecessor merges and reviews.
+4. **OWC-MS Closeout PR** — aggregating audit + signoff per OWC-MS gate spec §6 / §10. Records MS-A1..MS-A8 PASS.
+5. **OWC-DA gate spec §10 signoff PR** — docs-only PR filling architect (Raobin) + reviewer (Alisa) signoff lines on [docs/reviews/owc_da_gate_spec_v1.md](../reviews/owc_da_gate_spec_v1.md) §10. Authoring may happen in parallel with OWC-MS work; gate-opening requires both this signoff AND DA-E3 (OWC-MS Closeout MS-A1..MS-A8 PASS).
+6. **OWC-DA implementation PRs** — exactly three PRs sequenced PR-1 (DA-W1 + DA-W2) → PR-2 (DA-W3..W7) → PR-3 (DA-W8 + DA-W9) per OWC-DA gate spec §5.
+7. **OWC-DA Closeout PR** — aggregating audit + signoff per OWC-DA gate spec §6 / §10. Records DA-A1..DA-A8 PASS.
+8. **Trial re-entry review** — separate docs-only review updating [docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md) §0 sample-validity criteria for product-flow module presence on every sample line; signed by architect + reviewer + coordinator + product manager.
 
 Always-allowed maintenance (no wave gate required):
 
@@ -360,12 +382,23 @@ Per Plan A §4.1:
 **One sequence. No parallel drift. No step starts before its predecessor signs off.**
 
 ```
-Plan A live-trial execution
-  → Plan E gate spec
-  → Plan E implementation
+OWC-MS gate spec §10 signoff (docs-only)
+  → OWC-MS PR-1 (MS-W1 + MS-W2)
+  → OWC-MS PR-2 (MS-W3..W6)
+  → OWC-MS PR-3 (MS-W7 + MS-W8)
+  → OWC-MS Closeout (MS-A1..MS-A8 PASS)
+  → OWC-DA gate spec §10 signoff (docs-only)
+  → OWC-DA PR-1 (DA-W1 + DA-W2)
+  → OWC-DA PR-2 (DA-W3..W7)
+  → OWC-DA PR-3 (DA-W8 + DA-W9)
+  → OWC-DA Closeout (DA-A1..DA-A8 PASS)
+  → Trial re-entry review (docs-only; updates OPERATIONS_TRIAL_READINESS_PLAN_v1 §0)
+  → Plan A live-trial execution
   → Platform Runtime Assembly Wave
   → Capability Expansion Gate Wave
 ```
+
+The earlier "Plan A live-trial execution → Plan E gate spec → Plan E implementation → Platform Runtime Assembly Wave → Capability Expansion Gate Wave" sequence is preserved as historical anchor — Operator Capability Recovery Wave PR-1..PR-4 superseded the Plan E phase scope by landing the unified `publish_readiness` producer + L3 `final_provenance` emitter + L4 advisory emitter + Asset Supply minimum capability + Matrix Script closure binding + Digital Anchor formal entry / closure binding directly on the recovery mainline; Plan E phase closeout signoffs (A7 / UA7 / RA7) remain independently pending in Raobin / Alisa / Jackie's queue and are NOT advanced by OWC.
 
 ### 7.1 Step 1 — Plan A live-trial execution (single next allowed action)
 
