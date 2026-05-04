@@ -403,11 +403,15 @@ It is valid as contract/projection baseline evidence, but not yet sufficient as 
 
 ---
 
-## 13. Real Operator Trial Re-Entry — Recovery Wave PR-5 (2026-05-04)
+## 13. Real Operator Trial Re-Entry — NOT READY (Recovery Wave PR-5, 2026-05-04)
 
 This section closes the **static-only / authority-only era** of this
-write-up and opens the **real operator trial era** under the
-post-recovery gate.
+write-up. It does **NOT** open the real operator trial era. The
+PR-5 gate verdict is **NOT READY**: contract-backed minimum operator
+capability is restored (PR-1..PR-4 merged) but operator workflow
+convergence to the line-specific product-flow authority documents
+is missing. Real operator trial therefore remains BLOCKED until the
+**Operator Workflow Convergence Wave** closes.
 
 ### 13.1 What changed under recovery
 
@@ -444,22 +448,47 @@ It supersedes:
 
 The §8 live-run placeholder in this write-up's body was authored when
 Plan A was authority-only. With recovery PR-1 .. PR-4 merged and the
-PR-5 trial re-entry gate authored, real-trial live-run results are no
-longer captured in §8 of this document. They are captured in:
+PR-5 NOT-READY gate authored, real-trial live-run results are not yet
+captured anywhere — because real-trial is BLOCKED until the Operator
+Workflow Convergence Wave closes. When the Convergence Wave closes
+and a separate "Trial Re-Entry Gate v2" PR re-opens the real-trial
+decision, real-trial live-run results will be captured in:
 
-- **PR-5 trial re-entry gate** §10 signoff block — coordinator,
-  architect, reviewer.
-- A future per-sample live-run log filed under `docs/execution/` by the
+- The signoff block of the future "Trial Re-Entry Gate v2" document
+  (coordinator, architect, reviewer).
+- Per-sample live-run logs filed under `docs/execution/` by the
   operations team after each real-trial sample. Naming convention:
-  `RECOVERY_PR5_REAL_TRIAL_SAMPLE_<n>_<line>_<yyyymmdd>_v1.md`.
+  `OPERATOR_TRIAL_SAMPLE_<n>_<line>_<yyyymmdd>_v1.md` — re-numbered
+  from a v2 trial gate, not from PR-5.
 
-### 13.4 Coordinator instruction to read both eras
+### 13.4 Coordinator instruction during the Convergence Wave
 
-Coordinators MUST read **both** the static-only body of this write-up
-(§1 .. §12) AND the PR-5 trial re-entry gate document end-to-end
-before authorizing the first real-trial sample. The static body
-remains the authoritative record of why authority-only trial was
-sufficient pre-recovery; the gate document is the authoritative
-record of why real trial is now safe.
+Coordinators MUST NOT authorize a real-trial sample on Matrix Script
+or Digital Anchor surfaces during the Convergence Wave. Two
+allowances apply (verbatim from PR-5 gate §8):
+
+1. **Hot Follow golden-path samples** remain valid as factory-baseline
+   evidence per the pre-recovery Plan A §7.1 wave 1 / wave 2.
+2. **Static surface inspection** by the trial coordinator MAY produce
+   convergence-gap notes used as input to the Convergence Wave.
+
+When the Convergence Wave closes and a "Trial Re-Entry Gate v2"
+document is authored, that document — not PR-5 — is the authoritative
+record of real-trial readiness.
+
+### 13.5 Operator Workflow Convergence Wave
+
+The next mandatory wave is the **Operator Workflow Convergence Wave**.
+Its scope is the W7..W12 preconditions in the PR-5 gate document §2.3,
+ordered Matrix Script first (Phase OWC-MS) then Digital Anchor
+second (Phase OWC-DA). The two product-flow authority documents
+elevated by PR-5 are:
+
+- [`docs/product/matrix_script_product_flow_v1.md`](../product/matrix_script_product_flow_v1.md)
+- [`docs/product/digital_anchor_product_flow_v1.md`](../product/digital_anchor_product_flow_v1.md)
+
+Future Task Area / Workbench / Delivery Center implementations on
+those two lines MUST map to the product-flow modules, not only to
+the packet / contract / runtime truth.
 
 End of §13 — Real Operator Trial Re-Entry section.

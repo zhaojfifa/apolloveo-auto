@@ -225,8 +225,10 @@ Status: P2 pre-execution evidence index
 | Operator Capability Recovery PR-4 — closure HTTP router tests | `gateway/app/services/tests/test_digital_anchor_closure_api.py` |
 | Operator Capability Recovery PR-4 — workspace + publish-hub wiring tests | `gateway/app/services/tests/test_digital_anchor_workspace_wiring.py` |
 | Operator Capability Recovery PR-4 — surface-boundary integrity tests | `gateway/app/services/tests/test_digital_anchor_surface_boundary.py` |
-| Operator Capability Recovery PR-5 — execution log | `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_EXECUTION_LOG_v1.md` |
-| Operator Capability Recovery PR-5 — binding trial re-entry gate document with PR-1..PR-4 evidence map + go/no-go checklist + signoff block | `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md` |
+| Operator Capability Recovery PR-5 — execution log (rewritten 2026-05-04: NOT-READY decision + Product-Flow Enforcement Order) | `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_EXECUTION_LOG_v1.md` |
+| Operator Capability Recovery PR-5 — binding trial re-entry gate document (NOT READY verdict; W1..W12 preconditions; Product-Flow Enforcement Order; Operator Workflow Convergence Wave next) | `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md` |
+| Operator Capability Recovery PR-5 — Matrix Script line-specific execution authority (elevated by PR-5) | `docs/product/matrix_script_product_flow_v1.md` |
+| Operator Capability Recovery PR-5 — Digital Anchor line-specific execution authority (elevated by PR-5) | `docs/product/digital_anchor_product_flow_v1.md` |
 | Operator Capability Recovery PR-5 — Plan A trial brief §13 post-recovery superseder of pre-recovery §12 | `docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md` (additive §13) |
 | Operator Capability Recovery PR-5 — Plan A coordinator write-up §13 closing the static-only era | `docs/execution/PLAN_A_OPS_TRIAL_WRITEUP_v1.md` (additive §13) |
 | Operator Capability Recovery PR-5 — narrow validation script (documentation invariants) | `scripts/recovery_pr5_trial_reentry_check.py` |

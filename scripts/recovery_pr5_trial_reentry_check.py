@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""Recovery PR-5 trial re-entry gate validation script.
+"""Recovery PR-5 trial re-entry gate validation script (NOT-READY rewrite).
 
-Re-asserts the documentation invariants that the post-recovery real
-operator trial gate depends on. The script imports nothing from
-``gateway.app``; it only opens repository documentation files and
-checks for required tokens.
+Re-asserts the documentation invariants of the rewritten PR-5 gate:
+real operator trial is NOT READY, the two product-flow design
+documents are line-specific execution authority, and the next
+mandatory wave is the Operator Workflow Convergence Wave (Matrix
+Script first, Digital Anchor second).
+
+The script imports nothing from ``gateway.app``; it only opens
+repository documentation files and checks for required tokens.
 
 Usage::
 
@@ -17,6 +21,8 @@ Exit codes:
 Authority:
 - ``docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md``
 - ``docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_EXECUTION_LOG_v1.md``
+- ``docs/product/matrix_script_product_flow_v1.md``
+- ``docs/product/digital_anchor_product_flow_v1.md``
 """
 from __future__ import annotations
 
@@ -27,9 +33,6 @@ from typing import List
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# Each invariant is a (description, file path, list of required tokens)
-# tuple. The token check is substring-match; tokens are short and
-# verbatim-stable so this resists template drift.
 INVARIANTS: List[tuple[str, Path, List[str]]] = [
     (
         "PR-1 execution log MERGED with squash commit 4c317c4",
@@ -52,48 +55,77 @@ INVARIANTS: List[tuple[str, Path, List[str]]] = [
         ["MERGED to `main`", "0549ee0", "9.1 Reviewer-Fail Correction Pass"],
     ),
     (
-        "PR-5 trial re-entry gate document exists with §1 evidence map and §10 signoff block",
+        "PR-5 trial re-entry gate document records the NOT-READY verdict + Product-Flow Enforcement Order",
         REPO_ROOT / "docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md",
         [
-            "Recovery Wave Acceptance — Evidence Map",
-            "Real-Trial Re-Entry Go/No-Go Checklist",
-            "Post-Recovery Operator-Eligible Scope",
-            "Post-Recovery Operator-Blocked Scope",
-            "## 10. Signoff",
+            "## 0. Verdict",
+            "Real operator trial is NOT READY",
+            "Product-Flow Enforcement Order",
+            "Operator Workflow Convergence Wave",
+            "W7..W12",
+            "Matrix Script first",
+            "Digital Anchor second",
+            "## 11. Signoff",
             "Stop conditions",
         ],
     ),
     (
-        "PR-5 execution log exists with PR-5 forbidden-scope audit",
+        "PR-5 execution log records the NOT-READY rewrite",
         REPO_ROOT / "docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_EXECUTION_LOG_v1.md",
         [
+            "rewritten from a GO gate to a NOT-READY decision",
+            "Product-Flow Enforcement Order",
+            "Operator Workflow Convergence Wave",
             "## 7. Forbidden-Scope Audit",
             "## 6. Acceptance Mapping",
         ],
     ),
     (
-        "Plan A trial brief carries the post-recovery §13 superseder",
+        "Matrix Script product-flow document is in repo with the line-specific execution authority preamble",
+        REPO_ROOT / "docs/product/matrix_script_product_flow_v1.md",
+        [
+            "Matrix Script Product-Flow Design v1",
+            "line-specific execution authority",
+            "Recovery PR-5",
+            "Operator-ready",
+        ],
+    ),
+    (
+        "Digital Anchor product-flow document is in repo with the line-specific execution authority preamble",
+        REPO_ROOT / "docs/product/digital_anchor_product_flow_v1.md",
+        [
+            "Digital Anchor Product-Flow Design v1",
+            "line-specific execution authority",
+            "Recovery PR-5",
+            "Operator-ready",
+        ],
+    ),
+    (
+        "Plan A trial brief carries the post-recovery §13 with NOT-READY verdict",
         REPO_ROOT / "docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md",
         [
-            "## 13. Real Operator Trial Re-Entry",
-            "supersedes",
-            "Real operator trial readiness",
+            "## 13. Real Operator Trial Re-Entry — NOT READY",
+            "Real operator trial readiness:** **NOT READY",
+            "Operator Workflow Convergence Wave",
         ],
     ),
     (
-        "Plan A coordinator write-up carries the post-recovery §13 closure",
+        "Plan A coordinator write-up §13 records BLOCKED + Convergence Wave",
         REPO_ROOT / "docs/execution/PLAN_A_OPS_TRIAL_WRITEUP_v1.md",
         [
-            "## 13. Real Operator Trial Re-Entry",
-            "static-only era",
+            "## 13. Real Operator Trial Re-Entry — NOT READY",
+            "BLOCKED until",
+            "Operator Workflow Convergence Wave",
         ],
     ),
     (
-        "CURRENT_ENGINEERING_FOCUS reflects the post-recovery / re-entry stage",
+        "CURRENT_ENGINEERING_FOCUS records NOT READY + the Convergence Wave",
         REPO_ROOT / "CURRENT_ENGINEERING_FOCUS.md",
         [
-            "Real Operator Trial Re-Entry",
-            "PR-1 / PR-2 / PR-3 / PR-4",
+            "Operator Workflow Convergence Wave",
+            "NOT READY",
+            "Matrix Script first",
+            "Digital Anchor second",
         ],
     ),
 ]

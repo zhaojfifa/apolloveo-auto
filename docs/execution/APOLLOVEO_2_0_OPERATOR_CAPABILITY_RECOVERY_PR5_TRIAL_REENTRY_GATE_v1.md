@@ -1,265 +1,376 @@
 # ApolloVeo 2.0 · Operator Capability Recovery · PR-5 · Real Operator Trial Re-Entry Gate v1
 
-Date: 2026-05-04
-Status: **Trial re-entry gate document.** This is the binding gate for
-real operator trial re-entry after the Minimal Operator Capability
-Recovery wave (PR-1 / PR-2 / PR-3 / PR-4) has all merged to `main`.
-Wave: ApolloVeo 2.0 Minimal Operator Capability Recovery — Re-entry.
+Date: 2026-05-04 (rewritten from a GO gate to a NOT-READY decision +
+Product-Flow Enforcement Order on 2026-05-04 per the rewrite mission)
+Status: **Trial re-entry gate document — NOT READY decision.** This
+document does **NOT** authorize real operator trial. It records the
+recovery wave's contract-backed minimum capability as restored, and
+explicitly declares operator workflow convergence as not yet
+sufficient for real trial.
+Wave: ApolloVeo 2.0 Minimal Operator Capability Recovery — Re-entry
+**evaluation** (the re-entry itself is BLOCKED by this document's
+verdict).
 Decision authority:
 [`docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`](ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md).
 Action authority:
 [`docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_GLOBAL_ACTION_v1.md`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_GLOBAL_ACTION_v1.md) §8 (PR-5).
 Predecessors (all MERGED to `main` 2026-05-04):
-- PR-1 ([#114](https://github.com/zhaojfifa/apolloveo-auto/pull/114), squash `4c317c4`)
-- PR-2 ([#116](https://github.com/zhaojfifa/apolloveo-auto/pull/116), squash `4343bec`)
-- PR-3 ([#118](https://github.com/zhaojfifa/apolloveo-auto/pull/118), squash `d53da0f`)
-- PR-4 ([#119](https://github.com/zhaojfifa/apolloveo-auto/pull/119), squash `0549ee0`)
+- PR-1 ([#114](https://github.com/zhaojfifa/apolloveo-auto/pull/114), squash `4c317c4`) — Unified Publish Readiness Runtime Recovery.
+- PR-2 ([#116](https://github.com/zhaojfifa/apolloveo-auto/pull/116), squash `4343bec`) — B-roll / Asset Supply minimum operator capability.
+- PR-3 ([#118](https://github.com/zhaojfifa/apolloveo-auto/pull/118), squash `d53da0f`) — Matrix Script Operator Workspace Promotion.
+- PR-4 ([#119](https://github.com/zhaojfifa/apolloveo-auto/pull/119), squash `0549ee0`) — Digital Anchor Operator Workspace Recovery.
 
-## 0. Why this document exists
+## 0. Verdict
 
-The pre-recovery Plan A trial brief
-[`docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md`](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md)
-froze a trial that was, by the recovery decision §1.1, an
-"authority-only" trial — operators could not actually exercise an
-end-to-end production loop because the publish-readiness producer was
-not unified, the Asset Supply surface was hidden, the Matrix Script
-publish-feedback closure was never reachable, and Digital Anchor was
-inspection-only. The Recovery Decision §0 demoted that trial.
+**Real operator trial is NOT READY.**
 
-PR-1 through PR-4 have now landed the **minimum operator capability**
-that the decision required as a precondition for real operator trial.
-This document is the explicit go/no-go gate that re-opens trial as
-**real operator trial** rather than authority-only trial. It does NOT
-author new contracts, new runtime, or new product features. It is the
-gate artifact whose purpose is exactly:
+The minimum **contract-backed** operator capability is restored
+(PR-1 / PR-2 / PR-3 / PR-4 all merged to `main` 2026-05-04). What
+remains missing is **operator workflow convergence**: the per-line
+operator-visible surfaces (Task Area card fields, Workbench modules,
+Delivery Center sections) are not yet mapped to the line-specific
+product-flow authority documents
+[`docs/product/matrix_script_product_flow_v1.md`](../product/matrix_script_product_flow_v1.md)
+and
+[`docs/product/digital_anchor_product_flow_v1.md`](../product/digital_anchor_product_flow_v1.md).
+Consequently an operator opening a Matrix Script or Digital Anchor task
+today does not see the workflow that the product-flow design specifies
+— they see only the contract-truth projection.
 
-1. Tie each recovered capability to a concrete merged PR + execution log;
-2. State precisely what operators MAY now do that they could not before;
-3. State precisely what remains blocked even after re-entry;
-4. Provide a coordinator/architect/reviewer signoff block that, when
-   filled, authorizes the operations team to proceed with a real
-   trial wave.
+Real operator trial therefore remains **blocked**. The next mandatory
+wave is the **Operator Workflow Convergence Wave** (Matrix Script
+first, Digital Anchor second), defined in §4 below.
 
-## 1. Recovery Wave Acceptance — Evidence Map
+## 1. Why this document was rewritten (2026-05-04)
+
+The first revision of this gate document declared real operator trial
+**GO subject to coordinator G5..G9**. That conclusion was wrong: it
+treated "contract-backed minimum operator capability is present" as a
+sufficient condition for real trial, when the binding condition is
+"operator workflow as specified by the line-specific product-flow
+documents is present on operator-visible surfaces". The two are not
+the same. The recovery wave restored the former; the latter remains
+unmet.
+
+This rewrite:
+
+1. Flips the gate verdict from **GO** to **NOT READY**.
+2. Adds the **Product-Flow Enforcement Order** (§3) elevating the two
+   product-flow design documents to binding line-specific execution
+   authority.
+3. Names the **Operator Workflow Convergence Wave** (§4) as the next
+   mandatory wave, with Matrix Script first and Digital Anchor second.
+4. Rewrites §2's checklist from G1..G16 (acceptance) to W1..W12
+   (workflow-convergence preconditions for real trial).
+5. Preserves §1 of the prior revision's evidence map (renamed §6 here)
+   verbatim — the recovery wave's contract-backed acceptance is
+   intact; this document simply states that contract-backed
+   acceptance is necessary but not sufficient.
+6. Preserves the §"Stop conditions during real trial" list (renamed
+   §10 here) verbatim — those stop conditions remain binding for any
+   future trial.
+
+The pre-rewrite revision is preserved in git history; no documentation
+on `main` claims real operator trial is GO.
+
+## 2. Real-Trial Re-Entry Workflow-Convergence Preconditions (W1..W12)
+
+These are the binding preconditions for real operator trial. Until
+**all** are satisfied, real operator trial remains BLOCKED.
+
+### 2.1 Contract-backed minimum capability (already met by recovery)
+
+- [x] **W1.** PR-1 (Unified Publish Readiness Runtime Recovery)
+  merged to `main`. See §6 row 1 evidence.
+- [x] **W2.** PR-2 (B-roll / Asset Supply minimum) merged to `main`.
+  See §6 row 2 evidence.
+- [x] **W3.** PR-3 (Matrix Script Operator Workspace Promotion)
+  merged to `main`. See §6 row 3 evidence.
+- [x] **W4.** PR-4 (Digital Anchor Operator Workspace Recovery)
+  merged to `main` after the §9.1 reviewer-fail correction pass.
+  See §6 row 4 evidence.
+
+### 2.2 Product-flow authority elevated (this PR-5)
+
+- [x] **W5.** [`docs/product/matrix_script_product_flow_v1.md`](../product/matrix_script_product_flow_v1.md)
+  is in `main` with the line-specific-execution-authority preamble
+  (PR-5).
+- [x] **W6.** [`docs/product/digital_anchor_product_flow_v1.md`](../product/digital_anchor_product_flow_v1.md)
+  is in `main` with the line-specific-execution-authority preamble
+  (PR-5).
+
+### 2.3 Operator workflow convergence (NOT YET MET — blocks real trial)
+
+- [ ] **W7.** Matrix Script Task Area card carries the §5.3 fields
+  from `matrix_script_product_flow_v1.md` (主题 / 目标; 核心脚本名称;
+  当前变体数; 可发布版本数; 已发布账号数; 当前最佳版本; 最近一次生
+  成时间; 当前阻塞项).
+- [ ] **W8.** Matrix Script Workbench renders the §6.1 modules from
+  `matrix_script_product_flow_v1.md` (A 脚本结构区, B 变体配置区,
+  C 预览对比区, D 校对区, E 质检与诊断区) — not only the Phase B
+  variation-surface projection that PR-3 wired.
+- [ ] **W9.** Matrix Script Delivery Center renders the §7.1 standard
+  deliverable set (final.mp4, subtitles, audio, copy_bundle, metadata
+  / manifest, scene_pack 可选, publish_status) and enforces §7.2
+  publish rules (成片完成 + 发布必需项就绪 = 可发布; Scene Pack 非
+  阻塞; 历史成功 vs 当前尝试分开解释; publish 只消费 authoritative
+  projection).
+- [ ] **W10.** Digital Anchor Task Area card carries the §5.2 fields
+  from `digital_anchor_product_flow_v1.md` (任务标题; Role Profile;
+  Scene Template; Target Language; 当前版本状态; 当前阻塞项; 交付
+  包状态; 最近更新).
+- [ ] **W11.** Digital Anchor Workbench renders the §6.1 modules
+  from `digital_anchor_product_flow_v1.md` (A 角色绑定面, B 内容结
+  构面, C 场景模板面, D 语言输出面, E 预览与校对面) — not only the
+  Phase B role/speaker-surface projection that PR-4 wired.
+- [ ] **W12.** Digital Anchor Delivery Center renders the §7.1
+  standard deliverable set (final_video, subtitle, dubbed_audio,
+  metadata, manifest, pack, role_usage, scene_usage, language_usage)
+  and enforces §7.2 delivery rules (主交付物是成片; 附属交付物可追
+  溯; manifest 是交付证据; pack 是协作接口; 历史成功 vs 当前尝试分
+  开解释).
+
+W7..W12 will be delivered by the **Operator Workflow Convergence
+Wave** (§4). Until they are all checked, real operator trial cannot
+be authorized.
+
+### 2.4 Re-entry decision
+
+| Condition | State | Implication |
+|---|---|---|
+| W1 .. W4 (recovery contract-backed) | MET | Necessary, not sufficient. |
+| W5 .. W6 (product-flow authority elevated) | MET | This PR-5 lands them. |
+| W7 .. W12 (operator workflow convergence) | NOT MET | **Real trial BLOCKED.** |
+
+**Verdict: NOT READY.** Real operator trial does not start until
+W7..W12 are met by the Operator Workflow Convergence Wave.
+
+## 3. Product-Flow Enforcement Order (binding)
+
+The two product-flow design documents
+[`docs/product/matrix_script_product_flow_v1.md`](../product/matrix_script_product_flow_v1.md)
+and
+[`docs/product/digital_anchor_product_flow_v1.md`](../product/digital_anchor_product_flow_v1.md)
+are hereby elevated from "design notes" to **binding line-specific
+execution authority** for their respective lines. The ordering rule:
+
+1. **Top-level flow remains valid as the factory-wide abstract flow.**
+   [`docs/architecture/apolloveo_2_0_top_level_business_flow_v1.md`](../architecture/apolloveo_2_0_top_level_business_flow_v1.md)
+   continues to define the factory-wide abstract chain
+   (task → line → workbench → delivery → publish → archive). It is
+   the cross-line authority for what a "task" is, what a "deliverable"
+   is, and what "publishability" is.
+2. **Line-specific product-flow documents are binding inside their
+   line.** For Matrix Script surfaces, the Matrix Script product-flow
+   document is the line-specific authority for Task Area card fields,
+   Workbench modules, Delivery Center sections, and the line's
+   §"运营目标" (跑量测试 / 内容配方验证 / 账号矩阵分发 / 快速复盘).
+   Same for Digital Anchor on Digital Anchor surfaces.
+3. **Future Task Area / Workbench / Delivery implementations MUST map
+   to the product-flow modules.** Mapping to the packet / contract /
+   runtime truth alone is **not sufficient** for operator-ready. A
+   workbench page that consumes the Phase B variation surface
+   projection but does not render §6.1 A / B / C / D / E modules is
+   not operator-ready under this rule.
+4. **Operator-ready cannot be claimed unless product-flow modules are
+   actually present.** The PR-5 NOT-READY verdict is the first
+   instance of this rule. Future PRs that claim "operator-ready" or
+   "real trial GO" MUST cite the specific product-flow modules they
+   render.
+5. **Conflict-resolution.** Where the line-specific document and the
+   top-level document diverge for a line-specific concern, the
+   line-specific document wins on that line's surfaces. Where the
+   line-specific document and a frozen contract diverge, the contract
+   wins (validators / packet rules / Plan B/C/D contracts are not
+   re-opened by product-flow elevation).
+6. **Re-versioning discipline.** Either document may be re-versioned
+   (`_v2`) only via a separate authored PR; this PR-5 does not modify
+   their substantive content beyond adding the authority preamble.
+
+## 4. Operator Workflow Convergence Wave (next mandatory wave)
+
+The next mandatory wave after PR-5 is the **Operator Workflow
+Convergence Wave**. Its scope is exactly W7..W12 (§2.3 above).
+
+### 4.1 Wave goal
+
+Land operator workflow convergence on the two recovered lines so that
+W7..W12 can be checked. The wave is **operator-surface only**: it
+maps existing recovered runtime + contract truth into the modules
+specified by the product-flow documents. It does NOT add new runtime
+features, new contracts, new packet truth, or new Plan E phases.
+
+### 4.2 Wave ordering (mandatory)
+
+1. **Phase OWC-MS — Matrix Script first.** Lands W7 + W8 + W9.
+2. **Phase OWC-DA — Digital Anchor second.** Lands W10 + W11 + W12.
+
+Matrix Script is sequenced first because it is the more mature line
+(8 §8.A..§8.H corrections complete; Phase B authoring already
+populates real axes / cells / slots) and because the task-area /
+workbench / delivery surfaces all already have the contract-backed
+projections wired by PR-1 / PR-3. Digital Anchor's Phase B authoring
+is not yet implemented (it is contract-deferred per the PR-4 residual
+risks); the Digital Anchor convergence step therefore renders empty
+panels by design until Phase B authoring lands separately.
+
+### 4.3 Wave hard boundaries
+
+This wave MUST NOT:
+
+- Add new runtime features outside what is needed to map existing
+  truth into the product-flow modules.
+- Reopen Platform Runtime Assembly.
+- Reopen Capability Expansion (W2.2 / W2.3 / durable persistence /
+  runtime API / third production line).
+- Modify the Matrix Script or Digital Anchor packet schema, sample,
+  or any frozen contract.
+- Modify Hot Follow business behavior.
+- Add provider / model / vendor / engine controls.
+- Re-version either product-flow document.
+
+### 4.4 Wave acceptance
+
+The Operator Workflow Convergence Wave is acceptable only when:
+
+- W7 .. W9 are all checked for Matrix Script (Phase OWC-MS).
+- W10 .. W12 are all checked for Digital Anchor (Phase OWC-DA).
+- The repository ships a follow-up gate document that records each
+  W-item as PASS with a file/line citation into the operator surface.
+- That follow-up gate document re-runs the §10 stop-condition list
+  against the post-convergence state.
+
+After OWC-MS + OWC-DA close, a separate "Trial Re-Entry Gate v2"
+document may be authored to reopen the real-trial decision. PR-5
+does NOT pre-decide that gate.
+
+## 5. Post-recovery Stage Definition
+
+The repository's stage transitions from the pre-recovery
+**"Operator-Visible Surface Validation Wave (authority-only trial
+freeze)"** to the post-recovery **"Operator Workflow Convergence Wave
+— Matrix Script First, Digital Anchor Second"**.
+
+This is **not** the start of:
+
+- Real operator trial (BLOCKED — gated on §2.3 W7..W12).
+- Platform Runtime Assembly (still BLOCKED).
+- Capability Expansion (still BLOCKED).
+- New production lines (still BLOCKED).
+- Provider / model / vendor consoles (forbidden at every phase).
+
+It IS the start of: mapping the recovered operator surfaces onto the
+two product-flow design documents, line-by-line, in the ordering of
+§4.2.
+
+## 6. Recovery Wave Acceptance — Evidence Map (W1..W4)
 
 Each row maps a Recovery Decision §4 mandatory capability onto the
 merged PR that delivered it, the execution log, and the operator-
-visible surface(s) that exercise it.
+visible surface(s) that exercise it. **This evidence is sufficient
+for W1..W4 of §2 only — not sufficient for real-trial re-entry.**
 
 | § | Capability | Status | Merged commit | Execution log | Operator-visible surface |
 |---|---|---|---|---|---|
 | 4.1 | Asset Supply / B-roll minimum usable operator capability | **PASS** | [`4343bec`](https://github.com/zhaojfifa/apolloveo-auto/commit/4343bec) (PR #116) | [`PR2_ASSET_SUPPLY`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR2_ASSET_SUPPLY_EXECUTION_LOG_v1.md) | `/assets`, `/api/assets`, `POST /api/assets/promote` |
-| 4.2 | Unified `publish_readiness` runtime producer | **PASS** | [`4c317c4`](https://github.com/zhaojfifa/apolloveo-auto/commit/4c317c4) (PR #114) | [`PR1_PUBLISH_READINESS`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR1_PUBLISH_READINESS_EXECUTION_LOG_v1.md) | Board / Workbench / Delivery — same `publish_readiness` truth across surfaces |
+| 4.2 | Unified `publish_readiness` runtime producer | **PASS** | [`4c317c4`](https://github.com/zhaojfifa/apolloveo-auto/commit/4c317c4) (PR #114) | [`PR1_PUBLISH_READINESS`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR1_PUBLISH_READINESS_EXECUTION_LOG_v1.md) | Board / Workbench / Delivery converge on the same producer |
 | 4.3 | Matrix Script operator workspace promotion (variation → workbench → delivery → feedback loop) | **PASS** | [`d53da0f`](https://github.com/zhaojfifa/apolloveo-auto/commit/d53da0f) (PR #118) | [`PR3_MATRIX_SCRIPT_WORKSPACE`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR3_MATRIX_SCRIPT_WORKSPACE_EXECUTION_LOG_v1.md) | `/api/matrix-script/closures/{task_id}` (GET / POST events / peek), publish-hub `_ms_kind == "matrix_script"` block |
 | 4.3 | Digital Anchor operator workspace recovery (formal create-entry + Phase D.1 write-back) | **PASS** | [`0549ee0`](https://github.com/zhaojfifa/apolloveo-auto/commit/0549ee0) (PR #119) | [`PR4_DIGITAL_ANCHOR_WORKSPACE`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR4_DIGITAL_ANCHOR_WORKSPACE_EXECUTION_LOG_v1.md) (with §9.1 reviewer-fail correction pass) | `/tasks/digital-anchor/new`, `/api/digital-anchor/closures/{task_id}` (GET / POST events / peek), publish-hub `_da_kind == "digital_anchor"` block |
-| 4.4 | Trial re-entry preparation | **PASS (this document)** | (PR-5) | [`PR5_EXECUTION_LOG`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_EXECUTION_LOG_v1.md) | n/a — gate document only |
+| 4.4 | Trial re-entry preparation | **PASS (this document) — verdict NOT READY** | (PR-5) | [`PR5_EXECUTION_LOG`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_EXECUTION_LOG_v1.md) | n/a — gate document only |
 
-All four predecessor PRs merged before PR-5 was authored. The recovery
-wave's required ordering (Global Action §3) is therefore satisfied.
+The recovery wave's mandatory ordering (Global Action §3) is satisfied;
+the recovery sequence PR-1 → PR-2 → PR-3 → PR-4 → PR-5 is complete.
+Real operator trial is a separate condition (§2.3 W7..W12), not
+satisfied by §6 alone.
 
-## 2. Real-Trial Re-Entry Go/No-Go Checklist
+## 7. Operator Surface Inventory (post-recovery, pre-convergence)
 
-Each item below is binding. The trial coordinator MUST verify every
-row before authorizing the first real-trial sample.
+What the recovered surfaces actually present today, line-by-line. This
+is the baseline the Operator Workflow Convergence Wave starts from.
 
-### 2.1 Engineering preconditions (PR-1 .. PR-4 acceptance)
+### 7.1 Hot Follow
 
-- [x] **G1.** Recovery PR-1 (Unified Publish Readiness Runtime
-  Recovery) merged to `main`. Evidence: §1 row 4.2;
-  `gateway/app/services/operator_visible_surfaces/publish_readiness.py`
-  exists and is the producer; Board / Workbench / Delivery consume it
-  via `compute_publish_readiness`. Tests:
-  `test_publish_readiness_unified_producer.py` (30/30 PASS),
-  `test_final_provenance_emission.py` (5/5),
-  `test_publish_readiness_surface_alignment.py` (18/18).
-- [x] **G2.** Recovery PR-2 (B-roll / Asset Supply Minimum Usable
-  Operator Capability) merged to `main`. Evidence: §1 row 4.1;
-  `gateway/app/routers/assets.py` registered; `/assets` page renders
-  contract-backed assets; `POST /api/assets/promote` accepts
-  contract-shaped intent and rejects `license_metadata.source !=
-  task_artifact_promote`. Tests: `test_asset_library_read_only.py`
-  (18/18), `test_asset_promote_lifecycle.py` (24/24),
-  `test_asset_surface_boundary.py` (8/8),
-  `test_asset_surface_submit_end_to_end.py` (5/5).
-- [x] **G3.** Recovery PR-3 (Matrix Script Operator Workspace
-  Promotion) merged to `main`. Evidence: §1 row 4.3 (Matrix Script);
-  `gateway/app/services/matrix_script/closure_binding.py` exposes
-  `apply_event_for_task`; `/api/matrix-script/closures/{task_id}/events`
-  is the active operator path; publish-hub renders the
-  variation_feedback table inside the matrix_script gate. Tests:
-  `test_matrix_script_closure_binding.py` (11/11),
-  `test_matrix_script_closure_publish_hub_wiring.py` (4/4),
-  `test_matrix_script_closure_surface_boundary.py` (6/6),
-  `test_matrix_script_closure_api.py` (HTTP end-to-end).
-- [x] **G4.** Recovery PR-4 (Digital Anchor Operator Workspace
-  Recovery) merged to `main`. Evidence: §1 row 4.3 (Digital Anchor);
-  `/tasks/digital-anchor/new` formal route accepts the contract-shaped
-  `language_scope` mapping and rejects unknown form/JSON keys at HTTP
-  400; `/api/digital-anchor/closures/{task_id}/events` is the active
-  D.1 write-back operator path with closed event_kind set
-  `{publish_attempted, publish_accepted, publish_rejected,
-  publish_retracted, metrics_snapshot, operator_note}` and per-row
-  `publish_status` ∈ `{pending, published, failed, retracted}`. Tests:
-  `test_digital_anchor_create_entry.py` (16/16),
-  `test_digital_anchor_closure_binding.py` (16/16),
-  `test_digital_anchor_workspace_wiring.py` (4/4),
-  `test_digital_anchor_surface_boundary.py` (9/9),
-  `test_digital_anchor_new_task_route_shape.py` (route shape +
-  closed-set rejection),
-  `test_digital_anchor_closure_api.py` (HTTP end-to-end).
+End-to-end (intake → publish), unchanged. Per
+[`docs/architecture/hot_follow_business_flow_v1.md`](../architecture/hot_follow_business_flow_v1.md)
+the Hot Follow operator workflow is already convergent at the line
+level — no Hot Follow product-flow document is required by this
+gate. Hot Follow remains the runtime reference line and is **not**
+in scope for the Operator Workflow Convergence Wave.
 
-### 2.2 Trial-environment preconditions (coordinator-side)
+### 7.2 Matrix Script
 
-- [ ] **G5.** Trial environment is on a `main`-tracking deploy whose
-  HEAD includes squash commit `0549ee0` or later.
-- [ ] **G6.** Coordinator has read this PR-5 gate document, the
-  Recovery Decision, and the four predecessor execution logs end-to-end.
-- [ ] **G7.** Coordinator has briefed the operations team on §4
-  (post-recovery operator-eligible scope) and §5 (post-recovery
-  operator-blocked scope) of this document, including the verbatim
-  口径 wording in §6.
-- [ ] **G8.** Coordinator confirms there is no remaining
-  pre-§8.A / pre-§8.F Matrix Script sample being treated as live trial
-  evidence (the PR-3 promotion did not retrofit historical samples).
-- [ ] **G9.** Coordinator confirms no provider / model / vendor /
-  engine / avatar-engine / TTS-provider / lip-sync-engine selector is
-  visible on any operator surface (regression-only check; the recovery
-  PRs do not add any).
+- Task Area card today: line-id, kind, status, formal-entry next-
+  surfaces. **Does not yet carry §5.3 fields** (主题 / 核心脚本名称
+  / 当前变体数 / 可发布版本数 / 已发布账号数 / 当前最佳版本 / 最近
+  一次生成时间 / 当前阻塞项).
+- Workbench today: Phase B variation panel (axes / cells / slots),
+  comprehension panel (PR-U2). **Does not yet render §6.1 modules**
+  (A 脚本结构区 / B 变体配置区 / C 预览对比区 / D 校对区 / E 质检
+  与诊断区).
+- Delivery Center today: the five contract-frozen rows
+  (variation_manifest / slot_bundle / subtitle_bundle / audio_preview
+  / scene_pack), per-row `required` / `blocking_publish` zoning,
+  delivery comprehension lanes, the variation_feedback table from
+  PR-3. **Does not yet render §7.1 standard deliverable set as the
+  product-flow expects** (final.mp4 primacy is partly there via
+  comprehension; copy_bundle / publish_status / metadata / manifest
+  rows are not yet first-class).
 
-### 2.3 Out-of-scope confirmation (no stealth scope expansion)
+### 7.3 Digital Anchor
 
-- [x] **G10.** No Platform Runtime Assembly work landed under cover of
-  PR-5. Evidence: this document; PR-5 file diff.
-- [x] **G11.** No Capability Expansion (W2.2 / W2.3 / durable
-  persistence / runtime API) landed under cover of PR-5.
-- [x] **G12.** No new production line landed.
-- [x] **G13.** No Hot Follow business behavior change in PR-5.
-- [x] **G14.** No Matrix Script / Digital Anchor packet, schema, or
-  closed-truth contract redesign in PR-5.
-- [x] **G15.** No provider / model / vendor / engine controls in PR-5.
-- [x] **G16.** No generalized digital-human platform expansion in
-  PR-5.
+- Task Area card today: line-id, kind, formal-entry next-surfaces.
+  **Does not yet carry §5.2 fields** (Role Profile / Scene Template
+  / Target Language / 当前版本状态 / 当前阻塞项 / 交付包状态 / 最
+  近更新).
+- Workbench today: empty-on-create role/speaker projection (Phase B
+  authoring deferred). **Does not yet render §6.1 modules** (A 角色
+  绑定面 / B 内容结构面 / C 场景模板面 / D 语言输出面 / E 预览与
+  校对面).
+- Delivery Center today: contract-frozen rows from
+  `digital_anchor_delivery_binding_v1`. **Does not yet render §7.1
+  standard deliverable set** (final_video / subtitle / dubbed_audio
+  / metadata / manifest / pack / role_usage / scene_usage /
+  language_usage).
 
-### 2.4 Re-entry decision
+### 7.4 Asset Supply
 
-If G1 .. G4 are checked (engineering preconditions; this document's
-state) AND G10 .. G16 are checked (out-of-scope confirmation; this
-document's state) AND G5 .. G9 are checked by the trial coordinator
-before the first sample, the gate is **GO** for real operator trial.
-If any G item is unchecked, the gate is **NO-GO** and the coordinator
-MUST not authorize the first sample.
+`/assets` page renders contract-backed assets with closed-facet
+filters; promote-intent submit accepted; `requested → withdrawn /
+rejected` closure visible. Asset Supply is a cross-line resource
+surface, not a per-line workflow; it is not subject to the Operator
+Workflow Convergence Wave's per-line W-checks but remains an enabler
+for Matrix Script reference-into-task and Digital Anchor role/scene
+asset discovery.
 
-## 3. Post-recovery Stage Definition
-
-The repository's stage transitions from the pre-recovery
-**"Operator-Visible Surface Validation Wave (authority-only trial
-freeze)"** to the post-recovery **"Real Operator Trial Re-Entry —
-Minimum Operator Capability Recovered"**.
-
-This is **not** the start of:
-- Platform Runtime Assembly (still BLOCKED — gated on this real trial
-  closing successfully and a separate wave-start authority).
-- Capability Expansion (still BLOCKED — gated on Platform Runtime
-  Assembly signoff).
-- New production lines (still BLOCKED — gated on the same).
-- Provider / model / vendor consoles (forbidden at every phase).
-
-It IS the start of: real operators submitting real tasks, completing
-real workspace flows, exercising real publish-feedback closures, and
-producing real trial evidence under a coordinator runbook tied to the
-recovered capabilities.
-
-## 4. Post-Recovery Operator-Eligible Scope
-
-What operators MAY now do, by line and surface. Each row supersedes
-the corresponding row in Plan A §3 / §3.1 / §3.2 / §3.3.
-
-### 4.1 Hot Follow
-
-End-to-end (intake → publish), unchanged. The unified
-`publish_readiness` from PR-1 is the truth; Board / Workbench /
-Delivery converge.
-
-### 4.2 Matrix Script
-
-End-to-end **including** the publish-feedback closure loop, no longer
-inspect-only on the closure surface. Operators may:
-
-- Submit a task via `/tasks/matrix-script/new` (formal Matrix Script
-  entry; closed eleven-field set).
-- Inspect the Workbench Phase B variation panel (real authored axes /
-  cells / slots, §8.A–§8.H corrections active).
-- Open the Delivery Center; the per-row `required` /
-  `blocking_publish` zoning + delivery comprehension lanes are real,
-  consuming the unified `publish_readiness` from PR-1.
-- Lazily create the Phase D.1 closure for the task and write per-
-  variation events
-  (`operator_publish` / `operator_retract` / `operator_note`)
-  through `POST /api/matrix-script/closures/{task_id}/events`.
-- See `publish_status_mirror` aggregate per-variation status on the
-  Delivery surface.
-
-### 4.3 Digital Anchor
-
-End-to-end **promoted from inspection-only**, with explicit Phase B
-authoring deferred. Operators may:
-
-- Submit a task via `/tasks/digital-anchor/new` (formal entry; closed
-  eleven-field set; `language_scope` is a structured object;
-  bracket-notation form keys or JSON body accepted; unknown keys
-  rejected at HTTP 400).
-- Inspect the Workbench role/speaker panel (read-only projection of
-  packet truth; empty `roles[]` / `segments[]` until Phase B authoring
-  lands in a future wave).
-- Open the Delivery Center; rows render from the contract-frozen
-  Phase C delivery binding.
-- Lazily create the Phase D.1 closure for the task and write per-row
-  D.1 events
-  (`publish_attempted` / `publish_accepted` / `publish_rejected` /
-  `publish_retracted` / `metrics_snapshot` / `operator_note`)
-  scoped to a role or segment row through
-  `POST /api/digital-anchor/closures/{task_id}/events`.
-- See `publish_status_mirror` aggregate per-row status on the
-  Delivery surface.
-
-### 4.4 Asset Supply
-
-Browse + filter + reference + promote-intent submit.
-
-- `/assets` page renders contract-backed assets with closed-facet
-  filters.
-- `POST /api/assets/promote` accepts contract-shaped intent (artifact-
-  backed source only).
-- Operators see promote-closure status transition (`requested` →
-  `rejected` / `withdrawn`); approval is intentionally disabled until
-  a future wave lands the asset-library write path.
-
-### 4.5 Cross-line Board
+### 7.5 Cross-line Board
 
 `/tasks` Board renders Hot Follow + Matrix Script + Digital Anchor
-rows; all three accept new tasks under their formal create-entry
-routes.
+rows. The unified `publish_readiness` from PR-1 is the truth; Board
+/ Workbench / Delivery agree on the same publishable state per task.
 
-## 5. Post-Recovery Operator-Blocked Scope
+## 8. What operators MAY do during the Convergence Wave (interim)
 
-What operators MUST NOT do, even after re-entry.
+The Convergence Wave is operator-surface engineering, not operator
+trial. The operations team SHOULD NOT execute live operator trial
+samples against the post-recovery / pre-convergence state. Two
+exceptions are permitted:
 
-### 5.1 Out of recovery scope
+1. **Hot Follow golden-path samples** — Hot Follow is unchanged by
+   the recovery wave and unchanged by the Convergence Wave. Hot
+   Follow trial samples remain valid as factory-baseline evidence
+   per the pre-recovery Plan A §7.1 wave 1 / wave 2.
+2. **Static surface inspection by the trial coordinator** — the
+   coordinator MAY inspect the post-recovery surfaces, file
+   convergence-gap notes against §7.2 / §7.3, and use those notes as
+   input to the Convergence Wave. This is documentation work, not
+   operator trial.
 
-- **Platform Runtime Assembly entry / phases A–E.** Still BLOCKED. The
-  recovery wave was scoped to operator-visible capability, not runtime
-  assembly.
-- **Capability Expansion (W2.2 / W2.3 / durable persistence / runtime
-  API).** Still BLOCKED.
-- **Third production line.** Still BLOCKED. The trial covers Hot
-  Follow + Matrix Script + Digital Anchor only.
-- **Asset platform expansion beyond PR-2.** Asset library
-  write/admin/upload paths remain forbidden; PR-2 shipped read +
-  promote-intent only. The asset-library write path lands in a
-  separate wave; until then, `approve_request()` raises
-  `AssetLibraryWriteUnavailable`.
+All other operator actions remain blocked by §2.4's NOT-READY verdict.
 
-### 5.2 Forbidden at every phase (validator + asset-supply red lines)
+## 9. Cross-cutting Forbidden List (carried forward)
+
+These remain forbidden at every phase, including during the
+Convergence Wave:
 
 - **Vendor / model / provider / engine / avatar-engine / TTS-provider
   / lip-sync-engine selectors / consoles** anywhere on operator-
@@ -272,154 +383,25 @@ What operators MUST NOT do, even after re-entry.
 - **Closed kind-set widening** (`framing_kind_set`,
   `appearance_ref_kind_set`, `dub_kind_set`, `lip_sync_kind_set`,
   Matrix Script axis kinds, asset-library closed enums).
-- **Workbench writes outside closure paths.** Workbench remains
-  read-only except where the closure contracts authorize per-row
-  write-back.
+- **Workbench writes outside closure paths.**
+- **Phase B authoring at entry-time** for Digital Anchor `roles[]`
+  / `segments[]`.
+- **Operator-driven Matrix Script Phase B axis authoring** in this
+  wave.
+- **B-roll / Asset Supply admin review UI, fingerprinting platform,
+  full DAM, upload-heavy admin tooling.**
+- **Platform Runtime Assembly entry / phases A–E.**
+- **Capability Expansion** (W2.2 / W2.3 / durable persistence /
+  runtime API).
+- **Third production line.**
+- **Re-versioning either product-flow document under cover of the
+  Convergence Wave.**
 
-### 5.3 Out of scope for this trial wave
+## 10. Stop conditions (carried forward; binding for any future trial)
 
-- Phase B authoring of Digital Anchor `roles[]` / `segments[]` (the
-  Phase B contract is frozen; entry-time authoring is forbidden;
-  workbench-time authoring is a separate future wave).
-- Operator-driven Matrix Script Phase B authoring (axes / cells /
-  slots are deterministic per §8.C; operator-driven authoring is
-  forbidden in this wave).
-- B-roll / Asset Supply admin review UI, fingerprinting platform,
-  full DAM, upload-heavy admin tooling.
-- Digital Anchor `platform_callback` / `metrics_snapshot` event
-  surfaces beyond the operator-side D.1 write-back UI (the service
-  API supports these events; the operator UI exposes only the operator
-  events).
-
-## 6. Coordinator 口径 — Verbatim Briefing Lines
-
-These lines supersede the pre-recovery Plan A §5 wording where the
-two conflict. Pre-recovery wording that remains accurate (e.g. the
-"current vs historical" rule on Workbench) is preserved.
-
-### 6.1 Task Area
-> **What you see:** three lines listed — Hot Follow, Matrix Script,
-> Digital Anchor. All three accept new tasks; all three have a formal
-> create-entry route.
-> **What you may do:** submit a task on any of the three lines.
-> **What's hidden:** vendor, model, provider, engine, route — these
-> are runtime concerns and never appear here.
-
-### 6.2 Workbench
-> **What you see:** a read-only projection of the current attempt and
-> accepted artifacts. Matrix Script tasks render the Phase B variation
-> panel; Digital Anchor tasks render the role/speaker panel.
-> **What you may do:** inspect; trigger publish-feedback closure
-> events on the variation row (Matrix Script) or per role/segment
-> (Digital Anchor).
-> **What you may not do:** edit anything outside the closure paths;
-> author `roles[]` / `segments[]` or widen any closed kind-set; expect
-> the system to fetch external URLs.
-
-### 6.3 Delivery Center
-> **What you see:** the deliverables for this task, with required vs
-> optional zoning. The publish-readiness gate is unified across Board,
-> Workbench, and Delivery — they will agree on the same task state.
-> **What you may do:** publish (Hot Follow); for Matrix Script and
-> Digital Anchor, exercise the publish-feedback closure events on the
-> per-row scope.
-> **What you may not do:** rely on a deliverable row labeled
-> "unresolved" as truth (it means the artifact lookup has not yet
-> resolved); rely on closure-wide `publish_status` (the active truth
-> path is per-row D.1 publish_status).
-
-### 6.4 Asset Supply
-> **What you see:** read-only Asset Library with closed-facet filters
-> and promote-intent action.
-> **What you may do:** browse / filter; reference an asset opaquely;
-> submit a promote intent against a task artifact; see the closure
-> status (`requested` → `rejected` / `withdrawn`).
-> **What you may not do:** upload / approve / mark canonical /
-> mark reusable / edit metadata.
-
-## 7. Suggested Real-Trial Sample Wave (overrides Plan A §7.1 / §7.2)
-
-The pre-recovery §7.1 sample plan covered Hot Follow + Matrix Script
-inspect-first samples. The post-recovery sample wave extends that with
-Digital Anchor and Asset Supply samples. Coordinator runs the
-following in order; samples are **real** trial evidence (not authority
-trial evidence).
-
-1. **Hot Follow golden path** (unchanged from §7.1 sample 1).
-2. **Hot Follow preserve-source route** (unchanged from §7.1 sample 2).
-3. **Matrix Script — fresh contract-clean small variation plan** with
-   `variation_target_count=4`, `target_language=mm`, opaque
-   `source_script_ref=content://matrix-script/source/<token>`. Goal:
-   exercise the full variation → workbench → delivery → feedback loop
-   via at least one `operator_publish` event per cell.
-4. **Digital Anchor — formal create-entry submission** via
-   `/tasks/digital-anchor/new`. Provide `topic`, opaque
-   `source_script_ref`, structured `language_scope`, opaque
-   `role_profile_ref`, `role_framing_hint=half_body`, `output_intent`,
-   `speaker_segment_count_hint=2`. Goal: confirm the formal entry
-   route accepts the contract-shaped body, persists the task, and
-   directs the operator to the workbench. Then open
-   `POST /api/digital-anchor/closures/{task_id}/events` and write at
-   least one `publish_attempted` event on a role row and one
-   `publish_accepted` event simulated as a platform callback.
-5. **Asset Supply — promote intent** on a Hot Follow artifact created
-   in sample 1. Goal: confirm `POST /api/assets/promote` accepts the
-   contract-shaped JSON, the closure renders `requested` state, and
-   `withdraw_request()` transitions to `rejected` cleanly.
-6. **Cross-line `/tasks` Board** inspection with at least one task per
-   line in flight. Goal: confirm Board's `publishable` matches
-   Workbench's and Delivery's for each task (PR-1 unified producer
-   agreement).
-
-## 8. Forbidden in this Trial Wave (re-asserts §5)
-
-- Any task submitted through a temp `/tasks/connect/...` URL (those
-  routes are retired for matrix_script and digital_anchor).
-- Any vendor / model / provider / engine selector — none should
-  exist; if any appears, file a regression and pause the trial.
-- Any Phase B authoring action against Digital Anchor or operator-
-  driven Matrix Script axis authoring.
-- Any approve / mark-canonical / mark-reusable action against the
-  asset library (the write path is intentionally absent).
-- Any third-line or new-line probe.
-
-## 9. Validation
-
-The validation script at
-[`scripts/recovery_pr5_trial_reentry_check.py`](../../scripts/recovery_pr5_trial_reentry_check.py)
-re-asserts the documentation invariants this gate depends on:
-
-- All four predecessor PR execution logs exist and carry "MERGED"
-  status with the four squash commits named.
-- This PR-5 gate document exists.
-- The PR-5 execution log exists.
-- Plan A's pre-recovery §12 readiness conclusion has been re-anchored
-  by a §13 trial re-entry section.
-- `CURRENT_ENGINEERING_FOCUS.md` carries the post-recovery stage line.
-
-The same invariants are pinned by
-`gateway/app/services/tests/test_recovery_pr5_trial_reentry_gate.py`
-so CI catches regression of the gate documentation.
-
-## 10. Signoff
-
-The trial coordinator MUST obtain the three signoffs below before
-authorizing the first real-trial sample.
-
-- [ ] **Trial coordinator:** confirms G5 .. G9 (this document §2.2)
-  are satisfied in the trial environment.
-- [ ] **Architect (codex):** confirms the recovery wave acceptance
-  in §1 is intact and PR-5 introduces no stealth scope (G10 .. G16
-  green by file diff).
-- [ ] **Reviewer / Merge owner:** confirms `main` HEAD includes squash
-  commits `4c317c4`, `4343bec`, `d53da0f`, `0549ee0`, and the PR-5
-  squash commit (filled at merge time) — and that no later commit has
-  silently re-introduced a Recovery Decision §5 forbidden item.
-
-## 11. Stop conditions during real trial
-
-The coordinator MUST pause the trial if any of the following is
-observed:
+If the operations team or the Convergence Wave engineering team
+observes any of the following, the wave MUST pause and a regression
+note MUST be filed:
 
 - A vendor / model / provider / engine selector appears on any
   operator surface.
@@ -427,7 +409,7 @@ observed:
   with a non-404.
 - A Matrix Script Phase B variation panel renders empty-fallback
   messages or the bound-method repr — those samples were created
-  before §8.A / §8.G and are pre-recovery; not real-trial evidence.
+  before §8.A / §8.G and are pre-recovery.
 - A Digital Anchor formal-entry POST silently accepts a flat
   `source_language` / `target_language` form key without rejection
   (PR-4 reviewer-fail correction §9.1.1 closed this).
@@ -437,21 +419,55 @@ observed:
 - The publish-feedback closure mirrors the legacy D.0 closure-wide
   `publish_status` enum on operator-visible surfaces (PR-4 reviewer-
   fail correction §9.1.3 made D.1 per-row the active truth path).
+- Either product-flow document is silently re-versioned without an
+  authored re-version PR.
+
+## 11. Signoff
+
+The trial coordinator MUST NOT obtain real-trial signoff from this
+document. This document records the **NOT-READY** verdict for real
+operator trial. Real-trial signoff is the responsibility of a future
+"Trial Re-Entry Gate v2" document authored after the Operator
+Workflow Convergence Wave closes.
+
+What this document's signoff block records is the **acceptance of the
+recovery wave + the elevation of the two product-flow documents to
+binding line-specific execution authority + the NOT-READY verdict
+itself**:
+
+- [ ] **Architect (codex):** confirms §6 evidence map is intact;
+  confirms §3 product-flow enforcement order is binding; confirms §0
+  NOT-READY verdict reflects the §2.3 W7..W12 gap.
+- [ ] **Reviewer / Merge owner:** confirms `main` HEAD includes
+  squash commits `4c317c4`, `4343bec`, `d53da0f`, `0549ee0`, and the
+  PR-5 squash commit (filled at merge time); confirms no later commit
+  has silently re-introduced a Recovery Decision §5 forbidden item;
+  confirms no later commit has silently flipped the §0 verdict to GO
+  without an authored "Trial Re-Entry Gate v2" PR.
+- [ ] **Trial coordinator (operations):** acknowledges that real
+  operator trial is BLOCKED until the Convergence Wave closes; commits
+  to using only the §8 interim allowances during the wave.
 
 ## 12. References
 
 - Decision: [`ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`](ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md)
 - Action: [`APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_GLOBAL_ACTION_v1.md`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_GLOBAL_ACTION_v1.md)
+- **Matrix Script line-specific execution authority (elevated by this PR-5):**
+  [`docs/product/matrix_script_product_flow_v1.md`](../product/matrix_script_product_flow_v1.md)
+- **Digital Anchor line-specific execution authority (elevated by this PR-5):**
+  [`docs/product/digital_anchor_product_flow_v1.md`](../product/digital_anchor_product_flow_v1.md)
+- Top-level abstract flow (factory-wide; remains valid):
+  [`docs/architecture/apolloveo_2_0_top_level_business_flow_v1.md`](../architecture/apolloveo_2_0_top_level_business_flow_v1.md)
 - Predecessor execution logs (all merged):
   - [`PR1_PUBLISH_READINESS`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR1_PUBLISH_READINESS_EXECUTION_LOG_v1.md)
   - [`PR2_ASSET_SUPPLY`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR2_ASSET_SUPPLY_EXECUTION_LOG_v1.md)
   - [`PR3_MATRIX_SCRIPT_WORKSPACE`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR3_MATRIX_SCRIPT_WORKSPACE_EXECUTION_LOG_v1.md)
   - [`PR4_DIGITAL_ANCHOR_WORKSPACE`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR4_DIGITAL_ANCHOR_WORKSPACE_EXECUTION_LOG_v1.md) (with §9.1 reviewer-fail correction pass)
-- Pre-recovery trial brief (re-anchored by Plan A §13 in this PR):
+- Pre-recovery trial brief (re-anchored by Plan A §13 in this PR — to be re-rewritten to NOT-READY by this PR's edit):
   [`OPERATIONS_TRIAL_READINESS_PLAN_v1.md`](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md)
-- Pre-recovery coordinator write-up (live-run section appended in this
-  PR): [`PLAN_A_OPS_TRIAL_WRITEUP_v1.md`](PLAN_A_OPS_TRIAL_WRITEUP_v1.md)
-- Cross-line contracts pinned by the gate:
+- Pre-recovery coordinator write-up (live-run section appended in this PR — to be re-rewritten to NOT-READY by this PR's edit):
+  [`PLAN_A_OPS_TRIAL_WRITEUP_v1.md`](PLAN_A_OPS_TRIAL_WRITEUP_v1.md)
+- Cross-line contracts pinned by the gate (unchanged):
   [`publish_readiness_contract_v1.md`](../contracts/publish_readiness_contract_v1.md),
   [`factory_delivery_contract_v1.md`](../contracts/factory_delivery_contract_v1.md),
   [`workbench_panel_dispatch_contract_v1.md`](../contracts/workbench_panel_dispatch_contract_v1.md)

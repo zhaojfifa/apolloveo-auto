@@ -361,16 +361,42 @@ End of Plan A (pre-recovery body).
 
 ---
 
-## 13. Real Operator Trial Re-Entry (post-recovery, 2026-05-04)
+## 13. Real Operator Trial Re-Entry — NOT READY (post-recovery, 2026-05-04)
 
 This section is added by Recovery PR-5. It **supersedes** §12's
-"CONDITIONAL / authority-only" readiness conclusion for the
-post-recovery state.
+"CONDITIONAL / authority-only" readiness conclusion, and replaces the
+prior revision of §13 that declared real-trial GO. The verdict is
+now **NOT READY**.
 
 The Minimal Operator Capability Recovery wave (PR-1 / PR-2 / PR-3 /
-PR-4, all merged to `main` 2026-05-04) has restored the operator
-capability the Recovery Decision §1.1 named missing. The trial therefore
-transitions from **authority-only** to **real operator trial**.
+PR-4, all merged to `main` 2026-05-04) restored the **contract-backed
+minimum operator capability** the Recovery Decision §1.1 named
+missing. That is necessary but **not sufficient** for real operator
+trial. What remains missing is **operator workflow convergence**: the
+per-line operator-visible surfaces (Task Area card fields, Workbench
+modules, Delivery Center sections) are not yet mapped to the
+line-specific product-flow authority documents
+[`matrix_script_product_flow_v1.md`](matrix_script_product_flow_v1.md)
+and
+[`digital_anchor_product_flow_v1.md`](digital_anchor_product_flow_v1.md).
+
+The binding gate at
+[`docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md`](../execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md)
+records the verdict and the W1..W12 preconditions. W7..W12 (operator
+workflow convergence) are NOT MET; real trial is therefore BLOCKED.
+
+### 13.0 Verdict
+
+- **Real operator trial readiness:** **NOT READY** (workflow
+  convergence missing).
+- **Recovery wave PR-1 / PR-2 / PR-3 / PR-4:** all PASS, all merged.
+- **Next mandatory wave:** **Operator Workflow Convergence Wave** —
+  Matrix Script first, Digital Anchor second.
+- **Platform Runtime Assembly:** still **BLOCKED**.
+- **Capability Expansion:** still **BLOCKED**.
+- **Third production line:** still **BLOCKED**.
+- **Provider / model / vendor / engine consoles:** still **FORBIDDEN
+  at every phase**.
 
 ### 13.1 What changed since §12
 
@@ -398,17 +424,34 @@ first real-trial sample. It is the single source of truth for:
 
 ### 13.3 Final readiness conclusion (post-recovery)
 
-- **Real operator trial readiness:** **GO** subject to G5 .. G9 in the
-  PR-5 gate document §2.2 being verified by the trial coordinator
-  before the first sample.
-- **Recovery wave PR-1 / PR-2 / PR-3 / PR-4:** all PASS, all merged.
-- **Platform Runtime Assembly:** still **BLOCKED** (gated on a
-  separate wave-start authority after this real trial closes
-  successfully).
-- **Capability Expansion:** still **BLOCKED**.
-- **Third production line:** still **BLOCKED**.
-- **Provider / model / vendor / engine consoles:** still **FORBIDDEN
-  at every phase**.
+The verdict is recorded in §13.0 above: **NOT READY**. The
+Convergence Wave (§13.4) is the next mandatory wave; real-trial
+re-entry is gated on its closure plus a separate "Trial Re-Entry
+Gate v2" PR.
+
+### 13.4 Operator Workflow Convergence Wave — next mandatory wave
+
+The next mandatory wave after PR-5 is the **Operator Workflow
+Convergence Wave**. Its scope is exactly the W7..W12 preconditions
+in the PR-5 gate document §2.3:
+
+| Phase | Line | Targets |
+|---|---|---|
+| OWC-MS | Matrix Script (first) | W7 task-area card §5.3 fields; W8 workbench §6.1 modules A/B/C/D/E; W9 delivery-center §7.1 deliverable set + §7.2 publish rules |
+| OWC-DA | Digital Anchor (second) | W10 task-area card §5.2 fields; W11 workbench §6.1 modules A/B/C/D/E; W12 delivery-center §7.1 deliverable set + §7.2 delivery rules |
+
+The two product-flow authority documents that this wave maps to are:
+
+- [`docs/product/matrix_script_product_flow_v1.md`](matrix_script_product_flow_v1.md)
+  (line-specific execution authority for Matrix Script)
+- [`docs/product/digital_anchor_product_flow_v1.md`](digital_anchor_product_flow_v1.md)
+  (line-specific execution authority for Digital Anchor)
+
+The wave does NOT add new runtime features, new contracts, new packet
+truth, or new Plan E phases. It maps existing recovered runtime +
+contract truth into the modules specified by the product-flow
+documents. See PR-5 gate §4.3 for the wave's full hard-boundary
+list.
 
 ### 13.4 Pre-recovery §12 conditions — disposition
 
