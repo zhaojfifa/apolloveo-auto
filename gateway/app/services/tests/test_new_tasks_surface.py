@@ -96,8 +96,10 @@ def test_newtasks_template_is_selection_only_not_workbench_like():
 def test_newtasks_card_links_target_active_create_route():
     template = (TEMPLATE_DIR / "tasks_newtasks.html").read_text(encoding="utf-8")
 
+    # Recovery PR-4: digital_anchor card now points at the formal create
+    # route per docs/contracts/digital_anchor/new_task_route_contract_v1.md.
     expected_targets = {
-        "digital_anchor": "/tasks/connect/digital_anchor/new",
+        "digital_anchor": "/tasks/digital-anchor/new",
         "hot_follow": "/tasks/hot/new",
         "matrix_script": "/tasks/matrix-script/new",
         "baseline": "/tasks/baseline/new",
@@ -110,26 +112,36 @@ def test_newtasks_card_links_target_active_create_route():
     assert "/tasks/apollo-avatar/new" not in template
 
 
-def test_newtasks_temporary_connected_card_targets_load_without_disabled_avatar(monkeypatch):
+def test_digital_anchor_formal_create_route_renders_template(monkeypatch):
+    """Recovery PR-4: the formal /tasks/digital-anchor/new route renders
+    digital_anchor_new.html. The temp /tasks/connect/digital_anchor/new
+    placeholder is retired per
+    docs/contracts/digital_anchor/new_task_route_contract_v1.md §3."""
+
     monkeypatch.setenv("AUTH_MODE", "off")
 
     def fake_render_template(*, request, name, ctx=None, status_code=200, headers=None):
-        assert name == "tasks_connected_placeholder.html"
-        return HTMLResponse(
-            content=f"loaded:{name}:{ctx['line_id']}:{ctx['page_role']}",
-            status_code=status_code,
-            headers=headers,
-        )
+        assert name == "digital_anchor_new.html"
+        return HTMLResponse(content=f"loaded:{name}", status_code=status_code, headers=headers)
 
     monkeypatch.setattr(tasks_router, "render_template", fake_render_template)
     client = TestClient(app, raise_server_exceptions=False)
 
-    for line_id in ("digital_anchor",):
-        response = client.get(f"/tasks/connect/{line_id}/new?ui_locale=zh")
+    response = client.get("/tasks/digital-anchor/new?ui_locale=zh")
+    assert response.status_code == 200
+    assert "loaded:digital_anchor_new.html" in response.text
 
-        assert response.status_code == 200
-        assert f"loaded:tasks_connected_placeholder.html:{line_id}:create" in response.text
-        assert "ApolloAvatar is disabled" not in response.text
+
+def test_temp_digital_anchor_connect_path_returns_404(monkeypatch):
+    """Recovery PR-4: the /tasks/connect/digital_anchor/new placeholder is
+    retired. The temp connect route only resolves for lines still listed in
+    `_TEMP_CONNECTED_LINES`; digital_anchor was removed."""
+
+    monkeypatch.setenv("AUTH_MODE", "off")
+    client = TestClient(app, raise_server_exceptions=False)
+
+    response = client.get("/tasks/connect/digital_anchor/new?ui_locale=zh")
+    assert response.status_code == 404
 
 
 def test_matrix_script_newtasks_target_uses_formal_create_entry(monkeypatch):
@@ -164,31 +176,21 @@ def test_hot_follow_newtasks_target_uses_formal_create_entry(monkeypatch):
     assert "loaded:hot_follow_new.html" in response.text
 
 
-def test_temporary_connected_lines_expose_workbench_and_delivery(monkeypatch):
+def test_temporary_connected_workbench_delivery_paths_404_after_pr4(monkeypatch):
+    """Recovery PR-4: /tasks/connect/digital_anchor/workbench and /publish
+    no longer have a registered line in `_TEMP_CONNECTED_LINES`, so the
+    placeholder workbench / delivery surfaces return 404 for digital_anchor.
+    Workbench / delivery for a created Digital Anchor task flow through
+    /tasks/{task_id} and /tasks/{task_id}/publish per the new-task route
+    contract `next_surfaces` block."""
+
     monkeypatch.setenv("AUTH_MODE", "off")
-
-    def fake_render_template(*, request, name, ctx=None, status_code=200, headers=None):
-        assert name == "tasks_connected_placeholder.html"
-        return HTMLResponse(
-            content=(
-                f"{ctx['line_id']} {ctx['page_role']} 当前接通版本 "
-                f"{ctx['workbench_href']} {ctx['delivery_href']}"
-            ),
-            status_code=status_code,
-            headers=headers,
-        )
-
-    monkeypatch.setattr(tasks_router, "render_template", fake_render_template)
     client = TestClient(app, raise_server_exceptions=False)
 
-    for line_id in ("digital_anchor",):
-        workbench = client.get(f"/tasks/connect/{line_id}/workbench?ui_locale=zh")
-        delivery = client.get(f"/tasks/connect/{line_id}/publish?ui_locale=zh")
-
-        assert workbench.status_code == 200
-        assert delivery.status_code == 200
-        assert f"{line_id} workbench 当前接通版本" in workbench.text
-        assert f"{line_id} delivery 当前接通版本" in delivery.text
+    workbench = client.get("/tasks/connect/digital_anchor/workbench?ui_locale=zh")
+    delivery = client.get("/tasks/connect/digital_anchor/publish?ui_locale=zh")
+    assert workbench.status_code == 404
+    assert delivery.status_code == 404
 
 
 def test_matrix_script_temporary_create_is_removed_from_primary_path(monkeypatch):

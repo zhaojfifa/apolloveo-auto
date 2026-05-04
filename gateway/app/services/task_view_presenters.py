@@ -644,6 +644,17 @@ def _operator_surfaces_for_publish_hub(
             # Defense-in-depth: presenter must never crash the publish hub if
             # the closure binding raises.
             closure = None
+    elif kind == "digital_anchor":
+        try:
+            from gateway.app.services.digital_anchor.closure_binding import (
+                get_closure_view_for_task as _da_get_closure_view_for_task,
+            )
+
+            task_id = str(task.get("task_id") or task.get("id") or "")
+            if task_id:
+                closure = _da_get_closure_view_for_task(task_id)
+        except Exception:
+            closure = None
     return build_operator_surfaces_for_publish_hub(
         task=task,
         authoritative_state=authoritative_state,

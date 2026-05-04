@@ -243,6 +243,20 @@ def build_operator_surfaces_for_workbench(
                 workbench_panel,
             )
         )
+    # Recovery PR-4: when the Workbench mounts the Digital Anchor
+    # line-specific panel, attach the formal
+    # `digital_anchor_workbench_role_speaker_surface_v1` projection so
+    # the panel renders roles / segments / role-segment binding /
+    # attribution refs from authoritative packet truth. Mirror of the
+    # Matrix Script branch above; never enters for Hot Follow.
+    if workbench_panel.get("panel_kind") == "digital_anchor":
+        from gateway.app.services.digital_anchor.workbench_role_speaker_surface import (
+            project_workbench_role_speaker_surface,
+        )
+
+        bundle["workbench"]["digital_anchor_role_speaker_surface"] = (
+            project_workbench_role_speaker_surface(packet_view)
+        )
     return bundle
 
 

@@ -261,6 +261,12 @@ from gateway.app.services.matrix_script.source_script_ref_minting import (  # no
     MATRIX_SCRIPT_MINT_ROUTE,
     mint_source_script_ref,
 )
+from gateway.app.services.digital_anchor.create_entry import (  # noqa: E402
+    DIGITAL_ANCHOR_CREATE_ROUTE,
+    DIGITAL_ANCHOR_LINE_ID,
+    build_digital_anchor_entry,
+    build_digital_anchor_task_payload,
+)
 from gateway.app.services.voice_state import (  # noqa: E402
     DRY_TTS_CONFIG_KEY as _DRY_TTS_CONFIG_KEY,
     DRY_TTS_ROLE as _DRY_TTS_ROLE,
@@ -542,12 +548,12 @@ async def tasks_newtasks(request: Request) -> HTMLResponse:
     )
 
 
-_TEMP_CONNECTED_LINES = {
-    "digital_anchor": {
-        "label": "数字人IP",
-        "next_label": "数字人IP当前接通版本",
-        "future_replace": "正式 Digital Anchor create-entry route",
-    },
+_TEMP_CONNECTED_LINES: dict[str, dict[str, str]] = {
+    # Recovery PR-4: the digital_anchor placeholder retired with the formal
+    # /tasks/digital-anchor/new route landing per
+    # docs/contracts/digital_anchor/new_task_route_contract_v1.md §3
+    # ("temp path MUST be removed once formal route lands"). The dict is
+    # preserved as an empty seam so future lines can plug in if needed.
 }
 
 
@@ -678,6 +684,76 @@ async def mint_matrix_script_source_script_ref(request: Request) -> JSONResponse
         requested_by = None
     payload = mint_source_script_ref(requested_by=requested_by)
     return JSONResponse(content=dict(payload))
+
+
+@pages_router.get(DIGITAL_ANCHOR_CREATE_ROUTE, response_class=HTMLResponse)
+async def tasks_digital_anchor_new(request: Request) -> HTMLResponse:
+    """Render the formal Digital Anchor create-entry page (Recovery PR-4).
+
+    Per ``docs/contracts/digital_anchor/new_task_route_contract_v1.md``
+    §"Route map", this is the single canonical create surface for
+    Digital Anchor tasks. The temp ``/tasks/connect/digital_anchor/new``
+    placeholder is retired by this PR.
+    """
+
+    return render_template(
+        request=request,
+        name="digital_anchor_new.html",
+        ctx={"features": get_features()},
+    )
+
+
+@pages_router.post(DIGITAL_ANCHOR_CREATE_ROUTE)
+async def create_digital_anchor_task(
+    topic: str = Form(...),
+    source_script_ref: str = Form(...),
+    source_language: str = Form(...),
+    target_language: str = Form(...),
+    role_profile_ref: str = Form(...),
+    role_framing_hint: str = Form(...),
+    output_intent: str = Form(...),
+    speaker_segment_count_hint: str = Form(...),
+    dub_kind_hint: str | None = Form(default=None),
+    lip_sync_kind_hint: str | None = Form(default=None),
+    scene_binding_hint: str | None = Form(default=None),
+    operator_notes: str | None = Form(default=None),
+    repo=Depends(get_task_repository),
+) -> RedirectResponse:
+    """Create a Digital Anchor task from the formal entry surface.
+
+    Delegates payload construction to
+    :func:`build_digital_anchor_task_payload` per the Plan B builder
+    contract. Unknown fields are rejected by the builder; required-
+    field absence returns HTTP 400.
+    """
+
+    entry = build_digital_anchor_entry(
+        topic=topic,
+        source_script_ref=source_script_ref,
+        source_language=source_language,
+        target_language=target_language,
+        role_profile_ref=role_profile_ref,
+        role_framing_hint=role_framing_hint,
+        output_intent=output_intent,
+        speaker_segment_count_hint=speaker_segment_count_hint,
+        dub_kind_hint=dub_kind_hint,
+        lip_sync_kind_hint=lip_sync_kind_hint,
+        scene_binding_hint=scene_binding_hint,
+        operator_notes=operator_notes,
+    )
+    task_payload = build_digital_anchor_task_payload(entry)
+    repo.create(task_payload)
+    task_id = str(task_payload["task_id"])
+    stored_task = repo.get(task_id)
+    if not stored_task:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Task persistence failed for task_id={task_id}",
+        )
+    return RedirectResponse(
+        url=f"/tasks/{task_id}?created={DIGITAL_ANCHOR_LINE_ID}",
+        status_code=303,
+    )
 
 
 @pages_router.get("/tasks/apollo-avatar/new", response_class=HTMLResponse)
