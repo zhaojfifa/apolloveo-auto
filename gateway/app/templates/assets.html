@@ -43,6 +43,18 @@
                    color: #336; word-break: break-all; }
     .surface-tag { font-size: 11px; color: #888; padding: 1px 6px;
                    border-radius: 3px; background: #f4f4f4; margin-left: 6px; }
+    .promote-form { margin-top: 8px; padding: 8px; border-top: 1px dashed #ccc;
+                    display: flex; flex-direction: column; gap: 6px; }
+    .promote-form label { display: flex; flex-direction: column; gap: 2px;
+                          font-size: 11px; color: #444; }
+    .promote-form input, .promote-form select, .promote-form textarea {
+      font: inherit; font-size: 12px; padding: 3px 6px; border: 1px solid #aaa;
+      border-radius: 3px; box-sizing: border-box; width: 100%;
+    }
+    .promote-form textarea { resize: vertical; }
+    .promote-result { font-size: 12px; min-height: 14px; }
+    .promote-result.ok { color: #252; }
+    .promote-result.err { color: #722; }
   </style>
 </head>
 <body>
@@ -116,11 +128,82 @@
               <button type="button" data-role="copy-ref" data-asset-id="{{ asset.asset_id }}">
                 Copy opaque ref
               </button>
-              <button type="button" data-role="open-promote-stub" data-asset-id="{{ asset.asset_id }}">
+              <button type="button" data-role="open-promote-form" data-asset-id="{{ asset.asset_id }}" data-asset-kind="{{ asset.kind }}">
                 Promote …
               </button>
             </div>
             <div class="ref-display" data-role="ref-display" data-asset-id="{{ asset.asset_id }}"></div>
+
+            {# PR-2 reviewer-fix #3: real contract-backed promote submit
+               form per `promote_request_contract_v1.md` §"Closed request
+               schema". Hidden by default; the "Promote …" button reveals
+               it. POSTs to /api/assets/promote and renders the
+               returned request_id + initial request_state. No admin UI,
+               no upload, no provider/model controls. #}
+            <form
+              class="promote-form"
+              data-role="promote-form"
+              data-asset-id="{{ asset.asset_id }}"
+              hidden
+            >
+              <label>
+                Source artifact handle
+                <input type="text" name="artifact_ref" required
+                       placeholder="artifact://line/task/handle"
+                       pattern="^artifact://\S+" />
+              </label>
+              <label>
+                Proposed asset title
+                <input type="text" name="proposed_title" required maxlength="120" />
+              </label>
+              <label>
+                Target asset kind
+                <select name="target_kind" required>
+                  {% for kind in filter_options.kinds %}
+                    <option value="{{ kind }}" {% if kind == asset.kind %}selected{% endif %}>{{ kind }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                Target line availability (comma-separated)
+                <input type="text" name="target_line_availability" required
+                       value="{{ asset.line_availability|join(',') }}" />
+              </label>
+              <label>
+                License
+                <select name="license" required>
+                  <option value="owned">owned</option>
+                  <option value="licensed_reuse_allowed">licensed_reuse_allowed</option>
+                  <option value="licensed_single_use">licensed_single_use</option>
+                  <option value="public_domain">public_domain</option>
+                  <option value="unknown_review_required">unknown_review_required</option>
+                </select>
+              </label>
+              <label>
+                Reuse policy
+                <select name="reuse_policy" required>
+                  <option value="reuse_allowed">reuse_allowed</option>
+                  <option value="line_limited">line_limited</option>
+                  <option value="task_limited">task_limited</option>
+                  <option value="review_required">review_required</option>
+                  <option value="blocked">blocked</option>
+                </select>
+              </label>
+              <label>
+                Requested by (operator ref)
+                <input type="text" name="requested_by" required maxlength="120"
+                       value="operator:demo" />
+              </label>
+              <label>
+                Operator notes (optional)
+                <textarea name="operator_notes" rows="2" maxlength="500"></textarea>
+              </label>
+              <div class="actions">
+                <button type="submit">Submit promote intent</button>
+                <button type="button" data-role="cancel-promote">Cancel</button>
+              </div>
+              <div class="promote-result" data-role="promote-result"></div>
+            </form>
             {% if asset.badges.canonical %}<span class="badge canonical">canonical</span>{% endif %}
             {% if asset.badges.archived %}<span class="badge archived">archived</span>{% endif %}
           </div>
@@ -158,9 +241,9 @@
 
   <script>
     // Minimal progressive enhancement: copy opaque ref to clipboard +
-    // surface promote-stub message. Promote submission itself uses the
-    // /api/assets/promote JSON endpoint per the contract; PR-2 leaves
-    // the inline form for a follow-up wave.
+    // real promote submit against the contract-backed
+    // POST /api/assets/promote endpoint per
+    // `docs/contracts/promote_request_contract_v1.md`.
     document.querySelectorAll('[data-role="copy-ref"]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var assetId = btn.getAttribute('data-asset-id');
@@ -173,9 +256,83 @@
           .catch(function () { /* swallow */ });
       });
     });
-    document.querySelectorAll('[data-role="open-promote-stub"]').forEach(function (btn) {
+
+    // PR-2 reviewer-fix #3: real operator-visible submit form. The old
+    // alert() stub is gone. Reveals the inline form, posts the
+    // contract-shaped payload, renders request_id + initial state on
+    // success, renders the rejection error_code on failure.
+    document.querySelectorAll('[data-role="open-promote-form"]').forEach(function (btn) {
       btn.addEventListener('click', function () {
-        alert('Promote intent UI: PR-2 ships the contract-backed JSON path at POST /api/assets/promote. Inline form is a follow-up.');
+        var assetId = btn.getAttribute('data-asset-id');
+        var form = document.querySelector('[data-role="promote-form"][data-asset-id="' + assetId + '"]');
+        if (form) { form.hidden = false; }
+      });
+    });
+    document.querySelectorAll('[data-role="cancel-promote"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var form = btn.closest('[data-role="promote-form"]');
+        if (form) {
+          form.hidden = true;
+          var result = form.querySelector('[data-role="promote-result"]');
+          if (result) { result.textContent = ''; result.className = 'promote-result'; }
+        }
+      });
+    });
+    document.querySelectorAll('[data-role="promote-form"]').forEach(function (form) {
+      form.addEventListener('submit', function (event) {
+        event.preventDefault();
+        var data = new FormData(form);
+        var lineRaw = String(data.get('target_line_availability') || '');
+        var lines = lineRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+        var notesRaw = String(data.get('operator_notes') || '').trim();
+        var payload = {
+          artifact_ref: data.get('artifact_ref'),
+          target_kind: data.get('target_kind'),
+          target_tags: [{ facet: 'line', value: lines[0] || 'hot_follow' }],
+          target_line_availability: lines,
+          license_metadata: {
+            license: data.get('license'),
+            // PR-2 reviewer-fix #1: artifact-backed submit MUST carry
+            // source=task_artifact_promote per
+            // promote_request_contract_v1.md §"Closed request schema".
+            // The form does not expose `source` to the operator; it is
+            // pinned by the surface because submit only takes an
+            // artifact handle.
+            source: 'task_artifact_promote',
+            reuse_policy: data.get('reuse_policy'),
+          },
+          proposed_title: data.get('proposed_title'),
+          requested_by: data.get('requested_by'),
+        };
+        if (notesRaw) { payload.operator_notes = notesRaw; }
+        var result = form.querySelector('[data-role="promote-result"]');
+        if (result) { result.textContent = 'submitting…'; result.className = 'promote-result'; }
+        fetch('/api/assets/promote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+          .then(function (r) { return r.json().then(function (body) { return { status: r.status, body: body }; }); })
+          .then(function (resp) {
+            if (!result) { return; }
+            if (resp.status === 201 && resp.body && resp.body.request_id) {
+              result.textContent =
+                'submitted · request_id=' + resp.body.request_id +
+                ' · state=' + resp.body.request_state;
+              result.className = 'promote-result ok';
+            } else {
+              var code = (resp.body && resp.body.error_code) || ('http_' + resp.status);
+              var msg = (resp.body && resp.body.message) || '';
+              result.textContent = 'rejected · ' + code + (msg ? ' · ' + msg : '');
+              result.className = 'promote-result err';
+            }
+          })
+          .catch(function (err) {
+            if (result) {
+              result.textContent = 'network_error · ' + (err && err.message ? err.message : err);
+              result.className = 'promote-result err';
+            }
+          });
       });
     });
   </script>

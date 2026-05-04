@@ -231,6 +231,183 @@ Script from inspect-first to real operator-usable workflow. Per Global
 Action §3, **PR-3 may not start until this PR-2 is merged and
 reviewed**. Claude stops after this PR-2 is opened.
 
+## 9.1 Reviewer-Fail Correction Pass (2026-05-04)
+
+The Codex/architect review of the initial PR-2 commit returned FAIL
+with three explicit findings. This section records the failure
+findings, the exact correction made, and residual risks after
+correction.
+
+### 9.1.1 Reviewer findings (FAIL)
+
+1. **Promote submit accepted non-task_artifact source.** The submit
+   path validated `license_metadata.source` against the broad
+   `ORIGIN_KIND_ENUM` (`{operator_upload, task_artifact_promote,
+   external_reference, licensed_stock, admin_seeded}`). Per
+   `promote_request_contract_v1.md` §"Closed request schema" notes +
+   §"Submit-time discipline" item 5, an artifact-backed promote submit
+   MUST carry `source = task_artifact_promote`; any other value is a
+   contract violation because the request payload itself only carries
+   `artifact_ref`.
+
+2. **Approval / closure asset-truth integrity violated.**
+   `approve_request()` accepted a caller-provided `resulting_asset_id`
+   and wrote it into the closure without verifying that an Asset
+   Library object existed at that id. Per
+   `promote_feedback_closure_contract_v1.md` §"Source-of-truth rules"
+   item 2 the closure may reference `resulting_asset_id` ONLY after
+   the asset object exists in the Asset Library truth path. PR-2 ships
+   no asset-library write path (forbidden by Recovery red lines), so
+   no asset object could possibly exist at the supplied id.
+
+3. **Operator-visible promote submit was an `alert()` stub.** The
+   "Promote …" button on `/assets` opened a JS alert pointing
+   operators at the JSON endpoint instead of actually initiating a
+   promote intent from the surface. This violated Decision §4.4
+   "minimum operator capability" by presenting a placeholder where a
+   real, contract-backed operator action belonged.
+
+### 9.1.2 Exact corrections made
+
+1. **Submit source enforcement**
+   ([promote.py::_validate_request_payload](../../gateway/app/services/asset/promote.py)):
+   added an explicit equality check
+   `license_metadata["source"] == "task_artifact_promote"` after the
+   broad enum validation. New error code
+   `license_metadata.source_must_be_task_artifact_promote`. The
+   underlying ORIGIN_KIND_ENUM validation is still performed first so
+   non-enum values still produce the closed-enum-violation error.
+
+2. **Approval restricted (narrow correction chosen)**: PR-2's
+   `approve_request()` now raises `AssetLibraryWriteUnavailable`
+   (a `PromoteRequestRejected` subclass with error_code
+   `asset_library_write_unavailable`) regardless of caller input.
+   The closure's `requested` and `rejected` (operator `withdrawn` →
+   `rejected` and reviewer `reject_request`) terminal semantics
+   continue to work. The `resulting_asset_id` field is permanently
+   `None` until a real asset-library write path lands in a later
+   wave. Reasoning: per the reviewer's instruction "If full
+   asset-object creation is not yet present, then keep PR-2
+   approval/closure at requested/rejected semantics only and remove
+   premature resulting_asset_id behavior" — this is the narrowest
+   contract-safe correction. Asset-library write path arrives with
+   the next Recovery iteration or Platform Runtime Assembly Wave;
+   that wave will re-enable `approve_request()` and add the
+   asset-object verification step.
+
+3. **Real operator-visible submit form**
+   ([assets.html](../../gateway/app/templates/assets.html)): the old
+   `open-promote-stub` JS alert is removed. Each asset card now reveals
+   an inline `<form>` element with closed-enum dropdowns for `license`
+   / `reuse_policy` / `target_kind`, free-text inputs for
+   `artifact_ref` / `proposed_title` / `requested_by` / `operator_notes`,
+   and a `target_line_availability` field pre-populated from the asset's
+   current `line_availability`. Submit fires a real `fetch()` POST to
+   `/api/assets/promote` with a contract-shaped JSON payload; the
+   surface pins `license_metadata.source = "task_artifact_promote"`
+   (PR-2 reviewer-fix #1 alignment — operators do not select the
+   source). Success renders `request_id` + `request_state="requested"`
+   inline; rejection renders the producer's `error_code` + `message`.
+   No upload affordance, no provider/model controls, no admin review
+   UI.
+
+### 9.1.3 Tests added / updated
+
+- `test_asset_promote_lifecycle.py`:
+  - **NEW** `test_non_task_artifact_promote_source_rejected` — every
+    non-`task_artifact_promote` ORIGIN_KIND_ENUM value (including
+    `external_reference`, `licensed_stock`, `operator_upload`,
+    `admin_seeded`) is rejected with
+    `license_metadata.source_must_be_task_artifact_promote`.
+  - **NEW** `test_task_artifact_promote_source_accepted` — positive
+    path still works.
+  - **REPLACED** `test_approve_transitions_to_approved_with_resulting_asset_id`
+    → `test_approve_request_disabled_in_pr2_without_asset_library_write_path`
+    asserting `AssetLibraryWriteUnavailable` is raised and the closure
+    stays in `requested` state with `resulting_asset_id is None`.
+  - **NEW** `test_no_path_can_set_resulting_asset_id_without_asset_object`
+    walks every closure produced by every PR-2 service path
+    (submit / withdraw / reject) and asserts `resulting_asset_id is
+    None` everywhere.
+  - **UPDATED** `test_approve_after_terminal_rejected` now asserts the
+    PR-2 disabled behavior.
+
+- **NEW** `test_asset_surface_submit_end_to_end.py` — 5 cases:
+  - `test_promote_form_replaces_alert_stub` (template integrity, runs
+    always)
+  - `test_promote_form_does_not_expose_provider_or_admin_controls`
+    (template integrity, runs always)
+  - `test_assets_surface_submits_promote_intent_end_to_end` (HTTP via
+    Starlette TestClient — exercises the real `/api/assets/promote`
+    endpoint and proves the closure is queryable)
+  - `test_assets_surface_rejects_non_task_artifact_promote_source`
+    (HTTP — proves the source enforcement reaches the operator
+    surface)
+  - `test_assets_surface_renders_page_with_contract_driven_data`
+    (HTTP — proves the page is contract-backed, not a placeholder)
+
+- `test_asset_surface_boundary.py` unchanged — all 8 boundary tests
+  still pass, proving Asset Supply remains distinct from Task Area /
+  Tool Backstage after the corrections.
+
+### 9.1.4 Tests after correction
+
+- Library suite: **18/18 PASS** (unchanged).
+- Promote lifecycle suite: **24/24 PASS** (21 original updated + 3 new
+  for source enforcement + asset-truth integrity).
+- Surface boundary suite: **8/8 PASS** (unchanged — boundary still
+  enforced after corrections).
+- Surface submit end-to-end suite (NEW): **5/5 PASS** (3 HTTP + 2
+  template-integrity).
+- Adjacent baseline: **190 PASS** (PR-1 producer + final_provenance +
+  surface alignment + Hot Follow + Matrix Script).
+- Aggregate: **245 PASS / 0 FAIL** on Python 3.9 import-light set.
+
+### 9.1.5 Why each FAIL item is now closed
+
+| FAIL item | Closed by |
+| --- | --- |
+| (1) Promote submit accepted non-task_artifact source | Explicit equality check in `_validate_request_payload`; new error code `license_metadata.source_must_be_task_artifact_promote`; tested at the service layer (4 negative cases + 1 positive) AND at the operator surface via HTTP. |
+| (2) Approval premature `resulting_asset_id` | `approve_request()` permanently raises `AssetLibraryWriteUnavailable` in PR-2; closure stays at `requested` until withdrawn or rejected; `resulting_asset_id` is None on every closure produced by every PR-2 path; tested at the service layer + asserted in the surface end-to-end test. |
+| (3) Alert stub instead of real submit | Real `<form>` per asset card POSTs to `/api/assets/promote`; surface pins `source=task_artifact_promote`; tested at template integrity (always) AND at HTTP via Starlette TestClient (proves the endpoint is reachable through the operator surface and the closure is queryable). |
+
+### 9.1.6 Approval-path status (explicit per reviewer ask)
+
+**The PR-2 approval path is intentionally restricted to
+`requested → rejected` (via operator `withdraw_request` or reviewer
+`reject_request`).** Approval (`requested → approved` with
+`resulting_asset_id`) is **disabled** because PR-2 ships no
+asset-library write path. The narrow correction was chosen per the
+reviewer's instruction: "If full asset-object creation is not yet
+present, then keep PR-2 approval/closure at requested/rejected
+semantics only and remove premature resulting_asset_id behavior."
+
+Re-enabling approval is a follow-up wave that lands an asset-library
+write path AND adds asset-object existence verification before
+`approve_request()` writes `resulting_asset_id`.
+
+### 9.1.7 Operator-visible submit path (explicit per reviewer ask)
+
+The corrected operator-visible submit path is a per-asset-card inline
+`<form>` revealed by the existing "Promote …" button. The form posts
+the contract-shaped JSON to `POST /api/assets/promote` and renders
+the returned `request_id` + initial `request_state="requested"`
+inline, or the rejection `error_code` on contract violation. No admin
+review UI, no upload UI, no provider/model controls.
+
+### 9.1.8 Residual risks after correction
+
+- Approval path remains disabled until a future wave lands the
+  asset-library write path (intentional per reviewer instruction).
+- HTTP end-to-end tests run only when the FastAPI router + Starlette
+  TestClient are importable in the test environment; they
+  unconditionally PASS today (Py3.9 + installed FastAPI). Service-level
+  tests cover the contract path regardless. Test gracefully skips with
+  an explicit reason when the test client cannot be built.
+- All other residual risks from §8 carry forward unchanged
+  (in-process store, no admin review UI, asset reference plumbing into
+  Workbench / Task Area packet refs deferred to PR-3 / PR-4).
+
 ## 10. References
 
 - Decision: `docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`

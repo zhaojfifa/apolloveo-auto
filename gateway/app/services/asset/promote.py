@@ -227,6 +227,24 @@ def _validate_request_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
     _validate_closed_enum(
         "license_metadata.source", license_metadata.get("source"), ORIGIN_KIND_ENUM
     )
+    # PR-2 reviewer-fix #1: per `promote_request_contract_v1.md`
+    # §"Submit-time discipline" item 5 + §"Closed request schema" notes —
+    # `license_metadata.source` MUST be `task_artifact_promote` for
+    # promote-from-artifact requests. The original PR-2 implementation
+    # accepted any ORIGIN_KIND_ENUM value here, which silently allowed
+    # `external_reference` / `licensed_stock` / `admin_seeded` to substitute
+    # for task-artifact promote semantics. Submit only takes an
+    # `artifact_ref` so the request is by construction artifact-backed;
+    # any other source is a contract violation.
+    if license_metadata.get("source") != "task_artifact_promote":
+        raise PromoteRequestRejected(
+            error_code="license_metadata.source_must_be_task_artifact_promote",
+            message=(
+                "Submit accepts only artifact-backed promote intents; "
+                "license_metadata.source MUST be 'task_artifact_promote' "
+                "(per promote_request_contract_v1 §'Closed request schema')."
+            ),
+        )
     source_label = license_metadata.get("source_label")
     if source_label is not None and not isinstance(source_label, str):
         raise PromoteRequestRejected(
@@ -453,49 +471,59 @@ def withdraw_request(request_id: str, *, actor_ref: str) -> dict[str, Any]:
         return copy.deepcopy(closure)
 
 
+class AssetLibraryWriteUnavailable(PromoteRequestRejected):
+    """Raised when approval is requested but no Asset Library write path
+    exists to materialize the resulting asset object.
+
+    PR-2 reviewer-fix #2: per `promote_feedback_closure_contract_v1.md`
+    §"Source-of-truth rules" item 2, the closure may reference
+    `resulting_asset_id` ONLY after the asset object exists in the
+    Asset Library truth path. PR-2 ships no asset-library write path
+    (deferred to Platform Runtime Assembly Wave or a later Recovery
+    iteration); therefore approval cannot be honored here without
+    inventing asset truth that does not exist. The narrow contract-safe
+    correction is to refuse approval at the service surface entirely
+    until a real asset-library write path lands.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            error_code="asset_library_write_unavailable",
+            message=(
+                "Promote approval is not available in PR-2: closure cannot "
+                "reference `resulting_asset_id` because the Asset Library "
+                "write path is not yet implemented. The closure remains in "
+                "`requested` state until withdrawn (operator) or rejected "
+                "(reviewer)."
+            ),
+        )
+
+
 def approve_request(
     request_id: str,
     *,
-    reviewer_ref: str,
-    resulting_asset_id: str,
+    reviewer_ref: str = "",
+    resulting_asset_id: str = "",
     reviewer_notes: Optional[str] = None,
 ) -> dict[str, Any]:
-    """Reviewer-side approve. Service API only — PR-2 ships no admin UI.
+    """Reviewer-side approve — DISABLED in PR-2.
 
-    Records `review_started` and then `approved`; sets
-    `resulting_asset_id` per `promote_feedback_closure_contract_v1.md`
-    §"Closure object shape".
+    PR-2 reviewer-fix #2: the original PR-2 implementation accepted a
+    caller-provided `resulting_asset_id` and wrote it to the closure
+    without verifying that an Asset Library object existed at that id.
+    This violated `promote_feedback_closure_contract_v1.md`
+    §"Source-of-truth rules" item 2 ("the resulting asset object is
+    created in the Asset Library; the closure references it by
+    `resulting_asset_id`") because PR-2 ships no asset-library write
+    path — so no asset object could possibly exist at the supplied id.
+
+    Narrow correction: refuse approval at the service surface. The
+    closure contract's `requested` and `rejected` (including operator
+    `withdrawn` → `rejected` transition) terminal semantics remain
+    fully honored. Approval is deferred until a real asset-library
+    write path lands in a later wave.
     """
-    with _LOCK:
-        closure = _CLOSURES.get(request_id)
-        if closure is None:
-            raise PromoteRequestRejected(
-                error_code="closure_not_found", message=f"unknown request_id {request_id!r}"
-            )
-        if closure["request_state"] != "requested":
-            raise PromoteRequestRejected(
-                error_code="closure_terminal",
-                message=f"closure for {request_id!r} is already terminal.",
-            )
-        _append_event(
-            closure,
-            event_kind="review_started",
-            actor_kind="reviewer",
-            actor_ref=reviewer_ref,
-        )
-        _append_event(
-            closure,
-            event_kind="approved",
-            actor_kind="reviewer",
-            actor_ref=reviewer_ref,
-            payload_ref=resulting_asset_id,
-        )
-        closure["request_state"] = "approved"
-        closure["reviewer_ref"] = reviewer_ref
-        closure["reviewer_notes"] = reviewer_notes
-        closure["resulting_asset_id"] = resulting_asset_id
-        closure["resolved_timestamp_utc"] = _utcnow_iso()
-        return copy.deepcopy(closure)
+    raise AssetLibraryWriteUnavailable()
 
 
 def reject_request(
@@ -551,6 +579,7 @@ __all__ = [
     "EVENT_KIND_ENUM",
     "FORBIDDEN_PROMOTE_KEYS",
     "FORBIDDEN_REQUEST_STATE_FIELDS",
+    "AssetLibraryWriteUnavailable",
     "PromoteRequestRejected",
     "REJECTION_REASON_ENUM",
     "REQUEST_STATE_ENUM",

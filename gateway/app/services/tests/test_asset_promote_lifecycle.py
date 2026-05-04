@@ -13,6 +13,7 @@ import pytest
 
 from gateway.app.services.asset import (
     EVENT_KIND_ENUM,
+    AssetLibraryWriteUnavailable,
     PromoteRequestRejected,
     REJECTION_REASON_ENUM,
     REQUEST_STATE_ENUM,
@@ -147,6 +148,45 @@ def test_missing_requested_by_rejected() -> None:
     assert exc.value.error_code == "requested_by_required"
 
 
+def test_non_task_artifact_promote_source_rejected() -> None:
+    """PR-2 reviewer-fix #1: artifact-backed submit MUST carry
+    license_metadata.source = task_artifact_promote per
+    `promote_request_contract_v1.md` §"Closed request schema"
+    `license_metadata.source` row + §"Submit-time discipline" item 5.
+    The original PR-2 implementation accepted any ORIGIN_KIND_ENUM value
+    here — this test pins the contract enforcement.
+    """
+    for bad_source in (
+        "external_reference",
+        "licensed_stock",
+        "operator_upload",
+        "admin_seeded",
+    ):
+        payload = {
+            **_VALID_PAYLOAD,
+            "license_metadata": {**_VALID_PAYLOAD["license_metadata"], "source": bad_source},
+        }
+        with pytest.raises(PromoteRequestRejected) as exc:
+            submit_promote_request(payload)
+        assert (
+            exc.value.error_code
+            == "license_metadata.source_must_be_task_artifact_promote"
+        ), bad_source
+
+
+def test_task_artifact_promote_source_accepted() -> None:
+    """Positive path: explicit task_artifact_promote still works."""
+    payload = {
+        **_VALID_PAYLOAD,
+        "license_metadata": {
+            **_VALID_PAYLOAD["license_metadata"],
+            "source": "task_artifact_promote",
+        },
+    }
+    result = submit_promote_request(payload)
+    assert result["request_state"] == "requested"
+
+
 def test_unknown_license_rejected() -> None:
     payload = {
         **_VALID_PAYLOAD,
@@ -179,20 +219,55 @@ def test_withdraw_after_terminal_rejected() -> None:
     assert exc.value.error_code == "closure_terminal"
 
 
-def test_approve_transitions_to_approved_with_resulting_asset_id() -> None:
+def test_approve_request_disabled_in_pr2_without_asset_library_write_path() -> None:
+    """PR-2 reviewer-fix #2: approve_request MUST refuse to set
+    `resulting_asset_id` because PR-2 ships no Asset Library write
+    path. Per `promote_feedback_closure_contract_v1.md` §"Source-of-truth
+    rules" item 2 the closure may reference `resulting_asset_id` only
+    after the asset object exists in the Asset Library.
+    """
     result = submit_promote_request(_VALID_PAYLOAD)
-    closure = approve_request(
-        result["request_id"],
-        reviewer_ref="reviewer:admin1",
-        resulting_asset_id="asset_promoted_001",
-        reviewer_notes="Looks good.",
-    )
-    assert closure["request_state"] == "approved"
-    assert closure["resulting_asset_id"] == "asset_promoted_001"
-    assert closure["reviewer_ref"] == "reviewer:admin1"
-    assert closure["resolved_timestamp_utc"] is not None
+    with pytest.raises(AssetLibraryWriteUnavailable) as exc:
+        approve_request(
+            result["request_id"],
+            reviewer_ref="reviewer:admin1",
+            resulting_asset_id="asset_promoted_001",
+        )
+    assert exc.value.error_code == "asset_library_write_unavailable"
+
+    # Closure remains in `requested` state — no premature transition,
+    # no `resulting_asset_id` leak.
+    closure = get_closure(result["request_id"])
+    assert closure is not None
+    assert closure["request_state"] == "requested"
+    assert closure["resulting_asset_id"] is None
+    assert closure["resolved_timestamp_utc"] is None
     event_kinds = [r["event_kind"] for r in closure["closure_records"]]
-    assert event_kinds == ["submitted", "review_started", "approved"]
+    assert event_kinds == ["submitted"]
+
+
+def test_no_path_can_set_resulting_asset_id_without_asset_object() -> None:
+    """Defensive: walk every closure produced by every PR-2 service path
+    and confirm `resulting_asset_id` is None unless a verified asset
+    object exists. PR-2 has no asset-library write path, therefore
+    `resulting_asset_id` MUST be None on every closure produced.
+    """
+    submit_promote_request(_VALID_PAYLOAD)
+    payload2 = {**_VALID_PAYLOAD, "requested_by": "operator:other", "proposed_title": "Other"}
+    r2 = submit_promote_request(payload2)
+    withdraw_request(r2["request_id"], actor_ref="operator:other")
+    payload3 = {**_VALID_PAYLOAD, "requested_by": "operator:third", "proposed_title": "Third"}
+    r3 = submit_promote_request(payload3)
+    reject_request(
+        r3["request_id"],
+        reviewer_ref="reviewer:admin1",
+        rejection_reason="reviewer_discretion",
+    )
+    for closure in list_closures():
+        assert closure["resulting_asset_id"] is None, (
+            f"closure {closure['request_id']!r} leaked resulting_asset_id "
+            f"without an asset-library write path"
+        )
 
 
 def test_reject_with_closed_reason_enum_only() -> None:
@@ -220,18 +295,19 @@ def test_reject_with_unknown_reason_rejected() -> None:
 
 
 def test_approve_after_terminal_rejected() -> None:
+    """approve_request raises AssetLibraryWriteUnavailable regardless of
+    closure state in PR-2 (the asset-library write path is the gate);
+    the terminal-state check is exercised by reject_request /
+    withdraw_request tests below.
+    """
     result = submit_promote_request(_VALID_PAYLOAD)
     reject_request(
         result["request_id"],
         reviewer_ref="reviewer:admin1",
         rejection_reason="reviewer_discretion",
     )
-    with pytest.raises(PromoteRequestRejected):
-        approve_request(
-            result["request_id"],
-            reviewer_ref="reviewer:admin1",
-            resulting_asset_id="asset_should_not_exist",
-        )
+    with pytest.raises(AssetLibraryWriteUnavailable):
+        approve_request(result["request_id"], reviewer_ref="reviewer:admin1")
 
 
 # ---------- Closure mirror integrity --------------------------------------
