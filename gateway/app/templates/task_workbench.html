@@ -258,6 +258,7 @@
 
     {% if ops_workbench_panel.panel_kind == "matrix_script" %}
       {% set ms_surface = ((ops.workbench or {}).matrix_script_variation_surface or {}) %}
+      {% set ms_comp = ((ops.workbench or {}).matrix_script_comprehension or {}) %}
       {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
       {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
       {% set ms_slot_detail = (ms_surface.slot_detail_surface or {}) %}
@@ -268,6 +269,79 @@
       {% set ms_slots = (ms_copy_bundle.slots or []) %}
       {% set ms_slot_index = {} %}
       {% for slot in ms_slots %}{% if ms_slot_index.update({slot.slot_id: slot}) %}{% endif %}{% endfor %}
+      {# PR-U2 Matrix Script Workbench operator-comprehension block. Additive — sits ABOVE the existing axes/cells/slots/attribution rows which are preserved verbatim below. Reads only ms_comp (presentation-layer projection over ms_surface + panel resolver). No new packet truth. No provider/model/vendor controls. #}
+      {% if ms_comp.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-comprehension-panel">
+          <div class="section-title">
+            <h2 data-role="ms-comp-title">{{ ms_comp.panel_title_zh }}</h2>
+            <div class="secondary" data-role="ms-comp-subtitle">{{ ms_comp.panel_subtitle_zh }}</div>
+          </div>
+
+          <h3 style="margin:12px 0 6px;" data-role="ms-comp-four-zone-label">{{ ms_comp.four_zone_alignment_label_zh }}</h3>
+          <div class="meta-grid" data-role="ms-comp-four-zone-grid">
+            {% for zone in (ms_comp.four_zone_alignment or []) %}
+              <div class="meta-item" data-role="ms-comp-zone" data-zone-id="{{ zone.zone_id }}" data-zone-bound="{{ 'true' if zone.is_bound else 'false' }}">
+                <strong>{{ zone.zone_label_zh }}</strong>
+                <span>
+                  {% if zone.is_bound %}
+                    {% for ref in zone.bound_refs %}
+                      <span class="info-pill" style="margin-right:4px;"><code>{{ ref.ref_id }}</code>{% if ref.version %}@{{ ref.version }}{% endif %}</span>
+                    {% endfor %}
+                  {% else %}
+                    <span class="muted">{{ zone.empty_label_zh }}</span>
+                  {% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-comp-identity-label">{{ ms_comp.task_identity_label_zh }}</h3>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-comp-identity-axes">
+              <strong>axes</strong>
+              <span>{{ ms_comp.task_identity_summary.axes_count }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-comp-identity-cells">
+              <strong>cells</strong>
+              <span>{{ ms_comp.task_identity_summary.cells_count }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-comp-identity-slots">
+              <strong>slots</strong>
+              <span>{{ ms_comp.task_identity_summary.slots_count }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-comp-identity-ready-state">
+              <strong>ready_state</strong>
+              <span>{{ ms_comp.task_identity_summary.ready_state_label_zh }}</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-comp-next-step-header">下一步</h3>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-comp-next-step" data-next-step-zone="{{ ms_comp.next_step_zone }}">
+              <strong>{{ ms_comp.next_step_label_zh }}</strong>
+              <span class="muted">{{ ms_comp.next_step_explanation_zh }}</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-comp-variation-summary-label">{{ ms_comp.variation_summary_label_zh }}</h3>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-comp-variation-summary">
+              <strong>合计</strong>
+              <span>{{ ms_comp.variation_summary.summary_text_zh }}</span>
+            </div>
+          </div>
+          {% if ms_comp.should_group_cells %}
+            <div class="muted t-secondary" style="margin-top:6px;" data-role="ms-comp-grouping-hint">
+              变体数超过 {{ ms_comp.cell_grouping_threshold }} 组，按 axis 元组聚合便于阅读：
+            </div>
+            <ul class="muted" data-role="ms-comp-grouping-list" style="margin:6px 0 0 18px;">
+              {% for group in (ms_comp.axis_tuple_groupings or []) %}
+                <li><code>{{ group.group_key }}</code> · {{ group.count }} 组（示例 cell：{{ group.sample_cell_ids | join(", ") }}）</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% endif %}
       <div class="panel" data-role="matrix-script-variation-panel">
         <div class="section-title">
           <h2>Matrix Script — Variation Panel</h2>
