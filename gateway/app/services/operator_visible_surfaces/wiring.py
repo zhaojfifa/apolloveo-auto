@@ -146,8 +146,23 @@ def build_operator_surfaces_for_workbench(
     # `line_specific_refs[].delta` and never mutates packet truth.
     workbench_panel = bundle.get("workbench", {}).get("line_specific_panel", {}) or {}
     if workbench_panel.get("panel_kind") == "matrix_script":
-        bundle["workbench"]["matrix_script_variation_surface"] = (
-            project_workbench_variation_surface(packet_view)
+        variation_surface = project_workbench_variation_surface(packet_view)
+        bundle["workbench"]["matrix_script_variation_surface"] = variation_surface
+        # PR-U2: Matrix Script Workbench operator-comprehension bundle.
+        # Pure presentation-layer projection over the variation surface +
+        # panel resolver shape. No projection mutation; no contract
+        # mutation; no `panel_kind` enum widening; no provider/model/vendor
+        # control. Hot Follow / Digital Anchor / Baseline workbench
+        # surfaces never enter this branch. Authority:
+        # docs/reviews/plan_e_matrix_script_operator_comprehensible_ui_alignment_gate_spec_v1.md
+        from gateway.app.services.matrix_script.workbench_comprehension import (
+            derive_matrix_script_workbench_comprehension,
+        )
+        bundle["workbench"]["matrix_script_comprehension"] = (
+            derive_matrix_script_workbench_comprehension(
+                variation_surface,
+                workbench_panel,
+            )
         )
     return bundle
 
