@@ -1,0 +1,183 @@
+{# Operator-visible Asset Supply / B-roll page (Operator Capability
+   Recovery, PR-2). Read-only browse + closed-facet filter + opaque
+   reference + promote intent. Distinct from Task Area (`/tasks*`) and
+   Tool Backstage (`/admin/*`, `/tools/*`) per
+   `docs/product/broll_asset_supply_freeze_v1.md` §0 "Boundary". No
+   provider/model/vendor controls. No upload affordance. #}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Asset Supply</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+           margin: 16px; color: #1c1c1c; }
+    h1 { margin: 0 0 4px 0; font-size: 22px; }
+    .secondary { color: #666; font-size: 13px; margin-bottom: 16px; }
+    .panel { border: 1px solid #ddd; border-radius: 6px; padding: 12px;
+             margin-bottom: 16px; }
+    .filters { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+    .filter-item { display: flex; flex-direction: column; gap: 4px; }
+    .filter-item label { font-size: 12px; color: #555; }
+    .asset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+                  gap: 12px; margin-top: 12px; }
+    .asset-card { border: 1px solid #ddd; border-radius: 6px; padding: 10px;
+                  display: flex; flex-direction: column; gap: 6px; }
+    .asset-title { font-weight: 600; }
+    .asset-kind, .asset-license, .asset-quality, .asset-lines, .asset-tags {
+        font-size: 12px; color: #555; }
+    .badge { display: inline-block; padding: 1px 6px; border-radius: 3px;
+             font-size: 11px; margin-right: 4px; background: #eef; color: #224; }
+    .badge.canonical { background: #dfd; color: #252; }
+    .badge.archived { background: #fed; color: #713; }
+    .actions { display: flex; gap: 6px; margin-top: 6px; }
+    button { padding: 4px 10px; border-radius: 4px; border: 1px solid #888;
+             background: #fafafa; cursor: pointer; font-size: 12px; }
+    button:hover { background: #efefef; }
+    .closure-row { padding: 6px 0; border-bottom: 1px solid #eee; font-size: 12px; }
+    .state-requested { color: #555; }
+    .state-approved { color: #252; font-weight: 600; }
+    .state-rejected { color: #722; }
+    .ref-display { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px;
+                   color: #336; word-break: break-all; }
+    .surface-tag { font-size: 11px; color: #888; padding: 1px 6px;
+                   border-radius: 3px; background: #f4f4f4; margin-left: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Asset Supply <span class="surface-tag">B-roll · Asset Library</span></h1>
+  <div class="secondary">
+    Browse, filter, and reference reusable assets. Promote intents transition through
+    review-gated closure (per <code>promote_feedback_closure_contract_v1</code>).
+    This surface is distinct from Task Area and Tool Backstage; no task / packet truth
+    is mutated here.
+  </div>
+
+  <div class="panel">
+    <form method="get" action="/assets" class="filters">
+      <div class="filter-item">
+        <label for="filter-line">Line</label>
+        <select id="filter-line" name="line">
+          <option value="">— any —</option>
+          {% for line in filter_options.lines %}
+            <option value="{{ line }}" {% if filters.line == line %}selected{% endif %}>{{ line }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-item">
+        <label for="filter-kind">Kind</label>
+        <select id="filter-kind" name="kind">
+          <option value="">— any —</option>
+          {% for kind in filter_options.kinds %}
+            <option value="{{ kind }}" {% if filters.kind == kind %}selected{% endif %}>{{ kind }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-item">
+        <label for="filter-quality">Quality threshold</label>
+        <select id="filter-quality" name="quality">
+          {% for bucket in filter_options.quality_buckets %}
+            <option value="{{ bucket }}" {% if filters.quality_filter == bucket %}selected{% endif %}>{{ bucket }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-item">
+        <button type="submit">Apply</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="panel">
+    <h2 style="margin: 0 0 6px 0; font-size: 16px;">Library
+      <span class="secondary">({{ assets|length }} asset{{ 's' if assets|length != 1 else '' }})</span>
+    </h2>
+    {% if not assets %}
+      <div class="secondary">No assets match the current filters.</div>
+    {% else %}
+      <div class="asset-grid">
+        {% for asset in assets %}
+          <div class="asset-card" data-asset-id="{{ asset.asset_id }}">
+            <div class="asset-title">{{ asset.title }}</div>
+            <div class="asset-kind">kind: <strong>{{ asset.kind }}</strong></div>
+            <div class="asset-quality">quality_threshold: {{ asset.quality_threshold }}</div>
+            <div class="asset-license">
+              license: {{ asset.usage_limits.license }}
+              · reuse_policy: {{ asset.usage_limits.reuse_policy }}
+            </div>
+            <div class="asset-lines">
+              line_availability:
+              {% for line in asset.line_availability %}<span class="badge">{{ line }}</span>{% else %}<span class="secondary">—</span>{% endfor %}
+            </div>
+            <div class="asset-tags">
+              {% for tag in asset.tags %}<span class="badge">{{ tag.facet }}={{ tag.value }}</span>{% endfor %}
+            </div>
+            <div class="actions">
+              <button type="button" data-role="copy-ref" data-asset-id="{{ asset.asset_id }}">
+                Copy opaque ref
+              </button>
+              <button type="button" data-role="open-promote-stub" data-asset-id="{{ asset.asset_id }}">
+                Promote …
+              </button>
+            </div>
+            <div class="ref-display" data-role="ref-display" data-asset-id="{{ asset.asset_id }}"></div>
+            {% if asset.badges.canonical %}<span class="badge canonical">canonical</span>{% endif %}
+            {% if asset.badges.archived %}<span class="badge archived">archived</span>{% endif %}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="panel">
+    <h2 style="margin: 0 0 6px 0; font-size: 16px;">Promote closures
+      <span class="secondary">({{ closures|length }})</span>
+    </h2>
+    {% if not closures %}
+      <div class="secondary">No promote intents yet. Use the Promote button on any asset card to begin.</div>
+    {% else %}
+      {% for closure in closures %}
+        <div class="closure-row">
+          <span class="state-{{ closure.request_state }}">{{ closure.request_state }}</span>
+          · request_id: <code>{{ closure.request_id }}</code>
+          · artifact_ref: <code>{{ closure.artifact_ref }}</code>
+          {% if closure.resulting_asset_id %}
+            · resulting_asset_id: <code>{{ closure.resulting_asset_id }}</code>
+          {% endif %}
+          {% if closure.rejection_reason %}
+            · rejection_reason: <code>{{ closure.rejection_reason }}</code>
+          {% endif %}
+          · submitted: <code>{{ closure.request_timestamp_utc }}</code>
+          {% if closure.resolved_timestamp_utc %}
+            · resolved: <code>{{ closure.resolved_timestamp_utc }}</code>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  <script>
+    // Minimal progressive enhancement: copy opaque ref to clipboard +
+    // surface promote-stub message. Promote submission itself uses the
+    // /api/assets/promote JSON endpoint per the contract; PR-2 leaves
+    // the inline form for a follow-up wave.
+    document.querySelectorAll('[data-role="copy-ref"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var assetId = btn.getAttribute('data-asset-id');
+        fetch('/api/assets/' + encodeURIComponent(assetId) + '/reference')
+          .then(function (r) { return r.json(); })
+          .then(function (data) {
+            var disp = document.querySelector('[data-role="ref-display"][data-asset-id="' + assetId + '"]');
+            if (disp) { disp.textContent = data.ref || ''; }
+          })
+          .catch(function () { /* swallow */ });
+      });
+    });
+    document.querySelectorAll('[data-role="open-promote-stub"]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        alert('Promote intent UI: PR-2 ships the contract-backed JSON path at POST /api/assets/promote. Inline form is a follow-up.');
+      });
+    });
+  </script>
+</body>
+</html>
