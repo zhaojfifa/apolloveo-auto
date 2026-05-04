@@ -379,6 +379,163 @@
           <ul data-role="ms-closure-events-recent" class="muted" style="margin:6px 0 0 18px;"></ul>
         </div>
       {% endif %}
+
+      {# Recovery PR-4: Digital Anchor publish-feedback closure operator surface.
+         Per docs/contracts/digital_anchor/publish_feedback_closure_contract_v1.md +
+         publish_feedback_writeback_contract_v1.md, the closure is a separate
+         ownership zone (Phase D). Operator events flow through
+         POST /api/digital-anchor/closures/{task_id}/{role-feedback,segment-feedback,publish-closure}.
+         Server-rendered container + JS-driven row population from
+         data.digital_anchor_publish_feedback_closure. Hot Follow / Matrix Script
+         publish hubs render unchanged. #}
+      {% set _da_kind = (task.category_key or task.kind or task.platform or "") | lower %}
+      {% if _da_kind == "digital_anchor" %}
+        <div class="card" id="digital-anchor-closure-block"
+             data-role="digital-anchor-closure" style="margin-top:10px;">
+          <div class="section-title">
+            <h2>Digital Anchor · 发布反馈闭环</h2>
+            <div class="secondary">
+              role / segment 双层反馈 + scoped publish_status。所有写回严格遵循
+              <code>digital_anchor_publish_feedback_closure_v1</code> +
+              <code>digital_anchor_publish_feedback_writeback_v1</code>。
+            </div>
+          </div>
+
+          <h3 style="margin:14px 0 6px;">role_feedback[]</h3>
+          <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">role_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">display_name</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">role_feedback_kind</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">linked_segments</th>
+              </tr>
+            </thead>
+            <tbody data-role="da-role-rows"></tbody>
+          </table>
+
+          <h3 style="margin:14px 0 6px;">segment_feedback[]</h3>
+          <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">segment_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">binds_role_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">segment_feedback_kind</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">script_ref</th>
+              </tr>
+            </thead>
+            <tbody data-role="da-segment-rows"></tbody>
+          </table>
+
+          <div class="copy-row" style="margin-top:10px; gap:8px;">
+            <button id="btn-da-closure-init" type="button" class="btn-secondary">初始化 closure</button>
+            <span id="da-closure-status" class="muted"></span>
+          </div>
+
+          <h3 style="margin:14px 0 6px;">提交 role 反馈</h3>
+          <form id="da-role-feedback-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
+            <label class="field">
+              <span>role_id</span>
+              <input type="text" name="role_id" required />
+            </label>
+            <label class="field">
+              <span>role_feedback_kind</span>
+              <select name="role_feedback_kind" required>
+                <option value="accepted">accepted</option>
+                <option value="needs_revision">needs_revision</option>
+                <option value="not_used">not_used</option>
+              </select>
+            </label>
+            <label class="field" style="grid-column: 1 / -1;">
+              <span>role_feedback_note（可选）</span>
+              <textarea name="role_feedback_note" rows="2"></textarea>
+            </label>
+            <div class="copy-row" style="grid-column: 1 / -1;">
+              <button type="submit" class="btn-primary">提交 role 反馈</button>
+              <span id="da-role-feedback-status" class="muted"></span>
+            </div>
+          </form>
+
+          <h3 style="margin:14px 0 6px;">提交 segment 反馈</h3>
+          <form id="da-segment-feedback-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
+            <label class="field">
+              <span>segment_id</span>
+              <input type="text" name="segment_id" required />
+            </label>
+            <label class="field">
+              <span>segment_feedback_kind</span>
+              <select name="segment_feedback_kind" required>
+                <option value="accepted">accepted</option>
+                <option value="needs_revision">needs_revision</option>
+                <option value="not_used">not_used</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>audio_feedback_note</span>
+              <input type="text" name="audio_feedback_note" />
+            </label>
+            <label class="field">
+              <span>lip_sync_feedback_note</span>
+              <input type="text" name="lip_sync_feedback_note" />
+            </label>
+            <label class="field" style="grid-column: 1 / -1;">
+              <span>subtitle_feedback_note</span>
+              <input type="text" name="subtitle_feedback_note" />
+            </label>
+            <div class="copy-row" style="grid-column: 1 / -1;">
+              <button type="submit" class="btn-primary">提交 segment 反馈</button>
+              <span id="da-segment-feedback-status" class="muted"></span>
+            </div>
+          </form>
+
+          <h3 style="margin:14px 0 6px;">D.1 publish 反馈写回（active path）</h3>
+          <div class="muted t-secondary" style="margin-bottom:6px;">
+            按 <code>publish_feedback_writeback_contract_v1</code> §"Closed write-back event set"。
+            事件按 <code>row_scope</code>(role/segment) + <code>row_id</code> 定位单行；
+            <code>publish_status</code> ∈ {pending, published, failed, retracted}。
+          </div>
+          <form id="da-d1-event-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
+            <label class="field">
+              <span>event_kind</span>
+              <select name="event_kind" id="da-d1-event-kind" required>
+                <option value="publish_attempted">publish_attempted（operator）</option>
+                <option value="publish_accepted">publish_accepted（platform）</option>
+                <option value="publish_rejected">publish_rejected（platform）</option>
+                <option value="publish_retracted">publish_retracted（operator）</option>
+                <option value="metrics_snapshot">metrics_snapshot（platform）</option>
+                <option value="operator_note">operator_note（operator）</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>row_scope</span>
+              <select name="row_scope" required>
+                <option value="role">role</option>
+                <option value="segment">segment</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>row_id（role_id 或 segment_id）</span>
+              <input type="text" name="row_id" required />
+            </label>
+            <label class="field" data-role="da-d1-payload-publish-url">
+              <span>payload.publish_url（仅 publish_accepted）</span>
+              <input type="url" name="publish_url" />
+            </label>
+            <label class="field" data-role="da-d1-payload-note" style="grid-column: 1 / -1; display:none;">
+              <span>payload.note（operator_note）</span>
+              <textarea name="note" rows="2"></textarea>
+            </label>
+            <div class="copy-row" style="grid-column: 1 / -1;">
+              <button type="submit" class="btn-primary">写入 D.1 事件</button>
+              <span id="da-d1-event-status" class="muted"></span>
+            </div>
+          </form>
+
+          <h3 style="margin:14px 0 6px;">最近事件（append-only）</h3>
+          <ul data-role="da-closure-events-recent" class="muted" style="margin:6px 0 0 18px;"></ul>
+        </div>
+      {% endif %}
+
       <div class="card" data-role="operator-publish-gate-strip">
         <div class="section-title">
           <h2>Publish gate</h2>
@@ -893,6 +1050,206 @@ function resolveLang(serverLang) {
       refreshClosure();
     }
 
+    // Recovery PR-4: Digital Anchor publish-feedback closure renderer.
+    // Reads only data.digital_anchor_publish_feedback_closure; submits events
+    // through the contract-backed POST /api/digital-anchor/closures/{task_id}/...
+    function renderDigitalAnchorClosure(closure) {
+      const block = document.getElementById("digital-anchor-closure-block");
+      if (!block) return;
+      const roleTbody = block.querySelector('[data-role="da-role-rows"]');
+      const segmentTbody = block.querySelector('[data-role="da-segment-rows"]');
+      const eventsEl = block.querySelector('[data-role="da-closure-events-recent"]');
+      if (!closure) {
+        if (roleTbody) roleTbody.innerHTML = "";
+        if (segmentTbody) segmentTbody.innerHTML = "";
+        if (eventsEl) eventsEl.innerHTML = "";
+        return;
+      }
+      function renderRows(tbody, rows, columns) {
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        (rows || []).forEach((row) => {
+          const tr = document.createElement("tr");
+          columns.forEach((col) => {
+            const td = document.createElement("td");
+            td.style.padding = "6px";
+            td.style.borderBottom = "1px solid #f1f5f9";
+            const value = row[col];
+            if (Array.isArray(value)) {
+              td.textContent = value.join(", ");
+            } else {
+              td.textContent = (value === null || value === undefined) ? "—" : String(value);
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+      renderRows(roleTbody, closure.role_feedback, [
+        "role_id",
+        "role_display_name",
+        "role_feedback_kind",
+        "linked_segments",
+      ]);
+      renderRows(segmentTbody, closure.segment_feedback, [
+        "segment_id",
+        "binds_role_id",
+        "segment_feedback_kind",
+        "script_ref",
+      ]);
+      if (eventsEl) {
+        eventsEl.innerHTML = "";
+        const records = (closure.feedback_closure_records || []).slice(-5).reverse();
+        records.forEach((record) => {
+          const li = document.createElement("li");
+          li.textContent =
+            (record.recorded_at || "—") +
+            " · " +
+            (record.record_kind || "—") +
+            " · roles=[" + (record.role_ids || []).join(",") + "]" +
+            " · segments=[" + (record.segment_ids || []).join(",") + "]";
+          eventsEl.appendChild(li);
+        });
+      }
+    }
+
+    function bindDigitalAnchorClosureForms() {
+      const block = document.getElementById("digital-anchor-closure-block");
+      if (!block) return;
+      const initBtn = document.getElementById("btn-da-closure-init");
+      const initStatusEl = document.getElementById("da-closure-status");
+      const roleForm = document.getElementById("da-role-feedback-form");
+      const roleStatus = document.getElementById("da-role-feedback-status");
+      const segmentForm = document.getElementById("da-segment-feedback-form");
+      const segmentStatus = document.getElementById("da-segment-feedback-status");
+      const d1Form = document.getElementById("da-d1-event-form");
+      const d1Status = document.getElementById("da-d1-event-status");
+      const d1EventKind = document.getElementById("da-d1-event-kind");
+
+      async function refreshClosure() {
+        try {
+          const resp = await fetch(
+            `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}/peek`
+          );
+          if (!resp.ok) return;
+          const body = await resp.json();
+          renderDigitalAnchorClosure(body && body.closure);
+        } catch (err) { /* presentation-only */ }
+      }
+
+      if (initBtn) {
+        initBtn.addEventListener("click", async () => {
+          if (initStatusEl) initStatusEl.textContent = "正在初始化…";
+          try {
+            const resp = await fetch(
+              `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}`
+            );
+            const body = await resp.json();
+            if (!resp.ok) {
+              if (initStatusEl) initStatusEl.textContent = "失败：" + (body.detail || resp.status);
+              return;
+            }
+            renderDigitalAnchorClosure(body);
+            if (initStatusEl) initStatusEl.textContent = "已就绪";
+          } catch (err) {
+            if (initStatusEl) initStatusEl.textContent = "失败：" + (err && err.message);
+          }
+        });
+      }
+
+      async function postEvent(form, statusEl, path) {
+        const data = {};
+        new FormData(form).forEach((value, key) => {
+          if (typeof value === "string" && value.length > 0) data[key] = value;
+        });
+        if (statusEl) statusEl.textContent = "提交中…";
+        try {
+          const resp = await fetch(
+            `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}/${path}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            }
+          );
+          const body = await resp.json();
+          if (!resp.ok) {
+            if (statusEl) statusEl.textContent = "失败：" + (body.detail || resp.status);
+            return;
+          }
+          renderDigitalAnchorClosure(body && body.closure);
+          if (statusEl) statusEl.textContent = "已写入 record_id=" + (body.record_id || "—");
+        } catch (err) {
+          if (statusEl) statusEl.textContent = "失败：" + (err && err.message);
+        }
+      }
+
+      if (roleForm) {
+        roleForm.addEventListener("submit", (ev) => {
+          ev.preventDefault();
+          postEvent(roleForm, roleStatus, "role-feedback");
+        });
+      }
+      if (segmentForm) {
+        segmentForm.addEventListener("submit", (ev) => {
+          ev.preventDefault();
+          postEvent(segmentForm, segmentStatus, "segment-feedback");
+        });
+      }
+      function syncD1FieldVisibility() {
+        const kind = (d1EventKind && d1EventKind.value) || "";
+        const urlField = block.querySelector('[data-role="da-d1-payload-publish-url"]');
+        const noteField = block.querySelector('[data-role="da-d1-payload-note"]');
+        if (urlField) urlField.style.display = kind === "publish_accepted" ? "" : "none";
+        if (noteField) noteField.style.display = kind === "operator_note" ? "" : "none";
+      }
+      if (d1EventKind) d1EventKind.addEventListener("change", syncD1FieldVisibility);
+      syncD1FieldVisibility();
+
+      if (d1Form) {
+        d1Form.addEventListener("submit", async (ev) => {
+          ev.preventDefault();
+          const formData = new FormData(d1Form);
+          const eventKind = formData.get("event_kind") || "";
+          const body = {
+            event_kind: eventKind,
+            row_scope: formData.get("row_scope") || "",
+            row_id: formData.get("row_id") || "",
+            recorded_at: new Date().toISOString(),
+            payload: {},
+          };
+          if (eventKind === "publish_accepted") {
+            const url = formData.get("publish_url");
+            if (url) body.payload.publish_url = url;
+          } else if (eventKind === "operator_note") {
+            const note = formData.get("note");
+            if (note) body.payload.note = note;
+          }
+          if (d1Status) d1Status.textContent = "提交中…";
+          try {
+            const resp = await fetch(
+              `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}/events`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+              }
+            );
+            const respBody = await resp.json();
+            if (!resp.ok) {
+              if (d1Status) d1Status.textContent = "失败：" + (respBody.detail || resp.status);
+              return;
+            }
+            renderDigitalAnchorClosure(respBody && respBody.closure);
+            if (d1Status) d1Status.textContent = "已写入 record_id=" + (respBody.record_id || "—");
+          } catch (err) {
+            if (d1Status) d1Status.textContent = "失败：" + (err && err.message);
+          }
+        });
+      }
+      refreshClosure();
+    }
+
     function renderOperatorSurfaces(ops) {
       const delivery = (ops && ops.delivery) || {};
       const mirror = delivery.publish_status_mirror || {};
@@ -964,6 +1321,7 @@ function resolveLang(serverLang) {
       renderDeliverables(data.deliverables || {});
       renderMatrixScriptDeliveryComprehension(data.matrix_script_delivery_comprehension || null);
       renderMatrixScriptClosure(data.matrix_script_publish_feedback_closure || null);
+      renderDigitalAnchorClosure(data.digital_anchor_publish_feedback_closure || null);
       renderCopyBundle(data.copy_bundle || {});
       await fillCaptionFallback(data.copy_bundle || {});
       renderArchive(data.archive || {});
@@ -1089,6 +1447,7 @@ function resolveLang(serverLang) {
       // surface only renders when the server emitted the gated container
       // (task.kind == "matrix_script"); for other lines the call is a no-op.
       try { bindMatrixScriptClosureForm(); } catch (err) { /* noop */ }
+      try { bindDigitalAnchorClosureForms(); } catch (err) { /* noop */ }
       const tabs = document.querySelectorAll(".tab-btn");
       const panels = document.querySelectorAll(".tab-panel");
       function activate(id) {

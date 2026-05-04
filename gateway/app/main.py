@@ -23,7 +23,7 @@ from gateway.app.core.logging_config import configure_logging
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
 from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
-from gateway.app.routers import admin_publish, admin_tools as admin_tools_router, assets as assets_router, matrix_script_closure as matrix_script_closure_router, matrix_script_panel_debug, publish as publish_router, tasks as tasks_router
+from gateway.app.routers import admin_publish, admin_tools as admin_tools_router, assets as assets_router, digital_anchor_closure as digital_anchor_closure_router, matrix_script_closure as matrix_script_closure_router, matrix_script_panel_debug, publish as publish_router, tasks as tasks_router
 from gateway.app.routers import hot_follow_ui as hot_follow_ui_router
 from gateway.app.routers.hot_follow_api import hot_follow_api_router
 from gateway.app.routers.api_tools import router as tools_api_router
@@ -181,6 +181,7 @@ app.include_router(v17_pack_router)
 app.include_router(hot_follow_ui_router.router)
 app.include_router(matrix_script_panel_debug.router)
 app.include_router(matrix_script_closure_router.api_router)
+app.include_router(digital_anchor_closure_router.api_router)
 # Operator Capability Recovery PR-2: B-roll / Asset Supply minimum
 # operator surface. Distinct from `/tasks*` (Task Area) and
 # `/admin/*` (Tool Backstage) per

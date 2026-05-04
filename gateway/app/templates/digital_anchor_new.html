@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>数字人新建任务 - ApolloVeo</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css" />
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      background: #f8fafc;
+      color: #111827;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 1040px; margin: 0 auto; padding: 16px; }
+    .panel {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+    }
+    .section-title { margin: 0 0 14px; font-size: 18px; font-weight: 800; }
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .field { display: grid; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+    label { font-size: 14px; font-weight: 700; color: #334155; }
+    input, select, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 14px;
+      background: #fff;
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    .help { font-size: 12px; color: #64748b; }
+    .actions {
+      margin-top: 18px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .btn-primary, .btn-secondary {
+      padding: 9px 14px;
+      border-radius: 6px;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1px solid transparent;
+      text-decoration: none;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { filter: brightness(.95); }
+    .btn-secondary { background: #e5e7eb; color: #111827; border-color: #d1d5db; }
+    .legend { color: #475569; font-size: 13px; margin-bottom: 8px; }
+    .closed-set { color: #2563eb; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="panel">
+      <h1 class="section-title">数字人 · 新建任务（formal）</h1>
+      <div class="legend">
+        正式接入路由 <code>/tasks/digital-anchor/new</code>。表单字段对应
+        <code>digital_anchor_task_entry_v1</code> 闭合输入集；不接受
+        vendor / model / provider / engine / 数字人引擎 / TTS provider /
+        lip-sync engine 选择。
+      </div>
+
+      <form method="post" action="/tasks/digital-anchor/new">
+        <div class="field-grid">
+          <div class="field full">
+            <label for="topic">topic（必填，作业主题）</label>
+            <input type="text" id="topic" name="topic" required />
+            <div class="help">将以非真值方式追加到 <code>metadata.notes</code>，不写入 packet 真值。</div>
+          </div>
+
+          <div class="field full">
+            <label for="source_script_ref">source_script_ref（必填，opaque）</label>
+            <input type="text" id="source_script_ref" name="source_script_ref"
+                   placeholder="content://digital-anchor/source/<token>"
+                   required />
+            <div class="help">Phase B 鉴权阶段才解引用为 segments[].script_ref；entry 仅接受不透明句柄。</div>
+          </div>
+
+          <div class="field">
+            <label for="language_scope_source_language">language_scope.source_language（必填）</label>
+            <input type="text" id="language_scope_source_language"
+                   name="language_scope[source_language]" required placeholder="en" />
+            <div class="help">归属 <code>language_scope</code> 闭合对象；route 边界仅接受
+              <code>language_scope[source_language]</code> / <code>language_scope[target_language]</code>。</div>
+          </div>
+          <div class="field">
+            <label for="language_scope_target_language">language_scope.target_language（必填，逗号分隔）</label>
+            <input type="text" id="language_scope_target_language"
+                   name="language_scope[target_language]" required placeholder="zh, mm" />
+            <div class="help">由 <code>g_lang</code> 允许值约束；Phase B 才绑定到 role / segment。</div>
+          </div>
+
+          <div class="field full">
+            <label for="role_profile_ref">role_profile_ref（必填，opaque）</label>
+            <input type="text" id="role_profile_ref" name="role_profile_ref"
+                   placeholder="catalog://role_card/anchor_a_v1"
+                   required />
+            <div class="help">Phase B 鉴权阶段才解引用为 role_pack.roles[].appearance_ref。</div>
+          </div>
+
+          <div class="field">
+            <label for="role_framing_hint">role_framing_hint（必填，闭合集）</label>
+            <select id="role_framing_hint" name="role_framing_hint" required>
+              <option value="head">head</option>
+              <option value="half_body" selected>half_body</option>
+              <option value="full_body">full_body</option>
+            </select>
+            <div class="help"><span class="closed-set">framing_kind_set</span> 由
+              <code>role_pack_contract_v1</code> 闭合，hint 不会扩展该集。</div>
+          </div>
+          <div class="field">
+            <label for="output_intent">output_intent（必填）</label>
+            <input type="text" id="output_intent" name="output_intent" required
+                   placeholder="例如：双语讲解短视频" />
+            <div class="help">仅作为 <code>metadata.notes</code> 痕迹；不绑定 delivery（Phase C）。</div>
+          </div>
+
+          <div class="field">
+            <label for="speaker_segment_count_hint">speaker_segment_count_hint（必填，1-24）</label>
+            <input type="number" id="speaker_segment_count_hint"
+                   name="speaker_segment_count_hint" min="1" max="24" required value="1" />
+          </div>
+          <div class="field">
+            <label for="dub_kind_hint">dub_kind_hint（可选，闭合集）</label>
+            <select id="dub_kind_hint" name="dub_kind_hint">
+              <option value="">—</option>
+              <option value="tts_neutral">tts_neutral</option>
+              <option value="tts_role_voice">tts_role_voice</option>
+              <option value="source_passthrough">source_passthrough</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="lip_sync_kind_hint">lip_sync_kind_hint（可选，闭合集）</label>
+            <select id="lip_sync_kind_hint" name="lip_sync_kind_hint">
+              <option value="">—</option>
+              <option value="tight">tight</option>
+              <option value="loose">loose</option>
+              <option value="none">none</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="scene_binding_hint">scene_binding_hint（可选）</label>
+            <input type="text" id="scene_binding_hint" name="scene_binding_hint" />
+          </div>
+
+          <div class="field full">
+            <label for="operator_notes">operator_notes（可选）</label>
+            <textarea id="operator_notes" name="operator_notes"></textarea>
+          </div>
+        </div>
+
+        <div class="actions">
+          <a class="btn-secondary" href="/tasks/newtasks">返回</a>
+          <button type="submit" class="btn-primary">提交（创建数字人任务）</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

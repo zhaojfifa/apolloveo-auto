@@ -1071,6 +1071,46 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
         except Exception:
             payload["operator_surfaces"] = {}
             payload["matrix_script_publish_feedback_closure"] = None
+
+    if kind_value == "digital_anchor":
+        # Recovery PR-4: project the Digital Anchor Phase C delivery binding +
+        # bind the Phase D.1 closure into the operator surface bundle so the
+        # publish hub can render role/segment feedback. Read-only; never
+        # mutates packet truth or the workbench projection.
+        try:
+            from gateway.app.services.digital_anchor.closure_binding import (
+                get_closure_view_for_task,
+            )
+            from gateway.app.services.digital_anchor.delivery_binding import (
+                project_delivery_binding as project_da_delivery_binding,
+            )
+            from gateway.app.services.operator_visible_surfaces.wiring import (
+                build_operator_surfaces_for_publish_hub,
+            )
+
+            packet_view = task.get("packet") if isinstance(task.get("packet"), dict) else task
+            payload["digital_anchor_delivery_binding"] = project_da_delivery_binding(
+                packet_view
+            )
+            closure = get_closure_view_for_task(task_id)
+            authoritative_state = {
+                "ready_gate": task.get("ready_gate") or {},
+                "final": composed.get("final") or {"exists": False},
+                "final_stale_reason": composed.get("final_stale_reason"),
+                "current_attempt": task.get("current_attempt"),
+            }
+            payload["operator_surfaces"] = {
+                "delivery": build_operator_surfaces_for_publish_hub(
+                    task=task,
+                    authoritative_state=authoritative_state,
+                    publish_feedback_closure=closure,
+                )
+            }
+            payload["digital_anchor_publish_feedback_closure"] = closure
+        except Exception:
+            payload["operator_surfaces"] = {}
+            payload["digital_anchor_publish_feedback_closure"] = None
+            payload["digital_anchor_delivery_binding"] = {}
     return payload
 
 

@@ -27,6 +27,42 @@ CHANNEL_METRICS_KEYS = frozenset(
     {"views", "likes", "shares", "comments", "watch_seconds", "captured_at"}
 )
 
+# Phase D.1 publish-feedback write-back contract
+# (`docs/contracts/digital_anchor/publish_feedback_writeback_contract_v1.md`)
+# closed enums. The D.1 path is the **active truth path** for publish-
+# state mutations; the older D.0 top-level `publish_status` /
+# `record_kind` enums on the closure object are retained as the
+# storage shape only and MUST NOT be used as the operator-visible
+# write-back vocabulary.
+D1_EVENT_KINDS = frozenset(
+    {
+        "publish_attempted",
+        "publish_accepted",
+        "publish_rejected",
+        "publish_retracted",
+        "metrics_snapshot",
+        "operator_note",
+    }
+)
+D1_PUBLISH_STATUS_VALUES = frozenset({"pending", "published", "failed", "retracted"})
+D1_ROW_SCOPES = frozenset({"role", "segment"})
+
+_D1_EVENT_ACTOR = {
+    "publish_attempted": "operator",
+    "publish_accepted": "platform",
+    "publish_rejected": "platform",
+    "publish_retracted": "operator",
+    "metrics_snapshot": "platform",
+    "operator_note": "operator",
+}
+
+_D1_EVENT_STATUS_TRANSITION = {
+    "publish_attempted": "pending",
+    "publish_accepted": "published",
+    "publish_rejected": "failed",
+    "publish_retracted": "retracted",
+}
+
 
 class ClosureValidationError(ValueError):
     """Raised when a feedback closure write violates the Phase D contract."""
@@ -343,6 +379,206 @@ def append_feedback_closure_record(
     return record["record_id"]
 
 
+def _ensure_role_writeback_row(
+    closure: MutableMapping[str, Any],
+    packet: Mapping[str, Any],
+    role_id: str,
+) -> dict[str, Any]:
+    """Locate (or create) a role_feedback row carrying D.1 publish_status."""
+    roles = _roles(packet)
+    if role_id not in roles:
+        raise ClosureValidationError(f"unknown role_id: {role_id!r}")
+    for row in closure["role_feedback"]:
+        if row.get("role_id") == role_id:
+            row.setdefault("publish_status", "pending")
+            row.setdefault("publish_url", None)
+            row.setdefault("channel_metrics", [])
+            row.setdefault("last_event_id", None)
+            return row
+    role = roles[role_id]
+    row = {
+        "role_id": role_id,
+        "role_display_name": role.get("display_name"),
+        "role_feedback_kind": None,
+        "role_feedback_note": None,
+        "linked_segments": _linked_segments(packet, role_id),
+        "publish_status": "pending",
+        "publish_url": None,
+        "channel_metrics": [],
+        "last_event_id": None,
+    }
+    closure["role_feedback"].append(row)
+    return row
+
+
+def _ensure_segment_writeback_row(
+    closure: MutableMapping[str, Any],
+    packet: Mapping[str, Any],
+    segment_id: str,
+) -> dict[str, Any]:
+    segments = _segments(packet)
+    if segment_id not in segments:
+        raise ClosureValidationError(f"unknown segment_id: {segment_id!r}")
+    for row in closure["segment_feedback"]:
+        if row.get("segment_id") == segment_id:
+            row.setdefault("publish_status", "pending")
+            row.setdefault("publish_url", None)
+            row.setdefault("channel_metrics", [])
+            row.setdefault("last_event_id", None)
+            return row
+    segment = segments[segment_id]
+    row = {
+        "segment_id": segment_id,
+        "binds_role_id": segment.get("binds_role_id"),
+        "script_ref": segment.get("script_ref"),
+        "segment_feedback_kind": None,
+        "audio_feedback_note": None,
+        "lip_sync_feedback_note": None,
+        "subtitle_feedback_note": None,
+        "publish_status": "pending",
+        "publish_url": None,
+        "channel_metrics": [],
+        "last_event_id": None,
+    }
+    closure["segment_feedback"].append(row)
+    return row
+
+
+def apply_writeback_event(
+    closure: MutableMapping[str, Any],
+    packet: Mapping[str, Any],
+    *,
+    event_kind: str,
+    row_scope: str,
+    row_id: str,
+    payload: Optional[Mapping[str, Any]] = None,
+    actor_kind: Optional[str] = None,
+    recorded_by: Optional[str] = None,
+    recorded_at: Optional[str] = None,
+    record_id: Optional[str] = None,
+) -> str:
+    """Apply one Phase D.1 publish-feedback write-back event in place.
+
+    Closed shape per
+    ``docs/contracts/digital_anchor/publish_feedback_writeback_contract_v1.md``:
+
+    - ``event_kind`` ∈ ``D1_EVENT_KINDS``
+    - ``row_scope`` ∈ ``{role, segment}``; ``row_id`` resolves to the
+      matching role/segment in the packet
+    - ``actor_kind`` is checked against the contract's actor table
+      (operator vs platform vs system) — supplying a wrong actor for an
+      event_kind is a contract violation
+    - ``publish_attempted`` / ``publish_accepted`` / ``publish_rejected``
+      / ``publish_retracted`` mutate the row's
+      ``publish_status`` ∈ ``D1_PUBLISH_STATUS_VALUES``
+    - ``publish_accepted`` may set ``publish_url``; ``publish_rejected``
+      and others may not
+    - ``metrics_snapshot`` appends to row ``channel_metrics``
+    - ``operator_note`` records a note in the audit trail (and on the
+      row when the row exposes ``operator_publish_notes`` semantics)
+
+    The audit append in ``feedback_closure_records[]`` is append-only
+    (the existing D.0 record shape is reused).
+    """
+    if event_kind not in D1_EVENT_KINDS:
+        raise ClosureValidationError(f"unknown event_kind: {event_kind!r}")
+    if row_scope not in D1_ROW_SCOPES:
+        raise ClosureValidationError(f"unknown row_scope: {row_scope!r}")
+    if not isinstance(row_id, str) or not row_id:
+        raise ClosureValidationError("row_id is required")
+
+    expected_actor = _D1_EVENT_ACTOR[event_kind]
+    if actor_kind is None:
+        actor_kind = expected_actor
+    if actor_kind != expected_actor:
+        raise ClosureValidationError(
+            f"event_kind {event_kind!r} requires actor_kind "
+            f"{expected_actor!r} (got {actor_kind!r})"
+        )
+
+    payload_map: Mapping[str, Any] = payload or {}
+
+    row: dict[str, Any]
+    if row_scope == "role":
+        row = _ensure_role_writeback_row(closure, packet, row_id)
+        affected_role_ids = [row_id]
+        affected_segment_ids: list[str] = []
+    else:
+        row = _ensure_segment_writeback_row(closure, packet, row_id)
+        affected_segment_ids = [row_id]
+        affected_role_ids = (
+            [row.get("binds_role_id")] if row.get("binds_role_id") else []
+        )
+
+    # Per-row monotonic recorded_at guard (writeback contract §"Timestamping
+    # discipline"): a late-arriving event with a non-greater timestamp
+    # than the row's last_event_id is rejected.
+    if recorded_at is not None and not isinstance(recorded_at, str):
+        raise ClosureValidationError("recorded_at must be a string when supplied")
+    if recorded_at and row.get("last_event_recorded_at"):
+        if recorded_at < row["last_event_recorded_at"]:
+            raise ClosureValidationError(
+                "recorded_at is not monotonic for this row"
+            )
+
+    if event_kind == "publish_attempted":
+        row["publish_status"] = "pending"
+    elif event_kind == "publish_accepted":
+        row["publish_status"] = "published"
+        url = payload_map.get("publish_url")
+        if url is not None:
+            if not isinstance(url, str):
+                raise ClosureValidationError("publish_url must be a string")
+            row["publish_url"] = url
+    elif event_kind == "publish_rejected":
+        row["publish_status"] = "failed"
+    elif event_kind == "publish_retracted":
+        row["publish_status"] = "retracted"
+    elif event_kind == "metrics_snapshot":
+        snapshot = _validate_channel_metrics(payload_map)
+        row["channel_metrics"].append(snapshot)
+    elif event_kind == "operator_note":
+        note = payload_map.get("operator_publish_notes")
+        if note is None:
+            note = payload_map.get("note")
+        if not isinstance(note, str) or not note.strip():
+            raise ClosureValidationError(
+                "operator_note event requires non-empty note text"
+            )
+        # Phase D.1 routes the operator-note event-row binding into the
+        # row-level note on the per-row scope; the closure-wide
+        # `operator_publish_notes` field stays where it was as last-
+        # write-wins for the closure-level note.
+        if row_scope == "segment":
+            row["audio_feedback_note"] = note
+        else:
+            row["role_feedback_note"] = note
+        closure["operator_publish_notes"] = note
+
+    new_record_id = record_id or f"rec_{uuid4().hex[:12]}"
+    row["last_event_id"] = new_record_id
+    if recorded_at:
+        row["last_event_recorded_at"] = recorded_at
+    record = _record(
+        record_kind="publish_callback",
+        recorded_by=recorded_by or expected_actor,
+        role_ids=affected_role_ids,
+        segment_ids=affected_segment_ids,
+        note=payload_map.get("note") or payload_map.get("operator_publish_notes"),
+        record_id=new_record_id,
+        recorded_at=recorded_at,
+    )
+    # Record the event_kind directly so the audit trail carries the D.1
+    # vocabulary verbatim (the existing D.0 `record_kind` enum is
+    # preserved on the same record for backward-compatible storage).
+    record["event_kind"] = event_kind
+    record["row_scope"] = row_scope
+    record["row_id"] = row_id
+    record["actor_kind"] = actor_kind
+    closure["feedback_closure_records"].append(record)
+    return new_record_id
+
+
 def project_closure_view(closure: Mapping[str, Any]) -> Dict[str, Any]:
     """Return a deep-copy display view of the separate closure object."""
     return deepcopy(dict(closure))
@@ -398,10 +634,23 @@ class InMemoryClosureStore:
         record_id = write_publish_closure(self._closures[closure_id], packet, **kwargs)
         return {"record_id": record_id, "closure": self.get(closure_id)}
 
+    def apply_writeback_event(
+        self, closure_id: str, packet: Mapping[str, Any], **kwargs: Any
+    ) -> Dict[str, Any]:
+        if closure_id not in self._closures:
+            raise ClosureValidationError(f"unknown closure_id: {closure_id!r}")
+        record_id = apply_writeback_event(
+            self._closures[closure_id], packet, **kwargs
+        )
+        return {"record_id": record_id, "closure": self.get(closure_id)}
+
 
 __all__ = [
     "CHANNEL_METRICS_KEYS",
     "ClosureValidationError",
+    "D1_EVENT_KINDS",
+    "D1_PUBLISH_STATUS_VALUES",
+    "D1_ROW_SCOPES",
     "InMemoryClosureStore",
     "PUBLISH_STATUS_VALUES",
     "RECORD_KINDS",
@@ -409,6 +658,7 @@ __all__ = [
     "SEGMENT_FEEDBACK_KINDS",
     "SURFACE_ID",
     "append_feedback_closure_record",
+    "apply_writeback_event",
     "create_closure",
     "project_closure_view",
     "write_publish_closure",

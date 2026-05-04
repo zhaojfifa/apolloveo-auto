@@ -215,6 +215,16 @@ Status: P2 pre-execution evidence index
 | Operator Capability Recovery PR-3 — closure HTTP router tests | `gateway/app/services/tests/test_matrix_script_closure_api.py` |
 | Operator Capability Recovery PR-3 — closure / publish-hub wiring tests | `gateway/app/services/tests/test_matrix_script_closure_publish_hub_wiring.py` |
 | Operator Capability Recovery PR-3 — surface-boundary integrity tests | `gateway/app/services/tests/test_matrix_script_closure_surface_boundary.py` |
+| Operator Capability Recovery PR-4 — execution log | `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR4_DIGITAL_ANCHOR_WORKSPACE_EXECUTION_LOG_v1.md` |
+| Operator Capability Recovery PR-4 — Digital Anchor formal create-entry payload builder + new-task route handlers | `gateway/app/services/digital_anchor/create_entry.py`, `gateway/app/routers/tasks.py` (`tasks_digital_anchor_new` / `create_digital_anchor_task`) |
+| Operator Capability Recovery PR-4 — Digital Anchor closure binding service + JSON router | `gateway/app/services/digital_anchor/closure_binding.py`, `gateway/app/routers/digital_anchor_closure.py` |
+| Operator Capability Recovery PR-4 — Digital Anchor formal create-entry template | `gateway/app/templates/digital_anchor_new.html` |
+| Operator Capability Recovery PR-4 — publish-hub closure block + JS event forms (Digital Anchor) | `gateway/app/templates/task_publish_hub.html` (under `_da_kind == "digital_anchor"` gate) |
+| Operator Capability Recovery PR-4 — create-entry builder tests | `gateway/app/services/tests/test_digital_anchor_create_entry.py` |
+| Operator Capability Recovery PR-4 — closure binding service tests | `gateway/app/services/tests/test_digital_anchor_closure_binding.py` |
+| Operator Capability Recovery PR-4 — closure HTTP router tests | `gateway/app/services/tests/test_digital_anchor_closure_api.py` |
+| Operator Capability Recovery PR-4 — workspace + publish-hub wiring tests | `gateway/app/services/tests/test_digital_anchor_workspace_wiring.py` |
+| Operator Capability Recovery PR-4 — surface-boundary integrity tests | `gateway/app/services/tests/test_digital_anchor_surface_boundary.py` |
 
 ## Current Known Evidence Gaps
 

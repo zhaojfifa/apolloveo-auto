@@ -261,6 +261,13 @@ from gateway.app.services.matrix_script.source_script_ref_minting import (  # no
     MATRIX_SCRIPT_MINT_ROUTE,
     mint_source_script_ref,
 )
+from gateway.app.services.digital_anchor.create_entry import (  # noqa: E402
+    DIGITAL_ANCHOR_ALLOWED_FIELDS,
+    DIGITAL_ANCHOR_CREATE_ROUTE,
+    DIGITAL_ANCHOR_LINE_ID,
+    build_digital_anchor_entry,
+    build_digital_anchor_task_payload,
+)
 from gateway.app.services.voice_state import (  # noqa: E402
     DRY_TTS_CONFIG_KEY as _DRY_TTS_CONFIG_KEY,
     DRY_TTS_ROLE as _DRY_TTS_ROLE,
@@ -542,12 +549,12 @@ async def tasks_newtasks(request: Request) -> HTMLResponse:
     )
 
 
-_TEMP_CONNECTED_LINES = {
-    "digital_anchor": {
-        "label": "数字人IP",
-        "next_label": "数字人IP当前接通版本",
-        "future_replace": "正式 Digital Anchor create-entry route",
-    },
+_TEMP_CONNECTED_LINES: dict[str, dict[str, str]] = {
+    # Recovery PR-4: the digital_anchor placeholder retired with the formal
+    # /tasks/digital-anchor/new route landing per
+    # docs/contracts/digital_anchor/new_task_route_contract_v1.md §3
+    # ("temp path MUST be removed once formal route lands"). The dict is
+    # preserved as an empty seam so future lines can plug in if needed.
 }
 
 
@@ -678,6 +685,170 @@ async def mint_matrix_script_source_script_ref(request: Request) -> JSONResponse
         requested_by = None
     payload = mint_source_script_ref(requested_by=requested_by)
     return JSONResponse(content=dict(payload))
+
+
+# Closed form-key set for /tasks/digital-anchor/new POST. Mirrors the
+# entry contract field set verbatim. `language_scope` is structured —
+# its sub-keys arrive as `language_scope[source_language]` /
+# `language_scope[target_language]` per the contract; both bracket-
+# notation and dotted-notation are accepted at the route boundary, and
+# unknown keys (anywhere) cause HTTP 400 (route-boundary closed-set
+# rejection per new_task_route_contract_v1.md §"Forbidden in route surface").
+_DIGITAL_ANCHOR_FORM_LANGUAGE_KEYS = (
+    "language_scope[source_language]",
+    "language_scope.source_language",
+    "language_scope[target_language]",
+    "language_scope[target_language][]",
+    "language_scope.target_language",
+    "language_scope.target_language[]",
+)
+_DIGITAL_ANCHOR_FORM_ALLOWED_KEYS = frozenset(
+    {
+        "topic",
+        "source_script_ref",
+        "role_profile_ref",
+        "role_framing_hint",
+        "output_intent",
+        "speaker_segment_count_hint",
+        "dub_kind_hint",
+        "lip_sync_kind_hint",
+        "scene_binding_hint",
+        "operator_notes",
+        *_DIGITAL_ANCHOR_FORM_LANGUAGE_KEYS,
+    }
+)
+
+
+def _digital_anchor_form_to_kwargs(form) -> dict[str, Any]:
+    """Project a Starlette FormData into the closed builder kwargs shape.
+
+    Enforces the closed key-set at the route boundary (HTTP 400 on any
+    unknown key) and assembles the structured ``language_scope`` mapping
+    expected by ``build_digital_anchor_entry``.
+    """
+
+    submitted_keys = set(form.keys())
+    unknown = sorted(submitted_keys - _DIGITAL_ANCHOR_FORM_ALLOWED_KEYS)
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unknown fields are not supported: {unknown}",
+        )
+
+    def _scope_source() -> str | None:
+        for key in (
+            "language_scope[source_language]",
+            "language_scope.source_language",
+        ):
+            value = form.get(key)
+            if value is not None:
+                return value
+        return None
+
+    target_values: list[str] = []
+    for key in (
+        "language_scope[target_language]",
+        "language_scope[target_language][]",
+        "language_scope.target_language",
+        "language_scope.target_language[]",
+    ):
+        target_values.extend(form.getlist(key))
+
+    language_scope = {
+        "source_language": _scope_source(),
+        "target_language": target_values,
+    }
+
+    def _opt(key: str) -> str | None:
+        value = form.get(key)
+        return value if value not in (None, "") else None
+
+    return {
+        "topic": form.get("topic"),
+        "source_script_ref": form.get("source_script_ref"),
+        "language_scope": language_scope,
+        "role_profile_ref": form.get("role_profile_ref"),
+        "role_framing_hint": form.get("role_framing_hint"),
+        "output_intent": form.get("output_intent"),
+        "speaker_segment_count_hint": form.get("speaker_segment_count_hint"),
+        "dub_kind_hint": _opt("dub_kind_hint"),
+        "lip_sync_kind_hint": _opt("lip_sync_kind_hint"),
+        "scene_binding_hint": _opt("scene_binding_hint"),
+        "operator_notes": _opt("operator_notes"),
+    }
+
+
+def _digital_anchor_json_to_kwargs(body: Any) -> dict[str, Any]:
+    """Project a JSON body into the closed builder kwargs shape with route-
+    boundary closed-set rejection."""
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="body must be a JSON object")
+    unknown = sorted(set(body) - DIGITAL_ANCHOR_ALLOWED_FIELDS)
+    if unknown:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unknown fields are not supported: {unknown}",
+        )
+    return {field: body.get(field) for field in DIGITAL_ANCHOR_ALLOWED_FIELDS}
+
+
+@pages_router.get(DIGITAL_ANCHOR_CREATE_ROUTE, response_class=HTMLResponse)
+async def tasks_digital_anchor_new(request: Request) -> HTMLResponse:
+    """Render the formal Digital Anchor create-entry page (Recovery PR-4).
+
+    Per ``docs/contracts/digital_anchor/new_task_route_contract_v1.md``
+    §"Route map", this is the single canonical create surface for
+    Digital Anchor tasks. The rendered surface collects exactly the
+    closed eleven-field entry set; the temp
+    ``/tasks/connect/digital_anchor/new`` placeholder is retired.
+    """
+
+    return render_template(
+        request=request,
+        name="digital_anchor_new.html",
+        ctx={"features": get_features()},
+    )
+
+
+@pages_router.post(DIGITAL_ANCHOR_CREATE_ROUTE)
+async def create_digital_anchor_task(
+    request: Request,
+    repo=Depends(get_task_repository),
+) -> RedirectResponse:
+    """Create a Digital Anchor task from the formal entry surface.
+
+    Accepts either a form-encoded body (using bracket / dotted
+    sub-keys for ``language_scope``) or a JSON body matching the
+    closed entry contract shape. Any submitted field outside the
+    closed set returns HTTP 400 at the route boundary
+    (correction pass for reviewer-fail #2).
+    """
+
+    content_type = (request.headers.get("content-type") or "").lower()
+    if content_type.startswith("application/json"):
+        try:
+            body = await request.json()
+        except Exception as exc:  # pragma: no cover - parser-specific
+            raise HTTPException(status_code=400, detail=f"invalid_json:{exc}")
+        kwargs = _digital_anchor_json_to_kwargs(body)
+    else:
+        form = await request.form()
+        kwargs = _digital_anchor_form_to_kwargs(form)
+
+    entry = build_digital_anchor_entry(**kwargs)
+    task_payload = build_digital_anchor_task_payload(entry)
+    repo.create(task_payload)
+    task_id = str(task_payload["task_id"])
+    stored_task = repo.get(task_id)
+    if not stored_task:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Task persistence failed for task_id={task_id}",
+        )
+    return RedirectResponse(
+        url=f"/tasks/{task_id}?created={DIGITAL_ANCHOR_LINE_ID}",
+        status_code=303,
+    )
 
 
 @pages_router.get("/tasks/apollo-avatar/new", response_class=HTMLResponse)
