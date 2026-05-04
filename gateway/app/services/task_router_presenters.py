@@ -11,6 +11,9 @@ from gateway.app.services.hot_follow_runtime_bridge import (
     compat_hot_follow_operational_defaults,
     compat_hot_follow_task_status_shape,
 )
+from gateway.app.services.matrix_script.task_card_summary import (
+    derive_matrix_script_task_card_summary,
+)
 from gateway.app.services.operator_visible_surfaces import (
     build_board_row_projection,
     build_operator_surfaces_for_workbench,
@@ -192,6 +195,20 @@ def build_tasks_page_rows(
             row["board_bucket"] = "blocked"
         else:
             row["board_bucket"] = "ready"
+        # PR-U1: Matrix Script Task Area card summary. Additive, gated to
+        # `kind == "matrix_script"` rows so Hot Follow / Digital Anchor
+        # cards stay bytewise unchanged. Reads existing row truth +
+        # `kind` / `line_specific_refs` / `config.next_surfaces` carried
+        # from the create_entry payload; no projection mutation, no
+        # contract mutation. Authority:
+        # `docs/reviews/plan_e_matrix_script_operator_comprehensible_ui_alignment_gate_spec_v1.md`.
+        if kind_value == "matrix_script":
+            row["kind"] = "matrix_script"
+            row["line_specific_refs"] = t.get("line_specific_refs") or (
+                t.get("packet", {}).get("line_specific_refs") if isinstance(t.get("packet"), dict) else None
+            )
+            row["config"] = t.get("config")
+            row["matrix_script_card_summary"] = derive_matrix_script_task_card_summary(row)
         rows.append(row)
     return rows
 
