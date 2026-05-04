@@ -261,6 +261,50 @@
       </div>
     </div>
 <div class="tab-panel" id="tab-deliverables">
+      {# PR-U3 Matrix Script Delivery Center comprehension block. Server-rendered only when task.kind == "matrix_script"; populated client-side from data.matrix_script_delivery_comprehension after the publish-hub fetch. Hot Follow / Digital Anchor / Baseline publish hubs render the existing layout below verbatim — gated container is invisible for those kinds. #}
+      {% set _ms_kind = (task.category_key or task.kind or task.platform or "") | lower %}
+      {% if _ms_kind == "matrix_script" %}
+        <div class="card" id="matrix-script-delivery-comprehension-block"
+             data-role="matrix-script-delivery-comprehension" style="display:none;">
+          <div class="section-title">
+            <h2 data-role="ms-delivery-title">Matrix Script · 交付中心理解</h2>
+            <div class="secondary" data-role="ms-delivery-subtitle">只读理解层 · 不发明事实 · 不引入 vendor / model / provider / engine 控件。</div>
+          </div>
+
+          <div class="card" style="margin-top:10px; border:1px solid #2563eb; background:#eff6ff;"
+               data-role="ms-delivery-final-video-primary">
+            <div class="section-title">
+              <h2 data-role="ms-delivery-final-video-title">最终视频 · final_video（主交付）</h2>
+              <div class="secondary" data-role="ms-delivery-final-video-subtitle"></div>
+            </div>
+            <div class="muted" data-role="ms-delivery-final-video-explanation"></div>
+          </div>
+
+          <h3 style="margin:14px 0 6px;" data-role="ms-delivery-lanes-label">交付分区</h3>
+          <div data-role="ms-delivery-lane" data-lane-id="required_blocking" style="margin-top:8px;">
+            <strong data-role="ms-delivery-lane-label"></strong>
+            <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+            <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+          </div>
+          <div data-role="ms-delivery-lane" data-lane-id="required_non_blocking" style="margin-top:8px;">
+            <strong data-role="ms-delivery-lane-label"></strong>
+            <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+            <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+          </div>
+          <div data-role="ms-delivery-lane" data-lane-id="optional_non_blocking" style="margin-top:8px;">
+            <strong data-role="ms-delivery-lane-label"></strong>
+            <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+            <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+          </div>
+
+          <h3 style="margin:14px 0 6px;" data-role="ms-delivery-publish-blocking-label">发布阻塞解释</h3>
+          <div data-role="ms-delivery-publish-blocking-status"></div>
+          <ul data-role="ms-delivery-publish-blocking-rows" style="margin:6px 0 0 18px;"></ul>
+
+          <h3 style="margin:14px 0 6px;" data-role="ms-delivery-history-label">历史成功 vs 当前尝试</h3>
+          <div class="muted" data-role="ms-delivery-history-explanation"></div>
+        </div>
+      {% endif %}
       <div class="card" data-role="operator-publish-gate-strip">
         <div class="section-title">
           <h2>Publish gate</h2>
@@ -457,6 +501,81 @@ function resolveLang(serverLang) {
       if (empty) empty.style.display = count ? "none" : "";
     }
 
+    // PR-U3: Matrix Script Delivery Center comprehension renderer.
+    // Renders only when the server-side container exists (gated by
+    // task.kind == "matrix_script") and the payload carries a
+    // matrix_script_delivery_comprehension bundle. Hot Follow / Digital
+    // Anchor / Baseline publish hubs short-circuit at the container check.
+    function renderMatrixScriptDeliveryComprehension(comp) {
+      const block = document.getElementById("matrix-script-delivery-comprehension-block");
+      if (!block) return;
+      if (!comp || !comp.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const setRoleText = (role, value) => {
+        const el = block.querySelector(`[data-role="${role}"]`);
+        if (el) el.textContent = value || "";
+      };
+
+      setRoleText("ms-delivery-title", comp.panel_title_zh);
+      setRoleText("ms-delivery-subtitle", comp.panel_subtitle_zh);
+
+      const fv = comp.final_video_primary || {};
+      setRoleText("ms-delivery-final-video-title", fv.title_zh);
+      setRoleText("ms-delivery-final-video-subtitle", fv.subtitle_zh);
+      setRoleText("ms-delivery-final-video-explanation", fv.primacy_explanation_zh);
+
+      setRoleText("ms-delivery-lanes-label", comp.lanes_label_zh);
+      const lanes = comp.lanes || {};
+      ["required_blocking", "required_non_blocking", "optional_non_blocking"].forEach((laneId) => {
+        const laneEl = block.querySelector(`[data-role="ms-delivery-lane"][data-lane-id="${laneId}"]`);
+        if (!laneEl) return;
+        const lane = lanes[laneId] || { rows: [] };
+        const labelEl = laneEl.querySelector('[data-role="ms-delivery-lane-label"]');
+        const explEl = laneEl.querySelector('[data-role="ms-delivery-lane-explanation"]');
+        const rowsEl = laneEl.querySelector('[data-role="ms-delivery-lane-rows"]');
+        if (labelEl) labelEl.textContent = (lane.lane_label_zh || "") + "（" + (lane.row_count || 0) + " 项）";
+        if (explEl) explEl.textContent = lane.lane_explanation_zh || "";
+        if (rowsEl) {
+          rowsEl.innerHTML = "";
+          (lane.rows || []).forEach((row) => {
+            const li = document.createElement("li");
+            li.dataset.deliverableId = row.deliverable_id || "";
+            li.dataset.artifactStatusCode = row.artifact_status_code || "";
+            li.textContent =
+              (row.kind_label_zh || row.kind || "—") +
+              " · " + (row.zoning_label_zh || "") +
+              " · " + (row.artifact_status_label_zh || "");
+            rowsEl.appendChild(li);
+          });
+        }
+      });
+
+      setRoleText("ms-delivery-publish-blocking-label", comp.publish_blocking_explanation_label_zh);
+      const blocking = comp.publish_blocking_explanation || {};
+      const statusEl = block.querySelector('[data-role="ms-delivery-publish-blocking-status"]');
+      if (statusEl) {
+        statusEl.textContent = blocking.reason_label_zh || "";
+        statusEl.dataset.isBlocked = blocking.is_blocked ? "true" : "false";
+      }
+      const blockingRowsEl = block.querySelector('[data-role="ms-delivery-publish-blocking-rows"]');
+      if (blockingRowsEl) {
+        blockingRowsEl.innerHTML = "";
+        (blocking.blocking_rows || []).forEach((br) => {
+          const li = document.createElement("li");
+          li.textContent =
+            (br.kind_label_zh || "") + " · " + (br.artifact_status_label_zh || "");
+          blockingRowsEl.appendChild(li);
+        });
+      }
+
+      setRoleText("ms-delivery-history-label", comp.history_vs_current_label_zh);
+      setRoleText("ms-delivery-history-explanation", comp.history_vs_current_explanation_zh);
+    }
+
     function renderCopyBundle(copy) {
       const captionEl = document.getElementById("copy-caption");
       if (captionEl && !captionEl.value) captionEl.value = copy.caption || "";
@@ -585,6 +704,7 @@ function resolveLang(serverLang) {
       const data = await resp.json();
       setText("download-code", data.download_code || "-");
       renderDeliverables(data.deliverables || {});
+      renderMatrixScriptDeliveryComprehension(data.matrix_script_delivery_comprehension || null);
       renderCopyBundle(data.copy_bundle || {});
       await fillCaptionFallback(data.copy_bundle || {});
       renderArchive(data.archive || {});

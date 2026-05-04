@@ -977,7 +977,7 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
         final_item["url"] = final_preview_url
         deliverables["final_mp4"] = final_item
 
-    return {
+    payload: dict[str, object] = {
         "task_id": task_id,
         "gate_enabled": op_gate_enabled(),
         "media": {
@@ -1013,6 +1013,32 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
             "published_at": task.get("published_at") or "-",
         },
     }
+    # PR-U3: Matrix Script Delivery Center comprehension bundle. Pure
+    # presentation-layer projection over the existing
+    # `project_delivery_binding(packet)` output. Gated to
+    # `kind == "matrix_script"` so Hot Follow / Digital Anchor / Baseline
+    # publish hubs are bytewise unchanged. No contract mutation; no D1
+    # unified `publish_readiness` producer; no D2 / D3 / D4. Authority:
+    # docs/reviews/plan_e_matrix_script_operator_comprehensible_ui_alignment_gate_spec_v1.md
+    kind_value = str(task.get("kind") or task.get("category_key") or task.get("platform") or "").strip().lower()
+    if kind_value == "matrix_script":
+        try:
+            from gateway.app.services.matrix_script.delivery_binding import (
+                project_delivery_binding,
+            )
+            from gateway.app.services.matrix_script.delivery_comprehension import (
+                derive_matrix_script_delivery_comprehension,
+            )
+            packet_view = task.get("packet") if isinstance(task.get("packet"), dict) else task
+            delivery_binding = project_delivery_binding(packet_view)
+            payload["matrix_script_delivery_comprehension"] = (
+                derive_matrix_script_delivery_comprehension(delivery_binding)
+            )
+        except Exception:
+            # Defense-in-depth: comprehension is presentation-only; never
+            # break the publish hub if the projection raises.
+            payload["matrix_script_delivery_comprehension"] = {}
+    return payload
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
