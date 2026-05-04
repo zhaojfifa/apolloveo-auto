@@ -1,7 +1,7 @@
 # Plan E — Packet / Schema Freeze + Admission Readiness Gate Spec v1
 
 Date: 2026-05-04
-Status: **Authored. Documentation only. No code, no UI, no contract, no schema, no test, no template change. No file moves. No directory restructure.** This document is the formal gate specification for the **third** Plan E phase. It is a *readiness-assessment* gate, not a packet/schema-slicing gate. It authorizes a bounded set of docs-only readiness write-ups across four dimensions (Matrix Script packet/schema freeze readiness; Digital Anchor packet/schema freeze readiness; Asset Supply matrix readiness; onboarding / validator / packet-envelope admission readiness) so that a future packet/schema slicing gate spec can be authored against a documented baseline. The §10 approval block remains `<fill>` placeholders; readiness-assessment work is BLOCKED until architect + reviewer signoff is filled and committed.
+Status: Gate-opening signoff completed on 2026-05-04 by Architect (Raobin) and Reviewer (Alisa). Entry condition R7 is now SATISFIED. Readiness write-up authoring remains limited to §3 allowed scope only. **Documentation only. No code, no UI, no contract, no schema, no test, no template change. No file moves. No directory restructure.** This document is the formal gate specification for the **third** Plan E phase. It is a *readiness-assessment* gate, not a packet/schema-slicing gate. It authorizes a bounded set of docs-only readiness write-ups across four dimensions (Matrix Script packet/schema freeze readiness; Digital Anchor packet/schema freeze readiness; Asset Supply matrix readiness; onboarding / validator / packet-envelope admission readiness) so that a future packet/schema slicing gate spec can be authored against a documented baseline. The §10 approval block is now signed by Architect (Raobin) and Reviewer (Alisa); readiness write-up authoring MAY proceed strictly within §3 once this signoff PR merges to main.
 
 Authority of creation:
 
@@ -89,7 +89,7 @@ This Plan E readiness phase MAY NOT begin readiness-assessment write-up before *
 | R4 | Second-phase UA7 closeout signoff at [PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md §3](../execution/PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md) status is **either** (a) signed, **or** (b) intentionally pending with no in-flight UA7 work being forced by this gate spec. Either state satisfies R4. | [PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md §3](../execution/PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md) | **SATISFIED** under (b) — UA7 intentionally pending; this gate spec authoring does not advance UA7 paperwork |
 | R5 | Hot Follow baseline preserved — no commits to `gateway/app/services/hot_follow_*`, `tasks.py` Hot Follow paths, `hot_follow_api.py` business logic, `hot_follow_workbench.html`, or Hot Follow Delivery Center per-deliverable zoning code paths since second-phase closeout audit. | [PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md §2.4](../execution/PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md), [unified map §4.1](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) | **SATISFIED** at audit baseline `024ee18`; reviewer re-confirms at §10 signoff time |
 | R6 | Digital Anchor freeze preserved — no operator submission path; Plan A §2.1 hide guards (Digital Anchor New-Tasks card click target + temp `/tasks/connect/digital_anchor/new`) still in force; no Digital Anchor implementation has landed. | [PLAN_A_OPS_TRIAL_WRITEUP_v1.md §3.2 / §3.3](../execution/PLAN_A_OPS_TRIAL_WRITEUP_v1.md), [PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md §2.5](../execution/PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md) | **SATISFIED** |
-| R7 | This gate spec reviewed and approved through its own approval block (§10) by Architect (Raobin) and Reviewer (Alisa). Operations team coordinator (Jackie) signs the closeout block per §6 row RA7, not the gate-opening block. | This document §10 | **PENDING** — gate spec authored on 2026-05-04 with §10 placeholders; readiness-assessment work BLOCKED until signoff is filled and committed |
+| R7 | This gate spec reviewed and approved through its own approval block (§10) by Architect (Raobin) and Reviewer (Alisa). Operations team coordinator (Jackie) signs the closeout block per §6 row RA7, not the gate-opening block. | This document §10 | **SATISFIED** (Raobin 2026-05-04 15:42; Alisa 2026-05-04 15:55) — readiness-phase write-up gate OPEN for §3 items only on signoff-PR merge to `main` |
 
 When R1 → R7 all hold, and only then, a readiness write-up within the §3 allowed scope MAY be authored. Until R7 is signed, no readiness-assessment work is authorized. R3 / R4's "either signed or intentionally pending" wording is binding: this phase **MUST NOT** make either prior closeout signoff a hidden pre-condition; A7 / UA7 are independent paperwork on independent evidence.
 
@@ -338,8 +338,8 @@ This readiness gate spec authorizes readiness-assessment write-ups only. No pack
 | Plan E first-phase closeout signoff (A7) | INTENTIONALLY PENDING — not touched by this gate spec | [first-phase closeout §3](../execution/PLAN_E_MATRIX_SCRIPT_PHASE_CLOSEOUT_v1.md), §7.6 of this gate spec |
 | Plan E second-phase engineering | COMPLETE | [second-phase closeout §2.1 / §2.2 / §2.3](../execution/PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md) |
 | Plan E second-phase closeout signoff (UA7) | INTENTIONALLY PENDING — not touched by this gate spec | [second-phase closeout §3](../execution/PLAN_E_MATRIX_SCRIPT_UI_ALIGNMENT_PHASE_CLOSEOUT_v1.md), §7.6 of this gate spec |
-| Plan E readiness-phase gate spec (this document) | **AUTHORED + AWAITING SIGNOFF** | this gate spec §10 |
-| Plan E readiness-phase write-ups | gate OPENS for §3 items only when §10 architect + reviewer signoff is filled and committed | this gate spec §2 (R7) + §10 |
+| Plan E readiness-phase gate spec (this document) | **AUTHORED + SIGNED OPEN** (Raobin 2026-05-04 15:42; Alisa 2026-05-04 15:55) | this gate spec §10 |
+| Plan E readiness-phase write-ups | gate OPEN for §3 items only on signoff-PR merge to `main`; first RA.* readiness-write-up PR may open thereafter | this gate spec §2 (R7) + §10 |
 | Packet / schema slicing | **BLOCKED** — separate slicing gate spec required; gated on RA-AGG verdict + its own approval | this gate spec §0 + §3.5 + §4.1 |
 | Platform Runtime Assembly | **BLOCKED** until **all** Plan E phases close + separate wave-start authority | [unified map §7.4](../architecture/apolloveo_2_0_unified_alignment_map_v1.md), [Platform Runtime Assembly Wave 指挥单 v1](../architecture/ApolloVeo_2.0_Platform_Runtime_Assembly_Wave_指挥单_v1.md) |
 | Capability Expansion | **BLOCKED** until Platform Runtime Assembly signoff | [unified map §7.5](../architecture/apolloveo_2_0_unified_alignment_map_v1.md) |
@@ -370,8 +370,8 @@ This Plan E readiness phase write-up authoring is BLOCKED until the following bl
 
 ```
 Architect — Raobin
-  Date / time:        <fill — yyyy-mm-dd hh:mm>
-  Signature / handle: <fill>
+  Date / time:        2026-05-04 15:42
+  Signature / handle: Raobin
   Statement:          I confirm the §3 allowed scope is exhaustively bounded
                       to RA.1 / RA.2 / RA.3 / RA.4 / RA-AGG only;
                       the §4 forbidden scope is explicitly preserved;
@@ -392,8 +392,8 @@ Architect — Raobin
                       by this signoff.
 
 Reviewer — Alisa
-  Date / time:        <fill — yyyy-mm-dd hh:mm>
-  Signature / handle: <fill>
+  Date / time:        2026-05-04 15:55
+  Signature / handle: Alisa
   Statement:          I confirm the R1 → R6 entry conditions hold per the
                       cited artifacts; R3 / R4 are satisfied under
                       "intentionally pending" — this gate spec does not
