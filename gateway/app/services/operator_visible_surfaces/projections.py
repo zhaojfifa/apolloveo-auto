@@ -51,31 +51,21 @@ def sanitize_operator_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
 def derive_board_publishable(ready_gate: Mapping[str, Any]) -> dict[str, Any]:
     """Project the Board card `publishable` field plus head reason.
 
-    Derived only from `ready_gate.*`. No new truth, no new field on the
-    packet. If `ready_gate` is missing or empty, returns `publishable=False`
-    with `head_reason=None` so the Board's `publishable` bucket renders
-    empty per the design's deferral path.
+    Operator Capability Recovery PR-1: this function is now a thin pass-through
+    over the unified `compute_publish_readiness` producer at
+    `gateway/app/services/operator_visible_surfaces/publish_readiness.py`.
+    Per `docs/contracts/publish_readiness_contract_v1.md` §"Single-producer
+    rule" the Board MUST consume the producer's output rather than carry its
+    own derivation. The legacy two-field shape `{publishable, head_reason}` is
+    preserved so existing Board callers (`task_router_presenters.build_tasks_page_rows`)
+    do not need a per-row migration in the same PR.
     """
-    gate = dict(ready_gate or {})
-    blocking = list(gate.get("blocking") or [])
-    publishable = (
-        bool(gate.get("publish_ready"))
-        and bool(gate.get("compose_ready"))
-        and not blocking
-    )
-    head_reason: Optional[str] = None
-    if not publishable:
-        if blocking:
-            head_reason = blocking[0]
-        else:
-            for key in ("compose_reason", "compose_blocked_reason"):
-                value = gate.get(key)
-                if isinstance(value, str) and value.strip():
-                    head_reason = value
-                    break
+    from .publish_readiness import compute_publish_readiness
+
+    result = compute_publish_readiness(ready_gate=ready_gate, l2_facts=None)
     return {
-        "publishable": publishable,
-        "head_reason": head_reason,
+        "publishable": result["publishable"],
+        "head_reason": result["head_reason"],
     }
 
 
@@ -95,39 +85,35 @@ def _final_fresh(l2_facts: Mapping[str, Any]) -> bool:
 def derive_delivery_publish_gate(
     ready_gate: Mapping[str, Any],
     l2_facts: Mapping[str, Any],
+    *,
+    l3_current_attempt: Mapping[str, Any] | None = None,
+    delivery_rows: Any = None,
 ) -> dict[str, Any]:
     """Project a single Delivery publish-gate boolean.
 
-    Inputs: existing L4 `ready_gate` + existing L2 artifact facts. Optional
-    items (`scene_pack`, `pack_zip`, `edit_bundle_zip`, helper / attribution
-    exports) are excluded from the AND inputs by construction — they are
-    enumerated separately on the Delivery contract via the per-deliverable
-    `required: bool` flag, never reaching this gate.
+    Operator Capability Recovery PR-1: this function is now a thin pass-through
+    over the unified `compute_publish_readiness` producer. Per
+    `docs/contracts/publish_readiness_contract_v1.md` §"Single-producer rule"
+    the Delivery surface MUST consume the same producer as Board / Workbench;
+    the legacy `{publish_gate, publish_gate_head_reason}` shape is preserved
+    so existing Delivery callers remain byte-compatible.
+
+    `l3_current_attempt` and `delivery_rows` are accepted additively so the
+    Matrix Script Delivery Center can plumb its per-row `required` /
+    `blocking_publish` zoning through to the producer; default behavior
+    matches the prior `derive_delivery_publish_gate(gate, l2_facts)` signature.
     """
-    gate = dict(ready_gate or {})
-    publish_ready = bool(gate.get("publish_ready"))
-    compose_ready = bool(gate.get("compose_ready"))
-    final_fresh = _final_fresh(l2_facts)
-    blocking = list(gate.get("blocking") or [])
-    publish_gate = publish_ready and compose_ready and final_fresh and not blocking
-    head_reason: Optional[str] = None
-    if not publish_gate:
-        if blocking:
-            head_reason = blocking[0]
-        elif not final_fresh:
-            head_reason = (
-                str((l2_facts or {}).get("final_stale_reason") or "").strip()
-                or "final_missing"
-            )
-        else:
-            compose_reason = gate.get("compose_reason")
-            if isinstance(compose_reason, str) and compose_reason.strip():
-                head_reason = compose_reason
-            else:
-                head_reason = "publish_not_ready"
+    from .publish_readiness import compute_publish_readiness
+
+    result = compute_publish_readiness(
+        ready_gate=ready_gate,
+        l2_facts=l2_facts,
+        l3_current_attempt=l3_current_attempt,
+        delivery_rows=delivery_rows,
+    )
     return {
-        "publish_gate": publish_gate,
-        "publish_gate_head_reason": head_reason,
+        "publish_gate": result["publishable"],
+        "publish_gate_head_reason": result["head_reason"],
     }
 
 

@@ -54,6 +54,11 @@ class HotFollowCurrentAttempt:
     requires_recompose: bool
     final_fresh: bool
     final_stale_reason: str | None
+    # Plan D amendment per `docs/contracts/hot_follow_current_attempt_contract_v1.md`
+    # §"`final_provenance` Field". Closed enum {current, historical}. Consumed by
+    # the unified publish_readiness producer at
+    # `gateway/app/services/operator_visible_surfaces/publish_readiness.py`.
+    final_provenance: str
     route_truth_source: str
     route_truth_reason: str | None
     route_event_id: str | None
@@ -91,6 +96,7 @@ class HotFollowCurrentAttempt:
             "requires_recompose": self.requires_recompose,
             "final_fresh": self.final_fresh,
             "final_stale_reason": self.final_stale_reason,
+            "final_provenance": self.final_provenance,
             "route_truth_source": self.route_truth_source,
             "route_truth_reason": self.route_truth_reason,
             "route_event_id": self.route_event_id,
@@ -620,6 +626,17 @@ def build_hot_follow_current_attempt(
     final_fresh = bool(final_stale_reason is None and artifacts.get("final_exists") and _norm(composed_reason) == "ready")
     requires_redub = bool(route == "tts_replace_route" and subtitle_ready and not dub_current)
     requires_recompose = bool(compose_allowed and compose_input_ready and not final_fresh and _norm(compose_status) != "running")
+    # Plan D `final_provenance`: "current" when the resolved final artifact is
+    # the output of the current attempt; "historical" when a final exists but
+    # the current attempt requires re-dub or re-compose, or the final is stale.
+    # When no final exists at all there is no "historical" artifact to render
+    # — emit "current" so consumers do not flip into a historical-tagged UI
+    # for tasks that have never composed.
+    final_exists = bool(artifacts.get("final_exists"))
+    if final_exists and (not final_fresh or requires_recompose or requires_redub):
+        final_provenance = "historical"
+    else:
+        final_provenance = "current"
     blocking: list[str] = []
     if not compose_allowed:
         blocking.append(compose_reason)
@@ -659,6 +676,7 @@ def build_hot_follow_current_attempt(
         requires_recompose=requires_recompose,
         final_fresh=final_fresh,
         final_stale_reason=final_stale_reason,
+        final_provenance=final_provenance,
         route_truth_source=route_truth.source,
         route_truth_reason=route_truth.reason,
         route_event_id=route_truth.event_id,
