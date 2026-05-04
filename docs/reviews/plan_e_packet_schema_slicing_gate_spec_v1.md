@@ -374,49 +374,28 @@ This Plan E slicing phase implementation is BLOCKED until the following block is
 
 ```
 Architect — Raobin
-  Date / time:        <fill — yyyy-mm-dd hh:mm>
-  Signature / handle: <fill>
-  Statement:          I confirm the §3 allowed scope is exhaustively bounded
-                      to SL.1 / SL.2 / SL.3 / SL.4 / SL-AGG only, and each
-                      SL.* PR is single-amendment scoped to one entry of
-                      the future RA-AGG named-amendment list; the §4
-                      forbidden scope is explicitly preserved; the §5 PR
-                      slicing plan is single-dimension, single-amendment,
-                      scope-fenced, contract-only, independently revertable,
-                      and review-citable; the §6 acceptance evidence is
-                      verifiable; the §7 preserved freezes remain binding;
-                      and the prior first-phase A7 + second-phase UA7 +
-                      third-phase RA7 closeout signoffs are **not** touched
-                      by this gate-spec opening or by any SL.* PR. I
-                      authorize Plan E packet/schema slicing implementation
-                      under this gate spec only AFTER the readiness phase
-                      has produced RA-AGG with a non-NOT-READY verdict. No
-                      runtime implementation, no Hot Follow behavior reopen,
-                      no Digital Anchor runtime unfreeze, no Asset Library /
-                      Asset Supply / promote runtime, no admission-validator
-                      runtime hardening, no Platform Runtime Assembly, no
-                      Capability Expansion, no provider/model/vendor controls,
-                      no invented runtime truth, and no forced prior-phase
-                      signing are implied by this signoff.
+  Date / time:        2026-05-04 12:12
+  Signature / handle: Raobin
+  Statement:          I confirm the Packet / Schema Slicing gate is correctly
+                      scoped to the slicing phase only, remains subordinate to
+                      the signed Packet / Schema Freeze + Admission Readiness
+                      gate, preserves all frozen boundaries, and does not
+                      authorize implementation before both §10 signoff and the
+                      required non-NOT-READY RA-AGG verdict are satisfied. I
+                      approve this gate spec for documentation purposes and for
+                      subsequent slicing-phase governance only.
 
 Reviewer — Alisa
-  Date / time:        <fill — yyyy-mm-dd hh:mm>
-  Signature / handle: <fill>
-  Statement:          I confirm the S1, S5, S6, S8 entry conditions hold
-                      per the cited artifacts; S2 / S3 / S4 are explicit
-                      gating conditions on the readiness phase output and
-                      are checked again at SL.* PR open time, not at this
-                      signoff time. I confirm the §3 allowed scope and §4
-                      forbidden scope have no overlap. I authorize
-                      independent merge-gate review of SL.* PRs against
-                      this gate spec, and I will reject any PR that lands
-                      a §4 item, breaks a §7 freeze, opens before S2 / S3
-                      / S4 hold, fails to cite the RA-AGG named-amendment
-                      entry it closes, or touches any prior closeout
-                      signoff block. The Plan E slicing-phase implementation
-                      gate is OPEN for the items in §3 only on architect
-                      + reviewer signoff PR merge to `main` AND on RA-AGG
-                      with a non-NOT-READY verdict.
+  Date / time:        2026-05-04 12:12
+  Signature / handle: Alisa
+  Statement:          I confirm the Packet / Schema Slicing gate preserves the
+                      Hot Follow baseline, preserves the Digital Anchor freeze,
+                      does not authorize Platform Runtime Assembly or Capability
+                      Expansion, and keeps packet/schema implementation blocked
+                      until both §10 signoff and the required readiness verdict
+                      conditions are satisfied. I approve this gate spec for
+                      documentation purposes and for subsequent slicing-phase
+                      governance only.
 
 Operations team coordinator — Jackie
   Date / time:        <fill — yyyy-mm-dd hh:mm>

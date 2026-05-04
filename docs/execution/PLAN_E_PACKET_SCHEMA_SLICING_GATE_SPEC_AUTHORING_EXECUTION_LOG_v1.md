@@ -55,6 +55,16 @@ Files updated alongside the new gate spec in this docs-only authoring step:
 - Does **NOT** sign the new gate spec §10 approval block. That signoff is owned by Raobin (architect) and Alisa (reviewer); Jackie (coordinator) signs the closeout block per §6 row SL7 after slicing PRs land.
 - Does **NOT** count as "Plan E" being unblocked broadly. Only the **fourth** Plan E phase scoped to packet/schema slicing implementation has a gate spec authored; runtime implementation across cross-line dimensions, admission-validator runtime hardening, Digital Anchor runtime, Asset Library / Asset Supply page / promote services runtime, L4 advisory producer-emitter runtime, L3 final_provenance emitter runtime, unified publish_readiness producer runtime, panel dispatch contract object runtime conversion, and operator-driven Phase B authoring runtime all remain explicitly **separately BLOCKED** pending their own future gate-spec authoring steps under the same discipline.
 
+## 3.1 Signoff update — 2026-05-04 12:12
+
+Docs-only signoff update applied to [docs/reviews/plan_e_packet_schema_slicing_gate_spec_v1.md](../reviews/plan_e_packet_schema_slicing_gate_spec_v1.md) §10 gate-opening block:
+
+- Architect Raobin signed at `2026-05-04 12:12`.
+- Reviewer Alisa signed at `2026-05-04 12:12`.
+- Coordinator closeout block remains untouched.
+
+This update does **not** change scope semantics, verdict semantics, or implementation authority. Packet/schema implementation remains blocked until the required readiness-phase RA-AGG verdict exists and is non-NOT-READY, in addition to the §10 signoff condition.
+
 ## 4. Final gate verdict (per the mission instruction)
 
 | # | Question | Verdict | Evidence |
