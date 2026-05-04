@@ -1,8 +1,15 @@
 # ApolloVeo 2.0 · Operator Capability Recovery · PR-4 Execution Log v1
 
 Date: 2026-05-04
-Status: Engineering complete on branch
-`claude/recovery-pr4-digital-anchor-workspace`; PR opening pending.
+Status: **MERGED to `main` 2026-05-04T13:07:02Z** as squash commit
+[`0549ee0`](https://github.com/zhaojfifa/apolloveo-auto/commit/0549ee0)
+via [PR #119](https://github.com/zhaojfifa/apolloveo-auto/pull/119).
+Branch `claude/recovery-pr4-digital-anchor-workspace` merged after one
+reviewer-fail correction pass (see §9.1: route-shape `language_scope`
+alignment, route-boundary closed-set rejection, D.1 write-back active
+truth path). The Recovery wave PR-1 / PR-2 / PR-3 / PR-4 / PR-5
+sequence is now complete; the trial re-entry gate is at
+`docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md`.
 Wave: ApolloVeo 2.0 Minimal Operator Capability Recovery.
 Decision authority:
 `docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`.

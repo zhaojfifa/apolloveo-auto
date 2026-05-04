@@ -400,3 +400,66 @@ End of §8.E / §8.F / §8.G / §8.H operator brief follow-up correction addendu
 Coordinator note:
 This observation is retained as deployed-environment baseline evidence for Matrix Script Sample 3 only.
 It is valid as contract/projection baseline evidence, but not yet sufficient as full Plan A wave-completion evidence.
+
+---
+
+## 13. Real Operator Trial Re-Entry — Recovery Wave PR-5 (2026-05-04)
+
+This section closes the **static-only / authority-only era** of this
+write-up and opens the **real operator trial era** under the
+post-recovery gate.
+
+### 13.1 What changed under recovery
+
+The Operator Capability Recovery wave (decision authority:
+[`docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`](ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md))
+demoted the pre-recovery Plan A from "current main action" to
+"validation action after PR-1 .. PR-4 restore minimum operator
+capability". Recovery PR-1 / PR-2 / PR-3 / PR-4 have all merged to
+`main` 2026-05-04:
+
+- PR-1 ([#114](https://github.com/zhaojfifa/apolloveo-auto/pull/114),
+  squash `4c317c4`) — Unified Publish Readiness Runtime Recovery.
+- PR-2 ([#116](https://github.com/zhaojfifa/apolloveo-auto/pull/116),
+  squash `4343bec`) — B-roll / Asset Supply minimum operator capability.
+- PR-3 ([#118](https://github.com/zhaojfifa/apolloveo-auto/pull/118),
+  squash `d53da0f`) — Matrix Script Operator Workspace Promotion.
+- PR-4 ([#119](https://github.com/zhaojfifa/apolloveo-auto/pull/119),
+  squash `0549ee0`) — Digital Anchor Operator Workspace Recovery.
+
+### 13.2 Authority pointer (binding)
+
+The binding gate document for real operator trial re-entry is
+[`APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md).
+It supersedes:
+
+- §2.1 / §2.2 / §2.3 of this write-up (pre-recovery coordinator
+  runbook).
+- §11.4 / §12.4 of this write-up (pre-recovery action items).
+- §12 of [`OPERATIONS_TRIAL_READINESS_PLAN_v1.md`](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md)
+  (pre-recovery readiness conclusion); the trial brief now carries
+  §13 with the post-recovery readiness conclusion.
+
+### 13.3 §8 live-run placeholder — closed for the static-only era
+
+The §8 live-run placeholder in this write-up's body was authored when
+Plan A was authority-only. With recovery PR-1 .. PR-4 merged and the
+PR-5 trial re-entry gate authored, real-trial live-run results are no
+longer captured in §8 of this document. They are captured in:
+
+- **PR-5 trial re-entry gate** §10 signoff block — coordinator,
+  architect, reviewer.
+- A future per-sample live-run log filed under `docs/execution/` by the
+  operations team after each real-trial sample. Naming convention:
+  `RECOVERY_PR5_REAL_TRIAL_SAMPLE_<n>_<line>_<yyyymmdd>_v1.md`.
+
+### 13.4 Coordinator instruction to read both eras
+
+Coordinators MUST read **both** the static-only body of this write-up
+(§1 .. §12) AND the PR-5 trial re-entry gate document end-to-end
+before authorizing the first real-trial sample. The static body
+remains the authoritative record of why authority-only trial was
+sufficient pre-recovery; the gate document is the authoritative
+record of why real trial is now safe.
+
+End of §13 — Real Operator Trial Re-Entry section.

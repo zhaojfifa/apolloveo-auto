@@ -357,4 +357,85 @@ A trial-execution write-up (post-trial) MUST be filed separately under `docs/exe
 - **Capability Expansion:** **BLOCKED**
 - **Frontend patching:** **BLOCKED**
 
-End of Plan A.
+End of Plan A (pre-recovery body).
+
+---
+
+## 13. Real Operator Trial Re-Entry (post-recovery, 2026-05-04)
+
+This section is added by Recovery PR-5. It **supersedes** §12's
+"CONDITIONAL / authority-only" readiness conclusion for the
+post-recovery state.
+
+The Minimal Operator Capability Recovery wave (PR-1 / PR-2 / PR-3 /
+PR-4, all merged to `main` 2026-05-04) has restored the operator
+capability the Recovery Decision §1.1 named missing. The trial therefore
+transitions from **authority-only** to **real operator trial**.
+
+### 13.1 What changed since §12
+
+| Pre-recovery (§12 readiness) | Post-recovery (this section) |
+|---|---|
+| Digital Anchor: **inspection-only**; submit MUST be hidden. | Digital Anchor: **end-to-end** (formal `/tasks/digital-anchor/new`, Phase D.1 closure write-back via D.1 events). |
+| Matrix Script: end-to-end **except Delivery Center binding**; closure path was inspect-first. | Matrix Script: **end-to-end including closure loop** via `POST /api/matrix-script/closures/{task_id}/events`; Delivery Center consumes unified `publish_readiness`. |
+| Asset Supply / B-roll page: **hide from operator navigation**. | Asset Supply: **operator-eligible**; read + filter + reference + promote-intent submit at `/assets`. |
+| Board / Workbench / Delivery: each re-derives `publishable` locally. | Board / Workbench / Delivery: **converged on the unified `publish_readiness` producer** (PR-1). |
+
+### 13.2 Binding gate document
+
+The binding go/no-go checklist + signoff block lives at
+[`docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md`](../execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md).
+Coordinators MUST read that document end-to-end before authorizing the
+first real-trial sample. It is the single source of truth for:
+
+- Recovery wave acceptance evidence (PR-1 .. PR-4 commit + log map).
+- Post-recovery operator-eligible scope per line.
+- Post-recovery operator-blocked scope per line + cross-cutting red lines.
+- Coordinator 口径 verbatim briefing lines.
+- Real-trial sample wave (overrides §7.1 / §7.2 of this document).
+- Stop conditions during real trial.
+- Coordinator / architect / reviewer signoff block.
+
+### 13.3 Final readiness conclusion (post-recovery)
+
+- **Real operator trial readiness:** **GO** subject to G5 .. G9 in the
+  PR-5 gate document §2.2 being verified by the trial coordinator
+  before the first sample.
+- **Recovery wave PR-1 / PR-2 / PR-3 / PR-4:** all PASS, all merged.
+- **Platform Runtime Assembly:** still **BLOCKED** (gated on a
+  separate wave-start authority after this real trial closes
+  successfully).
+- **Capability Expansion:** still **BLOCKED**.
+- **Third production line:** still **BLOCKED**.
+- **Provider / model / vendor / engine consoles:** still **FORBIDDEN
+  at every phase**.
+
+### 13.4 Pre-recovery §12 conditions — disposition
+
+| §12 condition | Disposition under §13 |
+|---|---|
+| §12.1 Coordinator briefs §5 verbatim. | Replaced by PR-5 gate §6 verbatim 口径. |
+| §12.2 Hide Digital Anchor New-Tasks card + temp route. | Retired. Digital Anchor card now points at the formal `/tasks/digital-anchor/new` route; the temp `/tasks/connect/digital_anchor/{new,workbench,publish}` paths return 404 (PR-4). |
+| §12.3 Hide Asset Supply / B-roll page. | Retired. `/assets` is operator-eligible (PR-2). |
+| §12.4 Restrict trial to §7.1; §7.2 excluded. | Replaced by PR-5 gate §7 sample wave; PR-5 gate §8 forbidden list supersedes §7.2. |
+| §12.5 Coordinator monitors §8 risks; pauses on activation. | Replaced by PR-5 gate §11 stop conditions. |
+| §12.6 Matrix Script trial samples MUST be fresh contract-clean. | Carried forward verbatim. The §0.1 sample-validity rule remains binding for any Matrix Script sample created in real trial. |
+| §12.7 Coordinator briefs §0.2 product-meaning of `source_script_ref`. | Carried forward verbatim. |
+| §12.8 Operator transitional convention `content://matrix-script/source/<token>` recommended. | Carried forward; the Plan E PR-2 in-product minting flow (already shipped pre-recovery) is also acceptable. |
+
+### 13.5 Authority pointer
+
+The real trial re-entry has the following authority chain:
+
+1. **Recovery Decision** §0 + §4 — demoted authority-only trial; named
+   the four required capability recoveries.
+2. **Recovery Global Action** §3 — required PR-1 .. PR-4 to merge
+   before PR-5 may open.
+3. **PR-1 / PR-2 / PR-3 / PR-4 execution logs** — each MERGED with the
+   acceptance criteria its log §6 enumerates.
+4. **PR-5 trial re-entry gate** (this paragraph's §13.2 link) — the
+   binding gate document.
+5. **PR-5 execution log** —
+   [`docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_EXECUTION_LOG_v1.md`](../execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_EXECUTION_LOG_v1.md).
+
+End of Plan A §13.

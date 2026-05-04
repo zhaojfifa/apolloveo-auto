@@ -1,8 +1,14 @@
 # ApolloVeo 2.0 · Operator Capability Recovery · PR-1 Execution Log v1
 
 Date: 2026-05-04
-Status: Engineering complete on branch `claude/wonderful-visvesvaraya-4020d0`;
-PR opening pending.
+Status: **MERGED to `main` 2026-05-04** as squash commit
+[`4c317c4`](https://github.com/zhaojfifa/apolloveo-auto/commit/4c317c4)
+via [PR #114](https://github.com/zhaojfifa/apolloveo-auto/pull/114).
+Branch `claude/wonderful-visvesvaraya-4020d0` merged after one
+reviewer-fail correction pass (see §9.1 / §9.2). The Recovery wave
+PR-1 / PR-2 / PR-3 / PR-4 / PR-5 sequence is now complete; the trial
+re-entry gate is at
+`docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md`.
 Wave: ApolloVeo 2.0 Minimal Operator Capability Recovery.
 Decision authority: `docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`.
 Action authority: `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_GLOBAL_ACTION_v1.md` §4.
