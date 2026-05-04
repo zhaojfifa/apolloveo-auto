@@ -196,6 +196,8 @@ Status: P2 pre-execution evidence index
 | Matrix Script Workbench Panel Integration — template implementation | `gateway/app/templates/task_workbench.html` |
 | Matrix Script Workbench Panel Integration — tests | `tests/contracts/operator_visible_surfaces/test_wiring.py` |
 | Matrix Script Operator-Visible Slice — merge / signoff note (Phase A + Phase B + state-sync only; NOT Phase C / Phase D) | `docs/execution/evidence/matrix_script_operator_visible_slice_merge_note_v1.md` |
+| Operator Capability Recovery — direction-correction decision | `docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md` |
+| Operator Capability Recovery — global action / Claude handoff | `docs/execution/APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_GLOBAL_ACTION_v1.md` |
 
 ## Current Known Evidence Gaps
 
