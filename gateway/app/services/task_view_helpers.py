@@ -1038,6 +1038,39 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
             # Defense-in-depth: comprehension is presentation-only; never
             # break the publish hub if the projection raises.
             payload["matrix_script_delivery_comprehension"] = {}
+
+        # Recovery PR-3: surface the operator-visible publish hub bundle for
+        # Matrix Script tasks (delivery `publish_gate` + `publish_status_mirror`
+        # + `publish_readiness`). Hot Follow has its own dedicated builder; the
+        # baseline `publish_hub_payload` is the entry for Matrix Script /
+        # Digital Anchor / other lines, so this branch is the single seam where
+        # the operator surface bundle reaches the Matrix Script publish hub.
+        try:
+            from gateway.app.services.matrix_script.closure_binding import (
+                get_closure_view_for_task,
+            )
+            from gateway.app.services.operator_visible_surfaces.wiring import (
+                build_operator_surfaces_for_publish_hub,
+            )
+
+            closure = get_closure_view_for_task(task_id)
+            authoritative_state = {
+                "ready_gate": task.get("ready_gate") or {},
+                "final": composed.get("final") or {"exists": False},
+                "final_stale_reason": composed.get("final_stale_reason"),
+                "current_attempt": task.get("current_attempt"),
+            }
+            payload["operator_surfaces"] = {
+                "delivery": build_operator_surfaces_for_publish_hub(
+                    task=task,
+                    authoritative_state=authoritative_state,
+                    publish_feedback_closure=closure,
+                )
+            }
+            payload["matrix_script_publish_feedback_closure"] = closure
+        except Exception:
+            payload["operator_surfaces"] = {}
+            payload["matrix_script_publish_feedback_closure"] = None
     return payload
 
 
