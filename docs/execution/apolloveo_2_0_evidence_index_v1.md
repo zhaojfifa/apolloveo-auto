@@ -226,6 +226,33 @@ Status: P2 pre-execution evidence index
 | Operator Capability Recovery PR-4 — workspace + publish-hub wiring tests | `gateway/app/services/tests/test_digital_anchor_workspace_wiring.py` |
 | Operator Capability Recovery PR-4 — surface-boundary integrity tests | `gateway/app/services/tests/test_digital_anchor_surface_boundary.py` |
 
+## Operator Workflow Convergence Wave (OWC) — Placeholder Index
+
+The OWC wave is active mainline as of 2026-05-04. Strict ordering: OWC-MS first, OWC-DA second. Each row below is a placeholder pointing at where the evidence will land; placeholders without a `(LANDED ...)` annotation indicate the corresponding PR has not yet opened. Placeholders are added now (in the OWC authority/gate normalization PR) so future PRs only need to fill annotations, not extend this table.
+
+| Concern | Evidence (placeholder) |
+| --- | --- |
+| OWC wave anchor — line-specific execution authority (Matrix Script) | `docs/product/matrix_script_product_flow_v1.md` |
+| OWC wave anchor — line-specific execution authority (Digital Anchor) | `docs/product/digital_anchor_product_flow_v1.md` |
+| OWC wave anchor — factory-wide abstract flow | `docs/architecture/apolloveo_2_0_top_level_business_flow_v1.md` |
+| OWC wave anchor — operator-visible surface authority | `docs/design/ApolloVeo_Operator_Visible_Surfaces_v1.md` |
+| OWC wave anchor — design handoff | `docs/handoffs/apolloveo_2_0_design_handoff_v1.md` |
+| OWC wave anchor — engineering rule binding (Product-Flow Module Presence) | `ENGINEERING_RULES.md` §13 |
+| OWC-MS gate spec | `docs/reviews/owc_ms_gate_spec_v1.md` |
+| OWC-MS gate spec §10 architect + reviewer signoff PR (placeholder; opens after OWC authority/gate normalization PR merges) | (pending) |
+| OWC-MS PR-1 — Matrix Script Task Area Workflow Convergence (MS-W1 + MS-W2) execution log | `docs/execution/APOLLOVEO_2_0_OWC_MS_PR1_TASK_AREA_EXECUTION_LOG_v1.md` (pending) |
+| OWC-MS PR-2 — Matrix Script Workbench Five-Panel Convergence (MS-W3 + MS-W4 + MS-W5 + MS-W6) execution log | `docs/execution/APOLLOVEO_2_0_OWC_MS_PR2_WORKBENCH_FIVE_PANEL_EXECUTION_LOG_v1.md` (pending) |
+| OWC-MS PR-3 — Matrix Script Delivery Convergence + 回填 Multi-Channel (MS-W7 + MS-W8) execution log | `docs/execution/APOLLOVEO_2_0_OWC_MS_PR3_DELIVERY_CONVERGENCE_EXECUTION_LOG_v1.md` (pending) |
+| OWC-MS Closeout — aggregating audit (MS-A1..MS-A8) | `docs/execution/APOLLOVEO_2_0_OWC_MS_PHASE_CLOSEOUT_v1.md` (pending) |
+| OWC-DA gate spec | `docs/reviews/owc_da_gate_spec_v1.md` |
+| OWC-DA gate spec §10 architect + reviewer signoff PR (placeholder; gate-opening additionally requires DA-E3 OWC-MS Closeout PASS) | (pending) |
+| OWC-DA PR-1 — Digital Anchor Task Entry + Task Area Convergence (DA-W1 + DA-W2) execution log | `docs/execution/APOLLOVEO_2_0_OWC_DA_PR1_TASK_AREA_EXECUTION_LOG_v1.md` (pending) |
+| OWC-DA PR-2 — Digital Anchor Workbench Five-Panel Convergence (DA-W3 + DA-W4 + DA-W5 + DA-W6 + DA-W7) execution log | `docs/execution/APOLLOVEO_2_0_OWC_DA_PR2_WORKBENCH_FIVE_PANEL_EXECUTION_LOG_v1.md` (pending) |
+| OWC-DA PR-3 — Digital Anchor Delivery Pack + Publish Closure Multi-Channel Convergence (DA-W8 + DA-W9) execution log | `docs/execution/APOLLOVEO_2_0_OWC_DA_PR3_DELIVERY_PACK_EXECUTION_LOG_v1.md` (pending) |
+| OWC-DA Closeout — aggregating audit (DA-A1..DA-A8) | `docs/execution/APOLLOVEO_2_0_OWC_DA_PHASE_CLOSEOUT_v1.md` (pending) |
+| Trial re-entry review (separate review; opens after OWC-DA Closeout signs) | (pending) |
+| OWC authority/gate normalization PR (this PR) execution log | `docs/execution/APOLLOVEO_2_0_OWC_AUTHORITY_GATE_NORMALIZATION_EXECUTION_LOG_v1.md` |
+
 ## Current Known Evidence Gaps
 
 | Gap | Effect |
