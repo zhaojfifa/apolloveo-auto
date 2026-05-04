@@ -400,3 +400,95 @@ End of §8.E / §8.F / §8.G / §8.H operator brief follow-up correction addendu
 Coordinator note:
 This observation is retained as deployed-environment baseline evidence for Matrix Script Sample 3 only.
 It is valid as contract/projection baseline evidence, but not yet sufficient as full Plan A wave-completion evidence.
+
+---
+
+## 13. Real Operator Trial Re-Entry — NOT READY (Recovery Wave PR-5, 2026-05-04)
+
+This section closes the **static-only / authority-only era** of this
+write-up. It does **NOT** open the real operator trial era. The
+PR-5 gate verdict is **NOT READY**: contract-backed minimum operator
+capability is restored (PR-1..PR-4 merged) but operator workflow
+convergence to the line-specific product-flow authority documents
+is missing. Real operator trial therefore remains BLOCKED until the
+**Operator Workflow Convergence Wave** closes.
+
+### 13.1 What changed under recovery
+
+The Operator Capability Recovery wave (decision authority:
+[`docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`](ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md))
+demoted the pre-recovery Plan A from "current main action" to
+"validation action after PR-1 .. PR-4 restore minimum operator
+capability". Recovery PR-1 / PR-2 / PR-3 / PR-4 have all merged to
+`main` 2026-05-04:
+
+- PR-1 ([#114](https://github.com/zhaojfifa/apolloveo-auto/pull/114),
+  squash `4c317c4`) — Unified Publish Readiness Runtime Recovery.
+- PR-2 ([#116](https://github.com/zhaojfifa/apolloveo-auto/pull/116),
+  squash `4343bec`) — B-roll / Asset Supply minimum operator capability.
+- PR-3 ([#118](https://github.com/zhaojfifa/apolloveo-auto/pull/118),
+  squash `d53da0f`) — Matrix Script Operator Workspace Promotion.
+- PR-4 ([#119](https://github.com/zhaojfifa/apolloveo-auto/pull/119),
+  squash `0549ee0`) — Digital Anchor Operator Workspace Recovery.
+
+### 13.2 Authority pointer (binding)
+
+The binding gate document for real operator trial re-entry is
+[`APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md`](APOLLOVEO_2_0_OPERATOR_CAPABILITY_RECOVERY_PR5_TRIAL_REENTRY_GATE_v1.md).
+It supersedes:
+
+- §2.1 / §2.2 / §2.3 of this write-up (pre-recovery coordinator
+  runbook).
+- §11.4 / §12.4 of this write-up (pre-recovery action items).
+- §12 of [`OPERATIONS_TRIAL_READINESS_PLAN_v1.md`](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md)
+  (pre-recovery readiness conclusion); the trial brief now carries
+  §13 with the post-recovery readiness conclusion.
+
+### 13.3 §8 live-run placeholder — closed for the static-only era
+
+The §8 live-run placeholder in this write-up's body was authored when
+Plan A was authority-only. With recovery PR-1 .. PR-4 merged and the
+PR-5 NOT-READY gate authored, real-trial live-run results are not yet
+captured anywhere — because real-trial is BLOCKED until the Operator
+Workflow Convergence Wave closes. When the Convergence Wave closes
+and a separate "Trial Re-Entry Gate v2" PR re-opens the real-trial
+decision, real-trial live-run results will be captured in:
+
+- The signoff block of the future "Trial Re-Entry Gate v2" document
+  (coordinator, architect, reviewer).
+- Per-sample live-run logs filed under `docs/execution/` by the
+  operations team after each real-trial sample. Naming convention:
+  `OPERATOR_TRIAL_SAMPLE_<n>_<line>_<yyyymmdd>_v1.md` — re-numbered
+  from a v2 trial gate, not from PR-5.
+
+### 13.4 Coordinator instruction during the Convergence Wave
+
+Coordinators MUST NOT authorize a real-trial sample on Matrix Script
+or Digital Anchor surfaces during the Convergence Wave. Two
+allowances apply (verbatim from PR-5 gate §8):
+
+1. **Hot Follow golden-path samples** remain valid as factory-baseline
+   evidence per the pre-recovery Plan A §7.1 wave 1 / wave 2.
+2. **Static surface inspection** by the trial coordinator MAY produce
+   convergence-gap notes used as input to the Convergence Wave.
+
+When the Convergence Wave closes and a "Trial Re-Entry Gate v2"
+document is authored, that document — not PR-5 — is the authoritative
+record of real-trial readiness.
+
+### 13.5 Operator Workflow Convergence Wave
+
+The next mandatory wave is the **Operator Workflow Convergence Wave**.
+Its scope is the W7..W12 preconditions in the PR-5 gate document §2.3,
+ordered Matrix Script first (Phase OWC-MS) then Digital Anchor
+second (Phase OWC-DA). The two product-flow authority documents
+elevated by PR-5 are:
+
+- [`docs/product/matrix_script_product_flow_v1.md`](../product/matrix_script_product_flow_v1.md)
+- [`docs/product/digital_anchor_product_flow_v1.md`](../product/digital_anchor_product_flow_v1.md)
+
+Future Task Area / Workbench / Delivery Center implementations on
+those two lines MUST map to the product-flow modules, not only to
+the packet / contract / runtime truth.
+
+End of §13 — Real Operator Trial Re-Entry section.
