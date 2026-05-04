@@ -207,30 +207,41 @@
     </div>
 
     {% set ops = (task_json.operator_surfaces or {}) %}
-    {% set ops_board = (ops.board or {}) %}
     {% set ops_workbench_panel = ((ops.workbench or {}).line_specific_panel or {}) %}
-    {% set ops_delivery = (ops.delivery or {}) %}
     {% set ops_hot_follow_panel = (ops.hot_follow_panel or {}) %}
+    {# PR-1 reviewer-fix: Workbench displays the SINGLE unified
+       publish_readiness result that Board and Delivery also consume.
+       The legacy split `ops.board.publishable` vs
+       `ops.delivery.publish_gate` displays were removed because they
+       were the visible symptom of the cross-surface drift the unified
+       producer is meant to eliminate. `ops.publish_readiness.head_reason`
+       is constrained to the closed enum from
+       `docs/contracts/publish_readiness_contract_v1.md`;
+       `consumed_inputs.first_blocking_reason` carries the operator-readable
+       original ready_gate string when present. #}
+    {% set ops_pr = (ops.publish_readiness or {}) %}
+    {% set ops_pr_inputs = (ops_pr.consumed_inputs or {}) %}
     <div class="panel" data-role="operator-surface-strip">
       <div class="section-title">
         <h2>Operator surface</h2>
-        <div class="secondary">Read-only projection — no UI-authored truth.</div>
+        <div class="secondary">Read-only projection — single publish_readiness producer; Board / Workbench / Delivery consume the same result.</div>
       </div>
       <div class="meta-grid">
         <div class="meta-item">
-          <strong>L3 publish gate</strong>
-          <span data-role="operator-publish-gate">
-            {{ "open" if ops_delivery.publish_gate else "blocked" }}
-            {% if ops_delivery.publish_gate_head_reason %}
-              · <span data-role="operator-publish-gate-reason">{{ ops_delivery.publish_gate_head_reason }}</span>
+          <strong>Publish readiness</strong>
+          <span data-role="operator-publish-readiness">
+            {{ "publishable" if ops_pr.publishable else "blocked" }}
+            {% if ops_pr.head_reason and not ops_pr.publishable %}
+              · <span data-role="operator-publish-readiness-head-reason">{{ ops_pr.head_reason }}</span>
+              {% if ops_pr_inputs.first_blocking_reason and ops_pr_inputs.first_blocking_reason != ops_pr.head_reason %}
+                <span data-role="operator-publish-readiness-detail" class="muted">({{ ops_pr_inputs.first_blocking_reason }})</span>
+              {% endif %}
             {% endif %}
           </span>
         </div>
         <div class="meta-item">
-          <strong>Board bucket</strong>
-          <span data-role="operator-board-bucket">
-            {% if ops_board.publishable %}publishable{% elif ops_board.head_reason %}blocked · {{ ops_board.head_reason }}{% else %}ready{% endif %}
-          </span>
+          <strong>final_provenance</strong>
+          <span data-role="operator-final-provenance">{{ ops_pr_inputs.final_provenance or "—" }}</span>
         </div>
         <div class="meta-item">
           <strong>Line panel</strong>

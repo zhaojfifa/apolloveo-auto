@@ -61,14 +61,19 @@ def test_output_shape_is_closed_per_contract() -> None:
         "final_fresh",
         "final_provenance",
         "blocking_count",
+        "first_blocking_reason",
     }
 
 
 def test_head_reason_is_always_in_closed_enum() -> None:
+    """PR-1 reviewer-fix: head_reason MUST always be a member of the
+    closed enum — no escape via arbitrary ready_gate strings.
+    """
     inputs = [
         ({}, {}),
         ({"publish_ready": True, "compose_ready": True}, {"final": {"exists": True}}),
         ({"blocking": ["voiceover_missing"]}, {}),
+        ({"blocking": ["totally_unknown_xyz"]}, {}),
         ({"publish_ready": False, "compose_ready": True}, {"final": {"exists": True}}),
         ({"publish_ready": True, "compose_ready": False}, {"final": {"exists": True}}),
         ({"publish_ready": True, "compose_ready": True}, {"final": {"exists": False}}),
@@ -80,11 +85,9 @@ def test_head_reason_is_always_in_closed_enum() -> None:
     for ready_gate, l2_facts in inputs:
         result = compute_publish_readiness(ready_gate=ready_gate, l2_facts=l2_facts)
         if result["head_reason"] is not None:
-            assert result["head_reason"] in CLOSED_HEAD_REASON_ENUM or (
-                # The producer copies the first ready_gate.blocking[] entry
-                # verbatim per contract; that string is the head reason.
-                ready_gate.get("blocking")
-                and result["head_reason"] == ready_gate["blocking"][0]
+            assert result["head_reason"] in CLOSED_HEAD_REASON_ENUM, (
+                f"head_reason {result['head_reason']!r} escaped closed enum "
+                f"for inputs ready_gate={ready_gate!r}, l2_facts={l2_facts!r}"
             )
 
 
@@ -103,7 +106,12 @@ def test_publishable_true_when_gate_green_and_final_fresh() -> None:
 # ---------- ready_gate.blocking dominates ----------------------------------
 
 
-def test_ready_gate_blocking_first_entry_becomes_head_reason() -> None:
+def test_ready_gate_blocking_normalizes_to_closed_enum() -> None:
+    """PR-1 reviewer-fix: `head_reason` MUST stay inside the closed enum
+    declared in `publish_readiness_contract_v1.md`. The original ready_gate
+    blocking string is preserved on `consumed_inputs.first_blocking_reason`
+    for operator-readable rendering.
+    """
     result = compute_publish_readiness(
         ready_gate={
             "publish_ready": True,
@@ -113,8 +121,61 @@ def test_ready_gate_blocking_first_entry_becomes_head_reason() -> None:
         l2_facts={"final": {"exists": True}},
     )
     assert result["publishable"] is False
-    assert result["head_reason"] == "voiceover_missing"
+    assert result["head_reason"] in CLOSED_HEAD_REASON_ENUM
+    assert result["head_reason"] == "publish_not_ready"  # voiceover_missing → publish_not_ready
     assert result["consumed_inputs"]["blocking_count"] == 2
+    assert result["consumed_inputs"]["first_blocking_reason"] == "voiceover_missing"
+
+
+def test_unknown_blocking_reason_degrades_to_ready_gate_blocking() -> None:
+    """Unknown / future ready_gate blocking strings MUST NOT escape the
+    closed enum — they degrade to `ready_gate_blocking`.
+    """
+    result = compute_publish_readiness(
+        ready_gate={
+            "publish_ready": True,
+            "compose_ready": True,
+            "blocking": ["some_brand_new_reason_not_in_taxonomy"],
+        },
+        l2_facts={"final": {"exists": True}},
+    )
+    assert result["publishable"] is False
+    assert result["head_reason"] == "ready_gate_blocking"
+    assert result["head_reason"] in CLOSED_HEAD_REASON_ENUM
+    assert (
+        result["consumed_inputs"]["first_blocking_reason"]
+        == "some_brand_new_reason_not_in_taxonomy"
+    )
+
+
+def test_known_compose_blocking_reasons_normalize_to_compose_not_ready() -> None:
+    for reason in (
+        "compose_not_done",
+        "compose_input_blocked",
+        "compose_input_derive_failed",
+        "compose_exec_failed",
+    ):
+        result = compute_publish_readiness(
+            ready_gate={"publish_ready": True, "compose_ready": True, "blocking": [reason]},
+            l2_facts={"final": {"exists": True}},
+        )
+        assert result["head_reason"] == "compose_not_ready", reason
+
+
+def test_known_publish_blocking_reasons_normalize_to_publish_not_ready() -> None:
+    for reason in (
+        "audio_not_ready",
+        "audio_not_done",
+        "voiceover_missing",
+        "missing_voiceover",
+        "subtitle_missing",
+        "subtitle_not_ready",
+    ):
+        result = compute_publish_readiness(
+            ready_gate={"publish_ready": True, "compose_ready": True, "blocking": [reason]},
+            l2_facts={"final": {"exists": True}},
+        )
+        assert result["head_reason"] == "publish_not_ready", reason
 
 
 # ---------- final_missing / final_stale ------------------------------------

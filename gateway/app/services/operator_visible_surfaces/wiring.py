@@ -110,11 +110,36 @@ def build_board_row_projection(
     """Per-row Board projection. Adds ``publishable`` + ``head_reason`` only.
 
     Reads ``ready_gate`` from the row when not passed explicitly.
+
+    PR-1 reviewer-fix: routes through the unified producer with the same
+    L2 facts the Delivery surface uses, so Board / Workbench / Delivery
+    cannot disagree on publishability for the same task state. When the
+    row has not yet hydrated L2 facts (cold list view), the producer's
+    `l2_provided=False` path defers freshness gating to the ready_gate.
     """
     gate = ready_gate
     if gate is None and isinstance(task, Mapping):
         gate = task.get("ready_gate") if isinstance(task.get("ready_gate"), Mapping) else {}
-    return derive_board_publishable(gate or {})
+    l2_facts = _l2_facts_from_state(task, task) if isinstance(task, Mapping) else None
+    # Skip L2 gating when the row carries no `final` truth at all — preserves
+    # legacy Board behavior for rows whose L2 was never hydrated.
+    if isinstance(l2_facts, Mapping) and not (l2_facts.get("final") or {}).get("exists"):
+        # Distinguish "row has no L2" (no final dict) from "L2 says no final
+        # exists" by checking the original task — if neither task nor state
+        # carried a `final` dict, treat L2 as not provided.
+        has_final_dict = isinstance(task.get("final"), Mapping) if isinstance(task, Mapping) else False
+        if not has_final_dict:
+            l2_facts = None
+    l3_current_attempt = _l3_current_attempt_from_state(task, task) if isinstance(task, Mapping) else None
+    result = compute_publish_readiness(
+        ready_gate=gate or {},
+        l2_facts=l2_facts,
+        l3_current_attempt=l3_current_attempt,
+    )
+    return {
+        "publishable": result["publishable"],
+        "head_reason": result["head_reason"],
+    }
 
 
 def _l3_current_attempt_from_state(
@@ -164,12 +189,29 @@ def build_operator_surfaces_for_workbench(
         packet=packet_view,
         publish_feedback_closure=publish_feedback_closure,
     )
-    bundle["publish_readiness"] = compute_publish_readiness(
+    # Compute unified publish_readiness once with the FULL input set
+    # (ready_gate + L2 + L3 + per-row delivery zoning when available) and
+    # rewrite both `bundle["board"]` and `bundle["delivery"].publish_gate*`
+    # from the same result. Without this overlay, the legacy Board path
+    # (`derive_board_publishable(ready_gate)`) and the legacy Delivery
+    # path (`derive_delivery_publish_gate(ready_gate, l2_facts)`) would
+    # see different inputs (Board has no L2 / L3 / rows) and could
+    # disagree on the same task state — the exact drift PR-1 must fix.
+    publish_readiness = compute_publish_readiness(
         ready_gate=ready_gate or {},
         l2_facts=l2_facts,
         l3_current_attempt=l3_current_attempt,
         delivery_rows=delivery_rows,
     )
+    bundle["publish_readiness"] = publish_readiness
+    bundle["board"] = {
+        "publishable": publish_readiness["publishable"],
+        "head_reason": publish_readiness["head_reason"],
+    }
+    delivery_view = dict(bundle.get("delivery") or {})
+    delivery_view["publish_gate"] = publish_readiness["publishable"]
+    delivery_view["publish_gate_head_reason"] = publish_readiness["head_reason"]
+    bundle["delivery"] = delivery_view
     # Phase B: when the Workbench mounts the Matrix Script line-specific
     # panel, attach the formal `matrix_script_workbench_variation_surface_v1`
     # projection so the panel renders axes / cells / slot detail / attribution

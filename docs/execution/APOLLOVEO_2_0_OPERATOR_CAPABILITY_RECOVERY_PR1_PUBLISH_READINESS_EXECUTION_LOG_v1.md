@@ -217,6 +217,133 @@ promote feedback closure, minimum operator-visible asset surface. Per
 Global Action §3, PR-2 may not start until PR-1 is merged and reviewed.
 Claude stops after this PR-1 is opened.
 
+## 9.1 Reviewer-Fail Correction Pass (2026-05-04)
+
+The Codex/architect review of the initial PR-1 commit returned FAIL with
+four explicit findings. This section records the failure findings, the
+exact correction made, and residual risks after correction.
+
+### 9.1.1 Reviewer findings (FAIL)
+
+1. **Workbench display drift.** The Workbench template rendered
+   `ops.delivery.publish_gate` for one meta-item and
+   `ops.board.publishable` for another. Both were backed by the unified
+   producer after the initial commit, but the two paths fed the producer
+   different inputs (Board path passed `l2_facts=None`, Delivery path
+   passed L2). For the same task state, Board and Delivery could
+   therefore disagree on publishability — the exact drift PR-1 must
+   eliminate.
+2. **`head_reason` enum escape.** The producer copied
+   `ready_gate.blocking[0]` verbatim into `head_reason` when blocking
+   strings were present (e.g. `"voiceover_missing"`,
+   `"compose_input_blocked"`). These strings are not members of the
+   closed enum declared in `publish_readiness_contract_v1.md`
+   §"Closed `head_reason` enum". The contract is normative;
+   `head_reason` MUST always be inside the enum.
+3. **Missing surface-alignment integration tests.** The initial test
+   suite covered the producer in isolation and the legacy wrapper
+   agreement, but had no test that exercised Board + Workbench +
+   Delivery as a triple and asserted they agree on the same task state.
+4. **No integration coverage** for `final_provenance="historical"`,
+   Matrix Script blocking rows, or scene_pack non-blocking at the
+   surface-alignment level.
+
+### 9.1.2 Exact corrections made
+
+1. **Workbench display alignment** (file:
+   [`gateway/app/templates/task_workbench.html`](../../gateway/app/templates/task_workbench.html)).
+   Removed the split `ops.board.publishable` / `ops.delivery.publish_gate`
+   meta-items that visualized the drift. Replaced with a single
+   "Publish readiness" meta-item rendered from
+   `ops.publish_readiness.publishable` + `head_reason`, plus a
+   `final_provenance` meta-item from
+   `ops.publish_readiness.consumed_inputs.final_provenance`. The
+   operator-readable original ready-gate string is shown in muted text
+   when it differs from the normalized enum value.
+2. **Source-of-drift fix in wiring**
+   ([`gateway/app/services/operator_visible_surfaces/wiring.py`](../../gateway/app/services/operator_visible_surfaces/wiring.py)):
+   `build_operator_surfaces_for_workbench` now computes
+   `publish_readiness` once with the FULL input set (`ready_gate` + L2 +
+   L3 + delivery rows) and overwrites `bundle["board"]` and
+   `bundle["delivery"].publish_gate*` from the same result. Even surfaces
+   that read the legacy keys see the unified-producer output.
+3. **Board producer-input alignment**: `build_board_row_projection` now
+   plumbs L2 facts and L3 `current_attempt` from the row through to the
+   producer (when present), rather than passing `l2_facts=None`. Cold
+   list rows that have not yet hydrated L2 still degrade to the
+   ready-gate-only path so existing Board behavior is preserved.
+4. **`head_reason` enum normalization**
+   ([`gateway/app/services/operator_visible_surfaces/publish_readiness.py`](../../gateway/app/services/operator_visible_surfaces/publish_readiness.py)):
+   added `_BLOCKING_REASON_TO_HEAD_REASON` mapping +
+   `_map_ready_gate_blocking_to_head_reason` normalizer. Known compose
+   reasons map to `compose_not_ready`; known publish-blocking reasons
+   map to `publish_not_ready`; unknown / future reasons degrade safely
+   to `ready_gate_blocking` (a member of the closed enum). The original
+   string is preserved on
+   `consumed_inputs.first_blocking_reason` so the operator surface can
+   still render operator-readable detail without `head_reason` itself
+   escaping the contract.
+5. **Surface-alignment integration tests** (new file:
+   [`gateway/app/services/tests/test_publish_readiness_surface_alignment.py`](../../gateway/app/services/tests/test_publish_readiness_surface_alignment.py))
+   — 16 cases covering: same task state ⇒ same publishability across
+   Board/Workbench/Delivery; ready_gate blocking string normalization
+   agreement; `final_provenance="historical"` agreement;
+   `final_provenance="current"` agreement; Matrix Script unresolved
+   required row blocking agreement; Matrix Script resolved rows publish;
+   scene_pack defensive non-blocking clamp; scene_pack unresolved does
+   not flip Hot Follow off-publishable; an 8-case parametrized
+   cross-surface invariant.
+6. **Producer-test updates**: `test_ready_gate_blocking_first_entry_becomes_head_reason`
+   renamed to `test_ready_gate_blocking_normalizes_to_closed_enum`;
+   added `test_unknown_blocking_reason_degrades_to_ready_gate_blocking`,
+   `test_known_compose_blocking_reasons_normalize_to_compose_not_ready`,
+   `test_known_publish_blocking_reasons_normalize_to_publish_not_ready`.
+   Closed-enum invariant test
+   (`test_head_reason_is_always_in_closed_enum`) now hard-asserts no
+   escape — no carve-out for ready_gate strings.
+
+### 9.1.3 Tests after correction
+
+- Producer suite: **30/30 PASS** (24 original + 6 enum-normalization).
+- L3 emission suite: **5/5 PASS** (unchanged).
+- Surface-alignment suite (new): **17/17 PASS**.
+- Adjacent baseline: **189 PASS** (Hot Follow current_attempt wave1,
+  Matrix Script B4/zoning/comprehension/card summary, contract_runtime
+  projection rules, Hot Follow L4 wave2, artifact facts, subtitle
+  currentness, helper translation, line binding service).
+
+### 9.1.4 Why the reviewer-fail is now closed
+
+| Finding | Closed by |
+| --- | --- |
+| Workbench drift | Template now displays `ops.publish_readiness` only. Underlying wiring overlays the unified result onto `bundle.board` and `bundle.delivery.publish_gate*`, so even legacy reads cannot drift. Board's `build_board_row_projection` passes the same L2 + L3 the other surfaces pass. Surface-alignment tests prove agreement across 17 input combinations. |
+| `head_reason` enum escape | Explicit normalization layer in the producer maps known reasons into the enum and degrades unknown reasons to `ready_gate_blocking`. Tests assert `head_reason in CLOSED_HEAD_REASON_ENUM` for every probed input including `"some_brand_new_reason_not_in_taxonomy"`. Original string preserved on `consumed_inputs.first_blocking_reason` — the contract is honored without losing operator-readable detail. |
+| Missing surface-alignment integration tests | New file `test_publish_readiness_surface_alignment.py` covers the four reviewer-required cases plus an 8-case parametrized invariant. |
+| `final_provenance="historical"` / Matrix Script blocking rows / scene_pack non-blocking integration coverage | Each is a named test in the new alignment suite. |
+
+### 9.1.5 Residual risks after correction
+
+- **`build_board_row_projection`'s "no L2 hydrated" carve-out**:
+  cold Board list rows that don't carry a `final` dict still flow
+  through the producer with `l2_facts=None`, deferring freshness to the
+  ready_gate. This preserves legacy Board behavior but means a cold
+  list row could in principle disagree with Workbench/Delivery when the
+  freshness check would have flipped the result. In practice the row's
+  `ready_gate` was already computed from L2 upstream, so the deferral
+  is tight; a follow-up could plumb L2 onto every row, but that's a
+  presenter-side change outside PR-1's reviewer-fix scope.
+- **Hot Follow `current_attempt` not yet attached to `state`**: as in
+  the original PR-1 log, the Hot Follow Workbench presenter does not
+  yet attach the L3 dataclass to the state dict; until it does, the
+  Hot Follow path can reach `final_provenance_historical` only via L2
+  `final_stale_reason`. Wiring the L3 dataclass into the Hot Follow
+  presenter would touch Hot Follow business surfaces and is intentionally
+  deferred. The unified producer reads `current_attempt` from `state`
+  or `task` — either source is honored.
+- **Legacy thin wrappers** (`derive_board_publishable`,
+  `derive_delivery_publish_gate`) remain in `projections.py` per
+  ENGINEERING_RULES §7. Removal still queued for a later Recovery Wave PR.
+
 ## 10. References
 
 - Decision: `docs/execution/ApolloVeo_2.0_Operator_Capability_Recovery_Decision_v1.md`

@@ -61,6 +61,52 @@ CLOSED_HEAD_REASON_ENUM = frozenset(
 _SCENE_PACK_KIND_PREFIXES = ("scene_pack",)
 
 
+# `ready_gate.blocking[]` carries free-form line-specific reason strings (see
+# `hot_follow_projection_rules_v1.md` §"Blocking-Reason Mapping Contract" —
+# names like `voiceover_missing`, `compose_input_blocked`, `subtitle_missing`,
+# etc.). Per `publish_readiness_contract_v1.md` §"Output discipline":
+#
+#     "Every `head_reason` value MUST be reachable from the input shape; the
+#      producer MUST NOT invent a reason outside this enum."
+#
+# We map each known ready-gate reason family into the closed `head_reason`
+# enum. Unknown / future reasons degrade safely to `ready_gate_blocking`
+# (an enum member declared explicitly for this purpose) rather than escape
+# the contract. The original ready-gate string is preserved on
+# `consumed_inputs.first_blocking_reason` so the operator surface can render
+# operator-readable text; `head_reason` itself stays inside the enum.
+_BLOCKING_REASON_TO_HEAD_REASON: dict[str, str] = {
+    # compose-not-ready family
+    "compose_not_done": "compose_not_ready",
+    "compose_not_ready": "compose_not_ready",
+    "compose_input_not_ready": "compose_not_ready",
+    "compose_input_blocked": "compose_not_ready",
+    "compose_input_derive_failed": "compose_not_ready",
+    "compose_exec_failed": "compose_not_ready",
+    # publish-not-ready family
+    "audio_not_ready": "publish_not_ready",
+    "audio_not_done": "publish_not_ready",
+    "voiceover_missing": "publish_not_ready",
+    "missing_voiceover": "publish_not_ready",
+    "subtitle_missing": "publish_not_ready",
+    "subtitle_not_ready": "publish_not_ready",
+    # final-stale family
+    "final_stale": "final_stale",
+}
+
+
+def _map_ready_gate_blocking_to_head_reason(reason: str) -> str:
+    """Normalize a ready-gate blocking string into the closed head_reason enum.
+
+    Returns `ready_gate_blocking` for any unrecognized value so the producer
+    output never contains a string outside `CLOSED_HEAD_REASON_ENUM`.
+    """
+    norm = str(reason or "").strip().lower()
+    if not norm:
+        return HEAD_REASON_READY_GATE_BLOCKING
+    return _BLOCKING_REASON_TO_HEAD_REASON.get(norm, HEAD_REASON_READY_GATE_BLOCKING)
+
+
 def _final_fresh(l2_facts: Mapping[str, Any]) -> bool:
     facts = dict(l2_facts or {})
     final = dict(facts.get("final") or {})
@@ -203,8 +249,11 @@ def compute_publish_readiness(
     # explicitly says "historical". Required-deliverable gating runs last so
     # the most surface-specific reason wins only when the upstream gate is
     # already green.
+    first_blocking_reason: Optional[str] = None
     if blocking:
-        head_reason = blocking[0] if isinstance(blocking[0], str) and blocking[0] else HEAD_REASON_READY_GATE_BLOCKING
+        first = blocking[0] if isinstance(blocking[0], str) else ""
+        first_blocking_reason = first or None
+        head_reason = _map_ready_gate_blocking_to_head_reason(first)
     elif l2_provided and not final_fresh and not final_exists:
         head_reason = HEAD_REASON_FINAL_MISSING
     elif l2_provided and not final_fresh:
@@ -238,6 +287,10 @@ def compute_publish_readiness(
             "final_fresh": final_fresh,
             "final_provenance": provenance,
             "blocking_count": len(blocking),
+            # Original first ready_gate.blocking[] string (or None) — surfaces
+            # render this for the operator-visible reason text; `head_reason`
+            # above stays inside the closed enum.
+            "first_blocking_reason": first_blocking_reason,
         },
     }
 
