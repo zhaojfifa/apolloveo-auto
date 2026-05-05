@@ -240,8 +240,8 @@ The OWC wave is active mainline as of 2026-05-04. Strict ordering: OWC-MS first,
 | OWC wave anchor — engineering rule binding (Product-Flow Module Presence) | `ENGINEERING_RULES.md` §13 |
 | OWC-MS gate spec | `docs/reviews/owc_ms_gate_spec_v1.md` |
 | OWC-MS gate spec §10 architect + reviewer signoff PR (placeholder; opens after OWC authority/gate normalization PR merges) | (pending) |
-| OWC-MS PR-1 — Matrix Script Task Area Workflow Convergence (MS-W1 + MS-W2) execution log | `docs/execution/APOLLOVEO_2_0_OWC_MS_PR1_TASK_AREA_EXECUTION_LOG_v1.md` (pending) |
-| OWC-MS PR-2 — Matrix Script Workbench Five-Panel Convergence (MS-W3 + MS-W4 + MS-W5 + MS-W6) execution log | `docs/execution/APOLLOVEO_2_0_OWC_MS_PR2_WORKBENCH_FIVE_PANEL_EXECUTION_LOG_v1.md` (pending) |
+| OWC-MS PR-1 — Matrix Script Task Area Workflow Convergence (MS-W1 + MS-W2) execution log | `docs/execution/APOLLOVEO_2_0_OWC_MS_PR1_TASK_AREA_EXECUTION_LOG_v1.md` (LANDED 2026-05-04 — PR #122 squash commit `0b23605`) |
+| OWC-MS PR-2 — Matrix Script Workbench Five-Panel Convergence (MS-W3 + MS-W4 + MS-W5 + MS-W6) execution log | `docs/execution/APOLLOVEO_2_0_OWC_MS_PR2_WORKBENCH_FIVE_PANEL_EXECUTION_LOG_v1.md` (LANDED 2026-05-05T01:43:52Z — PR #123 squash commit `c7a5a89`; §8.1 reviewer-fail correction pass closed three blockers — MS-W5 real submit affordance, MS-W3 real read-view, PR stacking hygiene) |
 | OWC-MS PR-3 — Matrix Script Delivery Convergence + 回填 Multi-Channel (MS-W7 + MS-W8) execution log | `docs/execution/APOLLOVEO_2_0_OWC_MS_PR3_DELIVERY_CONVERGENCE_EXECUTION_LOG_v1.md` (pending) |
 | OWC-MS Closeout — aggregating audit (MS-A1..MS-A8) | `docs/execution/APOLLOVEO_2_0_OWC_MS_PHASE_CLOSEOUT_v1.md` (pending) |
 | OWC-DA gate spec | `docs/reviews/owc_da_gate_spec_v1.md` |

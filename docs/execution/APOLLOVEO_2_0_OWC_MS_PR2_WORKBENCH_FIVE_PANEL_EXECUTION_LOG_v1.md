@@ -1,10 +1,10 @@
 # ApolloVeo 2.0 · OWC-MS PR-2 — Matrix Script Workbench Five-Panel Convergence — Execution Log v1
 
 Date: 2026-05-05
-Status: Engineering complete on branch `claude/owc-ms-pr1-task-area-convergence` (re-used per branch-strategy convergence on the OWC-MS line); PR opening pending.
+Status: **MERGED to `main` on 2026-05-05T01:43:52Z as PR #123, squash commit `c7a5a89`.** Final state after the §8.1 reviewer-fail correction pass closing all three blockers.
 Wave: ApolloVeo 2.0 Operator Workflow Convergence Wave (OWC), Phase OWC-MS.
 Phase Gate: [docs/reviews/owc_ms_gate_spec_v1.md](../reviews/owc_ms_gate_spec_v1.md).
-Predecessors: OWC authority/gate normalization PR (#121, squash commit `27aa950`); OWC-MS PR-1 (Task Area Workflow Convergence — `8862adc` + post-merge corrections `cdc6cb1` and `7569f0e`); Operator Capability Recovery PR-1..PR-4 (all merged 2026-05-04).
+Predecessors: OWC authority/gate normalization PR (#121, squash commit `27aa950`); OWC-MS PR-1 (Task Area Workflow Convergence — PR #122, squash commit `0b23605`); Operator Capability Recovery PR-1..PR-4 (all merged 2026-05-04).
 
 ## 1. Scope
 
@@ -287,7 +287,7 @@ The first OWC-MS PR-2 revision returned FAIL with three blockers:
 
 ## 9. Exact Statement of What Remains for the Next PR
 
-OWC-MS PR-3 — Matrix Script Delivery Convergence + 回填 Multi-Channel (MS-W7 + MS-W8) per `owc_ms_gate_spec_v1.md` §5. PR-3 may not start until this PR-2 is merged and reviewed. Claude stops after this PR-2 correction pass is force-pushed.
+OWC-MS PR-3 — Matrix Script Delivery Convergence + 回填 Multi-Channel (MS-W7 + MS-W8) per `owc_ms_gate_spec_v1.md` §5. **PR-2 merged to `main` 2026-05-05T01:43:52Z as PR #123, squash commit `c7a5a89`.** PR-3 is paperwork-eligible by branch state but not authorized: the user has explicitly held off the PR-3 execution instruction. Claude stops after the post-merge housekeeping PR.
 
 ## 10. References
 
