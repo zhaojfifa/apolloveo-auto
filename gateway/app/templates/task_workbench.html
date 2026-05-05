@@ -953,6 +953,445 @@
       {% endif %}
     {% endif %}
 
+    {# OWC-DA PR-2 — Digital Anchor Workbench Five-Panel Convergence (DA-W3 + DA-W4 + DA-W5 + DA-W6 + DA-W7).
+       Each panel is a pure presentation-layer projection over already-existing truth (role-speaker surface / delivery binding / publish feedback closure read-only). Hot Follow / Matrix Script / Baseline panels never enter this branch.
+       Authority: docs/reviews/owc_da_gate_spec_v1.md §3 DA-W3..W7. #}
+    {% if ops_workbench_panel.panel_kind == "digital_anchor" %}
+      {% set da_role_binding = ((ops.workbench or {}).digital_anchor_role_binding or {}) %}
+      {% set da_content_structure = ((ops.workbench or {}).digital_anchor_content_structure or {}) %}
+      {% set da_scene_template = ((ops.workbench or {}).digital_anchor_scene_template or {}) %}
+      {% set da_language_output = ((ops.workbench or {}).digital_anchor_language_output or {}) %}
+      {% set da_review_zone = ((ops.workbench or {}).digital_anchor_review_zone or {}) %}
+
+      {# DA-W3 — Workbench A 角色绑定面 #}
+      {% if da_role_binding.is_digital_anchor %}
+        <div class="panel" data-role="digital-anchor-role-binding-panel">
+          <div class="section-title">
+            <h2 data-role="da-role-binding-title">{{ da_role_binding.panel_title_zh }}</h2>
+            <div class="secondary" data-role="da-role-binding-subtitle">{{ da_role_binding.panel_subtitle_zh }}</div>
+          </div>
+          <h3 style="margin:12px 0 6px;" data-role="da-role-binding-facets-label">{{ da_role_binding.role_facets_label_zh }}</h3>
+          <div class="meta-grid" data-role="da-role-binding-facets-grid">
+            {% for facet in (da_role_binding.role_facets or []) %}
+              <div class="meta-item" data-role="da-role-binding-facet" data-facet-id="{{ facet.facet_id }}" data-resolved="{{ 'true' if facet.is_resolved else 'false' }}">
+                <strong>{{ facet.label_zh }}</strong>
+                <span>{{ facet.value_label_zh or "—" }}</span>
+                <span class="muted t-secondary">{{ facet.guidance_zh }}</span>
+              </div>
+            {% endfor %}
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="da-role-binding-roles-label">{{ da_role_binding.role_summary_label_zh }}</h3>
+          {% if da_role_binding.role_summary_rows %}
+            <ul class="muted" data-role="da-role-binding-roles-list" style="margin:6px 0 0 18px;">
+              {% for row in da_role_binding.role_summary_rows %}
+                <li data-role="da-role-binding-role-row" data-role-id="{{ row.role_id }}">
+                  <code>{{ row.role_id }}</code> · {{ row.display_name or "—" }} · {{ row.framing_kind_label_zh }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="muted" data-role="da-role-binding-roles-empty">尚未绑定角色。</div>
+          {% endif %}
+
+          <h3 style="margin:16px 0 6px;" data-role="da-role-binding-speakers-label">{{ da_role_binding.speaker_summary_label_zh }}</h3>
+          {% if da_role_binding.speaker_summary_rows %}
+            <ul class="muted" data-role="da-role-binding-speakers-list" style="margin:6px 0 0 18px;">
+              {% for row in da_role_binding.speaker_summary_rows %}
+                <li data-role="da-role-binding-speaker-row" data-segment-id="{{ row.segment_id }}">
+                  <code>{{ row.segment_id }}</code> · binds=<code>{{ row.binds_role_id or "—" }}</code> · 配音={{ row.dub_kind_label_zh }} · 对位={{ row.lip_sync_kind_label_zh }}{% if row.language_pick %} · 语言={{ row.language_pick }}{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="muted" data-role="da-role-binding-speakers-empty">尚未规划段落。</div>
+          {% endif %}
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="da-role-binding-asset-supply-hint">
+            <strong>{{ da_role_binding.asset_supply_browse_label_zh }}：</strong>
+            {{ da_role_binding.asset_supply_browse_role_pack_hint_zh }}<br />
+            {{ da_role_binding.asset_supply_browse_speaker_hint_zh }}
+          </div>
+          <div class="muted t-secondary" style="margin-top:6px;" data-role="da-role-binding-closed-set-explanation">
+            {{ da_role_binding.closed_set_explanation_zh }}
+          </div>
+          <div class="muted t-secondary" style="margin-top:6px;" data-role="da-role-binding-phase-b-forbidden">
+            {{ da_role_binding.phase_b_authoring_forbidden_label_zh }}
+          </div>
+        </div>
+      {% endif %}
+
+      {# DA-W4 — Workbench B 内容结构面 (read-view) #}
+      {% if da_content_structure.is_digital_anchor %}
+        <div class="panel" data-role="digital-anchor-content-structure-panel">
+          <div class="section-title">
+            <h2 data-role="da-content-structure-title">{{ da_content_structure.panel_title_zh }}</h2>
+            <div class="secondary" data-role="da-content-structure-subtitle">{{ da_content_structure.panel_subtitle_zh }}</div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="da-content-structure-title-row">
+              <strong>{{ da_content_structure.title_label_zh }}</strong>
+              <span>{{ da_content_structure.title_value or "—" }}</span>
+              <span class="muted t-secondary">{{ da_content_structure.title_status_label_zh }}</span>
+            </div>
+            <div class="meta-item" data-role="da-content-structure-source-ref-row">
+              <strong>{{ da_content_structure.source_script_ref_label_zh }}</strong>
+              <span><code>{{ da_content_structure.source_script_ref_value or "—" }}</code></span>
+              <span class="muted t-secondary">{{ da_content_structure.source_script_ref_status_label_zh }}</span>
+            </div>
+            <div class="meta-item" data-role="da-content-structure-language-row">
+              <strong>{{ da_content_structure.language_scope_label_zh }}</strong>
+              <span>
+                {% if da_content_structure.language_scope.source_language %}{{ da_content_structure.language_scope.source_language }}{% else %}—{% endif %}
+                {% if da_content_structure.language_scope.target_language %}→ {{ da_content_structure.language_scope.target_language | join(", ") }}{% endif %}
+              </span>
+            </div>
+            <div class="meta-item" data-role="da-content-structure-output-intent-row">
+              <strong>{{ da_content_structure.output_intent_label_zh }}</strong>
+              <span>{{ da_content_structure.output_intent_value or "—" }}</span>
+            </div>
+            <div class="meta-item" data-role="da-content-structure-segment-count-hint-row">
+              <strong>{{ da_content_structure.speaker_segment_count_hint_label_zh }}</strong>
+              <span>{% if da_content_structure.speaker_segment_count_hint_value is not none %}{{ da_content_structure.speaker_segment_count_hint_value }}{% else %}—{% endif %}</span>
+            </div>
+            <div class="meta-item" data-role="da-content-structure-operator-notes-row">
+              <strong>{{ da_content_structure.operator_notes_label_zh }}</strong>
+              <span>{{ da_content_structure.operator_notes_value or "—" }}</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="da-content-structure-sections-label">{{ da_content_structure.sections_label_zh }}</h3>
+          {% for section in (da_content_structure.sections or []) %}
+            <div class="meta-item" data-role="da-content-structure-section" data-section-id="{{ section.section_id }}" data-section-status="{{ section.body_status_code }}">
+              <strong>{{ section.section_label_zh }}</strong>
+              {% if section.body_text %}
+                <span data-role="da-content-structure-section-body">{{ section.body_text }}</span>
+              {% endif %}
+              <span class="muted t-secondary">{{ section.body_status_label_zh }}</span>
+            </div>
+          {% endfor %}
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="da-content-structure-phase-b-forbidden">
+            {{ da_content_structure.phase_b_authoring_forbidden_label_zh }}
+          </div>
+        </div>
+      {% endif %}
+
+      {# DA-W5 — Workbench C 场景模板面 #}
+      {% if da_scene_template.is_digital_anchor %}
+        <div class="panel" data-role="digital-anchor-scene-template-panel">
+          <div class="section-title">
+            <h2 data-role="da-scene-template-title">{{ da_scene_template.panel_title_zh }}</h2>
+            <div class="secondary" data-role="da-scene-template-subtitle">{{ da_scene_template.panel_subtitle_zh }}</div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="da-scene-template-ref-row" data-status="{{ da_scene_template.scene_template_ref_status_code }}">
+              <strong>{{ da_scene_template.scene_template_ref_label_zh }}</strong>
+              <span><code>{{ da_scene_template.scene_template_ref_value or "—" }}</code></span>
+              <span class="muted t-secondary">{{ da_scene_template.scene_template_ref_status_label_zh }}</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="da-scene-template-zones-label">{{ da_scene_template.scene_zones_label_zh }}</h3>
+          <div class="meta-grid" data-role="da-scene-template-zones-grid">
+            {% for zone in (da_scene_template.scene_zones or []) %}
+              <div class="meta-item" data-role="da-scene-template-zone" data-zone-id="{{ zone.zone_id }}" data-status="{{ zone.status_code }}">
+                <strong>{{ zone.label_zh }}</strong>
+                <span class="muted t-secondary">{{ zone.guidance_zh }}</span>
+                <span class="muted t-secondary">{{ zone.status_label_zh }}</span>
+              </div>
+            {% endfor %}
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="da-scene-template-segments-label">{{ da_scene_template.segment_scene_rows_label_zh }}</h3>
+          {% if da_scene_template.segment_scene_rows %}
+            <ul class="muted" data-role="da-scene-template-segments-list" style="margin:6px 0 0 18px;">
+              {% for row in da_scene_template.segment_scene_rows %}
+                <li data-role="da-scene-template-segment-row" data-segment-id="{{ row.segment_id }}">
+                  <code>{{ row.segment_id }}</code>{% if row.script_ref %} · script_ref=<code>{{ row.script_ref }}</code>{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="muted" data-role="da-scene-template-segments-empty">尚未规划段落。</div>
+          {% endif %}
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="da-scene-template-asset-supply-hint">
+            <strong>{{ da_scene_template.asset_supply_browse_label_zh }}：</strong>
+            {{ da_scene_template.asset_supply_browse_scene_hint_zh }}
+          </div>
+          <div class="muted t-secondary" style="margin-top:6px;" data-role="da-scene-template-authoring-forbidden">
+            {{ da_scene_template.scene_authoring_forbidden_label_zh }}
+          </div>
+        </div>
+      {% endif %}
+
+      {# DA-W6 — Workbench D 语言输出面 + multi-language navigator #}
+      {% if da_language_output.is_digital_anchor %}
+        <div class="panel" data-role="digital-anchor-language-output-panel">
+          <div class="section-title">
+            <h2 data-role="da-language-output-title">{{ da_language_output.panel_title_zh }}</h2>
+            <div class="secondary" data-role="da-language-output-subtitle">{{ da_language_output.panel_subtitle_zh }}</div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="da-language-output-scope-row">
+              <strong>{{ da_language_output.language_scope_label_zh }}</strong>
+              <span>
+                {% if da_language_output.language_scope.source_language %}{{ da_language_output.language_scope.source_language }}{% else %}—{% endif %}
+                {% if da_language_output.language_scope.target_language %}→ {{ da_language_output.language_scope.target_language | join(", ") }}{% endif %}
+              </span>
+            </div>
+            <div class="meta-item" data-role="da-language-output-subtitle-strategy-row" data-status="{{ da_language_output.subtitle_strategy_code }}">
+              <strong>{{ da_language_output.subtitle_strategy_label_zh }}</strong>
+              <span>{{ da_language_output.subtitle_strategy_label_value_zh }}</span>
+            </div>
+            <div class="meta-item" data-role="da-language-output-terminology-row">
+              <strong>{{ da_language_output.terminology_label_zh }}</strong>
+              <span>{{ da_language_output.terminology_value or "—" }}</span>
+              <span class="muted t-secondary">{{ da_language_output.terminology_status_label_zh }}</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="da-language-output-facets-label">语言输出四要素</h3>
+          <div class="meta-grid" data-role="da-language-output-facets-grid">
+            {% for facet in (da_language_output.facets or []) %}
+              <div class="meta-item" data-role="da-language-output-facet" data-facet-id="{{ facet.facet_id }}">
+                <strong>{{ facet.label_zh }}</strong>
+                <span class="muted t-secondary">{{ facet.guidance_zh }}</span>
+              </div>
+            {% endfor %}
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="da-language-output-per-language-label">{{ da_language_output.per_language_label_zh }}</h3>
+          {% if da_language_output.per_language_rows %}
+            <ul class="muted" data-role="da-language-output-per-language-list" style="margin:6px 0 0 18px;">
+              {% for row in da_language_output.per_language_rows %}
+                <li data-role="da-language-output-per-language-row" data-language="{{ row.language }}" data-status="{{ row.status_code }}">
+                  <code>{{ row.language }}</code>{% if row.is_source_language %} · 源语言{% endif %} · 段落覆盖={{ "已绑" if row.has_segment_pick else "未绑" }} · {{ row.status_label_zh }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="muted" data-role="da-language-output-per-language-empty">尚未声明 target_language。</div>
+          {% endif %}
+
+          <h3 style="margin:16px 0 6px;" data-role="da-language-output-navigator-label">{{ da_language_output.navigator_label_zh }}</h3>
+          {% if da_language_output.navigator_rows %}
+            <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;" data-role="da-language-output-navigator-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">language</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">subtitle_bundle</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">audio_bundle</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">lip_sync_bundle</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in da_language_output.navigator_rows %}
+                  <tr data-role="da-language-output-navigator-row" data-language="{{ row.language }}">
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"><code>{{ row.language }}</code></td>
+                    {% set sub_kind = row.per_kind.get("subtitle_bundle") or {} %}
+                    {% set audio_kind = row.per_kind.get("audio_bundle") or {} %}
+                    {% set lip_kind = row.per_kind.get("lip_sync_bundle") or {} %}
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="da-language-output-navigator-cell" data-kind="subtitle_bundle">
+                      {% if sub_kind %}
+                        {{ sub_kind.deliverable_id or "—" }}{% if sub_kind.required %} · 必{% endif %} · <code>{{ sub_kind.artifact_lookup or "—" }}</code>
+                      {% else %}—{% endif %}
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="da-language-output-navigator-cell" data-kind="audio_bundle">
+                      {% if audio_kind %}
+                        {{ audio_kind.deliverable_id or "—" }}{% if audio_kind.required %} · 必{% endif %} · <code>{{ audio_kind.artifact_lookup or "—" }}</code>
+                      {% else %}—{% endif %}
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="da-language-output-navigator-cell" data-kind="lip_sync_bundle">
+                      {% if lip_kind %}
+                        {{ lip_kind.deliverable_id or "—" }}{% if lip_kind.required %} · 必{% endif %} · <code>{{ lip_kind.artifact_lookup or "—" }}</code>
+                      {% else %}—{% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <div class="muted" data-role="da-language-output-navigator-empty">delivery 暂未投射 per-language 行。</div>
+          {% endif %}
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="da-language-output-phase-b-forbidden">
+            {{ da_language_output.phase_b_authoring_forbidden_label_zh }}
+          </div>
+        </div>
+      {% endif %}
+
+      {# DA-W7 — Workbench E 预览与校对面 #}
+      {% if da_review_zone.is_digital_anchor %}
+        <div class="panel" data-role="digital-anchor-review-zone-panel">
+          <div class="section-title">
+            <h2 data-role="da-review-zone-title">{{ da_review_zone.panel_title_zh }}</h2>
+            <div class="secondary" data-role="da-review-zone-subtitle">{{ da_review_zone.panel_subtitle_zh }}</div>
+          </div>
+
+          <h3 style="margin:12px 0 6px;" data-role="da-review-zone-zones-label">{{ da_review_zone.zones_label_zh }}</h3>
+          <div class="meta-grid" data-role="da-review-zone-zones-grid">
+            {% for zone in (da_review_zone.zones or []) %}
+              <div class="meta-item" data-role="da-review-zone-zone" data-zone-id="{{ zone.zone_id }}">
+                <strong>{{ zone.zone_label_zh }}</strong>
+                <span>{{ zone.zone_guidance_zh }}</span>
+                <span class="muted t-secondary">回写：<code>POST {{ zone.endpoint_template }}</code> · event_kind=<code>{{ zone.event_kind }}</code> · review_zone=<code>{{ zone.zone_id }}</code></span>
+              </div>
+            {% endfor %}
+          </div>
+
+          {# Per-row submit affordance — single endpoint, single event_kind=operator_note, optional review_zone tag. Mirror of OWC-MS MS-W5 real write affordance. #}
+          {% if da_review_zone.closure_endpoint_url and (da_review_zone.role_review_rows or da_review_zone.segment_review_rows) %}
+            <h3 style="margin:16px 0 6px;" data-role="da-review-zone-submit-label">提交校对意见</h3>
+            <div class="muted t-secondary" style="margin-bottom:6px;">
+              每条 role / segment 可在 5 个分区分别回写 operator_note；提交将以 JSON POST 写入既有 closure 真理路径，不创建第二条真理路径。
+            </div>
+
+            {% if da_review_zone.role_review_rows %}
+              <h4 style="margin:8px 0 4px;" data-role="da-review-zone-role-rows-label">{{ da_review_zone.role_review_rows_label_zh }}</h4>
+              {% for row in da_review_zone.role_review_rows %}
+                <details class="panel" style="margin:6px 0; padding:10px;" data-role="da-review-zone-submit-row" data-row-scope="{{ row.row_scope }}" data-row-id="{{ row.row_id }}">
+                  <summary><code>{{ row.row_id }}</code> · {{ row.display_name or "—" }} · {{ row.row_scope_label_zh }} · 提交校对意见</summary>
+                  <div style="margin-top:8px;">
+                    {% for zone in da_review_zone.zones %}
+                      {% set z = row.per_zone[zone.zone_id] %}
+                      {% if z.submit_form %}
+                        <form
+                          class="digital-anchor-review-form"
+                          data-role="da-review-zone-submit-form"
+                          data-row-scope="{{ z.submit_form.row_scope }}"
+                          data-row-id="{{ z.submit_form.row_id }}"
+                          data-zone-id="{{ z.submit_form.review_zone }}"
+                          data-event-kind="{{ z.submit_form.event_kind }}"
+                          data-actor-kind="{{ z.submit_form.actor_kind }}"
+                          action="{{ z.submit_form.action }}"
+                          method="{{ z.submit_form.method }}"
+                          style="margin:8px 0; padding:8px; border:1px solid #e5e7eb; border-radius:4px;"
+                        >
+                          <label style="display:block; font-weight:600;">{{ zone.input_label_zh }}</label>
+                          <textarea
+                            data-role="da-review-zone-submit-input"
+                            name="operator_publish_notes"
+                            rows="3"
+                            required
+                            maxlength="2000"
+                            placeholder="{{ zone.input_placeholder_zh }}"
+                            style="width:100%; margin-top:4px; padding:6px; box-sizing:border-box;"
+                          ></textarea>
+                          <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+                            <button type="submit" data-role="da-review-zone-submit-button">{{ zone.submit_label_zh }}</button>
+                            <span class="muted t-secondary" data-role="da-review-zone-submit-status"></span>
+                          </div>
+                        </form>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endfor %}
+            {% endif %}
+
+            {% if da_review_zone.segment_review_rows %}
+              <h4 style="margin:8px 0 4px;" data-role="da-review-zone-segment-rows-label">{{ da_review_zone.segment_review_rows_label_zh }}</h4>
+              {% for row in da_review_zone.segment_review_rows %}
+                <details class="panel" style="margin:6px 0; padding:10px;" data-role="da-review-zone-submit-row" data-row-scope="{{ row.row_scope }}" data-row-id="{{ row.row_id }}">
+                  <summary><code>{{ row.row_id }}</code>{% if row.binds_role_id %} · role=<code>{{ row.binds_role_id }}</code>{% endif %} · {{ row.row_scope_label_zh }} · 提交校对意见</summary>
+                  <div style="margin-top:8px;">
+                    {% for zone in da_review_zone.zones %}
+                      {% set z = row.per_zone[zone.zone_id] %}
+                      {% if z.submit_form %}
+                        <form
+                          class="digital-anchor-review-form"
+                          data-role="da-review-zone-submit-form"
+                          data-row-scope="{{ z.submit_form.row_scope }}"
+                          data-row-id="{{ z.submit_form.row_id }}"
+                          data-zone-id="{{ z.submit_form.review_zone }}"
+                          data-event-kind="{{ z.submit_form.event_kind }}"
+                          data-actor-kind="{{ z.submit_form.actor_kind }}"
+                          action="{{ z.submit_form.action }}"
+                          method="{{ z.submit_form.method }}"
+                          style="margin:8px 0; padding:8px; border:1px solid #e5e7eb; border-radius:4px;"
+                        >
+                          <label style="display:block; font-weight:600;">{{ zone.input_label_zh }}</label>
+                          <textarea
+                            data-role="da-review-zone-submit-input"
+                            name="operator_publish_notes"
+                            rows="3"
+                            required
+                            maxlength="2000"
+                            placeholder="{{ zone.input_placeholder_zh }}"
+                            style="width:100%; margin-top:4px; padding:6px; box-sizing:border-box;"
+                          ></textarea>
+                          <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+                            <button type="submit" data-role="da-review-zone-submit-button">{{ zone.submit_label_zh }}</button>
+                            <span class="muted t-secondary" data-role="da-review-zone-submit-status"></span>
+                          </div>
+                        </form>
+                      {% endif %}
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endfor %}
+            {% endif %}
+
+            <script data-role="da-review-zone-submit-handler">
+              (function () {
+                var forms = document.querySelectorAll('form.digital-anchor-review-form');
+                if (!forms || !forms.length) { return; }
+                forms.forEach(function (form) {
+                  form.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    var status = form.querySelector('[data-role="da-review-zone-submit-status"]');
+                    var input = form.querySelector('[data-role="da-review-zone-submit-input"]');
+                    var button = form.querySelector('[data-role="da-review-zone-submit-button"]');
+                    var note = (input && input.value || '').trim();
+                    if (!note) { if (status) { status.textContent = '请先输入校对意见。'; } return; }
+                    if (button) { button.disabled = true; }
+                    if (status) { status.textContent = '提交中…'; }
+                    var body = {
+                      event_kind: form.dataset.eventKind || 'operator_note',
+                      actor_kind: form.dataset.actorKind || 'operator',
+                      row_scope: form.dataset.rowScope,
+                      row_id: form.dataset.rowId,
+                      payload: {
+                        operator_publish_notes: note,
+                        review_zone: form.dataset.zoneId
+                      }
+                    };
+                    fetch(form.action, {
+                      method: form.method || 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(body)
+                    }).then(function (resp) {
+                      if (button) { button.disabled = false; }
+                      if (resp.ok) {
+                        if (status) { status.textContent = '已提交 · 已写入 closure。'; }
+                        if (input) { input.value = ''; }
+                      } else {
+                        resp.text().then(function (text) {
+                          if (status) { status.textContent = '提交失败：' + (text || resp.status); }
+                        });
+                      }
+                    }).catch(function (err) {
+                      if (button) { button.disabled = false; }
+                      if (status) { status.textContent = '提交失败：' + err.message; }
+                    });
+                  });
+                });
+              })();
+            </script>
+          {% endif %}
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="da-review-zone-endpoint-explanation">
+            {{ da_review_zone.closure_endpoint_explanation_zh }}
+          </div>
+          <div class="muted t-secondary" style="margin-top:6px;" data-role="da-review-zone-phase-b-forbidden">
+            {{ da_review_zone.phase_b_authoring_forbidden_label_zh }}
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+
     {% if ops_hot_follow_panel.mounted %}
       <div class="panel" data-role="operator-hot-follow-panel">
         <div class="section-title">

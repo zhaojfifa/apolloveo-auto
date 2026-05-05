@@ -340,8 +340,99 @@ def build_operator_surfaces_for_workbench(
             project_workbench_role_speaker_surface,
         )
 
-        bundle["workbench"]["digital_anchor_role_speaker_surface"] = (
-            project_workbench_role_speaker_surface(packet_view)
+        role_speaker_surface = project_workbench_role_speaker_surface(packet_view)
+        bundle["workbench"]["digital_anchor_role_speaker_surface"] = role_speaker_surface
+        # OWC-DA PR-2: Digital Anchor Workbench five-panel convergence
+        # bundle (DA-W3 + DA-W4 + DA-W5 + DA-W6 + DA-W7). All five are
+        # pure presentation-layer projections over already-existing
+        # truth (role/speaker surface / delivery binding / publish
+        # feedback closure read-only). Hot Follow / Matrix Script /
+        # Baseline workbench surfaces never enter this branch.
+        # Authority: docs/reviews/owc_da_gate_spec_v1.md §3 DA-W3..W7.
+        from gateway.app.services.digital_anchor.content_structure_view import (
+            derive_digital_anchor_content_structure_view,
+        )
+        from gateway.app.services.digital_anchor.delivery_binding import (
+            project_delivery_binding,
+        )
+        from gateway.app.services.digital_anchor.language_output_view import (
+            derive_digital_anchor_language_output_view,
+        )
+        from gateway.app.services.digital_anchor.review_zone_view import (
+            derive_digital_anchor_review_zone_view,
+        )
+        from gateway.app.services.digital_anchor.role_binding_view import (
+            derive_digital_anchor_role_binding_view,
+        )
+        from gateway.app.services.digital_anchor.scene_template_view import (
+            derive_digital_anchor_scene_template_view,
+        )
+
+        try:
+            da_delivery_binding = project_delivery_binding(packet_view)
+        except Exception:
+            da_delivery_binding = {}
+
+        # Read closure read-only — never lazy-create a closure on the
+        # workbench path. Defense-in-depth try/except: presentation
+        # never breaks the workbench if the closure read raises.
+        da_closure_view: Mapping[str, Any] | None = None
+        try:
+            from gateway.app.services.digital_anchor.closure_binding import (
+                get_closure_view_for_task,
+            )
+
+            _da_task_id = (
+                str(task.get("task_id") or task.get("id") or "")
+                if isinstance(task, Mapping)
+                else ""
+            )
+            if _da_task_id:
+                da_closure_view = get_closure_view_for_task(_da_task_id)
+        except Exception:
+            da_closure_view = None
+
+        bundle["workbench"]["digital_anchor_role_binding"] = (
+            derive_digital_anchor_role_binding_view(
+                task,
+                role_speaker_surface,
+                workbench_panel,
+            )
+        )
+        bundle["workbench"]["digital_anchor_content_structure"] = (
+            derive_digital_anchor_content_structure_view(
+                task,
+                role_speaker_surface,
+                workbench_panel,
+            )
+        )
+        bundle["workbench"]["digital_anchor_scene_template"] = (
+            derive_digital_anchor_scene_template_view(
+                task,
+                role_speaker_surface,
+                workbench_panel,
+            )
+        )
+        bundle["workbench"]["digital_anchor_language_output"] = (
+            derive_digital_anchor_language_output_view(
+                task,
+                role_speaker_surface,
+                da_delivery_binding,
+                workbench_panel,
+            )
+        )
+        _da_task_id_for_review = (
+            str(task.get("task_id") or task.get("id") or "")
+            if isinstance(task, Mapping)
+            else ""
+        )
+        bundle["workbench"]["digital_anchor_review_zone"] = (
+            derive_digital_anchor_review_zone_view(
+                role_speaker_surface,
+                da_closure_view,
+                workbench_panel,
+                task_id=_da_task_id_for_review or None,
+            )
         )
     return bundle
 
