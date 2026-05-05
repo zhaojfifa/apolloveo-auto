@@ -424,9 +424,10 @@
           {% for tax in (ms_script_structure.taxonomy or []) %}
             <div class="meta-item" data-role="ms-script-structure-taxonomy-item" data-taxonomy-id="{{ tax.taxonomy_id }}" data-taxonomy-status="{{ tax.values_status_code }}">
               <strong>{{ tax.taxonomy_label_zh }}</strong>
-              {% if tax.values %}
+              {# Item access (`tax["values"]`) — Jinja attribute access on a dict key named `values` resolves to `dict.values` (the bound method) and yields a non-iterable, raising `TypeError: 'builtin_function_or_method' object is not iterable` at render. Same shape as the §8.G axis-values fix. #}
+              {% if tax["values"] %}
                 <span data-role="ms-script-structure-taxonomy-values">
-                  {% for v in tax.values %}<span class="info-pill" style="margin-right:4px;">{{ v }}</span>{% endfor %}
+                  {% for v in tax["values"] %}<span class="info-pill" style="margin-right:4px;">{{ v }}</span>{% endfor %}
                 </span>
               {% endif %}
               <span class="muted t-secondary">{{ tax.values_status_label_zh }}</span>

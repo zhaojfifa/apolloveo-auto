@@ -356,3 +356,44 @@ def test_template_helper_text_documents_transitional_convention():
     # Transitional convention example for operator usability.
     assert "content://matrix-script/source/&lt;token&gt;" in template
     assert "&lt;token&gt;" in template
+
+
+def test_template_pattern_compiles_under_html5_v_flag_grammar():
+    """Live incident regression: the HTML5 ``pattern=`` attribute is
+    compiled by browsers with the ECMAScript ``v`` flag (set notation).
+    A bare ``/`` inside a character class is a v-mode syntax error
+    (``Invalid character in character class``), which makes the input
+    field unusable from the operator's browser even though the pattern
+    parses fine in Python's ``re`` module.
+
+    The fix escapes the slash inside the character class. This test
+    extracts the actual pattern string from the rendered template and
+    asserts the bare-slash-in-character-class syntax is gone, plus
+    asserts the regex is still functionally equivalent for the four
+    opaque-by-construction schemes and the operator-discipline
+    ``mint-…`` token shape.
+    """
+    import re as _re
+
+    template = (TEMPLATE_DIR / "matrix_script_new.html").read_text(encoding="utf-8")
+    match = _re.search(r'pattern="([^"]+)"', template)
+    assert match, "source_script_ref pattern attribute missing"
+    pattern = match.group(1)
+    # Bare-slash-inside-character-class is the v-mode syntax error.
+    # Inside ``[...]``, every ``/`` must be escaped as ``\/``.
+    bracket_class_match = _re.search(r"\[[^\]]*\]", pattern)
+    assert bracket_class_match, "expected at least one character class"
+    bracket_body = bracket_class_match.group(0)
+    assert "/" not in bracket_body or "\\/" in bracket_body, (
+        f"bare '/' inside character class is invalid in v-mode: {bracket_body!r}"
+    )
+    # Functional equivalence: the regex still accepts the four opaque
+    # schemes and the operator-discipline mint-token form, and rejects
+    # multi-line prose that the §8.A guard already rejects server-side.
+    py_regex = _re.compile(pattern.replace(r"\/", "/"))
+    assert py_regex.match("content://matrix-script/source/mint-cafebabe")
+    assert py_regex.match("task://t-001")
+    assert py_regex.match("asset://a-001")
+    assert py_regex.match("ref://r-001")
+    assert py_regex.match("mint-deadbeef00000000")
+    assert not py_regex.match("镜头一：开场画面\n镜头二：展示")
