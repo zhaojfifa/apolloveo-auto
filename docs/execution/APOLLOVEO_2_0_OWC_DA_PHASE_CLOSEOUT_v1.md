@@ -1,7 +1,7 @@
 # ApolloVeo 2.0 · OWC-DA Phase Closeout v1
 
 Date: 2026-05-05
-Status: Documentation only. Aggregating audit + signoff aggregation for the OWC-DA phase of the Operator Workflow Convergence Wave. **No code, no UI, no contract, no schema, no test, no template change.** Authoring this closeout does NOT open the trial re-entry review; the trial re-entry review is a separately gated docs-only step that opens only after this closeout merges and a separate explicit user hand-off lands.
+Status: **MERGED to `main` 2026-05-05T15:31:32Z as PR [#139](https://github.com/zhaojfifa/apolloveo-auto/pull/139), squash commit `f5e86a5`.** Documentation only. Aggregating audit + signoff aggregation for the OWC-DA phase of the Operator Workflow Convergence Wave. **No code, no UI, no contract, no schema, no test, no template change.** Merging this closeout does NOT open the trial re-entry review; the trial re-entry review is a separately gated docs-only step that opens only after a separate explicit user hand-off lands.
 Wave: ApolloVeo 2.0 Operator Workflow Convergence Wave (OWC), Phase OWC-DA.
 Phase Gate: [docs/reviews/owc_da_gate_spec_v1.md](../reviews/owc_da_gate_spec_v1.md).
 Predecessors: OWC authority/gate normalization PR ([apolloveo-auto#121](https://github.com/zhaojfifa/apolloveo-auto/pull/121), squash commit `27aa950`); OWC-MS PR-1 ([#122](https://github.com/zhaojfifa/apolloveo-auto/pull/122), `0b23605`); OWC-MS PR-2 ([#123](https://github.com/zhaojfifa/apolloveo-auto/pull/123), `c7a5a89`) + housekeeping ([#124](https://github.com/zhaojfifa/apolloveo-auto/pull/124), `d2ad7a8`); OWC-MS PR-3 ([#125](https://github.com/zhaojfifa/apolloveo-auto/pull/125), `3d9954c`) + housekeeping ([#126](https://github.com/zhaojfifa/apolloveo-auto/pull/126), `11d896e`); OWC-MS Closeout ([#127](https://github.com/zhaojfifa/apolloveo-auto/pull/127), `ed08626`) + §11 signoff (`b1160b3`); OWC-DA gate spec §10 signoff (`6825005`); OWC-DA PR-1 ([#131](https://github.com/zhaojfifa/apolloveo-auto/pull/131), `13ae744`) + housekeeping ([#132](https://github.com/zhaojfifa/apolloveo-auto/pull/132), `3bb9172`); OWC-DA PR-2 ([#133](https://github.com/zhaojfifa/apolloveo-auto/pull/133), `5db9bb6`) + housekeeping ([#134](https://github.com/zhaojfifa/apolloveo-auto/pull/134), `226fcf9`); OWC-DA PR-3 ([#135](https://github.com/zhaojfifa/apolloveo-auto/pull/135), `f25a46c`); OWC-DA PR-3 follow-up Codex P2 source-language fix ([#138](https://github.com/zhaojfifa/apolloveo-auto/pull/138), `8d42ef9`).
@@ -197,7 +197,7 @@ These gaps are **not blocking** the OWC-DA Closeout. The product-flow surfaces t
 
 These placeholders are filled in the standard follow-on docs-only signoff PR (the same pattern as the OWC-DA gate spec §10 signoff commit `6825005`, the OWC-MS Closeout §11 signoff commit `b1160b3`, and the per-PR housekeeping PRs #132 / #134).
 
-**OVERALL CLOSEOUT VERDICT: PASS** — engineering closeout complete; paperwork pending §11 signoff.
+**OVERALL CLOSEOUT VERDICT: PASS** — engineering closeout complete and MERGED to `main` as PR [#139](https://github.com/zhaojfifa/apolloveo-auto/pull/139) squash commit `f5e86a5`; paperwork pending §11 signoff.
 
 ---
 
