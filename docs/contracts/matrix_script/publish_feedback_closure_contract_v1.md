@@ -249,3 +249,75 @@ Phase D implementation may not start until:
 2. This Phase D.0 contract is reviewed and accepted.
 3. A Phase D.1 brief is issued that explicitly authorizes write-back implementation, names the persistence surface, and confirms it does not turn Phase C projection into a mutable owner.
 4. The variation-id join rule remains the single canonical join into closure truth.
+
+## Operator review zone tag (additive, OWC-MS PR-2 — 2026-05-05)
+
+Authority: `docs/reviews/owc_ms_gate_spec_v1.md` §3 MS-W5 — "four review affordances (字幕 / 配音 / 文案 / CTA) writing through existing closure `operator_note` event with an additive structured `review_zone` field (closed enum: `subtitle / dub / copy / cta`). Closure shape unchanged; an enum closed-set extension on event payload is the only contract touch."
+
+This addendum extends the `operator_note` event payload with one optional field. It introduces no new field on `variation_feedback[]`, no new field on the closure-wide envelope, and no new event kind.
+
+### Closed enum
+
+```
+review_zone ∈ { "subtitle", "dub", "copy", "cta" }
+```
+
+These four zones map 1:1 onto the matrix_script_product_flow §6.1D Workbench D 校对区 affordances and are the binding-and-exhaustive set for OWC-MS PR-2. Any future widening requires a separate gate-spec authoring step.
+
+### Payload shape
+
+`operator_note` events MAY carry an additional `payload.review_zone` value drawn from the closed enum above. The existing required field `payload.operator_publish_notes` is unchanged. Legacy `operator_note` events without `review_zone` remain valid.
+
+```
+{
+  "event_kind": "operator_note",
+  "actor_kind": "operator",
+  "variation_id": "<cell_id>",
+  "payload": {
+    "operator_publish_notes": "<operator note text>",
+    "review_zone": "subtitle"   // OPTIONAL · closed enum above
+  }
+}
+```
+
+### Validation rule
+
+When `payload.review_zone` is present on an `operator_note` event, it MUST be a member of the closed enum; otherwise the closure raises `ClosureValidationError` (HTTP 400 at the operator endpoint). The validator does not auto-fill `review_zone`; an operator may submit a legacy untagged note. The validator does NOT accept `review_zone` on any other event kind (`operator_publish` / `operator_retract` / `platform_callback` / `metrics_snapshot`).
+
+### Recorded position
+
+When the validation passes, the value is recorded as an additional optional key on the appended `feedback_closure_records[]` entry only:
+
+```
+record = {
+  "event_id": ...,
+  "variation_id": ...,
+  "event_kind": "operator_note",
+  "recorded_at": ...,
+  "actor_kind": "operator",
+  "payload_ref": ...,
+  "review_zone": "subtitle"        // present iff the validated event carried it
+}
+```
+
+The `variation_feedback[]` row is not mutated by the additional tag. The closure-wide shape (`surface`, `closure_id`, `line_id`, `packet_version`, `variation_feedback`, `feedback_closure_records`) is not extended.
+
+### What this addendum does NOT do
+
+- It does not introduce a new event kind. `operator_note` remains the single review-write event kind.
+- It does not introduce a new actor kind; the `operator_note → operator` mapping is unchanged.
+- It does not widen `EVENT_KINDS`, `ACTOR_KINDS`, or `CHANNEL_METRICS_KEYS`.
+- It does not change the closure-shape envelope, the per-row `variation_feedback[]` shape, or the closure-wide `publish_status` aggregator.
+- It does not add a new endpoint; review actions write through the existing `POST /api/matrix-script/closures/{task_id}/events` route per Recovery PR-3.
+- It does not introduce per-zone aggregate state on the closure; consumers that need per-zone history MUST replay `feedback_closure_records[]`.
+- It does not interact with Hot Follow / Digital Anchor closures.
+
+### Schema impact
+
+- `schemas/`: unchanged (no per-event JSON schema lives in `schemas/` for this surface today; `EVENT_KINDS` / `REVIEW_ZONE_VALUES` are owned by `gateway/app/services/matrix_script/publish_feedback_closure.py`).
+- `docs/contracts/matrix_script/packet_v1.md`: unchanged.
+- `docs/contracts/matrix_script/task_entry_contract_v1.md`: unchanged.
+- `docs/contracts/matrix_script/workbench_variation_surface_contract_v1.md`: unchanged.
+- `docs/contracts/matrix_script/delivery_binding_contract_v1.md`: unchanged.
+
+This addendum is the only contract touch in OWC-MS PR-2. All other PR-2 work is pure projection over existing truth.
