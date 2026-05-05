@@ -105,6 +105,59 @@ def test_zone_payload_shape_example_uses_existing_endpoint_and_event_kind() -> N
         assert zone["endpoint_template"] == "/api/matrix-script/closures/{task_id}/events"
 
 
+# -- 3b. MS-W5 real submit affordance: per-(variation, zone) form ------
+
+
+def test_submit_form_resolves_endpoint_url_when_task_id_provided() -> None:
+    bundle = derive_matrix_script_review_zone_view(
+        _variation_surface(), None, _matrix_script_panel(), task_id="ms_w5_task_42"
+    )
+    assert (
+        bundle["closure_endpoint_url"]
+        == "/api/matrix-script/closures/ms_w5_task_42/events"
+    )
+    for zone in bundle["zones"]:
+        assert (
+            zone["endpoint_url"]
+            == "/api/matrix-script/closures/ms_w5_task_42/events"
+        )
+        assert zone["input_label_zh"]
+        assert zone["submit_label_zh"]
+
+
+def test_submit_form_per_variation_per_zone_carries_real_action_and_payload_keys() -> None:
+    bundle = derive_matrix_script_review_zone_view(
+        _variation_surface(), None, _matrix_script_panel(), task_id="ms_w5_task_42"
+    )
+    rows = bundle["review_status_rows"]
+    assert rows  # exactly two cells in the fixture
+    for row in rows:
+        for zone_id in ("subtitle", "dub", "copy", "cta"):
+            form = row["per_zone"][zone_id]["submit_form"]
+            assert form is not None
+            assert form["method"] == "POST"
+            assert (
+                form["action"]
+                == "/api/matrix-script/closures/ms_w5_task_42/events"
+            )
+            assert form["event_kind"] == "operator_note"
+            assert form["actor_kind"] == "operator"
+            assert form["variation_id"] == row["variation_id"]
+            assert form["review_zone"] == zone_id
+
+
+def test_submit_form_absent_when_no_task_id_provided() -> None:
+    bundle = derive_matrix_script_review_zone_view(
+        _variation_surface(), None, _matrix_script_panel()
+    )
+    assert bundle["closure_endpoint_url"] is None
+    for row in bundle["review_status_rows"]:
+        for zone_id in ("subtitle", "dub", "copy", "cta"):
+            assert row["per_zone"][zone_id]["submit_form"] is None
+        for zone in bundle["zones"]:
+            assert zone["endpoint_url"] is None
+
+
 def test_closure_endpoint_explanation_names_recovery_pr3_endpoint() -> None:
     bundle = derive_matrix_script_review_zone_view(
         _variation_surface(), None, _matrix_script_panel()

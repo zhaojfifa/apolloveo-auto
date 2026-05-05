@@ -42,7 +42,8 @@ from gateway.app.services.matrix_script.script_structure_view import (
     SECTION_CTA,
     SECTION_HOOK,
     STATUS_OPAQUE_REF,
-    STATUS_UNAUTHORED,
+    STATUS_RESOLVED,
+    STATUS_UNRESOLVED,
     TAXONOMY_FORBIDDEN,
     TAXONOMY_KEYWORDS,
     derive_matrix_script_script_structure_view,
@@ -60,7 +61,27 @@ def _matrix_script_task(
     tone_hint: str = "casual",
     audience_hint: str = "b2c",
     length_hint: str = "60",
+    cells: list[dict[str, Any]] | None = None,
+    slots: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    if cells is None:
+        cells = [
+            {
+                "cell_id": "cell_001",
+                "axis_selections": {"tone": "formal", "audience": "b2b", "length": 60},
+                "script_slot_ref": "slot_001",
+            },
+            {
+                "cell_id": "cell_002",
+                "axis_selections": {"tone": "casual", "audience": "b2c", "length": 30},
+                "script_slot_ref": "slot_002",
+            },
+        ]
+    if slots is None:
+        slots = [
+            {"slot_id": "slot_001", "length_hint": 60},
+            {"slot_id": "slot_002", "length_hint": 30},
+        ]
     return {
         "task_id": "ms_ms_w3_001",
         "id": "ms_ms_w3_001",
@@ -86,6 +107,20 @@ def _matrix_script_task(
                 "audience_hint": audience_hint,
                 "length_hint": length_hint,
             },
+        },
+        "packet": {
+            "line_id": "matrix_script",
+            "packet_version": "v1",
+            "line_specific_refs": [
+                {
+                    "ref_id": "matrix_script_variation_matrix",
+                    "delta": {"cells": cells},
+                },
+                {
+                    "ref_id": "matrix_script_slot_pack",
+                    "delta": {"slots": slots},
+                },
+            ],
         },
     }
 
@@ -189,10 +224,13 @@ def test_source_script_ref_status_label_explains_opaque_handle() -> None:
     bundle = derive_matrix_script_script_structure_view(_matrix_script_task())
     label = bundle["source_script_ref_status_label_zh"]
     assert "opaque" in label
-    assert "Plan E F3" in label
+    # Updated label after MS-W3 real read-view: panel surfaces resolved
+    # content from Phase B + entry truth instead of declaring everything
+    # gated by F3 dereference.
+    assert "Phase B" in label and "entry" in label
 
 
-# -- 4. Hook / Body / CTA section structure -----------------------------
+# -- 4. Hook / Body / CTA section structure (real read-view) ------------
 
 
 def test_sections_render_three_in_order() -> None:
@@ -204,12 +242,76 @@ def test_sections_render_three_in_order() -> None:
     ]
 
 
-def test_section_bodies_render_unauthored_sentinel() -> None:
+def test_hook_section_renders_real_content_from_entry_topic_and_hints() -> None:
+    bundle = derive_matrix_script_script_structure_view(
+        _matrix_script_task(topic="春节促销", tone_hint="casual", audience_hint="b2c")
+    )
+    hook = next(s for s in bundle["sections"] if s["section_id"] == SECTION_HOOK)
+    assert hook["body_status_code"] == STATUS_RESOLVED
+    assert hook["body_text"] is not None
+    assert "春节促销" in hook["body_text"]
+    assert "casual" in hook["body_text"]
+    assert "b2c" in hook["body_text"]
+
+
+def test_hook_section_unresolved_only_when_topic_missing() -> None:
+    bundle = derive_matrix_script_script_structure_view(_matrix_script_task(topic=""))
+    hook = next(s for s in bundle["sections"] if s["section_id"] == SECTION_HOOK)
+    assert hook["body_status_code"] == STATUS_UNRESOLVED
+    assert hook["body_text"] is None
+
+
+def test_body_section_renders_real_content_from_resolved_phase_b_cells() -> None:
     bundle = derive_matrix_script_script_structure_view(_matrix_script_task())
-    for section in bundle["sections"]:
-        assert section["body_text"] is None
-        assert section["body_status_code"] == STATUS_UNAUTHORED
-        assert "Outline Contract" in section["body_status_label_zh"]
+    body = next(s for s in bundle["sections"] if s["section_id"] == SECTION_BODY)
+    assert body["body_status_code"] == STATUS_RESOLVED
+    assert body["body_text"] is not None
+    # Real derived content: variation count + axis-value spread + length stats.
+    assert "已派生 2 条变体" in body["body_text"]
+    assert "tone=" in body["body_text"]
+    assert "平均时长" in body["body_text"]
+
+
+def test_body_section_unresolved_when_no_phase_b_cells() -> None:
+    bundle = derive_matrix_script_script_structure_view(
+        _matrix_script_task(cells=[], slots=[])
+    )
+    body = next(s for s in bundle["sections"] if s["section_id"] == SECTION_BODY)
+    assert body["body_status_code"] == STATUS_UNRESOLVED
+    assert body["body_text"] is None
+
+
+def test_cta_section_renders_real_content_from_target_platform() -> None:
+    bundle = derive_matrix_script_script_structure_view(
+        _matrix_script_task(target_platform="douyin")
+    )
+    cta = next(s for s in bundle["sections"] if s["section_id"] == SECTION_CTA)
+    assert cta["body_status_code"] == STATUS_RESOLVED
+    assert cta["body_text"] is not None
+    assert "douyin" in cta["body_text"]
+
+
+def test_cta_section_unresolved_only_when_target_platform_missing() -> None:
+    bundle = derive_matrix_script_script_structure_view(
+        _matrix_script_task(target_platform="")
+    )
+    cta = next(s for s in bundle["sections"] if s["section_id"] == SECTION_CTA)
+    assert cta["body_status_code"] == STATUS_UNRESOLVED
+    assert cta["body_text"] is None
+
+
+def test_per_field_unresolved_fallback_does_not_replace_resolved_fields() -> None:
+    """Critical invariant per blocker 2: unresolved fallback applies ONLY
+    to the unresolved field, not to the whole panel."""
+    bundle = derive_matrix_script_script_structure_view(
+        _matrix_script_task(target_platform="", topic="春节促销")
+    )
+    by_id = {s["section_id"]: s for s in bundle["sections"]}
+    # Hook + Body resolved (topic + cells present)
+    assert by_id[SECTION_HOOK]["body_status_code"] == STATUS_RESOLVED
+    assert by_id[SECTION_BODY]["body_status_code"] == STATUS_RESOLVED
+    # CTA only one with unresolved fallback
+    assert by_id[SECTION_CTA]["body_status_code"] == STATUS_UNRESOLVED
 
 
 def test_section_labels_use_operator_language() -> None:
@@ -220,7 +322,7 @@ def test_section_labels_use_operator_language() -> None:
     assert "CTA" in labels[SECTION_CTA]
 
 
-# -- 5. 关键词 / 禁用词 taxonomy structure -------------------------------
+# -- 5. 关键词 / 禁用词 taxonomy structure (real read-view) --------------
 
 
 def test_taxonomy_renders_two_in_order() -> None:
@@ -231,11 +333,43 @@ def test_taxonomy_renders_two_in_order() -> None:
     ]
 
 
-def test_taxonomy_renders_unauthored_sentinel() -> None:
+def test_keywords_taxonomy_renders_real_values_from_entry_signals() -> None:
+    bundle = derive_matrix_script_script_structure_view(
+        _matrix_script_task(
+            topic="春节促销",
+            tone_hint="casual",
+            audience_hint="b2c",
+            target_platform="douyin",
+        )
+    )
+    kw = next(t for t in bundle["taxonomy"] if t["taxonomy_id"] == TAXONOMY_KEYWORDS)
+    assert kw["values_status_code"] == STATUS_RESOLVED
+    assert "春节促销" in kw["values"]
+    assert "casual" in kw["values"]
+    assert "b2c" in kw["values"]
+    assert "douyin" in kw["values"]
+
+
+def test_keywords_taxonomy_unresolved_only_when_all_entry_signals_blank() -> None:
+    bundle = derive_matrix_script_script_structure_view(
+        _matrix_script_task(
+            topic="", tone_hint="", audience_hint="", target_platform=""
+        )
+    )
+    kw = next(t for t in bundle["taxonomy"] if t["taxonomy_id"] == TAXONOMY_KEYWORDS)
+    assert kw["values_status_code"] == STATUS_UNRESOLVED
+    assert kw["values"] == []
+
+
+def test_forbidden_taxonomy_renders_real_operator_visible_red_lines() -> None:
     bundle = derive_matrix_script_script_structure_view(_matrix_script_task())
-    for tax in bundle["taxonomy"]:
-        assert tax["values"] == []
-        assert tax["values_status_code"] == STATUS_UNAUTHORED
+    fb = next(t for t in bundle["taxonomy"] if t["taxonomy_id"] == TAXONOMY_FORBIDDEN)
+    assert fb["values_status_code"] == STATUS_RESOLVED
+    # Real forbidden-terms enforced at the operator-visible-surface boundary:
+    assert "vendor" in fb["values"]
+    assert "model" in fb["values"]
+    assert "provider" in fb["values"]
+    assert "engine" in fb["values"]
 
 
 def test_taxonomy_labels_use_operator_language() -> None:

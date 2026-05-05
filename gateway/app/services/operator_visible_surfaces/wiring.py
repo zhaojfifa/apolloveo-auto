@@ -308,11 +308,17 @@ def build_operator_surfaces_for_workbench(
                 closure=closure_view,
             )
         )
+        _task_id_for_review = (
+            str(task.get("task_id") or task.get("id") or "")
+            if isinstance(task, Mapping)
+            else ""
+        )
         bundle["workbench"]["matrix_script_review_zone"] = (
             derive_matrix_script_review_zone_view(
                 variation_surface,
                 closure_view,
                 workbench_panel,
+                task_id=_task_id_for_review or None,
             )
         )
         bundle["workbench"]["matrix_script_qc_diagnostics"] = (

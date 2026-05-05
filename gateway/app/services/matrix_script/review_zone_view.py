@@ -157,11 +157,19 @@ def derive_matrix_script_review_zone_view(
     variation_surface: Mapping[str, Any] | None,
     closure: Mapping[str, Any] | None,
     line_specific_panel: Mapping[str, Any] | None,
+    *,
+    task_id: str | None = None,
 ) -> dict[str, Any]:
     """Project the Matrix Script Workbench D 校对区 bundle.
 
     Returns ``{}`` when the panel is not Matrix Script, so the caller
     can attach the result without further gating.
+
+    When ``task_id`` is provided, the bundle additionally carries a
+    per-(variation, zone) ``submit_form`` shape so the template can
+    render real operator review submit forms — single endpoint, single
+    event_kind, optional ``review_zone`` tag (OWC-MS PR-2 / MS-W5 real
+    write affordance per gate spec §3 MS-W5).
     """
     panel = _safe_mapping(line_specific_panel)
     if not _is_matrix_script(panel):
@@ -173,6 +181,13 @@ def derive_matrix_script_review_zone_view(
 
     history_index = _zone_history_index(closure)
 
+    resolved_task_id = str(task_id) if task_id else ""
+    endpoint_url = (
+        REVIEW_EVENT_ENDPOINT_TEMPLATE.format(task_id=resolved_task_id)
+        if resolved_task_id
+        else None
+    )
+
     zones: list[dict[str, Any]] = []
     for zone_id in REVIEW_ZONE_ORDER:
         zones.append(
@@ -183,7 +198,11 @@ def derive_matrix_script_review_zone_view(
                 "event_kind": "operator_note",
                 "actor_kind": "operator",
                 "endpoint_template": REVIEW_EVENT_ENDPOINT_TEMPLATE,
+                "endpoint_url": endpoint_url,
                 "payload_shape_example": _zone_payload_template(zone_id),
+                "input_label_zh": f"输入{REVIEW_ZONE_LABELS_ZH[zone_id]}意见",
+                "input_placeholder_zh": "请输入校对意见…（提交后写入 closure operator_note）",
+                "submit_label_zh": f"提交 {REVIEW_ZONE_LABELS_ZH[zone_id]} 意见",
             }
         )
 
@@ -203,6 +222,22 @@ def derive_matrix_script_review_zone_view(
                 "last_event_id": (last or {}).get("event_id"),
                 "last_recorded_at": (last or {}).get("recorded_at"),
                 "is_reviewed": bool(last),
+                # Per-(variation, zone) real submit-form shape. Single
+                # endpoint, single event_kind, optional review_zone tag.
+                # Renders only when task_id was provided so the template
+                # can build the form against the resolved closure URL.
+                "submit_form": (
+                    {
+                        "method": "POST",
+                        "action": endpoint_url,
+                        "event_kind": "operator_note",
+                        "actor_kind": "operator",
+                        "variation_id": variation_id,
+                        "review_zone": zone_id,
+                    }
+                    if endpoint_url
+                    else None
+                ),
             }
         legacy_history = history_index.get((variation_id, "_legacy_unzoned"), [])
         review_status_rows.append(
@@ -228,6 +263,7 @@ def derive_matrix_script_review_zone_view(
         "review_status_rows": review_status_rows,
         "closure_endpoint_label_zh": "回写端点",
         "closure_endpoint_template": REVIEW_EVENT_ENDPOINT_TEMPLATE,
+        "closure_endpoint_url": endpoint_url,
         "closure_endpoint_explanation_zh": (
             "通过既有 Recovery PR-3 端点回写：POST /api/matrix-script/closures/{task_id}/events，"
             "event_kind=operator_note，actor_kind=operator，payload 包含 operator_publish_notes 与 review_zone。"
