@@ -608,3 +608,65 @@ def test_workbench_render_context_attaches_variation_surface(monkeypatch):
     assert captured["axes_count"] == 3
     assert captured["cells_count"] == 4
     assert captured["slots_count"] == 4
+
+
+# --- §9. MS-W3 taxonomy values render (live 500 incident regression) ---
+
+
+def test_ms_w3_script_structure_taxonomy_values_render(monkeypatch):
+    """Live incident regression: the MS-W3 script-structure read-view
+    block in ``task_workbench.html`` iterated over ``tax.values`` —
+    Jinja's attribute access on a dict whose key is named ``values``
+    resolves to the bound ``dict.values`` method (not the dict's
+    ``"values"`` key) and the for-loop raises
+    ``TypeError: 'builtin_function_or_method' object is not iterable``,
+    turning every Matrix Script task page into a 500.
+
+    Same shape as the §8.G axis-values fix; the patch flips the access
+    to ``tax["values"]``. This test asserts both that the page no
+    longer 500s AND that the resolved-keywords taxonomy values surface
+    inside the script-structure region (i.e. the loop actually runs
+    over the dict's ``"values"`` list and not the bound method).
+    """
+    monkeypatch.setenv("AUTH_MODE", "off")
+    repo = _InMemoryRepo()
+    app.dependency_overrides[get_task_repository] = lambda: repo
+    client = TestClient(app, raise_server_exceptions=False)
+    try:
+        task_id = _post_fresh_sample(client, variation_target_count=4)
+        response = client.get(
+            f"/tasks/{task_id}",
+            params={"created": "matrix_script"},
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200, response.text
+    body = response.text
+
+    # Script-structure region must be present (positive anchor).
+    assert 'data-role="matrix-script-script-structure-panel"' in body
+    assert 'data-role="ms-script-structure-taxonomy-item"' in body
+
+    # Forbidden-terms taxonomy is always resolved (vendor / model /
+    # provider / engine red lines, per script_structure_view._derive_
+    # forbidden_taxonomy). Each value MUST appear inside the rendered
+    # taxonomy region — proves the for-loop iterates over the dict's
+    # ``"values"`` list, not the bound ``dict.values`` method.
+    forbidden_marker = (
+        'data-role="ms-script-structure-taxonomy-item" '
+        'data-taxonomy-id="forbidden_terms"'
+    )
+    assert forbidden_marker in body
+    forbidden_start = body.index(forbidden_marker)
+    forbidden_end = body.index("</div>", forbidden_start)
+    forbidden_region = body[forbidden_start:forbidden_end]
+    for forbidden_value in ("vendor", "model", "provider", "engine"):
+        assert f">{forbidden_value}<" in forbidden_region, (
+            f"forbidden taxonomy value {forbidden_value!r} missing — Jinja "
+            f"`tax.values` likely resolved to the bound dict.values method"
+        )
+
+    # Negative: the bound-method repr must not leak into the taxonomy
+    # region (the same canary used by the §8.G axes-table regression).
+    assert "<built-in method values" not in body
