@@ -1,7 +1,7 @@
 # ApolloVeo 2.0 · OWC-DA PR-1 — Digital Anchor Task Entry + Task Area Convergence — Execution Log v1
 
 Date: 2026-05-05
-Status: Engineering complete on branch `claude/agitated-lederberg-6be462`; PR opening pending.
+Status: **MERGED to `main` on 2026-05-05T11:12:54Z as PR #131, squash commit `13ae744`.** OWC-DA PR-1 implementation phase complete; OWC-DA PR-2 (DA-W3..W7) gate is paperwork-eligible per gate spec §5 ordering but does NOT open without explicit user hand-off.
 Wave: ApolloVeo 2.0 Operator Workflow Convergence Wave (OWC), Phase OWC-DA.
 Phase Gate: [docs/reviews/owc_da_gate_spec_v1.md](../reviews/owc_da_gate_spec_v1.md) (architect Raobin + reviewer Alisa signed; coordinator Jackie + product manager standby per §10).
 Predecessors: OWC authority/gate normalization PR (#121, squash commit `27aa950`); OWC-MS PR-1/2/3 + Closeout (all merged 2026-05-04 / 2026-05-05); Operator Capability Recovery PR-1..PR-4 (all merged 2026-05-04).
