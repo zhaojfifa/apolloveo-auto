@@ -281,6 +281,59 @@ def test_language_usage_aggregates_languages_from_target_and_segment_pick(
     assert rows["zh-CN"]["segment_count"] == 1  # seg_002
 
 
+def test_language_usage_includes_source_language_when_excluded_from_target_and_segment_picks(
+    delivery_binding,
+):
+    """Codex P2 (PR #135 review at delivery_pack_view.py:447-453).
+
+    When ``source_language`` is set but is NOT included in
+    ``target_languages`` and NOT present in any segment ``language_pick``,
+    the rendered ``language_rows`` must still surface the
+    ``source_language`` row so the Delivery Pack language lane keeps
+    operator-visible source coverage. Synthetic delivery binding here
+    forces every segment's ``language_pick`` to ``zh-CN`` so the source
+    ``en-US`` cannot reach the union via segment_picks; the entry's
+    ``language_scope.target_language`` also excludes ``en-US``.
+    """
+    entry = _entry_with(target=("zh-CN",))  # target excludes the source
+    assert entry["language_scope"]["source_language"] == "en-US"
+    task = _da_task(entry=entry)
+    # Override the delivery binding's role_segment_bindings so every
+    # segment language_pick is zh-CN (excludes the source). The packet
+    # itself remains untouched (read-only discipline).
+    binding = deepcopy(delivery_binding)
+    bindings = binding["result_packet_binding"]["role_segment_bindings"]
+    assert bindings, "fixture must have at least one role_segment_binding"
+    for row in bindings:
+        row["language_pick"] = "zh-CN"
+
+    pack = derive_digital_anchor_delivery_pack(
+        delivery_binding=binding, task=task
+    )
+    lane = pack["lanes"][LANE_LANGUAGE_USAGE]
+    assert lane["status_code"] == STATUS_RESOLVED
+    assert lane["source_language"] == "en-US"
+    assert lane["target_languages"] == ["zh-CN"]
+
+    rows_by_lang = {row["language"]: row for row in lane["language_rows"]}
+    # The condition: source language MUST be in the rendered rows even
+    # when excluded from both target_languages and segment_picks.
+    assert "en-US" in rows_by_lang, (
+        "source_language must remain operator-visible in the language_usage "
+        "lane even when excluded from target_languages and segment_picks"
+    )
+    source_row = rows_by_lang["en-US"]
+    assert source_row["is_source_language"] is True
+    assert source_row["is_target_language"] is False
+    assert source_row["segment_count"] == 0  # no segments pick the source
+    assert source_row["segment_ids"] == []
+    # Tracked-gap discipline preserved: the row is rendered with
+    # zero segment coverage, not a synthesized hit.
+    # The other lanes' tracked-gap status is independent and unaffected.
+    assert rows_by_lang["zh-CN"]["is_source_language"] is False
+    assert rows_by_lang["zh-CN"]["is_target_language"] is True
+
+
 def test_language_usage_tracked_gap_when_language_scope_absent(delivery_binding):
     entry = _entry_with()
     entry.pop("language_scope")
