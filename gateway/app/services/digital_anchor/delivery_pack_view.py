@@ -444,7 +444,19 @@ def _build_language_usage_lane(
             "value_source_id": None,
         }
 
+    # Codex P2 (PR #135 review at delivery_pack_view.py:447-453): the
+    # language_usage lane MUST keep ``source_language`` operator-visible
+    # in the rendered union, even when it is not among ``target_languages``
+    # and not present in ``segment_picks`` (e.g. source ``en-US`` with
+    # target-only ``zh-CN``). Otherwise the Delivery Pack language panel
+    # is incomplete on a real entry and operators see a misleading
+    # coverage view. Read-only over the existing entry / delivery-binding
+    # substrate; no new truth is synthesised — the source_language value
+    # was already projected at the lane level above, this just keeps it
+    # in the per-language row union.
     union_languages: list[str] = []
+    if source_language and source_language not in union_languages:
+        union_languages.append(source_language)
     for lang in target_languages:
         if lang and lang not in union_languages:
             union_languages.append(lang)
