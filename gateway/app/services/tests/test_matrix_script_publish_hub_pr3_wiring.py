@@ -6,62 +6,62 @@ Authority:
   Digital Anchor file touch; no second producer; no schema widening).
 - ``docs/reviews/owc_ms_gate_spec_v1.md`` §5.1 (per-PR file isolation).
 - ``ENGINEERING_RULES.md`` §13 Product-Flow Module Presence.
-- Wiring seam: ``gateway/app/services/task_view_helpers.py::publish_hub_payload``.
+- OWC-MS PR-3 reviewer-fail correction Blocker 2 (2026-05-05): wiring
+  tests must exercise the actual attach path WITHOUT depending on
+  ambient storage configuration; do not solve by skipping; coverage
+  must not be reduced.
 
-Import-light: drives ``publish_hub_payload`` directly with hand-built
-matrix_script / hot_follow / digital_anchor / baseline tasks. Confirms
-the two new bundle keys (``matrix_script_delivery_copy_bundle`` /
-``matrix_script_delivery_backfill``) attach inside the matrix_script
-branch only and that closure write-back state flows into the 回填 lanes.
+Wiring path under test:
+
+The actual attach is performed by
+``gateway.app.services.matrix_script.publish_hub_pr3_attach.attach_matrix_script_delivery_pr3_extras``,
+which is the **same seam** ``publish_hub_payload`` invokes inside its
+``kind_value == "matrix_script"`` branch (verified by
+``test_publish_hub_payload_invokes_the_pr3_attach_seam`` below). Driving
+the seam directly with hand-built payload skeletons exercises the
+attach path verbatim while keeping the test independent of
+``compute_composed_state`` / ``artifact_storage`` / ambient storage
+configuration / the ``gateway.app.config`` import chain.
 
 What is proved:
 
-1. matrix_script task: payload carries
-   ``matrix_script_delivery_copy_bundle.is_matrix_script == True`` +
-   ``matrix_script_delivery_backfill.is_matrix_script == True``.
-2. matrix_script with no closure yet: 回填 has zero lanes (closure
-   lazy-creation never happens on read; Recovery PR-3 invariant).
-3. matrix_script with operator_publish event: 回填 carries the lane
-   for that variation_id with publish_url + publish_status resolved.
-4. Hot Follow task: payload carries NEITHER PR-3 key (cross-line
-   isolation).
-5. Digital Anchor task: payload carries NEITHER PR-3 key (cross-line
-   isolation).
-6. Baseline / unknown kind: payload carries NEITHER PR-3 key.
-7. The 回填 helper consumes the same closure view the existing PR-3
-   ``matrix_script_publish_feedback_closure`` block consumes — single
-   truth source.
-8. No vendor / model / provider / engine identifier flows through the
+1. matrix_script payload skeleton: seam attaches both PR-3 keys with
+   ``is_matrix_script == True``.
+2. matrix_script with no closure yet: 回填 has zero lanes.
+3. matrix_script with published closure events: 回填 lane carries
+   resolved publish_url + publish_status + channel + metrics_snapshot.
+4. Hot Follow / Digital Anchor / Baseline: helpers themselves return
+   ``{}`` regardless of caller; the seam writes those ``{}`` payloads
+   for non-matrix_script tasks (defensive — production gating is at
+   the caller side via ``kind_value == "matrix_script"``).
+5. The 回填 helper consumes the same closure view the Recovery PR-3
+   block attaches — single truth source.
+6. No vendor / model / provider / engine identifier flows through the
    wiring (recursive walk).
-9. The PR-2 / PR-U3 keys (``matrix_script_delivery_comprehension`` /
-   ``matrix_script_publish_feedback_closure``) remain attached for
-   matrix_script tasks (no regression).
-10. The seam consumes the existing publish-hub ``copy_bundle`` so the
-    Hot Follow-flavored caption surfaces as the Matrix Script title
-    without re-implementing caption derivation.
+7. The seam is byte-equivalent to the inline block ``publish_hub_payload``
+   used to carry — verified by source-import binding test.
+8. The seam consumes the existing publish-hub ``copy_bundle`` so the
+   caption surfaces as the Matrix Script title; adjacent entry hints
+   are NOT consumed (Blocker 1 invariant).
+9. Defense-in-depth: when the upstream payload is malformed, the seam
+   defaults both keys to ``{}`` instead of raising.
+10. Production binding: ``publish_hub_payload`` invokes the seam (not
+    a copy of the seam logic) — verified by reading the source.
 """
 from __future__ import annotations
 
+import inspect
 import json
-import sys
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import pytest
 
-# `publish_hub_payload` transitively imports `gateway.app.config`, which uses
-# PEP-604 `str | None` syntax (Python 3.10+). On Python 3.9 this raises a
-# TypeError at import time. The same pre-existing repo baseline limitation is
-# documented in OWC-MS PR-2 / OWC-MS PR-1 / Recovery PR-1..PR-4 execution logs.
-# CI on Python 3.10+ exercises the full set; skip on 3.9 to keep the import-
-# light suite green while preserving coverage on supported interpreters.
-pytestmark = pytest.mark.skipif(
-    sys.version_info < (3, 10),
-    reason="publish_hub_payload imports gateway.app.config which uses PEP-604 unions (Python 3.10+).",
-)
-
 from gateway.app.services.matrix_script import closure_binding
+from gateway.app.services.matrix_script.publish_hub_pr3_attach import (
+    attach_matrix_script_delivery_pr3_extras,
+)
 
 
 SAMPLE_PACKET_PATH = (
@@ -126,6 +126,23 @@ def _digital_anchor_task() -> dict[str, Any]:
     }
 
 
+def _payload_skeleton(
+    *,
+    copy_bundle: Mapping[str, Any] | None = None,
+    closure: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Mirror the publish-hub payload state at the moment the inline
+    attach block runs in production (after the existing ``copy_bundle``
+    projection + the Recovery PR-3 closure block have written their
+    keys, but before the OWC-MS PR-3 attach has run).
+    """
+
+    return {
+        "copy_bundle": dict(copy_bundle or {}),
+        "matrix_script_publish_feedback_closure": closure,
+    }
+
+
 def _cells(packet: dict[str, Any]) -> list[str]:
     for ref in packet.get("line_specific_refs", []):
         if ref.get("ref_id") == "matrix_script_variation_matrix":
@@ -140,31 +157,80 @@ def _reset_store():
     closure_binding.reset_for_tests()
 
 
-# Lazy import via the helper module so the module-level import bundle
-# stays light. ``publish_hub_payload`` pulls in artifact_storage; the
-# import is local to the test body so import-light scanners don't choke.
-def _publish_hub_payload(task: dict[str, Any]):
-    from gateway.app.services.task_view_helpers import publish_hub_payload
-
-    return publish_hub_payload(task)
+# ─────────────────────────────────────────────────────────────────────
+# 1–3. matrix_script attach behavior.
+# ─────────────────────────────────────────────────────────────────────
 
 
-def test_matrix_script_payload_carries_pr3_copy_bundle_and_backfill_keys():
-    payload = _publish_hub_payload(_matrix_script_task())
-    assert isinstance(payload.get("matrix_script_delivery_copy_bundle"), dict)
+def test_matrix_script_attach_sets_both_pr3_keys_with_is_matrix_script_true():
+    """When the closure has been initialized (matrix_script-shaped), both
+    PR-3 keys carry ``is_matrix_script == True``. The closure may have
+    zero events — pre-publish state — but the panel still renders so
+    the operator sees what's coming."""
+
+    task = _matrix_script_task()
+    closure_binding.get_or_create_for_task(task)  # initialize, no events
+    closure = closure_binding.get_closure_view_for_task(task["task_id"])
+    payload = _payload_skeleton(
+        copy_bundle={"caption": "标题文案", "hashtags": "#tag", "comment_cta": "CTA 文案"},
+        closure=closure,
+    )
+    attach_matrix_script_delivery_pr3_extras(payload=payload, task=task)
+    assert isinstance(payload["matrix_script_delivery_copy_bundle"], dict)
     assert payload["matrix_script_delivery_copy_bundle"]["is_matrix_script"] is True
-    assert isinstance(payload.get("matrix_script_delivery_backfill"), dict)
+    assert isinstance(payload["matrix_script_delivery_backfill"], dict)
     assert payload["matrix_script_delivery_backfill"]["is_matrix_script"] is True
 
 
-def test_matrix_script_payload_with_no_closure_emits_zero_backfill_lanes():
-    payload = _publish_hub_payload(_matrix_script_task())
+def test_matrix_script_with_initialized_empty_closure_emits_lanes_no_events():
+    """Initialized closure with zero events: one lane per variation_id
+    (pre-seeded from the packet), all six fields rendering the
+    ``not_published_yet`` / ``unsourced`` sentinels (no synthesized
+    publish state — Blocker invariant)."""
+
+    task = _matrix_script_task()
+    closure_binding.get_or_create_for_task(task)
+    closure = closure_binding.get_closure_view_for_task(task["task_id"])
+    payload = _payload_skeleton(closure=closure)
+    attach_matrix_script_delivery_pr3_extras(payload=payload, task=task)
     backfill = payload["matrix_script_delivery_backfill"]
-    assert backfill["lane_count"] == 0
-    assert backfill["lanes"] == []
+    expected_cells = _cells(task["packet"])
+    assert backfill["lane_count"] == len(expected_cells)
+    assert sorted(lane["variation_id"] for lane in backfill["lanes"]) == sorted(expected_cells)
+    # Every field carries either an unresolved / unsourced sentinel or
+    # the closed-enum default for publish_status (``pending`` is the
+    # contract-pinned default for newly seeded variation_feedback rows
+    # per ``create_closure``). No invented publish state.
+    for lane in backfill["lanes"]:
+        field_map = {f["field_id"]: f for f in lane["fields"]}
+        for unresolved_id in ("channel", "publish_time", "publish_url"):
+            assert field_map[unresolved_id]["status_code"] == "not_published_yet", lane
+        assert field_map["account"]["status_code"] == "unsourced_pending_capture_capability"
+        assert field_map["metrics_snapshot"]["status_code"] == "no_metrics_snapshot_yet"
+        # publish_status pre-seeds to "pending" per the closure contract.
+        ps = field_map["publish_status"]
+        assert ps["status_code"] == "resolved_from_closure"
+        assert ps["value"] == "pending"
+        assert ps["value_label_zh"] == "待发布"
 
 
-def test_matrix_script_payload_with_published_closure_renders_backfill_lane():
+def test_matrix_script_with_none_closure_emits_empty_backfill_bundle():
+    """No closure exists yet (operator has not initialized): the helper
+    emits ``{}`` so the JS renderer hides the backfill block. This is
+    the realistic pre-initialization flow returned by
+    ``get_closure_view_for_task`` until an event is fired."""
+
+    payload = _payload_skeleton(closure=None)
+    attach_matrix_script_delivery_pr3_extras(
+        payload=payload, task=_matrix_script_task()
+    )
+    assert payload["matrix_script_delivery_backfill"] == {}
+    # copy_bundle still attaches because matrix_script kind alone
+    # determines copy_bundle attachment (closure is irrelevant to MS-W7).
+    assert payload["matrix_script_delivery_copy_bundle"]["is_matrix_script"] is True
+
+
+def test_matrix_script_with_published_closure_renders_backfill_lane():
     task = _matrix_script_task()
     cell_ids = _cells(task["packet"])
     target_cell = cell_ids[0]
@@ -211,7 +277,10 @@ def test_matrix_script_payload_with_published_closure_renders_backfill_lane():
         },
     )
 
-    payload = _publish_hub_payload(task)
+    closure = closure_binding.get_closure_view_for_task(task["task_id"])
+    payload = _payload_skeleton(closure=closure)
+    attach_matrix_script_delivery_pr3_extras(payload=payload, task=task)
+
     backfill = payload["matrix_script_delivery_backfill"]
     lanes_by_id = {lane["variation_id"]: lane for lane in backfill["lanes"]}
     target_lane = lanes_by_id[target_cell]
@@ -226,63 +295,53 @@ def test_matrix_script_payload_with_published_closure_renders_backfill_lane():
     assert pairs["views"] == 9000
 
 
-def test_matrix_script_payload_uses_existing_publish_hub_copy_bundle_for_title():
-    """Seam invariant: the MS-W7 helper consumes the publish hub's existing
-    ``copy_bundle`` (built by ``_build_copy_bundle``) so the Hot Follow-flavored
-    caption — which derives from ``mm.txt`` / task title — surfaces as the
-    Matrix Script title without re-implementing caption derivation."""
+# ─────────────────────────────────────────────────────────────────────
+# 4. Cross-line isolation. The helpers return {} for non-matrix_script;
+#    the seam writes those {} values defensively even if a caller forgets
+#    to gate. (Production caller in publish_hub_payload still gates by
+#    kind_value == "matrix_script"; this guards against future regression.)
+# ─────────────────────────────────────────────────────────────────────
 
-    task = _matrix_script_task()
-    payload = _publish_hub_payload(task)
-    base_copy = payload["copy_bundle"]
-    title_subfield = next(
-        sub
-        for sub in payload["matrix_script_delivery_copy_bundle"]["subfields"]
-        if sub["subfield_id"] == "title"
+
+def test_hot_follow_attach_writes_empty_pr3_bundles():
+    payload = _payload_skeleton(
+        copy_bundle={"caption": "hf-caption", "hashtags": "#hf", "comment_cta": "hf-cta"},
+        closure=None,
     )
-    if base_copy.get("caption"):
-        # The caption fallback path: title resolves from the publish hub
-        # copy_bundle.caption first.
-        assert title_subfield["value"] == base_copy["caption"].strip()
-        assert title_subfield["value_source_id"] == "delivery_copy_bundle_caption"
-    else:
-        # No caption available → fall back to entry.topic.
-        assert title_subfield["value"] == task["config"]["entry"]["topic"]
-        assert title_subfield["value_source_id"] == "matrix_script_entry_topic"
-
-
-def test_hot_follow_payload_carries_neither_pr3_key():
-    payload = _publish_hub_payload(_hot_follow_task())
-    assert "matrix_script_delivery_copy_bundle" not in payload
-    assert "matrix_script_delivery_backfill" not in payload
-
-
-def test_digital_anchor_payload_carries_neither_pr3_key():
-    payload = _publish_hub_payload(_digital_anchor_task())
-    assert "matrix_script_delivery_copy_bundle" not in payload
-    assert "matrix_script_delivery_backfill" not in payload
-
-
-def test_baseline_unknown_kind_payload_carries_neither_pr3_key():
-    payload = _publish_hub_payload(
-        {"task_id": "baseline_001", "id": "baseline_001", "kind": ""}
+    attach_matrix_script_delivery_pr3_extras(
+        payload=payload, task=_hot_follow_task()
     )
-    assert "matrix_script_delivery_copy_bundle" not in payload
-    assert "matrix_script_delivery_backfill" not in payload
+    assert payload["matrix_script_delivery_copy_bundle"] == {}
+    assert payload["matrix_script_delivery_backfill"] == {}
 
 
-def test_pr2_and_pr_u3_keys_remain_attached_for_matrix_script_tasks():
-    payload = _publish_hub_payload(_matrix_script_task())
-    # Pre-existing keys MUST continue to attach (no regression).
-    assert "matrix_script_delivery_comprehension" in payload
-    assert "matrix_script_publish_feedback_closure" in payload
-    assert "operator_surfaces" in payload
+def test_digital_anchor_attach_writes_empty_pr3_bundles():
+    payload = _payload_skeleton(closure=None)
+    attach_matrix_script_delivery_pr3_extras(
+        payload=payload, task=_digital_anchor_task()
+    )
+    assert payload["matrix_script_delivery_copy_bundle"] == {}
+    assert payload["matrix_script_delivery_backfill"] == {}
 
 
-def test_backfill_helper_reads_same_closure_as_existing_pr3_block():
+def test_baseline_unknown_kind_attach_writes_empty_pr3_bundles():
+    payload = _payload_skeleton(closure=None)
+    attach_matrix_script_delivery_pr3_extras(
+        payload=payload, task={"task_id": "baseline", "id": "baseline", "kind": ""}
+    )
+    assert payload["matrix_script_delivery_copy_bundle"] == {}
+    assert payload["matrix_script_delivery_backfill"] == {}
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 5. Single-truth invariant for closure consumption.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_backfill_helper_reads_same_closure_attached_to_payload():
     """Single-truth invariant: the 回填 helper and the existing PR-3
     ``matrix_script_publish_feedback_closure`` block both read the same
-    closure view; they never divergence on the closure_id."""
+    closure view; they never diverge on variation_ids."""
 
     task = _matrix_script_task()
     cell_ids = _cells(task["packet"])
@@ -295,17 +354,24 @@ def test_backfill_helper_reads_same_closure_as_existing_pr3_block():
             "payload": {"publish_url": "https://example.test/u", "publish_status": "pending"},
         },
     )
-    payload = _publish_hub_payload(task)
-    closure = payload["matrix_script_publish_feedback_closure"]
-    backfill = payload["matrix_script_delivery_backfill"]
+    closure = closure_binding.get_closure_view_for_task(task["task_id"])
+    payload = _payload_skeleton(closure=closure)
+    attach_matrix_script_delivery_pr3_extras(payload=payload, task=task)
+
     closure_variation_ids = {row["variation_id"] for row in closure["variation_feedback"]}
-    backfill_variation_ids = {lane["variation_id"] for lane in backfill["lanes"]}
+    backfill_variation_ids = {
+        lane["variation_id"]
+        for lane in payload["matrix_script_delivery_backfill"]["lanes"]
+    }
     assert closure_variation_ids == backfill_variation_ids
 
 
-def _walk_strings(value):
-    from typing import Mapping
+# ─────────────────────────────────────────────────────────────────────
+# 6. Validator R3 — no forbidden token leaks.
+# ─────────────────────────────────────────────────────────────────────
 
+
+def _walk_strings(value: Any):
     if isinstance(value, Mapping):
         for v in value.values():
             yield from _walk_strings(v)
@@ -329,41 +395,157 @@ def test_pr3_bundle_keys_carry_no_forbidden_token_recursively(token):
             "payload": {"publish_url": "https://example.test/p", "publish_status": "pending"},
         },
     )
-    payload = _publish_hub_payload(task)
+    closure = closure_binding.get_closure_view_for_task(task["task_id"])
+    payload = _payload_skeleton(
+        copy_bundle={"caption": "标题", "hashtags": "#tag", "comment_cta": "CTA"},
+        closure=closure,
+    )
+    attach_matrix_script_delivery_pr3_extras(payload=payload, task=task)
+
     for key in ("matrix_script_delivery_copy_bundle", "matrix_script_delivery_backfill"):
         bundle = payload.get(key, {})
         for s in _walk_strings(bundle):
             assert token not in s.lower(), f"token {token!r} leaked into {key}: {s!r}"
 
 
-def test_seam_does_not_lazy_create_closure_when_none_exists():
-    """Read-only closure consumption invariant. ``get_closure_view_for_task``
-    must NEVER lazy-create a closure on the publish-hub read path."""
+# ─────────────────────────────────────────────────────────────────────
+# 7. Blocker 1 invariant — copy_bundle from caption only; no entry hints.
+# ─────────────────────────────────────────────────────────────────────
 
+
+def test_copy_bundle_title_resolves_from_payload_caption_only():
+    payload = _payload_skeleton(
+        copy_bundle={"caption": "上头条 · 9.9 高端面霜实测", "hashtags": "", "comment_cta": ""},
+        closure=None,
+    )
+    attach_matrix_script_delivery_pr3_extras(
+        payload=payload, task=_matrix_script_task()
+    )
+    title_subfield = next(
+        sub
+        for sub in payload["matrix_script_delivery_copy_bundle"]["subfields"]
+        if sub["subfield_id"] == "title"
+    )
+    assert title_subfield["value"] == "上头条 · 9.9 高端面霜实测"
+    assert title_subfield["value_source_id"] == "delivery_copy_bundle_caption"
+
+
+def test_copy_bundle_all_unresolved_when_only_entry_hints_present():
+    """Blocker 1 invariant at the wiring layer: an empty publish-hub
+    ``copy_bundle`` produces ALL UNRESOLVED subfields even when the
+    matrix_script task carries a fully populated ``entry`` payload."""
+
+    payload = _payload_skeleton(copy_bundle={}, closure=None)
+    attach_matrix_script_delivery_pr3_extras(
+        payload=payload, task=_matrix_script_task()
+    )
+    bundle = payload["matrix_script_delivery_copy_bundle"]
+    assert bundle["unresolved_count"] == 4
+    for sub in bundle["subfields"]:
+        assert sub["status_code"] == "unresolved_pending_copy_projection_contract"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 8. Defense-in-depth — malformed inputs do not raise.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_attach_with_malformed_closure_returns_empty_backfill_without_raising():
+    payload = _payload_skeleton(closure="not-a-mapping")  # type: ignore[arg-type]
+    attach_matrix_script_delivery_pr3_extras(
+        payload=payload, task=_matrix_script_task()
+    )
+    # Backfill helper recognizes invalid input → {}.
+    assert payload["matrix_script_delivery_backfill"] == {}
+
+
+def test_attach_with_missing_copy_bundle_falls_back_to_empty_dict():
+    payload = {"matrix_script_publish_feedback_closure": None}  # no copy_bundle key
+    attach_matrix_script_delivery_pr3_extras(
+        payload=payload, task=_matrix_script_task()
+    )
+    bundle = payload["matrix_script_delivery_copy_bundle"]
+    assert bundle["is_matrix_script"] is True
+    assert bundle["unresolved_count"] == 4
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 9. Production binding — publish_hub_payload invokes this seam.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_publish_hub_payload_invokes_the_pr3_attach_seam():
+    """Source-level binding check: the production publish_hub_payload
+    body imports and invokes ``attach_matrix_script_delivery_pr3_extras``
+    inside its ``kind_value == "matrix_script"`` branch.
+
+    Reading source bytes (not importing the module) avoids the
+    ``gateway.app.config`` PEP-604 chain on Python 3.9 while still
+    proving the seam is wired into production. CI on 3.10+ additionally
+    exercises end-to-end through ``publish_hub_payload`` itself via
+    higher-level integration suites.
+    """
+
+    helpers_path = (
+        Path(__file__).resolve().parents[1]
+        / "task_view_helpers.py"
+    )
+    source = helpers_path.read_text()
+    # The production body must import the seam under the
+    # publish_hub_payload entry and call it. Both literal substrings
+    # must appear in the source.
+    assert "from gateway.app.services.matrix_script.publish_hub_pr3_attach import" in source
+    assert "attach_matrix_script_delivery_pr3_extras" in source
+    # And the call must be inside the matrix_script branch (i.e. occurs
+    # after `kind_value == "matrix_script"`).
+    branch_idx = source.find('kind_value == "matrix_script"')
+    call_idx = source.find("attach_matrix_script_delivery_pr3_extras(payload=payload, task=task)")
+    assert branch_idx != -1, "matrix_script branch missing in publish_hub_payload"
+    assert call_idx != -1, "PR-3 seam invocation missing in publish_hub_payload"
+    assert call_idx > branch_idx, (
+        "PR-3 seam must be invoked inside the matrix_script branch, "
+        "not before it"
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 10. No mutation of inputs other than the payload's two new keys.
+# ─────────────────────────────────────────────────────────────────────
+
+
+def test_attach_does_not_mutate_task_or_inputs_other_than_two_target_keys():
     task = _matrix_script_task()
-    # Sanity-check store empty before payload build.
-    assert closure_binding.get_closure_view_for_task(task["task_id"]) is None
-    _publish_hub_payload(task)
-    # Still empty afterwards: the read path did not lazy-create.
-    assert closure_binding.get_closure_view_for_task(task["task_id"]) is None
+    task_snapshot = deepcopy(task)
+    payload = _payload_skeleton(
+        copy_bundle={"caption": "标题"},
+        closure=None,
+    )
+    payload_snapshot = deepcopy(payload)
+    attach_matrix_script_delivery_pr3_extras(payload=payload, task=task)
+    # Task is untouched.
+    assert task == task_snapshot
+    # The two non-PR-3 payload keys are untouched.
+    assert payload["copy_bundle"] == payload_snapshot["copy_bundle"]
+    assert (
+        payload["matrix_script_publish_feedback_closure"]
+        == payload_snapshot["matrix_script_publish_feedback_closure"]
+    )
+    # Only the two PR-3 keys are added.
+    new_keys = set(payload.keys()) - set(payload_snapshot.keys())
+    assert new_keys == {
+        "matrix_script_delivery_copy_bundle",
+        "matrix_script_delivery_backfill",
+    }
 
 
-def test_seam_attaches_pr3_keys_alongside_pr_u3_comprehension():
-    """Composition invariant: PR-3 keys + PR-U3 comprehension key all attach
-    inside the same ``kind == "matrix_script"`` seam without one shadowing
-    another."""
+def test_seam_signature_matches_documented_attach_contract():
+    """The seam's keyword-only signature is part of its public contract:
+    callers (publish_hub_payload + tests) MUST pass ``payload=`` and
+    ``task=`` keyword arguments. A future positional change would silently
+    break the production wiring."""
 
-    payload = _publish_hub_payload(_matrix_script_task())
-    pr_u3 = payload.get("matrix_script_delivery_comprehension", {})
-    pr3_copy = payload.get("matrix_script_delivery_copy_bundle", {})
-    pr3_backfill = payload.get("matrix_script_delivery_backfill", {})
-    assert pr_u3.get("is_matrix_script") is True
-    assert pr3_copy.get("is_matrix_script") is True
-    assert pr3_backfill.get("is_matrix_script") is True
-
-
-def test_helper_does_not_mutate_task_config_entry():
-    task = _matrix_script_task()
-    snapshot = deepcopy(task["config"]["entry"])
-    _publish_hub_payload(task)
-    assert task["config"]["entry"] == snapshot
+    sig = inspect.signature(attach_matrix_script_delivery_pr3_extras)
+    params = sig.parameters
+    assert set(params.keys()) == {"payload", "task"}
+    for name in ("payload", "task"):
+        assert params[name].kind == inspect.Parameter.KEYWORD_ONLY

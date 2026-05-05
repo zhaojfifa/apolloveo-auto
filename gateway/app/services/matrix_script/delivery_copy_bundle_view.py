@@ -1,9 +1,9 @@
 """Matrix Script Delivery Center — copy_bundle exposure (OWC-MS PR-3 / MS-W7).
 
-Pure presentation-layer projection over the existing Matrix Script truth
-that already reaches the publish-hub payload. Surfaces the four
-operator-language fields enumerated by ``docs/product/matrix_script_product_flow_v1.md``
-§7.1 标准交付物:
+Pure presentation-layer projection over the existing authoritative copy
+truth that already reaches the publish-hub payload. Surfaces the four
+operator-language fields enumerated by
+``docs/product/matrix_script_product_flow_v1.md`` §7.1 标准交付物:
 
 - 标题 (title)
 - hashtags
@@ -14,30 +14,52 @@ The OWC-MS gate spec §3 MS-W7 binds this slice to "render `copy_bundle`
 (标题 / hashtags / CTA / 评论关键词) as a Delivery Center row backed by
 existing `variation_manifest.copy` projection. If the field is not
 projection-ready, mark as a tracked gap; do NOT add packet truth in
-this wave." This module honors that contract verbatim:
+this wave."
 
-- Each subfield is sourced from existing closed truth (entry payload +
-  the publish-hub `_build_copy_bundle(task)` projection that has shipped
-  on `gateway/app/services/task_view_helpers.py` since pre-OWC). When the
-  source carries a non-empty value, the subfield carries
-  ``STATUS_RESOLVED`` + the value verbatim.
-- When the specific source is empty, the subfield falls back to the
-  closed ``STATUS_UNRESOLVED`` sentinel — operator-language explanation
-  names the gating future contract (Outline Contract per product-flow
-  §9.2 for 标题; future copy_pack contract for hashtags / 评论关键词).
-  The fallback is per-subfield and never panel-wide (§8.1.1 PR-2
-  reviewer-fail correction precedent: per-field unresolved fallback,
-  never panel-wide replacement).
-- No new packet field, no schema widening, no contract authoring. The
-  Delivery Center copy_bundle is a presentation row, not a truth source.
+Authoritative copy truth (binding):
 
-Hard discipline (binding under OWC-MS gate spec §4):
+The Delivery Center MAY ONLY consume the existing publish-hub
+``copy_bundle`` projection emitted by
+``gateway/app/services/task_view_helpers.py::_build_copy_bundle(task)``.
+That projection is the **single producer** of operator-facing publish
+copy in the repo today. Adjacent task-entry hints (``topic`` /
+``target_platform`` / ``audience_hint`` / ``tone_hint`` /
+``length_hint``) are NOT copy truth — they are Phase A authoring hints
+that drive Phase B variation cells, not publish copy. Synthesizing CTA /
+评论关键词 / any copy_bundle subfield from those hints would make this
+helper a **second copy producer**, which violates gate spec §4.1 ("no
+second authoritative producer") and the OWC-MS PR-3 reviewer-fail
+correction (Blocker 1 — 2026-05-05).
+
+Each subfield therefore has exactly one authorized source:
+
+- ``title`` → ``base_copy_bundle.caption``
+- ``hashtags`` → ``base_copy_bundle.hashtags``
+- ``cta`` → ``base_copy_bundle.comment_cta`` (the Hot Follow-shaped
+  ``_build_copy_bundle`` emits the CTA line as ``comment_cta``; in the
+  Matrix Script Delivery Center surface this label is rendered as 评论
+  CTA, with the operator-language tracked-gap label naming the gap
+  toward a Matrix-Script-native CTA copy field.)
+- ``comment_keywords`` → no authoritative producer today; ALWAYS rendered
+  as the closed ``STATUS_UNRESOLVED`` tracked gap.
+
+When the authoritative source is empty (or scrubbed for forbidden
+tokens), the subfield falls back to the closed ``STATUS_UNRESOLVED``
+sentinel with operator-language explanation citing the future copy
+projection contract. The fallback is per-subfield, never panel-wide
+(§8.1.1 PR-2 reviewer-fail correction precedent — per-field unresolved
+fallback, never panel-wide replacement).
+
+Hard discipline (binding under OWC-MS gate spec §4 + PR-3 §1
+reviewer-fail correction Blocker 1):
 
 - No Matrix Script packet truth mutation (§4.1).
 - No widening of ``target_language`` / canonical axes / accepted-scheme
   set / closure enums (§4.1).
-- No second authoritative producer for publishability / final_provenance
-  / advisories (§4.1).
+- **No second authoritative producer for publish copy** (§4.1 +
+  Blocker 1 correction). Adjacent entry hints
+  (``target_platform`` / ``audience_hint`` / ``tone_hint``) are NOT
+  consumed; they are not copy truth.
 - No Hot Follow / Digital Anchor file touched (§4.2). Non-matrix_script
   callers receive ``{}``.
 - No cross-cutting wiring change outside the existing
@@ -81,24 +103,29 @@ STATUS_LABELS_ZH = {
 }
 
 # Operator-language explanation strings per subfield's unresolved gating.
-# Authority pointers for each gating are encoded in the explanation so a
-# reviewer reading the rendered card can trace the gap to its anchor.
+# Each explanation names the gating future contract so reviewers can
+# trace the gap to its product-flow / contract anchor without inferring
+# the source of truth from adjacent task-entry hints.
 UNRESOLVED_EXPLANATIONS_ZH: dict[str, str] = {
     SUBFIELD_TITLE: (
-        "当前 entry 未提供 topic；标题暂以 — 占位。"
-        "未来 Outline Contract（product-flow §9.2）上线后将由结构化 hook + topic 衍生。"
+        "当前 publish-hub copy_bundle 不携带 caption；标题暂以 — 占位。"
+        "未来 copy 投射契约（matrix_script_product_flow §7.1 + §9.5 Deliverable Contract）"
+        "上线后将由 variation_manifest 衍生 publish 标题。"
     ),
     SUBFIELD_HASHTAGS: (
-        "当前 task 投射的 copy_bundle 不携带 hashtags；先以 — 占位。"
+        "当前 publish-hub copy_bundle 不携带 hashtags；先以 — 占位。"
         "未来 copy 投射契约上线后将由 slot_pack / variation_manifest 衍生 hashtags。"
     ),
     SUBFIELD_CTA: (
-        "当前 entry 未提供 target_platform；CTA 暂以 — 占位。"
-        "Phase A 入口要求 target_platform 必填，正常路径下不应触发此分支。"
+        "当前 publish-hub copy_bundle 不携带 CTA 文案（comment_cta 字段为空）；"
+        "先以 — 占位。CTA 不应从 entry.target_platform / audience_hint / tone_hint "
+        "等编辑期 hint 合成，那些不是 publish 文案真值。未来 copy 投射契约上线后由 "
+        "variation_manifest 的 publish CTA 字段衍生。"
     ),
     SUBFIELD_COMMENT_KEYWORDS: (
-        "当前 task 投射的 copy_bundle 不携带 comment_cta；先以 — 占位。"
-        "未来 copy 投射契约上线后将由 slot_pack 关键词聚合衍生评论关键词。"
+        "当前 publish-hub copy_bundle 不存在评论关键词字段；先以 — 占位。"
+        "评论关键词不应从 audience_hint / tone_hint 等编辑期 hint 合成，那些不是 "
+        "评论关键词真值。未来 copy 投射契约上线后由 slot_pack 评论关键词聚合衍生。"
     ),
 }
 
@@ -147,56 +174,22 @@ def _is_matrix_script_task(task: Mapping[str, Any]) -> bool:
     return False
 
 
-def _entry_payload(task: Mapping[str, Any]) -> Mapping[str, Any]:
-    """Return the closed Matrix Script entry payload from the task config."""
-
-    config = task.get("config")
-    if not isinstance(config, Mapping):
-        return {}
-    entry = config.get("entry")
-    return entry if isinstance(entry, Mapping) else {}
+# ─────────────────────────────────────────────────────────────────────
+# Per-subfield resolvers — each subfield has EXACTLY ONE authoritative
+# source. Adjacent task-entry hints are NOT consumed (Blocker 1 / 2026-05-05).
+# ─────────────────────────────────────────────────────────────────────
 
 
-def _derive_title(
-    entry: Mapping[str, Any], base_copy_bundle: Mapping[str, Any]
-) -> tuple[str, Optional[str]]:
-    """Operator-language title.
-
-    Order of precedence (read-only over existing closed truth):
-
-    1. ``base_copy_bundle.caption`` if non-empty (the existing publish-hub
-       projection already builds caption from `mm.txt` / task title).
-    2. ``entry.topic`` (closed Phase A field — operator-supplied content
-       that maps to "主题/目标" per product-flow §5.3).
-    3. ``""`` (triggers per-subfield unresolved fallback).
-    """
-
+def _derive_title(base_copy_bundle: Mapping[str, Any]) -> tuple[str, Optional[str]]:
     caption = _scrub_forbidden(_strip_or_empty(base_copy_bundle.get("caption")))
     if caption:
         return caption, "delivery_copy_bundle_caption"
-
-    topic = _scrub_forbidden(_strip_or_empty(entry.get("topic")))
-    if topic:
-        # Title is the operator-readable rendering of topic; product-flow
-        # §5.3 task-card field "主题 / 目标". Hint annotations such as
-        # tone_hint / audience_hint are NOT concatenated here — those
-        # are properly the Hook section of the Outline Contract, not the
-        # Delivery Center title.
-        return topic, "matrix_script_entry_topic"
     return "", None
 
 
 def _derive_hashtags(
     base_copy_bundle: Mapping[str, Any],
 ) -> tuple[str, Optional[str]]:
-    """Operator-language hashtags.
-
-    Sources, in order:
-
-    1. ``base_copy_bundle.hashtags`` if non-empty.
-    2. Empty (unresolved fallback).
-    """
-
     hashtags = _scrub_forbidden(_strip_or_empty(base_copy_bundle.get("hashtags")))
     if hashtags:
         return hashtags, "delivery_copy_bundle_hashtags"
@@ -204,56 +197,22 @@ def _derive_hashtags(
 
 
 def _derive_cta(
-    entry: Mapping[str, Any],
+    base_copy_bundle: Mapping[str, Any],
 ) -> tuple[str, Optional[str]]:
-    """Operator-language CTA.
-
-    Source: ``entry.target_platform`` per the MS-W3 read-view precedent
-    (PR-2 derived CTA from `entry.target_platform`). Operator-language
-    rendering is "在 ``<target_platform>`` 完成发布并引导互动 / 评论 /
-    私信。" so the operator sees a real call-to-action, not just a
-    bare platform identifier.
-    """
-
-    platform = _scrub_forbidden(_strip_or_empty(entry.get("target_platform")))
-    if platform:
-        cta_text = (
-            f"在 {platform} 完成发布并引导互动 / 评论 / 私信"
-            "（请按平台规范替换为账号级 CTA 文案）"
-        )
-        return cta_text, "matrix_script_entry_target_platform"
+    cta = _scrub_forbidden(_strip_or_empty(base_copy_bundle.get("comment_cta")))
+    if cta:
+        return cta, "delivery_copy_bundle_comment_cta"
     return "", None
 
 
-def _derive_comment_keywords(
-    base_copy_bundle: Mapping[str, Any],
-    entry: Mapping[str, Any],
-) -> tuple[str, Optional[str]]:
-    """Operator-language comment_keywords.
-
-    Sources, in order:
-
-    1. ``base_copy_bundle.comment_cta`` if non-empty (the publish-hub
-       projection's pre-existing field; semantically the same shape as
-       evaluated comment-keyword guidance).
-    2. ``entry.audience_hint`` + ``entry.tone_hint`` joined when both are
-       non-empty (operator-readable audience-and-tone hint that doubles
-       as a comment-keyword seed; never minted as a value of its own).
-    3. Empty (unresolved fallback).
+def _derive_comment_keywords() -> tuple[str, Optional[str]]:
+    """Comment keywords have no authoritative producer in the publish-hub
+    ``copy_bundle`` shape today (no ``comment_keywords`` field exists).
+    Always render the tracked gap. The future copy projection contract
+    will land the field as part of the broader Matrix Script Delivery
+    Contract (product-flow §9.5).
     """
 
-    comment_cta = _scrub_forbidden(_strip_or_empty(base_copy_bundle.get("comment_cta")))
-    if comment_cta:
-        return comment_cta, "delivery_copy_bundle_comment_cta"
-
-    audience = _scrub_forbidden(_strip_or_empty(entry.get("audience_hint")))
-    tone = _scrub_forbidden(_strip_or_empty(entry.get("tone_hint")))
-    if audience and tone:
-        return f"{audience} · {tone}", "matrix_script_entry_audience_tone_hint"
-    if audience:
-        return audience, "matrix_script_entry_audience_hint"
-    if tone:
-        return tone, "matrix_script_entry_tone_hint"
     return "", None
 
 
@@ -304,11 +263,13 @@ def derive_matrix_script_delivery_copy_bundle(
 
     - ``task`` — the in-memory task dict reaching ``publish_hub_payload``.
       Must carry ``kind == "matrix_script"`` (or equivalent under
-      ``category_key`` / ``platform``); otherwise returns ``{}``.
+      ``category_key`` / ``platform``); otherwise returns ``{}``. The task
+      is used **only** for the matrix_script kind check; subfield values
+      are NEVER read from the task's ``config.entry`` payload (per
+      Blocker 1 — adjacent entry hints are not copy truth).
     - ``base_copy_bundle`` — the existing publish-hub
-      ``_build_copy_bundle(task)`` output, passed in by the wiring layer
-      so we re-use its caption / hashtags / comment_cta projection
-      without re-implementing it. Defaults to ``{}``.
+      ``_build_copy_bundle(task)`` output, the **single authoritative
+      copy producer**. Defaults to ``{}``.
 
     Returns the closed comprehension shape:
 
@@ -333,13 +294,12 @@ def derive_matrix_script_delivery_copy_bundle(
     if not _is_matrix_script_task(_safe_mapping(task)):
         return {}
 
-    entry = _entry_payload(_safe_mapping(task))
     base_bundle = _safe_mapping(base_copy_bundle)
 
-    title_value, title_source = _derive_title(entry, base_bundle)
+    title_value, title_source = _derive_title(base_bundle)
     hashtags_value, hashtags_source = _derive_hashtags(base_bundle)
-    cta_value, cta_source = _derive_cta(entry)
-    comment_value, comment_source = _derive_comment_keywords(base_bundle, entry)
+    cta_value, cta_source = _derive_cta(base_bundle)
+    comment_value, comment_source = _derive_comment_keywords()
 
     subfields = [
         _subfield(
@@ -369,7 +329,8 @@ def derive_matrix_script_delivery_copy_bundle(
         "panel_title_zh": "Matrix Script · 交付中心 · copy_bundle",
         "panel_subtitle_zh": (
             "按 product-flow §7.1 的标准交付物投射四项 operator 文案字段（标题 / hashtags / "
-            "CTA / 评论关键词）；只读理解层，不发明事实，不改契约。"
+            "CTA / 评论关键词）；只读理解层，仅消费已有 publish-hub copy_bundle 投射，"
+            "不作为第二条 copy 真值路径。"
         ),
         "subfields": subfields,
         "unresolved_count": unresolved_count,
@@ -378,7 +339,8 @@ def derive_matrix_script_delivery_copy_bundle(
     if unresolved_count:
         bundle["tracked_gap_summary_zh"] = (
             f"当前共 {unresolved_count} 项 copy_bundle 字段尚未投射，已按子字段单独标注 "
-            "状态；不会以 panel-wide 占位替换已解析字段。"
+            "状态；不会以 panel-wide 占位替换已解析字段，亦不会从编辑期 hint 合成 "
+            "copy 真值。"
         )
     else:
         bundle["tracked_gap_summary_zh"] = ""

@@ -1,37 +1,44 @@
 """OWC-MS PR-3 / MS-W7 — Matrix Script Delivery Center copy_bundle exposure tests.
 
 Authority:
-- ``docs/reviews/owc_ms_gate_spec_v1.md`` §3 MS-W7 (binding scope).
+- ``docs/reviews/owc_ms_gate_spec_v1.md`` §3 MS-W7 (binding scope) + §4.1
+  (no second authoritative producer).
 - ``docs/product/matrix_script_product_flow_v1.md`` §7.1 (标准交付物).
 - ``gateway/app/services/matrix_script/delivery_copy_bundle_view.py`` (helper under test).
+- OWC-MS PR-3 reviewer-fail correction Blocker 1 (2026-05-05): copy_bundle
+  must not synthesize subfields from adjacent task-entry hints
+  (``target_platform`` / ``audience_hint`` / ``tone_hint``); it may only
+  consume the existing publish-hub ``copy_bundle`` projection.
 
 Import-light: exercises the pure helper
-``derive_matrix_script_delivery_copy_bundle`` over hand-built inputs that
-mirror the shapes reaching ``publish_hub_payload``.
+``derive_matrix_script_delivery_copy_bundle`` over hand-built inputs
+mirroring the publish-hub ``copy_bundle`` shape.
 
 What is proved:
 
 1. Returns ``{}`` for non-Matrix-Script tasks (Hot Follow / Digital Anchor / unknown).
 2. The four operator-language subfields render in the closed order
    ``title / hashtags / cta / comment_keywords`` per product-flow §7.1.
-3. ``title`` resolves from ``base_copy_bundle.caption`` first, falls back
-   to ``entry.topic`` when caption is empty, falls back to UNRESOLVED
-   when both are empty.
-4. ``hashtags`` resolves from ``base_copy_bundle.hashtags`` only, falls
-   back to UNRESOLVED otherwise.
-5. ``cta`` resolves from ``entry.target_platform`` and renders the
-   operator-language CTA template; falls back to UNRESOLVED when missing.
-6. ``comment_keywords`` resolves from ``base_copy_bundle.comment_cta``
-   first, then ``audience_hint + tone_hint``, then UNRESOLVED.
-7. Per-subfield UNRESOLVED fallback is independent — a panel-wide
-   replacement is forbidden (PR-2 §8.1.1 reviewer-fail correction
-   precedent).
-8. Forbidden tokens (vendor / model_id / provider / engine) anywhere in
+3. Each subfield has EXACTLY ONE authorized source — the existing
+   publish-hub ``copy_bundle`` projection. Adjacent entry hints
+   (``target_platform`` / ``audience_hint`` / ``tone_hint`` / ``topic``)
+   are NEVER consumed.
+4. ``title`` resolves from ``base_copy_bundle.caption``; UNRESOLVED otherwise.
+5. ``hashtags`` resolves from ``base_copy_bundle.hashtags``; UNRESOLVED otherwise.
+6. ``cta`` resolves from ``base_copy_bundle.comment_cta``; UNRESOLVED otherwise.
+7. ``comment_keywords`` is ALWAYS UNRESOLVED — no authoritative producer
+   exists in the publish-hub ``copy_bundle`` shape today.
+8. Per-subfield UNRESOLVED fallback is independent — a panel-wide
+   replacement is forbidden.
+9. Forbidden tokens (vendor / model_id / provider / engine) anywhere in
    any source field cause that subfield to fall back to UNRESOLVED
    without leaking the identifier.
-9. Validator R3 alignment — no vendor / model / provider / engine
-   identifier anywhere in the bundle (recursive walk).
-10. Helper does not mutate inputs.
+10. Validator R3 alignment — no vendor / model / provider / engine
+    identifier anywhere in the bundle (recursive walk).
+11. Helper does not mutate inputs.
+12. NEW (Blocker 1 invariant): synthesizing copy_bundle from adjacent
+    entry hints alone produces ALL UNRESOLVED subfields. The hints are
+    not a fallback source.
 """
 from __future__ import annotations
 
@@ -115,7 +122,7 @@ def test_returns_empty_for_non_mapping_task():
     assert derive_matrix_script_delivery_copy_bundle("not-a-mapping") == {}
 
 
-# 2. The four operator-language subfields render in the closed order.
+# 2. Four subfields in stable order.
 def test_subfields_emit_four_in_stable_order():
     bundle = derive_matrix_script_delivery_copy_bundle(
         _matrix_script_task(), base_copy_bundle=_base_copy_bundle()
@@ -135,7 +142,7 @@ def test_panel_title_and_subtitle_render():
     )
     assert bundle["is_matrix_script"] is True
     assert "copy_bundle" in bundle["panel_title_zh"]
-    assert "product-flow §7.1" in bundle["panel_subtitle_zh"]
+    assert "publish-hub copy_bundle 投射" in bundle["panel_subtitle_zh"]
 
 
 def test_subfield_label_zh_matches_product_flow_section_7_1():
@@ -149,7 +156,7 @@ def test_subfield_label_zh_matches_product_flow_section_7_1():
     assert label_map[SUBFIELD_COMMENT_KEYWORDS] == "评论关键词"
 
 
-# 3. title precedence: caption > entry.topic > unresolved.
+# 3. title — single source from base_copy_bundle.caption.
 def test_title_resolves_from_caption_when_present():
     bundle = derive_matrix_script_delivery_copy_bundle(
         _matrix_script_task(),
@@ -161,30 +168,26 @@ def test_title_resolves_from_caption_when_present():
     assert title["value_source_id"] == "delivery_copy_bundle_caption"
 
 
-def test_title_falls_back_to_topic_when_caption_empty():
+def test_title_unresolved_when_caption_empty_even_if_topic_present():
+    """Blocker 1 invariant: ``entry.topic`` MUST NOT be a fallback source.
+
+    Even when ``topic`` is non-empty, an empty ``caption`` renders the
+    title as UNRESOLVED — the helper is not a second copy producer."""
+
     bundle = derive_matrix_script_delivery_copy_bundle(
         _matrix_script_task(topic="国货高端面霜矩阵"),
-        base_copy_bundle=_base_copy_bundle(caption=""),
-    )
-    title = _subfield(bundle, SUBFIELD_TITLE)
-    assert title["status_code"] == STATUS_RESOLVED
-    assert title["value"] == "国货高端面霜矩阵"
-    assert title["value_source_id"] == "matrix_script_entry_topic"
-
-
-def test_title_unresolved_when_both_caption_and_topic_empty():
-    bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(topic=""),
         base_copy_bundle=_base_copy_bundle(caption=""),
     )
     title = _subfield(bundle, SUBFIELD_TITLE)
     assert title["status_code"] == STATUS_UNRESOLVED
     assert title["value"] == ""
     assert title["value_source_id"] is None
-    assert "Outline Contract" in title["unresolved_explanation_zh"]
+    # Explanation cites the future copy projection contract, not the
+    # missing entry hint.
+    assert "copy 投射契约" in title["unresolved_explanation_zh"]
 
 
-# 4. hashtags precedence: hashtags > unresolved.
+# 4. hashtags — single source from base_copy_bundle.hashtags.
 def test_hashtags_resolves_from_base_copy_bundle():
     bundle = derive_matrix_script_delivery_copy_bundle(
         _matrix_script_task(),
@@ -207,81 +210,73 @@ def test_hashtags_unresolved_when_empty():
     assert "copy 投射契约" in hashtags["unresolved_explanation_zh"]
 
 
-# 5. cta from target_platform.
-def test_cta_resolves_from_entry_target_platform():
+# 5. cta — single source from base_copy_bundle.comment_cta. (Blocker 1: NOT
+# synthesized from entry.target_platform.)
+def test_cta_resolves_from_base_copy_bundle_comment_cta():
     bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(target_platform="douyin"),
-        base_copy_bundle=_base_copy_bundle(),
+        _matrix_script_task(),
+        base_copy_bundle=_base_copy_bundle(comment_cta="点击主页查看更多 · 私信领取试用装"),
     )
     cta = _subfield(bundle, SUBFIELD_CTA)
     assert cta["status_code"] == STATUS_RESOLVED
-    assert "douyin" in cta["value"]
-    assert "评论 / 私信" in cta["value"]
-    assert cta["value_source_id"] == "matrix_script_entry_target_platform"
+    assert cta["value"] == "点击主页查看更多 · 私信领取试用装"
+    assert cta["value_source_id"] == "delivery_copy_bundle_comment_cta"
 
 
-def test_cta_unresolved_when_target_platform_blank():
+def test_cta_unresolved_when_target_platform_present_but_comment_cta_empty():
+    """Blocker 1 invariant: ``entry.target_platform`` MUST NOT be a CTA
+    fallback source. Even with ``target_platform == "douyin"``, an empty
+    ``comment_cta`` renders the CTA subfield as UNRESOLVED."""
+
     bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(target_platform=""),
-        base_copy_bundle=_base_copy_bundle(),
+        _matrix_script_task(target_platform="douyin"),
+        base_copy_bundle=_base_copy_bundle(comment_cta=""),
     )
     cta = _subfield(bundle, SUBFIELD_CTA)
     assert cta["status_code"] == STATUS_UNRESOLVED
     assert cta["value"] == ""
+    assert cta["value_source_id"] is None
+    # The explanation must explicitly name the prohibition on hint
+    # synthesis so reviewers can trace the discipline.
+    assert "target_platform" in cta["unresolved_explanation_zh"]
 
 
-# 6. comment_keywords precedence: comment_cta > audience+tone > audience > tone > unresolved.
-def test_comment_keywords_resolves_from_comment_cta_first():
-    bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(audience_hint="A", tone_hint="B"),
-        base_copy_bundle=_base_copy_bundle(comment_cta="评论关键词 · 复购"),
-    )
-    comment = _subfield(bundle, SUBFIELD_COMMENT_KEYWORDS)
-    assert comment["status_code"] == STATUS_RESOLVED
-    assert comment["value"] == "评论关键词 · 复购"
-    assert comment["value_source_id"] == "delivery_copy_bundle_comment_cta"
+# 6. comment_keywords — ALWAYS UNRESOLVED (no producer in copy_bundle today).
+def test_comment_keywords_always_unresolved_regardless_of_inputs():
+    """Blocker 1 invariant: ``audience_hint`` / ``tone_hint`` are not
+    评论关键词 truth. Even when both hints are populated the subfield
+    renders as UNRESOLVED."""
 
-
-def test_comment_keywords_falls_back_to_audience_and_tone_combined():
     bundle = derive_matrix_script_delivery_copy_bundle(
         _matrix_script_task(audience_hint="26-35 都市女性", tone_hint="理性 · 信赖"),
-        base_copy_bundle=_base_copy_bundle(comment_cta=""),
-    )
-    comment = _subfield(bundle, SUBFIELD_COMMENT_KEYWORDS)
-    assert comment["status_code"] == STATUS_RESOLVED
-    assert comment["value"] == "26-35 都市女性 · 理性 · 信赖"
-    assert comment["value_source_id"] == "matrix_script_entry_audience_tone_hint"
-
-
-def test_comment_keywords_falls_back_to_audience_only():
-    bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(audience_hint="26-35 都市女性", tone_hint=""),
-        base_copy_bundle=_base_copy_bundle(comment_cta=""),
-    )
-    comment = _subfield(bundle, SUBFIELD_COMMENT_KEYWORDS)
-    assert comment["status_code"] == STATUS_RESOLVED
-    assert comment["value"] == "26-35 都市女性"
-    assert comment["value_source_id"] == "matrix_script_entry_audience_hint"
-
-
-def test_comment_keywords_unresolved_when_all_sources_blank():
-    bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(audience_hint="", tone_hint=""),
-        base_copy_bundle=_base_copy_bundle(comment_cta=""),
+        base_copy_bundle=_base_copy_bundle(comment_cta="some-cta"),
     )
     comment = _subfield(bundle, SUBFIELD_COMMENT_KEYWORDS)
     assert comment["status_code"] == STATUS_UNRESOLVED
     assert comment["value"] == ""
+    assert comment["value_source_id"] is None
+    assert (
+        "audience_hint" in comment["unresolved_explanation_zh"]
+        and "tone_hint" in comment["unresolved_explanation_zh"]
+    )
+
+
+def test_comment_keywords_unresolved_even_when_all_other_subfields_resolved():
+    bundle = derive_matrix_script_delivery_copy_bundle(
+        _matrix_script_task(),
+        base_copy_bundle=_base_copy_bundle(
+            caption="标题", hashtags="#tag", comment_cta="cta"
+        ),
+    )
+    comment = _subfield(bundle, SUBFIELD_COMMENT_KEYWORDS)
+    assert comment["status_code"] == STATUS_UNRESOLVED
 
 
 # 7. Per-subfield unresolved fallback is independent — never panel-wide.
 def test_per_subfield_unresolved_fallback_does_not_replace_resolved_subfields():
-    # Title resolved from caption; hashtags unresolved; cta resolved from
-    # platform; comment_keywords unresolved. The unresolved subfields must
-    # not poison the resolved ones.
     bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(audience_hint="", tone_hint=""),
-        base_copy_bundle=_base_copy_bundle(caption="标题文案"),
+        _matrix_script_task(),
+        base_copy_bundle=_base_copy_bundle(caption="标题文案", hashtags="", comment_cta=""),
     )
     title = _subfield(bundle, SUBFIELD_TITLE)
     hashtags = _subfield(bundle, SUBFIELD_HASHTAGS)
@@ -289,45 +284,60 @@ def test_per_subfield_unresolved_fallback_does_not_replace_resolved_subfields():
     comment = _subfield(bundle, SUBFIELD_COMMENT_KEYWORDS)
     assert title["status_code"] == STATUS_RESOLVED and title["value"] == "标题文案"
     assert hashtags["status_code"] == STATUS_UNRESOLVED
-    assert cta["status_code"] == STATUS_RESOLVED and "douyin" in cta["value"]
+    assert cta["status_code"] == STATUS_UNRESOLVED
     assert comment["status_code"] == STATUS_UNRESOLVED
 
 
-def test_unresolved_count_and_tracked_gap_summary_emit_when_any_subfield_unresolved():
+def test_unresolved_count_when_only_caption_resolves():
     bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(topic="", audience_hint="", tone_hint=""),
-        base_copy_bundle=_base_copy_bundle(),
+        _matrix_script_task(),
+        base_copy_bundle=_base_copy_bundle(caption="标题"),
     )
-    # title (caption empty, topic empty) + hashtags + comment_keywords all
-    # unresolved; only CTA resolves via target_platform = "douyin".
+    # title resolved, hashtags/cta/comment_keywords unresolved → 3.
     assert bundle["unresolved_count"] == 3
     assert bundle["tracked_gap_summary_zh"] != ""
     assert "panel-wide" in bundle["tracked_gap_summary_zh"]
+    assert "编辑期 hint" in bundle["tracked_gap_summary_zh"]
 
 
-def test_unresolved_count_zero_when_all_subfields_resolved():
+def test_unresolved_count_three_when_only_three_resolve_due_to_comment_keywords_gap():
+    """All three publish-hub copy_bundle producers populated; only
+    ``comment_keywords`` remains structurally UNRESOLVED."""
+
     bundle = derive_matrix_script_delivery_copy_bundle(
         _matrix_script_task(),
         base_copy_bundle=_base_copy_bundle(
-            caption="标题", hashtags="#tag", comment_cta="评论关键词"
+            caption="标题", hashtags="#tag", comment_cta="评论 CTA"
         ),
     )
-    assert bundle["unresolved_count"] == 0
-    assert bundle["tracked_gap_summary_zh"] == ""
+    assert bundle["unresolved_count"] == 1
+    assert bundle["tracked_gap_summary_zh"] != ""
+
+
+def test_unresolved_count_four_when_all_subfields_unresolved():
+    bundle = derive_matrix_script_delivery_copy_bundle(
+        _matrix_script_task(),
+        base_copy_bundle=_base_copy_bundle(),
+    )
+    assert bundle["unresolved_count"] == 4
+    assert bundle["tracked_gap_summary_zh"] != ""
 
 
 # 8. Forbidden token scrub (validator R3).
 @pytest.mark.parametrize("token", FORBIDDEN_TOKEN_FRAGMENTS)
-def test_forbidden_token_in_caption_falls_back_to_topic(token):
+def test_forbidden_token_in_caption_renders_unresolved(token):
+    """Blocker 1 invariant + Blocker 1 corollary: when the only
+    authoritative source is scrubbed, the subfield falls back to
+    UNRESOLVED rather than synthesizing from the entry payload."""
+
     bundle = derive_matrix_script_delivery_copy_bundle(
         _matrix_script_task(topic="安全主题"),
         base_copy_bundle=_base_copy_bundle(caption=f"poison {token} value"),
     )
     title = _subfield(bundle, SUBFIELD_TITLE)
-    # Caption is scrubbed, so title falls back to entry.topic source.
-    assert title["status_code"] == STATUS_RESOLVED
-    assert title["value"] == "安全主题"
-    assert title["value_source_id"] == "matrix_script_entry_topic"
+    # Caption scrubbed, no entry-hint fallback → UNRESOLVED.
+    assert title["status_code"] == STATUS_UNRESOLVED
+    assert title["value"] == ""
 
 
 def test_forbidden_token_in_hashtags_renders_unresolved():
@@ -340,10 +350,10 @@ def test_forbidden_token_in_hashtags_renders_unresolved():
     assert hashtags["value"] == ""
 
 
-def test_forbidden_token_in_target_platform_falls_back_to_unresolved():
+def test_forbidden_token_in_comment_cta_renders_cta_unresolved():
     bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(target_platform="provider_x_app"),
-        base_copy_bundle=_base_copy_bundle(),
+        _matrix_script_task(),
+        base_copy_bundle=_base_copy_bundle(comment_cta="provider_x app cta"),
     )
     cta = _subfield(bundle, SUBFIELD_CTA)
     assert cta["status_code"] == STATUS_UNRESOLVED
@@ -367,7 +377,7 @@ def test_bundle_carries_no_forbidden_token_recursively(token):
     bundle = derive_matrix_script_delivery_copy_bundle(
         _matrix_script_task(),
         base_copy_bundle=_base_copy_bundle(
-            caption="标题", hashtags="#tag", comment_cta="评论关键词"
+            caption="标题", hashtags="#tag", comment_cta="评论 CTA"
         ),
     )
     for s in _walk_strings(bundle):
@@ -385,10 +395,10 @@ def test_helper_does_not_mutate_task_or_base_copy_bundle():
     assert copy_bundle == copy_snapshot
 
 
-# Closed-shape invariants. These keep the rendering JS contract stable.
+# 11. Closed-shape invariants.
 def test_each_subfield_carries_closed_keys_only():
     bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(audience_hint="", tone_hint=""),
+        _matrix_script_task(),
         base_copy_bundle=_base_copy_bundle(),
     )
     expected_keys = {
@@ -416,7 +426,7 @@ def test_resolved_subfield_carries_empty_unresolved_explanation():
 
 def test_unresolved_subfield_carries_non_empty_explanation():
     bundle = derive_matrix_script_delivery_copy_bundle(
-        _matrix_script_task(topic=""),
+        _matrix_script_task(),
         base_copy_bundle=_base_copy_bundle(),
     )
     title = _subfield(bundle, SUBFIELD_TITLE)
@@ -431,3 +441,70 @@ def test_subfield_labels_match_module_constants():
     )
     for sub in bundle["subfields"]:
         assert sub["label_zh"] == SUBFIELD_LABELS_ZH[sub["subfield_id"]]
+
+
+# 12. Blocker 1 — adjacent task-entry hints alone produce ALL UNRESOLVED.
+def test_adjacent_entry_hints_alone_produce_all_unresolved_subfields():
+    """Even when every entry hint is populated (topic, target_platform,
+    audience_hint, tone_hint) but the publish-hub copy_bundle is empty,
+    every subfield renders UNRESOLVED. Adjacent entry hints are NOT
+    copy truth and MUST NOT be a fallback source."""
+
+    task_with_full_entry = _matrix_script_task(
+        topic="国货高端面霜矩阵",
+        target_platform="douyin",
+        audience_hint="26-35 都市女性",
+        tone_hint="理性 · 信赖",
+    )
+    bundle = derive_matrix_script_delivery_copy_bundle(
+        task_with_full_entry,
+        base_copy_bundle=_base_copy_bundle(),  # all empty
+    )
+    for sub in bundle["subfields"]:
+        assert sub["status_code"] == STATUS_UNRESOLVED, sub
+        assert sub["value"] == ""
+    assert bundle["unresolved_count"] == 4
+
+
+@pytest.mark.parametrize(
+    "hint_field,hint_value",
+    [
+        ("topic", "国货高端面霜矩阵"),
+        ("target_platform", "douyin"),
+        ("audience_hint", "26-35 都市女性"),
+        ("tone_hint", "理性 · 信赖"),
+        ("length_hint", "30-45s"),
+    ],
+)
+def test_individual_entry_hint_does_not_resolve_any_subfield(hint_field, hint_value):
+    """Each entry hint, alone, must not flip any subfield to RESOLVED."""
+
+    task = {"task_id": "t", "kind": "matrix_script", "config": {"entry": {hint_field: hint_value}}}
+    bundle = derive_matrix_script_delivery_copy_bundle(
+        task, base_copy_bundle=_base_copy_bundle()
+    )
+    for sub in bundle["subfields"]:
+        assert sub["status_code"] == STATUS_UNRESOLVED, (hint_field, sub)
+
+
+def test_blocker_1_explanations_explicitly_name_hint_prohibition():
+    """The CTA + comment_keywords UNRESOLVED explanations must explicitly
+    name the prohibition on synthesizing from entry hints — so a future
+    reader can trace the Blocker 1 discipline from the rendered card."""
+
+    bundle = derive_matrix_script_delivery_copy_bundle(
+        _matrix_script_task(),
+        base_copy_bundle=_base_copy_bundle(),
+    )
+    cta_explanation = _subfield(bundle, SUBFIELD_CTA)["unresolved_explanation_zh"]
+    comment_explanation = _subfield(bundle, SUBFIELD_COMMENT_KEYWORDS)["unresolved_explanation_zh"]
+    # CTA explanation calls out target_platform / audience_hint / tone_hint as
+    # explicitly forbidden synthesis sources.
+    assert "target_platform" in cta_explanation
+    assert "audience_hint" in cta_explanation
+    assert "tone_hint" in cta_explanation
+    assert "不应" in cta_explanation
+    # comment_keywords explanation calls out audience_hint / tone_hint.
+    assert "audience_hint" in comment_explanation
+    assert "tone_hint" in comment_explanation
+    assert "不应" in comment_explanation

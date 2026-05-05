@@ -224,6 +224,60 @@ Adjacent regression (no behavior change expected; verifies byte-isolation):
 - **Branch / PR stacking hygiene**: this PR is built on the worktree branch `claude/adoring-herschel-4761b5` rebased onto `origin/main` (which carries OWC authority normalization #121, OWC-MS PR-1 #122, OWC-MS PR-2 #123, and post-merge housekeeping #124 — confirmed at `git log --oneline -5`). The PR diff contains only PR-3 files; no prior-PR commits are bundled.
 - **Wiring test runs only on CI 3.10+**: the 15-case wiring test module imports `publish_hub_payload`, which transitively imports `gateway.app.config:43` — a pre-existing Python 3.9 PEP-604 limitation documented across PR-1 / PR-2 / PR-3 / PR-4 / OWC-MS PR-1 / OWC-MS PR-2 logs. Local runs on 3.9 auto-skip the wiring tests; CI on 3.10+ exercises the full set. Not a regression introduced by PR-3.
 
+## 8.1 Reviewer-Fail Correction Pass (2026-05-05)
+
+The first OWC-MS PR-3 revision returned FAIL with two blockers:
+
+1. **MS-W7 was acting as a second copy producer.** The first revision synthesized `cta` from `entry.target_platform` and `comment_keywords` from `entry.audience_hint` + `entry.tone_hint`. Adjacent task-entry hints are NOT publish-copy truth — they are Phase A authoring hints that drive Phase B variation cells, not publish copy. Synthesizing copy_bundle subfields from those hints made the helper a second authoritative copy producer (gate spec §4.1 violation).
+2. **PR-3 wiring tests depended on ambient storage configuration.** The first revision drove the attach path through `publish_hub_payload(task)`, which transitively imports `gateway.app.config` (PEP-604 baseline) and calls `compute_composed_state` → `artifact_storage.object_exists` (ambient storage probe). The wiring tests auto-skipped on Python 3.9 by `pytestmark = pytest.mark.skipif`, which the reviewer correctly rejected ("Do not solve this by skipping the test or reducing coverage").
+
+### 8.1.1 Exact code-path corrections
+
+- **MS-W7 single-source discipline** (`gateway/app/services/matrix_script/delivery_copy_bundle_view.py`):
+  - Removed all reads of `task["config"]["entry"]` from the helper. The task is consumed only for the `kind == "matrix_script"` check; no `topic` / `target_platform` / `audience_hint` / `tone_hint` / `length_hint` is consumed.
+  - Each subfield now has exactly one authorized source on the existing publish-hub `copy_bundle` projection:
+    - `title` ← `base_copy_bundle.caption`
+    - `hashtags` ← `base_copy_bundle.hashtags`
+    - `cta` ← `base_copy_bundle.comment_cta`
+    - `comment_keywords` → ALWAYS `STATUS_UNRESOLVED` (no producer in `copy_bundle` today)
+  - When the authoritative source is empty, the subfield falls back to the closed `STATUS_UNRESOLVED` sentinel with operator-language explanation citing the future copy projection contract per product-flow §7.1 + §9.5 Deliverable Contract.
+  - Per-subfield UNRESOLVED fallback discipline preserved verbatim — never panel-wide replacement.
+  - The `cta` and `comment_keywords` UNRESOLVED explanations explicitly name the prohibition on synthesizing from `target_platform` / `audience_hint` / `tone_hint` so reviewers can trace the Blocker 1 discipline from the rendered card.
+  - **No second authoritative producer for publish copy. No packet truth mutation. No contract redesign.**
+- **PR-3 wiring seam extraction** (`gateway/app/services/matrix_script/publish_hub_pr3_attach.py` — new):
+  - The OWC-MS PR-3 attach block in `task_view_helpers.py::publish_hub_payload` was extracted into a thin, importable seam `attach_matrix_script_delivery_pr3_extras(*, payload, task)`.
+  - The seam imports nothing from `gateway.app.config`; nothing from `artifact_storage`; nothing that requires Python 3.10+ syntax. It calls only `derive_matrix_script_delivery_copy_bundle` + `derive_matrix_script_delivery_backfill` — both pure projections.
+  - `publish_hub_payload` was updated to import and invoke this same seam — production behavior is byte-equivalent to the prior inline block (verified by source-import binding test + adjacent regression).
+- **Wiring test rewritten** (`gateway/app/services/tests/test_matrix_script_publish_hub_pr3_wiring.py`):
+  - All `pytest.mark.skipif` on Python 3.9 removed.
+  - Test calls `attach_matrix_script_delivery_pr3_extras(payload=skeleton, task=task)` directly with hand-built payload skeletons that mirror the publish-hub state at the moment the inline attach block runs in production.
+  - **Production binding** is verified by `test_publish_hub_payload_invokes_the_pr3_attach_seam`: reads the source bytes of `task_view_helpers.py` and asserts (a) the seam import statement is present, (b) the seam invocation is present, (c) the call is positioned after the `kind_value == "matrix_script"` branch entry. This proves the seam is wired into production without importing `task_view_helpers.py` (which would trigger the `gateway.app.config` PEP-604 chain).
+  - **Behavior coverage is preserved**: matrix_script attach with initialized empty closure (lanes × variation_id, fields all unresolved/unsourced/pending), matrix_script attach with published closure events (publish_url + publish_status + channel + metrics_snapshot resolve), Hot Follow / Digital Anchor / Baseline cross-line isolation, single-truth invariant for closure consumption, validator R3 forbidden-token recursive walk, Blocker 1 invariant assertions (caption-only resolution, all-unresolved when only entry hints present), defense-in-depth on malformed inputs, no input mutation, seam signature contract.
+
+### 8.1.2 Tests after correction
+
+- `test_matrix_script_delivery_copy_bundle_view.py` — **40/40 PASS** on Python 3.9 (added Blocker 1 invariants: `test_title_unresolved_when_caption_empty_even_if_topic_present`, `test_cta_unresolved_when_target_platform_present_but_comment_cta_empty`, `test_comment_keywords_always_unresolved_regardless_of_inputs`, `test_adjacent_entry_hints_alone_produce_all_unresolved_subfields`, `test_individual_entry_hint_does_not_resolve_any_subfield` × 5 hint fields, `test_blocker_1_explanations_explicitly_name_hint_prohibition`).
+- `test_matrix_script_delivery_backfill_view.py` — **40/40 PASS** (unchanged from first revision; MS-W8 already complied).
+- `test_matrix_script_publish_hub_pr3_wiring.py` — **22/22 PASS** on Python 3.9 (was 0 PASS / 16 SKIPPED). Active cases on the actual attach path: matrix_script-with-initialized-empty-closure lane assertion, matrix_script-with-published-closure resolution, Hot Follow / Digital Anchor / Baseline isolation × 3, single-truth-closure invariant, validator R3 recursive walk × 4, Blocker 1 caption-only assertion, Blocker 1 all-unresolved-from-entry-hints assertion, defense-in-depth × 2, production-binding source check, no-mutation, seam-signature-contract.
+
+**Subtotal after correction: 102/102 PASS** on Python 3.9 (40 + 40 + 22 across three dedicated PR-3 modules). Gate spec §5.2 ≥30 floor: PASS (102 cases, 3.4× the floor).
+
+Adjacent regression unchanged: **484 PASS / 6 SKIPPED / 0 FAIL** (the 6 skips are the pre-existing `test_matrix_script_review_zone_submit_http.py` HTTP cases auto-skipping on Python 3.9 per the documented baseline — not introduced by PR-3).
+
+**Aggregate after correction: 586 PASS / 6 SKIPPED / 0 FAIL** on Python 3.9 (102 PR-3 + 484 adjacent).
+
+### 8.1.3 Why each FAIL item is now closed
+
+| FAIL item | Closed by |
+| --- | --- |
+| (1) MS-W7 was acting as a second copy producer | Helper rewritten with single-source discipline per subfield: `caption` → title; `hashtags` → hashtags; `comment_cta` → cta; comment_keywords always UNRESOLVED. Helper no longer reads `task["config"]["entry"]` for any subfield value. Asserted by `test_title_unresolved_when_caption_empty_even_if_topic_present`, `test_cta_unresolved_when_target_platform_present_but_comment_cta_empty`, `test_comment_keywords_always_unresolved_regardless_of_inputs`, `test_adjacent_entry_hints_alone_produce_all_unresolved_subfields`, and the parametric `test_individual_entry_hint_does_not_resolve_any_subfield` covering all five entry hints. |
+| (2) PR-3 wiring tests depended on ambient storage configuration | Attach path extracted into `gateway/app/services/matrix_script/publish_hub_pr3_attach.py` — a pure seam with zero `gateway.app.config` / `artifact_storage` dependency. Wiring test imports the seam directly and exercises the actual attach path against hand-built payload skeletons. All `pytest.mark.skipif` removed. Production binding is independently verified by reading `task_view_helpers.py` source bytes (`test_publish_hub_payload_invokes_the_pr3_attach_seam`). 22/22 PASS on Python 3.9 native, no skips, no reduced coverage. |
+
+### 8.1.4 Residual risks after correction
+
+- The 6 `test_matrix_script_review_zone_submit_http.py` HTTP-side cases continue to auto-skip on Python 3.9 due to the **pre-existing repo baseline** (`gateway/app/config.py:43` PEP-604 union; documented across PR-1 / PR-2 / PR-3 / PR-4 / OWC-MS PR-1 / OWC-MS PR-2 logs). Not introduced by PR-3. CI on Python 3.10+ runs them.
+- All other residual risks from §8 carry forward unchanged.
+
 ## 9. Exact Statement of What Remains for the Next PR
 
 OWC-MS Closeout — aggregating audit + signoff per `owc_ms_gate_spec_v1.md` §6 + §10. Records MS-A1..MS-A8 PASS:

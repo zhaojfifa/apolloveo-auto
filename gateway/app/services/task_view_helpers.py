@@ -1076,28 +1076,13 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
         # `docs/reviews/owc_ms_gate_spec_v1.md` §3 + matrix_script_product_flow
         # §7.1 / §7.3. Pure presentation-layer projections over existing closed
         # truth; no second producer; no schema widening; no contract touch.
-        try:
-            from gateway.app.services.matrix_script.delivery_backfill_view import (
-                derive_matrix_script_delivery_backfill,
-            )
-            from gateway.app.services.matrix_script.delivery_copy_bundle_view import (
-                derive_matrix_script_delivery_copy_bundle,
-            )
+        # Extracted into a pure seam under matrix_script/ so the PR-3 wiring
+        # test exercises the attach path without ambient storage config.
+        from gateway.app.services.matrix_script.publish_hub_pr3_attach import (
+            attach_matrix_script_delivery_pr3_extras,
+        )
 
-            payload["matrix_script_delivery_copy_bundle"] = (
-                derive_matrix_script_delivery_copy_bundle(
-                    task,
-                    base_copy_bundle=payload.get("copy_bundle") or {},
-                )
-            )
-            payload["matrix_script_delivery_backfill"] = (
-                derive_matrix_script_delivery_backfill(
-                    payload.get("matrix_script_publish_feedback_closure")
-                )
-            )
-        except Exception:
-            payload["matrix_script_delivery_copy_bundle"] = {}
-            payload["matrix_script_delivery_backfill"] = {}
+        attach_matrix_script_delivery_pr3_extras(payload=payload, task=task)
 
     if kind_value == "digital_anchor":
         # Recovery PR-4: project the Digital Anchor Phase C delivery binding +
