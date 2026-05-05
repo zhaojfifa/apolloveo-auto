@@ -55,6 +55,15 @@ CHANNEL_METRICS_KEYS = frozenset(
 )
 CHANNEL_METRICS_REQUIRED = frozenset({"channel_id", "captured_at"})
 
+# OWC-MS PR-2 / MS-W5 — additive closed-set extension on the
+# `operator_note` event payload per OWC-MS gate spec §3 MS-W5
+# ("an enum closed-set extension on event payload is the only contract
+# touch"). The four zones map 1:1 onto matrix_script_product_flow §6.1D
+# (字幕 / 配音 / 文案 / CTA review affordances) and are recorded onto
+# the appended `feedback_closure_records[]` entry as an optional field;
+# legacy `operator_note` events without `review_zone` remain valid.
+REVIEW_ZONE_VALUES = frozenset({"subtitle", "dub", "copy", "cta"})
+
 EVENT_KIND_ACTOR = {
     "operator_publish": "operator",
     "operator_retract": "operator",
@@ -206,6 +215,13 @@ def apply_event(
         if not isinstance(note, str):
             raise ClosureValidationError("operator_publish_notes must be a string")
         row["operator_publish_notes"] = note
+        # OWC-MS PR-2 / MS-W5 — optional `review_zone` tag (closed enum).
+        # Validated in-place; recorded on the appended record below.
+        if "review_zone" in payload and payload.get("review_zone") not in REVIEW_ZONE_VALUES:
+            raise ClosureValidationError(
+                "operator_note.review_zone must be in "
+                f"{sorted(REVIEW_ZONE_VALUES)}"
+            )
     elif event_kind == "platform_callback":
         status = payload.get("publish_status")
         if status not in PLATFORM_STATUS_VALUES:
@@ -232,6 +248,11 @@ def apply_event(
         "actor_kind": actor_kind,
         "payload_ref": event.get("payload_ref"),
     }
+    # OWC-MS PR-2 / MS-W5 — optional `review_zone` tag flows through onto
+    # the appended record only. The variation_feedback row shape is
+    # unchanged; the closure-wide shape is unchanged.
+    if event_kind == "operator_note" and payload.get("review_zone") in REVIEW_ZONE_VALUES:
+        record["review_zone"] = payload["review_zone"]
     closure["feedback_closure_records"].append(record)
     return new_event_id
 
@@ -297,6 +318,7 @@ __all__ = [
     "EVENT_KINDS",
     "InMemoryClosureStore",
     "PUBLISH_STATUS_VALUES",
+    "REVIEW_ZONE_VALUES",
     "SURFACE_ID",
     "VARIATION_REF_ID",
     "apply_event",

@@ -243,6 +243,92 @@ def build_operator_surfaces_for_workbench(
                 workbench_panel,
             )
         )
+        # OWC-MS PR-2: Matrix Script Workbench five-panel convergence
+        # bundle (MS-W3 + MS-W4 + MS-W5 + MS-W6). All four are pure
+        # presentation-layer projections over already-existing truth
+        # (variation surface / delivery binding / unified
+        # publish_readiness / publish-feedback closure read-only).
+        # Hot Follow / Digital Anchor / Baseline workbench surfaces
+        # never enter this branch. Authority:
+        # docs/reviews/owc_ms_gate_spec_v1.md §3 MS-W3..W6.
+        from gateway.app.services.matrix_script.delivery_binding import (
+            project_delivery_binding,
+        )
+        from gateway.app.services.matrix_script.delivery_comprehension import (
+            derive_matrix_script_delivery_comprehension,
+        )
+        from gateway.app.services.matrix_script.preview_compare_view import (
+            derive_matrix_script_preview_compare_view,
+        )
+        from gateway.app.services.matrix_script.qc_diagnostics_view import (
+            derive_matrix_script_qc_diagnostics_view,
+        )
+        from gateway.app.services.matrix_script.review_zone_view import (
+            derive_matrix_script_review_zone_view,
+        )
+        from gateway.app.services.matrix_script.script_structure_view import (
+            derive_matrix_script_script_structure_view,
+        )
+
+        try:
+            delivery_binding = project_delivery_binding(packet_view)
+        except Exception:
+            delivery_binding = {}
+        delivery_comprehension = derive_matrix_script_delivery_comprehension(
+            delivery_binding
+        )
+        # Read closure read-only — never lazy-create a closure on the
+        # workbench path. Defense-in-depth try/except: presentation
+        # never breaks the workbench if the closure read raises.
+        closure_view: Mapping[str, Any] | None = None
+        try:
+            from gateway.app.services.matrix_script.closure_binding import (
+                get_closure_view_for_task,
+            )
+
+            task_id = (
+                str(task.get("task_id") or task.get("id") or "")
+                if isinstance(task, Mapping)
+                else ""
+            )
+            if task_id:
+                closure_view = get_closure_view_for_task(task_id)
+        except Exception:
+            closure_view = None
+
+        bundle["workbench"]["matrix_script_script_structure"] = (
+            derive_matrix_script_script_structure_view(task)
+        )
+        bundle["workbench"]["matrix_script_preview_compare"] = (
+            derive_matrix_script_preview_compare_view(
+                variation_surface,
+                delivery_binding,
+                publish_readiness,
+                workbench_panel,
+                closure=closure_view,
+            )
+        )
+        _task_id_for_review = (
+            str(task.get("task_id") or task.get("id") or "")
+            if isinstance(task, Mapping)
+            else ""
+        )
+        bundle["workbench"]["matrix_script_review_zone"] = (
+            derive_matrix_script_review_zone_view(
+                variation_surface,
+                closure_view,
+                workbench_panel,
+                task_id=_task_id_for_review or None,
+            )
+        )
+        bundle["workbench"]["matrix_script_qc_diagnostics"] = (
+            derive_matrix_script_qc_diagnostics_view(
+                publish_readiness,
+                delivery_comprehension,
+                variation_surface,
+                workbench_panel,
+            )
+        )
     # Recovery PR-4: when the Workbench mounts the Digital Anchor
     # line-specific panel, attach the formal
     # `digital_anchor_workbench_role_speaker_surface_v1` projection so

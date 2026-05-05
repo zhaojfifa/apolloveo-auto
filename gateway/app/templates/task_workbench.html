@@ -270,6 +270,10 @@
     {% if ops_workbench_panel.panel_kind == "matrix_script" %}
       {% set ms_surface = ((ops.workbench or {}).matrix_script_variation_surface or {}) %}
       {% set ms_comp = ((ops.workbench or {}).matrix_script_comprehension or {}) %}
+      {% set ms_script_structure = ((ops.workbench or {}).matrix_script_script_structure or {}) %}
+      {% set ms_preview_compare = ((ops.workbench or {}).matrix_script_preview_compare or {}) %}
+      {% set ms_review_zone = ((ops.workbench or {}).matrix_script_review_zone or {}) %}
+      {% set ms_qc_diagnostics = ((ops.workbench or {}).matrix_script_qc_diagnostics or {}) %}
       {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
       {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
       {% set ms_slot_detail = (ms_surface.slot_detail_surface or {}) %}
@@ -353,6 +357,88 @@
           {% endif %}
         </div>
       {% endif %}
+      {# OWC-MS PR-2 / MS-W3 — Workbench A 脚本结构区 read-view. Read-only over task.config.entry. No source_script_ref dereference; no Phase B authoring. Sits ABOVE the existing Variation Panel (Workbench B). Authority: docs/reviews/owc_ms_gate_spec_v1.md §3 MS-W3. #}
+      {% if ms_script_structure.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-script-structure-panel">
+          <div class="section-title">
+            <h2 data-role="ms-script-structure-title">{{ ms_script_structure.panel_title_zh }}</h2>
+            <div class="secondary" data-role="ms-script-structure-subtitle">{{ ms_script_structure.panel_subtitle_zh }}</div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-script-structure-title-row">
+              <strong>{{ ms_script_structure.title_label_zh }}</strong>
+              <span>{{ ms_script_structure.title_value or "—" }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-source-ref-row">
+              <strong>{{ ms_script_structure.source_script_ref_label_zh }}</strong>
+              <span><code>{{ ms_script_structure.source_script_ref_value or "—" }}</code></span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-source-ref-explanation">
+              <span class="muted t-secondary">{{ ms_script_structure.source_script_ref_status_label_zh }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-language-row">
+              <strong>{{ ms_script_structure.language_scope_label_zh }}</strong>
+              <span>
+                {% if ms_script_structure.language_scope.source_language %}{{ ms_script_structure.language_scope.source_language }}{% else %}—{% endif %}
+                {% if ms_script_structure.language_scope.target_language %}→ {{ ms_script_structure.language_scope.target_language | join(", ") }}{% endif %}
+              </span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-target-platform-row">
+              <strong>{{ ms_script_structure.target_platform_label_zh }}</strong>
+              <span>{{ ms_script_structure.target_platform_value or "—" }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-variation-target-count-row">
+              <strong>{{ ms_script_structure.variation_target_count_label_zh }}</strong>
+              <span>{% if ms_script_structure.variation_target_count_value is not none %}{{ ms_script_structure.variation_target_count_value }}{% else %}—{% endif %}</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-script-structure-axis-hints-label">{{ ms_script_structure.axis_hints_label_zh }}</h3>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-script-structure-tone-hint">
+              <strong>tone_hint</strong>
+              <span>{{ ms_script_structure.axis_hints.tone_hint or "—" }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-audience-hint">
+              <strong>audience_hint</strong>
+              <span>{{ ms_script_structure.axis_hints.audience_hint or "—" }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-length-hint">
+              <strong>length_hint</strong>
+              <span>{{ ms_script_structure.axis_hints.length_hint or "—" }}</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-script-structure-sections-label">{{ ms_script_structure.sections_label_zh }}</h3>
+          {% for section in (ms_script_structure.sections or []) %}
+            <div class="meta-item" data-role="ms-script-structure-section" data-section-id="{{ section.section_id }}" data-section-status="{{ section.body_status_code }}">
+              <strong>{{ section.section_label_zh }}</strong>
+              {% if section.body_text %}
+                <span data-role="ms-script-structure-section-body">{{ section.body_text }}</span>
+              {% endif %}
+              <span class="muted t-secondary">{{ section.body_status_label_zh }}</span>
+            </div>
+          {% endfor %}
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-script-structure-taxonomy-label">{{ ms_script_structure.taxonomy_label_zh }}</h3>
+          {% for tax in (ms_script_structure.taxonomy or []) %}
+            <div class="meta-item" data-role="ms-script-structure-taxonomy-item" data-taxonomy-id="{{ tax.taxonomy_id }}" data-taxonomy-status="{{ tax.values_status_code }}">
+              <strong>{{ tax.taxonomy_label_zh }}</strong>
+              {% if tax.values %}
+                <span data-role="ms-script-structure-taxonomy-values">
+                  {% for v in tax.values %}<span class="info-pill" style="margin-right:4px;">{{ v }}</span>{% endfor %}
+                </span>
+              {% endif %}
+              <span class="muted t-secondary">{{ tax.values_status_label_zh }}</span>
+            </div>
+          {% endfor %}
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="ms-script-structure-phase-b-forbidden">
+            {{ ms_script_structure.phase_b_authoring_forbidden_label_zh }}
+          </div>
+        </div>
+      {% endif %}
+
       <div class="panel" data-role="matrix-script-variation-panel">
         <div class="section-title">
           <h2>Matrix Script — Variation Panel</h2>
@@ -529,6 +615,341 @@
           </div>
         </div>
       </div>
+
+      {# OWC-MS PR-2 / MS-W4 — Workbench C 预览对比区 read-view. Multi-variation rows + per-axis diff hints + recommended-version markers from PR-1 unified publish_readiness (single producer; no second truth source). Authority: docs/reviews/owc_ms_gate_spec_v1.md §3 MS-W4. #}
+      {% if ms_preview_compare.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-preview-compare-panel">
+          <div class="section-title">
+            <h2 data-role="ms-preview-compare-title">{{ ms_preview_compare.panel_title_zh }}</h2>
+            <div class="secondary" data-role="ms-preview-compare-subtitle">{{ ms_preview_compare.panel_subtitle_zh }}</div>
+          </div>
+
+          <h3 style="margin:12px 0 6px;" data-role="ms-preview-compare-variations-label">{{ ms_preview_compare.variations_label_zh }} · 共 {{ ms_preview_compare.variation_count }} 组</h3>
+          {% if ms_preview_compare.variations %}
+            <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;" data-role="ms-preview-compare-variations-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">variation_id</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">axis 选择</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">script_slot / body_ref</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">预览状态</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">发布状态</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">推荐版本</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for variation in ms_preview_compare.variations %}
+                  <tr data-role="ms-preview-compare-variation-row" data-variation-id="{{ variation.variation_id }}" data-recommended-bucket="{{ variation.recommended_bucket }}">
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"><code>{{ variation.variation_id }}</code></td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                      {% for axis_id, val in (variation.axis_selections or {}).items() %}
+                        <span class="info-pill" style="margin-right:4px;">{{ axis_id }}={{ val }}</span>
+                      {% endfor %}
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                      <code>{{ variation.script_slot_ref or "—" }}</code>
+                      {% if variation.slot_body_ref %}<div class="muted t-secondary"><code>{{ variation.slot_body_ref }}</code></div>{% endif %}
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-preview-status" data-status="{{ variation.preview_status_code }}">
+                      {{ variation.preview_status_label_zh }}
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-publish-status" data-publish-status="{{ variation.publish_status }}">
+                      {{ variation.publish_status }}{% if variation.publish_url %} · <a href="{{ variation.publish_url }}" target="_blank" rel="noopener">链接</a>{% endif %}
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-recommended">
+                      <strong>{{ variation.recommended_label_zh }}</strong>
+                      {% if variation.recommended_head_reason %}
+                        <div class="muted t-secondary">head_reason=<code>{{ variation.recommended_head_reason }}</code></div>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <div class="muted">尚未有可对比的变体。</div>
+          {% endif %}
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-preview-compare-diff-hints-label">{{ ms_preview_compare.diff_hints_label_zh }}</h3>
+          {% if ms_preview_compare.diff_hints %}
+            <ul class="muted" data-role="ms-preview-compare-diff-hints-list" style="margin:6px 0 0 18px;">
+              {% for hint in ms_preview_compare.diff_hints %}
+                <li data-role="ms-preview-compare-diff-hint" data-axis-id="{{ hint.axis_id }}" data-is-differing="{{ 'true' if hint.is_differing else 'false' }}">
+                  <code>{{ hint.axis_id }}</code> · {{ hint.distinct_value_count }} 个 distinct 值
+                  {% if hint.distinct_values %}
+                    （{% for v in hint.distinct_values %}<span class="info-pill" style="margin-right:4px;">{{ v }}</span>{% endfor %}）
+                  {% endif %}
+                  {% if hint.is_differing %}<span class="muted t-secondary">· 跨变体存在差异</span>{% else %}<span class="muted t-secondary">· 跨变体一致</span>{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="muted">无差异项可比对。</div>
+          {% endif %}
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="ms-preview-compare-recommended-explanation">
+            <strong>{{ ms_preview_compare.recommended_label_zh }}：</strong>{{ ms_preview_compare.recommended_explanation_zh }}
+          </div>
+          <div class="muted t-secondary" style="margin-top:6px;" data-role="ms-preview-compare-granularity-note">
+            {{ ms_preview_compare.per_cell_artifact_granularity_note_zh }}
+          </div>
+        </div>
+      {% endif %}
+
+      {# OWC-MS PR-2 / MS-W5 — Workbench D 校对区. Four review zones (字幕/配音/文案/CTA) writing through the existing Recovery PR-3 closure event endpoint with the additive review_zone enum. Closure shape unchanged. Authority: docs/reviews/owc_ms_gate_spec_v1.md §3 MS-W5. #}
+      {% if ms_review_zone.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-review-zone-panel">
+          <div class="section-title">
+            <h2 data-role="ms-review-zone-title">{{ ms_review_zone.panel_title_zh }}</h2>
+            <div class="secondary" data-role="ms-review-zone-subtitle">{{ ms_review_zone.panel_subtitle_zh }}</div>
+          </div>
+
+          <h3 style="margin:12px 0 6px;" data-role="ms-review-zone-zones-label">{{ ms_review_zone.zones_label_zh }}</h3>
+          <div class="meta-grid" data-role="ms-review-zone-zones-grid">
+            {% for zone in ms_review_zone.zones %}
+              <div class="meta-item" data-role="ms-review-zone-zone" data-zone-id="{{ zone.zone_id }}">
+                <strong>{{ zone.zone_label_zh }}</strong>
+                <span>{{ zone.zone_guidance_zh }}</span>
+                <span class="muted t-secondary">回写：<code>POST {{ zone.endpoint_template }}</code> · event_kind=<code>{{ zone.event_kind }}</code> · review_zone=<code>{{ zone.zone_id }}</code></span>
+              </div>
+            {% endfor %}
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-review-zone-status-label">{{ ms_review_zone.review_status_label_zh }}</h3>
+          {% if ms_review_zone.review_status_rows %}
+            <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;" data-role="ms-review-zone-status-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">variation_id</th>
+                  {% for zone in ms_review_zone.zones %}
+                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">{{ zone.zone_label_zh }}</th>
+                  {% endfor %}
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">未分区历史</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in ms_review_zone.review_status_rows %}
+                  <tr data-role="ms-review-zone-status-row" data-variation-id="{{ row.variation_id }}">
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"><code>{{ row.variation_id }}</code></td>
+                    {% for zone in ms_review_zone.zones %}
+                      {% set z = row.per_zone[zone.zone_id] %}
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-review-zone-status-cell" data-zone-id="{{ zone.zone_id }}" data-is-reviewed="{{ 'true' if z.is_reviewed else 'false' }}">
+                        {% if z.is_reviewed %}
+                          已校对 · {{ z.history_count }} 条
+                          {% if z.last_recorded_at %}<div class="muted t-secondary">{{ z.last_recorded_at }}</div>{% endif %}
+                        {% else %}
+                          <span class="muted">未校对</span>
+                        {% endif %}
+                      </td>
+                    {% endfor %}
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-review-zone-legacy-count">{{ row.legacy_unzoned_history_count }} 条</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <div class="muted">尚未有可校对的变体。</div>
+          {% endif %}
+
+          {# OWC-MS PR-2 / MS-W5 — Real operator review submit affordance. Per-(variation, zone) operator-editable input + submit form posting JSON to the existing Recovery PR-3 closure endpoint. Single endpoint, single event_kind=operator_note, optional review_zone tag. No second truth path. #}
+          {% if ms_review_zone.review_status_rows and ms_review_zone.closure_endpoint_url %}
+            <h3 style="margin:16px 0 6px;" data-role="ms-review-zone-submit-label">提交校对意见</h3>
+            <div class="muted t-secondary" style="margin-bottom:6px;">
+              每条变体可在 4 个分区分别回写 operator_note；提交将以 JSON POST 写入既有 closure 真理路径，不创建第二条真理路径。
+            </div>
+            {% for row in ms_review_zone.review_status_rows %}
+              <details class="panel" style="margin:6px 0; padding:10px;" data-role="ms-review-zone-submit-row" data-variation-id="{{ row.variation_id }}">
+                <summary><code>{{ row.variation_id }}</code> · 提交校对意见</summary>
+                <div style="margin-top:8px;">
+                  {% for zone in ms_review_zone.zones %}
+                    {% set z = row.per_zone[zone.zone_id] %}
+                    {% if z.submit_form %}
+                      <form
+                        class="matrix-script-review-form"
+                        data-role="ms-review-zone-submit-form"
+                        data-variation-id="{{ z.submit_form.variation_id }}"
+                        data-zone-id="{{ z.submit_form.review_zone }}"
+                        data-event-kind="{{ z.submit_form.event_kind }}"
+                        data-actor-kind="{{ z.submit_form.actor_kind }}"
+                        action="{{ z.submit_form.action }}"
+                        method="{{ z.submit_form.method }}"
+                        style="margin:8px 0; padding:8px; border:1px solid #e5e7eb; border-radius:4px;"
+                      >
+                        <label style="display:block; font-weight:600;">{{ zone.input_label_zh }}</label>
+                        <textarea
+                          data-role="ms-review-zone-submit-input"
+                          name="operator_publish_notes"
+                          rows="3"
+                          required
+                          maxlength="2000"
+                          placeholder="{{ zone.input_placeholder_zh }}"
+                          style="width:100%; margin-top:4px; padding:6px; box-sizing:border-box;"
+                        ></textarea>
+                        <div style="margin-top:6px; display:flex; align-items:center; gap:8px;">
+                          <button type="submit" data-role="ms-review-zone-submit-button">{{ zone.submit_label_zh }}</button>
+                          <span class="muted t-secondary" data-role="ms-review-zone-submit-status"></span>
+                        </div>
+                      </form>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              </details>
+            {% endfor %}
+            <script data-role="ms-review-zone-submit-handler">
+              (function () {
+                var forms = document.querySelectorAll('form.matrix-script-review-form');
+                if (!forms || !forms.length) { return; }
+                forms.forEach(function (form) {
+                  form.addEventListener('submit', function (event) {
+                    event.preventDefault();
+                    var status = form.querySelector('[data-role="ms-review-zone-submit-status"]');
+                    var input = form.querySelector('[data-role="ms-review-zone-submit-input"]');
+                    var button = form.querySelector('[data-role="ms-review-zone-submit-button"]');
+                    var note = (input && input.value || '').trim();
+                    if (!note) { if (status) { status.textContent = '请先输入校对意见。'; } return; }
+                    if (button) { button.disabled = true; }
+                    if (status) { status.textContent = '提交中…'; }
+                    var body = {
+                      event_kind: form.dataset.eventKind || 'operator_note',
+                      actor_kind: form.dataset.actorKind || 'operator',
+                      variation_id: form.dataset.variationId,
+                      payload: {
+                        operator_publish_notes: note,
+                        review_zone: form.dataset.zoneId
+                      }
+                    };
+                    fetch(form.action, {
+                      method: form.method || 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(body)
+                    }).then(function (resp) {
+                      if (button) { button.disabled = false; }
+                      if (resp.ok) {
+                        if (status) { status.textContent = '已提交 · 已写入 closure。'; }
+                        if (input) { input.value = ''; }
+                      } else {
+                        resp.text().then(function (text) {
+                          if (status) { status.textContent = '提交失败：' + (text || resp.status); }
+                        });
+                      }
+                    }).catch(function (err) {
+                      if (button) { button.disabled = false; }
+                      if (status) { status.textContent = '提交失败：' + err.message; }
+                    });
+                  });
+                });
+              })();
+            </script>
+          {% endif %}
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="ms-review-zone-endpoint-explanation">
+            {{ ms_review_zone.closure_endpoint_explanation_zh }}
+          </div>
+          <div class="muted t-secondary" style="margin-top:6px;" data-role="ms-review-zone-phase-b-forbidden">
+            {{ ms_review_zone.phase_b_authoring_forbidden_label_zh }}
+          </div>
+        </div>
+      {% endif %}
+
+      {# OWC-MS PR-2 / MS-W6 — Workbench E 质检与诊断区. Renders PR-1 L4 advisory_emitter output + closed publish_readiness head_reason + delivery comprehension lanes. Pure presentation; no advisory rule change. Authority: docs/reviews/owc_ms_gate_spec_v1.md §3 MS-W6. #}
+      {% if ms_qc_diagnostics.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-qc-diagnostics-panel">
+          <div class="section-title">
+            <h2 data-role="ms-qc-title">{{ ms_qc_diagnostics.panel_title_zh }}</h2>
+            <div class="secondary" data-role="ms-qc-subtitle">{{ ms_qc_diagnostics.panel_subtitle_zh }}</div>
+          </div>
+
+          <h3 style="margin:12px 0 6px;" data-role="ms-qc-ready-gate-label">{{ ms_qc_diagnostics.ready_gate_label_zh }}</h3>
+          <div class="meta-grid" data-role="ms-qc-ready-gate-grid">
+            <div class="meta-item" data-role="ms-qc-ready-gate-publishable">
+              <strong>publishable</strong>
+              <span>{{ ms_qc_diagnostics.ready_gate_explanation.publishable }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-qc-ready-gate-head-reason" data-head-reason="{{ ms_qc_diagnostics.ready_gate_explanation.head_reason or '' }}">
+              <strong>head_reason</strong>
+              <span>{{ ms_qc_diagnostics.ready_gate_explanation.head_reason_label_zh }}</span>
+              {% if ms_qc_diagnostics.ready_gate_explanation.first_blocking_reason_raw %}
+                <span class="muted t-secondary">first_blocking_reason=<code>{{ ms_qc_diagnostics.ready_gate_explanation.first_blocking_reason_raw }}</code></span>
+              {% endif %}
+            </div>
+            <div class="meta-item" data-role="ms-qc-ready-gate-final-fresh">
+              <strong>final_fresh</strong>
+              <span>{{ ms_qc_diagnostics.ready_gate_explanation.final_fresh }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-qc-ready-gate-final-provenance">
+              <strong>final_provenance</strong>
+              <span>{{ ms_qc_diagnostics.ready_gate_explanation.final_provenance or "—" }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-qc-ready-gate-blocking-count">
+              <strong>blocking_count</strong>
+              <span>{{ ms_qc_diagnostics.ready_gate_explanation.blocking_count }}</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-qc-risk-items-label">{{ ms_qc_diagnostics.risk_items_label_zh }}</h3>
+          {% if ms_qc_diagnostics.risk_items %}
+            <ul class="muted" data-role="ms-qc-risk-items-list" style="margin:6px 0 0 18px;">
+              {% for risk in ms_qc_diagnostics.risk_items %}
+                <li data-role="ms-qc-risk-item" data-advisory-id="{{ risk.advisory_id }}" data-level="{{ risk.level }}">
+                  <strong>[{{ risk.level }}]</strong> <code>{{ risk.advisory_id }}</code> — {{ risk.operator_hint or "—" }}
+                  {% if risk.explanation_zh %}<div class="muted t-secondary">{{ risk.explanation_zh }}</div>{% endif %}
+                  {% if risk.recommended_next_action %}<div class="muted t-secondary">recommended_next_action=<code>{{ risk.recommended_next_action }}</code></div>{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="muted">当前无 L4 advisory。</div>
+          {% endif %}
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-qc-compliance-items-label">{{ ms_qc_diagnostics.compliance_items_label_zh }}</h3>
+          <ul class="muted" data-role="ms-qc-compliance-items-list" style="margin:6px 0 0 18px;">
+            {% for c in ms_qc_diagnostics.compliance_items %}
+              <li data-role="ms-qc-compliance-item" data-compliance-id="{{ c.compliance_id }}">
+                <strong>{{ c.label_zh }}</strong>
+                <div class="muted t-secondary">{{ c.explanation_zh }}</div>
+              </li>
+            {% endfor %}
+          </ul>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-qc-quality-items-label">{{ ms_qc_diagnostics.quality_items_label_zh }}</h3>
+          <div class="meta-grid" data-role="ms-qc-quality-items-grid">
+            {% for q in ms_qc_diagnostics.quality_items %}
+              <div class="meta-item" data-role="ms-qc-quality-item" data-quality-id="{{ q.quality_id }}" data-quality-status="{{ q.status_code }}">
+                <strong>{{ q.label_zh }}</strong>
+                <span>{{ q.value_label_zh }}</span>
+              </div>
+            {% endfor %}
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-qc-artifact-status-label">{{ ms_qc_diagnostics.artifact_status_label_zh }}</h3>
+          {% if ms_qc_diagnostics.artifact_status_items %}
+            <ul class="muted" data-role="ms-qc-artifact-status-list" style="margin:6px 0 0 18px;">
+              {% for item in ms_qc_diagnostics.artifact_status_items %}
+                <li data-role="ms-qc-artifact-status-item" data-deliverable-id="{{ item.deliverable_id }}" data-lane-id="{{ item.lane_id }}" data-artifact-status-code="{{ item.artifact_status_code }}">
+                  <strong>{{ item.kind_label_zh }}</strong>（<code>{{ item.deliverable_id }}</code> · {{ item.lane_label_zh }}）：{{ item.artifact_status_label_zh }}
+                  {% if item.artifact_status_explanation_zh %}<div class="muted t-secondary">{{ item.artifact_status_explanation_zh }}</div>{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="muted">尚未有交付物可投射。</div>
+          {% endif %}
+
+          {% if ms_qc_diagnostics.publish_blocking_explanation %}
+            <h3 style="margin:16px 0 6px;" data-role="ms-qc-publish-blocking-label">{{ ms_qc_diagnostics.publish_blocking_explanation_label_zh }}</h3>
+            <div class="meta-item" data-role="ms-qc-publish-blocking" data-is-blocked="{{ 'true' if ms_qc_diagnostics.publish_blocking_explanation.is_blocked else 'false' }}">
+              <span>{{ ms_qc_diagnostics.publish_blocking_explanation.reason_label_zh or "—" }}</span>
+            </div>
+            {% if ms_qc_diagnostics.publish_blocking_explanation.blocking_rows %}
+              <ul class="muted" data-role="ms-qc-publish-blocking-rows-list" style="margin:6px 0 0 18px;">
+                {% for r in ms_qc_diagnostics.publish_blocking_explanation.blocking_rows %}
+                  <li><code>{{ r.deliverable_id }}</code>（{{ r.kind_label_zh }}）：{{ r.artifact_status_label_zh }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          {% endif %}
+        </div>
+      {% endif %}
     {% endif %}
 
     {% if ops_hot_follow_panel.mounted %}
