@@ -1123,6 +1123,19 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
             payload["operator_surfaces"] = {}
             payload["digital_anchor_publish_feedback_closure"] = None
             payload["digital_anchor_delivery_binding"] = {}
+
+        # OWC-DA PR-3: DA-W8 + DA-W9 Delivery Center convergence per
+        # `docs/reviews/owc_da_gate_spec_v1.md` §3 + digital_anchor_product_flow
+        # §7.1 / §7.3. Pure presentation-layer projections over existing closed
+        # truth (delivery_binding + D.1 closure); no second producer; no schema
+        # widening; no contract touch. Extracted into a pure seam under
+        # digital_anchor/ so the PR-3 wiring test exercises the attach path
+        # without ambient storage config.
+        from gateway.app.services.digital_anchor.publish_hub_pr3_attach import (
+            attach_digital_anchor_delivery_pr3_extras,
+        )
+
+        attach_digital_anchor_delivery_pr3_extras(payload=payload, task=task)
     return payload
 
 
