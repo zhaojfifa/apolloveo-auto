@@ -115,6 +115,8 @@
         {% set ms_owc = it.matrix_script_task_area_convergence or {} %}
         {% set ms_eight_stage = ms_owc.eight_stage or {} %}
         {% set ms_lanes = ms_owc.lanes_view or {} %}
+        {% set da_owc = it.digital_anchor_task_area_convergence or {} %}
+        {% set da_eight_stage = da_owc.eight_stage or {} %}
         <div class="task-card task-row" data-line="{{ line_id }}" data-status="{{ status_value }}" data-bucket="{{ bucket_value }}">
           {% if line_id == "matrix_script" and ms_summary.is_matrix_script %}
             {# PR-U1 Matrix Script Task Area comprehension block — operator-language fields + tri-state + explicit workbench/delivery actions. Gated to Matrix Script rows only; Hot Follow / Digital Anchor cards remain bytewise unchanged via the {% else %} branch below. OWC-MS PR-1 (MS-W1 + MS-W2) extends this block with the eight-stage badge, the four newly-converged operator-language fields, and the 脚本/变体/发布 three-tier lanes view; all extensions stay inside this matrix_script-gated branch. #}
@@ -200,6 +202,83 @@
                    data-role="ms-action-workbench">{{ ms_summary.workbench_action_label }}</a>
                 <a href="{{ ms_summary.delivery_action_href }}" class="btn-secondary"
                    data-role="ms-action-delivery">{{ ms_summary.delivery_action_label }}</a>
+                <button class="btn-danger-link" data-action="delete" data-id="{{ task_id }}"
+                        onclick="deleteTask('{{ task_id }}'); return false;">
+                  {{ t("action.delete") }}
+                </button>
+              </div>
+            </div>
+          {% elif line_id == "digital_anchor" and da_owc.is_digital_anchor %}
+            {# OWC-DA PR-1 Digital Anchor Task Area block — operator-language 8-field card per digital_anchor_product_flow §5.2 + 8-stage badge per §5.1 + explicit workbench/delivery actions. Gated to Digital Anchor rows only; Hot Follow / Matrix Script / baseline cards remain bytewise unchanged via the {% else %} branch below. 当前版本状态 consumes board_bucket only (PR-1 reminder #1); 交付包状态 stays tracked-gap until DA-W8 (PR-1 reminder #2); eight-stage degrades gracefully when closure is None (PR-1 reminder #3). #}
+            <div class="task-card__left" data-role="digital-anchor-card-left">
+              {% if cover %}
+                <img class="task-card__cover" src="{{ cover }}" alt="cover" />
+              {% else %}
+                <div class="task-card__cover"></div>
+              {% endif %}
+              <div class="task-card__info">
+                <div class="task-card__title">
+                  <span data-role="da-task-title-label">{{ da_owc.task_title_label }}</span>
+                  &middot;
+                  <span data-role="da-task-title-value">{{ da_owc.task_title_value or title }}</span>
+                </div>
+                <div class="task-card__meta">
+                  <span class="task-pill" data-role="board-line-label">{{ line_match.label }}</span>
+                  <span>ID: {{ task_id }}</span>
+                  {% if created %}
+                    <span title="{{ it.created_at or created }}">{{ created }}</span>
+                  {% endif %}
+                </div>
+                <div class="task-card__meta" data-role="da-field-row-identity">
+                  <span data-role="da-role-profile">
+                    {{ da_owc.role_profile_label }}：{{ da_owc.role_profile_value or "—" }}
+                  </span>
+                  <span>&middot;</span>
+                  <span data-role="da-scene-template">
+                    {{ da_owc.scene_template_label }}：{{ da_owc.scene_template_value or "—" }}
+                  </span>
+                  <span>&middot;</span>
+                  <span data-role="da-target-language">
+                    {{ da_owc.target_language_label }}：{% if da_owc.target_language_value %}{{ da_owc.target_language_value | join(", ") }}{% else %}—{% endif %}
+                  </span>
+                </div>
+                <div class="task-card__meta" data-role="da-field-row-state">
+                  <span data-role="da-current-version-state"
+                        title="当前版本状态由统一 publish_readiness / board_bucket 推导（reminder #1）">
+                    {{ da_owc.current_version_state_label }}：{{ da_owc.current_version_state_label_value }}
+                  </span>
+                  <span>&middot;</span>
+                  <span data-role="da-current-blocker">
+                    {{ da_owc.current_blocker_label }}：{{ da_owc.current_blocker_value or "无" }}
+                  </span>
+                  <span>&middot;</span>
+                  <span data-role="da-delivery-pack-state"
+                        title="{{ da_owc.delivery_pack_state_tooltip }}">
+                    {{ da_owc.delivery_pack_state_label }}：{% if da_owc.delivery_pack_state_value is none %}—{% else %}{{ da_owc.delivery_pack_state_value }}{% endif %}
+                  </span>
+                  <span>&middot;</span>
+                  <span data-role="da-last-update">
+                    {{ da_owc.last_update_label }}：{{ da_owc.last_update_value or "—" }}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div class="task-card__right" data-role="digital-anchor-card-right">
+              <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
+              {% if da_eight_stage and da_eight_stage.stage_label %}
+                <span class="task-badge stage-badge stage-badge--{{ da_eight_stage.stage }}"
+                      data-role="da-eight-stage"
+                      data-stage="{{ da_eight_stage.stage }}"
+                      data-stage-index="{{ da_eight_stage.stage_index }}">{{ da_eight_stage.stage_label }}</span>
+              {% endif %}
+              <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}"
+                    data-role="operator-bucket"
+                    data-bucket-language="zh">{{ da_owc.current_version_state_label_value }}</span>
+              <div class="task-actions" data-role="da-actions">
+                <a href="{{ da_owc.workbench_action_href }}" class="btn-primary"
+                   data-role="da-action-workbench">{{ da_owc.workbench_action_label }}</a>
+                <a href="{{ da_owc.delivery_action_href }}" class="btn-secondary"
+                   data-role="da-action-delivery">{{ da_owc.delivery_action_label }}</a>
                 <button class="btn-danger-link" data-action="delete" data-id="{{ task_id }}"
                         onclick="deleteTask('{{ task_id }}'); return false;">
                   {{ t("action.delete") }}
