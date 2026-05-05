@@ -47,6 +47,19 @@ D1_EVENT_KINDS = frozenset(
 D1_PUBLISH_STATUS_VALUES = frozenset({"pending", "published", "failed", "retracted"})
 D1_ROW_SCOPES = frozenset({"role", "segment"})
 
+# OWC-DA PR-2 / DA-W7 — additive closed-set extension on the
+# `operator_note` event payload per OWC-DA gate spec §3 DA-W7
+# ("an enum closed-set extension on event payload is the only contract
+# touch"). The five zones map 1:1 onto digital_anchor_product_flow §6.1E
+# (试听 / 视频预览 / 字幕校对 / 表达节奏复核 / 质检与诊断 review modules)
+# and are recorded onto the appended `feedback_closure_records[]` entry
+# as an optional field; legacy `operator_note` events without
+# `review_zone` remain valid. Mirror of OWC-MS MS-W5 precedent on
+# `matrix_script/publish_feedback_closure.py::REVIEW_ZONE_VALUES`.
+REVIEW_ZONE_VALUES = frozenset(
+    {"audition", "video_preview", "subtitle", "cadence", "qc"}
+)
+
 _D1_EVENT_ACTOR = {
     "publish_attempted": "operator",
     "publish_accepted": "platform",
@@ -554,6 +567,17 @@ def apply_writeback_event(
         else:
             row["role_feedback_note"] = note
         closure["operator_publish_notes"] = note
+        # OWC-DA PR-2 / DA-W7 — optional `review_zone` tag (closed enum).
+        # Validated in-place; recorded on the appended record below.
+        # Mirrors OWC-MS MS-W5 precedent on the matrix_script closure.
+        if (
+            "review_zone" in payload_map
+            and payload_map.get("review_zone") not in REVIEW_ZONE_VALUES
+        ):
+            raise ClosureValidationError(
+                "operator_note.review_zone must be in "
+                f"{sorted(REVIEW_ZONE_VALUES)}"
+            )
 
     new_record_id = record_id or f"rec_{uuid4().hex[:12]}"
     row["last_event_id"] = new_record_id
@@ -575,6 +599,11 @@ def apply_writeback_event(
     record["row_scope"] = row_scope
     record["row_id"] = row_id
     record["actor_kind"] = actor_kind
+    # OWC-DA PR-2 / DA-W7 — optional `review_zone` tag flows through onto
+    # the appended record only. The role_feedback / segment_feedback row
+    # shape is unchanged; the closure-wide shape is unchanged.
+    if event_kind == "operator_note" and payload_map.get("review_zone") in REVIEW_ZONE_VALUES:
+        record["review_zone"] = payload_map["review_zone"]
     closure["feedback_closure_records"].append(record)
     return new_record_id
 
@@ -654,6 +683,7 @@ __all__ = [
     "InMemoryClosureStore",
     "PUBLISH_STATUS_VALUES",
     "RECORD_KINDS",
+    "REVIEW_ZONE_VALUES",
     "ROLE_FEEDBACK_KINDS",
     "SEGMENT_FEEDBACK_KINDS",
     "SURFACE_ID",
