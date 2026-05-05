@@ -11,6 +11,9 @@ from gateway.app.services.hot_follow_runtime_bridge import (
     compat_hot_follow_operational_defaults,
     compat_hot_follow_task_status_shape,
 )
+from gateway.app.services.digital_anchor.task_area_convergence import (
+    derive_digital_anchor_card_summary_for_task,
+)
 from gateway.app.services.matrix_script.task_card_summary import (
     derive_matrix_script_task_card_summary,
 )
@@ -227,6 +230,28 @@ def build_tasks_page_rows(
             # docs/product/matrix_script_product_flow_v1.md §§5.1–5.3.
             row["matrix_script_task_area_convergence"] = (
                 derive_matrix_script_full_card_summary_for_task(row)
+            )
+        # OWC-DA PR-1 (DA-W1 + DA-W2) — Digital Anchor Task Area card +
+        # eight-stage state. Additive, gated to `kind == "digital_anchor"`
+        # rows so Hot Follow / Matrix Script / baseline cards stay
+        # bytewise unchanged. Reads existing row truth + the read-only
+        # closure view from `digital_anchor.closure_binding`. No packet /
+        # contract / projection mutation. Authority:
+        # docs/reviews/owc_da_gate_spec_v1.md §3 (DA-W1/W2);
+        # docs/product/digital_anchor_product_flow_v1.md §§5.1 / 5.2.
+        if kind_value == "digital_anchor":
+            row["kind"] = "digital_anchor"
+            row["line_specific_refs"] = t.get("line_specific_refs") or (
+                t.get("packet", {}).get("line_specific_refs") if isinstance(t.get("packet"), dict) else None
+            )
+            row["config"] = t.get("config")
+            row["packet"] = t.get("packet")
+            row["updated_at"] = t.get("updated_at")
+            row["last_generated_at"] = t.get("last_generated_at")
+            row["archived"] = bool(t.get("archived"))
+            row["final"] = t.get("final")
+            row["digital_anchor_task_area_convergence"] = (
+                derive_digital_anchor_card_summary_for_task(row)
             )
         rows.append(row)
     return rows
