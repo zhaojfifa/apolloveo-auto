@@ -1072,6 +1072,33 @@ def publish_hub_payload(task: dict) -> dict[str, object]:
             payload["operator_surfaces"] = {}
             payload["matrix_script_publish_feedback_closure"] = None
 
+        # OWC-MS PR-3: MS-W7 + MS-W8 Delivery Center convergence per
+        # `docs/reviews/owc_ms_gate_spec_v1.md` §3 + matrix_script_product_flow
+        # §7.1 / §7.3. Pure presentation-layer projections over existing closed
+        # truth; no second producer; no schema widening; no contract touch.
+        try:
+            from gateway.app.services.matrix_script.delivery_backfill_view import (
+                derive_matrix_script_delivery_backfill,
+            )
+            from gateway.app.services.matrix_script.delivery_copy_bundle_view import (
+                derive_matrix_script_delivery_copy_bundle,
+            )
+
+            payload["matrix_script_delivery_copy_bundle"] = (
+                derive_matrix_script_delivery_copy_bundle(
+                    task,
+                    base_copy_bundle=payload.get("copy_bundle") or {},
+                )
+            )
+            payload["matrix_script_delivery_backfill"] = (
+                derive_matrix_script_delivery_backfill(
+                    payload.get("matrix_script_publish_feedback_closure")
+                )
+            )
+        except Exception:
+            payload["matrix_script_delivery_copy_bundle"] = {}
+            payload["matrix_script_delivery_backfill"] = {}
+
     if kind_value == "digital_anchor":
         # Recovery PR-4: project the Digital Anchor Phase C delivery binding +
         # bind the Phase D.1 closure into the operator surface bundle so the
