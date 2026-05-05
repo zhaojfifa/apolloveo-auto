@@ -1,7 +1,7 @@
 # ApolloVeo 2.0 · OWC-MS PR-3 — Matrix Script Delivery Convergence + 回填 Multi-Channel — Execution Log v1
 
 Date: 2026-05-05
-Status: Implementation green; PR opening pending the `gh pr create` step.
+Status: **MERGED to `main` on 2026-05-05T03:22:39Z as PR #125, squash commit `3d9954c`.** Final state after the §8.1 reviewer-fail correction pass (single-source MS-W7 + storage-independent wiring tests via the `publish_hub_pr3_attach` seam) and the Codex P1 fix for the no-closure backfill bundle shape.
 Wave: ApolloVeo 2.0 Operator Workflow Convergence Wave (OWC), Phase OWC-MS.
 Phase Gate: [docs/reviews/owc_ms_gate_spec_v1.md](../reviews/owc_ms_gate_spec_v1.md).
 Predecessors: OWC authority/gate normalization PR (#121, squash commit `27aa950`); OWC-MS PR-1 (Task Area Workflow Convergence — PR #122, squash commit `0b23605`); OWC-MS PR-2 (Workbench Five-Panel Convergence — PR #123, squash commit `c7a5a89`); post-merge housekeeping PR #124 (`d2ad7a8`); Operator Capability Recovery PR-1..PR-4 (all merged 2026-05-04).
@@ -277,6 +277,29 @@ Adjacent regression unchanged: **484 PASS / 6 SKIPPED / 0 FAIL** (the 6 skips ar
 
 - The 6 `test_matrix_script_review_zone_submit_http.py` HTTP-side cases continue to auto-skip on Python 3.9 due to the **pre-existing repo baseline** (`gateway/app/config.py:43` PEP-604 union; documented across PR-1 / PR-2 / PR-3 / PR-4 / OWC-MS PR-1 / OWC-MS PR-2 logs). Not introduced by PR-3. CI on Python 3.10+ runs them.
 - All other residual risks from §8 carry forward unchanged.
+
+## 8.2 Post-Review Codex P1 Correction (2026-05-05)
+
+A second post-§8.1 review surfaced one remaining Codex P1 thread on `gateway/app/services/matrix_script/delivery_backfill_view.py:512`: when a Matrix Script task had no closure yet, the helper returned `{}` and the JS renderer hid the entire backfill card — operators never saw the intended "尚未生成 closure 记录" empty-state message, and any consumer indexing `backfill["lane_count"]` / `"lanes"` / `"is_matrix_script"` would `KeyError`.
+
+### 8.2.1 Exact code-path correction
+
+- **`delivery_backfill_view.py`**: when `closure` is `None` or an empty mapping, the helper now emits the matrix_script-shaped bundle with zero lanes — `is_matrix_script=True` + `panel_title_zh` + `panel_subtitle_zh` + `field_legend_zh` (six labels) + `lanes=[]` + `lane_count=0` + `tracked_gap_summary_zh` naming the "尚未生成 closure" empty-state. A non-matrix_script closure (cross-line wiring bug) still returns `{}` so cross-line render stays untouched.
+- **`publish_hub_pr3_attach.py`**: cross-line isolation moved into the seam itself. When the seam is invoked with a non-matrix_script task (caller bug; production publish_hub_payload still gates externally), both PR-3 keys are written as `{}` so non-matrix_script payloads stay untouched. Helpers can now assume matrix_script context.
+- **Tests**: `test_returns_zero_lanes_panel_for_none_closure`, `test_returns_zero_lanes_panel_for_empty_mapping`, `test_no_closure_panel_carries_documented_keys_so_template_renders` cover the helper. `test_matrix_script_with_none_closure_emits_zero_lanes_panel`, `test_attach_with_malformed_closure_does_not_raise_and_emits_zero_lanes_panel` cover the seam. Cross-line isolation tests still assert `{}` for Hot Follow / Digital Anchor / Baseline kinds at the seam.
+
+### 8.2.2 Tests after correction
+
+- `test_matrix_script_delivery_copy_bundle_view.py` — **40/40 PASS**.
+- `test_matrix_script_delivery_backfill_view.py` — **41/41 PASS** (added Codex P1 invariant tests).
+- `test_matrix_script_publish_hub_pr3_wiring.py` — **22/22 PASS** native on Python 3.9.
+- **Subtotal: 103/103 PASS** dedicated PR-3.
+- Adjacent regression unchanged: **484 PASS / 6 SKIPPED / 0 FAIL**.
+- **Aggregate: 587 PASS / 6 SKIPPED / 0 FAIL** on Python 3.9.
+
+### 8.2.3 Why the Codex thread is now closed
+
+The helper now structurally guarantees the documented bundle shape for the most common pre-publish state (no closure yet); the JS renderer always has `is_matrix_script == true` to gate on, the panel is shown, and the empty-state message at `data-role="ms-delivery-backfill-empty"` renders. Consumers indexing `backfill["lane_count"]` will get `0` instead of `KeyError`. The cross-line isolation that the original `closure → {}` short-circuit was guarding is now enforced at the seam (kind check) instead, which keeps it from leaking to the post-init "no closure yet" case. The Codex review thread was resolved on PR #125 with this fix in place.
 
 ## 9. Exact Statement of What Remains for the Next PR
 
