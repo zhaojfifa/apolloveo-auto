@@ -378,6 +378,43 @@
           <h3 style="margin:14px 0 6px;">最近事件（append-only）</h3>
           <ul data-role="ms-closure-events-recent" class="muted" style="margin:6px 0 0 18px;"></ul>
         </div>
+
+        {# OWC-MS PR-3 / MS-W7: Matrix Script Delivery Center copy_bundle exposure.
+           Per docs/reviews/owc_ms_gate_spec_v1.md §3 MS-W7 + matrix_script_product_flow
+           §7.1, exposes 标题 / hashtags / CTA / 评论关键词 as a Delivery Center row
+           backed by existing projection truth + per-subfield operator-language
+           fallback when the source is unresolved. Hot Follow / Digital Anchor /
+           Baseline publish hubs render unchanged (gated container is invisible
+           for those kinds). No contract touch; no packet truth mutation. #}
+        <div class="card" id="matrix-script-delivery-copy-bundle-block"
+             data-role="matrix-script-delivery-copy-bundle" style="margin-top:10px; display:none;">
+          <div class="section-title">
+            <h2 data-role="ms-delivery-copy-bundle-title">Matrix Script · 交付中心 · copy_bundle</h2>
+            <div class="secondary" data-role="ms-delivery-copy-bundle-subtitle"></div>
+          </div>
+          <ul data-role="ms-delivery-copy-bundle-rows" style="margin:8px 0 0 18px;"></ul>
+          <div class="muted" data-role="ms-delivery-copy-bundle-tracked-gap" style="margin-top:8px;"></div>
+        </div>
+
+        {# OWC-MS PR-3 / MS-W8: Matrix Script Delivery Center 多渠道回填 rendering.
+           Per docs/reviews/owc_ms_gate_spec_v1.md §3 MS-W8 + matrix_script_product_flow
+           §7.3, exposes 发布渠道 / 账号 ID / 发布时间 / 发布链接 / 发布状态 /
+           指标入口 per variation_id lane. Pure projection over closure.variation_feedback[]
+           + closure.feedback_closure_records[] + channel_metrics[]. No closure
+           schema widening; account_id is rendered as an explicit tracked gap. #}
+        <div class="card" id="matrix-script-delivery-backfill-block"
+             data-role="matrix-script-delivery-backfill" style="margin-top:10px; display:none;">
+          <div class="section-title">
+            <h2 data-role="ms-delivery-backfill-title">Matrix Script · 交付中心 · 多渠道回填</h2>
+            <div class="secondary" data-role="ms-delivery-backfill-subtitle"></div>
+          </div>
+          <div class="muted" data-role="ms-delivery-backfill-legend" style="margin-top:6px;"></div>
+          <div data-role="ms-delivery-backfill-lanes" style="margin-top:8px;"></div>
+          <div class="muted" data-role="ms-delivery-backfill-empty" style="display:none; margin-top:8px;">
+            尚未生成 closure 记录；初始化 closure 后此处将按 variation 出现回填行。
+          </div>
+          <div class="muted" data-role="ms-delivery-backfill-tracked-gap" style="margin-top:8px;"></div>
+        </div>
       {% endif %}
 
       {# Recovery PR-4: Digital Anchor publish-feedback closure operator surface.
@@ -805,6 +842,179 @@ function resolveLang(serverLang) {
 
       setRoleText("ms-delivery-history-label", comp.history_vs_current_label_zh);
       setRoleText("ms-delivery-history-explanation", comp.history_vs_current_explanation_zh);
+    }
+
+    // OWC-MS PR-3 / MS-W7: Matrix Script Delivery Center copy_bundle exposure
+    // renderer. Renders only when the server-side container exists (gated by
+    // task.kind == "matrix_script") and the payload carries a non-empty
+    // matrix_script_delivery_copy_bundle bundle. Hot Follow / Digital Anchor /
+    // Baseline publish hubs short-circuit at the container check.
+    function renderMatrixScriptDeliveryCopyBundle(bundle) {
+      const block = document.getElementById("matrix-script-delivery-copy-bundle-block");
+      if (!block) return;
+      if (!bundle || !bundle.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="ms-delivery-copy-bundle-title"]');
+      if (titleEl) titleEl.textContent = bundle.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="ms-delivery-copy-bundle-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = bundle.panel_subtitle_zh || "";
+
+      const rowsEl = block.querySelector('[data-role="ms-delivery-copy-bundle-rows"]');
+      if (rowsEl) {
+        rowsEl.innerHTML = "";
+        (bundle.subfields || []).forEach((sub) => {
+          const li = document.createElement("li");
+          li.dataset.subfieldId = sub.subfield_id || "";
+          li.dataset.statusCode = sub.status_code || "";
+          const labelEl = document.createElement("strong");
+          labelEl.textContent = (sub.label_zh || sub.subfield_id || "—") + "：";
+          li.appendChild(labelEl);
+          const valueSpan = document.createElement("span");
+          valueSpan.dataset.role = "ms-delivery-copy-bundle-value";
+          if (sub.value) {
+            valueSpan.textContent = sub.value;
+          } else {
+            valueSpan.textContent = "—";
+            valueSpan.classList.add("muted");
+          }
+          li.appendChild(valueSpan);
+          const statusSpan = document.createElement("span");
+          statusSpan.className = "muted";
+          statusSpan.style.marginLeft = "8px";
+          statusSpan.dataset.role = "ms-delivery-copy-bundle-status";
+          statusSpan.textContent = "[" + (sub.status_label_zh || sub.status_code || "") + "]";
+          li.appendChild(statusSpan);
+          if (sub.unresolved_explanation_zh) {
+            const expl = document.createElement("div");
+            expl.className = "muted t-secondary";
+            expl.dataset.role = "ms-delivery-copy-bundle-explanation";
+            expl.style.marginLeft = "12px";
+            expl.textContent = sub.unresolved_explanation_zh;
+            li.appendChild(expl);
+          }
+          rowsEl.appendChild(li);
+        });
+      }
+
+      const gapEl = block.querySelector('[data-role="ms-delivery-copy-bundle-tracked-gap"]');
+      if (gapEl) gapEl.textContent = bundle.tracked_gap_summary_zh || "";
+    }
+
+    // OWC-MS PR-3 / MS-W8: Matrix Script Delivery Center 多渠道回填 renderer.
+    // Reads only data.matrix_script_delivery_backfill; renders one lane per
+    // variation_id with six operator-language fields (channel / account /
+    // publish_time / publish_url / publish_status / metrics_snapshot). No
+    // second truth path; account_id surfaces as an explicit tracked gap.
+    function renderMatrixScriptDeliveryBackfill(backfill) {
+      const block = document.getElementById("matrix-script-delivery-backfill-block");
+      if (!block) return;
+      if (!backfill || !backfill.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="ms-delivery-backfill-title"]');
+      if (titleEl) titleEl.textContent = backfill.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="ms-delivery-backfill-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = backfill.panel_subtitle_zh || "";
+      const legendEl = block.querySelector('[data-role="ms-delivery-backfill-legend"]');
+      if (legendEl) {
+        const legend = backfill.field_legend_zh || [];
+        legendEl.textContent = legend.length ? "字段：" + legend.join(" / ") : "";
+      }
+
+      const lanesEl = block.querySelector('[data-role="ms-delivery-backfill-lanes"]');
+      const emptyEl = block.querySelector('[data-role="ms-delivery-backfill-empty"]');
+      if (lanesEl) {
+        lanesEl.innerHTML = "";
+        const lanes = backfill.lanes || [];
+        if (!lanes.length) {
+          if (emptyEl) emptyEl.style.display = "";
+        } else {
+          if (emptyEl) emptyEl.style.display = "none";
+          lanes.forEach((lane) => {
+            const laneCard = document.createElement("div");
+            laneCard.className = "card";
+            laneCard.style.marginTop = "8px";
+            laneCard.dataset.role = "ms-delivery-backfill-lane";
+            laneCard.dataset.variationId = lane.variation_id || "";
+
+            const laneTitle = document.createElement("strong");
+            laneTitle.dataset.role = "ms-delivery-backfill-lane-label";
+            laneTitle.textContent = lane.lane_label_zh || ("variation_id · " + (lane.variation_id || "—"));
+            laneCard.appendChild(laneTitle);
+
+            const fieldsList = document.createElement("ul");
+            fieldsList.style.margin = "6px 0 0 18px";
+            fieldsList.dataset.role = "ms-delivery-backfill-lane-fields";
+            (lane.fields || []).forEach((fld) => {
+              const li = document.createElement("li");
+              li.dataset.fieldId = fld.field_id || "";
+              li.dataset.statusCode = fld.status_code || "";
+              const labelEl = document.createElement("strong");
+              labelEl.textContent = (fld.label_zh || fld.field_id || "—") + "：";
+              li.appendChild(labelEl);
+
+              const valueSpan = document.createElement("span");
+              valueSpan.dataset.role = "ms-delivery-backfill-field-value";
+              if (fld.field_id === "metrics_snapshot") {
+                const pairs = fld.metrics_pairs || [];
+                if (pairs.length) {
+                  valueSpan.textContent = pairs
+                    .map((p) => (p.label_zh || p.metric_id || "—") + "=" + p.value)
+                    .join(" / ");
+                } else {
+                  valueSpan.textContent = "—";
+                  valueSpan.classList.add("muted");
+                }
+              } else if (fld.field_id === "publish_status") {
+                const labelTextRaw = fld.value_label_zh || "";
+                if (fld.value) {
+                  valueSpan.textContent = labelTextRaw
+                    ? labelTextRaw + "（" + fld.value + "）"
+                    : fld.value;
+                } else {
+                  valueSpan.textContent = labelTextRaw || "—";
+                  if (!labelTextRaw) valueSpan.classList.add("muted");
+                }
+              } else if (fld.value) {
+                valueSpan.textContent = fld.value;
+              } else {
+                valueSpan.textContent = "—";
+                valueSpan.classList.add("muted");
+              }
+              li.appendChild(valueSpan);
+
+              const statusSpan = document.createElement("span");
+              statusSpan.className = "muted";
+              statusSpan.style.marginLeft = "8px";
+              statusSpan.dataset.role = "ms-delivery-backfill-field-status";
+              statusSpan.textContent = "[" + (fld.status_label_zh || fld.status_code || "") + "]";
+              li.appendChild(statusSpan);
+
+              if (fld.tracked_gap_explanation_zh) {
+                const expl = document.createElement("div");
+                expl.className = "muted t-secondary";
+                expl.dataset.role = "ms-delivery-backfill-field-tracked-gap";
+                expl.style.marginLeft = "12px";
+                expl.textContent = fld.tracked_gap_explanation_zh;
+                li.appendChild(expl);
+              }
+              fieldsList.appendChild(li);
+            });
+            laneCard.appendChild(fieldsList);
+            lanesEl.appendChild(laneCard);
+          });
+        }
+      }
+
+      const gapEl = block.querySelector('[data-role="ms-delivery-backfill-tracked-gap"]');
+      if (gapEl) gapEl.textContent = backfill.tracked_gap_summary_zh || "";
     }
 
     function renderCopyBundle(copy) {
@@ -1320,6 +1530,8 @@ function resolveLang(serverLang) {
       setText("download-code", data.download_code || "-");
       renderDeliverables(data.deliverables || {});
       renderMatrixScriptDeliveryComprehension(data.matrix_script_delivery_comprehension || null);
+      renderMatrixScriptDeliveryCopyBundle(data.matrix_script_delivery_copy_bundle || null);
+      renderMatrixScriptDeliveryBackfill(data.matrix_script_delivery_backfill || null);
       renderMatrixScriptClosure(data.matrix_script_publish_feedback_closure || null);
       renderDigitalAnchorClosure(data.digital_anchor_publish_feedback_closure || null);
       renderCopyBundle(data.copy_bundle || {});
