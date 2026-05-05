@@ -61,6 +61,15 @@ def attach_matrix_script_delivery_pr3_extras(
     ``docs/product/matrix_script_product_flow_v1.md`` §7.1 / §7.3.
     """
 
+    # Defensive cross-line isolation. Production callers already gate by
+    # ``kind_value == "matrix_script"`` before invoking this seam; this
+    # check guards against future regression and lets the wiring tests
+    # drive arbitrary kinds without polluting non-matrix_script payloads.
+    if not _is_matrix_script_task(task):
+        payload["matrix_script_delivery_copy_bundle"] = {}
+        payload["matrix_script_delivery_backfill"] = {}
+        return
+
     try:
         from gateway.app.services.matrix_script.delivery_backfill_view import (
             derive_matrix_script_delivery_backfill,
@@ -83,6 +92,16 @@ def attach_matrix_script_delivery_pr3_extras(
     except Exception:
         payload["matrix_script_delivery_copy_bundle"] = {}
         payload["matrix_script_delivery_backfill"] = {}
+
+
+def _is_matrix_script_task(task: Any) -> bool:
+    if not isinstance(task, dict):
+        return False
+    for key in ("kind", "category_key", "category", "platform"):
+        value = task.get(key)
+        if isinstance(value, str) and value.strip().lower() == "matrix_script":
+            return True
+    return False
 
 
 __all__ = ["attach_matrix_script_delivery_pr3_extras"]

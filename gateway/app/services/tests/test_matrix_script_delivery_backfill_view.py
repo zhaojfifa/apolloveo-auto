@@ -165,15 +165,49 @@ def _field(lane: Mapping[str, Any], field_id: str) -> Mapping[str, Any]:
     raise AssertionError(f"field {field_id!r} not in lane {lane.get('variation_id')!r}")
 
 
-# 1. Empty / non-matrix_script returns {}.
-def test_returns_empty_for_none_closure():
-    assert derive_matrix_script_delivery_backfill(None) == {}
+# 1. No-closure-yet path emits the matrix_script-shaped panel with zero
+# lanes (Codex P1 review on PR #125, 2026-05-05). The operator sees the
+# empty-state message instead of a hidden card.
+def test_returns_zero_lanes_panel_for_none_closure():
+    bundle = derive_matrix_script_delivery_backfill(None)
+    assert bundle["is_matrix_script"] is True
+    assert bundle["lane_count"] == 0
+    assert bundle["lanes"] == []
+    assert "尚未生成 closure" in bundle["tracked_gap_summary_zh"]
 
 
-def test_returns_empty_for_empty_mapping():
-    assert derive_matrix_script_delivery_backfill({}) == {}
+def test_returns_zero_lanes_panel_for_empty_mapping():
+    bundle = derive_matrix_script_delivery_backfill({})
+    assert bundle["is_matrix_script"] is True
+    assert bundle["lane_count"] == 0
+    assert bundle["lanes"] == []
 
 
+def test_no_closure_panel_carries_documented_keys_so_template_renders():
+    """Documented bundle shape (is_matrix_script / panel_title_zh /
+    panel_subtitle_zh / field_legend_zh / lanes / lane_count /
+    tracked_gap_summary_zh) is intact so the JS renderer + the
+    ``data-role="ms-delivery-backfill-empty"`` empty-state message
+    show. Codex P1 fix invariant."""
+
+    bundle = derive_matrix_script_delivery_backfill(None)
+    expected = {
+        "is_matrix_script",
+        "panel_title_zh",
+        "panel_subtitle_zh",
+        "field_legend_zh",
+        "lanes",
+        "lane_count",
+        "tracked_gap_summary_zh",
+    }
+    assert expected.issubset(bundle.keys())
+    assert bundle["panel_title_zh"]
+    assert bundle["panel_subtitle_zh"]
+    assert len(bundle["field_legend_zh"]) == 6
+
+
+# Cross-line isolation: a non-matrix_script closure (wiring bug at the
+# caller side) still returns {} so the cross-line render stays untouched.
 @pytest.mark.parametrize("surface", ["hot_follow_publish_feedback_v1", "digital_anchor_publish_feedback_closure_v1"])
 def test_returns_empty_for_non_matrix_script_surface(surface):
     closure = {

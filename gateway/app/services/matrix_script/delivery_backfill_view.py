@@ -508,7 +508,42 @@ def derive_matrix_script_delivery_backfill(
     """
 
     closure_view = _safe_mapping(closure)
-    if not closure_view or not _is_matrix_script_closure(closure_view):
+    # No-closure-yet path: caller is the matrix_script publish-hub branch
+    # passing the result of ``get_closure_view_for_task`` which returns
+    # ``None`` until the operator initializes the closure. Emit the
+    # matrix_script-shaped bundle with zero lanes so the template renders
+    # the panel + the empty-state message ("尚未生成 closure 记录") instead
+    # of hiding the entire card. Reviewers and operators see the panel
+    # exists and what it's for. Codex P1 review on PR #125 (2026-05-05)
+    # surfaced this fix.
+    if not closure_view:
+        return {
+            "is_matrix_script": True,
+            "panel_title_zh": "Matrix Script · 交付中心 · 多渠道回填",
+            "panel_subtitle_zh": (
+                "按 product-flow §7.3 的回填对象投射六项 operator 字段（发布渠道 / "
+                "账号 ID / 发布时间 / 发布链接 / 发布状态 / 指标入口）；只读理解层，"
+                "不发明事实，不改 closure 契约，不引入第二条真值路径。"
+            ),
+            "field_legend_zh": [
+                FIELD_LABELS_ZH[FIELD_CHANNEL],
+                FIELD_LABELS_ZH[FIELD_ACCOUNT],
+                FIELD_LABELS_ZH[FIELD_PUBLISH_TIME],
+                FIELD_LABELS_ZH[FIELD_PUBLISH_URL],
+                FIELD_LABELS_ZH[FIELD_PUBLISH_STATUS],
+                FIELD_LABELS_ZH[FIELD_METRICS_SNAPSHOT],
+            ],
+            "lanes": [],
+            "lane_count": 0,
+            "tracked_gap_summary_zh": (
+                "尚未生成 closure；点击发布反馈闭环面板的“初始化 closure”可基于当前 "
+                "packet 创建，回填行将按 variation 出现。"
+            ),
+        }
+    # Cross-line isolation: a non-matrix_script closure (e.g., a Hot Follow
+    # or Digital Anchor surface) is a wiring bug at the caller side; emit
+    # ``{}`` so the cross-line render stays untouched.
+    if not _is_matrix_script_closure(closure_view):
         return {}
 
     variation_feedback = _safe_list(closure_view.get("variation_feedback"))

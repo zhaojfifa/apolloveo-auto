@@ -214,17 +214,21 @@ def test_matrix_script_with_initialized_empty_closure_emits_lanes_no_events():
         assert ps["value_label_zh"] == "待发布"
 
 
-def test_matrix_script_with_none_closure_emits_empty_backfill_bundle():
+def test_matrix_script_with_none_closure_emits_zero_lanes_panel():
     """No closure exists yet (operator has not initialized): the helper
-    emits ``{}`` so the JS renderer hides the backfill block. This is
-    the realistic pre-initialization flow returned by
-    ``get_closure_view_for_task`` until an event is fired."""
+    emits the matrix_script-shaped bundle with zero lanes so the
+    template renders the panel + the empty-state message instead of
+    hiding the entire card. Codex P1 fix on PR #125 (2026-05-05)."""
 
     payload = _payload_skeleton(closure=None)
     attach_matrix_script_delivery_pr3_extras(
         payload=payload, task=_matrix_script_task()
     )
-    assert payload["matrix_script_delivery_backfill"] == {}
+    backfill = payload["matrix_script_delivery_backfill"]
+    assert backfill["is_matrix_script"] is True
+    assert backfill["lane_count"] == 0
+    assert backfill["lanes"] == []
+    assert "尚未生成 closure" in backfill["tracked_gap_summary_zh"]
     # copy_bundle still attaches because matrix_script kind alone
     # determines copy_bundle attachment (closure is irrelevant to MS-W7).
     assert payload["matrix_script_delivery_copy_bundle"]["is_matrix_script"] is True
@@ -450,13 +454,19 @@ def test_copy_bundle_all_unresolved_when_only_entry_hints_present():
 # ─────────────────────────────────────────────────────────────────────
 
 
-def test_attach_with_malformed_closure_returns_empty_backfill_without_raising():
+def test_attach_with_malformed_closure_does_not_raise_and_emits_zero_lanes_panel():
+    """A non-mapping closure value (caller bug) is treated as 'no closure
+    yet' and the helper emits the zero-lanes panel so the operator sees
+    the empty-state message instead of a hidden card."""
+
     payload = _payload_skeleton(closure="not-a-mapping")  # type: ignore[arg-type]
     attach_matrix_script_delivery_pr3_extras(
         payload=payload, task=_matrix_script_task()
     )
-    # Backfill helper recognizes invalid input → {}.
-    assert payload["matrix_script_delivery_backfill"] == {}
+    backfill = payload["matrix_script_delivery_backfill"]
+    assert backfill["is_matrix_script"] is True
+    assert backfill["lane_count"] == 0
+    assert backfill["lanes"] == []
 
 
 def test_attach_with_missing_copy_bundle_falls_back_to_empty_dict():
