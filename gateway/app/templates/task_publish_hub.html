@@ -427,6 +427,59 @@
          publish hubs render unchanged. #}
       {% set _da_kind = (task.category_key or task.kind or task.platform or "") | lower %}
       {% if _da_kind == "digital_anchor" %}
+        {# OWC-DA PR-3 / DA-W8: Digital Anchor Delivery Center · Delivery Pack
+           assembly view. Per docs/reviews/owc_da_gate_spec_v1.md §3 DA-W8 +
+           digital_anchor_product_flow §7.1, exposes the nine standard Delivery
+           Pack lanes (final_video primary + subtitle / dubbed_audio / metadata /
+           manifest / pack / role_usage / scene_usage / language_usage) backed by
+           existing delivery_binding_v1 truth + entry.scene_binding_hint +
+           entry.language_scope. Pure projection-side; no schema widening;
+           tracked-gap rendering when subfields absent. #}
+        <div class="card" id="digital-anchor-delivery-pack-block"
+             data-role="digital-anchor-delivery-pack" style="margin-top:10px; display:none;">
+          <div class="section-title">
+            <h2 data-role="da-delivery-pack-title">Digital Anchor · 交付中心 · Delivery Pack</h2>
+            <div class="secondary" data-role="da-delivery-pack-subtitle"></div>
+          </div>
+
+          <div class="card" style="margin-top:10px; border:1px solid #2563eb; background:#eff6ff;"
+               data-role="da-delivery-pack-final-video-primary">
+            <div class="section-title">
+              <h2 data-role="da-delivery-pack-final-video-label"></h2>
+              <div class="secondary" data-role="da-delivery-pack-final-video-status"></div>
+            </div>
+            <div class="muted" data-role="da-delivery-pack-final-video-explanation"></div>
+            <div class="muted t-secondary" data-role="da-delivery-pack-final-video-tracked-gap"></div>
+          </div>
+
+          <h3 style="margin:14px 0 6px;" data-role="da-delivery-pack-lanes-label">交付分区</h3>
+          <div class="muted t-secondary" data-role="da-delivery-pack-legend" style="margin-bottom:6px;"></div>
+          <div data-role="da-delivery-pack-lanes" style="margin-top:6px;"></div>
+
+          <div class="muted" data-role="da-delivery-pack-tracked-gap-summary" style="margin-top:8px;"></div>
+        </div>
+
+        {# OWC-DA PR-3 / DA-W9: Digital Anchor Delivery Center · 多渠道回填 rendering.
+           Per docs/reviews/owc_da_gate_spec_v1.md §3 DA-W9 + digital_anchor_product_flow
+           §7.3, exposes 发布渠道 / 账号 ID / 发布时间 / 发布链接 / 发布状态 /
+           指标入口 per (role / segment) row lane. Pure projection over closure
+           role_feedback[] + segment_feedback[] + feedback_closure_records[] +
+           channel_metrics[]. No closure schema widening; account / channel
+           rendered as explicit tracked gaps. #}
+        <div class="card" id="digital-anchor-delivery-backfill-block"
+             data-role="digital-anchor-delivery-backfill" style="margin-top:10px; display:none;">
+          <div class="section-title">
+            <h2 data-role="da-delivery-backfill-title">Digital Anchor · 交付中心 · 多渠道回填</h2>
+            <div class="secondary" data-role="da-delivery-backfill-subtitle"></div>
+          </div>
+          <div class="muted" data-role="da-delivery-backfill-legend" style="margin-top:6px;"></div>
+          <div data-role="da-delivery-backfill-lanes" style="margin-top:8px;"></div>
+          <div class="muted" data-role="da-delivery-backfill-empty" style="display:none; margin-top:8px;">
+            尚未生成 closure 记录；初始化 closure 后此处将按 row_scope（role / segment）出现回填行。
+          </div>
+          <div class="muted" data-role="da-delivery-backfill-tracked-gap" style="margin-top:8px;"></div>
+        </div>
+
         <div class="card" id="digital-anchor-closure-block"
              data-role="digital-anchor-closure" style="margin-top:10px;">
           <div class="section-title">
@@ -1017,6 +1070,267 @@ function resolveLang(serverLang) {
       if (gapEl) gapEl.textContent = backfill.tracked_gap_summary_zh || "";
     }
 
+    // OWC-DA PR-3 / DA-W8: Digital Anchor Delivery Center · Delivery Pack
+    // assembly renderer. Renders only when the server-side container exists
+    // (gated by task.kind == "digital_anchor") and the payload carries a
+    // digital_anchor_delivery_pack bundle. Hot Follow / Matrix Script /
+    // Baseline publish hubs short-circuit at the container check.
+    function renderDigitalAnchorDeliveryPack(pack) {
+      const block = document.getElementById("digital-anchor-delivery-pack-block");
+      if (!block) return;
+      if (!pack || !pack.is_digital_anchor) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const setRoleText = (role, value) => {
+        const el = block.querySelector(`[data-role="${role}"]`);
+        if (el) el.textContent = value || "";
+      };
+
+      setRoleText("da-delivery-pack-title", pack.panel_title_zh);
+      setRoleText("da-delivery-pack-subtitle", pack.panel_subtitle_zh);
+
+      const lanes = pack.lanes || {};
+      const order = pack.lane_order || [];
+
+      const fv = lanes.final_video || {};
+      setRoleText("da-delivery-pack-final-video-label", fv.label_zh);
+      setRoleText("da-delivery-pack-final-video-status", fv.status_label_zh ? "[" + fv.status_label_zh + "]" : "");
+      setRoleText("da-delivery-pack-final-video-explanation", fv.primacy_explanation_zh);
+      setRoleText("da-delivery-pack-final-video-tracked-gap", fv.tracked_gap_explanation_zh);
+
+      setRoleText("da-delivery-pack-lanes-label", "交付分区");
+      const legend = (pack.lane_legend_zh || []).join(" / ");
+      setRoleText("da-delivery-pack-legend", legend ? "字段：" + legend : "");
+
+      const lanesEl = block.querySelector('[data-role="da-delivery-pack-lanes"]');
+      if (lanesEl) {
+        lanesEl.innerHTML = "";
+        order.forEach((laneId) => {
+          if (laneId === "final_video") return; // primacy lane rendered above
+          const lane = lanes[laneId];
+          if (!lane) return;
+          const laneCard = document.createElement("div");
+          laneCard.className = "card";
+          laneCard.style.marginTop = "8px";
+          laneCard.dataset.role = "da-delivery-pack-lane";
+          laneCard.dataset.laneId = laneId;
+          laneCard.dataset.statusCode = lane.status_code || "";
+
+          const titleEl = document.createElement("strong");
+          titleEl.dataset.role = "da-delivery-pack-lane-label";
+          titleEl.textContent = lane.label_zh || laneId;
+          laneCard.appendChild(titleEl);
+
+          const statusSpan = document.createElement("span");
+          statusSpan.className = "muted";
+          statusSpan.style.marginLeft = "8px";
+          statusSpan.dataset.role = "da-delivery-pack-lane-status";
+          statusSpan.textContent = "[" + (lane.status_label_zh || lane.status_code || "") + "]";
+          laneCard.appendChild(statusSpan);
+
+          const detail = document.createElement("div");
+          detail.className = "muted t-secondary";
+          detail.style.marginTop = "4px";
+          detail.dataset.role = "da-delivery-pack-lane-detail";
+
+          if (laneId === "subtitle" || laneId === "dubbed_audio" || laneId === "pack") {
+            const parts = [];
+            if (lane.deliverable_id) parts.push("deliverable_id=" + lane.deliverable_id);
+            if (lane.deliverable_kind_label_zh) parts.push("kind=" + lane.deliverable_kind_label_zh);
+            parts.push("required=" + (lane.required ? "true" : "false"));
+            if (lane.artifact_lookup) parts.push("artifact_lookup=" + (typeof lane.artifact_lookup === "string" ? lane.artifact_lookup : "ArtifactHandle"));
+            detail.textContent = parts.join(" · ");
+          } else if (laneId === "metadata") {
+            const parts = [];
+            if (lane.line_id) parts.push("line_id=" + lane.line_id);
+            if (lane.packet_version) parts.push("packet_version=" + lane.packet_version);
+            if (lane.notes) parts.push("notes=" + lane.notes);
+            detail.textContent = parts.join(" · ") || "—";
+          } else if (laneId === "manifest") {
+            const parts = [];
+            if (lane.manifest_id) parts.push("manifest_id=" + lane.manifest_id);
+            if (lane.deliverable_profile_ref) parts.push("deliverable_profile_ref=" + lane.deliverable_profile_ref);
+            if (lane.asset_sink_profile_ref) parts.push("asset_sink_profile_ref=" + lane.asset_sink_profile_ref);
+            if (lane.packet_ready_state) parts.push("packet_ready_state=" + lane.packet_ready_state);
+            if (lane.write_policy) parts.push("write_policy=" + lane.write_policy);
+            detail.textContent = parts.join(" · ") || "—";
+          } else if (laneId === "role_usage") {
+            const roles = lane.roles || [];
+            if (roles.length === 0) {
+              detail.textContent = "—";
+            } else {
+              const ul = document.createElement("ul");
+              ul.style.margin = "4px 0 0 18px";
+              ul.dataset.role = "da-delivery-pack-role-rows";
+              roles.forEach((role) => {
+                const li = document.createElement("li");
+                li.dataset.roleId = role.role_id || "";
+                const segCount = (role.segment_ids || []).length;
+                li.textContent =
+                  (role.role_display_name || role.role_id || "—") +
+                  " · " + (role.role_framing_label_zh || role.role_framing_kind || "—") +
+                  " · 段落数=" + segCount;
+                ul.appendChild(li);
+              });
+              detail.appendChild(ul);
+            }
+          } else if (laneId === "scene_usage") {
+            if (lane.scene_binding_hint) {
+              detail.textContent = "scene_binding_hint=" + lane.scene_binding_hint;
+            } else {
+              detail.textContent = lane.tracked_gap_explanation_zh || "—";
+            }
+          } else if (laneId === "language_usage") {
+            const rows = lane.language_rows || [];
+            if (rows.length === 0) {
+              detail.textContent = "—";
+            } else {
+              const ul = document.createElement("ul");
+              ul.style.margin = "4px 0 0 18px";
+              ul.dataset.role = "da-delivery-pack-language-rows";
+              rows.forEach((row) => {
+                const li = document.createElement("li");
+                li.dataset.language = row.language || "";
+                const flags = [];
+                if (row.is_source_language) flags.push("源");
+                if (row.is_target_language) flags.push("目标");
+                li.textContent =
+                  row.language +
+                  (flags.length ? "（" + flags.join("/") + "）" : "") +
+                  " · 段落数=" + (row.segment_count || 0);
+                ul.appendChild(li);
+              });
+              detail.appendChild(ul);
+            }
+          } else {
+            detail.textContent = "—";
+          }
+          laneCard.appendChild(detail);
+          lanesEl.appendChild(laneCard);
+        });
+      }
+
+      const gapEl = block.querySelector('[data-role="da-delivery-pack-tracked-gap-summary"]');
+      if (gapEl) gapEl.textContent = pack.tracked_gap_summary_zh || "";
+    }
+
+    // OWC-DA PR-3 / DA-W9: Digital Anchor Delivery Center · 多渠道回填 renderer.
+    // Reads only data.digital_anchor_delivery_backfill; renders one lane per
+    // (role / segment) row with six operator-language fields (channel /
+    // account / publish_time / publish_url / publish_status / metrics_snapshot).
+    // No second truth path; channel + account surface as explicit tracked gaps.
+    function renderDigitalAnchorDeliveryBackfill(backfill) {
+      const block = document.getElementById("digital-anchor-delivery-backfill-block");
+      if (!block) return;
+      if (!backfill || !backfill.is_digital_anchor) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="da-delivery-backfill-title"]');
+      if (titleEl) titleEl.textContent = backfill.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="da-delivery-backfill-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = backfill.panel_subtitle_zh || "";
+      const legendEl = block.querySelector('[data-role="da-delivery-backfill-legend"]');
+      if (legendEl) {
+        const legend = backfill.field_legend_zh || [];
+        legendEl.textContent = legend.length ? "字段：" + legend.join(" / ") : "";
+      }
+
+      const lanesEl = block.querySelector('[data-role="da-delivery-backfill-lanes"]');
+      const emptyEl = block.querySelector('[data-role="da-delivery-backfill-empty"]');
+      if (lanesEl) {
+        lanesEl.innerHTML = "";
+        const lanes = backfill.lanes || [];
+        if (!lanes.length) {
+          if (emptyEl) emptyEl.style.display = "";
+        } else {
+          if (emptyEl) emptyEl.style.display = "none";
+          lanes.forEach((lane) => {
+            const laneCard = document.createElement("div");
+            laneCard.className = "card";
+            laneCard.style.marginTop = "8px";
+            laneCard.dataset.role = "da-delivery-backfill-lane";
+            laneCard.dataset.rowScope = lane.row_scope || "";
+            laneCard.dataset.rowId = lane.row_id || "";
+
+            const laneTitle = document.createElement("strong");
+            laneTitle.dataset.role = "da-delivery-backfill-lane-label";
+            laneTitle.textContent = lane.lane_label_zh || ((lane.row_scope || "") + " · " + (lane.row_id || "—"));
+            laneCard.appendChild(laneTitle);
+
+            const fieldsList = document.createElement("ul");
+            fieldsList.style.margin = "6px 0 0 18px";
+            fieldsList.dataset.role = "da-delivery-backfill-lane-fields";
+            (lane.fields || []).forEach((fld) => {
+              const li = document.createElement("li");
+              li.dataset.fieldId = fld.field_id || "";
+              li.dataset.statusCode = fld.status_code || "";
+              const labelEl = document.createElement("strong");
+              labelEl.textContent = (fld.label_zh || fld.field_id || "—") + "：";
+              li.appendChild(labelEl);
+
+              const valueSpan = document.createElement("span");
+              valueSpan.dataset.role = "da-delivery-backfill-field-value";
+              if (fld.field_id === "metrics_snapshot") {
+                const pairs = fld.metrics_pairs || [];
+                if (pairs.length) {
+                  valueSpan.textContent = pairs
+                    .map((p) => (p.label_zh || p.metric_id || "—") + "=" + p.value)
+                    .join(" / ");
+                } else {
+                  valueSpan.textContent = "—";
+                  valueSpan.classList.add("muted");
+                }
+              } else if (fld.field_id === "publish_status") {
+                const labelTextRaw = fld.value_label_zh || "";
+                if (fld.value) {
+                  valueSpan.textContent = labelTextRaw
+                    ? labelTextRaw + "（" + fld.value + "）"
+                    : fld.value;
+                } else {
+                  valueSpan.textContent = labelTextRaw || "—";
+                  if (!labelTextRaw) valueSpan.classList.add("muted");
+                }
+              } else if (fld.value) {
+                valueSpan.textContent = fld.value;
+              } else {
+                valueSpan.textContent = "—";
+                valueSpan.classList.add("muted");
+              }
+              li.appendChild(valueSpan);
+
+              const statusSpan = document.createElement("span");
+              statusSpan.className = "muted";
+              statusSpan.style.marginLeft = "8px";
+              statusSpan.dataset.role = "da-delivery-backfill-field-status";
+              statusSpan.textContent = "[" + (fld.status_label_zh || fld.status_code || "") + "]";
+              li.appendChild(statusSpan);
+
+              if (fld.tracked_gap_explanation_zh) {
+                const expl = document.createElement("div");
+                expl.className = "muted t-secondary";
+                expl.dataset.role = "da-delivery-backfill-field-tracked-gap";
+                expl.style.marginLeft = "12px";
+                expl.textContent = fld.tracked_gap_explanation_zh;
+                li.appendChild(expl);
+              }
+              fieldsList.appendChild(li);
+            });
+            laneCard.appendChild(fieldsList);
+            lanesEl.appendChild(laneCard);
+          });
+        }
+      }
+
+      const gapEl = block.querySelector('[data-role="da-delivery-backfill-tracked-gap"]');
+      if (gapEl) gapEl.textContent = backfill.tracked_gap_summary_zh || "";
+    }
+
     function renderCopyBundle(copy) {
       const captionEl = document.getElementById("copy-caption");
       if (captionEl && !captionEl.value) captionEl.value = copy.caption || "";
@@ -1533,6 +1847,8 @@ function resolveLang(serverLang) {
       renderMatrixScriptDeliveryCopyBundle(data.matrix_script_delivery_copy_bundle || null);
       renderMatrixScriptDeliveryBackfill(data.matrix_script_delivery_backfill || null);
       renderMatrixScriptClosure(data.matrix_script_publish_feedback_closure || null);
+      renderDigitalAnchorDeliveryPack(data.digital_anchor_delivery_pack || null);
+      renderDigitalAnchorDeliveryBackfill(data.digital_anchor_delivery_backfill || null);
       renderDigitalAnchorClosure(data.digital_anchor_publish_feedback_closure || null);
       renderCopyBundle(data.copy_bundle || {});
       await fillCaptionFallback(data.copy_bundle || {});
