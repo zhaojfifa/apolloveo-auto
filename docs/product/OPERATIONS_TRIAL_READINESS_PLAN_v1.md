@@ -358,3 +358,21 @@ A trial-execution write-up (post-trial) MUST be filed separately under `docs/exe
 - **Frontend patching:** **BLOCKED**
 
 End of Plan A.
+
+---
+
+## 13. Post-OWC Operations Addendum (additive, 2026-05-06)
+
+After OWC-MS and OWC-DA engineering closeout both reached PASS (OWC-MS: four-party signoff commit `b1160b3`; OWC-DA: four-party signoff per §11 of [docs/execution/APOLLOVEO_2_0_OWC_DA_PHASE_CLOSEOUT_v1.md](../execution/APOLLOVEO_2_0_OWC_DA_PHASE_CLOSEOUT_v1.md)), an operations-readiness alignment review was conducted and a pre-trial operations addendum was authored.
+
+The addendum is the **post-OWC operational trial baseline** and supersedes the following Plan A sections for the OWC-converged surfaces:
+
+- §6.2 Matrix Script line guidance (updated scope: Task Area + Workbench C/D/E operable; Workbench A + Delivery Center copy_bundle inspect-only)
+- §6.3 Digital Anchor line guidance (updated scope: no longer inspection-only; Task Area + Workbench E operable; other surfaces constrained as documented)
+- §7.1 Trial samples (updated to include DA sample validity criteria)
+
+All other Plan A sections (§0.1 / §0.2 source_script_ref discipline, §6.1 Hot Follow, §7.2 samples to avoid, §8 risks, §9 next gate conditions) remain in force unchanged.
+
+**Post-OWC addendum authority:** [docs/product/OPERATIONS_TRIAL_READINESS_POST_OWC_ADDENDUM_v1.md](OPERATIONS_TRIAL_READINESS_POST_OWC_ADDENDUM_v1.md)
+
+**This addendum does NOT open Plan A live-trial.** Live-trial requires the trial re-entry review to be authored and signed by architect + reviewer + coordinator + PM. The addendum is the baseline the trial re-entry review must evaluate against.
