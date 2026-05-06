@@ -115,6 +115,7 @@
         {% set ms_owc = it.matrix_script_task_area_convergence or {} %}
         {% set ms_eight_stage = ms_owc.eight_stage or {} %}
         {% set ms_lanes = ms_owc.lanes_view or {} %}
+        {% set ms_result_status = it.matrix_script_result_status or {} %}
         {% set da_owc = it.digital_anchor_task_area_convergence or {} %}
         {% set da_eight_stage = da_owc.eight_stage or {} %}
         <div class="task-card task-row" data-line="{{ line_id }}" data-status="{{ status_value }}" data-bucket="{{ bucket_value }}">
@@ -172,6 +173,24 @@
                       {{ ms_owc.last_generated_at_label }}：{{ ms_owc.last_generated_at_value or "—" }}
                     </span>
                   </div>
+                  {% if ms_result_status and ms_result_status.is_matrix_script %}
+                    {# RC PR-1 RC-R6 — operator-language result-oriented status row. One of: "ready: do X next" / "blocked: missing Y" / "completed". Reads `board_bucket` + `head_reason` + eight-stage state already decided upstream — no second producer. Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md §3 RC-R6 + §5 RC PR-1. #}
+                    <div class="task-card__meta" data-role="ms-result-status"
+                         data-status-kind="{{ ms_result_status.status_kind }}"
+                         data-stage="{{ ms_result_status.stage }}">
+                      <span class="task-pill ms-result-status__kind ms-result-status__kind--{{ ms_result_status.status_kind }}"
+                            data-role="ms-result-status-kind">{{ ms_result_status.status_label_zh }}</span>
+                      <span data-role="ms-result-status-headline">{{ ms_result_status.headline_zh }}</span>
+                      <span>&middot;</span>
+                      <span data-role="ms-result-status-next-action">{{ ms_result_status.next_action_zh }}</span>
+                      {% if ms_result_status.head_reason %}
+                        <span>&middot;</span>
+                        <span data-role="ms-result-status-head-reason"
+                              data-head-reason="{{ ms_result_status.head_reason }}"
+                              title="head_reason = {{ ms_result_status.head_reason }}">{{ ms_result_status.head_reason_label_zh }}</span>
+                      {% endif %}
+                    </div>
+                  {% endif %}
                   {% if ms_lanes and ms_lanes.lanes %}
                     {# OWC-MS PR-1 MS-W1 — 脚本任务 / 变体任务 / 发布任务 three-tier lanes. Pure projection over packet + variation cells + closure publish events. #}
                     <div class="task-card__meta" data-role="ms-three-tier-lanes">

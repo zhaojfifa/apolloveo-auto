@@ -20,6 +20,9 @@ from gateway.app.services.matrix_script.task_card_summary import (
 from gateway.app.services.matrix_script.task_area_convergence import (
     derive_matrix_script_full_card_summary_for_task,
 )
+from gateway.app.services.matrix_script.result_status_view import (
+    derive_matrix_script_task_area_result_status_for_task,
+)
 from gateway.app.services.operator_visible_surfaces import (
     build_board_row_projection,
     build_operator_surfaces_for_workbench,
@@ -230,6 +233,16 @@ def build_tasks_page_rows(
             # docs/product/matrix_script_product_flow_v1.md §§5.1–5.3.
             row["matrix_script_task_area_convergence"] = (
                 derive_matrix_script_full_card_summary_for_task(row)
+            )
+            # RC PR-1 (RC-R6) — operator-language result-oriented status
+            # restating `board_bucket` + `head_reason` + the eight-stage
+            # state as one of: "ready: do X next" / "blocked: missing Y"
+            # / "completed". Pure presentation over already-decided
+            # state; no second producer. Authority:
+            # docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
+            # §3 RC-R6 + §5 RC PR-1.
+            row["matrix_script_result_status"] = (
+                derive_matrix_script_task_area_result_status_for_task(row)
             )
         # OWC-DA PR-1 (DA-W1 + DA-W2) — Digital Anchor Task Area card +
         # eight-stage state. Additive, gated to `kind == "digital_anchor"`
