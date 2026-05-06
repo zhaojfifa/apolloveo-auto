@@ -365,6 +365,23 @@ def build_operator_surfaces_for_workbench(
                 ),
             )
         )
+        # RC PR-3 (RC-R4) — recommended-version + next-action lane.
+        # Pure presentation-layer projection over the existing MS-W4
+        # `recommended_*` fields + RC PR-2 readable variants. No second
+        # producer; no fake publish; no raw internal handles.
+        # Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
+        # §3 RC-R4 + §5 RC PR-3.
+        from gateway.app.services.matrix_script.recommended_action_view import (
+            derive_matrix_script_recommended_action,
+        )
+
+        bundle["workbench"]["matrix_script_recommended_action"] = (
+            derive_matrix_script_recommended_action(
+                bundle["workbench"].get("matrix_script_preview_compare"),
+                bundle["workbench"].get("matrix_script_readable_variants"),
+                workbench_panel,
+            )
+        )
     # Recovery PR-4: when the Workbench mounts the Digital Anchor
     # line-specific panel, attach the formal
     # `digital_anchor_workbench_role_speaker_surface_v1` projection so

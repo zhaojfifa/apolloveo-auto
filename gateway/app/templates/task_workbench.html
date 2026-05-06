@@ -276,6 +276,7 @@
       {% set ms_qc_diagnostics = ((ops.workbench or {}).matrix_script_qc_diagnostics or {}) %}
       {% set ms_result_summary = ((ops.workbench or {}).matrix_script_result_summary or {}) %}
       {% set ms_readable_variants = ((ops.workbench or {}).matrix_script_readable_variants or {}) %}
+      {% set ms_recommended_action = ((ops.workbench or {}).matrix_script_recommended_action or {}) %}
       {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
       {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
       {% set ms_slot_detail = (ms_surface.slot_detail_surface or {}) %}
@@ -717,6 +718,58 @@
           <div class="muted t-secondary" style="margin-top:6px;" data-role="ms-preview-compare-granularity-note">
             {{ ms_preview_compare.per_cell_artifact_granularity_note_zh }}
           </div>
+        </div>
+      {% endif %}
+
+      {# RC PR-3 — Recommended-version + next-action lane (RC-R4). Sits between MS-W4 preview-compare and the RC PR-2 readable-variants panel. Pure presentation over the existing MS-W4 `recommended_*` fields + RC PR-2 readable variants — no second producer; no fake publish-readiness or delivery claim; no raw internal handles. Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md §3 RC-R4 + §5 RC PR-3. #}
+      {% if ms_recommended_action and ms_recommended_action.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-recommended-action-panel"
+             data-status-kind="{{ ms_recommended_action.status_kind }}">
+          <div class="section-title">
+            <h2 data-role="ms-recommended-action-title">{{ ms_recommended_action.panel_title_zh }}</h2>
+            <div class="secondary" data-role="ms-recommended-action-subtitle">{{ ms_recommended_action.panel_subtitle_zh }}</div>
+          </div>
+
+          <div data-role="ms-recommended-action-headline-row" style="padding:10px 12px; border-radius:6px; background:#f6f7f9; margin:6px 0;">
+            <div>
+              <span class="info-pill ms-recommended-action__kind ms-recommended-action__kind--{{ ms_recommended_action.status_kind }}"
+                    data-role="ms-recommended-action-status">{{ ms_recommended_action.status_label_zh }}</span>
+              <strong data-role="ms-recommended-action-headline" style="margin-left:6px;">{{ ms_recommended_action.headline_zh }}</strong>
+            </div>
+            <div class="secondary" data-role="ms-recommended-action-next-action" style="margin-top:4px;">{{ ms_recommended_action.next_action_zh }}</div>
+          </div>
+
+          {% if ms_recommended_action.recommended_variant %}
+            <div data-role="ms-recommended-action-variant-card"
+                 data-variation-id="{{ ms_recommended_action.recommended_variant.variation_id }}"
+                 style="padding:10px 12px; border:1px solid #d1fae5; border-radius:6px; background:#f0fdf4; margin:6px 0;">
+              <div>
+                <strong data-role="ms-recommended-action-variant-id">推荐变体：{{ ms_recommended_action.recommended_variant.variation_id }}</strong>
+                <span class="info-pill" style="margin-left:6px;" data-role="ms-recommended-action-variant-axis-summary">{{ ms_recommended_action.recommended_variant.axis_summary_zh }}</span>
+                {% if ms_recommended_action.recommended_variant.length_hint_zh and ms_recommended_action.recommended_variant.length_hint_zh != "—" %}
+                  <span class="muted t-secondary" style="margin-left:6px;" data-role="ms-recommended-action-variant-length">目标时长：{{ ms_recommended_action.recommended_variant.length_hint_zh }}</span>
+                {% endif %}
+              </div>
+              {% if ms_recommended_action.recommended_variant.differentiator_zh %}
+                <div class="muted t-secondary" data-role="ms-recommended-action-variant-differentiator">{{ ms_recommended_action.recommended_variant.differentiator_zh }}</div>
+              {% endif %}
+              <div class="muted t-secondary" data-role="ms-recommended-action-variant-slot-bound">
+                {% if ms_recommended_action.recommended_variant.has_bound_slot %}已绑定脚本片段（正文为 opaque 句柄，本面板不展开正文）{% else %}尚未绑定脚本片段{% endif %}
+              </div>
+            </div>
+            <div class="muted t-secondary" data-role="ms-recommended-action-reason" style="margin-top:6px;">推荐依据：{{ ms_recommended_action.reason_zh }}</div>
+          {% else %}
+            <div class="muted t-secondary" data-role="ms-recommended-action-reason" style="margin-top:6px;">{{ ms_recommended_action.reason_zh }}</div>
+            {% if ms_recommended_action.head_reason %}
+              <div class="muted t-secondary" data-role="ms-recommended-action-head-reason"
+                   data-head-reason="{{ ms_recommended_action.head_reason }}"
+                   style="margin-top:4px;">
+                head_reason = <code>{{ ms_recommended_action.head_reason }}</code> · {{ ms_recommended_action.head_reason_label_zh }}
+              </div>
+            {% endif %}
+          {% endif %}
+
+          <div class="muted t-secondary" data-role="ms-recommended-action-no-publish-claim-note" style="margin-top:10px;">{{ ms_recommended_action.no_publish_claim_note_zh }}</div>
         </div>
       {% endif %}
 
