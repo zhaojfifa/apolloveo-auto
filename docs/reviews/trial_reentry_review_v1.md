@@ -1,7 +1,7 @@
 # ApolloVeo 2.0 · Trial Re-Entry Review v1
 
 Date: 2026-05-06
-Status: **AUTHORED — signoff block at §8 carries `<fill>` placeholders; the follow-on docs-only signoff PR fills them. Plan A live-trial reopen BLOCKED on §8 signoff.**
+Status: **SIGNED — §8 four-party signoff filled. Plan A live-trial reopen AUTHORIZED after this docs-only signoff PR merges to `main`.**
 Wave position: Post-OWC-MS + OWC-DA closeout. Post-pre-trial ops addendum. Pre-Plan A live-trial reopen.
 Authority: Produced after reading the authority stack listed in §0 in full.
 Relation to Plan A: This review is the gate document for Plan A live-trial reopen. It evaluates against the post-OWC addendum as the binding operational baseline and updates Plan A §12 readiness conclusion (§7 below). It does NOT reopen OWC-MS or OWC-DA implementation, does NOT start Platform Runtime Assembly, does NOT start Capability Expansion, and does NOT author Digital Anchor sample-validity criteria.
@@ -295,32 +295,32 @@ The original Plan A §12 verdict ("CONDITIONAL — eight conditions") was author
 11. **Workbench A inspect-only briefing completed:** coordinator has briefed operators that Workbench A 脚本结构区 content fields are `STATUS_UNRESOLVED` and MUST NOT be reported as defects. Operators understand no readable script content is available in this wave.
 12. **Delivery Center copy_bundle display-only briefing completed:** coordinator has briefed operators that MS-W7 copy_bundle is display-only (layout with no content); operators MUST NOT use it for copy extraction and MUST NOT report its `STATUS_UNRESOLVED` state as a defect.
 
-**Gate verdict: READY FOR PLAN A LIVE-TRIAL REOPEN** — pending the §8 signoff block below being filled by all four parties in the follow-on docs-only signoff PR.
+**Gate verdict: READY FOR PLAN A LIVE-TRIAL REOPEN** — §8 signoff block below is filled by all four parties in this docs-only signoff PR.
 
-Plan A live-trial MUST NOT reopen until all four §8 signoff lines are filled and committed to `main`. The follow-on docs-only signoff PR is the standard pattern (parallel to OWC-MS Closeout §11 signoff commit `b1160b3` and OWC-DA gate spec §10 signoff commit `6825005`).
+Plan A live-trial MAY reopen after this docs-only signoff PR merges to `main`. Platform Runtime Assembly Wave and Capability Expansion Gate Wave remain BLOCKED pending Plan A live-trial closeout and their own separate wave authority.
 
 ---
 
 ## 8. Signoff Block
 
-This block carries `<fill>` placeholders. The follow-on docs-only signoff PR fills the four lines. **Plan A live-trial MUST NOT reopen until all four lines below are filled and committed to `main`.**
+This block carries the final four-party governance record for the trial re-entry review. **Plan A live-trial MAY reopen after this docs-only signoff PR merges to `main`.**
 
 | Role | Name | Date | Signature / handle |
 |---|---|---|---|
-| Architect | Raobin | `<fill date>` | `<fill handle>` |
-| Reviewer | Alisa | `<fill date>` | `<fill handle>` |
-| Operations Coordinator | Jackie | `<fill date>` | `<fill handle>` |
-| Product Manager | `<fill name>` | `<fill date>` | `<fill handle>` |
+| Architect | Raobin | 2026-05-06 21:10 | raobin |
+| Reviewer | Alisa | 2026-05-06 21:18 | alisa |
+| Operations Coordinator | Jackie | 2026-05-06 21:25 | jackie |
+| Product Manager | sunny | 2026-05-06 21:30 | sunny |
 
-**What the follow-on signoff PR must do:**
+**What this signoff PR records:**
 
-1. Fill all four lines above with date and signature / handle.
-2. Annotate the evidence index trial re-entry review row as SIGNED.
-3. Update `CURRENT_ENGINEERING_FOCUS.md` to reflect Plan A live-trial reopen authorized.
-4. Update `ENGINEERING_STATUS.md` completion log accordingly.
-5. Record that Platform Runtime Assembly Wave and Capability Expansion Gate Wave remain BLOCKED pending Plan A live-trial closeout.
+1. All four lines above are filled with the exact provided date and signature / handle.
+2. The evidence index trial re-entry review row is annotated as SIGNED.
+3. `CURRENT_ENGINEERING_FOCUS.md` reflects Plan A live-trial reopen authorization.
+4. `ENGINEERING_STATUS.md` records the signed state.
+5. Platform Runtime Assembly Wave and Capability Expansion Gate Wave remain BLOCKED pending Plan A live-trial closeout.
 
-**What the follow-on signoff PR must NOT do:**
+**What this signoff PR must NOT do:**
 
 - Advance any OWC-MS or OWC-DA implementation item.
 - Author Digital Anchor sample-validity criteria.
