@@ -382,18 +382,29 @@ Per Plan A §4.1:
 **One sequence. No parallel drift. No step starts before its predecessor signs off.**
 
 ```
-OWC-MS gate spec §10 signoff (docs-only)
-  → OWC-MS PR-1 (MS-W1 + MS-W2)
-  → OWC-MS PR-2 (MS-W3..W6)
-  → OWC-MS PR-3 (MS-W7 + MS-W8)
-  → OWC-MS Closeout (MS-A1..MS-A8 PASS)
-  → OWC-DA gate spec §10 signoff (docs-only)
-  → OWC-DA PR-1 (DA-W1 + DA-W2)
-  → OWC-DA PR-2 (DA-W3..W7)
-  → OWC-DA PR-3 (DA-W8 + DA-W9)
-  → OWC-DA Closeout (DA-A1..DA-A8 PASS)
-  → Trial re-entry review (docs-only; updates OPERATIONS_TRIAL_READINESS_PLAN_v1 §0)
-  → Plan A live-trial execution
+OWC-MS gate spec §10 signoff (docs-only)                                    [DONE]
+  → OWC-MS PR-1 (MS-W1 + MS-W2)                                              [DONE]
+  → OWC-MS PR-2 (MS-W3..W6)                                                  [DONE]
+  → OWC-MS PR-3 (MS-W7 + MS-W8)                                              [DONE]
+  → OWC-MS Closeout (MS-A1..MS-A8 PASS)                                      [DONE]
+  → OWC-DA gate spec §10 signoff (docs-only)                                 [DONE]
+  → OWC-DA PR-1 (DA-W1 + DA-W2)                                              [DONE]
+  → OWC-DA PR-2 (DA-W3..W7)                                                  [DONE]
+  → OWC-DA PR-3 (DA-W8 + DA-W9)                                              [DONE]
+  → OWC-DA Closeout (DA-A1..DA-A8 PASS)                                      [DONE]
+  → Pre-trial post-OWC operations addendum (docs-only)                       [DONE — PR #141]
+  → Trial re-entry review (docs-only)                                        [DONE — PR #143 + signoff `7e2ad59`]
+  → Matrix Script Result-Capability Recovery Amendment (docs-only)           [THIS PR — supersedes the prior LIMITED/CONSTRAINED MS classification with RESULT-CAPABILITY RECOVERY REQUIRED]
+  → Plan A live-trial Hot Follow execution (Hot-Follow-only window)
+       (operations-team action; Matrix Script samples paused; DA excluded)
+  → Hot Follow live-trial findings + four-party signoff
+  → Matrix Script Result-Capability Recovery Wave gate spec authoring (docs-only)
+  → Matrix Script Result-Capability Recovery Wave gate spec §10 signoff (docs-only)
+  → Matrix Script Result-Capability Recovery Wave implementation PRs (per gate spec slicing)
+  → Matrix Script Result-Capability Recovery Wave Closeout
+  → Follow-on trial re-entry review for Matrix Script (docs-only)
+  → Plan A live-trial Matrix Script execution
+  → Matrix Script live-trial findings + four-party signoff
   → Platform Runtime Assembly Wave
   → Capability Expansion Gate Wave
 ```
