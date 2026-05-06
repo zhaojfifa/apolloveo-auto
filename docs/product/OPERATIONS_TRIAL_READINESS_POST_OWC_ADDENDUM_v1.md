@@ -68,13 +68,23 @@ Engineering PASS does **not** mean:
 
 **As of 2026-05-06, the system is in the following state:**
 
-- OWC-MS and OWC-DA are engineering-closeout PASS. The surfaces exist.
+- OWC-MS and OWC-DA are engineering-closeout PASS. The surfaces exist; their content is contract/projection-aligned only.
 - **Real operator trial has NOT re-opened.** The PR-5 NOT-READY verdict remains in force.
 - The trial re-entry review has NOT been authored. It is the next docs-only step.
 - Plan A live-trial remains BLOCKED until: (a) trial re-entry review authored; (b) signed by architect + reviewer + coordinator + PM.
 - Platform Runtime Assembly Wave and Capability Expansion Gate Wave remain BLOCKED.
 
+**Operations posture is stricter than engineering posture in this wave.** Surface-visible does not imply operationally usable. Engineering closeout PASS does not imply trial-capable. This addendum carries the operations verdict, which is more restrictive than the four-party engineering signoffs would suggest if read in isolation.
+
 This addendum updates the operational trial baseline that the trial re-entry review must evaluate against. It does NOT open live-trial.
+
+### 1.4 Headline operations verdict
+
+| Line | Operations verdict |
+|---|---|
+| Hot Follow | **Benchmark end-to-end line.** Operationally trial-capable; reference / control line for any trial. |
+| Matrix Script | **Limited / constrained trial candidate.** Partially operable — Task Area + Workbench C/D/E + 回填; Workbench A and Delivery Center copy_bundle are inspect-only / display-only. Trial scope must be explicitly narrowed and operator-briefed. |
+| Digital Anchor | **NOT a trial candidate in current state.** Contract/projection-aligned only. Surface-visible but not operationally usable. Not eligible for real operator trial in this wave even though OWC-DA engineering closeout is PASS. See §2.3 for the five findings that anchor this verdict. |
 
 ---
 
@@ -82,7 +92,7 @@ This addendum updates the operational trial baseline that the trial re-entry rev
 
 ### 2.1 Hot Follow — Benchmark End-to-End Line
 
-**Role:** Operational control line. Hot Follow is the only line in the system with an unqualified end-to-end operational capability this wave.
+**Role:** Benchmark end-to-end line. Operational control / reference line. Hot Follow is the only line in the system with an unqualified end-to-end operational capability this wave.
 
 **Trial scope:** End-to-end. Intake → subtitle → dub → compose → publish → Delivery Center. No inspection-only restrictions apply to the core workflow.
 
@@ -94,9 +104,9 @@ This addendum updates the operational trial baseline that the trial re-entry rev
 
 ---
 
-### 2.2 Matrix Script — Constrained Operator Trial
+### 2.2 Matrix Script — Limited / Constrained Trial Candidate
 
-**Role:** Surface-converged, partially operable production line. Operators can run the Task Area + Workbench core workflow. Delivery Center surfaces exist but carry significant content gaps.
+**Role:** Limited / constrained trial candidate. Surface-converged, partially operable production line. Operators can run the Task Area + Workbench C/D/E core workflow with a narrowed scope. Delivery Center surfaces exist but carry significant content gaps and are not delivery-truth in this wave.
 
 **What OWC-MS added since Plan A:**
 
@@ -146,99 +156,114 @@ This addendum updates the operational trial baseline that the trial re-entry rev
 
 ---
 
-### 2.3 Digital Anchor — Surface-Readiness / Constrained Smoke-Trial Line
+### 2.3 Digital Anchor — NOT a Trial Candidate in Current State
 
-**Role:** Surface-convergence confirmed line. All nine OWC-DA modules exist. This is NOT a full end-to-end operational line in this wave. Operators may run a smoke trial that exercises Task Area, Workbench E review forms, and Delivery Center inspection — but significant authoring and artifact-resolution capabilities are absent.
+**Role:** **Contract/projection-aligned only. Surface-visible but not operationally usable. NOT eligible for real operator trial in this wave**, even though OWC-DA engineering closeout is PASS and all nine DA-W* modules are merged with four-party signoffs.
 
-**What OWC-DA added since Plan A:**
+This is a deliberate operations correction. An earlier draft of this addendum described Digital Anchor as a "constrained smoke-trial line." That framing overclaimed operator capability and is rejected here. The corrected verdict is:
 
-Plan A §6.3 classified Digital Anchor as "**inspection only. Operators may open the New-Tasks landing page and confirm the Digital Anchor card exists. They MUST NOT click through to submit.**" This is fundamentally superseded by OWC-DA. The following capabilities now exist:
+> **Digital Anchor is NOT trial-capable in the current wave. The line is engineering-closeout PASS but operations-NOT-READY. The trial re-entry review must NOT plan or admit any Digital Anchor operator trial sample.**
 
-- Task Area: 8-field card (DA-W1) + eight-stage projection (DA-W2).
-- Workbench: five panels (DA-W3..W7), including the DA-W7 review forms that write through the Recovery PR-4 closure endpoint.
-- Delivery Center: Delivery Pack assembly view (DA-W8) + 发布回填 multi-channel view (DA-W9).
-- Formal task creation route (`/tasks/digital-anchor/new`) shipped by Recovery PR-4 — operators may now create and submit DA tasks.
+#### 2.3.1 Five operations findings that anchor the not-trial-capable verdict
 
-**Operable surfaces:**
+These findings are the operational reading of the OWC-DA Closeout §8 tracked gaps + the structural absences in the DA pipeline as of 2026-05-06. Each is independently sufficient to disqualify Digital Anchor from real operator trial; together they are conclusive.
 
-| Surface | Module | Classification | Notes |
+1. **Script generation / source path is not operationally closed.** A real DA operator workflow per [digital_anchor_product_flow_v1.md §4.1](digital_anchor_product_flow_v1.md) requires that script / 文案 input is converted into 讲解提纲 / 段落逻辑 / 节奏 / 强调点 — i.e. a closed source-to-content-structure path. In the current wave there is no operationally closed path: Phase B content structure authoring is not landed (DA-W4 fields show `STATUS_UNRESOLVED` for most tasks); `roles[]` / `segments[]` operator authoring is forbidden; `source_script_ref` resolution to readable content body does not exist (the same product-meaning constraint that applies to Matrix Script `source_script_ref` per Plan A §0.2 — handle, not body). An operator who creates a DA task today cannot drive script-to-structure conversion through the platform. The line cannot deliver its first product-flow stage.
+
+2. **Workbench panels are partitioned but not truly operable.** The DA Workbench is correctly partitioned into five panels per gate spec §3 (DA-W3 角色绑定 / DA-W4 内容结构 / DA-W5 场景模板 / DA-W6 语言输出 / DA-W7 预览与校对). Surface convergence is real. **But operability is not the same as visibility.** DA-W3 and DA-W5 surface only an Asset Supply browse pointer — not an interactive selector — so role and scene cannot be configured from the workbench. DA-W4 is display-only with mostly unresolved content. DA-W6 is a read-view of language_scope with no operator authoring affordance. Only DA-W7 carries a real write-through path (review-zone forms posting to the Recovery PR-4 closure endpoint), but DA-W7 alone is a closure-feedback surface, not a content-creation surface. The five-panel partition is correct as a contract projection; it is insufficient as an operator workbench.
+
+3. **Interactive capability is insufficient for an operator session.** A real DA operator session requires the operator to: select a role; select a scene template; review or correct content structure; review/adjust language output; submit review feedback. Of these five, only the last (DA-W7 review submission) is interactive in this wave. Role and scene are fixed at task creation time and cannot be corrected from any DA Workbench surface. Content structure cannot be authored. Language output is read-view. The interactive surface area is too narrow to constitute an operator-driven workflow — the operator's role would be limited to inspecting projections of decisions made elsewhere and submitting closure feedback after the fact.
+
+4. **No practically usable generation result is available for operators.** The DA Delivery Center surface (DA-W8) is the canonical place an operator would expect to obtain the final DA artifact. In the current wave the `final_video` lane renders as primacy-label-only with tracked-gap explanation — the Phase C delivery binding does not enumerate a row for the composed final asset. The actual artifact is reachable only via `media.final_video_url` on the publish hub payload, which is not exposed as an operator-visible action in the DA Delivery Pack. DA artifact_lookup remains `not_implemented_phase_c`. DA-W9 回填 carries `account` and `channel` tracked-gaps. There is no operator-accessible path through the standard DA surface that delivers a usable final result. An operator cannot complete a "produce → review → deliver" loop through the visible surface.
+
+5. **Therefore: Digital Anchor is NOT trial-capable in the current state, even though engineering closeout PASS exists.** Findings 1–4 each point at a different stage of the line where operability is missing: the source-to-structure conversion (1), the workbench-driven configuration (2 + 3), and the delivery of the produced artifact (4). The OWC-DA engineering closeout PASS verdict is correct on its own terms — every contracted surface module is on `main` with a `data-role` anchor, every projection is truth-source-clean, every byte-isolation audit holds. But surface convergence is what OWC was chartered to deliver; it is not what an operator trial requires. Operations must read the closeout PASS as "the projections are correct" — not as "operators can run a workflow." The two are different verdicts on different questions.
+
+#### 2.3.2 Consequence: trial scope for Digital Anchor in this wave
+
+| Aspect | Verdict |
+|---|---|
+| Real operator trial sample | **NOT PERMITTED.** No DA task may be submitted as a trial sample in this wave. |
+| Operator-visible inspection (no submission) | Permitted with explicit "surface-inspection only — not a trial sample" labeling. Operators may open `tasks.html` and confirm the DA card renders post-OWC, may navigate to Workbench / Delivery Center and confirm the surfaces render, but MUST NOT submit, configure, or interact for trial-evidence purposes. |
+| New-Tasks DA card click target during trial | Hidden or disabled by coordinator (mirrors the Plan A §6.3 disposition). The OWC formal route `/tasks/digital-anchor/new` exists in the codebase but is not opened to operators in this trial wave. |
+| DA-W7 review forms during trial | NOT exercised. Closure submissions on DA tasks are not produced as trial evidence. |
+| DA Delivery Pack inspection during trial | NOT exercised as trial evidence. Even surface-inspection should not include the Delivery Pack because the `final_video` access path is not operationally closed for trial purposes. |
+| Coordinator briefing | Must explicitly state: "Digital Anchor is engineering-closeout PASS but operations-NOT-READY. Do not submit. Do not configure. Do not consume any DA surface as trial evidence." |
+
+#### 2.3.3 What would unblock Digital Anchor trial readiness (out of this addendum's scope)
+
+The following items are NOT delivered by this addendum and are NOT preconditions for the trial re-entry review of Matrix Script + Hot Follow. They are recorded as the named structural prerequisites for any future operations posture in which Digital Anchor becomes trial-capable:
+
+1. An operationally closed script-to-content-structure path: either upstream content-structure authoring lands (Phase B authoring for `roles[]` / `segments[]` / Outline / cadence) or a deterministic Phase B authoring step (parallel to Matrix Script §8.C) is added for DA.
+2. Interactive role and scene selection wired from DA-W3 / DA-W5 (replacing the read-only browse pointer with a selector backed by the Asset Library object service).
+3. A `final_video` access path enumerated in the DA Delivery Pack (or a documented, supported alternative operator path that is briefed in operator-language UI, not buried in a payload field).
+4. DA artifact_lookup wired (DA equivalent of Matrix Script Plan E B4) so DA delivery lanes resolve to real artifacts, not `not_implemented_phase_c`.
+5. Durable closure persistence (in-process closure store retired in favor of durable backing) — same constraint as Matrix Script but applies more sharply to DA because DA's only interactive surface (DA-W7) writes to the volatile store.
+
+These items together constitute a future wave; none of them is a single-PR scope. The trial re-entry review must not attempt to relax any of them by widening trial scope; it must classify Digital Anchor as not-trial-capable and proceed with Matrix Script + Hot Follow only.
+
+#### 2.3.4 Surface-by-surface state (informational, not trial scope)
+
+The DA surface state is recorded here for completeness so future addenda or trial re-entry reviews have a documented baseline. These rows describe what each DA surface DOES if an operator inspects it (in non-trial inspection mode). They do NOT define trial scope; the only DA trial scope in this wave is "no DA trial samples."
+
+| Surface | Module | What the surface displays | Trial-relevance |
 |---|---|---|---|
-| Task Area 8-field card | DA-W1 | **OPERABLE** | 任务标题 / Role Profile / Scene Template / Target Language / 当前版本状态 / 当前阻塞项 / 最近更新 truth-backed. 当前版本状态 reads `board_bucket` from PR-1 unified producer. 交付包状态 now shows real DA-W8 delivery pack state (sentinel upgraded by PR-3 landing). |
-| Task Area eight-stage projection | DA-W2 | **OPERABLE** | Eight-stage badge reads `board_bucket` from PR-1 unified producer. Correct mapping to `输入已提交 / 内容结构已生成 / 场景计划已生成 / 角色/声音已绑定 / 多语言版本生成中 / 合成完成 / 可交付 / 已归档`. |
-| Workbench A 角色绑定面 | DA-W3 | **OPERABLE (read-view, subject to data availability)** | Reads from existing `role_pack_ref + speaker_plan_ref`. If these are populated on the task, the panel renders Role Profile / 形象风格 / 声音 preset / 表达风格 / 情绪 correctly. If not populated, status sentinels appear. |
-| Workbench D 语言输出面 | DA-W6 | **OPERABLE (read-view)** | Target Language / Subtitle Strategy / Terminology / multi-language navigator surface from `language_scope` + delivery_binding rows. Subtitle-Strategy enum derives from `capability_plan` closed set (`SUBTITLE_STRATEGY_REQUIRED / OPTIONAL / DISABLED / UNKNOWN`). |
-| Workbench E 预览与校对面 | DA-W7 | **OPERABLE** | Per-(role, segment) `<form class="digital-anchor-review-form">` writes through the existing Recovery PR-4 `POST /api/digital-anchor/closures/{task_id}/events` endpoint. Five review zones (试听 / 视频预览 / 字幕校对 / 表达节奏复核 / 质检) are real forms. This is the **primary operator-interaction surface** for DA workflow in this wave. |
-| 发布回填 | DA-W9 | **PARTIALLY OPERABLE** | Renders per-row closure data from `role_feedback[]` / `segment_feedback[]` / `feedback_closure_records[]` D.1 events. `account` always tracked-gap (closure schema lacks `account_id`). `channel` tracked-gap when no `metrics_snapshot.channel_id` present. Channel + publish time + publish URL + publish status readable if closure events exist. |
-
-**Read-only / display-only / inspect-only surfaces:**
-
-| Surface | Module | Classification | Gap |
-|---|---|---|---|
-| Workbench A 角色绑定面 — Asset Supply select | DA-W3 | **READ-VIEW (no interactive selection)** | Asset Supply selection beyond read-only browse is not landed. The Asset Supply browse pointer is present but is NOT an interactive selector. Operators can see the role binding hint but cannot select or change the role from within the Workbench A panel. Role binding is fixed at task creation time for this wave. |
-| Workbench B 内容结构面 | DA-W4 | **DISPLAY-ONLY with structural gaps** | Phase B authoring for Outline / 段落结构 / 强调点 / 节奏 bodies is not landed. Fields show `STATUS_RESOLVED / STATUS_UNRESOLVED / STATUS_OPAQUE_REF` per section depending on what is bound. No operator authoring of `roles[]` / `segments[]` is available from this panel — explicitly forbidden in OWC scope. `roles[]` / `segments[]` are read-only surfaces only. |
-| Workbench C 场景模板面 | DA-W5 | **DISPLAY-ONLY (browse pointer only)** | Scene five-zone read-view (布局 / 背景 / 信息区 / 标题区 / 辅助区) bound to `scene_template_ref` indirection. Status shows `STATUS_TEMPLATE_BOUND / STATUS_GENERIC_REF_ONLY / STATUS_TEMPLATE_PENDING` depending on `entry.scene_binding_hint`. The Asset Supply browse pointer is present but is NOT an interactive selector. `scene_binding_writeback` shows `not_implemented_phase_b`. Scene is fixed at task creation time for this wave. |
-| Delivery Center Delivery Pack | DA-W8 | **DISPLAY-ONLY — see §4 for final_video access** | Nine-lane Delivery Pack view (final_video / subtitle / dubbed_audio / metadata / manifest / pack / role_usage / scene_usage / language_usage) renders with `STATUS_RESOLVED / STATUS_TRACKED_GAP / STATUS_TRACKED_GAP_SCENE / STATUS_TRACKED_GAP_LANGUAGE / STATUS_TRACKED_GAP_ROLES` per lane. **`final_video` is primacy-label-only with tracked-gap explanation — the actual final video artifact is NOT accessible through this surface.** See §4.4 for the correct operator access path. Operators may NOT treat this as a download / delivery surface for the final video in this wave. |
-
-**Explicitly tracked limits for operator briefing:**
-
-1. **Non-interactive role/scene selection:** Role binding (DA-W3) and scene template (DA-W5) are read-only views of what was bound at task creation. Operators cannot select a different role or scene from the workbench. If a task has an incorrect role or scene binding, it cannot be corrected in-session — the operator must create a new task with the correct configuration.
-
-2. **Unresolved Workbench B content structure fields:** DA-W4 shows Outline / cadence / emphasis fields as `STATUS_UNRESOLVED` unless upstream content structure has been resolved by the production pipeline. Most DA tasks in the trial environment will show unresolved content structure fields. This is correct sentinel behavior; operators MUST NOT report these as defects.
-
-3. **DA-W8 final_video access path — critical operator briefing item:** The Delivery Pack (DA-W8) renders `final_video` as a primacy lane label with tracked-gap explanation. It does NOT expose the final video URL. The actual final video artifact is accessible via `media.final_video_url` on the publish hub payload — this is the correct path for operators who need to access the final DA video. Coordinator MUST brief operators on this access path before any DA trial session. An operator navigating to the Delivery Center and seeing only the label will otherwise conclude the final video is missing; it is not missing — it is accessible through a different surface path.
-
-4. **account / channel capture gaps:** Both DA-W9 `account` (always tracked-gap) and `channel` (tracked-gap when no `metrics_snapshot.channel_id`) are correctly labeled sentinel states. Operators will not see account identity in the 回填 table. This is a contract-layer gap (closure schema lacks `account_id`; `CHANNEL_METRICS_KEYS` excludes `channel_id`), not a display defect.
-
-5. **DA artifact_lookup is `not_implemented_phase_c`:** Per OWC-DA Closeout §8: "The Digital Anchor side keeps `artifact_lookup='not_implemented_phase_c'` because OWC-DA scope is read-only consumption." DA delivery lanes that depend on artifact lookup show tracked-gap sentinels. Future Plan E equivalent phase for DA B4 is required; out of this wave's scope.
-
-6. **Closure store volatility (see §4):** All DA closure data (role_feedback, segment_feedback, feedback_closure_records, DA-W7 review-zone submissions) is in-process and non-durable. Gateway restart destroys all closure history.
+| Task Area 8-field card | DA-W1 | 任务标题 / Role Profile / Scene Template / Target Language / 当前版本状态 / 当前阻塞项 / 交付包状态 / 最近更新 — fields read from packet + PR-1 unified producer | NOT TRIAL SCOPE |
+| Task Area eight-stage projection | DA-W2 | Eight-stage badge from `board_bucket` | NOT TRIAL SCOPE |
+| Workbench A 角色绑定面 | DA-W3 | Read-view of `role_pack_ref + speaker_plan_ref`; Asset Supply browse pointer only (NOT interactive) | NOT TRIAL SCOPE |
+| Workbench B 内容结构面 | DA-W4 | Display-only; STATUS_UNRESOLVED for most fields; no Phase B authoring | NOT TRIAL SCOPE |
+| Workbench C 场景模板面 | DA-W5 | Display-only scene five-zone view; `scene_binding_writeback` is `not_implemented_phase_b`; Asset Supply browse pointer only | NOT TRIAL SCOPE |
+| Workbench D 语言输出面 | DA-W6 | Read-view of language_scope + delivery_binding | NOT TRIAL SCOPE |
+| Workbench E 预览与校对面 | DA-W7 | Real per-(role, segment) write-through forms posting to Recovery PR-4 closure endpoint; closed `REVIEW_ZONE_VALUES` enum | NOT TRIAL SCOPE — surface exists but trial samples MUST NOT exercise it |
+| Delivery Pack | DA-W8 | Nine-lane Delivery Pack view with `final_video` primacy-label-only; lanes carry `STATUS_TRACKED_GAP*` sentinels | NOT TRIAL SCOPE |
+| 发布回填 | DA-W9 | Read-view of closure D.1 events with `account` / `channel` tracked-gaps | NOT TRIAL SCOPE |
 
 **Operator scope for trial re-entry review:**
 
-> Digital Anchor trial scope post-OWC: Task Area (fully operable) + Workbench E (real write-through, primary DA interaction surface) + Workbench D (operable read-view) + Workbench A/C (read-view, browse pointer only, not interactive) + Workbench B (display-only, content unresolved) + Delivery Center 回填 (operable with account gap) + Delivery Center Delivery Pack (display-only, final_video via `media.final_video_url` path only). Digital Anchor is a **constrained smoke-trial line**, not a full end-to-end operator line in this wave.
+> Digital Anchor scope: **NOT a trial candidate.** No DA tasks submitted, no DA closure events produced, no DA delivery surfaces consumed as trial evidence. The DA New-Tasks card click target should be hidden or disabled during trial. Engineering closeout PASS does not translate to trial readiness for this line in this wave; the trial re-entry review must explicitly carry this verdict and must NOT author DA sample-validity criteria, since no DA samples are valid trial evidence.
 
 ---
 
 ## 3. Visible / Usable / Operable Matrix
 
 For each line and surface area, the classification is:
-- **Operable:** operator can take real action with real data; result is meaningful.
-- **Usable:** operator can interact but results may be partially incomplete / sentinel-filled.
-- **Inspect-only / display-only:** operator can see the surface; cannot take meaningful action; content may be unresolved.
+- **Operable:** operator can take real action with real data; result is meaningful AND surface is in trial scope.
+- **Usable:** operator can interact but results may be partially incomplete / sentinel-filled; surface is in trial scope.
+- **Inspect-only / display-only:** operator can see the surface; cannot take meaningful action; content may be unresolved; surface MAY be in trial scope as a read-only reference.
 - **Not present / blocked:** surface does not exist for this line in this wave.
+- **Not trial scope (DA):** Digital Anchor surfaces all carry this classification. The DA column entries describe what each surface DOES if rendered (informational only). Per §2.3, Digital Anchor is NOT a trial candidate in the current wave; the DA column is included for surface-state documentation, NOT trial scoping. Read every DA cell as "this surface technically renders X, but the operator MUST NOT consume it as trial evidence in this wave."
 
 ### 3.1 Task Area
 
-| Surface | Hot Follow | Matrix Script | Digital Anchor |
+| Surface | Hot Follow | Matrix Script | Digital Anchor (NOT TRIAL SCOPE) |
 |---|---|---|---|
-| Task list + line filter | **Operable** | **Operable** | **Operable** |
-| Three-tier / eight-stage state projection | **Operable** | **Operable** (MS-W1 + MS-W2) | **Operable** (DA-W1 + DA-W2) |
-| 8-field operator-language card body | **Operable** | **Operable** (MS-W2) | **Operable** (DA-W1) |
-| Blocked / ready / publishable tri-state | **Operable** | **Operable** | **Operable** |
-| Entry: new task creation | **Operable** | **Operable** (formal `/tasks/matrix-script/new` POST only) | **Operable** (formal `/tasks/digital-anchor/new` POST only) |
-| Quick actions (进入工作台 / 跳交付中心) | **Operable** | **Operable** | **Operable** |
+| Task list + line filter | **Operable** | **Operable** | Surface renders; not trial scope |
+| Three-tier / eight-stage state projection | **Operable** | **Operable** (MS-W1 + MS-W2) | Surface renders (DA-W1 + DA-W2); not trial scope |
+| 8-field operator-language card body | **Operable** | **Operable** (MS-W2) | Surface renders (DA-W1); not trial scope |
+| Blocked / ready / publishable tri-state | **Operable** | **Operable** | Surface renders; not trial scope |
+| Entry: new task creation | **Operable** | **Operable** (formal `/tasks/matrix-script/new` POST only) | Route exists (`/tasks/digital-anchor/new`); **MUST be hidden / disabled during trial** |
+| Quick actions (进入工作台 / 跳交付中心) | **Operable** | **Operable** | Surface renders; not trial scope |
 
 ### 3.2 Workbench
 
-| Panel | Hot Follow | Matrix Script | Digital Anchor |
+| Panel | Hot Follow | Matrix Script | Digital Anchor (NOT TRIAL SCOPE) |
 |---|---|---|---|
-| A — content structure / 脚本结构区 / 角色绑定面 | **Operable** | **Inspect-only** (STATUS_UNRESOLVED, Outline Contract gap) | **Usable** (read-view if data present; no interactive role selection) |
-| B — scene plan / variation panel / 内容结构面 | **Operable** | **Operable** (Phase B variation panel — real axes/cells/slots) | **Display-only** (STATUS_UNRESOLVED, no Phase B authoring) |
-| C — audio / preview compare / 场景模板面 | **Operable** | **Usable** (MS-W4 read-view, recommended marker live) | **Display-only** (browse pointer only, no interactive scene selection) |
-| D — language / 校对区 / 语言输出面 | **Operable** | **Operable** (MS-W5 real write-through forms) | **Usable** (DA-W6 read-view, language rows from delivery_binding) |
-| E — QC / diagnostics / 预览与校对面 | **Operable** | **Usable** (MS-W6 advisory-backed read-view) | **Operable** (DA-W7 real write-through forms — primary DA interaction surface) |
+| A — content structure / 脚本结构区 / 角色绑定面 | **Operable** | **Inspect-only** (STATUS_UNRESOLVED, Outline Contract gap) | Read-view; Asset Supply browse pointer only; not interactive; not trial scope |
+| B — scene plan / variation panel / 内容结构面 | **Operable** | **Operable** (Phase B variation panel — real axes/cells/slots) | Display-only; STATUS_UNRESOLVED; no Phase B authoring; not trial scope |
+| C — audio / preview compare / 场景模板面 | **Operable** | **Usable** (MS-W4 read-view, recommended marker live) | Display-only; `scene_binding_writeback` is `not_implemented_phase_b`; not trial scope |
+| D — language / 校对区 / 语言输出面 | **Operable** | **Operable** (MS-W5 real write-through forms) | Read-view of language_scope; not trial scope |
+| E — QC / diagnostics / 预览与校对面 | **Operable** | **Usable** (MS-W6 advisory-backed read-view) | Real write-through forms exist (DA-W7); **MUST NOT be exercised in trial** |
 | Variation panel (Matrix Script specific) | Not present | **Operable** (Plan A §3.2 baseline, real axes/cells/slots per §8.A–§8.H) | Not present |
 
 ### 3.3 Delivery Center
 
-| Panel | Hot Follow | Matrix Script | Digital Anchor |
+| Panel | Hot Follow | Matrix Script | Digital Anchor (NOT TRIAL SCOPE) |
 |---|---|---|---|
-| Final video primary lane | **Operable** | **Inspect-only** (artifact_lookup still `not_implemented_phase_c`) | **Display-only** (`final_video` is primacy-label-only; actual artifact at `media.final_video_url`) |
-| Required deliverables | **Operable** | **Inspect-only** (STATUS_UNRESOLVED) | **Inspect-only** (STATUS_TRACKED_GAP* sentinels) |
-| Optional / non-blocking deliverables (scene_pack etc.) | **Operable** | **Inspect-only** | **Inspect-only** |
-| copy_bundle / delivery pack layout | Not applicable | **Display-only** (all subfields STATUS_UNRESOLVED) | **Inspect-only** (nine-lane layout with tracked-gap sentinels) |
-| 回填 / publish feedback multi-channel | **Operable** | **Usable** (MS-W8 reads closure; account always STATUS_UNSOURCED) | **Usable** (DA-W9 reads closure; account always tracked-gap) |
-| Publish action button | **Operable** | **Usable** (consumes authoritative projection; no copy delivery) | **Usable** (consumes authoritative projection) |
+| Final video primary lane | **Operable** | **Inspect-only** (artifact_lookup still `not_implemented_phase_c`) | `final_video` primacy-label-only; actual artifact at `media.final_video_url`; not trial scope |
+| Required deliverables | **Operable** | **Inspect-only** (STATUS_UNRESOLVED) | STATUS_TRACKED_GAP* sentinels; not trial scope |
+| Optional / non-blocking deliverables (scene_pack etc.) | **Operable** | **Inspect-only** | Surface renders; not trial scope |
+| copy_bundle / delivery pack layout | Not applicable | **Display-only** (all subfields STATUS_UNRESOLVED) | Nine-lane layout with tracked-gap sentinels; not trial scope |
+| 回填 / publish feedback multi-channel | **Operable** | **Usable** (MS-W8 reads closure; account always STATUS_UNSOURCED) | DA-W9 reads closure; account / channel tracked-gap; not trial scope |
+| Publish action button | **Operable** | **Usable** (consumes authoritative projection; no copy delivery) | Surface renders; **MUST NOT be exercised in trial** |
 
 ### 3.4 Asset Supply Dependency Surfaces
 
@@ -246,7 +271,7 @@ For each line and surface area, the classification is:
 |---|---|---|
 | Asset Supply browse (`/assets`) | **Inspect-only** | Recovery PR-2 shipped minimum capability: browse + opaque `asset://` reference. No interactive selection wired from Workbench panels yet. |
 | Promote intent submission | **Not operable** | Approval path is restricted to `requested → rejected` only (Recovery PR-2 §9.1.6). No approval path exists until Asset Library write path lands in a later wave. |
-| Role/scene select from Workbench A / C | **Not operable** | DA-W3 and DA-W5 surface browse pointer only; interactive selector is a future operator-driven authoring wave item. |
+| Role/scene select from Workbench A / C | **Not operable; reinforces DA not-trial-capable verdict** | DA-W3 and DA-W5 surface browse pointer only; interactive selector is a future operator-driven authoring wave item. The absence of this capability is one of the five findings (§2.3.1 finding 3) anchoring the DA not-trial-capable verdict. |
 | Matrix Script Asset Supply reference | **Not applicable** | MS creates `content://` opaque handles via Plan E F2 minting flow; no direct Asset Supply dependency in the MS workbench panels. |
 
 ---
@@ -280,24 +305,23 @@ These constraints are **binding** for any trial session coordinated after this a
 | `STATUS_UNSOURCED` (account_id) | MS-W8 回填, DA-W9 回填 | "Account identity is not yet captured in the closure schema. This is a known gap, not a defect." |
 | `not_implemented_phase_b` (DA-W5) | DA Workbench C 场景模板面 | "Scene template writeback is a Phase B future item. The scene is bound at task creation; it cannot be changed from the workbench in this wave." |
 
-### 4.3 DA final_video actual access path
+### 4.3 DA final_video access path (informational only — DA is not trial scope)
 
-**Constraint:** Operators accessing DA tasks in the Delivery Center MUST be briefed on the correct access path for the final video artifact.
+**Status correction:** An earlier draft of this addendum framed the DA `final_video` access path as a coordinator briefing item required for DA Delivery Center trial sessions. That framing implied DA Delivery Center inspection was a trial activity. **It is not** — per §2.3, Digital Anchor is NOT a trial candidate in the current wave, and DA Delivery Center is not consumed as trial evidence.
 
-**The gap:** DA-W8 Delivery Pack renders `final_video` as a primacy-label-only lane with a tracked-gap explanation. The surface correctly identifies this as a gap — the Phase C delivery binding does not enumerate a composed final asset row. The actual final video URL is available via `media.final_video_url` on the publish hub payload.
+**The underlying surface state (informational, for future-wave reference):**
+- DA-W8 Delivery Pack renders `final_video` as a primacy-label-only lane with a tracked-gap explanation.
+- The Phase C delivery binding does not enumerate a composed final asset row.
+- The actual final video URL is available via `media.final_video_url` on the publish hub payload.
+- This is finding 4 in §2.3.1: there is no operator-accessible path through the standard DA surface that delivers a usable final result. This is one of the five reasons DA is not trial-capable in this wave.
 
-**Required coordinator action before any DA Delivery Center trial session:**
-1. Confirm the `media.final_video_url` field is populated for the trial task before beginning.
-2. Brief operators: "The Delivery Pack 'Final Video' row shows a label, not a link — this is expected in this wave. To access the actual final video, use [the alternative access path at `media.final_video_url`]."
-3. Document the access path explicitly in the trial sample profile (see §5).
-
-**Note for trial re-entry review:** The trial re-entry review must confirm and document the exact UI path or API call that exposes `media.final_video_url` to operators. This addendum names the field; the trial re-entry review must verify the operator-accessible path.
+**No trial coordinator action required this wave.** No DA trial session is planned. The `media.final_video_url` access path is documented here only for future reference once DA becomes trial-capable in a later wave (per §2.3.3, this requires an enumerated `final_video` lane in the Delivery Pack or a documented operator-language alternative path — not just a payload field name).
 
 ### 4.4 All trial samples must be fresh, valid, and correctly configured
 
-**Constraint:** No pre-OWC samples, no pre-§8.A / pre-§8.F Matrix Script samples, no incorrectly-configured DA tasks may be used as trial evidence. See §5 for sample validity criteria.
+**Constraint:** No pre-OWC Matrix Script samples and no pre-§8.A / pre-§8.F Matrix Script samples may be used as trial evidence. See §5 for sample validity criteria.
 
-**Why:** Pre-OWC samples do not carry the OWC-converged surface rendering. Pre-§8.A / pre-§8.F Matrix Script samples carry invalid `source_script_ref` shapes. DA tasks with incorrectly-bound role or scene cannot be corrected in-session (role/scene are fixed at creation in this wave).
+**Why:** Pre-OWC Matrix Script samples do not carry the OWC-MS-converged surface rendering. Pre-§8.A / pre-§8.F Matrix Script samples carry invalid `source_script_ref` shapes. (Digital Anchor sample validity is a non-question in this wave because no DA samples are valid trial evidence — see §2.3.2.)
 
 ### 4.5 Forbidden-token scrub substring match risk
 
@@ -327,50 +351,27 @@ A Matrix Script task is valid post-OWC trial evidence iff the following ALSO hol
 - Delivery Center copy_bundle subfields (`STATUS_UNRESOLVED`) — inspect only; operators MUST NOT use this as copy delivery.
 - account_id on 回填 rows (`STATUS_UNSOURCED`) — labeled expected state; MUST NOT be reported as a defect.
 
-### 5.3 Digital Anchor sample validity (new — Plan A had none)
+### 5.3 Digital Anchor sample validity — NO valid DA trial samples exist in this wave
 
-A Digital Anchor task counts as a valid post-OWC trial evidence task iff ALL of the following hold:
+**Status correction:** An earlier draft of this addendum authored seven DA sample-validity criteria parallel to the Matrix Script criteria, plus a ten-step suggested DA trial workflow. That framing implied DA had a defined trial sample shape. **It does not** — per §2.3, Digital Anchor is NOT a trial candidate in the current wave. There is no valid DA trial sample.
 
-**At task creation time:**
+**The corrected statement:**
 
-1. **Formal create-entry route.** Created via the formal `/tasks/digital-anchor/new` POST (Recovery PR-4 formal route). Never via the legacy temp `/tasks/connect/digital_anchor/new` or any other path.
+> **No Digital Anchor task is a valid trial sample in this wave.** The trial re-entry review must NOT author DA sample-validity criteria. Any document or runbook that defines a DA trial sample profile is rejected as inconsistent with this addendum's operations verdict.
 
-2. **Role binding configured at creation.** The task `config.entry.role_profile_ref` is populated with a valid `role_pack_ref` value at creation time. This binding CANNOT be changed from the Workbench A panel in this wave. If it is missing or incorrect, the Workbench A panel will render without meaningful role binding data — create a new task.
+This is not a temporary classification awaiting clarification. It is the operations verdict for the OWC-MS + OWC-DA closeout state, anchored on the five findings in §2.3.1. The line is engineering-closeout PASS but operations-NOT-READY; trial samples require operations-READY, not engineering-PASS.
 
-3. **Scene binding configured at creation.** The task `config.entry.scene_binding_hint` is populated at creation time. This binding CANNOT be changed from the Workbench C panel in this wave. If it is missing or incorrect, Workbench C renders `STATUS_TEMPLATE_PENDING` — create a new task.
+**Consequences:**
 
-4. **Target language(s) configured at creation.** The task `language_scope.target_languages` is populated at creation time. DA-W6 Workbench D and DA-W8 `language_usage` depend on this.
+| Concern | Disposition |
+|---|---|
+| DA task creation during trial | NOT PERMITTED. New-Tasks DA card click target hidden / disabled by coordinator. |
+| Pre-existing DA tasks in trial environment | NOT consumed as trial evidence. May exist in the system; trial coordinator does not include them in the §7.1 sample roster. |
+| DA-W7 review-zone form submissions | NOT exercised. No closure events produced as trial evidence. |
+| DA Delivery Center inspection | NOT exercised as trial evidence. The `final_video` access path question (§4.3) does not arise this wave because no DA Delivery Center trial inspection happens. |
+| DA surface rendering verification | Permitted as a non-trial smoke check ONLY (engineering-team verification that OWC-DA `data-role` anchors render correctly post-deploy). Coordinator labels this explicitly as "engineering verification, not trial evidence." |
 
-**At trial time:**
-
-5. **OWC surface rendering present.** `GET /tasks/{task_id}` for `kind=digital_anchor` renders the Task Area card with `data-role="da-eight-stage"` + `data-role="da-*"` per-field anchors visible. The Workbench renders five panels with `data-role="digital-anchor-role-binding-panel"` / `data-role="digital-anchor-content-structure-panel"` / `data-role="digital-anchor-scene-template-panel"` / `data-role="digital-anchor-language-output-panel"` / `data-role="digital-anchor-review-zone-panel"` visible. The Delivery Center renders with `data-role="digital-anchor-delivery-pack"` and `data-role="digital-anchor-delivery-backfill"` visible.
-
-6. **final_video access path confirmed before Delivery Center trial.** Before any DA Delivery Center trial session, coordinator must confirm that `media.final_video_url` is accessible for the trial task. The DA-W8 Delivery Pack will NOT expose this URL — that is expected; the alternative access path must be briefed and confirmed.
-
-7. **Closure store not restarted.** No gateway restart between task creation and trial session. See §4.1.
-
-**What is NOT expected to be corrected in-session:**
-
-- Role binding (Workbench A) — fixed at task creation.
-- Scene template (Workbench C) — fixed at task creation.
-- Content structure (Workbench B Outline / 段落逻辑 / 强调点 / 节奏) — unresolved in most cases; cannot be authored from the workbench in this wave.
-- `final_video` URL in Delivery Pack — not surfaced through Delivery Pack; access via `media.final_video_url`.
-- Account identity in 回填 rows — always tracked-gap; cannot be captured in this wave.
-
-**DA trial sample suggested workflow (for first-wave samples):**
-
-| Step | Surface | Expected result |
-|---|---|---|
-| 1. Create DA task via formal route | `/tasks/digital-anchor/new` POST | Task created; 任务区 row appears |
-| 2. Inspect Task Area 8-field card | `tasks.html` DA branch | Eight fields visible; 当前版本状态 reads from PR-1 unified producer |
-| 3. Enter Workbench | `task_workbench.html` DA branch | Five panels visible with correct `data-role` anchors |
-| 4. Inspect DA-W3 角色绑定面 | Workbench A panel | Role Profile / 形象风格 / 声音 preset / 表达风格 / 情绪 visible if role configured |
-| 5. Inspect DA-W6 语言输出面 | Workbench D panel | Target Language / Subtitle Strategy / multi-language navigator visible |
-| 6. Submit DA-W7 review via form | Workbench E form → `POST /api/digital-anchor/closures/{task_id}/events` | Closure event recorded; review zone submission confirmed |
-| 7. Navigate to Delivery Center | `task_publish_hub.html` DA branch | DA-W8 nine-lane layout + DA-W9 backfill layout visible |
-| 8. Inspect DA-W8 Delivery Pack | Delivery Center DA branch | `final_video` primacy lane labeled (expected); other lanes show tracked-gap or resolved status |
-| 9. Access final video via publish hub payload | `media.final_video_url` field | Actual final video URL accessible via this path (verify pre-trial) |
-| 10. Inspect DA-W9 回填 | Delivery Center DA branch | Post-closure events visible; account tracked-gap (expected) |
+**What unblocks DA sample validity authoring in a future wave:** see §2.3.3. Until those five structural prerequisites are addressed, no DA sample-validity criteria may be authored, and any draft attempting to author them is to be rejected.
 
 ---
 
@@ -380,10 +381,12 @@ These gaps are documented in both OWC closeouts as non-blocking tracked items. T
 
 ### 6.1 Critical (would block end-to-end workflow for the named scenario)
 
+**DA-aggregating finding (overrides per-DA-gap classifications):** OPS-GAP-1 + OPS-GAP-5 + OPS-GAP-6 + OPS-GAP-8, taken together with the absence of an operationally closed script-to-content-structure path (§2.3.1 finding 1) and the insufficient interactive surface area (§2.3.1 finding 3), classify Digital Anchor as NOT trial-capable in this wave. The DA-specific gaps below are NOT gaps to be mitigated for trial coordination — they are evidence that DA does not meet the operations bar for trial entry. No coordinator briefing or trial protocol can compensate for these gaps within this wave.
+
 | Gap ID | Gap | Lines affected | What it blocks |
 |---|---|---|---|
-| OPS-GAP-1 | **DA `final_video` not accessible through Delivery Pack** | Digital Anchor only | Operators cannot complete "deliver and download final video" through the standard Delivery Center surface. The actual artifact is at `media.final_video_url` — a non-obvious path that requires coordinator briefing. |
-| OPS-GAP-2 | **`InMemoryClosureStore` volatile across gateway restart** | Matrix Script + Digital Anchor | All MS and DA closure history lost on gateway restart. Review-zone submissions, publish events, feedback records — all non-durable. Affects any multi-session trial workflow. |
+| OPS-GAP-1 | **DA `final_video` not accessible through Delivery Pack** | Digital Anchor only | Operators cannot complete "deliver and download final video" through the standard Delivery Center surface. The actual artifact is at `media.final_video_url` — a non-obvious path. **Operations classification: contributes to the DA not-trial-capable verdict (§2.3.1 finding 4).** |
+| OPS-GAP-2 | **`InMemoryClosureStore` volatile across gateway restart** | Matrix Script + Digital Anchor | All MS and DA closure history lost on gateway restart. For Matrix Script: managed by the §4.1 trial protocol constraint. For Digital Anchor: amplifies the not-trial-capable verdict because DA's only interactive surface (DA-W7) writes to the volatile store. |
 | OPS-GAP-3 | **MS copy_bundle all fields `STATUS_UNRESOLVED`** | Matrix Script only | Operators cannot extract actual copy (title / hashtags / CTA / comment_keywords) from the Delivery Center. The surface exists but delivers no content. Any MS trial workflow requiring actual copy delivery is blocked. |
 
 ### 6.2 Significant (degrades trial quality; does not block the core loop but will confuse operators)
@@ -391,10 +394,10 @@ These gaps are documented in both OWC closeouts as non-blocking tracked items. T
 | Gap ID | Gap | Lines affected | What it degrades |
 |---|---|---|---|
 | OPS-GAP-4 | **MS-W3 script structure fields `STATUS_UNRESOLVED`** | Matrix Script only | Operators expecting to review the Hook / Body / CTA / 关键词 / 禁用词 content structure in the Workbench see empty panels. Core MS readability without the Outline Contract is limited to the variation panel + review forms. |
-| OPS-GAP-5 | **DA-W4 content structure fields `STATUS_UNRESOLVED`** | Digital Anchor only | Operators expecting to review Outline / 段落结构 / 强调点 / 节奏 in the Workbench see empty or `STATUS_UNRESOLVED` fields. DA content structure comprehension is limited in this wave. |
-| OPS-GAP-6 | **DA-W3 / DA-W5 asset selection not interactive** | Digital Anchor only | Operators expecting to select or change a role or scene template from the Workbench find browse pointers only. Role/scene correction is not possible in-session; must be done by creating a new task. |
-| OPS-GAP-7 | **account_id always `STATUS_UNSOURCED` / tracked-gap (MS + DA 回填)** | Matrix Script + Digital Anchor | Operators cannot identify which account published the content from the 回填 tables. Account-level publishing analytics are unavailable this wave. |
-| OPS-GAP-8 | **DA artifact_lookup `not_implemented_phase_c` on DA delivery lanes** | Digital Anchor only | DA delivery binding lanes that depend on artifact lookup show tracked-gap sentinels. Artifact resolution for DA is not yet wired (Plan E equivalent for DA B4 is out of scope). |
+| OPS-GAP-5 | **DA-W4 content structure fields `STATUS_UNRESOLVED`** | Digital Anchor only | Workbench B is display-only with mostly unresolved content. **Operations classification: contributes to the DA not-trial-capable verdict (§2.3.1 finding 1 + finding 2). Not a coordinator briefing item; not mitigable for trial coordination this wave.** |
+| OPS-GAP-6 | **DA-W3 / DA-W5 asset selection not interactive** | Digital Anchor only | Workbench A and C surface only an Asset Supply browse pointer; no interactive selector. **Operations classification: contributes to the DA not-trial-capable verdict (§2.3.1 finding 2 + finding 3). Not a coordinator briefing item; not mitigable for trial coordination this wave.** |
+| OPS-GAP-7 | **account_id always `STATUS_UNSOURCED` / tracked-gap (MS + DA 回填)** | Matrix Script + Digital Anchor | Operators cannot identify which account published the content from the 回填 tables. For Matrix Script: a tracked sentinel-state to brief. For Digital Anchor: not in trial scope this wave. |
+| OPS-GAP-8 | **DA artifact_lookup `not_implemented_phase_c` on DA delivery lanes** | Digital Anchor only | DA delivery binding lanes that depend on artifact lookup show tracked-gap sentinels. **Operations classification: contributes to the DA not-trial-capable verdict (§2.3.1 finding 4). Not a coordinator briefing item; not mitigable for trial coordination this wave.** |
 
 ### 6.3 Low impact (known regression risk; unlikely to affect first-wave trial if coordinator manages content)
 
@@ -409,17 +412,23 @@ These gaps are documented in both OWC closeouts as non-blocking tracked items. T
 
 ### 7.1 What this addendum establishes
 
-This addendum establishes the **post-OWC operational trial baseline**. It supersedes Plan A §6.2 (Matrix Script), Plan A §6.3 (Digital Anchor), and Plan A §7.1 (trial samples) for the OWC-converged surfaces. Plan A's §0.1 / §0.2 (Matrix Script sample validity and `source_script_ref` product meaning), §6.1 (Hot Follow), §7.1 samples 1–5, §8 (risks and mitigations), and §9 (next gate conditions) remain in force unchanged.
+This addendum establishes the **post-OWC operational trial baseline** with a stricter operations posture than the engineering closeout PASS verdicts on their own would suggest:
+
+- **Hot Follow:** benchmark end-to-end line. Trial-capable. Reference / control line for trial.
+- **Matrix Script:** limited / constrained trial candidate. Partially operable; trial scope must be explicitly narrowed (Task Area + Workbench C/D/E + 回填 only; Workbench A and Delivery Center copy_bundle inspect-only / display-only) and operator-briefed on closure store volatility, sentinel fields, and unresolved-content disposition.
+- **Digital Anchor:** **NOT a trial candidate in current state.** Engineering closeout PASS, operations NOT-READY. Surface-visible but not operationally usable. The five findings in §2.3.1 anchor this verdict; OPS-GAP-1 / 5 / 6 / 8 are evidence of, not mitigations for, the not-trial-capable state.
+
+This addendum supersedes Plan A §6.2 (Matrix Script — narrows scope), Plan A §6.3 (Digital Anchor — supersedes the prior "inspection-only" framing with the "NOT a trial candidate" framing now grounded in OWC tracked gaps), and Plan A §7.1 (trial samples). Plan A's §0.1 / §0.2 (Matrix Script sample validity and `source_script_ref` product meaning), §6.1 (Hot Follow), §8 (risks and mitigations), and §9 (next gate conditions) remain in force unchanged.
 
 ### 7.2 What the trial re-entry review must do
 
 The formal trial re-entry review (the next docs-only step, opened by explicit user hand-off) must:
 
 1. **Evaluate against this updated baseline.** The trial re-entry review must cite this addendum as the operational baseline and confirm which ops gaps are acceptable for trial vs which require further mitigation before trial begins.
-2. **Resolve the `media.final_video_url` access path for DA trial.** The trial re-entry review must confirm and document the exact operator-accessible path (UI route or API call) for `media.final_video_url` so the DA trial coordinator can brief operators with a precise instruction, not just a field name.
-3. **Author the DA equivalent of Plan A §5 口径.** The trial re-entry review must produce coordinator briefing scripts for DA that parallel the Plan A §5.1 / §5.2 / §5.3 口径 — covering Task Area, Workbench (emphasizing DA-W7 as primary interaction surface), and Delivery Center (emphasizing the final_video access path).
-4. **Confirm the trial protocol constraints (§4) are satisfiable in the planned trial environment.** Specifically: confirm gateway restart risk is manageable for the trial window; confirm `media.final_video_url` is populated for the trial DA task set.
-5. **Update Plan A §12 readiness conclusion.** The trial re-entry review must update the Plan A §12 final readiness conclusion to reflect the post-OWC, post-addendum operational posture.
+2. **Carry the DA not-trial-capable verdict explicitly.** The trial re-entry review must NOT widen DA scope, MUST NOT author DA sample-validity criteria, and MUST NOT plan or admit any DA trial sample. Any DA-related content in the trial re-entry review must be limited to (a) restating §2.3 verdict; (b) confirming the §4.3 informational-only treatment of `media.final_video_url`; (c) noting the §2.3.3 future-wave prerequisites without authoring them.
+3. **Define the Matrix Script trial scope precisely.** Operating on the Hot Follow + Matrix Script line set only. Brief coordinator briefing scripts (Plan A §5 口径 update) covering MS Task Area, MS Workbench A inspect-only, MS Workbench C/D/E operability, MS Delivery Center copy_bundle display-only state, MS Delivery Center 回填 with account gap.
+4. **Confirm the trial protocol constraints (§4) are satisfiable in the planned trial environment.** Specifically: confirm gateway restart risk is manageable for the trial window for Matrix Script. Confirm DA card click target is hidden / disabled.
+5. **Update Plan A §12 readiness conclusion.** The trial re-entry review must update the Plan A §12 final readiness conclusion to reflect the post-OWC, post-addendum operational posture, including the explicit "DA NOT trial-capable" verdict.
 
 ### 7.3 What this addendum does NOT unlock
 
