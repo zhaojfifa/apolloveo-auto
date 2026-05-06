@@ -404,3 +404,30 @@ The trial re-entry review was authored on 2026-05-06 as a docs-only step followi
 **Gate verdict:** READY FOR PLAN A LIVE-TRIAL REOPEN pending four-party signoff (§8 of the trial re-entry review). The review carries `<fill>` placeholders for Architect Raobin / Reviewer Alisa / Operations Coordinator Jackie / Product Manager in §8; those placeholders are filled in a follow-on docs-only signoff PR before Plan A live-trial reopens.
 
 **This §14 reference does NOT open Plan A live-trial.** Live-trial requires §8 of the trial re-entry review to be signed by all four parties in a follow-on docs-only signoff PR.
+
+---
+
+## 15. Matrix Script Result-Capability Recovery Amendment (additive, 2026-05-06)
+
+After the trial re-entry review §8 signoff landed (commit `7e2ad59`), a product/operations review concluded that surface convergence is insufficient for Matrix Script trial-readiness. The Matrix Script Result-Capability Recovery Amendment supersedes the post-OWC addendum + trial re-entry review classification of Matrix Script.
+
+**Amendment authority:** [docs/product/OPERATIONS_TRIAL_READINESS_MATRIX_SCRIPT_RECOVERY_AMENDMENT_v1.md](OPERATIONS_TRIAL_READINESS_MATRIX_SCRIPT_RECOVERY_AMENDMENT_v1.md)
+
+**Updated per-line classification (per amendment §4):**
+
+| Production Line | Trial Verdict |
+|---|---|
+| Hot Follow | OPERABLE — benchmark end-to-end line. Plan A live-trial Hot-Follow-only window MAY proceed. |
+| Matrix Script | **RESULT-CAPABILITY RECOVERY REQUIRED** — paused; not a trial candidate until the recovery wave closes and a follow-on trial re-entry review signs |
+| Digital Anchor | NOT A TRIAL CANDIDATE — engineering PASS, operations NOT-READY (unchanged) |
+
+**Effect on this Plan A document:**
+
+- §6.2 Matrix Script line guidance — superseded for live-trial purposes by the amendment §2.3 (Matrix Script downgraded to RESULT-CAPABILITY RECOVERY REQUIRED). The eight Plan A §0.1 sample-validity criteria + §0.2 product-meaning of `source_script_ref` remain in force as binding for any future Matrix Script samples authored after the recovery wave closes.
+- §7.1 samples 3–5 (Matrix Script samples) — **OUT OF SCOPE** for the Hot-Follow-only window; deferred until after the recovery wave closes.
+- §7.1 sample 6 (cross-line Board inspection) — in scope only for Hot Follow rows in the Hot-Follow-only window.
+- §12 readiness conclusion — Hot Follow OPERABLE proceeds; Matrix Script RESULT-CAPABILITY RECOVERY REQUIRED status replaces the prior LIMITED / CONSTRAINED verdict from §14.
+- §14 trial re-entry review reference — its §8 four-party signoff remains a binding audit record on the trial re-entry review **as authored**; the amendment shifts the forward operational classification of Matrix Script and does not retract any signature.
+- §0.1 / §0.2 / §6.1 Hot Follow / §7.2 / §8 / §9 / §13 post-OWC addendum reference — unchanged.
+
+**This §15 reference does NOT open implementation work.** It records the amendment's effect on this Plan A authority. The next allowed docs-only step (per amendment §8) is the Matrix Script Result-Capability Recovery Wave gate spec authoring; in parallel, the operations team may run the Hot-Follow-only window per amendment §5.

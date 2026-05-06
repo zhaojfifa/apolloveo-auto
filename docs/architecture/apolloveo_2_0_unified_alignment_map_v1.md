@@ -382,46 +382,86 @@ Per Plan A §4.1:
 **One sequence. No parallel drift. No step starts before its predecessor signs off.**
 
 ```
-OWC-MS gate spec §10 signoff (docs-only)
-  → OWC-MS PR-1 (MS-W1 + MS-W2)
-  → OWC-MS PR-2 (MS-W3..W6)
-  → OWC-MS PR-3 (MS-W7 + MS-W8)
-  → OWC-MS Closeout (MS-A1..MS-A8 PASS)
-  → OWC-DA gate spec §10 signoff (docs-only)
-  → OWC-DA PR-1 (DA-W1 + DA-W2)
-  → OWC-DA PR-2 (DA-W3..W7)
-  → OWC-DA PR-3 (DA-W8 + DA-W9)
-  → OWC-DA Closeout (DA-A1..DA-A8 PASS)
-  → Trial re-entry review (docs-only; updates OPERATIONS_TRIAL_READINESS_PLAN_v1 §0)
-  → Plan A live-trial execution
+OWC-MS gate spec §10 signoff (docs-only)                                    [DONE]
+  → OWC-MS PR-1 (MS-W1 + MS-W2)                                              [DONE]
+  → OWC-MS PR-2 (MS-W3..W6)                                                  [DONE]
+  → OWC-MS PR-3 (MS-W7 + MS-W8)                                              [DONE]
+  → OWC-MS Closeout (MS-A1..MS-A8 PASS)                                      [DONE]
+  → OWC-DA gate spec §10 signoff (docs-only)                                 [DONE]
+  → OWC-DA PR-1 (DA-W1 + DA-W2)                                              [DONE]
+  → OWC-DA PR-2 (DA-W3..W7)                                                  [DONE]
+  → OWC-DA PR-3 (DA-W8 + DA-W9)                                              [DONE]
+  → OWC-DA Closeout (DA-A1..DA-A8 PASS)                                      [DONE]
+  → Pre-trial post-OWC operations addendum (docs-only)                       [DONE — PR #141]
+  → Trial re-entry review (docs-only)                                        [DONE — PR #143 + signoff `7e2ad59`]
+  → Matrix Script Result-Capability Recovery Amendment (docs-only)           [THIS PR — supersedes the prior LIMITED/CONSTRAINED MS classification with RESULT-CAPABILITY RECOVERY REQUIRED]
+  → Plan A live-trial Hot Follow execution (Hot-Follow-only window)
+       (operations-team action; Matrix Script samples paused; DA excluded)
+  → Hot Follow live-trial findings + four-party signoff
+  → Matrix Script Result-Capability Recovery Wave gate spec authoring (docs-only)
+  → Matrix Script Result-Capability Recovery Wave gate spec §10 signoff (docs-only)
+  → Matrix Script Result-Capability Recovery Wave implementation PRs (per gate spec slicing)
+  → Matrix Script Result-Capability Recovery Wave Closeout
+  → Follow-on trial re-entry review for Matrix Script (docs-only)
+  → Plan A live-trial Matrix Script execution
+  → Matrix Script live-trial findings + four-party signoff
   → Platform Runtime Assembly Wave
   → Capability Expansion Gate Wave
 ```
 
 The earlier "Plan A live-trial execution → Plan E gate spec → Plan E implementation → Platform Runtime Assembly Wave → Capability Expansion Gate Wave" sequence is preserved as historical anchor — Operator Capability Recovery Wave PR-1..PR-4 superseded the Plan E phase scope by landing the unified `publish_readiness` producer + L3 `final_provenance` emitter + L4 advisory emitter + Asset Supply minimum capability + Matrix Script closure binding + Digital Anchor formal entry / closure binding directly on the recovery mainline; Plan E phase closeout signoffs (A7 / UA7 / RA7) remain independently pending in Raobin / Alisa / Jackie's queue and are NOT advanced by OWC.
 
-### 7.1 Step 1 — Plan A live-trial execution (single next allowed action)
+### 7.1 Step 1 — Bifurcated Plan A live-trial + Matrix Script Result-Capability Recovery Wave (parallel tracks)
+
+**Updated 2026-05-06 by the Matrix Script Result-Capability Recovery Amendment** ([docs/product/OPERATIONS_TRIAL_READINESS_MATRIX_SCRIPT_RECOVERY_AMENDMENT_v1.md](../product/OPERATIONS_TRIAL_READINESS_MATRIX_SCRIPT_RECOVERY_AMENDMENT_v1.md)). Plan A live-trial execution is re-scoped after the trial re-entry review §8 signoff (`7e2ad59`). The earlier "single full sample-wave (samples 1–6 including Matrix Script `mm` / `vi` boundary checks)" framing is **superseded**. Two tracks now proceed in parallel after the amendment merges.
+
+#### Track A — Hot-Follow-only Plan A live-trial (operations team)
 
 Owner: Operations team coordinator + product / design / architect / reviewer roles per [docs/execution/apolloveo_2_0_role_matrix_v1.md](../execution/apolloveo_2_0_role_matrix_v1.md).
 
-Authority: [OPERATIONS_TRIAL_READINESS_PLAN_v1.md](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md) + [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](../execution/PLAN_A_OPS_TRIAL_WRITEUP_v1.md).
+Authority: [OPERATIONS_TRIAL_READINESS_PLAN_v1.md](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md) §6.1 (Hot Follow line guidance) + [PLAN_A_OPS_TRIAL_WRITEUP_v1.md](../execution/PLAN_A_OPS_TRIAL_WRITEUP_v1.md), **as re-scoped by recovery amendment §5** (Hot-Follow-only window).
 
 Pre-conditions (verified):
 
-- Plan B / C / D contracts frozen ✅ ([PLAN_BCD_CONTRACT_FREEZE_EXECUTION_LOG_v1.md](../execution/PLAN_BCD_CONTRACT_FREEZE_EXECUTION_LOG_v1.md))
-- Matrix Script §8.A → §8.H all PASS ✅ ([ENGINEERING_STATUS.md](../../ENGINEERING_STATUS.md) §"Current Completion")
-- Plan A static verification PASS ✅
+- Plan B / C / D contracts frozen ✅
+- Trial re-entry review §8 SIGNED ✅ (commit `7e2ad59`)
+- Matrix Script Result-Capability Recovery Amendment merged ✅ (this amendment's PR)
 - Coordinator hide/disable guards achievable in trial environment
 
-Action (summarized; see Plan A authorities for verbatim instructions):
+Action (Hot-Follow-only window):
 
-- Coordinator runs §2.1 hide guards (Digital Anchor card + temp route + Asset Supply / B-roll page + promote intent submit).
-- Coordinator briefs operators on §5.1 / §5.2 / §5.3 口径 + §0.1 sample-validity rule (seven criteria) + §0.2 product-meaning of `source_script_ref`.
-- Operations team executes Plan A §7.1 samples 1–6 in order (Hot Follow golden + preserve-source × Matrix Script `mm` `vi` boundary check + cross-line Board inspection).
-- Operations team appends live-run results to §8 placeholder of the coordinator write-up.
-- Coordinator + architect + reviewer signoff.
+- Coordinator runs §2.1 hide guards (Digital Anchor card + temp route + Asset Supply / B-roll page + promote intent submit) **plus additionally hides the Matrix Script New-Tasks card click target during this window**.
+- Coordinator briefs operators on Hot Follow §5.1 / §5.2 / §5.3 wording only. Matrix Script-specific paragraphs are out of scope; operators are told only that "Matrix Script is in a result-capability recovery wave; do not submit Matrix Script tasks."
+- Operations team executes Plan A §7.1 sample 1 (Hot Follow golden-path) + sample 2 (Hot Follow preserve-source) + Hot-Follow-only portions of sample 6 (cross-line Board inspection limited to Hot Follow rows). **Matrix Script samples 3, 4, 5 are OUT OF SCOPE.** Digital Anchor remains excluded.
+- Operations team appends Hot-Follow-only live-run results to §8 of the coordinator write-up, recorded as a Hot-Follow-only live-run cycle distinct from any future Matrix Script cycle.
+- Coordinator + architect + reviewer + product manager four-party signoff on the Hot-Follow-only window's findings.
 
-Deliverable: at least one full sample-wave entry in §8 of the Plan A coordinator write-up; Plan E pre-condition #1 satisfied.
+Deliverable: Hot-Follow-only live-run cycle entry in §8 of the Plan A coordinator write-up.
+
+#### Track B — Matrix Script Result-Capability Recovery Wave (engineering)
+
+Owner: Architect (Raobin) + reviewer (Alisa) for gate spec authoring and §10 signoff; coordinator (Jackie) + product manager for closeout signoff.
+
+Authority: Recovery amendment §2.5 / §7 (hard boundaries) / §8 (sequencing rule).
+
+Sequenced action:
+
+1. **Next allowed engineering step (single docs-only step):** Author the Matrix Script Result-Capability Recovery Wave gate spec at `docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md`. The gate spec must cite the recovery amendment as authority and observe its §7 hard boundaries (no new contracts, no new structural surface modules, no closed-enum widening, no Hot Follow / Digital Anchor / Asset Supply touch).
+2. Gate spec §10 architect (Raobin) + reviewer (Alisa) signoff lands in a follow-on docs-only PR.
+3. **Implementation gate is step 2 merging to `main`** — not Track A's Hot Follow live-trial signoff.
+4. Matrix Script Result-Capability Recovery Wave implementation PRs (slicing per gate spec).
+5. Matrix Script Result-Capability Recovery Wave Closeout.
+6. Follow-on trial re-entry review for Matrix Script (docs-only).
+7. Plan A live-trial Matrix Script execution.
+8. Matrix Script live-trial findings + four-party signoff.
+
+#### Parallelism, separation, and convergence
+
+- Track A and Track B have **separate ownership and separate signoff cycles** and may run in parallel after the recovery amendment merges.
+- Hot Follow live-trial findings (Track A) are **informational input** to the recovery gate spec (Track B step 1) — not a hard predecessor gate on gate spec authoring or §10 signoff.
+- Matrix Script implementation PRs (Track B step 4) are gated on Track B step 2 (gate spec §10 signoff merge), not on Track A signoff.
+- Both tracks must close before the next wave: **Platform Runtime Assembly Wave** is BLOCKED until BOTH Track A's Hot Follow live-trial signoff lands AND Track B's Matrix Script live-trial signoff (Track B step 8) lands. **Capability Expansion Gate Wave** is BLOCKED until Platform Runtime Assembly signoff.
+- Plan E A7 / UA7 / RA7 closeout signoffs remain independently pending and are NOT advanced by either track.
 
 ### 7.2 Step 2 — Plan E gate spec (after Step 1 lands)
 
