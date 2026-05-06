@@ -358,3 +358,29 @@ A trial-execution write-up (post-trial) MUST be filed separately under `docs/exe
 - **Frontend patching:** **BLOCKED**
 
 End of Plan A.
+
+---
+
+## 13. Post-OWC Operations Addendum (additive, 2026-05-06)
+
+After OWC-MS and OWC-DA engineering closeout both reached PASS (OWC-MS: four-party signoff commit `b1160b3`; OWC-DA: four-party signoff per §11 of [docs/execution/APOLLOVEO_2_0_OWC_DA_PHASE_CLOSEOUT_v1.md](../execution/APOLLOVEO_2_0_OWC_DA_PHASE_CLOSEOUT_v1.md)), an operations-readiness alignment review was conducted and a pre-trial operations addendum was authored. The addendum carries a stricter operations posture than the engineering PASS verdicts would suggest if read in isolation.
+
+**Post-OWC operations posture (binding):**
+
+- **Hot Follow** — benchmark end-to-end line. Trial-capable. Reference / control line for trial.
+- **Matrix Script** — limited / constrained trial candidate. Partially operable with explicitly narrowed scope and operator briefing.
+- **Digital Anchor** — **NOT a trial candidate in current state.** Engineering closeout PASS, operations NOT-READY. Surface-visible but not operationally usable. Five operations findings (script generation path not closed; workbench panels partitioned but not truly operable; insufficient interactive capability; no practically usable generation result; therefore not trial-capable) anchor this verdict.
+
+The addendum is the **post-OWC operational trial baseline** and supersedes the following Plan A sections for the OWC-converged surfaces:
+
+- §6.2 Matrix Script line guidance (narrowed scope per addendum §2.2)
+- §6.3 Digital Anchor line guidance (replaced — DA is now classified NOT trial-capable in this wave; the prior "inspection-only" Plan A framing is also superseded)
+- §7.1 Trial samples (no DA samples; MS samples extended with OWC surface rendering criterion)
+
+All other Plan A sections (§0.1 / §0.2 source_script_ref discipline, §6.1 Hot Follow, §7.2 samples to avoid, §8 risks, §9 next gate conditions) remain in force unchanged.
+
+**Post-OWC addendum authority:** [docs/product/OPERATIONS_TRIAL_READINESS_POST_OWC_ADDENDUM_v1.md](OPERATIONS_TRIAL_READINESS_POST_OWC_ADDENDUM_v1.md)
+
+**This addendum does NOT open Plan A live-trial.** Live-trial requires the trial re-entry review to be authored and signed by architect + reviewer + coordinator + PM. The addendum is the baseline the trial re-entry review must evaluate against. The trial re-entry review must NOT author Digital Anchor sample-validity criteria, and any draft attempting to widen DA scope is rejected as inconsistent with the addendum's operations verdict.
+
+**Sequencing (binding):** the trial re-entry review may begin only after PR #141 (the addendum PR) merges to `main` AND after explicit user hand-off. Both preconditions must hold; either alone is insufficient. While PR #141 is open, no trial re-entry review work may begin even if the hand-off has been issued.
