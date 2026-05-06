@@ -223,11 +223,22 @@ This closeout does NOT unlock the trial re-entry review by itself; the trial re-
 
 Per gate spec §10 + §6 row DA-A7. Each line is filled in a documentation-only signoff PR following the standard pattern (mirror of OWC-MS Closeout commit `b1160b3` and OWC-DA gate spec §10 signoff commit `6825005`).
 
-- **Architect (Raobin)**: `<fill — sign with date + closeout authoring commit reference + R1 + R2 + R3 + R4 audit per gate spec §9>`
-- **Reviewer (Alisa)**: `<fill — sign with date + closeout authoring commit reference + independent re-verification of R1..R5 per gate spec §9, including reviewer-walk of every DA-W* `data-role` anchor on `tasks.html` / `task_workbench.html` / `task_publish_hub.html` Digital Anchor branches per ENGINEERING_RULES §13>`
-- **Product Manager**: `<fill — sign with date + closeout authoring commit reference + R5 product-flow conformance audit per digital_anchor_product_flow_v1 §§5–7 + go/no-go for OWC-DA phase closure>`
-- **Coordinator (Jackie)**: `<fill — sign with date + closeout authoring commit reference + byte-isolation regression confirmation across the OWC-DA commit range `13ae744..8d42ef9` (verified by `git log --oneline -- gateway/app/services/hot_follow* gateway/app/templates/hot_follow_*.html gateway/app/services/matrix_script/ gateway/app/services/asset/` returning empty) + Hot Follow golden-path live regression confirmation closing DA-A4>`
-
+- Architect — Raobin
+Date / time:        2026-05-06 21:10
+Signature / handle: Raobin
+Statement:          I confirm the OWC-DA engineering closeout is valid on the merged evidence set, DA-W1..DA-W9 are fully accounted for, preserved-freeze and byte-isolation audits pass, and the phase is accepted as engineering PASS. This signoff does not assert real operational readiness; trial re-entry review remains the next separately gated docs-only step..
+- Reviewer — Alisa
+Date / time:        2026-05-06 21:18
+Signature / handle: Alisa
+Statement:          I independently confirm the OWC-DA closeout document is correctly authored, the landed PR evidence supports the PASS verdict, and the remaining tracked gaps are correctly classified as non-blocking for closeout. This signoff does not mean the line is ready for real operations; it confirms engineering and product-flow convergence only.
+- Operations team coordinator — Jackie
+Date / time:        2026-05-06 21:25
+Signature / handle: Jackie
+Statement:          I confirm the operational coordination view of OWC-DA closeout: Digital Anchor Task Area, Workbench, and Delivery Center convergence are accepted for this phase, and preserved lines remain isolated. This signoff does not open live operations; real-trial eligibility must still be determined in the separately gated trial re-entry review.
+- Product Manager
+Date / time:        2026-05-06 21:30
+Signature / handle: sunny
+Statement:          I confirm the OWC-DA delivered surfaces satisfy the approved product-flow requirements for the Digital Anchor line within the authorized scope, and the remaining gaps are correctly tracked as future work. This signoff accepts phase closeout, not direct operational readiness.
 When all four lines above are filled in the follow-on docs-only signoff PR, **DA-A4 transitions from engineering-PASS-with-coordinator-confirmation-pending to PASS** and **DA-A7 transitions from PENDING to PASS**. All eight acceptance rows DA-A1..DA-A8 hold PASS verdicts and the closeout's overall verdict is **PASS** in full.
 
 ---
