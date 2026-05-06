@@ -70,7 +70,7 @@ Engineering PASS does **not** mean:
 
 - OWC-MS and OWC-DA are engineering-closeout PASS. The surfaces exist; their content is contract/projection-aligned only.
 - **Real operator trial has NOT re-opened.** The PR-5 NOT-READY verdict remains in force.
-- The trial re-entry review has NOT been authored. It is the next docs-only step.
+- The trial re-entry review has NOT been authored. It may begin only after PR #141 (this addendum) merges to `main` AND after explicit user hand-off; see §7.2 + §7.4 for the binding sequencing rule.
 - Plan A live-trial remains BLOCKED until: (a) trial re-entry review authored; (b) signed by architect + reviewer + coordinator + PM.
 - Platform Runtime Assembly Wave and Capability Expansion Gate Wave remain BLOCKED.
 
@@ -422,7 +422,9 @@ This addendum supersedes Plan A §6.2 (Matrix Script — narrows scope), Plan A 
 
 ### 7.2 What the trial re-entry review must do
 
-The formal trial re-entry review (the next docs-only step, opened by explicit user hand-off) must:
+**Sequencing (binding):** The trial re-entry review may begin only after PR #141 (this addendum) merges to `main` AND after explicit user hand-off. Both preconditions must hold; either alone is insufficient. While PR #141 is open, no trial re-entry review work may begin, even if the hand-off has been issued.
+
+When both preconditions hold, the formal trial re-entry review (the next docs-only step) must:
 
 1. **Evaluate against this updated baseline.** The trial re-entry review must cite this addendum as the operational baseline and confirm which ops gaps are acceptable for trial vs which require further mitigation before trial begins.
 2. **Carry the DA not-trial-capable verdict explicitly.** The trial re-entry review must NOT widen DA scope, MUST NOT author DA sample-validity criteria, and MUST NOT plan or admit any DA trial sample. Any DA-related content in the trial re-entry review must be limited to (a) restating §2.3 verdict; (b) confirming the §4.3 informational-only treatment of `media.final_video_url`; (c) noting the §2.3.3 future-wave prerequisites without authoring them.
@@ -442,18 +444,17 @@ This addendum is documentation only. It does NOT:
 
 ### 7.4 Precondition summary for trial re-entry review to open
 
-The following preconditions are ALL satisfied as of 2026-05-06:
-
 | Precondition | Status |
 |---|---|
 | OWC-MS Closeout MS-A1..MS-A8 PASS | **SATISFIED** — all eight acceptance rows PASS; MS-A7 signed commit `b1160b3` |
 | OWC-DA Closeout DA-A1..DA-A8 PASS | **SATISFIED** — all eight acceptance rows PASS; DA-A7 signed per §11 (2026-05-06) |
 | OWC-DA Closeout merged to `main` | **SATISFIED** — PR #139 squash `f5e86a5`; docs-only housekeeping PR #140 also merged |
 | Pre-trial ops-readiness review produced | **SATISFIED** — OWC operations-readiness alignment review 2026-05-06 |
-| Pre-trial ops addendum authored | **SATISFIED** — this document |
-| Explicit user hand-off for trial re-entry review | PENDING — the next explicit user instruction |
+| Pre-trial ops addendum (this document) authored | **SATISFIED** — authored 2026-05-06 in PR #141 |
+| Pre-trial ops addendum (this document) merged to `main` (PR #141) | **PENDING** — PR #141 is currently OPEN; sequencing requires PR #141 to merge before any trial re-entry review work may begin |
+| Explicit user hand-off for trial re-entry review | PENDING — the next explicit user instruction; must be issued AFTER PR #141 merges |
 
-After the explicit user hand-off lands, the trial re-entry review may open as the next docs-only step.
+**Sequencing rule (binding):** the trial re-entry review may begin only after PR #141 merges to `main` AND after explicit user hand-off. Both preconditions must hold concurrently. Issuing a hand-off while PR #141 is still open does not unblock the trial re-entry review; the merge precondition is independent of the hand-off precondition and neither substitutes for the other.
 
 ---
 

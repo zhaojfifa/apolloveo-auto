@@ -382,3 +382,5 @@ All other Plan A sections (§0.1 / §0.2 source_script_ref discipline, §6.1 Hot
 **Post-OWC addendum authority:** [docs/product/OPERATIONS_TRIAL_READINESS_POST_OWC_ADDENDUM_v1.md](OPERATIONS_TRIAL_READINESS_POST_OWC_ADDENDUM_v1.md)
 
 **This addendum does NOT open Plan A live-trial.** Live-trial requires the trial re-entry review to be authored and signed by architect + reviewer + coordinator + PM. The addendum is the baseline the trial re-entry review must evaluate against. The trial re-entry review must NOT author Digital Anchor sample-validity criteria, and any draft attempting to widen DA scope is rejected as inconsistent with the addendum's operations verdict.
+
+**Sequencing (binding):** the trial re-entry review may begin only after PR #141 (the addendum PR) merges to `main` AND after explicit user hand-off. Both preconditions must hold; either alone is insufficient. While PR #141 is open, no trial re-entry review work may begin even if the hand-off has been issued.
