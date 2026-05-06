@@ -277,6 +277,7 @@
       {% set ms_result_summary = ((ops.workbench or {}).matrix_script_result_summary or {}) %}
       {% set ms_readable_variants = ((ops.workbench or {}).matrix_script_readable_variants or {}) %}
       {% set ms_recommended_action = ((ops.workbench or {}).matrix_script_recommended_action or {}) %}
+      {% set ms_delivery_ready_package = ((ops.workbench or {}).matrix_script_delivery_ready_package or {}) %}
       {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
       {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
       {% set ms_slot_detail = (ms_surface.slot_detail_surface or {}) %}
@@ -853,6 +854,63 @@
           <div class="muted t-secondary" style="margin-top:4px;" data-role="ms-readable-no-phase-b-note">
             {{ ms_readable_variants.no_phase_b_authoring_note_zh }}
           </div>
+        </div>
+      {% endif %}
+
+      {# RC PR-4 — Delivery-ready copy/script package per variation (RC-R5 + RC-R8). Sits after the RC PR-2 readable-variants panel. Pure presentation over RC PR-2 readable variants + OWC-MS PR-3 delivery_comprehension + OWC-MS PR-3 copy_bundle + RC PR-1 unified publish_readiness. No second producer; no fake final_video / media URL; no closed-enum widening. Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md §3 RC-R5 + §3 RC-R8 + §5 RC PR-4. #}
+      {% if ms_delivery_ready_package and ms_delivery_ready_package.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-delivery-ready-package-panel">
+          <div class="section-title">
+            <h2 data-role="ms-delivery-ready-package-title">{{ ms_delivery_ready_package.panel_title_zh }}</h2>
+            <div class="secondary" data-role="ms-delivery-ready-package-subtitle">{{ ms_delivery_ready_package.panel_subtitle_zh }}</div>
+          </div>
+          <div class="muted t-secondary" data-role="ms-delivery-ready-package-legend" style="margin-top:6px;">
+            分级：
+            {% for label in ms_delivery_ready_package.package_status_legend_zh %}
+              <span class="info-pill" style="margin-right:6px;">{{ label }}</span>
+            {% endfor %}
+            · 共 {{ ms_delivery_ready_package.row_count }} 行（就绪 {{ ms_delivery_ready_package.ready_count }} · 部分 {{ ms_delivery_ready_package.partial_count }} · 阻塞 {{ ms_delivery_ready_package.blocked_count }} · 跟踪缺口 {{ ms_delivery_ready_package.unavailable_count }}）
+          </div>
+          {% if ms_delivery_ready_package.rows %}
+            <div data-role="ms-delivery-ready-package-rows" style="margin-top:8px;">
+              {% for row in ms_delivery_ready_package.rows %}
+                <div class="meta-item" data-role="ms-delivery-ready-package-row"
+                     data-variation-id="{{ row.variation_id }}"
+                     data-package-status-kind="{{ row.package_status_kind }}"
+                     data-has-bound-slot="{{ 'true' if row.has_bound_slot else 'false' }}"
+                     style="padding:10px 12px; margin:6px 0; border:1px solid #e5e7eb; border-radius:6px;">
+                  <div>
+                    <strong data-role="ms-delivery-ready-package-row-id">变体 {{ row.variation_id }}</strong>
+                    <span class="info-pill ms-delivery-ready-package__kind ms-delivery-ready-package__kind--{{ row.package_status_kind }}"
+                          style="margin-left:6px;"
+                          data-role="ms-delivery-ready-package-row-status">{{ row.package_status_label_zh }}</span>
+                    <span class="info-pill" style="margin-left:6px;" data-role="ms-delivery-ready-package-row-axis">{{ row.axis_summary_zh }}</span>
+                    {% if row.length_hint_zh and row.length_hint_zh != "—" %}
+                      <span class="muted t-secondary" style="margin-left:6px;" data-role="ms-delivery-ready-package-row-length">目标时长：{{ row.length_hint_zh }}</span>
+                    {% endif %}
+                  </div>
+                  {% if row.differentiator_zh %}
+                    <div class="muted t-secondary" data-role="ms-delivery-ready-package-row-differentiator">{{ row.differentiator_zh }}</div>
+                  {% endif %}
+                  <div data-role="ms-delivery-ready-package-row-headline" style="margin-top:4px;">{{ row.headline_zh }}</div>
+                  <div class="muted t-secondary" data-role="ms-delivery-ready-package-row-next-action" style="margin-top:4px;">{{ row.next_action_zh }}</div>
+                  {% if row.gap_explanation_zh %}
+                    <div class="muted t-secondary" data-role="ms-delivery-ready-package-row-gap" style="margin-top:4px;">缺口：{{ row.gap_explanation_zh }}</div>
+                  {% endif %}
+                  <div class="muted t-secondary" data-role="ms-delivery-ready-package-row-copy-bundle-count" style="margin-top:4px;">copy_bundle 字段：{{ row.copy_bundle_resolved_count }}/{{ row.copy_bundle_total_count }}</div>
+                  {% if row.head_reason %}
+                    <div class="muted t-secondary" data-role="ms-delivery-ready-package-row-head-reason"
+                         data-head-reason="{{ row.head_reason }}"
+                         style="margin-top:4px;">head_reason = <code>{{ row.head_reason }}</code> · {{ row.head_reason_label_zh }}</div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="muted">尚未有可投射的变体（Phase B 未派生）。</div>
+          {% endif %}
+          <div class="muted t-secondary" style="margin-top:10px;" data-role="ms-delivery-ready-package-no-fake-final-note">{{ ms_delivery_ready_package.no_final_video_url_note_zh }}</div>
+          <div class="muted t-secondary" style="margin-top:4px;" data-role="ms-delivery-ready-package-no-publish-claim-note">{{ ms_delivery_ready_package.no_publish_claim_note_zh }}</div>
         </div>
       {% endif %}
 

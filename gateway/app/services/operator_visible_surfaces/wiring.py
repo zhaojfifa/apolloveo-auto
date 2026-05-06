@@ -382,6 +382,37 @@ def build_operator_surfaces_for_workbench(
                 workbench_panel,
             )
         )
+        # RC PR-4 (RC-R5 + RC-R8) — delivery-ready copy/script package per
+        # variation. Pure presentation-layer projection over the existing
+        # RC PR-2 readable variants + OWC-MS PR-3 delivery_comprehension +
+        # OWC-MS PR-3 delivery_copy_bundle + RC PR-1 unified
+        # publish_readiness. No second producer; no fake final_video; no
+        # closed-enum widening. Authority:
+        # docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
+        # §3 RC-R5 + §5 RC PR-4.
+        from gateway.app.services.matrix_script.delivery_copy_bundle_view import (
+            derive_matrix_script_delivery_copy_bundle,
+        )
+        from gateway.app.services.matrix_script.delivery_ready_package_view import (
+            derive_matrix_script_delivery_ready_package,
+        )
+
+        try:
+            workbench_copy_bundle_view = derive_matrix_script_delivery_copy_bundle(
+                task,
+                base_copy_bundle={},
+            )
+        except Exception:
+            workbench_copy_bundle_view = {}
+        bundle["workbench"]["matrix_script_delivery_ready_package"] = (
+            derive_matrix_script_delivery_ready_package(
+                bundle["workbench"].get("matrix_script_readable_variants"),
+                delivery_comprehension,
+                workbench_copy_bundle_view,
+                publish_readiness,
+                workbench_panel,
+            )
+        )
     # Recovery PR-4: when the Workbench mounts the Digital Anchor
     # line-specific panel, attach the formal
     # `digital_anchor_workbench_role_speaker_surface_v1` projection so

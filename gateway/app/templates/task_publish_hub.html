@@ -415,6 +415,27 @@
           </div>
           <div class="muted" data-role="ms-delivery-backfill-tracked-gap" style="margin-top:8px;"></div>
         </div>
+
+        {# RC PR-4 / RC-R7 + RC-R8 — Matrix Script publish/backfill readiness explanation per variation.
+           Server-rendered shell + JS-driven row population from
+           data.matrix_script_publish_backfill_readiness. Pure presentation over RC PR-1
+           publish_readiness producer + OWC-MS PR-3 delivery_comprehension lanes + read-only
+           closure publish_status. Closure schema unchanged; no fake final_video / media URL.
+           Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
+           §3 RC-R7 + §3 RC-R8 + §5 RC PR-4. #}
+        <div class="card" id="matrix-script-publish-backfill-readiness-block"
+             data-role="matrix-script-publish-backfill-readiness" style="margin-top:10px; display:none;">
+          <div class="section-title">
+            <h2 data-role="ms-publish-backfill-readiness-title">Matrix Script · 发布 / 回填就绪解释</h2>
+            <div class="secondary" data-role="ms-publish-backfill-readiness-subtitle"></div>
+          </div>
+          <div class="muted" data-role="ms-publish-backfill-readiness-legend" style="margin-top:6px;"></div>
+          <div data-role="ms-publish-backfill-readiness-rows" style="margin-top:8px;"></div>
+          <div class="muted" data-role="ms-publish-backfill-readiness-empty" style="display:none; margin-top:8px;">
+            尚无可解释的变体（Phase B 未派生 / packet 未到位）。
+          </div>
+          <div class="muted" data-role="ms-publish-backfill-readiness-no-fake-final-note" style="margin-top:8px;"></div>
+        </div>
       {% endif %}
 
       {# Recovery PR-4: Digital Anchor publish-feedback closure operator surface.
@@ -1068,6 +1089,114 @@ function resolveLang(serverLang) {
 
       const gapEl = block.querySelector('[data-role="ms-delivery-backfill-tracked-gap"]');
       if (gapEl) gapEl.textContent = backfill.tracked_gap_summary_zh || "";
+    }
+
+    // RC PR-4 / RC-R7 + RC-R8: Matrix Script publish/backfill readiness
+    // explanation renderer. Reads only data.matrix_script_publish_backfill_readiness;
+    // renders one row per variation_id with operator-language readiness label +
+    // next-input + gap summary. No second truth path; never renders publish_url
+    // or any media URL string. Authority:
+    // docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
+    // §3 RC-R7 + §3 RC-R8 + §5 RC PR-4.
+    function renderMatrixScriptPublishBackfillReadiness(readiness) {
+      const block = document.getElementById("matrix-script-publish-backfill-readiness-block");
+      if (!block) return;
+      if (!readiness || !readiness.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="ms-publish-backfill-readiness-title"]');
+      if (titleEl) titleEl.textContent = readiness.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="ms-publish-backfill-readiness-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = readiness.panel_subtitle_zh || "";
+
+      const legendEl = block.querySelector('[data-role="ms-publish-backfill-readiness-legend"]');
+      if (legendEl) {
+        const legend = readiness.readiness_legend_zh || [];
+        const counters = "（可发 " + (readiness.publishable_now_count || 0)
+          + " · 阻塞 " + (readiness.gated_count || 0)
+          + " · 已发布 " + (readiness.already_published_count || 0)
+          + " · 失败 " + (readiness.already_failed_count || 0)
+          + " · 跟踪缺口 " + (readiness.tracked_gap_count || 0) + "）";
+        legendEl.textContent = (legend.length ? "分级：" + legend.join(" / ") + " " : "") + counters;
+      }
+
+      const rowsEl = block.querySelector('[data-role="ms-publish-backfill-readiness-rows"]');
+      const emptyEl = block.querySelector('[data-role="ms-publish-backfill-readiness-empty"]');
+      if (rowsEl) {
+        rowsEl.innerHTML = "";
+        const rows = readiness.rows || [];
+        if (!rows.length) {
+          if (emptyEl) emptyEl.style.display = "";
+        } else {
+          if (emptyEl) emptyEl.style.display = "none";
+          rows.forEach((row) => {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.style.marginTop = "8px";
+            card.dataset.role = "ms-publish-backfill-readiness-row";
+            card.dataset.variationId = row.variation_id || "";
+            card.dataset.readinessKind = row.readiness_kind || "";
+
+            const head = document.createElement("div");
+            const idStrong = document.createElement("strong");
+            idStrong.textContent = "变体 " + (row.variation_id || "—");
+            head.appendChild(idStrong);
+            const kindPill = document.createElement("span");
+            kindPill.className = "info-pill";
+            kindPill.style.marginLeft = "6px";
+            kindPill.dataset.role = "ms-publish-backfill-readiness-kind";
+            kindPill.textContent = row.readiness_label_zh || "";
+            head.appendChild(kindPill);
+            const axisPill = document.createElement("span");
+            axisPill.className = "info-pill";
+            axisPill.style.marginLeft = "6px";
+            axisPill.textContent = row.axis_summary_zh || "—";
+            head.appendChild(axisPill);
+            card.appendChild(head);
+
+            const nextInput = document.createElement("div");
+            nextInput.className = "muted t-secondary";
+            nextInput.dataset.role = "ms-publish-backfill-readiness-next-input";
+            nextInput.style.marginTop = "4px";
+            nextInput.textContent = row.next_input_zh || "";
+            card.appendChild(nextInput);
+
+            if (row.gap_summary_zh) {
+              const gap = document.createElement("div");
+              gap.className = "muted t-secondary";
+              gap.dataset.role = "ms-publish-backfill-readiness-gap";
+              gap.style.marginTop = "4px";
+              gap.textContent = "缺口：" + row.gap_summary_zh;
+              card.appendChild(gap);
+            }
+            if (row.head_reason) {
+              const hr = document.createElement("div");
+              hr.className = "muted t-secondary";
+              hr.dataset.role = "ms-publish-backfill-readiness-head-reason";
+              hr.dataset.headReason = row.head_reason;
+              hr.style.marginTop = "4px";
+              hr.textContent = "head_reason = " + row.head_reason
+                + (row.head_reason_label_zh ? " · " + row.head_reason_label_zh : "");
+              card.appendChild(hr);
+            }
+            if (row.closure_publish_status_label_zh) {
+              const cs = document.createElement("div");
+              cs.className = "muted t-secondary";
+              cs.dataset.role = "ms-publish-backfill-readiness-closure-status";
+              cs.style.marginTop = "4px";
+              cs.textContent = "closure publish_status：" + row.closure_publish_status_label_zh;
+              card.appendChild(cs);
+            }
+            rowsEl.appendChild(card);
+          });
+        }
+      }
+
+      const noteEl = block.querySelector('[data-role="ms-publish-backfill-readiness-no-fake-final-note"]');
+      if (noteEl) noteEl.textContent = readiness.no_final_video_url_note_zh || "";
     }
 
     // OWC-DA PR-3 / DA-W8: Digital Anchor Delivery Center · Delivery Pack
@@ -1846,6 +1975,7 @@ function resolveLang(serverLang) {
       renderMatrixScriptDeliveryComprehension(data.matrix_script_delivery_comprehension || null);
       renderMatrixScriptDeliveryCopyBundle(data.matrix_script_delivery_copy_bundle || null);
       renderMatrixScriptDeliveryBackfill(data.matrix_script_delivery_backfill || null);
+      renderMatrixScriptPublishBackfillReadiness(data.matrix_script_publish_backfill_readiness || null);
       renderMatrixScriptClosure(data.matrix_script_publish_feedback_closure || null);
       renderDigitalAnchorDeliveryPack(data.digital_anchor_delivery_pack || null);
       renderDigitalAnchorDeliveryBackfill(data.digital_anchor_delivery_backfill || null);
