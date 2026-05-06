@@ -164,6 +164,40 @@ def test_returns_empty_for_unrecognised_panel_kind():
 
 
 def test_ready_package_when_all_inputs_satisfy():
+    """Reviewer-fail correction (2026-05-07): the helper's closed
+    ``ready_package`` state was previously only covered indirectly. Build
+    a fixture that satisfies *every* ready condition (bound slot +
+    publishable + all required+blocking artifacts current + every
+    copy_bundle subfield — including ``comment_keywords`` —
+    ``resolved_from_existing_projection``) and assert the row promotes
+    to ``ready_package`` with ``ready_count == 1``."""
+    fully_resolved_copy_bundle = {
+        "is_matrix_script": True,
+        "subfields": [
+            {"subfield_id": "title", "status_code": "resolved_from_existing_projection"},
+            {"subfield_id": "hashtags", "status_code": "resolved_from_existing_projection"},
+            {"subfield_id": "cta", "status_code": "resolved_from_existing_projection"},
+            {"subfield_id": "comment_keywords", "status_code": "resolved_from_existing_projection"},
+        ],
+    }
+    out = derive_matrix_script_delivery_ready_package(
+        _readable_variants(),
+        _delivery_comprehension(all_current=True),
+        fully_resolved_copy_bundle,
+        _publish_readiness(publishable=True),
+        _ms_panel(),
+    )
+    assert out["row_count"] == 1
+    row = out["rows"][0]
+    assert row["package_status_kind"] == PACKAGE_READY
+    assert out["ready_count"] == 1
+
+
+def test_partial_package_when_comment_keywords_unresolved():
+    """Companion to the ready-state regression: when the OWC-MS PR-3
+    single-source discipline keeps ``comment_keywords`` unresolved (the
+    real workbench projection state today), the row stays in
+    ``partial_package`` even with all other ready conditions met."""
     out = derive_matrix_script_delivery_ready_package(
         _readable_variants(),
         _delivery_comprehension(all_current=True),
@@ -171,8 +205,6 @@ def test_ready_package_when_all_inputs_satisfy():
         _publish_readiness(publishable=True),
         _ms_panel(),
     )
-    # All resolved? Note: comment_keywords always unresolved per OWC-MS PR-3
-    # discipline → cannot be ready_package by classifier; partial expected.
     assert out["row_count"] == 1
     row = out["rows"][0]
     assert row["package_status_kind"] == PACKAGE_PARTIAL
