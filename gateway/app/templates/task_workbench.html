@@ -274,6 +274,7 @@
       {% set ms_preview_compare = ((ops.workbench or {}).matrix_script_preview_compare or {}) %}
       {% set ms_review_zone = ((ops.workbench or {}).matrix_script_review_zone or {}) %}
       {% set ms_qc_diagnostics = ((ops.workbench or {}).matrix_script_qc_diagnostics or {}) %}
+      {% set ms_result_summary = ((ops.workbench or {}).matrix_script_result_summary or {}) %}
       {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
       {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
       {% set ms_slot_detail = (ms_surface.slot_detail_surface or {}) %}
@@ -291,6 +292,27 @@
             <h2 data-role="ms-comp-title">{{ ms_comp.panel_title_zh }}</h2>
             <div class="secondary" data-role="ms-comp-subtitle">{{ ms_comp.panel_subtitle_zh }}</div>
           </div>
+
+          {% if ms_result_summary and ms_result_summary.is_matrix_script %}
+            {# RC PR-1 RC-R6 — Workbench result-oriented summary header. Restates the unified `publish_readiness` producer's `publishable` + `head_reason` as one of "ready: do X next" / "blocked: missing Y" / "completed", in operator language only. No second producer. Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md §3 RC-R6 + §5 RC PR-1. #}
+            <div data-role="ms-comp-result-status"
+                 data-status-kind="{{ ms_result_summary.status_kind }}"
+                 style="margin:12px 0 6px;padding:10px 12px;border-radius:6px;background:#f6f7f9;">
+              <div>
+                <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_result_summary.status_kind }}"
+                      data-role="ms-comp-result-status-kind">{{ ms_result_summary.status_label_zh }}</span>
+                <strong data-role="ms-comp-result-status-headline" style="margin-left:6px;">{{ ms_result_summary.headline_zh }}</strong>
+              </div>
+              <div class="secondary" data-role="ms-comp-result-status-next-action" style="margin-top:4px;">{{ ms_result_summary.next_action_zh }}</div>
+              {% if ms_result_summary.head_reason %}
+                <div class="secondary" data-role="ms-comp-result-status-head-reason"
+                     data-head-reason="{{ ms_result_summary.head_reason }}"
+                     style="margin-top:4px;">
+                  head_reason = <code>{{ ms_result_summary.head_reason }}</code> · {{ ms_result_summary.head_reason_label_zh }}
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
 
           <h3 style="margin:12px 0 6px;" data-role="ms-comp-four-zone-label">{{ ms_comp.four_zone_alignment_label_zh }}</h3>
           <div class="meta-grid" data-role="ms-comp-four-zone-grid">

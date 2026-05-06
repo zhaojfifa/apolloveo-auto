@@ -329,6 +329,22 @@ def build_operator_surfaces_for_workbench(
                 workbench_panel,
             )
         )
+        # RC PR-1 (RC-R6) — operator-language result-oriented Workbench
+        # summary header. Reads the same unified `publish_readiness`
+        # producer output consumed by qc_diagnostics_view; does NOT
+        # introduce a second producer. Authority:
+        # docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
+        # §3 RC-R6 + §5 RC PR-1.
+        from gateway.app.services.matrix_script.result_status_view import (
+            derive_matrix_script_workbench_result_summary,
+        )
+
+        bundle["workbench"]["matrix_script_result_summary"] = (
+            derive_matrix_script_workbench_result_summary(
+                publish_readiness,
+                workbench_panel,
+            )
+        )
     # Recovery PR-4: when the Workbench mounts the Digital Anchor
     # line-specific panel, attach the formal
     # `digital_anchor_workbench_role_speaker_surface_v1` projection so
