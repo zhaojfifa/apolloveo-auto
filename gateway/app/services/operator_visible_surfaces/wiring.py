@@ -345,6 +345,26 @@ def build_operator_surfaces_for_workbench(
                 workbench_panel,
             )
         )
+        # RC PR-2 (RC-R1 + R2 + R3) — operator-readable script + variant
+        # candidate package. Pure presentation-layer projection over
+        # the existing variation surface + entry truth + the
+        # already-computed preview_compare diff_hints. No new producer.
+        # Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
+        # §3 RC-R1..R3 + §5 RC PR-2.
+        from gateway.app.services.matrix_script.readable_variant_view import (
+            derive_matrix_script_readable_variants,
+        )
+
+        bundle["workbench"]["matrix_script_readable_variants"] = (
+            derive_matrix_script_readable_variants(
+                task,
+                variation_surface,
+                workbench_panel,
+                preview_compare=bundle["workbench"].get(
+                    "matrix_script_preview_compare"
+                ),
+            )
+        )
     # Recovery PR-4: when the Workbench mounts the Digital Anchor
     # line-specific panel, attach the formal
     # `digital_anchor_workbench_role_speaker_surface_v1` projection so

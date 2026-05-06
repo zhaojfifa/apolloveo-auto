@@ -275,6 +275,7 @@
       {% set ms_review_zone = ((ops.workbench or {}).matrix_script_review_zone or {}) %}
       {% set ms_qc_diagnostics = ((ops.workbench or {}).matrix_script_qc_diagnostics or {}) %}
       {% set ms_result_summary = ((ops.workbench or {}).matrix_script_result_summary or {}) %}
+      {% set ms_readable_variants = ((ops.workbench or {}).matrix_script_readable_variants or {}) %}
       {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
       {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
       {% set ms_slot_detail = (ms_surface.slot_detail_surface or {}) %}
@@ -715,6 +716,89 @@
           </div>
           <div class="muted t-secondary" style="margin-top:6px;" data-role="ms-preview-compare-granularity-note">
             {{ ms_preview_compare.per_cell_artifact_granularity_note_zh }}
+          </div>
+        </div>
+      {% endif %}
+
+      {# RC PR-2 — Operator-readable script + variant candidate package (RC-R1 + R2 + R3). Sits between MS-W4 preview-compare and MS-W5 review-zone. Pure presentation over Phase B + entry truth + preview_compare diff_hints; no new producer; no fake final_video; no synthesised media. Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md §3 RC-R1..R3 + §5 RC PR-2. #}
+      {% if ms_readable_variants and ms_readable_variants.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-readable-variants-panel">
+          <div class="section-title">
+            <h2 data-role="ms-readable-title">{{ ms_readable_variants.panel_title_zh }}</h2>
+            <div class="secondary" data-role="ms-readable-subtitle">{{ ms_readable_variants.panel_subtitle_zh }}</div>
+          </div>
+
+          <h3 style="margin:12px 0 6px;" data-role="ms-readable-shared-label">{{ ms_readable_variants.shared_script_label_zh }}</h3>
+          <div class="meta-grid" data-role="ms-readable-shared-sections">
+            {% for section in ms_readable_variants.shared_sections %}
+              <div class="meta-item" data-role="ms-readable-shared-section"
+                   data-section-id="{{ section.section_id }}"
+                   data-status-code="{{ section.body_status_code }}">
+                <strong>{{ section.section_label_zh }}</strong>
+                <span>
+                  {% if section.body_status_code == "resolved_from_source_content" %}
+                    <span data-role="ms-readable-shared-section-readable">{{ section.body_text }}</span>
+                  {% elif section.body_status_code == "structural_summary_only" %}
+                    <span data-role="ms-readable-shared-section-structural">{{ section.body_text }}</span>
+                    <div class="muted" data-role="ms-readable-shared-section-structural-label">{{ section.body_status_label_zh }}</div>
+                  {% else %}
+                    <span class="muted" data-role="ms-readable-shared-section-unresolved">{{ section.body_status_label_zh }}</span>
+                  {% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-readable-variants-label">{{ ms_readable_variants.variant_candidates_label_zh }} · 共 {{ ms_readable_variants.variant_count }} 组</h3>
+          {% if ms_readable_variants.variant_candidates %}
+            <div data-role="ms-readable-variant-list">
+              {% for variant in ms_readable_variants.variant_candidates %}
+                <div class="meta-item" data-role="ms-readable-variant-card"
+                     data-variation-id="{{ variant.variation_id }}"
+                     data-has-bound-slot="{{ 'true' if variant.has_bound_slot else 'false' }}"
+                     style="padding:10px 12px; margin:6px 0; border:1px solid #e5e7eb; border-radius:6px;">
+                  <div>
+                    <strong data-role="ms-readable-variant-id">变体 {{ variant.variation_id }}</strong>
+                    <span class="info-pill" style="margin-left:6px;" data-role="ms-readable-variant-axis-summary">{{ variant.axis_summary_zh }}</span>
+                    {% if variant.length_hint_zh and variant.length_hint_zh != "—" %}
+                      <span class="muted t-secondary" style="margin-left:6px;" data-role="ms-readable-variant-length">目标时长：{{ variant.length_hint_zh }}</span>
+                    {% endif %}
+                  </div>
+                  <div class="muted t-secondary" data-role="ms-readable-variant-differentiator">{{ variant.differentiator_zh }}</div>
+                  <div class="muted t-secondary" data-role="ms-readable-variant-slot-bound">
+                    {{ variant.bound_slot_label_zh }}
+                    <div>{{ variant.slot_body_opacity_note_zh }}</div>
+                  </div>
+                  <div data-role="ms-readable-variant-sections" style="margin-top:6px;">
+                    {% for section in variant.readable_sections %}
+                      <div data-role="ms-readable-variant-section"
+                           data-section-id="{{ section.section_id }}"
+                           data-status-code="{{ section.body_status_code }}"
+                           style="margin:4px 0;">
+                        <strong>{{ section.section_label_zh }}：</strong>
+                        {% if section.body_status_code == "resolved_from_source_content" %}
+                          <span data-role="ms-readable-variant-section-readable">{{ section.body_text }}</span>
+                        {% elif section.body_status_code == "structural_summary_only" %}
+                          <span data-role="ms-readable-variant-section-structural">{{ section.body_text }}</span>
+                          <div class="muted" data-role="ms-readable-variant-section-structural-label">{{ section.body_status_label_zh }}</div>
+                        {% else %}
+                          <span class="muted" data-role="ms-readable-variant-section-unresolved">{{ section.body_status_label_zh }}</span>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="muted">尚未有可读变体（Phase B 未派生）。</div>
+          {% endif %}
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="ms-readable-no-fake-final-note">
+            {{ ms_readable_variants.no_fake_final_video_note_zh }}
+          </div>
+          <div class="muted t-secondary" style="margin-top:4px;" data-role="ms-readable-no-phase-b-note">
+            {{ ms_readable_variants.no_phase_b_authoring_note_zh }}
           </div>
         </div>
       {% endif %}
