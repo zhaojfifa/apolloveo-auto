@@ -1,7 +1,7 @@
 # ApolloVeo 2.0 · Trial Re-Entry Review v1
 
-Date: 2026-05-06
-Status: **AUTHORED — signoff block at §8 carries `<fill>` placeholders; the follow-on docs-only signoff PR fills them. Plan A live-trial reopen BLOCKED on §8 signoff.**
+Date: 2026-05-06 (authored); 2026-05-06 (§8 signed by all four parties — see §8)
+Status: **SIGNED — §8 signoff block filled by Architect Raobin (2026-05-06 21:10), Reviewer Alisa (2026-05-06 21:18), Operations Coordinator Jackie (2026-05-06 21:25), Product Manager sunny (2026-05-06 21:30). Plan A live-trial reopen AUTHORIZED.**
 Wave position: Post-OWC-MS + OWC-DA closeout. Post-pre-trial ops addendum. Pre-Plan A live-trial reopen.
 Authority: Produced after reading the authority stack listed in §0 in full.
 Relation to Plan A: This review is the gate document for Plan A live-trial reopen. It evaluates against the post-OWC addendum as the binding operational baseline and updates Plan A §12 readiness conclusion (§7 below). It does NOT reopen OWC-MS or OWC-DA implementation, does NOT start Platform Runtime Assembly, does NOT start Capability Expansion, and does NOT author Digital Anchor sample-validity criteria.
@@ -303,14 +303,14 @@ Plan A live-trial MUST NOT reopen until all four §8 signoff lines are filled an
 
 ## 8. Signoff Block
 
-This block carries `<fill>` placeholders. The follow-on docs-only signoff PR fills the four lines. **Plan A live-trial MUST NOT reopen until all four lines below are filled and committed to `main`.**
+This block was filled by all four parties in the follow-on docs-only signoff PR. **Plan A live-trial reopen is now AUTHORIZED upon merge of this signoff PR to `main`.**
 
 | Role | Name | Date | Signature / handle |
 |---|---|---|---|
-| Architect | Raobin | `<fill date>` | `<fill handle>` |
-| Reviewer | Alisa | `<fill date>` | `<fill handle>` |
-| Operations Coordinator | Jackie | `<fill date>` | `<fill handle>` |
-| Product Manager | `<fill name>` | `<fill date>` | `<fill handle>` |
+| Architect | Raobin | 2026-05-06 21:10 | raobin |
+| Reviewer | Alisa | 2026-05-06 21:18 | alisa |
+| Operations Coordinator | Jackie | 2026-05-06 21:25 | jackie |
+| Product Manager | sunny | 2026-05-06 21:30 | sunny |
 
 **What the follow-on signoff PR must do:**
 
