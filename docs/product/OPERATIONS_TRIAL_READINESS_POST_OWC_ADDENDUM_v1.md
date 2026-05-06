@@ -1,7 +1,7 @@
 # ApolloVeo 2.0 · Operations Trial Readiness — Post-OWC Addendum v1
 
 Date: 2026-05-06
-Status: **Documentation only. No code, no UI, no contract, no schema, no template change.**
+Status: **MERGED to `main` 2026-05-06T02:34:45Z as PR [#141](https://github.com/zhaojfifa/apolloveo-auto/pull/141), squash commit `27a5b6d`. Documentation only. No code, no UI, no contract, no schema, no template change.**
 Authority: Produced from the OWC operations-readiness alignment review (2026-05-06) using the authority stack listed in §0.
 Wave position: Post-OWC-MS + OWC-DA closeout. Pre-trial re-entry review. Pre-Plan A live-trial reopen.
 Relation to Plan A: This file is an **addendum** to `docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md`. It does NOT replace Plan A. It updates the operational trial baseline to reflect the OWC-MS and OWC-DA surface convergence landings, and must be read alongside Plan A before any trial re-entry review is authored or any live-trial session is coordinated.
@@ -450,9 +450,9 @@ This addendum is documentation only. It does NOT:
 | OWC-DA Closeout DA-A1..DA-A8 PASS | **SATISFIED** — all eight acceptance rows PASS; DA-A7 signed per §11 (2026-05-06) |
 | OWC-DA Closeout merged to `main` | **SATISFIED** — PR #139 squash `f5e86a5`; docs-only housekeeping PR #140 also merged |
 | Pre-trial ops-readiness review produced | **SATISFIED** — OWC operations-readiness alignment review 2026-05-06 |
-| Pre-trial ops addendum (this document) authored | **SATISFIED** — authored 2026-05-06 in PR #141 |
-| Pre-trial ops addendum (this document) merged to `main` (PR #141) | **PENDING** — PR #141 is currently OPEN; sequencing requires PR #141 to merge before any trial re-entry review work may begin |
-| Explicit user hand-off for trial re-entry review | PENDING — the next explicit user instruction; must be issued AFTER PR #141 merges |
+| Pre-trial ops addendum (this document) authored | **SATISFIED** — authored 2026-05-06 in PR [#141](https://github.com/zhaojfifa/apolloveo-auto/pull/141) |
+| Pre-trial ops addendum (this document) merged to `main` (PR #141) | **SATISFIED** — MERGED 2026-05-06T02:34:45Z, squash commit `27a5b6d` |
+| Explicit user hand-off for trial re-entry review | PENDING — the next explicit user instruction |
 
 **Sequencing rule (binding):** the trial re-entry review may begin only after PR #141 merges to `main` AND after explicit user hand-off. Both preconditions must hold concurrently. Issuing a hand-off while PR #141 is still open does not unblock the trial re-entry review; the merge precondition is independent of the hand-off precondition and neither substitutes for the other.
 
