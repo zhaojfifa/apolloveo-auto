@@ -93,6 +93,54 @@ def attach_matrix_script_delivery_pr3_extras(
         payload["matrix_script_delivery_copy_bundle"] = {}
         payload["matrix_script_delivery_backfill"] = {}
 
+    # RC PR-4 (RC-R7 + RC-R8) — publish/backfill readiness explanation per
+    # variation. Pure presentation-layer projection over the existing RC
+    # PR-2 readable variants + OWC-MS PR-3 delivery_comprehension + RC
+    # PR-1 unified publish_readiness + read-only closure. No second
+    # producer; no fake final_video; no closed-enum widening. The
+    # readable-variants payload reaches this attach via the workbench
+    # bundle on payload["operator_surfaces"]["workbench"][...]; on the
+    # publish-hub-only path it must be re-derived from the packet here.
+    # Authority:
+    # docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
+    # §3 RC-R7 + §5 RC PR-4.
+    try:
+        from gateway.app.services.matrix_script.publish_backfill_readiness_view import (
+            derive_matrix_script_publish_backfill_readiness,
+        )
+        from gateway.app.services.matrix_script.readable_variant_view import (
+            derive_matrix_script_readable_variants,
+        )
+        from gateway.app.services.matrix_script.workbench_variation_surface import (
+            project_workbench_variation_surface,
+        )
+
+        packet_view = task.get("packet") if isinstance(task.get("packet"), dict) else task
+        variation_surface = project_workbench_variation_surface(packet_view)
+        ms_panel = {"panel_kind": "matrix_script"}
+        readable_variants = derive_matrix_script_readable_variants(
+            task,
+            variation_surface,
+            ms_panel,
+            preview_compare=None,
+        )
+        delivery_comprehension = (
+            payload.get("matrix_script_delivery_comprehension") or {}
+        )
+        operator_surfaces = payload.get("operator_surfaces") or {}
+        delivery_view = (operator_surfaces or {}).get("delivery") or {}
+        publish_readiness = delivery_view.get("publish_readiness") or {}
+        payload["matrix_script_publish_backfill_readiness"] = (
+            derive_matrix_script_publish_backfill_readiness(
+                readable_variants,
+                delivery_comprehension,
+                publish_readiness,
+                payload.get("matrix_script_publish_feedback_closure"),
+            )
+        )
+    except Exception:
+        payload["matrix_script_publish_backfill_readiness"] = {}
+
 
 def _is_matrix_script_task(task: Any) -> bool:
     if not isinstance(task, dict):

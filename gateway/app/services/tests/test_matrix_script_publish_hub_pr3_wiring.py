@@ -540,11 +540,12 @@ def test_attach_does_not_mutate_task_or_inputs_other_than_two_target_keys():
         payload["matrix_script_publish_feedback_closure"]
         == payload_snapshot["matrix_script_publish_feedback_closure"]
     )
-    # Only the two PR-3 keys are added.
+    # Only the OWC-MS PR-3 + RC PR-4 keys are added by this seam.
     new_keys = set(payload.keys()) - set(payload_snapshot.keys())
     assert new_keys == {
         "matrix_script_delivery_copy_bundle",
         "matrix_script_delivery_backfill",
+        "matrix_script_publish_backfill_readiness",
     }
 
 
