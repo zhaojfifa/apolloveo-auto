@@ -33,6 +33,8 @@ import pytest
 
 from gateway.app.services.matrix_script.readable_variant_view import (
     AUDIENCE_LABELS_ZH,
+    STATUS_STRUCTURAL_ONLY,
+    STATUS_STRUCTURAL_ONLY_LABEL_ZH,
     TONE_LABELS_ZH,
     derive_matrix_script_readable_variants,
 )
@@ -169,12 +171,17 @@ def test_shared_hook_unresolved_when_topic_missing() -> None:
     assert hook["body_text"] is None
 
 
-def test_shared_body_resolves_unconditionally_with_canonical_structure() -> None:
+def test_shared_body_is_structural_only_with_canonical_structure() -> None:
     out = derive_matrix_script_readable_variants(
         _task(), _variation_surface(), _ms_panel()
     )
     body = out["shared_sections"][1]
-    assert body["body_status_code"] == "resolved_from_source_content"
+    # Shared Body never carries actual readable body text in this wave
+    # (slot bodies remain opaque content:// handles per §8.F). The
+    # operator must be able to distinguish this from real readable
+    # content — hence the dedicated structural-only status code.
+    assert body["body_status_code"] == STATUS_STRUCTURAL_ONLY
+    assert body["body_status_label_zh"] == STATUS_STRUCTURAL_ONLY_LABEL_ZH
     assert "Hook" in body["body_text"]
     assert "CTA" in body["body_text"]
 
@@ -225,15 +232,22 @@ def test_per_variation_hook_unresolved_when_topic_missing() -> None:
     assert hook["body_status_code"] == "unresolved_pending_outline_contract"
 
 
-def test_per_variation_body_includes_length_and_tone_when_present() -> None:
+def test_per_variation_body_is_structural_only_with_length_and_tone() -> None:
     out = derive_matrix_script_readable_variants(
         _task(), _variation_surface(), _ms_panel()
     )
     body = out["variant_candidates"][0]["readable_sections"][1]
-    assert body["body_status_code"] == "resolved_from_source_content"
+    # The per-variation Body is honestly labelled as structural only
+    # because slot bodies remain opaque handles in this wave. The
+    # operator-visible text carries length + tone + canonical outline
+    # but is NOT presented as resolved readable body.
+    assert body["body_status_code"] == STATUS_STRUCTURAL_ONLY
+    assert body["body_status_label_zh"] == STATUS_STRUCTURAL_ONLY_LABEL_ZH
     assert "60s" in body["body_text"]
     assert "轻松" in body["body_text"]
-    assert "slot=slot_001" in body["body_text"]
+    # Raw slot identifier MUST NOT appear in operator-visible body text.
+    assert "slot=slot_001" not in body["body_text"]
+    assert "slot_001" not in body["body_text"]
 
 
 def test_per_variation_body_unresolved_when_axis_and_slot_absent() -> None:
@@ -343,24 +357,78 @@ def test_variant_count_matches_cells() -> None:
     assert len(out["variant_candidates"]) == 2
 
 
-def test_each_variant_carries_slot_body_ref_verbatim() -> None:
+def test_variant_dict_does_not_expose_raw_slot_identifiers() -> None:
+    """Raw internal handles MUST NOT leak into the operator-visible payload.
+
+    This is a structural assertion: the helper output dict must not
+    carry `script_slot_ref` or `slot_body_ref` keys, so the template
+    physically cannot render them.
+    """
     out = derive_matrix_script_readable_variants(
         _task(), _variation_surface(), _ms_panel()
     )
-    refs = [v["slot_body_ref"] for v in out["variant_candidates"]]
-    assert refs == [
-        "content://matrix-script/task_rc_pr2/slot/slot_001",
-        "content://matrix-script/task_rc_pr2/slot/slot_002",
+    for variant in out["variant_candidates"]:
+        assert "script_slot_ref" not in variant
+        assert "slot_body_ref" not in variant
+        assert "slot_body_ref_note_zh" not in variant
+
+
+def test_variant_dict_does_not_carry_content_scheme_strings() -> None:
+    """Defensive: no `content://...` substring anywhere in the per-
+    variant payload, even nested.
+    """
+    out = derive_matrix_script_readable_variants(
+        _task(), _variation_surface(), _ms_panel()
+    )
+    for variant in out["variant_candidates"]:
+        assert "content://" not in repr(variant)
+    # And no raw slot id (e.g. "slot_001") anywhere in the variant.
+    for variant in out["variant_candidates"]:
+        blob = repr(variant)
+        assert "slot_001" not in blob
+        assert "slot_002" not in blob
+
+
+def test_each_variant_has_bound_slot_boolean_and_label() -> None:
+    """The operator sees only an operator-language indicator that a slot
+    is bound; never the raw identifier.
+    """
+    out = derive_matrix_script_readable_variants(
+        _task(), _variation_surface(), _ms_panel()
+    )
+    for variant in out["variant_candidates"]:
+        assert variant["has_bound_slot"] is True
+        assert "已绑定脚本片段" in variant["bound_slot_label_zh"]
+
+
+def test_unbound_slot_renders_unbound_label() -> None:
+    cells = [
+        {
+            "cell_id": "cell_x",
+            "axis_selections": {"tone": "casual", "audience": "b2c", "length": 60},
+            "script_slot_ref": "",
+        }
     ]
+    out = derive_matrix_script_readable_variants(
+        _task(),
+        _variation_surface(cells=cells, slots=[]),
+        _ms_panel(),
+    )
+    variant = out["variant_candidates"][0]
+    assert variant["has_bound_slot"] is False
+    assert variant["bound_slot_label_zh"] == "尚未绑定脚本片段"
 
 
-def test_each_variant_carries_opaque_ref_note() -> None:
+def test_each_variant_carries_opacity_note() -> None:
     out = derive_matrix_script_readable_variants(
         _task(), _variation_surface(), _ms_panel()
     )
-    note = out["variant_candidates"][0]["slot_body_ref_note_zh"]
+    note = out["variant_candidates"][0]["slot_body_opacity_note_zh"]
     assert "opaque" in note
     assert "不解引用" in note
+    # The note itself names neither slot ids nor content:// scheme.
+    assert "slot_" not in note
+    assert "content://" not in note
 
 
 def test_length_hint_zh_fallback_em_dash_when_slot_lacks_hint() -> None:
@@ -560,10 +628,15 @@ def test_consumes_variation_surface_verbatim_no_re_derivation() -> None:
         _task(), _variation_surface(cells=cells, slots=slots), _ms_panel()
     )
     variant = out["variant_candidates"][0]
+    # Operator-visible identity is the variation_id only; the slot id
+    # and body_ref are internal handles and must not appear in the
+    # output payload.
     assert variant["variation_id"] == "cell_zzz"
     assert variant["axis_selections"] == {"tone": "formal", "audience": "b2b", "length": 90}
-    assert variant["script_slot_ref"] == "slot_z"
-    assert variant["slot_body_ref"] == "content://opaque"
+    assert variant["has_bound_slot"] is True
+    # Defensive: `slot_z` and `content://opaque` MUST NOT leak.
+    assert "slot_z" not in repr(variant)
+    assert "content://" not in repr(variant)
 
 
 def test_helper_does_not_call_publish_readiness() -> None:
@@ -594,3 +667,132 @@ def test_helper_signature_only_takes_documented_inputs() -> None:
         "line_specific_panel",
         "preview_compare",
     }
+
+
+# ---------------------------------------------------------------------------
+# Conditional-pass corrections — three-state operator distinction +
+# raw-handle non-leakage (this PR's blockers)
+# ---------------------------------------------------------------------------
+
+
+def test_three_state_distinction_in_per_variation_sections() -> None:
+    """The operator must be able to distinguish three states per
+    section: readable / structural placeholder / unresolved.
+    """
+    out = derive_matrix_script_readable_variants(
+        _task(), _variation_surface(), _ms_panel()
+    )
+    variant = out["variant_candidates"][0]
+    sections_by_id = {s["section_id"]: s for s in variant["readable_sections"]}
+    # Hook resolves from entry truth → readable.
+    assert sections_by_id["hook"]["body_status_code"] == "resolved_from_source_content"
+    # Body never has actual readable text in this wave → structural-only.
+    assert sections_by_id["body"]["body_status_code"] == STATUS_STRUCTURAL_ONLY
+    # CTA resolves from entry.target_platform → readable.
+    assert sections_by_id["cta"]["body_status_code"] == "resolved_from_source_content"
+
+
+def test_three_state_distinction_when_topic_and_platform_missing() -> None:
+    out = derive_matrix_script_readable_variants(
+        _task(entry=_entry(topic="", target_platform="")),
+        _variation_surface(),
+        _ms_panel(),
+    )
+    variant = out["variant_candidates"][0]
+    sections_by_id = {s["section_id"]: s for s in variant["readable_sections"]}
+    # Hook + CTA fall back to unresolved tracked-gap sentinel.
+    assert sections_by_id["hook"]["body_status_code"] == "unresolved_pending_outline_contract"
+    assert sections_by_id["cta"]["body_status_code"] == "unresolved_pending_outline_contract"
+    # Body retains its structural-only framing because length / tone /
+    # bound-slot are still present.
+    assert sections_by_id["body"]["body_status_code"] == STATUS_STRUCTURAL_ONLY
+
+
+def test_body_unresolved_when_no_structural_signals() -> None:
+    cells = [{"cell_id": "cell_x", "axis_selections": {}, "script_slot_ref": ""}]
+    out = derive_matrix_script_readable_variants(
+        _task(),
+        _variation_surface(cells=cells, slots=[]),
+        _ms_panel(),
+    )
+    variant = out["variant_candidates"][0]
+    body = variant["readable_sections"][1]
+    assert body["body_status_code"] == "unresolved_pending_outline_contract"
+
+
+def test_structural_only_status_label_is_honest_about_opaque_handle() -> None:
+    out = derive_matrix_script_readable_variants(
+        _task(), _variation_surface(), _ms_panel()
+    )
+    body = out["variant_candidates"][0]["readable_sections"][1]
+    label = body["body_status_label_zh"]
+    # Honest framing: structural placeholder, opaque handle, future
+    # resolution gated on Outline Contract.
+    assert "结构性占位" in label
+    assert "opaque" in label
+    assert "Outline Contract" in label
+
+
+def test_no_raw_slot_or_body_ref_anywhere_in_payload() -> None:
+    """Top-level structural assertion: scan the entire payload repr for
+    forbidden internal-handle substrings.
+    """
+    out = derive_matrix_script_readable_variants(
+        _task(), _variation_surface(), _ms_panel()
+    )
+    blob = repr(out)
+    # No raw slot ids that came from the variation surface fixture.
+    assert "slot_001" not in blob
+    assert "slot_002" not in blob
+    # No `content://` scheme strings.
+    assert "content://" not in blob
+    # No removed-field key names in payload.
+    assert "script_slot_ref" not in blob
+    assert "slot_body_ref" not in blob
+
+
+def test_template_does_not_render_raw_handles() -> None:
+    """Template-level no-leakage: scan the rendered Jinja template
+    source for the removed handle-rendering directives.
+    """
+    template_path = (
+        "gateway/app/templates/task_workbench.html"
+    )
+    with open(template_path) as fh:
+        template = fh.read()
+    # Find the readable-variants panel block by its data-role anchor.
+    start = template.index("matrix-script-readable-variants-panel")
+    # Bound the search to a generous window covering the panel + its
+    # successor (`matrix-script-review-zone-panel`).
+    end = template.index("matrix-script-review-zone-panel", start)
+    panel = template[start:end]
+    # Forbidden rendering directives (the prior CONDITIONAL-PASS
+    # leakage points).
+    assert "variant.script_slot_ref" not in panel
+    assert "variant.slot_body_ref" not in panel
+    assert "script_slot_ref：" not in panel
+    assert "body_ref：" not in panel
+    # The replacement operator-language anchors must be present.
+    assert "ms-readable-variant-slot-bound" in panel
+    assert "bound_slot_label_zh" in panel
+    assert "slot_body_opacity_note_zh" in panel
+
+
+def test_template_renders_three_section_states_distinctly() -> None:
+    """The operator-visible HTML must render readable / structural /
+    unresolved with distinct anchors so the operator (and a reviewer
+    walking the surface) can tell them apart.
+    """
+    template_path = "gateway/app/templates/task_workbench.html"
+    with open(template_path) as fh:
+        template = fh.read()
+    start = template.index("matrix-script-readable-variants-panel")
+    end = template.index("matrix-script-review-zone-panel", start)
+    panel = template[start:end]
+    # Three distinct render branches with three distinct data-role anchors.
+    assert "ms-readable-variant-section-readable" in panel
+    assert "ms-readable-variant-section-structural" in panel
+    assert "ms-readable-variant-section-unresolved" in panel
+    assert "ms-readable-shared-section-readable" in panel
+    assert "ms-readable-shared-section-structural" in panel
+    assert "ms-readable-shared-section-unresolved" in panel

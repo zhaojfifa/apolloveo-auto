@@ -66,6 +66,30 @@ from .script_structure_view import (
     STATUS_UNRESOLVED_LABEL_ZH,
 )
 
+# RC PR-2 view-layer status — distinct from the MS-W3 closed
+# `STATUS_RESOLVED` / `STATUS_UNRESOLVED` enum so the operator can tell
+# real readable content apart from a structural placeholder. This is a
+# presentation-only code (not a contract enum) and is local to this
+# helper module per recovery gate spec §4.1 (no closed-enum widening on
+# packet / contract surfaces).
+#
+# Three operator-visible distinctions:
+#
+# - ``STATUS_RESOLVED`` (from MS-W3) → readable content available
+#   (Hook from entry.topic + tone/audience; CTA from entry.target_platform).
+# - ``STATUS_STRUCTURAL_ONLY`` (this module) → structural summary only,
+#   not actual body text. Used for the per-variation Body section
+#   because slot bodies remain opaque ``content://`` handles in this
+#   wave per §8.F (gate-locked); the operator sees length / tone / slot
+#   id structure rather than a readable body.
+# - ``STATUS_UNRESOLVED`` (from MS-W3) → source data absent / tracked
+#   gap; the section renders the closed unresolved sentinel.
+STATUS_STRUCTURAL_ONLY = "structural_summary_only"
+STATUS_STRUCTURAL_ONLY_LABEL_ZH = (
+    "结构性占位（slot 正文为 opaque 句柄；本字段展示目标时长 + 语气 + slot 结构摘要，非可读正文；"
+    "待 Outline Contract / 句柄解引用上线后补齐）"
+)
+
 # Operator-language label maps for the closed Phase B axis enums. The
 # closed-enum membership is owned by phase_b_authoring; this map is a
 # view-layer concern that translates the technical axis values into
@@ -198,35 +222,48 @@ def _per_variation_body_section(
     *,
     length_seconds: Any,
     tone_value: Any,
-    slot_id: str | None,
+    has_bound_slot: bool,
 ) -> dict[str, Any]:
     """Per-variation Body (RC-R1 + RC-R2).
 
-    Body summarises the variation's structural shape (length pick +
-    tone + slot identifier). Real content from the resolved Phase B
-    cell + slot — never a placeholder. When the slot has no length
-    hint, the section falls back to a structural summary keyed on
-    tone + slot id only; when both are absent the unresolved sentinel
-    is rendered.
+    Honest framing: the per-variation Body is a **structural summary
+    only** in this wave — the slot body is an opaque ``content://``
+    handle per §8.F (gate-locked), and this view does NOT dereference
+    handles. The operator sees a structural placeholder (target length
+    + tone + canonical Hook→Body→CTA outline) rather than actual
+    readable body text. When even the structural signals are absent,
+    the unresolved sentinel is rendered.
+
+    Body status code follows the three-state operator distinction:
+
+    - ``STATUS_STRUCTURAL_ONLY`` when at least one structural signal
+      (length / tone / bound slot) is present — operator sees a
+      labelled structural placeholder, NOT a synthesised body.
+    - ``STATUS_UNRESOLVED`` when no structural signal is present —
+      operator sees the closed tracked-gap sentinel.
+
+    The raw ``slot_id`` is intentionally NOT named in the body text;
+    the operator-visible surface must not leak internal handles.
     """
     length_label = _localized_length(length_seconds)
     tone_label = _localized_tone(tone_value)
-    slot_label = slot_id if isinstance(slot_id, str) and slot_id else None
-    if not length_label and not tone_label and not slot_label:
+    if not length_label and not tone_label and not has_bound_slot:
         return _unresolved_section(SECTION_BODY)
     parts: list[str] = []
     if length_label:
         parts.append(f"目标时长：{length_label}")
     if tone_label:
         parts.append(f"语气：{tone_label}")
-    if slot_label:
-        parts.append(f"slot={slot_label}")
+    if has_bound_slot:
+        parts.append("已绑定脚本片段（正文为 opaque 句柄，本面板不展开）")
     parts.append("结构：Hook → Body → CTA（标准三段）")
-    return _resolved_section(
-        SECTION_BODY,
-        body_text=" · ".join(parts),
-        evidence="line_specific_refs.matrix_script_variation_matrix.delta.cells + slot_pack.delta.slots",
-    )
+    return {
+        "section_id": SECTION_BODY,
+        "section_label_zh": SECTION_LABELS_ZH[SECTION_BODY],
+        "body_text": " · ".join(parts),
+        "body_status_code": STATUS_STRUCTURAL_ONLY,
+        "body_status_label_zh": STATUS_STRUCTURAL_ONLY_LABEL_ZH,
+    }
 
 
 def _per_variation_cta_section(*, target_platform: str) -> dict[str, Any]:
@@ -340,13 +377,13 @@ def _shared_sections(
         if safe_topic
         else _unresolved_section(SECTION_HOOK)
     )
-    body = (
-        _resolved_section(
-            SECTION_BODY,
-            body_text="结构：Hook（前 3 秒）→ Body（中段展示 / 过程 / 对比）→ CTA（结尾引导）",
-            evidence="matrix_script_product_flow §4.1 标准结构",
-        )
-    )
+    body = {
+        "section_id": SECTION_BODY,
+        "section_label_zh": SECTION_LABELS_ZH[SECTION_BODY],
+        "body_text": "结构：Hook（前 3 秒）→ Body（中段展示 / 过程 / 对比）→ CTA（结尾引导）",
+        "body_status_code": STATUS_STRUCTURAL_ONLY,
+        "body_status_label_zh": STATUS_STRUCTURAL_ONLY_LABEL_ZH,
+    }
     cta = (
         _resolved_section(
             SECTION_CTA,
@@ -425,9 +462,13 @@ def derive_matrix_script_readable_variants(
         if not cell_id:
             continue
         axis_selections: Mapping[str, Any] = _safe_mapping(cell.get("axis_selections"))
+        # Look up the bound slot for length-hint inference only; the
+        # slot identifier and body_ref are NEVER surfaced to the
+        # operator — those are internal handles that would leak the
+        # opaque `content://` form per gate spec §4.4.
         slot_ref = str(cell.get("script_slot_ref") or "") or None
         slot = slot_index.get(slot_ref) if slot_ref else None
-        slot_body_ref = (slot or {}).get("body_ref")
+        has_bound_slot = bool(slot is not None and slot.get("body_ref"))
         length_hint = (slot or {}).get("length_hint")
 
         readable_sections = [
@@ -441,7 +482,7 @@ def derive_matrix_script_readable_variants(
                 if axis_selections.get("length") is not None
                 else length_hint,
                 tone_value=axis_selections.get("tone"),
-                slot_id=slot_ref,
+                has_bound_slot=has_bound_slot,
             ),
             _per_variation_cta_section(target_platform=target_platform),
         ]
@@ -454,11 +495,15 @@ def derive_matrix_script_readable_variants(
                 "differentiator_zh": _build_differentiator_zh(
                     axis_selections, differing_axes
                 ),
-                "script_slot_ref": slot_ref,
-                "slot_body_ref": slot_body_ref,
-                "slot_body_ref_note_zh": (
-                    "脚本来源是 opaque 句柄；当前阶段不解引用句柄正文，"
-                    "本面板从已派生的 entry + Phase B 真理面投射可见字段。"
+                "has_bound_slot": has_bound_slot,
+                "bound_slot_label_zh": (
+                    "已绑定脚本片段（正文为 opaque 句柄，本面板不展开正文）"
+                    if has_bound_slot
+                    else "尚未绑定脚本片段"
+                ),
+                "slot_body_opacity_note_zh": (
+                    "脚本片段正文以 opaque 句柄存储；当前阶段不解引用句柄，"
+                    "本面板不展示原始 slot 标识或句柄字符串。"
                 ),
                 "length_hint_zh": _localized_length(length_hint) or "—",
                 "readable_sections": readable_sections,
@@ -494,6 +539,8 @@ def derive_matrix_script_readable_variants(
 
 __all__ = [
     "AUDIENCE_LABELS_ZH",
+    "STATUS_STRUCTURAL_ONLY",
+    "STATUS_STRUCTURAL_ONLY_LABEL_ZH",
     "TONE_LABELS_ZH",
     "derive_matrix_script_readable_variants",
 ]

@@ -121,6 +121,59 @@ The five required outcomes from the user mission:
 
 ---
 
+## 7.1 Conditional-Pass Corrections (2026-05-06)
+
+The first PR-150 review returned **CONDITIONAL PASS** with two blockers; both are now closed in this PR (no scope widening, RC PR-2 boundary preserved):
+
+### Blocker 1 — Raw internal handles removed from operator-visible surface
+
+- The helper output dict no longer carries `script_slot_ref`, `slot_body_ref`, or `slot_body_ref_note_zh` keys. Variant identity is the `variation_id` only.
+- Two new operator-language fields replace the raw handles: `has_bound_slot: bool` (machine-readable presence flag) + `bound_slot_label_zh` (operator-visible string `"已绑定脚本片段（正文为 opaque 句柄，本面板不展开正文）"` or `"尚未绑定脚本片段"`). The opacity rationale is exposed via `slot_body_opacity_note_zh` which itself names neither slot ids nor `content://`.
+- The Workbench template no longer renders `variant.script_slot_ref` / `variant.slot_body_ref` / the literal labels `script_slot_ref：` / `body_ref：`. The replacement anchor is `data-role="ms-readable-variant-slot-bound"` rendering only the operator-language label + opacity note.
+- Variant differences remain operator-understandable: the per-variant card carries the variant id (`变体 cell_001`), the localized one-line axis summary (`语气=轻松（casual） · 受众=面向消费者（b2c） · 时长=60s`), the differentiator (`差异轴 · tone=轻松（casual）`), and the structural Body. None of these expose internal handles.
+
+### Blocker 2 — Body section reframed honestly with three-state distinction
+
+- New view-layer status code `STATUS_STRUCTURAL_ONLY = "structural_summary_only"` introduced **inside this helper module** (presentation-only; not a contract enum, not a closed-enum widening of any packet / contract surface — gate spec §4.1 preserved).
+- The per-variation Body section now returns `STATUS_STRUCTURAL_ONLY` whenever at least one structural signal is present (length / tone / bound slot); the closed `STATUS_UNRESOLVED` sentinel applies when no signal is present. The shared Body is also re-coded `STATUS_STRUCTURAL_ONLY` (the prior `STATUS_RESOLVED` claim was misleading because the shared Body always describes the canonical structure, not real resolved body text).
+- Honest operator-language label `STATUS_STRUCTURAL_ONLY_LABEL_ZH` reads: `"结构性占位（slot 正文为 opaque 句柄；本字段展示目标时长 + 语气 + slot 结构摘要，非可读正文；待 Outline Contract / 句柄解引用上线后补齐）"`. Operator can read the label and learn (a) this is a placeholder, (b) why (opaque handle), (c) what would unblock real readability (Outline Contract / handle dereference).
+- The raw slot id is also removed from the structural Body text itself: previously `"slot=slot_001"`, now `"已绑定脚本片段（正文为 opaque 句柄，本面板不展开）"`. Asserted by `test_per_variation_body_is_structural_only_with_length_and_tone` (`assert "slot_001" not in body["body_text"]`).
+- Three-state operator distinction in templates:
+  - `data-status-code="resolved_from_source_content"` → renders inside `data-role="ms-readable-variant-section-readable"` / `ms-readable-shared-section-readable` (real readable text).
+  - `data-status-code="structural_summary_only"` → renders inside `data-role="ms-readable-variant-section-structural"` / `ms-readable-shared-section-structural` (structural placeholder + honest label).
+  - else → renders inside `data-role="ms-readable-variant-section-unresolved"` / `ms-readable-shared-section-unresolved` (closed tracked-gap sentinel).
+- Asserted by new tests `test_three_state_distinction_in_per_variation_sections`, `test_three_state_distinction_when_topic_and_platform_missing`, `test_body_unresolved_when_no_structural_signals`, `test_template_renders_three_section_states_distinctly`.
+
+### Updated test coverage
+
+- 10 new tests added on top of the original 46 (total **56 PASS / 0 FAIL**, gate spec §5.2 ≥35 floor: PASS at 1.6×):
+  - `test_variant_dict_does_not_expose_raw_slot_identifiers`
+  - `test_variant_dict_does_not_carry_content_scheme_strings`
+  - `test_each_variant_has_bound_slot_boolean_and_label`
+  - `test_unbound_slot_renders_unbound_label`
+  - `test_each_variant_carries_opacity_note` (rewritten — formerly checked the now-removed raw-ref note)
+  - `test_three_state_distinction_in_per_variation_sections`
+  - `test_three_state_distinction_when_topic_and_platform_missing`
+  - `test_body_unresolved_when_no_structural_signals`
+  - `test_structural_only_status_label_is_honest_about_opaque_handle`
+  - `test_no_raw_slot_or_body_ref_anywhere_in_payload`
+  - `test_template_does_not_render_raw_handles`
+  - `test_template_renders_three_section_states_distinctly`
+- Two existing tests rewritten to assert the new honest framing: `test_shared_body_is_structural_only_with_canonical_structure` (was `test_shared_body_resolves_unconditionally_with_canonical_structure`) and `test_per_variation_body_is_structural_only_with_length_and_tone` (was `test_per_variation_body_includes_length_and_tone_when_present`).
+- Adjacent + cross-line preservation regression: **495 PASS / 0 FAIL** across 16 import-light suites.
+
+### Scope preservation (corrections only, no widening)
+
+- Still RC-R1 / RC-R2 / RC-R3 only.
+- No RC PR-3 recommended-version actionable lane.
+- No RC PR-4 delivery-ready package / publish-backfill expansion.
+- No fake `final_video` (already enforced; corrections preserve it).
+- No second truth source (helper signature unchanged; still no `publish_readiness` parameter).
+- No contract / schema mutation. The new `STATUS_STRUCTURAL_ONLY` is a presentation-layer view code local to this helper; it is NOT added to MS-W3's closed `STATUS_RESOLVED`/`STATUS_UNRESOLVED` enum (which remains untouched at `script_structure_view.py`).
+- No Hot Follow / Digital Anchor / Asset Supply / runtime / provider/model UI touched.
+
+---
+
 ## 8. What This PR Does NOT Do
 
 - Does NOT advance any closeout signoff (OWC-MS MS-A7, OWC-DA DA-A7, Plan E A7 / UA7 / RA7, RC PR-1 closeout — all stay independently pending).
