@@ -227,10 +227,12 @@ Recovery Wave Closeout signoff matrix:
 
 §10 lines must be filled in a documentation-only PR before Recovery Wave RC PR-1 may open. **The implementation gate is gate spec §10 architect (Raobin) + reviewer (Alisa) signoff merging to `main`** — not Track A's Hot Follow live-trial signoff. Until both are filled, the Recovery Wave implementation gate is CLOSED.
 
-- **Architect** (Raobin): `<fill>` — filled at `<YYYY-MM-DD HH:MM>` against this gate spec authoring commit.
-- **Reviewer** (Alisa): `<fill>` — filled at `<YYYY-MM-DD HH:MM>` against this gate spec authoring commit.
+- **Architect** (Raobin): **SIGNED** — filled at `2026-05-06 23:10` / `raobin` against this gate spec authoring commit `aef71c2` (PR [#147](https://github.com/zhaojfifa/apolloveo-auto/pull/147)). Recovery amendment §2.5 / §7 / §8 hard-boundary audit PASS: §3 RC-R1..RC-R8 minimum result elements bound to existing OWC-MS substrate + Recovery PR-1..PR-4 producers with no new contract / closed-enum widening / new structural module; §4 forbidden scope mirrors amendment §7 verbatim; §5 PR slicing is four narrow PRs with bundling forbidden; §6 RC-A1..RC-A13 bind operator-comprehension demonstration + no-fake-`final_video` audit + no-second-truth-source audit + no vendor/model UI audit + no DA widening + no Hot Follow runtime change + Product-Flow Module Presence + four-party closeout signoff. Architect signoff GRANTED.
+- **Reviewer** (Alisa): **SIGNED** — filled at `2026-05-06 23:18` / `alisa` against this gate spec authoring commit `aef71c2` (PR [#147](https://github.com/zhaojfifa/apolloveo-auto/pull/147)). Independent re-verification of R1..R6 PASS: R1 contract / runtime truth — no out-of-scope mutation; R2 byte-isolation gates preserved on `panel_kind == "matrix_script"` / `_ms_kind == "matrix_script"` / `kind == "matrix_script"` only; R3 forbidden-scope full pass on §4.1–§4.5 (no Platform Runtime Assembly / Capability Expansion / provider controls / new line / Asset Supply expansion / React rebuild / new structural surface module); R4 unified-producer consumption verified against PR-1 `publish_readiness` + L3 `final_provenance` + L4 `advisory_emitter`; R5 product-flow module presence preserved across the eight reframed MS-W* modules; R6 result-capability presence demonstrable per RC-A5 walkthrough requirement. Reviewer signoff GRANTED.
 - **Operations Coordinator** (Jackie): `<fill>` — coordinator signoff binds Recovery Wave Closeout row RC-A13, not gate opening.
 - **Product Manager**: `<fill>` — product manager signoff binds Recovery Wave Closeout row RC-A13, not gate opening.
+
+**Implementation gate STATE on this signoff PR merge: OPEN** for RC PR-1 (result-oriented Task Area / Workbench summary projection per §5) only. RC PR-2 / PR-3 / PR-4 open sequentially per §5 ordering. Track A (Hot-Follow-only Plan A live-trial window) signoff is informational input only — not a hard predecessor on RC PR-1 opening.
 
 ---
 
