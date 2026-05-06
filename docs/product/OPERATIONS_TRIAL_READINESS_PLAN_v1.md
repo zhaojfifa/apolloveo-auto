@@ -384,3 +384,23 @@ All other Plan A sections (§0.1 / §0.2 source_script_ref discipline, §6.1 Hot
 **This addendum does NOT open Plan A live-trial.** Live-trial requires the trial re-entry review to be authored and signed by architect + reviewer + coordinator + PM. The addendum is the baseline the trial re-entry review must evaluate against. The trial re-entry review must NOT author Digital Anchor sample-validity criteria, and any draft attempting to widen DA scope is rejected as inconsistent with the addendum's operations verdict.
 
 **Sequencing (binding):** the trial re-entry review may begin only after PR #141 (the addendum PR) merges to `main` AND after explicit user hand-off. Both preconditions must hold; either alone is insufficient. While PR #141 is open, no trial re-entry review work may begin even if the hand-off has been issued.
+
+---
+
+## 14. Trial Re-Entry Review Reference (additive, 2026-05-06)
+
+The trial re-entry review was authored on 2026-05-06 as a docs-only step following the explicit user hand-off that constituted the second precondition. Both preconditions are SATISFIED: PR [#141](OPERATIONS_TRIAL_READINESS_POST_OWC_ADDENDUM_v1.md) merged to `main` (first) and explicit user hand-off landed (second).
+
+**Trial re-entry review authority:** [docs/reviews/trial_reentry_review_v1.md](../reviews/trial_reentry_review_v1.md)
+
+**Updated §12 readiness conclusion (per trial re-entry review §7):**
+
+| Production Line | Trial Verdict |
+|---|---|
+| Hot Follow | OPERABLE — benchmark end-to-end line |
+| Matrix Script | LIMITED / CONSTRAINED trial candidate — partial scope per review §4 |
+| Digital Anchor | NOT A TRIAL CANDIDATE — engineering PASS, operations NOT-READY |
+
+**Gate verdict:** READY FOR PLAN A LIVE-TRIAL REOPEN pending four-party signoff (§8 of the trial re-entry review). The review carries `<fill>` placeholders for Architect Raobin / Reviewer Alisa / Operations Coordinator Jackie / Product Manager in §8; those placeholders are filled in a follow-on docs-only signoff PR before Plan A live-trial reopens.
+
+**This §14 reference does NOT open Plan A live-trial.** Live-trial requires §8 of the trial re-entry review to be signed by all four parties in a follow-on docs-only signoff PR.
