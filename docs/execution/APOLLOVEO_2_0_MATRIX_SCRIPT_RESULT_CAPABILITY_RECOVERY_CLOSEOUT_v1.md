@@ -1,7 +1,7 @@
 # Matrix Script Result-Capability Recovery Wave Closeout v1
 
 Date: 2026-05-07
-Status: Documentation only. Aggregating audit + signoff for the Matrix Script Result-Capability Recovery Wave (Track B of the post-amendment bifurcated sequence). **No code, no UI, no contract, no schema, no test, no template change.** Authoring this closeout does NOT advance Plan A live-trial Matrix Script execution; per recovery gate spec §11 + recovery amendment §6 Track B, the next step after this closeout merges is the **follow-on trial re-entry review for Matrix Script** — a separate docs-only review signed by architect + reviewer + coordinator + product manager — and only after that review signs may Plan A live-trial samples 3 / 4 / 5 (Matrix Script `mm` / `vi` / post-§8.F) plus the Matrix Script portion of sample 6 execute.
+Status: Documentation only. Aggregating audit + signoff for the Matrix Script Result-Capability Recovery Wave (Track B of the post-amendment bifurcated sequence). **No code, no UI, no contract, no schema, no test, no template change.** Authoring this closeout does NOT advance Plan A live-trial Matrix Script execution and does NOT itself open the follow-on trial re-entry review. Per recovery gate spec §11 + recovery amendment §6 Track B, the **only** step authorized by this closeout merging is the standard follow-on docs-only **RC-A13 closeout signoff PR** (architect + reviewer + coordinator + product manager four-party signature). The Matrix Script follow-on trial re-entry review may begin only **after** the RC-A13 signoff PR merges; only after that review signs may Plan A live-trial samples 3 / 4 / 5 (Matrix Script `mm` / `vi` / post-§8.F) plus the Matrix Script portion of sample 6 execute.
 
 Wave: ApolloVeo 2.0 Matrix Script Result-Capability Recovery Wave (Track B).
 Phase position: After RC PR-1 / RC PR-2 / RC PR-3 / RC PR-4 implementation PRs all merged. Gate spec §10 architect + reviewer signoff merged 2026-05-06 (commit `aef71c2`, PR [#147](https://github.com/zhaojfifa/apolloveo-auto/pull/147)).
@@ -172,7 +172,7 @@ Listed for transparency. None block this closeout's verdict; they are scoped to 
 6. **`comment_keywords` always unresolved** — OWC-MS PR-3 single-source discipline keeps the closure-side copy_bundle `comment_keywords` subfield in `unresolved_pending_copy_projection_contract`. Therefore RC PR-4 workbench-side package classification typically sits in `partial_package` even on a fully-prepared task. The future copy projection contract (matrix_script_product_flow §7.1 + §9.5) closes this gap; not in recovery scope.
 7. **Plan E A7 / UA7 / RA7 closeout signoffs** — Remain independently pending in Raobin / Alisa / Jackie / product-manager queues. NOT advanced by this closeout.
 8. **OWC-MS Closeout MS-A7 + OWC-DA Closeout DA-A7** — Remain independently pending. NOT advanced by this closeout.
-9. **Matrix Script live-trial entry** — Plan A live-trial Matrix Script execution remains gated on (a) this closeout merging AND (b) a separate follow-on trial re-entry review for Matrix Script signing. Per recovery gate spec §11 + amendment §6 Track B steps B6 / B7.
+9. **Matrix Script live-trial entry** — Plan A live-trial Matrix Script execution remains gated on (a) this closeout merging AND (b) the follow-on docs-only RC-A13 signoff PR merging AND (c) a separate follow-on trial re-entry review for Matrix Script signing. Per recovery gate spec §11 + amendment §6 Track B steps B6 / B7.
 
 ---
 
@@ -211,11 +211,15 @@ These placeholders are filled in the standard follow-on docs-only signoff PR (th
 
 ## 11. What This Closeout Unlocks
 
-When this closeout is merged, the next wave-internal step is the **follow-on trial re-entry review for Matrix Script** (docs-only). Per recovery gate spec §11 + recovery amendment §6 Track B steps B6 / B7:
+The **only** step authorized by this closeout merging is the standard follow-on docs-only **RC-A13 closeout signoff PR**. The Matrix Script follow-on trial re-entry review does NOT open on this closeout's merge — it opens only after the RC-A13 signoff PR itself merges.
 
-- A separate docs-only review evaluates, against the post-recovery state, whether Matrix Script meets a result-capability bar sufficient for live-trial re-entry. The review updates [docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md) §12 readiness conclusion for Matrix Script. Signed by architect + reviewer + coordinator + product manager.
-- After the follow-on trial re-entry review signs, **Plan A live-trial Matrix Script execution** (Track B step B7) may proceed: operations team runs Plan A §7.1 samples 3 / 4 / 5 (`mm` / `vi` / post-§8.F) plus the Matrix Script portion of sample 6 (cross-line Board inspection). Hot Follow Track A operations (samples 1 / 2 plus Hot-Follow-only portions of sample 6) remain on their own track per amendment §6.
-- **Matrix Script live-trial findings + four-party signoff** (Track B step B8) closes Track B.
+Strict sequencing (binding):
+
+1. **This closeout (PR #153) merges** — records RC-A1..RC-A12 status; RC-A13 remains pending. This merge authorizes only step 2 below.
+2. **RC-A13 closeout signoff PR (docs-only, separate)** — same pattern as the recovery gate spec §10 signoff PR [#148](https://github.com/zhaojfifa/apolloveo-auto/pull/148). Fills the four `<fill>` placeholder lines at §10 (Architect Raobin + Reviewer Alisa + Coordinator Jackie + Product Manager). When this PR merges, RC-A13 is satisfied and the recovery wave closes on paperwork as well as engineering.
+3. **Follow-on trial re-entry review for Matrix Script (docs-only, separate)** — may begin **only after** the RC-A13 signoff PR merges. Per recovery gate spec §11 + recovery amendment §6 Track B steps B6 / B7. A separate docs-only review evaluates, against the post-recovery state, whether Matrix Script meets a result-capability bar sufficient for live-trial re-entry; updates [docs/product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md](../product/OPERATIONS_TRIAL_READINESS_PLAN_v1.md) §12; signed by architect + reviewer + coordinator + product manager.
+4. **Plan A live-trial Matrix Script execution (Track B step B7)** — may proceed only after step 3 signs: operations team runs Plan A §7.1 samples 3 / 4 / 5 (`mm` / `vi` / post-§8.F) plus the Matrix Script portion of sample 6 (cross-line Board inspection). Hot Follow Track A operations (samples 1 / 2 plus Hot-Follow-only portions of sample 6) remain on their own track per amendment §6.
+5. **Matrix Script live-trial findings + four-party signoff (Track B step B8)** — closes Track B.
 
 **Other waves remain BLOCKED** per recovery amendment §6 + §8:
 
@@ -224,7 +228,7 @@ When this closeout is merged, the next wave-internal step is the **follow-on tri
 - **Plan E A7 / UA7 / RA7 closeout signoffs**: remain independently pending.
 - **Digital Anchor scope widening**: forbidden; the five operations findings remain in force.
 
-This closeout does NOT unlock Plan A live-trial Matrix Script execution by itself; that step is gated on the follow-on trial re-entry review signing.
+This closeout does NOT unlock the follow-on trial re-entry review by itself; that review is gated on the RC-A13 signoff PR merging. This closeout does NOT unlock Plan A live-trial Matrix Script execution by itself; that step is gated on the follow-on trial re-entry review signing.
 
 ---
 
