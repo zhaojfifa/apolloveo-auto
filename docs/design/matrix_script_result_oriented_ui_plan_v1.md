@@ -356,9 +356,14 @@ A future implementation PR consuming this design must:
 
 - Cite this document in its reading declaration.
 - Cite the relevant wireframe (Task Area / Workbench / Delivery Center) in its reading declaration.
+- Cite the implementation slicing addendum [matrix_script_result_oriented_ui_implementation_slicing_v1.md](matrix_script_result_oriented_ui_implementation_slicing_v1.md) and observe its §2 pre-conditions and §9 cross-PR discipline.
 - Cite the recovery gate spec [docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md](../reviews/matrix_script_result_capability_recovery_gate_spec_v1.md) and observe its §4 forbidden scope.
 - Open under whatever wave authority is current at the time (per the alignment map §3.3 allowed engineering actions for that wave).
 - Update §11 of this document only by appending — never silently retire a gap entry without a follow-on docs-only PR.
+
+### 13.1 Recommended PR slicing reference
+
+The recommended four-PR slicing (PR-1 Task Area card refit → PR-2 Workbench Blocks A / B / C → PR-3 Workbench Blocks D / E / F → PR-4 Delivery Center A–F + Publish Feedback → Closeout) for the future implementation wave is captured in [matrix_script_result_oriented_ui_implementation_slicing_v1.md](matrix_script_result_oriented_ui_implementation_slicing_v1.md). Each slice is annotated with operator-visible outcome, backend feeds consumed, secondary diagnostics scope, acceptance evidence, and hard non-goals. That addendum does not open the implementation gate; the alignment map's frozen next engineering sequence governs when it does.
 
 ---
 
