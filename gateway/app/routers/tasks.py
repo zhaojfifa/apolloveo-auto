@@ -1736,12 +1736,32 @@ async def task_publish_hub_page(
 
     detail = _task_to_detail(task)
     task_json = {"task_id": detail.task_id}
+    # OWC-MS-RO PR-4: Matrix Script Delivery Center server-rendered
+    # render-data. Pure presentation-layer projection over already-attached
+    # helpers (delivery_comprehension / preview_compare / recommended_action /
+    # delivery_ready_package / delivery_copy_bundle / publish_backfill_readiness
+    # / publish_feedback_closure / publish_readiness). Returns ``{}`` for non
+    # matrix_script tasks so the Hot Follow + Digital Anchor publish-hub
+    # template branches stay bytewise unchanged. Authority:
+    # docs/design/matrix_script_delivery_center_wireframe_v1.md +
+    # docs/design/matrix_script_result_oriented_ui_implementation_slicing_v1.md §7.
+    ms_publish_hub: dict[str, object] = {}
+    try:
+        from gateway.app.services.matrix_script.publish_hub_render_data import (
+            derive_matrix_script_publish_hub_render_data,
+        )
+
+        ms_publish_hub = derive_matrix_script_publish_hub_render_data(task) or {}
+    except Exception:
+        # Defense-in-depth: presentation-layer must never crash the page.
+        ms_publish_hub = {}
     return render_template(
         request=request,
         name=template_name,
         ctx={
             "task": detail,
             "task_json": task_json,
+            "ms_publish_hub": ms_publish_hub,
         },
     )
 
