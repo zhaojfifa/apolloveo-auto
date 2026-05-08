@@ -740,17 +740,49 @@ def test_publish_feedback_anchor_lives_inside_matrix_script_gate() -> None:
 def test_publish_feedback_anchor_does_not_appear_outside_matrix_script_gate() -> None:
     """The anchor must NOT leak into a non-matrix_script branch — Hot
     Follow / Digital Anchor / baseline publish hubs must not carry the
-    anchor (each line owns its own publish-feedback semantics)."""
+    anchor (each line owns its own publish-feedback semantics).
+
+    Implementation note: the matrix_script gate body now contains
+    nested ``{% if %}`` / ``{% for %}`` blocks (PR-4 added Blocks
+    A → F under inner conditionals). A non-greedy regex that stops at
+    the first inner ``{% endif %}`` would leave most of the gate
+    body in the "stripped" output and trigger a false positive. The
+    extraction below counts nested if / for opens against endif /
+    endfor closes so the correct outer-gate close is matched.
+    """
     template = _read_publish_hub_template()
-    # Strip every matrix_script gate body so what's left is the
-    # non-matrix_script template content. The anchor MUST NOT appear
-    # in the stripped content.
-    stripped = re.sub(
-        r'{%\s*if\s+_ms_kind\s*==\s*"matrix_script"\s*%}.*?{%\s*endif\s*%}',
-        "",
-        template,
-        flags=re.DOTALL,
+    rendered = re.sub(r"{#.*?#}", "", template, flags=re.DOTALL)
+    open_pat = re.compile(
+        r'{%\s*if\s+_ms_kind\s*==\s*"matrix_script"\s*%}'
     )
+    if_pat = re.compile(r"{%\s*(?:if|for)\b[^%]*%}")
+    endif_pat = re.compile(r"{%\s*end(?:if|for)\s*%}")
+    stripped = rendered
+    while True:
+        m = open_pat.search(stripped)
+        if not m:
+            break
+        start = m.start()
+        cursor = m.end()
+        depth = 1
+        gate_end = None
+        while depth > 0 and cursor < len(stripped):
+            next_open = if_pat.search(stripped, cursor)
+            next_close = endif_pat.search(stripped, cursor)
+            if next_close is None:
+                break
+            if next_open is not None and next_open.start() < next_close.start():
+                depth += 1
+                cursor = next_open.end()
+            else:
+                depth -= 1
+                if depth == 0:
+                    gate_end = next_close.end()
+                    break
+                cursor = next_close.end()
+        if gate_end is None:
+            break
+        stripped = stripped[:start] + stripped[gate_end:]
     assert 'id="publish-feedback"' not in stripped, (
         "publish-feedback anchor leaked outside the matrix_script gate"
     )
