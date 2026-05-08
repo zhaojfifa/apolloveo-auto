@@ -842,6 +842,8 @@
                   归档此任务
                 </button>
                 <span class="muted t-secondary" style="margin-left:6px;"
+                      data-role="ms-dc-block-f-archive-form-status"></span>
+                <span class="muted t-secondary" style="margin-left:6px;"
                       data-role="ms-dc-block-f-archive-form-explanation">
                   归档意图通过 closure operator_note 记录在所选候选行；
                   明确的 record_kind == archive_action（PG-4）将由后续 closure 增补落地。
@@ -2715,11 +2717,90 @@ function resolveLang(serverLang) {
       });
     }
 
+    // OWC-MS-RO PR-4 conditional-pass correction (2026-05-08): Block F
+    // archive form JSON submit handler. Intercepts the form's default
+    // multipart/url-encoded submit and posts a JSON event to the existing
+    // POST /api/matrix-script/closures/{task_id}/events endpoint, which
+    // is JSON-only per the closure router
+    // (gateway/app/routers/matrix_script_closure.py:108-147 — calls
+    // `await request.json()` and 400-rejects non-JSON bodies). The
+    // payload shape mirrors the existing closure JSON pattern reused by
+    // bindMatrixScriptClosureForm above:
+    //   { event_kind, variation_id, actor_kind, recorded_at,
+    //     payload: { operator_publish_notes } }
+    // event_kind is the closed `operator_note` member of the existing
+    // EVENT_KINDS frozenset (no enum widening); operator_publish_notes
+    // carries the operator-language archive intent marker. The function
+    // is a no-op when the form is absent (Hot Follow / Digital Anchor /
+    // baseline publish hubs do not render it; matrix_script tasks
+    // without a closure render the disabled fallback button instead).
+    function bindMatrixScriptArchiveForm() {
+      const form = document.querySelector(
+        '[data-role="ms-dc-block-f-archive-form"]'
+      );
+      if (!form) return;
+      const variationSelect = form.querySelector(
+        '[data-role="ms-dc-block-f-archive-form-variation-id"]'
+      );
+      const eventKindEl = form.querySelector('input[name="event_kind"]');
+      const actorKindEl = form.querySelector('input[name="actor_kind"]');
+      const notesEl = form.querySelector('input[name="operator_publish_notes"]');
+      const statusEl = form.querySelector(
+        '[data-role="ms-dc-block-f-archive-form-status"]'
+      );
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const variationId = (variationSelect && variationSelect.value) || "";
+        if (!variationId) {
+          if (statusEl) statusEl.textContent = "请先选择候选";
+          return;
+        }
+        const event = {
+          event_kind: (eventKindEl && eventKindEl.value) || "operator_note",
+          variation_id: variationId,
+          actor_kind: (actorKindEl && actorKindEl.value) || "operator",
+          recorded_at: new Date().toISOString(),
+          payload: {
+            operator_publish_notes:
+              (notesEl && notesEl.value) || "归档此任务",
+          },
+        };
+        const action = form.getAttribute("action");
+        if (statusEl) statusEl.textContent = "提交中…";
+        try {
+          const resp = await fetch(action, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(event),
+          });
+          let body = null;
+          try { body = await resp.json(); } catch (parseErr) { body = null; }
+          if (!resp.ok) {
+            const detail = (body && body.detail) || resp.status;
+            if (statusEl) statusEl.textContent = "失败：" + detail;
+            return;
+          }
+          const eventId = (body && body.event_id) || "—";
+          if (statusEl) {
+            statusEl.textContent = "已归档（事件 ID：" + eventId + "）";
+          }
+        } catch (err) {
+          if (statusEl) {
+            statusEl.textContent = "失败：" + (err && err.message);
+          }
+        }
+      });
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
       // Recovery PR-3: bind the Matrix Script closure form once. The form
       // surface only renders when the server emitted the gated container
       // (task.kind == "matrix_script"); for other lines the call is a no-op.
       try { bindMatrixScriptClosureForm(); } catch (err) { /* noop */ }
+      // OWC-MS-RO PR-4 conditional-pass correction: bind the Block F
+      // archive form to the JSON closure-event path. No-op when the
+      // form is absent.
+      try { bindMatrixScriptArchiveForm(); } catch (err) { /* noop */ }
       try { bindDigitalAnchorClosureForms(); } catch (err) { /* noop */ }
       const tabs = document.querySelectorAll(".tab-btn");
       const panels = document.querySelectorAll(".tab-panel");

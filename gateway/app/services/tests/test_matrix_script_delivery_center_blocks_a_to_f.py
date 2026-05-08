@@ -1142,6 +1142,431 @@ def test_block_f_archive_form_does_not_introduce_record_kind_field() -> None:
     )
 
 
+def test_block_f_archive_form_carries_status_anchor() -> None:
+    """The JS submit handler renders success / failure feedback into a
+    `data-role="ms-dc-block-f-archive-form-status"` span. Without
+    this anchor the operator gets no visible feedback after clicking."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
+    block_f_subtree = inside[block_f_open:]
+    assert 'data-role="ms-dc-block-f-archive-form-status"' in block_f_subtree
+
+
+# --------------------------------------------------------------------------
+# G.2. Block F archive form JSON submit handler (2026-05-08 PR-4
+#      conditional-pass correction round 2)
+# --------------------------------------------------------------------------
+#
+# The closure router at
+# `gateway/app/routers/matrix_script_closure.py::post_event_api` is
+# JSON-only — it calls `await request.json()` and 400-rejects non-JSON
+# bodies. The static archive form posts as a regular HTML form, so it
+# must be intercepted by a JS submit handler that builds the JSON event
+# payload and POSTs it via fetch with `Content-Type: application/json`.
+# These tests prove (1) the handler is bound, (2) it intercepts
+# submission, (3) the JSON payload it builds matches the closure
+# contract, and (4) the real endpoint accepts the payload and appends
+# the event to the closure log.
+
+
+def test_archive_form_js_handler_function_defined_in_template() -> None:
+    """The submit handler `bindMatrixScriptArchiveForm` is defined
+    directly in the publish-hub template (mirroring the existing
+    `bindMatrixScriptClosureForm` precedent in the same file)."""
+    template = _read_publish_hub_template()
+    assert "function bindMatrixScriptArchiveForm()" in template
+
+
+def test_archive_form_js_handler_bound_at_dom_ready() -> None:
+    """The DOMContentLoaded init block calls
+    `bindMatrixScriptArchiveForm()` so the form is wired once the
+    DOM is ready. Without this hookup the handler is dead code."""
+    template = _read_publish_hub_template()
+    assert "bindMatrixScriptArchiveForm();" in template
+    # And it must be inside the DOMContentLoaded block — confirm by
+    # checking the proximity to the DOM-ready listener.
+    dom_ready_pos = template.find('document.addEventListener("DOMContentLoaded"')
+    bind_call_pos = template.find("bindMatrixScriptArchiveForm();")
+    assert dom_ready_pos != -1 and bind_call_pos != -1
+    assert bind_call_pos > dom_ready_pos
+    # The bind call must be within ~3KB of the DOM-ready listener (i.e.,
+    # in the same init block, not in some unrelated later script).
+    assert bind_call_pos - dom_ready_pos < 3000
+
+
+def test_archive_form_js_handler_selects_archive_form_data_role() -> None:
+    """The handler selects the archive form by its data-role marker,
+    not by id (the form has no id; data-role is the stable hook)."""
+    template = _read_publish_hub_template()
+    handler_start = template.find("function bindMatrixScriptArchiveForm()")
+    assert handler_start != -1
+    handler_window = template[handler_start : handler_start + 4000]
+    assert (
+        '\'[data-role="ms-dc-block-f-archive-form"]\'' in handler_window
+        or '"[data-role=\\"ms-dc-block-f-archive-form\\"]"' in handler_window
+    )
+
+
+def test_archive_form_js_handler_intercepts_submission() -> None:
+    """The handler binds a `submit` listener on the form and calls
+    `ev.preventDefault()` so the browser does not fall back to a
+    multipart/url-encoded submission (which the closure router would
+    400-reject as `invalid_json`)."""
+    template = _read_publish_hub_template()
+    handler_start = template.find("function bindMatrixScriptArchiveForm()")
+    handler_window = template[handler_start : handler_start + 4000]
+    assert 'addEventListener("submit"' in handler_window
+    assert "ev.preventDefault()" in handler_window
+
+
+def test_archive_form_js_handler_posts_json_with_correct_content_type() -> None:
+    """The handler issues `fetch(url, {method: "POST", headers:
+    {"Content-Type": "application/json"}, body: JSON.stringify(event)})`
+    matching the existing closure JSON contract."""
+    template = _read_publish_hub_template()
+    handler_start = template.find("function bindMatrixScriptArchiveForm()")
+    handler_window = template[handler_start : handler_start + 4000]
+    assert 'method: "POST"' in handler_window
+    assert '"Content-Type": "application/json"' in handler_window
+    assert "JSON.stringify(event)" in handler_window
+
+
+def test_archive_form_js_handler_uses_form_action_url() -> None:
+    """The handler reads the form's `action` attribute (which the seam
+    populates with the existing `/api/matrix-script/closures/{task_id}/events`
+    endpoint) — no hard-coded URL, no new endpoint."""
+    template = _read_publish_hub_template()
+    handler_start = template.find("function bindMatrixScriptArchiveForm()")
+    handler_window = template[handler_start : handler_start + 4000]
+    assert 'form.getAttribute("action")' in handler_window
+
+
+def test_archive_form_js_handler_builds_closure_event_shape() -> None:
+    """The handler builds the JSON event shape expected by the closure
+    router: `{event_kind, variation_id, actor_kind, recorded_at,
+    payload: {operator_publish_notes}}`. event_kind defaults to
+    "operator_note" (closed enum); actor_kind defaults to "operator"
+    (closed enum); the archive intent marker lives in
+    `payload.operator_publish_notes`."""
+    template = _read_publish_hub_template()
+    handler_start = template.find("function bindMatrixScriptArchiveForm()")
+    handler_window = template[handler_start : handler_start + 4000]
+    # Closed event-kind default
+    assert '"operator_note"' in handler_window
+    # Closed actor-kind default
+    assert '"operator"' in handler_window
+    # Variation_id is required by the closure validator
+    assert "variation_id:" in handler_window
+    # Payload nested object with operator_publish_notes
+    assert "operator_publish_notes" in handler_window
+    assert "payload:" in handler_window
+
+
+def test_archive_form_js_handler_does_not_post_to_new_endpoint() -> None:
+    """The handler must not hard-code any URL other than the form's
+    action — i.e., no fallback to a different closure path. Defense
+    against future regressions where someone might inline a URL."""
+    template = _read_publish_hub_template()
+    handler_start = template.find("function bindMatrixScriptArchiveForm()")
+    handler_window = template[handler_start : handler_start + 4000]
+    # No hard-coded /api/matrix-script/... URLs in the handler body.
+    assert "/api/matrix-script/closures" not in handler_window
+
+
+def test_archive_form_js_handler_renders_success_status() -> None:
+    """On HTTP 201, the handler reads `body.event_id` and renders an
+    operator-language success line in the status anchor — operators
+    see the archive intent recorded successfully."""
+    template = _read_publish_hub_template()
+    handler_start = template.find("function bindMatrixScriptArchiveForm()")
+    handler_window = template[handler_start : handler_start + 4000]
+    # Status anchor selected by data-role
+    assert (
+        'data-role="ms-dc-block-f-archive-form-status"' in handler_window
+        or "ms-dc-block-f-archive-form-status" in handler_window
+    )
+    # Success uses event_id from response
+    assert "event_id" in handler_window
+    # Failure path renders detail or status code
+    assert "失败" in handler_window or "failed" in handler_window.lower()
+
+
+# --------------------------------------------------------------------------
+# G.3. Real JSON event-path round-trip via FastAPI TestClient
+#      Proves the JS handler's JSON payload is accepted by the existing
+#      closure endpoint — not just static markup.
+# --------------------------------------------------------------------------
+
+
+def _try_build_closure_test_client(repo_tasks: dict[str, Any]):
+    try:
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from gateway.app.deps import get_task_repository
+        from gateway.app.routers import matrix_script_closure
+    except Exception:
+        return None
+
+    class _StubRepo:
+        def __init__(self, tasks: dict[str, Any]) -> None:
+            self._tasks = tasks
+
+        def get(self, task_id: str):
+            return self._tasks.get(task_id)
+
+        def create(self, task):  # pragma: no cover
+            raise NotImplementedError
+
+        def update(self, task_id, patch):  # pragma: no cover
+            raise NotImplementedError
+
+        def list(self):  # pragma: no cover
+            return list(self._tasks.values())
+
+    app = FastAPI()
+    app.dependency_overrides[get_task_repository] = lambda: _StubRepo(repo_tasks)
+    app.include_router(matrix_script_closure.api_router)
+    try:
+        return TestClient(app)
+    except Exception:
+        return None
+
+
+def _archive_form_test_task() -> dict[str, Any]:
+    """Closure-router-compatible task fixture. The closure binding lazy-
+    creates a closure from the task's variation matrix on first GET, so
+    the task's packet must carry at least one cell. Reuses the
+    matrix_script_packet sample shape."""
+    import json as _json
+    from pathlib import Path as _Path
+
+    sample_path = (
+        _REPO_ROOT
+        / "schemas"
+        / "packets"
+        / "matrix_script"
+        / "sample"
+        / "matrix_script_packet_v1.sample.json"
+    )
+    packet = _json.loads(sample_path.read_text())
+    return {
+        "task_id": "ms_archive_e2e_001",
+        "id": "ms_archive_e2e_001",
+        "kind": "matrix_script",
+        "category_key": "matrix_script",
+        "platform": "matrix_script",
+        "packet": packet,
+    }
+
+
+@pytest.fixture()
+def _reset_closure_store_for_archive():
+    from gateway.app.services.matrix_script import closure_binding
+
+    closure_binding.reset_for_tests()
+    yield
+    closure_binding.reset_for_tests()
+
+
+def test_archive_form_round_trip_posts_real_json_event(
+    _reset_closure_store_for_archive,
+) -> None:
+    """End-to-end: the JSON payload the JS handler builds is accepted
+    by the existing closure router and appended to the closure log
+    as an `operator_note` event. Proves the wiring works against the
+    real endpoint — not just static markup."""
+    task = _archive_form_test_task()
+    client = _try_build_closure_test_client({task["task_id"]: task})
+    if client is None:
+        pytest.skip("FastAPI TestClient not importable in this env.")
+
+    # Lazy-create the closure (mirrors what bindMatrixScriptClosureForm
+    # does via the "初始化 closure" button before any event posts).
+    resp = client.get(f"/api/matrix-script/closures/{task['task_id']}")
+    assert resp.status_code == 200, resp.text
+    closure = resp.json()
+    variations = closure["variation_feedback"]
+    assert variations, "closure must have at least one variation row"
+    variation_id = variations[0]["variation_id"]
+
+    # The exact JSON payload the JS handler builds for archive.
+    archive_event = {
+        "event_kind": "operator_note",
+        "variation_id": variation_id,
+        "actor_kind": "operator",
+        "recorded_at": "2026-05-08T11:00:00Z",
+        "payload": {"operator_publish_notes": "归档此任务"},
+    }
+    resp = client.post(
+        f"/api/matrix-script/closures/{task['task_id']}/events",
+        json=archive_event,
+    )
+    assert resp.status_code == 201, resp.text
+    payload = resp.json()
+    assert payload["event_id"].startswith("evt_")
+
+    # The closure now carries an `operator_note` record with the
+    # archive intent text on the matching variation row — proving the
+    # wiring path is real, not stubbed.
+    refreshed = payload["closure"]
+    records = refreshed["feedback_closure_records"]
+    archive_records = [
+        r
+        for r in records
+        if r.get("event_kind") == "operator_note"
+        and r.get("variation_id") == variation_id
+    ]
+    assert archive_records, "archive operator_note not appended to closure log"
+
+    row = next(
+        r for r in refreshed["variation_feedback"] if r["variation_id"] == variation_id
+    )
+    assert row["operator_publish_notes"] == "归档此任务"
+
+
+def test_archive_form_round_trip_does_not_corrupt_publish_status(
+    _reset_closure_store_for_archive,
+) -> None:
+    """RC-R8 / publish_status invariant: archive intent must NOT
+    overwrite `publish_status`. The closure validator's
+    `operator_note` branch only writes `operator_publish_notes` — the
+    publish_status of the row stays at its prior state. This test
+    pre-publishes a row, then fires archive on the SAME row, and
+    asserts publish_status remains "pending" (the operator_publish
+    pending state) instead of being overwritten."""
+    task = _archive_form_test_task()
+    client = _try_build_closure_test_client({task["task_id"]: task})
+    if client is None:
+        pytest.skip("FastAPI TestClient not importable in this env.")
+
+    resp = client.get(f"/api/matrix-script/closures/{task['task_id']}")
+    closure = resp.json()
+    variation_id = closure["variation_feedback"][0]["variation_id"]
+
+    # First post: operator_publish with publish_status=pending +
+    # publish_url. This sets the row to a "ready-to-go" state.
+    resp = client.post(
+        f"/api/matrix-script/closures/{task['task_id']}/events",
+        json={
+            "event_kind": "operator_publish",
+            "variation_id": variation_id,
+            "actor_kind": "operator",
+            "recorded_at": "2026-05-08T10:00:00Z",
+            "payload": {
+                "publish_url": "https://example.test/post/1",
+                "publish_status": "pending",
+            },
+        },
+    )
+    assert resp.status_code == 201
+
+    # Second post: archive (operator_note) on the SAME row. The
+    # closure validator's operator_note branch does not touch
+    # publish_status — only operator_publish_notes is written.
+    resp = client.post(
+        f"/api/matrix-script/closures/{task['task_id']}/events",
+        json={
+            "event_kind": "operator_note",
+            "variation_id": variation_id,
+            "actor_kind": "operator",
+            "recorded_at": "2026-05-08T11:00:00Z",
+            "payload": {"operator_publish_notes": "归档此任务"},
+        },
+    )
+    assert resp.status_code == 201
+    refreshed = resp.json()["closure"]
+
+    row = next(
+        r
+        for r in refreshed["variation_feedback"]
+        if r["variation_id"] == variation_id
+    )
+    # publish_status preserved, publish_url preserved, archive note appended
+    assert row["publish_status"] == "pending"
+    assert row["publish_url"] == "https://example.test/post/1"
+    assert row["operator_publish_notes"] == "归档此任务"
+
+
+def test_archive_form_round_trip_preserves_append_only_log(
+    _reset_closure_store_for_archive,
+) -> None:
+    """The closure feedback_closure_records[] must remain append-only
+    across the archive round-trip. Neither the archive intent post nor
+    the seam read mutates / deletes any prior record."""
+    task = _archive_form_test_task()
+    client = _try_build_closure_test_client({task["task_id"]: task})
+    if client is None:
+        pytest.skip("FastAPI TestClient not importable in this env.")
+
+    resp = client.get(f"/api/matrix-script/closures/{task['task_id']}")
+    closure = resp.json()
+    variation_id = closure["variation_feedback"][0]["variation_id"]
+
+    # First: operator_note A
+    resp_a = client.post(
+        f"/api/matrix-script/closures/{task['task_id']}/events",
+        json={
+            "event_kind": "operator_note",
+            "variation_id": variation_id,
+            "actor_kind": "operator",
+            "recorded_at": "2026-05-08T10:00:00Z",
+            "payload": {"operator_publish_notes": "A"},
+        },
+    )
+    assert resp_a.status_code == 201
+    # Second: operator_note B (archive intent)
+    resp_b = client.post(
+        f"/api/matrix-script/closures/{task['task_id']}/events",
+        json={
+            "event_kind": "operator_note",
+            "variation_id": variation_id,
+            "actor_kind": "operator",
+            "recorded_at": "2026-05-08T11:00:00Z",
+            "payload": {"operator_publish_notes": "归档此任务"},
+        },
+    )
+    assert resp_b.status_code == 201
+
+    closure_after = resp_b.json()["closure"]
+    records = closure_after["feedback_closure_records"]
+    # Both A and B persisted in order; A not removed by B.
+    notes = [
+        r.get("event_kind") for r in records if r.get("variation_id") == variation_id
+    ]
+    assert notes.count("operator_note") >= 2
+
+
+def test_archive_form_round_trip_rejects_widened_event_kind(
+    _reset_closure_store_for_archive,
+) -> None:
+    """Defensive: confirm the closure router still 400-rejects an
+    arbitrary new event_kind, so the archive wiring cannot be expanded
+    to a non-closed value without reviewer signoff."""
+    task = _archive_form_test_task()
+    client = _try_build_closure_test_client({task["task_id"]: task})
+    if client is None:
+        pytest.skip("FastAPI TestClient not importable in this env.")
+
+    resp = client.get(f"/api/matrix-script/closures/{task['task_id']}")
+    closure = resp.json()
+    variation_id = closure["variation_feedback"][0]["variation_id"]
+
+    resp = client.post(
+        f"/api/matrix-script/closures/{task['task_id']}/events",
+        json={
+            "event_kind": "archive_action",  # NOT in EVENT_KINDS
+            "variation_id": variation_id,
+            "actor_kind": "operator",
+            "recorded_at": "2026-05-08T11:00:00Z",
+            "payload": {},
+        },
+    )
+    assert resp.status_code == 400
+    assert "event_kind" in resp.json()["detail"]
+
+
 def test_block_f_archive_form_cited_in_residual_implementation_note() -> None:
     """Defensive: the template comment block above the archive form
     cites both the closure validator constraint and the PG-4 deferred
