@@ -91,6 +91,69 @@ The Matrix Script trial re-entry review (alignment map §7 step 7) and Plan A li
 
 ---
 
+## 2.2 Amendment 2026-05-08 — Narrow PR-2 authorization (Workbench Blocks A / B / C, read-side)
+
+### 2.2.1 Authority basis
+
+Per §2.1.3 — "Any future amendment that unblocks PR-2..PR-4 MUST be authored as a separate docs-only PR citing this §2.1 as precedent and observing the same narrow-scope discipline" — the present §2.2 amendment is that separate docs-only PR for PR-2. The user's direct instruction in the OWC-MS-RO PR-2 implementation turn ("Open implementation PR-2 only: Matrix Script Workbench Blocks A / B / C") served as the "later authority that supersedes" the §2 default pre-conditions per the original §2 escape clause; this §2.2 amendment formalizes the audit trail per §2.1.3's procedural requirement.
+
+PR-2 has already landed as `feat(owc-ms-ro-pr2): Matrix Script Workbench Blocks A / B / C (UI-only, read-side)` (PR #160 on `claude/magical-driscoll-0aa583`, conditional-pass pending this §2.2 governance amendment). This amendment authorizes that landing under the same narrow constraints the implementation observed.
+
+### 2.2.2 Authorized scope — PR-2 only (Workbench Blocks A / B / C, read-side, UI-only)
+
+PR-2 (Workbench Blocks A / B / C; scope per §5) is authorized as a **UI-only, read-side slice**. The §2 pre-conditions originally numbered (1) through (4) — including the Matrix Script trial re-entry review §8 signoff, Plan A live-trial Matrix Script execution against §7.1 samples 3 / 4 / 5, Matrix Script live-trial four-party signoff, and `owc_ms_ro_gate_spec_v1.md` authoring + §10 signoff — do **not** apply to PR-2 under this amendment.
+
+Authority is **strictly limited** to the three blocks named in [matrix_script_workbench_wireframe_v1.md §3 / §4 / §5](matrix_script_workbench_wireframe_v1.md):
+
+- **Block A — Goal Summary** (subject / audience / target_platform / target_language / current overall status / current blocker / next recommended action + jump buttons to delivery center and publish feedback).
+- **Block B — Script Structure** (Hook / Body / CTA + keywords / forbidden terms; operator-readable wording only).
+- **Block C — Variant Strategy** (variant count + per-variant differentiator summary + why each variant exists).
+
+PR-2 is binding-and-exhaustive **UI-only** under this amendment, mirroring the §2.1.2 PR-1 constraints:
+
+- **No runtime truth change.** The variation execution path, ready-gate evaluation, projection rules, and closure event handling stay byte-stable.
+- **No contract / schema / packet / validator / sample mutation.** No file under `docs/contracts/` or `schemas/` is touched.
+- **No closed-enum widening.** All closed enums (`STAGE_*`, `STATUS_*`, `RECOMMENDED_BUCKET_*`, `READINESS_*`, `D1_EVENT_KINDS`, `D1_PUBLISH_STATUS_VALUES`, `RECORD_KINDS`, `REVIEW_ZONE_VALUES`, `head_reason`) remain frozen.
+- **No new endpoint.**
+- **No new structural service module.** PR-2 consumes only existing helpers (`derive_matrix_script_script_structure_view`, `derive_matrix_script_workbench_result_summary`, `derive_matrix_script_readable_variants`, `derive_matrix_script_workbench_comprehension`) — no new helper module created.
+- **No cross-line consolidation.** D1 unified `publish_readiness` producer / D2 L3 `final_provenance` emitter / D3 panel dispatch contract object / D4 L4 advisory producer / Asset Library / promote services remain out of scope.
+- **No Hot Follow file touch.** Hot Follow workbench branch remains bytewise unchanged.
+- **No Digital Anchor file touch.** Digital Anchor workbench branch remains bytewise unchanged.
+- **No Asset Supply / B-roll file touch.**
+- **No provider / model / vendor / engine UI.** Validator R3 + factory_packet_envelope_contract_v1 E5 carry forward.
+- **No raw refs / `content://` handles / `slot_id` / `cell_id` / `script_slot_ref` / `binds_cell_id` exposure** in operator-visible columns.
+- **No fake `final_video` / no fabricated `publish_url`** (RC-R8 invariant carries forward).
+- **No operator-driven Phase B authoring** (`axes[]` / `cells[]` / `slots[]` authoring forbidden by Plan E gate spec §4.3 — preserved).
+- **No closure-event posting from PR-2** (closure-D.1 affordances are PR-3 scope).
+- **No removal of the existing PR-U2 comprehension panel, MS-W3 script-structure panel, or Phase B Variation Panel** — all preserved verbatim as secondary diagnostics below the new Block A / B / C panels per §5.3.
+- **No PR-3 work**: Blocks D (Generate / Regenerate) / E (Candidate Review) / F (Delivery Teaser) are NOT authorized by this amendment.
+- **No PR-4 work**: Delivery Center A–F + Publish Feedback are NOT authorized by this amendment.
+- **No Task Area refit beyond OWC-MS-RO PR-1's already-merged scope** (PR #159 squashed as commit `941c73e` on `main`).
+
+### 2.2.3 PR-3 / PR-4 gating preserved
+
+PR-3 (Workbench Blocks D / E / F) and PR-4 (Delivery Center A–F + Publish Feedback) **remain gated** by §2 pre-conditions (1) through (4) as originally authored, OR by whatever later authority supersedes them. This amendment does NOT unblock PR-3 / PR-4. Any future amendment that unblocks PR-3 or PR-4 MUST be authored as a separate docs-only PR citing this §2.2 as precedent and observing the same narrow-scope discipline (mirroring how §2.2 itself cited §2.1).
+
+### 2.2.4 Authority and scope of this amendment
+
+This amendment is **documentation-only**. It does NOT:
+
+- Author or mutate any contract.
+- Author or mutate any schema.
+- Open any runtime wiring change.
+- Open any new endpoint.
+- Open any cross-line change (Hot Follow / Digital Anchor / Asset Supply file touch).
+- Open any provider / model / vendor / engine UI.
+- Mutate any sample / template / test / runtime in this PR.
+- Open any wave gate other than PR-2's narrow UI-only landing under §2.2.2.
+- Advance any prior closeout signoff (Plan E A7 / UA7 / RA7, OWC-MS MS-A7, OWC-DA DA-A7 all remain independently pending in Raobin / Alisa / Jackie / PM queue).
+- Alter the alignment map's frozen next engineering sequence outside the placement of PR-2 ahead of the Matrix Script live-trial.
+- Touch contracts, schemas, runtime, or provider/model UI.
+
+The Matrix Script trial re-entry review (alignment map §7 step 7) and Plan A live-trial Matrix Script execution remain authorised follow-on steps; PR-2's UI-only landing extends the operator-result-first surfaces (Task Area card refit landed as PR #159 squash `941c73e`; Workbench read-side Blocks A / B / C land via PR #160 governed by this §2.2) so the trial can execute against richer operator-visible substrate.
+
+---
+
 ## 3. Slicing rationale
 
 ### 3.1 Why four PRs in this order
