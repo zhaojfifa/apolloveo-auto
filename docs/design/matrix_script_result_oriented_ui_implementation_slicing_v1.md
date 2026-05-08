@@ -44,6 +44,53 @@ The wave that opens this slicing is BLOCKED on:
 
 ---
 
+## 2.1 Amendment 2026-05-08 — Narrow PR-1 unblock (circular-dependency correction)
+
+### 2.1.1 Circular dependency identified
+
+The §2 pre-conditions as authored on 2026-05-07 created a **circular dependency**: PR-1 (Task Area card refit) was gated on a Matrix Script live-trial against §7.1 samples 3 / 4 / 5, but a meaningful live-trial of the Matrix Script line on those samples requires the operator-result-first surfaces — including the result-oriented Task Area card defined by [matrix_script_task_area_wireframe_v1.md](matrix_script_task_area_wireframe_v1.md) — to render against real production samples. The prior wording made the trial wait on the implementation slice that the trial itself was supposed to validate, while the implementation slice was made to wait on the trial. The result was a deadlock between Track A's trial execution and Track B's first result-oriented UI implementation slice. This amendment dissolves that deadlock narrowly.
+
+The prior wording is **explicitly acknowledged here as having created the deadlock**, so future readers understand why §2.1 exists.
+
+### 2.1.2 Re-scoped pre-conditions for PR-1 only
+
+PR-1 (Task Area card refit; scope per §4) MAY open immediately after the result-oriented UI design package — [matrix_script_result_oriented_ui_plan_v1.md](matrix_script_result_oriented_ui_plan_v1.md), [matrix_script_task_area_wireframe_v1.md](matrix_script_task_area_wireframe_v1.md), [matrix_script_workbench_wireframe_v1.md](matrix_script_workbench_wireframe_v1.md), [matrix_script_delivery_center_wireframe_v1.md](matrix_script_delivery_center_wireframe_v1.md) — is frozen on `main` (PR #155 + PR #156, both merged). The §2 pre-conditions originally numbered (1) through (4) — including the Matrix Script trial re-entry review §8 signoff, Plan A live-trial Matrix Script execution against §7.1 samples 3 / 4 / 5, Matrix Script live-trial four-party signoff, and `owc_ms_ro_gate_spec_v1.md` authoring + §10 signoff — do **not** apply to PR-1 under this amendment.
+
+PR-1 is binding-and-exhaustive **UI-only** under this amendment:
+
+- **No runtime truth change.** The variation execution path, ready-gate evaluation, projection rules, and closure event handling stay byte-stable.
+- **No contract / schema / packet / validator / sample mutation.** No file under `docs/contracts/` or `schemas/` is touched.
+- **No closed-enum widening.** `STAGE_*`, `STATUS_*`, `RECOMMENDED_BUCKET_*`, `READINESS_*`, `D1_EVENT_KINDS`, `D1_PUBLISH_STATUS_VALUES`, `RECORD_KINDS`, `REVIEW_ZONE_VALUES`, `head_reason` all remain frozen.
+- **No new endpoint.**
+- **No new structural service module.** PR-1 is a template refit + thin presenter wiring over the existing helpers enumerated in §4.2 (`derive_matrix_script_task_card_summary`, `derive_matrix_script_eight_stage_state`, `derive_matrix_script_three_tier_lanes`, `derive_matrix_script_task_area_result_status`, `compute_publish_readiness.head_reason` → `HEAD_REASON_LABELS_ZH`).
+- **No test-scope widening beyond PR-1.** Dedicated test floor is the §4.4 RO-1.4 floor (≥ 30 cases in a new `test_matrix_script_task_area_card_refit.py`); adjacent regression sets that already exist on `main` continue to PASS.
+- **No Hot Follow file touch.** Hot Follow card branch (`kind == "hot_follow"`) remains bytewise unchanged.
+- **No Digital Anchor file touch.** Digital Anchor card branch (`kind == "digital_anchor"`) remains bytewise unchanged.
+- **No Asset Supply / B-roll file touch.**
+- **No provider / model / vendor / engine UI.** Validator R3 + factory_packet_envelope_contract_v1 E5 carry forward.
+- **No raw refs / `content://` handles / `slot_id` / `cell_id` exposure.** The card body stays operator-language only.
+- **No fake `final_video` / no fabricated `publish_url`.** RC-R8 invariant carries forward; tracked-gap rows render explicit operator-language text.
+
+### 2.1.3 PR-2 / PR-3 / PR-4 gating preserved
+
+PR-2 (Workbench Blocks A / B / C), PR-3 (Workbench Blocks D / E / F), and PR-4 (Delivery Center A–F + Publish Feedback) **remain gated** by §2 pre-conditions (1) through (4) as originally authored, OR by whatever later authority supersedes them. This amendment does NOT unblock PR-2 / PR-3 / PR-4. Any future amendment that unblocks PR-2..PR-4 MUST be authored as a separate docs-only PR citing this §2.1 as precedent and observing the same narrow-scope discipline.
+
+### 2.1.4 Authority and scope of this amendment
+
+This amendment is **documentation-only**. It does NOT:
+
+- Author or mutate any contract.
+- Author or mutate any schema.
+- Mutate any sample / template / test / runtime in this PR.
+- Open any wave gate other than PR-1's narrow UI-only landing.
+- Advance any prior closeout signoff (Plan E A7 / UA7 / RA7, OWC-MS MS-A7, OWC-DA DA-A7 all remain independently pending in Raobin / Alisa / Jackie / PM queue).
+- Alter the alignment map's frozen next engineering sequence outside the placement of PR-1 ahead of the Matrix Script live-trial.
+- Touch Hot Follow, Digital Anchor, contracts, schemas, runtime, or provider/model UI.
+
+The Matrix Script trial re-entry review (alignment map §7 step 7) and Plan A live-trial Matrix Script execution remain authorised follow-on steps; PR-1's UI-only landing makes them executable against real operator-result-first surfaces, dissolving the circular dependency identified in §2.1.1.
+
+---
+
 ## 3. Slicing rationale
 
 ### 3.1 Why four PRs in this order
