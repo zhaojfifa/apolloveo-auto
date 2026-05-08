@@ -627,6 +627,174 @@ def test_block_d_template_no_free_text_editing_affordance() -> None:
 
 
 # --------------------------------------------------------------------------
+# E.1. Block D resolved-status correction (2026-05-08 PR-4 conditional-pass)
+# --------------------------------------------------------------------------
+
+
+def test_block_d_producer_status_resolved_constant_value() -> None:
+    """The producer's STATUS_RESOLVED is the closed string the template
+    must literal-match. PR-4 conditional-pass blocker 1: the original
+    template branch checked for ``"resolved"``, but the producer emits
+    ``"resolved_from_existing_projection"`` (delivery_copy_bundle_view.py:97).
+    This test pins the producer constant so the literal-match path
+    cannot drift again."""
+    from gateway.app.services.matrix_script.delivery_copy_bundle_view import (
+        STATUS_RESOLVED,
+        STATUS_UNRESOLVED,
+    )
+
+    assert STATUS_RESOLVED == "resolved_from_existing_projection"
+    assert STATUS_UNRESOLVED == "unresolved_pending_copy_projection_contract"
+
+
+def test_block_d_template_resolved_check_matches_producer_status_resolved_literal() -> None:
+    """Template branch checks for the producer's
+    ``STATUS_RESOLVED == "resolved_from_existing_projection"`` literal
+    (not the bare ``"resolved"`` token). Without this fix, every
+    resolved subfield falls through to the unresolved branch and is
+    rendered as a tracked-gap explanation — operator never sees the
+    real copy values."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_d_open = inside.find('data-role="matrix-script-block-d-copy-bundle"')
+    block_e_open = inside.find('data-role="matrix-script-block-e-publish-feedback"')
+    block_d_subtree = inside[block_d_open:block_e_open]
+    assert (
+        'sub.status_code == "resolved_from_existing_projection"'
+        in block_d_subtree
+    ), (
+        "Block D resolved branch must literal-match the producer's "
+        "STATUS_RESOLVED constant — the bare \"resolved\" check never "
+        "matched the producer output."
+    )
+
+
+def test_block_d_template_no_unconditional_resolved_literal_fallback() -> None:
+    """Defensive: ensure the template does NOT keep the bare
+    ``"resolved"`` literal anywhere inside Block D — the literal must
+    be the producer-aligned ``"resolved_from_existing_projection"``
+    only, so a future drift cannot reintroduce the original bug."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_d_open = inside.find('data-role="matrix-script-block-d-copy-bundle"')
+    block_e_open = inside.find('data-role="matrix-script-block-e-publish-feedback"')
+    block_d_subtree = inside[block_d_open:block_e_open]
+    # The `status_code == "resolved"` substring (the broken branch) must
+    # not be present anywhere in Block D. The full producer literal is
+    # the only acceptable resolved-status check.
+    assert 'status_code == "resolved"' not in block_d_subtree, (
+        "Block D must not carry the bare \"resolved\" literal; the "
+        "resolved branch must literal-match the producer's "
+        "STATUS_RESOLVED constant `resolved_from_existing_projection`."
+    )
+
+
+def test_block_d_resolved_subfield_has_status_resolved_when_caption_present() -> None:
+    """End-to-end: when the publish-hub copy_bundle producer emits a
+    non-empty `caption` field, the matrix_script delivery_copy_bundle
+    seam emits a TITLE subfield with
+    `status_code == STATUS_RESOLVED == "resolved_from_existing_projection"`
+    and a non-empty `value` matching the caption — proving the seam
+    output flows the resolved status the template's resolved branch
+    now literal-matches.
+
+    The publish-hub copy_bundle producer
+    (`task_view_helpers._build_copy_bundle`) reads
+    `caption = _read_mm_txt_from_task(task) or task.title`. The S001
+    fixture has `task.title = "不会剪辑，也能做TikTok？"`, so the
+    derived caption is non-empty and the title subfield resolves to
+    that value. Without the literal-match fix, the template would
+    silently render this as the tracked-gap explanation."""
+    from gateway.app.services.matrix_script.delivery_copy_bundle_view import (
+        STATUS_RESOLVED,
+    )
+
+    out = derive_matrix_script_publish_hub_render_data(_s001_task())
+    subfields = out["delivery_copy_bundle"].get("subfields") or []
+    title_subfield = next(
+        (sub for sub in subfields if sub.get("subfield_id") == "title"), None
+    )
+    assert title_subfield is not None, "title subfield missing from seam output"
+    assert title_subfield["status_code"] == STATUS_RESOLVED
+    assert title_subfield["status_code"] == "resolved_from_existing_projection"
+    assert title_subfield["value"] == "不会剪辑，也能做TikTok？"
+
+
+def test_block_d_resolved_subfield_template_branch_renders_value() -> None:
+    """The template's resolved branch MUST emit the
+    `<span data-role="ms-dc-block-d-subfield-value">` element when the
+    subfield's status_code matches STATUS_RESOLVED. The empty/unresolved
+    branch emits the tracked-gap span. Both branches present in the
+    template — proves the conditional has both arms wired."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_d_open = inside.find('data-role="matrix-script-block-d-copy-bundle"')
+    block_e_open = inside.find('data-role="matrix-script-block-e-publish-feedback"')
+    block_d_subtree = inside[block_d_open:block_e_open]
+    # Resolved branch — emits the operator-visible value.
+    assert 'data-role="ms-dc-block-d-subfield-value"' in block_d_subtree
+    # Tracked-gap branch — emits the explanation when not resolved.
+    assert 'data-role="ms-dc-block-d-subfield-empty"' in block_d_subtree
+
+
+def test_block_d_unresolved_subfield_keeps_tracked_gap_branch() -> None:
+    """End-to-end: when the publish-hub copy_bundle producer has no
+    `comment_cta`, the matrix_script delivery_copy_bundle seam emits a
+    CTA subfield with
+    `status_code == STATUS_UNRESOLVED == "unresolved_pending_copy_projection_contract"`
+    and a tracked-gap explanation — proving the unresolved branch
+    stays honest after the literal-match fix.
+
+    `_derive_cta` reads `base_copy_bundle.get("comment_cta")` and
+    publish-hub `_build_copy_bundle` sets `comment_cta: ""` always —
+    so CTA always resolves to the unresolved tracked-gap row in this
+    wave."""
+    from gateway.app.services.matrix_script.delivery_copy_bundle_view import (
+        STATUS_UNRESOLVED,
+    )
+
+    out = derive_matrix_script_publish_hub_render_data(_s001_task())
+    subfields = out["delivery_copy_bundle"].get("subfields") or []
+    cta_subfield = next(
+        (sub for sub in subfields if sub.get("subfield_id") == "cta"), None
+    )
+    assert cta_subfield is not None
+    assert cta_subfield["status_code"] == STATUS_UNRESOLVED
+    assert cta_subfield["value"] == ""
+    assert isinstance(cta_subfield.get("unresolved_explanation_zh"), str)
+    assert cta_subfield["unresolved_explanation_zh"]
+
+
+def test_block_d_comment_keywords_subfield_always_unresolved() -> None:
+    """`_derive_comment_keywords` always returns empty until the future
+    copy projection contract lands (see delivery_copy_bundle_view.py:208).
+    This stays honest regardless of the resolved-status fix — the
+    tracked-gap row continues to render the unresolved explanation."""
+    from gateway.app.services.matrix_script.delivery_copy_bundle_view import (
+        STATUS_UNRESOLVED,
+    )
+
+    out = derive_matrix_script_publish_hub_render_data(_s001_task())
+    subfields = out["delivery_copy_bundle"].get("subfields") or []
+    keywords_subfield = next(
+        (sub for sub in subfields if sub.get("subfield_id") == "comment_keywords"),
+        None,
+    )
+    assert keywords_subfield is not None
+    assert keywords_subfield["status_code"] == STATUS_UNRESOLVED
+
+
+def test_block_d_subfield_set_is_closed_four_subfields() -> None:
+    """Block D subfields are a closed four-row set
+    (title / hashtags / cta / comment_keywords) per wireframe §7.2.
+    PR-4 must not widen the set."""
+    out = derive_matrix_script_publish_hub_render_data(_s001_task())
+    subfields = out["delivery_copy_bundle"].get("subfields") or []
+    ids = [sub["subfield_id"] for sub in subfields]
+    assert ids == ["title", "hashtags", "cta", "comment_keywords"]
+
+
+# --------------------------------------------------------------------------
 # F. Block E — Publish feedback (table + form + event log)
 # --------------------------------------------------------------------------
 
@@ -749,21 +917,254 @@ def test_block_f_iteration_recommendation_consumes_publish_backfill_readiness() 
     assert "row.next_input_zh" in block_f_subtree
 
 
-def test_block_f_archive_button_rendered_disabled_with_tooltip() -> None:
-    """PG-4 deferred per spec §7.5 — archive record_kind transition is
-    out of scope for PR-4. The button renders disabled-with-tooltip
-    so operator sees the affordance shape without triggering an
-    un-spec'd state transition."""
+# --------------------------------------------------------------------------
+# G.1. Block F archive form (2026-05-08 PR-4 conditional-pass correction 2)
+# --------------------------------------------------------------------------
+
+
+def test_block_f_archive_form_rendered_when_closure_has_variations() -> None:
+    """PR-4 conditional-pass blocker 2: archive action must no longer
+    be a disabled placeholder. When the closure has at least one
+    variation row (`_e_rows` non-empty), the template renders an
+    enabled `<form data-role="ms-dc-block-f-archive-form">` posting to
+    the existing closure endpoint."""
     template = _read_publish_hub_template()
     inside = _ms_publish_hub_gate_body(template)
     block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
     block_f_subtree = inside[block_f_open:]
-    archive_re = re.compile(
-        r'data-role="ms-dc-block-f-archive-button"[\s\S]*?</button>'
+    assert 'data-role="ms-dc-block-f-archive-form"' in block_f_subtree
+
+
+def test_block_f_archive_form_action_is_existing_closure_endpoint() -> None:
+    """The archive form posts to the existing
+    POST /api/matrix-script/closures/{task_id}/events endpoint via the
+    `ms_pub_endpoint` template variable resolved by the seam — no new
+    endpoint."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
+    block_f_subtree = inside[block_f_open:]
+    archive_form_re = re.compile(
+        r'<form\s+data-role="ms-dc-block-f-archive-form"[\s\S]*?</form>'
     )
-    m = archive_re.search(block_f_subtree)
-    assert m is not None, "archive button not found in Block F subtree"
-    assert "disabled" in m.group()
+    m = archive_form_re.search(block_f_subtree)
+    assert m is not None, "archive form not found"
+    archive_form = m.group()
+    assert 'method="POST"' in archive_form
+    assert 'action="{{ ms_pub_endpoint }}"' in archive_form
+
+
+def test_block_f_archive_form_event_kind_is_closed_operator_note() -> None:
+    """Per the wireframe §9.2 + slicing addendum §7.4 RO-4.8
+    "(or system-decided)" parenthetical: the archive event_kind picks
+    one closed `EVENT_KINDS` member. PR-4 chose `operator_note`
+    because the closure validator
+    (publish_feedback_closure.apply_event:198-210) ALWAYS overwrites
+    `publish_status` on `operator_publish` — using `operator_publish`
+    for archive would un-publish already-published variations on
+    archive, which is a state regression. `operator_note` carries the
+    archive intent in `operator_publish_notes` without touching
+    publish_status. Closed enum, no widening."""
+    assert "operator_note" in EVENT_KINDS
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
+    block_f_subtree = inside[block_f_open:]
+    archive_form_re = re.compile(
+        r'<form\s+data-role="ms-dc-block-f-archive-form"[\s\S]*?</form>'
+    )
+    m = archive_form_re.search(block_f_subtree)
+    assert m is not None
+    archive_form = m.group()
+    assert (
+        '<input type="hidden" name="event_kind" value="operator_note"' in archive_form
+    )
+
+
+def test_block_f_archive_form_actor_kind_is_closed_operator() -> None:
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
+    block_f_subtree = inside[block_f_open:]
+    archive_form_re = re.compile(
+        r'<form\s+data-role="ms-dc-block-f-archive-form"[\s\S]*?</form>'
+    )
+    m = archive_form_re.search(block_f_subtree)
+    assert m is not None
+    archive_form = m.group()
+    assert '<input type="hidden" name="actor_kind" value="operator"' in archive_form
+
+
+def test_block_f_archive_form_carries_archive_intent_note() -> None:
+    """The archive intent is captured in `operator_publish_notes` so the
+    closure event log carries an operator-language record of the archive
+    decision. The note text "归档此任务" matches the button label."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
+    block_f_subtree = inside[block_f_open:]
+    archive_form_re = re.compile(
+        r'<form\s+data-role="ms-dc-block-f-archive-form"[\s\S]*?</form>'
+    )
+    m = archive_form_re.search(block_f_subtree)
+    assert m is not None
+    archive_form = m.group()
+    assert 'name="operator_publish_notes"' in archive_form
+    assert 'value="归档此任务"' in archive_form
+
+
+def test_block_f_archive_form_carries_variation_id_select() -> None:
+    """The closure validator requires `variation_id` on every event
+    (publish_feedback_closure.apply_event:190-192). The archive form
+    pulls the select options from the same `_e_rows` set the publish
+    event form uses — operator picks which variation row carries the
+    archive intent record."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
+    block_f_subtree = inside[block_f_open:]
+    archive_form_re = re.compile(
+        r'<form\s+data-role="ms-dc-block-f-archive-form"[\s\S]*?</form>'
+    )
+    m = archive_form_re.search(block_f_subtree)
+    assert m is not None
+    archive_form = m.group()
+    assert 'name="variation_id"' in archive_form
+    assert 'data-role="ms-dc-block-f-archive-form-variation-id"' in archive_form
+    # Options are populated from the closure's variation_feedback rows.
+    assert "for row in _e_rows" in archive_form
+
+
+def test_block_f_archive_form_submit_button_rendered_enabled() -> None:
+    """The submit button has no `disabled` attribute — the archive
+    action is wired and clickable when the closure has at least one
+    variation."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
+    block_f_subtree = inside[block_f_open:]
+    archive_form_re = re.compile(
+        r'<form\s+data-role="ms-dc-block-f-archive-form"[\s\S]*?</form>'
+    )
+    m = archive_form_re.search(block_f_subtree)
+    assert m is not None
+    archive_form = m.group()
+    archive_button_re = re.compile(
+        r'<button\s+type="submit"[^>]*data-role="ms-dc-block-f-archive-button"[^>]*>'
+    )
+    bm = archive_button_re.search(archive_form)
+    assert bm is not None, "archive submit button not found inside the form"
+    button_open_tag = bm.group()
+    assert "disabled" not in button_open_tag, (
+        "archive submit button must not carry the disabled attribute when "
+        "the closure has variations — the action must be wired"
+    )
+
+
+def test_block_f_archive_form_does_not_widen_event_kinds_enum() -> None:
+    """No closed-enum widening: the form's event_kind value must be a
+    member of the existing closed EVENT_KINDS frozenset; this test
+    asserts the literal in the template is one of the existing members."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
+    block_f_subtree = inside[block_f_open:]
+    archive_form_re = re.compile(
+        r'<form\s+data-role="ms-dc-block-f-archive-form"[\s\S]*?</form>'
+    )
+    m = archive_form_re.search(block_f_subtree)
+    assert m is not None
+    archive_form = m.group()
+    event_kind_re = re.compile(
+        r'<input type="hidden" name="event_kind" value="([^"]+)"'
+    )
+    em = event_kind_re.search(archive_form)
+    assert em is not None
+    assert em.group(1) in EVENT_KINDS
+
+
+def test_block_f_archive_form_does_not_post_to_new_endpoint() -> None:
+    """The form action must resolve to the existing closure endpoint
+    template, not a new path. The seam emits closure_endpoint_url
+    matching the existing endpoint."""
+    out = derive_matrix_script_publish_hub_render_data(_s001_task(task_id="ms-arc-001"))
+    assert (
+        out["closure_endpoint_url"]
+        == "/api/matrix-script/closures/ms-arc-001/events"
+    )
+
+
+def test_block_f_archive_button_disabled_when_no_closure_variations() -> None:
+    """Disabled fallback: when `_e_rows` is empty (no closure variations
+    to attach the archive note to), the template renders a
+    disabled-with-tooltip button explaining the closure-existence
+    prerequisite. Closure event posts require a `variation_id` per the
+    closure validator, so without rows the form cannot be wired."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
+    block_f_subtree = inside[block_f_open:]
+    # The {% else %} branch renders a disabled button. Find it by its
+    # data-role marker outside of the form.
+    archive_actions_re = re.compile(
+        r'<div\s+class="task-actions"\s+data-role="ms-dc-block-f-archive-actions"[\s\S]*?</div>'
+    )
+    am = archive_actions_re.search(block_f_subtree)
+    assert am is not None, "archive disabled-fallback container not found"
+    fallback_block = am.group()
+    fallback_button_re = re.compile(
+        r'<button\s+type="button"[^>]*data-role="ms-dc-block-f-archive-button"[^>]*>'
+    )
+    fb = fallback_button_re.search(fallback_block)
+    assert fb is not None
+    assert "disabled" in fb.group()
+
+
+def test_block_f_archive_form_does_not_introduce_record_kind_field() -> None:
+    """The wireframe §9.2 calls for a future `record_kind == "archive_action"`
+    follow-up event; that field does NOT exist on the closure schema
+    today (PG-4 deferred). PR-4 must not introduce a `record_kind` form
+    input that would imply schema widening."""
+    template = _read_publish_hub_template()
+    inside = _ms_publish_hub_gate_body(template)
+    block_f_open = inside.find('data-role="matrix-script-block-f-iteration-archive"')
+    block_f_subtree = inside[block_f_open:]
+    archive_form_re = re.compile(
+        r'<form\s+data-role="ms-dc-block-f-archive-form"[\s\S]*?</form>'
+    )
+    m = archive_form_re.search(block_f_subtree)
+    assert m is not None
+    archive_form = m.group()
+    assert 'name="record_kind"' not in archive_form, (
+        "Block F archive form must not introduce a `record_kind` field — "
+        "the closure schema does not carry one today; PG-4 enrichment "
+        "is gated to a future closure schema change."
+    )
+
+
+def test_block_f_archive_form_cited_in_residual_implementation_note() -> None:
+    """Defensive: the template comment block above the archive form
+    cites both the closure validator constraint and the PG-4 deferred
+    enrichment, so reviewers walking ENGINEERING_RULES §13 can see
+    why `operator_note` is the chosen event_kind. Reads the raw
+    template (Jinja `{# ... #}` comments are stripped by the
+    gate-body extractor)."""
+    template = _read_publish_hub_template()
+    # Locate the Block F subtree on the raw template (comments
+    # preserved). The Block F section starts at its data-role marker
+    # and ends at the next sibling card or end-of-gate.
+    block_f_open = template.find(
+        'data-role="matrix-script-block-f-iteration-archive"'
+    )
+    assert block_f_open != -1, "Block F not found in raw template"
+    # Walk forward enough to capture the implementation-note comment
+    # and the form. 5KB is plenty for the Block F subtree.
+    block_f_window = template[block_f_open : block_f_open + 5000]
+    # Confirm the citation anchors are present so the design rationale
+    # survives future template churn.
+    assert "publish_feedback_closure.py" in block_f_window
+    assert "operator_note" in block_f_window
+    assert "archive_action" in block_f_window  # PG-4 enrichment cite
 
 
 def test_block_f_no_invented_truth_note_present() -> None:

@@ -572,7 +572,17 @@
                        data-subfield-id="{{ sub.subfield_id }}"
                        data-status-code="{{ sub.status_code }}">
                     <strong>{{ sub.label_zh }}</strong>
-                    {% if sub.status_code == "resolved" and sub.value %}
+                    {# Resolved status check matches the producer's closed
+                       constant `STATUS_RESOLVED = "resolved_from_existing_projection"`
+                       (gateway/app/services/matrix_script/delivery_copy_bundle_view.py:97).
+                       The earlier `"resolved"` literal here never matched
+                       the producer output; resolved values fell through
+                       to the unresolved branch and were rendered as
+                       tracked-gap. Fix: literal-match the producer's
+                       closed enum value. No enum widening — both
+                       STATUS_RESOLVED and STATUS_UNRESOLVED are
+                       producer-side closed constants. #}
+                    {% if sub.status_code == "resolved_from_existing_projection" and sub.value %}
                       <span data-role="ms-dc-block-d-subfield-value">{{ sub.value }}</span>
                     {% else %}
                       <span class="muted" data-role="ms-dc-block-d-subfield-empty">{{ sub.unresolved_explanation_zh or sub.status_label_zh or "—" }}</span>
@@ -784,20 +794,70 @@
               <div class="muted" data-role="ms-dc-block-f-iteration-empty" style="margin-top:8px;">尚无可解释的变体（Phase B 未派生 / packet 未到位）。</div>
             {% endif %}
             {# Archive affordance — posts an existing closure event via
-               the standard endpoint. This wave does NOT add a new
-               record_kind for archive (PG-4 deferred); the button
-               renders disabled-with-tooltip so operators see the
-               affordance shape without triggering an un-spec'd state
-               transition. #}
-            <div class="task-actions" data-role="ms-dc-block-f-archive-actions" style="margin-top:10px;">
-              <button type="button"
-                      class="btn-secondary"
-                      data-role="ms-dc-block-f-archive-button"
-                      title="归档此任务：当前阶段以 closure operator_note 记录意图；明确的 record_kind == archive_action（PG-4）将由后续 closure 增补落地。"
-                      disabled aria-disabled="true">
-                归档此任务
-              </button>
-            </div>
+               the standard POST /api/matrix-script/closures/{task_id}/events
+               endpoint. Implementation note (PR-4 conditional-pass
+               correction 2026-05-08): the wireframe §9.2 + slicing
+               addendum §7.4 RO-4.8 originally suggested
+               `event_kind == "operator_publish"` for the archive
+               event. The closure validator
+               (gateway/app/services/matrix_script/publish_feedback_closure.py
+               :198-210) ALWAYS overwrites
+               `variation_feedback[].publish_status` on
+               `operator_publish` — using it for archive would
+               un-publish already-published variations, which is a
+               state regression. Per the wireframe's
+               "(or system-decided)" parenthetical, this PR records
+               archive intent via `event_kind == "operator_note"`
+               (closed enum, no widening) with the operator-language
+               note text "归档此任务". The future
+               `record_kind == "archive_action"` event-shape
+               enrichment (PG-4) remains a follow-on closure schema
+               enhancement. The form is enabled when the closure has
+               at least one variation row (`_e_rows` non-empty);
+               otherwise the disabled fallback explains the
+               closure-existence prerequisite. #}
+            {% if _e_rows %}
+              <form data-role="ms-dc-block-f-archive-form"
+                    method="POST"
+                    action="{{ ms_pub_endpoint }}"
+                    style="margin-top:10px;">
+                <input type="hidden" name="event_kind" value="operator_note"
+                       data-role="ms-dc-block-f-archive-form-event-kind">
+                <input type="hidden" name="actor_kind" value="operator"
+                       data-role="ms-dc-block-f-archive-form-actor-kind">
+                <input type="hidden" name="operator_publish_notes" value="归档此任务"
+                       data-role="ms-dc-block-f-archive-form-notes">
+                <label class="field" style="display:inline-block;margin-right:8px;">
+                  <span>候选（variation_id）</span>
+                  <select name="variation_id" required
+                          data-role="ms-dc-block-f-archive-form-variation-id">
+                    {% for row in _e_rows %}
+                      <option value="{{ row.variation_id }}">候选 {{ loop.index }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <button type="submit"
+                        class="btn-secondary"
+                        data-role="ms-dc-block-f-archive-button">
+                  归档此任务
+                </button>
+                <span class="muted t-secondary" style="margin-left:6px;"
+                      data-role="ms-dc-block-f-archive-form-explanation">
+                  归档意图通过 closure operator_note 记录在所选候选行；
+                  明确的 record_kind == archive_action（PG-4）将由后续 closure 增补落地。
+                </span>
+              </form>
+            {% else %}
+              <div class="task-actions" data-role="ms-dc-block-f-archive-actions" style="margin-top:10px;">
+                <button type="button"
+                        class="btn-secondary"
+                        data-role="ms-dc-block-f-archive-button"
+                        title="尚未生成 closure 记录；记录任意发布事件后再尝试归档。"
+                        disabled aria-disabled="true">
+                  归档此任务
+                </button>
+              </div>
+            {% endif %}
             <div class="muted t-secondary" data-role="ms-dc-block-f-no-invented-truth-note" style="margin-top:6px;">
               本面板不发明任务级真值；建议来自既有 publish_backfill_readiness 投射，不基于尚未上线的指标分析（BG-5 待 Plan E 后续阶段）。
             </div>
