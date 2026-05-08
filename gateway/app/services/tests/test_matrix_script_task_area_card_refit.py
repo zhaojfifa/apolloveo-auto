@@ -666,3 +666,173 @@ def test_helper_returns_only_serialisable_types() -> None:
     allowed = (str, int, bool, type(None), list, tuple, dict, Mapping)
     for key, value in summary.items():
         assert isinstance(value, allowed), f"{key} = {type(value).__name__}"
+
+
+# --------------------------------------------------------------------------
+# J. Publish-feedback anchor existence (PR #159 conditional-pass correction)
+# --------------------------------------------------------------------------
+#
+# The Task Area "打开发布反馈" button (added by this PR) points to
+# `/tasks/{id}/publish#publish-feedback`. PR #159's first review found
+# this href was correctly generated but had no real DOM target on the
+# publish-hub page. This correction adds an explicit anchor element with
+# id="publish-feedback" inside the existing {% if _ms_kind == "matrix_script" %}
+# gate of task_publish_hub.html, immediately above the existing
+# `matrix-script-closure-block` card. The tests below verify:
+#
+# 1. The href the helper emits keeps the "#publish-feedback" anchor.
+# 2. The publish-hub template contains a real `id="publish-feedback"` anchor.
+# 3. The anchor lives inside the matrix_script-only branch (so Hot Follow /
+#    Digital Anchor / baseline publish hubs do NOT carry the anchor).
+# 4. The pre-existing `matrix-script-closure-block` id is preserved
+#    (Recovery PR-3 JS reference at document.getElementById keeps working).
+
+import os
+import re
+from pathlib import Path
+
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+_PUBLISH_HUB_TEMPLATE = _REPO_ROOT / "gateway" / "app" / "templates" / "task_publish_hub.html"
+
+
+def _read_publish_hub_template() -> str:
+    return _PUBLISH_HUB_TEMPLATE.read_text(encoding="utf-8")
+
+
+def test_publish_hub_template_file_exists() -> None:
+    """Sanity: the test below assumes the template exists at the
+    canonical path."""
+    assert _PUBLISH_HUB_TEMPLATE.is_file(), str(_PUBLISH_HUB_TEMPLATE)
+
+
+def test_publish_hub_template_contains_publish_feedback_anchor_id() -> None:
+    """The Task Area button's href targets `#publish-feedback`; the
+    publish-hub template must carry a real DOM element with that id so
+    the browser anchor jump lands on a stable target."""
+    template = _read_publish_hub_template()
+    assert 'id="publish-feedback"' in template, (
+        "publish-hub template missing id=\"publish-feedback\" anchor — Task "
+        "Area '打开发布反馈' button would have no real DOM target"
+    )
+
+
+def test_publish_feedback_anchor_lives_inside_matrix_script_gate() -> None:
+    """The anchor MUST live inside the existing `{% if _ms_kind ==
+    "matrix_script" %}` gate so Hot Follow / Digital Anchor / baseline
+    publish hubs do NOT render this anchor — preserves byte-isolation
+    on those line branches."""
+    template = _read_publish_hub_template()
+    # Find every {% if _ms_kind == "matrix_script" %} ... {% endif %}
+    # block and verify at least one of them contains id="publish-feedback".
+    matrix_blocks = re.findall(
+        r'{%\s*if\s+_ms_kind\s*==\s*"matrix_script"\s*%}(.*?){%\s*endif\s*%}',
+        template,
+        flags=re.DOTALL,
+    )
+    assert matrix_blocks, "no _ms_kind == matrix_script gates found in template"
+    inside_matrix_gate = any('id="publish-feedback"' in block for block in matrix_blocks)
+    assert inside_matrix_gate, (
+        "publish-feedback anchor must live inside the matrix_script {% if %} gate"
+    )
+
+
+def test_publish_feedback_anchor_does_not_appear_outside_matrix_script_gate() -> None:
+    """The anchor must NOT leak into a non-matrix_script branch — Hot
+    Follow / Digital Anchor / baseline publish hubs must not carry the
+    anchor (each line owns its own publish-feedback semantics)."""
+    template = _read_publish_hub_template()
+    # Strip every matrix_script gate body so what's left is the
+    # non-matrix_script template content. The anchor MUST NOT appear
+    # in the stripped content.
+    stripped = re.sub(
+        r'{%\s*if\s+_ms_kind\s*==\s*"matrix_script"\s*%}.*?{%\s*endif\s*%}',
+        "",
+        template,
+        flags=re.DOTALL,
+    )
+    assert 'id="publish-feedback"' not in stripped, (
+        "publish-feedback anchor leaked outside the matrix_script gate"
+    )
+
+
+def test_publish_feedback_anchor_carries_data_role_marker() -> None:
+    """Defensive: the anchor element carries a stable data-role marker
+    so future tests / DOM inspection can identify it without relying
+    on the id attribute alone."""
+    template = _read_publish_hub_template()
+    assert 'data-role="matrix-script-publish-feedback-anchor"' in template
+
+
+def test_publish_feedback_anchor_is_aria_hidden_and_not_focusable() -> None:
+    """The anchor is a non-interactive jump target — it must not steal
+    keyboard focus or read aloud to screen readers as a separate
+    landmark. Adding aria-hidden + tabindex='-1' keeps it invisible to
+    assistive tech."""
+    template = _read_publish_hub_template()
+    # The anchor element is a single line in the template; require both
+    # attributes appear on the same logical element by searching for the
+    # pattern inline.
+    pattern = re.compile(
+        r'<a\s+id="publish-feedback"[^>]*aria-hidden="true"[^>]*tabindex="-1"',
+        flags=re.DOTALL,
+    )
+    assert pattern.search(template), (
+        "publish-feedback anchor must carry aria-hidden=\"true\" + tabindex=\"-1\""
+    )
+
+
+def test_existing_matrix_script_closure_block_id_is_preserved() -> None:
+    """Recovery PR-3 JS at line 1527 calls
+    document.getElementById('matrix-script-closure-block'). The
+    correction MUST NOT rename or remove this id."""
+    template = _read_publish_hub_template()
+    assert 'id="matrix-script-closure-block"' in template
+
+
+def test_publish_feedback_anchor_positioned_above_closure_block() -> None:
+    """The anchor sits immediately above the closure-block card so a
+    browser anchor jump lands on the start of the publish-feedback
+    section, not inside the table body. Jinja comments are stripped
+    so the test reads the rendered-DOM ordering, not raw source."""
+    template = _read_publish_hub_template()
+    rendered = re.sub(r"{#.*?#}", "", template, flags=re.DOTALL)
+    anchor_pos = rendered.find('id="publish-feedback"')
+    closure_pos = rendered.find('id="matrix-script-closure-block"')
+    assert anchor_pos != -1
+    assert closure_pos != -1
+    assert anchor_pos < closure_pos, (
+        "anchor must precede the matrix-script-closure-block card so "
+        "anchor jump lands on the publish-feedback section header"
+    )
+
+
+def test_task_area_helper_href_matches_publish_hub_anchor_id() -> None:
+    """End-to-end invariant: the Task Area helper emits an href
+    ending in `#publish-feedback` and the publish-hub template
+    carries the matching `id="publish-feedback"` anchor — the two
+    are linked by the literal anchor name `publish-feedback`."""
+    summary = derive_matrix_script_task_card_summary(
+        _matrix_script_row(task_id="ms-link-001")
+    )
+    assert summary["publish_feedback_action_href"].endswith("#publish-feedback")
+    template = _read_publish_hub_template()
+    assert 'id="publish-feedback"' in template
+
+
+def test_publish_feedback_anchor_is_only_anchor_in_matrix_script_branch() -> None:
+    """The rendered DOM must carry exactly one element with
+    `id="publish-feedback"` — duplicates would make the browser jump
+    nondeterministic (browsers may pick either, depending on engine).
+    Jinja {# ... #} comments are stripped before count so they may
+    safely reference the anchor literal in their prose without tripping
+    the uniqueness check."""
+    template = _read_publish_hub_template()
+    # Strip Jinja {# ... #} comments — these are stripped at render time
+    # and never reach the browser, so they must not count toward the
+    # rendered-DOM uniqueness check.
+    rendered = re.sub(r"{#.*?#}", "", template, flags=re.DOTALL)
+    occurrences = rendered.count('id="publish-feedback"')
+    assert occurrences == 1, (
+        f"publish-feedback anchor must be unique in the rendered template; found {occurrences}"
+    )
