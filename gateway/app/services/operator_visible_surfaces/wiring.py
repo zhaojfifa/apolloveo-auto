@@ -277,6 +277,18 @@ def build_operator_surfaces_for_workbench(
         delivery_comprehension = derive_matrix_script_delivery_comprehension(
             delivery_binding
         )
+        # OWC-MS-RO PR-3 / Block F — Delivery Teaser consumes the same
+        # delivery comprehension lanes (required_blocking /
+        # required_non_blocking / optional_non_blocking) that the
+        # Delivery Center renders, so the workbench teaser stays
+        # truth-aligned without a second producer. Already computed
+        # above for qc_diagnostics + delivery_ready_package; this is
+        # only an attachment for template consumption. Authority:
+        # docs/design/matrix_script_workbench_wireframe_v1.md §8 +
+        # docs/design/matrix_script_result_oriented_ui_implementation_slicing_v1.md §6.2.
+        bundle["workbench"]["matrix_script_delivery_comprehension"] = (
+            delivery_comprehension
+        )
         # Read closure read-only — never lazy-create a closure on the
         # workbench path. Defense-in-depth try/except: presentation
         # never breaks the workbench if the closure read raises.
