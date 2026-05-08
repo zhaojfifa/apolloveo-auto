@@ -208,10 +208,17 @@ def test_action_hrefs_read_from_next_surfaces_when_present() -> None:
             },
         )
     )
-    assert summary["workbench_action_label"] == "进入工作台"
+    # OWC-MS-RO PR-1 (Task Area card refit) re-binds the two existing
+    # action labels to "打开工作台" / "打开交付中心" per the wireframe at
+    # docs/design/matrix_script_task_area_wireframe_v1.md §4.2 and adds
+    # the third "打开发布反馈" action (anchored at #publish-feedback on
+    # the publish-hub page) per IG-1 closure.
+    assert summary["workbench_action_label"] == "打开工作台"
     assert summary["workbench_action_href"] == "/tasks/ms-007"
-    assert summary["delivery_action_label"] == "跳交付中心"
+    assert summary["delivery_action_label"] == "打开交付中心"
     assert summary["delivery_action_href"] == "/tasks/ms-007/publish"
+    assert summary["publish_feedback_action_label"] == "打开发布反馈"
+    assert summary["publish_feedback_action_href"] == "/tasks/ms-007/publish#publish-feedback"
 
 
 def test_action_hrefs_fall_back_to_canonical_paths_when_surfaces_missing() -> None:
@@ -221,6 +228,10 @@ def test_action_hrefs_fall_back_to_canonical_paths_when_surfaces_missing() -> No
     summary = derive_matrix_script_task_card_summary(row)
     assert summary["workbench_action_href"] == "/tasks/ms-fallback"
     assert summary["delivery_action_href"] == "/tasks/ms-fallback/publish"
+    # OWC-MS-RO PR-1: publish-feedback anchors at #publish-feedback on
+    # the same publish-hub URL the delivery action targets, so the
+    # canonical fallback url + anchor must match.
+    assert summary["publish_feedback_action_href"] == "/tasks/ms-fallback/publish#publish-feedback"
 
 
 def test_action_hrefs_empty_when_task_id_missing_and_no_surfaces() -> None:

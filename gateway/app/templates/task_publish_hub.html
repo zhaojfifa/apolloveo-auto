@@ -305,6 +305,21 @@
           <div class="muted" data-role="ms-delivery-history-explanation"></div>
         </div>
 
+        {# OWC-MS-RO PR-1 follow-up correction (PR #159 conditional-pass blocker
+           closure 2026-05-08): stable anchor `id="publish-feedback"` makes the
+           Task Area "打开发布反馈" button href `/tasks/{id}/publish#publish-feedback`
+           land on a real DOM target. The anchor lives inside the existing
+           `{% if _ms_kind == "matrix_script" %}` gate so Hot Follow / Digital Anchor
+           / baseline publish hubs do NOT carry this anchor (their card branches
+           remain bytewise unchanged). The anchor sits as an empty sibling above
+           the existing `matrix-script-closure-block` card so the Recovery PR-3 JS
+           reference at `document.getElementById("matrix-script-closure-block")`
+           keeps working unchanged. Authority:
+           docs/design/matrix_script_task_area_wireframe_v1.md §4.2 (jump button)
+           + docs/design/matrix_script_result_oriented_ui_plan_v1.md §11.3 (IG-1
+           closure path). #}
+        <a id="publish-feedback" aria-hidden="true" tabindex="-1"
+           data-role="matrix-script-publish-feedback-anchor"></a>
         {# Recovery PR-3: Matrix Script publish-feedback closure operator surface.
            Per docs/contracts/matrix_script/publish_feedback_closure_contract_v1.md,
            the closure is a separate ownership zone (Phase D); operator events flow
