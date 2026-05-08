@@ -14,7 +14,14 @@ user-mandated PR-U1 narrowing of the signed gate spec at
 
 plus the operator-language tri-state badge label
 (``blocked`` / ``ready`` / ``publishable`` → ``阻塞中`` / ``就绪`` / ``可发布``)
-and the two action hrefs (``进入工作台`` / ``跳交付中心``).
+and the three action hrefs (``打开工作台`` / ``打开交付中心`` / ``打开发布反馈``).
+The Task Area Result-Oriented UI Refit (OWC-MS-RO PR-1) re-binds the two
+existing action labels from ``进入工作台`` / ``跳交付中心`` to ``打开工作台`` /
+``打开交付中心`` and adds the third ``打开发布反馈`` action that anchors at the
+publish-hub's ``#publish-feedback`` element. Authority:
+``docs/design/matrix_script_task_area_wireframe_v1.md`` §4.2 +
+``docs/design/matrix_script_result_oriented_ui_implementation_slicing_v1.md``
+§4 + §2.1 (narrow PR-1 unblock amendment).
 
 Hard discipline (binding):
 
@@ -151,6 +158,16 @@ def derive_matrix_script_task_card_summary(row: Mapping[str, Any]) -> dict[str, 
         str(surfaces.get("delivery") or "").strip()
         or (f"/tasks/{task_id}/publish" if task_id else "")
     )
+    # Publish-feedback href anchors at #publish-feedback on the same
+    # publish-hub page that the delivery action targets, mirroring the
+    # surface_task_area_lowfi_v1.md "Open Publish Feedback" jump and the
+    # IG-1 closure path in matrix_script_result_oriented_ui_plan_v1.md
+    # §11.3. Anchor element ``#publish-feedback`` already exists on the
+    # publish-hub template; this PR only adds the operator-visible button
+    # row entry that points at it.
+    publish_feedback_href = (
+        f"{delivery_href}#publish-feedback" if delivery_href else ""
+    )
 
     return {
         "is_matrix_script": True,
@@ -167,10 +184,12 @@ def derive_matrix_script_task_card_summary(row: Mapping[str, Any]) -> dict[str, 
         "current_blocker_value": blocker_label,
         "tri_state_bucket": bucket,
         "tri_state_badge_label": tri_state_label,
-        "workbench_action_label": "进入工作台",
+        "workbench_action_label": "打开工作台",
         "workbench_action_href": workbench_href,
-        "delivery_action_label": "跳交付中心",
+        "delivery_action_label": "打开交付中心",
         "delivery_action_href": delivery_href,
+        "publish_feedback_action_label": "打开发布反馈",
+        "publish_feedback_action_href": publish_feedback_href,
     }
 
 

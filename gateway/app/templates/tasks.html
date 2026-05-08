@@ -147,7 +147,8 @@
                   <span>&middot;</span>
                   <span data-role="ms-publishable-variation"
                         {% if ms_owc and ms_owc.publishable_variation_count_value is not none %}title="可发布版本数 = 已就绪可发布的变体数（来自统一 publish_readiness 判定，可发布 ≠ 已发布）"{% else %}title="{{ ms_summary.publishable_variation_count_tooltip }}"{% endif %}>
-                    {{ ms_summary.publishable_variation_count_label }}：{% if ms_owc %}{{ ms_owc.publishable_variation_count_value }}{% elif ms_summary.publishable_variation_count_value is none %}—{% else %}{{ ms_summary.publishable_variation_count_value }}{% endif %}
+                    {# OWC-MS-RO PR-1 — render M/N format per wireframe §4 row 4. ms_owc carries both publishable_variation_count_value (M) and current_variation_count_value (N) from derive_matrix_script_full_card_summary; PR-U1-only fallback (no ms_owc) renders the legacy '—' single-value. #}
+                    {{ ms_summary.publishable_variation_count_label }}：{% if ms_owc %}{{ ms_owc.publishable_variation_count_value }}/{{ ms_owc.current_variation_count_value }}{% elif ms_summary.publishable_variation_count_value is none %}—{% else %}{{ ms_summary.publishable_variation_count_value }}{% endif %}
                   </span>
                   <span>&middot;</span>
                   <span data-role="ms-current-blocker">
@@ -174,21 +175,27 @@
                     </span>
                   </div>
                   {% if ms_result_status and ms_result_status.is_matrix_script %}
-                    {# RC PR-1 RC-R6 — operator-language result-oriented status row. One of: "ready: do X next" / "blocked: missing Y" / "completed". Reads `board_bucket` + `head_reason` + eight-stage state already decided upstream — no second producer. Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md §3 RC-R6 + §5 RC PR-1. #}
+                    {# RC PR-1 RC-R6 — operator-language result-oriented status row. One of: "ready: do X next" / "blocked: missing Y" / "completed". Reads `board_bucket` + `head_reason` + eight-stage state already decided upstream — no second producer. Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md §3 RC-R6 + §5 RC PR-1.
+                       OWC-MS-RO PR-1 — split the next-action sentence out to its own "下一步" chip row below per matrix_script_task_area_wireframe_v1.md §4.1 (next-action chip lives in its own row, not inline with the result pill). #}
                     <div class="task-card__meta" data-role="ms-result-status"
                          data-status-kind="{{ ms_result_status.status_kind }}"
                          data-stage="{{ ms_result_status.stage }}">
                       <span class="task-pill ms-result-status__kind ms-result-status__kind--{{ ms_result_status.status_kind }}"
                             data-role="ms-result-status-kind">{{ ms_result_status.status_label_zh }}</span>
                       <span data-role="ms-result-status-headline">{{ ms_result_status.headline_zh }}</span>
-                      <span>&middot;</span>
-                      <span data-role="ms-result-status-next-action">{{ ms_result_status.next_action_zh }}</span>
                       {% if ms_result_status.head_reason %}
                         <span>&middot;</span>
                         <span data-role="ms-result-status-head-reason"
                               data-head-reason="{{ ms_result_status.head_reason }}"
                               title="head_reason = {{ ms_result_status.head_reason }}">{{ ms_result_status.head_reason_label_zh }}</span>
                       {% endif %}
+                    </div>
+                    {# OWC-MS-RO PR-1 — explicit "下一步" next-action chip on its own row per wireframe §4.1. The label "下一步" + the operator-language next-action sentence from `derive_matrix_script_task_area_result_status.next_action_label`/`next_action_zh`. Sourced from the same RC-R6 helper so there is no second truth source. #}
+                    <div class="task-card__meta" data-role="ms-next-action-chip"
+                         data-status-kind="{{ ms_result_status.status_kind }}">
+                      <span class="ms-next-action-chip__label" data-role="ms-next-action-label">下一步</span>
+                      <span class="ms-next-action-chip__separator">：</span>
+                      <span class="ms-next-action-chip__value" data-role="ms-next-action-value">{{ ms_result_status.next_action_zh }}</span>
                     </div>
                   {% endif %}
                   {% if ms_lanes and ms_lanes.lanes %}
@@ -216,11 +223,14 @@
               <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}"
                     data-role="operator-bucket"
                     data-bucket-language="zh">{{ ms_summary.tri_state_badge_label }}</span>
+              {# OWC-MS-RO PR-1 — three jump buttons per wireframe §4.2: 打开工作台 / 打开交付中心 / 打开发布反馈. The third button closes interaction gap IG-1 (matrix_script_result_oriented_ui_plan_v1.md §11.3 — "Open publish feedback" promoted from anchor-only to first-class card button). All three labels and hrefs come from the existing helper output in derive_matrix_script_task_card_summary; no new helper module. #}
               <div class="task-actions" data-role="ms-actions">
                 <a href="{{ ms_summary.workbench_action_href }}" class="btn-primary"
                    data-role="ms-action-workbench">{{ ms_summary.workbench_action_label }}</a>
                 <a href="{{ ms_summary.delivery_action_href }}" class="btn-secondary"
                    data-role="ms-action-delivery">{{ ms_summary.delivery_action_label }}</a>
+                <a href="{{ ms_summary.publish_feedback_action_href }}" class="btn-secondary"
+                   data-role="ms-action-publish-feedback">{{ ms_summary.publish_feedback_action_label }}</a>
                 <button class="btn-danger-link" data-action="delete" data-id="{{ task_id }}"
                         onclick="deleteTask('{{ task_id }}'); return false;">
                   {{ t("action.delete") }}
