@@ -288,6 +288,187 @@
       {% set ms_slots = (ms_copy_bundle.slots or []) %}
       {% set ms_slot_index = {} %}
       {% for slot in ms_slots %}{% if ms_slot_index.update({slot.slot_id: slot}) %}{% endif %}{% endfor %}
+      {# OWC-MS-RO PR-2 — Matrix Script Workbench Blocks A / B / C (read-side
+         comprehension). Per matrix_script_workbench_wireframe_v1.md §3 / §4 / §5.
+         Three additive operator-result-first panels rendered ABOVE the existing
+         PR-U2 comprehension block + MS-W3 script structure block + Variation
+         Panel (which all stay verbatim BELOW as secondary diagnostics per
+         matrix_script_result_oriented_ui_implementation_slicing_v1.md §5.3).
+         Pure presentation-layer over already-attached helpers — no new helper
+         module, no projection mutation, no contract/schema/runtime change.
+         Authority pointers: matrix_script_result_oriented_ui_plan_v1.md
+         §0.1 (S001/S002/S003 sample anchor) + §4.4 (six-block primary path);
+         matrix_script_workbench_wireframe_v1.md §3.A / §4.B / §5.C; slicing
+         addendum §4 PR-2 scope. PR-3 (Blocks D/E/F) and PR-4 (Delivery Center)
+         are NOT in this PR. #}
+
+      {# Block A — Goal Summary. Operator answers "what is being produced",
+         "what is blocked", "what should I do next". Sources: subject /
+         audience / target_platform / target_language come from the existing
+         derive_matrix_script_script_structure_view; status / blocker /
+         next-action come from the existing derive_matrix_script_workbench_result_summary
+         (RC-R6 single source — no second producer). Jump buttons route to
+         the existing publish-hub URL + #publish-feedback anchor (added by
+         OWC-MS-RO PR-1 + correction). #}
+      {% if (ms_script_structure.is_matrix_script or ms_result_summary.is_matrix_script) %}
+        <div class="panel" data-role="matrix-script-block-a-goal-summary">
+          <div class="section-title">
+            <h2 data-role="ms-block-a-title">Workbench A · 任务摘要</h2>
+            <div class="secondary" data-role="ms-block-a-subtitle">面向运营的目标 / 阻塞 / 下一步摘要；本面板只读，不发明事实。</div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-block-a-subject">
+              <strong>主题</strong>
+              <span>{{ ms_script_structure.title_value or task.title or "—" }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-block-a-audience">
+              <strong>受众</strong>
+              <span>{{ ms_script_structure.axis_hints.audience_hint or "—" }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-block-a-target-platform">
+              <strong>目标平台</strong>
+              <span>{{ ms_script_structure.target_platform_value or "—" }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-block-a-target-language">
+              <strong>目标语言</strong>
+              <span>
+                {% set _tl = (ms_script_structure.language_scope or {}).target_language %}
+                {% if _tl %}{{ _tl | join(", ") }}{% else %}—{% endif %}
+              </span>
+            </div>
+          </div>
+          {% if ms_result_summary and ms_result_summary.is_matrix_script %}
+            <div class="meta-grid" style="margin-top:8px;">
+              <div class="meta-item" data-role="ms-block-a-status"
+                   data-status-kind="{{ ms_result_summary.status_kind }}">
+                <strong>当前总状态</strong>
+                <span>
+                  <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_result_summary.status_kind }}"
+                        data-role="ms-block-a-status-kind">{{ ms_result_summary.status_label_zh }}</span>
+                  <span data-role="ms-block-a-status-headline" style="margin-left:6px;">{{ ms_result_summary.headline_zh }}</span>
+                </span>
+              </div>
+              <div class="meta-item" data-role="ms-block-a-blocker">
+                <strong>当前阻塞</strong>
+                <span data-role="ms-block-a-blocker-value">{{ ms_result_summary.head_reason_label_zh if ms_result_summary.head_reason else "无" }}</span>
+              </div>
+              <div class="meta-item" data-role="ms-block-a-next-action">
+                <strong>下一步</strong>
+                <span data-role="ms-block-a-next-action-value">{{ ms_result_summary.next_action_zh }}</span>
+              </div>
+            </div>
+          {% endif %}
+          <div class="task-actions" data-role="ms-block-a-actions" style="margin-top:10px;">
+            <a href="/tasks/{{ task.task_id }}/publish" class="btn-secondary"
+               data-role="ms-block-a-action-delivery">前往交付中心</a>
+            <a href="/tasks/{{ task.task_id }}/publish#publish-feedback" class="btn-secondary"
+               data-role="ms-block-a-action-publish-feedback">前往发布反馈</a>
+          </div>
+        </div>
+      {% endif %}
+
+      {# Block B — Script Structure (operator-readable wording only). Renders
+         Hook (前 3 秒) / Body (中段) / CTA (结尾) sections + 关键词 + 禁用词,
+         all sourced from derive_matrix_script_script_structure_view. The
+         engineering details (source_script_ref handle, axis_hints,
+         variation_target_count) stay BELOW in the existing MS-W3 panel as
+         secondary diagnostics — Block B does not surface them per wireframe §4.5
+         forbidden list ("operator-readable wording only"). #}
+      {% if ms_script_structure.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-block-b-script-structure">
+          <div class="section-title">
+            <h2 data-role="ms-block-b-title">Workbench B · 脚本结构</h2>
+            <div class="secondary" data-role="ms-block-b-subtitle">面向运营的 Hook / Body / CTA + 关键词 / 禁用词；只读视图。</div>
+          </div>
+          {% for section in (ms_script_structure.sections or []) %}
+            <div class="meta-item" data-role="ms-block-b-section"
+                 data-section-id="{{ section.section_id }}"
+                 data-section-status="{{ section.body_status_code }}"
+                 style="margin-top:8px;">
+              <strong>{{ section.section_label_zh }}</strong>
+              {% if section.body_text %}
+                <span data-role="ms-block-b-section-body">{{ section.body_text }}</span>
+              {% else %}
+                <span class="muted" data-role="ms-block-b-section-empty">{{ section.body_status_label_zh }}</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+          {% for tax in (ms_script_structure.taxonomy or []) %}
+            <div class="meta-item" data-role="ms-block-b-taxonomy"
+                 data-taxonomy-id="{{ tax.taxonomy_id }}"
+                 data-taxonomy-status="{{ tax.values_status_code }}"
+                 style="margin-top:6px;">
+              <strong>{{ tax.taxonomy_label_zh }}</strong>
+              {# Item access (`tax["values"]`) — Jinja attribute access on a dict key named `values` resolves to `dict.values` (the bound method) and yields a non-iterable, raising `TypeError: 'builtin_function_or_method' object is not iterable` at render. Same shape as the §8.G axis-values fix. #}
+              {% if tax["values"] %}
+                <span data-role="ms-block-b-taxonomy-values">
+                  {% for v in tax["values"] %}<span class="info-pill" style="margin-right:4px;">{{ v }}</span>{% endfor %}
+                </span>
+              {% else %}
+                <span class="muted" data-role="ms-block-b-taxonomy-empty">{{ tax.values_status_label_zh }}</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {# Block C — Variant Strategy. Renders variant count + per-variant
+         differentiator table (variation_id labeled as 候选 N + axis_summary +
+         differentiator + length hint). Per-row tooltip carries the
+         "why this variant" explanation. NO raw axis tuple labels in operator
+         column headers; NO cell_id / slot_id / script_slot_ref / content://
+         handles; NO vendor / model / provider / engine column.
+         Source: derive_matrix_script_readable_variants. #}
+      {% if ms_readable_variants.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-block-c-variant-strategy">
+          <div class="section-title">
+            <h2 data-role="ms-block-c-title">Workbench C · 变体策略</h2>
+            <div class="secondary" data-role="ms-block-c-subtitle">{{ ms_readable_variants.variant_candidates_label_zh }}</div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-block-c-variant-count">
+              <strong>变体数</strong>
+              <span data-role="ms-block-c-variant-count-value">{{ ms_readable_variants.variant_count }}</span>
+            </div>
+          </div>
+          {% if ms_readable_variants.variant_candidates %}
+            <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse; margin-top:8px;"
+                   data-role="ms-block-c-variant-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">变体</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">差异点</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">视角概要</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">节奏 / 时长</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">脚本片段</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for variant in ms_readable_variants.variant_candidates %}
+                  {% set _idx = loop.index %}
+                  <tr data-role="ms-block-c-variant-row"
+                      data-variant-index="{{ _idx }}"
+                      title="为什么存在此变体：{{ variant.differentiator_zh }}">
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                        data-role="ms-block-c-variant-label">候选 {{ _idx }}</td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                        data-role="ms-block-c-variant-differentiator">{{ variant.differentiator_zh or "—" }}</td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                        data-role="ms-block-c-variant-axis-summary">{{ variant.axis_summary_zh or "—" }}</td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                        data-role="ms-block-c-variant-length">{{ variant.length_hint_zh or "—" }}</td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                        data-role="ms-block-c-variant-bound-slot">{{ variant.bound_slot_label_zh }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <div class="muted" data-role="ms-block-c-empty" style="margin-top:8px;">尚未生成变体；前往任务区或工作台触发生成后再查看。</div>
+          {% endif %}
+        </div>
+      {% endif %}
+
       {# PR-U2 Matrix Script Workbench operator-comprehension block. Additive — sits ABOVE the existing axes/cells/slots/attribution rows which are preserved verbatim below. Reads only ms_comp (presentation-layer projection over ms_surface + panel resolver). No new packet truth. No provider/model/vendor controls. #}
       {% if ms_comp.is_matrix_script %}
         <div class="panel" data-role="matrix-script-comprehension-panel">
