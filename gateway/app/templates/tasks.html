@@ -8,6 +8,7 @@
   <!-- Keep existing i18n + ui skin -->
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <link rel="stylesheet" href="/static/css/operator_console.css">
 
   <style>
     :root { color-scheme: light; }
@@ -118,113 +119,156 @@
         {% set ms_result_status = it.matrix_script_result_status or {} %}
         {% set da_owc = it.digital_anchor_task_area_convergence or {} %}
         {% set da_eight_stage = da_owc.eight_stage or {} %}
-        <div class="task-card task-row" data-line="{{ line_id }}" data-status="{{ status_value }}" data-bucket="{{ bucket_value }}">
+        <div class="task-card task-row op-task-card" data-line="{{ line_id }}" data-status="{{ status_value }}" data-bucket="{{ bucket_value }}">
           {% if line_id == "matrix_script" and ms_summary.is_matrix_script %}
-            {# PR-U1 Matrix Script Task Area comprehension block — operator-language fields + tri-state + explicit workbench/delivery actions. Gated to Matrix Script rows only; Hot Follow / Digital Anchor cards remain bytewise unchanged via the {% else %} branch below. OWC-MS PR-1 (MS-W1 + MS-W2) extends this block with the eight-stage badge, the four newly-converged operator-language fields, and the 脚本/变体/发布 three-tier lanes view; all extensions stay inside this matrix_script-gated branch. #}
-            <div class="task-card__left" data-role="matrix-script-card-left">
-              {% if cover %}
-                <img class="task-card__cover" src="{{ cover }}" alt="cover" />
-              {% else %}
-                <div class="task-card__cover"></div>
-              {% endif %}
-              <div class="task-card__info">
-                <div class="task-card__title">
-                  <span data-role="ms-subject-label">{{ ms_summary.subject_label }}</span>
-                  &middot;
-                  <span data-role="ms-subject-value">{{ ms_summary.subject_value or title }}</span>
-                </div>
-                <div class="task-card__meta">
-                  <span class="task-pill" data-role="board-line-label">{{ line_match.label }}</span>
-                  <span>ID: {{ task_id }}</span>
-                  {% if created %}
-                    <span title="{{ it.created_at or created }}">{{ created }}</span>
-                  {% endif %}
-                </div>
-                <div class="task-card__meta" data-role="ms-field-row">
-                  <span data-role="ms-current-variation">
-                    {{ ms_summary.current_variation_count_label }}：{{ ms_summary.current_variation_count_value }}
+            {# PR-U1 Matrix Script Task Area — operator-rebuild visual shell.
+               This branch reads as "one production task driving multiple
+               publishable variants": mother-task identity + production
+               state grid + result banner + three-tier lanes + jump
+               actions. All `data-role="ms-*"` markers and presenter
+               contracts are preserved verbatim — only the visual layout
+               and class names are updated. Gated to Matrix Script rows
+               only; Hot Follow / Digital Anchor / baseline cards remain
+               bytewise unchanged via the `{% else %}` branch below. #}
+            <div class="task-card__left op-task-card__left" data-role="matrix-script-card-left">
+              <div class="op-task-card__top">
+                {% if cover %}
+                  <img class="task-card__cover op-task-card__cover" src="{{ cover }}" alt="cover" />
+                {% else %}
+                  <div class="task-card__cover op-task-card__cover"></div>
+                {% endif %}
+                <div class="task-card__info op-task-card__heading">
+                  <span class="op-task-card__line-tag op-task-card__line-tag--matrix" data-role="board-line-tag">
+                    <span class="task-pill" data-role="board-line-label">{{ line_match.label }}</span>
+                    · 母任务
                   </span>
-                  <span>&middot;</span>
-                  <span data-role="ms-publishable-variation"
-                        {% if ms_owc and ms_owc.publishable_variation_count_value is not none %}title="可发布版本数 = 已就绪可发布的变体数（来自统一 publish_readiness 判定，可发布 ≠ 已发布）"{% else %}title="{{ ms_summary.publishable_variation_count_tooltip }}"{% endif %}>
-                    {# OWC-MS-RO PR-1 — render M/N format per wireframe §4 row 4. ms_owc carries both publishable_variation_count_value (M) and current_variation_count_value (N) from derive_matrix_script_full_card_summary; PR-U1-only fallback (no ms_owc) renders the legacy '—' single-value. #}
-                    {{ ms_summary.publishable_variation_count_label }}：{% if ms_owc %}{{ ms_owc.publishable_variation_count_value }}/{{ ms_owc.current_variation_count_value }}{% elif ms_summary.publishable_variation_count_value is none %}—{% else %}{{ ms_summary.publishable_variation_count_value }}{% endif %}
-                  </span>
-                  <span>&middot;</span>
-                  <span data-role="ms-current-blocker">
-                    {{ ms_summary.current_blocker_label }}：{{ ms_summary.current_blocker_value or "无" }}
+                  <div class="task-card__title op-task-card__title">
+                    <span data-role="ms-subject-label" class="op-tech-note" style="display:block; font-size:10px; margin:0 0 2px;">{{ ms_summary.subject_label }}</span>
+                    <span data-role="ms-subject-value">{{ ms_summary.subject_value or title }}</span>
+                  </div>
+                  <div class="task-card__meta op-task-card__id-row">
+                    <span><code>{{ task_id }}</code></span>
+                    {% if created %}
+                      <span title="{{ it.created_at or created }}">{{ created }}</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              {# 生产状态卡 — 母脚本 / 当前版本 / 变体进度 / 已发布渠道 / 最近生成. Operator-friendly grid layout with closed-set field labels and presenter-derived values. #}
+              <div class="op-task-state" data-role="ms-production-state">
+                {% if ms_owc %}
+                  <div class="op-task-state__item" data-role="ms-core-script-name">
+                    <span class="op-task-state__label">{{ ms_owc.core_script_name_label }}</span>
+                    <span class="op-task-state__value op-task-state__value--mono">{{ ms_owc.core_script_name_value or "—" }}</span>
+                  </div>
+                  <div class="op-task-state__item" data-role="ms-best-version" title="{{ ms_owc.best_version_tooltip }}">
+                    <span class="op-task-state__label">{{ ms_owc.best_version_label }}</span>
+                    <span class="op-task-state__value">{% if ms_owc.best_version_value is none %}—{% else %}{{ ms_owc.best_version_value }}{% endif %}</span>
+                  </div>
+                {% endif %}
+                <div class="op-task-state__item" data-role="ms-field-row">
+                  <span class="op-task-state__label" data-role="ms-current-variation">{{ ms_summary.current_variation_count_label }}</span>
+                  <span class="op-task-state__value">{{ ms_summary.current_variation_count_value }}</span>
+                </div>
+                <div class="op-task-state__item" data-role="ms-publishable-variation"
+                     {% if ms_owc and ms_owc.publishable_variation_count_value is not none %}title="可发布版本数 = 已就绪可发布的变体数（来自统一 publish_readiness 判定，可发布 ≠ 已发布）"{% else %}title="{{ ms_summary.publishable_variation_count_tooltip }}"{% endif %}>
+                  <span class="op-task-state__label">{{ ms_summary.publishable_variation_count_label }}</span>
+                  <span class="op-task-state__value">
+                    {# OWC-MS-RO PR-1 — render M/N format per wireframe §4 row 4. #}
+                    {% if ms_owc %}{{ ms_owc.publishable_variation_count_value }}/{{ ms_owc.current_variation_count_value }}{% elif ms_summary.publishable_variation_count_value is none %}—{% else %}{{ ms_summary.publishable_variation_count_value }}{% endif %}
                   </span>
                 </div>
                 {% if ms_owc %}
-                  {# OWC-MS PR-1 MS-W2 — four newly-converged 8-field card rows. Read-only operator-language projection over existing row + closure truth. #}
-                  <div class="task-card__meta" data-role="ms-field-row-owc">
-                    <span data-role="ms-core-script-name">
-                      {{ ms_owc.core_script_name_label }}：{{ ms_owc.core_script_name_value or "—" }}
-                    </span>
-                    <span>&middot;</span>
-                    <span data-role="ms-published-channel-count">
-                      {{ ms_owc.published_channel_count_label }}：{{ ms_owc.published_channel_count_value }}
-                    </span>
-                    <span>&middot;</span>
-                    <span data-role="ms-best-version" title="{{ ms_owc.best_version_tooltip }}">
-                      {{ ms_owc.best_version_label }}：{% if ms_owc.best_version_value is none %}—{% else %}{{ ms_owc.best_version_value }}{% endif %}
-                    </span>
-                    <span>&middot;</span>
-                    <span data-role="ms-last-generated-at">
-                      {{ ms_owc.last_generated_at_label }}：{{ ms_owc.last_generated_at_value or "—" }}
-                    </span>
+                  <div class="op-task-state__item" data-role="ms-published-channel-count">
+                    <span class="op-task-state__label">{{ ms_owc.published_channel_count_label }}</span>
+                    <span class="op-task-state__value">{{ ms_owc.published_channel_count_value }}</span>
                   </div>
-                  {% if ms_result_status and ms_result_status.is_matrix_script %}
-                    {# RC PR-1 RC-R6 — operator-language result-oriented status row. One of: "ready: do X next" / "blocked: missing Y" / "completed". Reads `board_bucket` + `head_reason` + eight-stage state already decided upstream — no second producer. Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md §3 RC-R6 + §5 RC PR-1.
-                       OWC-MS-RO PR-1 — split the next-action sentence out to its own "下一步" chip row below per matrix_script_task_area_wireframe_v1.md §4.1 (next-action chip lives in its own row, not inline with the result pill). #}
-                    <div class="task-card__meta" data-role="ms-result-status"
-                         data-status-kind="{{ ms_result_status.status_kind }}"
-                         data-stage="{{ ms_result_status.stage }}">
-                      <span class="task-pill ms-result-status__kind ms-result-status__kind--{{ ms_result_status.status_kind }}"
-                            data-role="ms-result-status-kind">{{ ms_result_status.status_label_zh }}</span>
-                      <span data-role="ms-result-status-headline">{{ ms_result_status.headline_zh }}</span>
-                      {% if ms_result_status.head_reason %}
-                        <span>&middot;</span>
-                        <span data-role="ms-result-status-head-reason"
-                              data-head-reason="{{ ms_result_status.head_reason }}"
-                              title="head_reason = {{ ms_result_status.head_reason }}">{{ ms_result_status.head_reason_label_zh }}</span>
-                      {% endif %}
-                    </div>
-                    {# OWC-MS-RO PR-1 — explicit "下一步" next-action chip on its own row per wireframe §4.1. The label "下一步" + the operator-language next-action sentence from `derive_matrix_script_task_area_result_status.next_action_label`/`next_action_zh`. Sourced from the same RC-R6 helper so there is no second truth source. #}
-                    <div class="task-card__meta" data-role="ms-next-action-chip"
-                         data-status-kind="{{ ms_result_status.status_kind }}">
-                      <span class="ms-next-action-chip__label" data-role="ms-next-action-label">下一步</span>
-                      <span class="ms-next-action-chip__separator">：</span>
-                      <span class="ms-next-action-chip__value" data-role="ms-next-action-value">{{ ms_result_status.next_action_zh }}</span>
-                    </div>
-                  {% endif %}
-                  {% if ms_lanes and ms_lanes.lanes %}
-                    {# OWC-MS PR-1 MS-W1 — 脚本任务 / 变体任务 / 发布任务 three-tier lanes. Pure projection over packet + variation cells + closure publish events. #}
-                    <div class="task-card__meta" data-role="ms-three-tier-lanes">
-                      {% for lane in ms_lanes.lanes %}
-                        <div class="ms-lane" data-role="ms-lane-{{ lane.key }}">
-                          <span class="ms-lane__label">{{ lane.label }}</span>
-                          <span class="ms-lane__count" data-role="ms-lane-count">（{{ lane.rows | length }}）</span>
-                        </div>
-                      {% endfor %}
-                    </div>
-                  {% endif %}
+                  <div class="op-task-state__item" data-role="ms-last-generated-at">
+                    <span class="op-task-state__label">{{ ms_owc.last_generated_at_label }}</span>
+                    <span class="op-task-state__value op-task-state__value--soft">{{ ms_owc.last_generated_at_value or "—" }}</span>
+                  </div>
                 {% endif %}
               </div>
-            </div>
-            <div class="task-card__right" data-role="matrix-script-card-right">
-              <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
-              {% if ms_eight_stage and ms_eight_stage.stage_label %}
-                <span class="task-badge stage-badge stage-badge--{{ ms_eight_stage.stage }}"
-                      data-role="ms-eight-stage"
-                      data-stage="{{ ms_eight_stage.stage }}"
-                      data-stage-index="{{ ms_eight_stage.stage_index }}">{{ ms_eight_stage.stage_label }}</span>
+
+              {# Result banner — RC-R6 single-source operator-language status. Reads board_bucket + head_reason + eight-stage state via the result_status helper. #}
+              {% if ms_owc and ms_result_status and ms_result_status.is_matrix_script %}
+                {% if ms_result_status.status_kind == "publishable_candidate" %}
+                  {% set _banner_tone = "ready" %}
+                {% elif ms_result_status.status_kind == "blocked_pending_publish_readiness" %}
+                  {% set _banner_tone = "blocked" %}
+                {% elif ms_result_status.status_kind == "undetermined_pending_review" %}
+                  {% set _banner_tone = "review" %}
+                {% else %}
+                  {% set _banner_tone = "info" %}
+                {% endif %}
+                <div class="op-task-banner op-task-banner--{{ _banner_tone }}"
+                     data-role="ms-result-status"
+                     data-status-kind="{{ ms_result_status.status_kind }}"
+                     data-stage="{{ ms_result_status.stage }}">
+                  <div class="op-task-banner__head">
+                    <span class="task-pill ms-result-status__kind ms-result-status__kind--{{ ms_result_status.status_kind }}"
+                          data-role="ms-result-status-kind">{{ ms_result_status.status_label_zh }}</span>
+                    <span data-role="ms-result-status-headline">{{ ms_result_status.headline_zh }}</span>
+                    {% if ms_result_status.head_reason %}
+                      <span data-role="ms-result-status-head-reason"
+                            data-head-reason="{{ ms_result_status.head_reason }}"
+                            title="head_reason = {{ ms_result_status.head_reason }}">· {{ ms_result_status.head_reason_label_zh }}</span>
+                    {% endif %}
+                  </div>
+                  <div class="op-task-banner__next" data-role="ms-next-action-chip"
+                       data-status-kind="{{ ms_result_status.status_kind }}">
+                    <span class="ms-next-action-chip__label" data-role="ms-next-action-label">下一步</span><span class="ms-next-action-chip__separator">：</span><span class="ms-next-action-chip__value" data-role="ms-next-action-value">{{ ms_result_status.next_action_zh }}</span>
+                  </div>
+                </div>
               {% endif %}
-              <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}"
-                    data-role="operator-bucket"
-                    data-bucket-language="zh">{{ ms_summary.tri_state_badge_label }}</span>
-              {# OWC-MS-RO PR-1 — three jump buttons per wireframe §4.2: 打开工作台 / 打开交付中心 / 打开发布反馈. The third button closes interaction gap IG-1 (matrix_script_result_oriented_ui_plan_v1.md §11.3 — "Open publish feedback" promoted from anchor-only to first-class card button). All three labels and hrefs come from the existing helper output in derive_matrix_script_task_card_summary; no new helper module. #}
-              <div class="task-actions" data-role="ms-actions">
+
+              {# Three-tier lanes (脚本 / 变体 / 发布) — operator chips, NOT raw debug rows. #}
+              {% if ms_owc and ms_lanes and ms_lanes.lanes %}
+                <div class="op-task-lanes" data-role="ms-three-tier-lanes">
+                  <span class="op-task-lanes__label">生产线</span>
+                  {% for lane in ms_lanes.lanes %}
+                    <span class="op-task-lanes__chip ms-lane" data-role="ms-lane-{{ lane.key }}">
+                      <span class="ms-lane__label">{{ lane.label }}</span>
+                      <strong class="ms-lane__count" data-role="ms-lane-count">{{ lane.rows | length }}</strong>
+                    </span>
+                  {% endfor %}
+                </div>
+              {% endif %}
+
+              {# Blocker callout — only when there is an active blocker.
+                 Operator-language single-line summary backed by
+                 ms_summary.current_blocker_value. #}
+              {% if ms_summary.current_blocker_value %}
+                <div class="op-task-banner op-task-banner--blocked" data-role="ms-current-blocker-callout">
+                  <div class="op-task-banner__head">
+                    <span>⚠ {{ ms_summary.current_blocker_label }}</span>
+                  </div>
+                  <div class="op-task-banner__next" data-role="ms-current-blocker">
+                    {{ ms_summary.current_blocker_label }}：<span>{{ ms_summary.current_blocker_value }}</span>
+                  </div>
+                </div>
+              {% else %}
+                <span data-role="ms-current-blocker" hidden>{{ ms_summary.current_blocker_label }}：无</span>
+              {% endif %}
+            </div>
+            <div class="task-card__right op-task-card__right" data-role="matrix-script-card-right">
+              <div class="op-task-card__badges">
+                <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
+                {% if ms_eight_stage and ms_eight_stage.stage_label %}
+                  <span class="task-badge stage-badge stage-badge--{{ ms_eight_stage.stage }}"
+                        data-role="ms-eight-stage"
+                        data-stage="{{ ms_eight_stage.stage }}"
+                        data-stage-index="{{ ms_eight_stage.stage_index }}">{{ ms_eight_stage.stage_label }}</span>
+                {% endif %}
+                <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}"
+                      data-role="operator-bucket"
+                      data-bucket-language="zh">{{ ms_summary.tri_state_badge_label }}</span>
+              </div>
+              {# OWC-MS-RO PR-1 — three jump buttons per wireframe §4.2:
+                 打开工作台 / 打开交付中心 / 打开发布反馈. All three labels
+                 and hrefs come from derive_matrix_script_task_card_summary. #}
+              <div class="task-actions op-task-card__actions" data-role="ms-actions">
                 <a href="{{ ms_summary.workbench_action_href }}" class="btn-primary"
                    data-role="ms-action-workbench">{{ ms_summary.workbench_action_label }}</a>
                 <a href="{{ ms_summary.delivery_action_href }}" class="btn-secondary"
@@ -238,72 +282,121 @@
               </div>
             </div>
           {% elif line_id == "digital_anchor" and da_owc.is_digital_anchor %}
-            {# OWC-DA PR-1 Digital Anchor Task Area block — operator-language 8-field card per digital_anchor_product_flow §5.2 + 8-stage badge per §5.1 + explicit workbench/delivery actions. Gated to Digital Anchor rows only; Hot Follow / Matrix Script / baseline cards remain bytewise unchanged via the {% else %} branch below. 当前版本状态 consumes board_bucket only (PR-1 reminder #1); 交付包状态 stays tracked-gap until DA-W8 (PR-1 reminder #2); eight-stage degrades gracefully when closure is None (PR-1 reminder #3). #}
-            <div class="task-card__left" data-role="digital-anchor-card-left">
-              {% if cover %}
-                <img class="task-card__cover" src="{{ cover }}" alt="cover" />
-              {% else %}
-                <div class="task-card__cover"></div>
-              {% endif %}
-              <div class="task-card__info">
-                <div class="task-card__title">
-                  <span data-role="da-task-title-label">{{ da_owc.task_title_label }}</span>
-                  &middot;
-                  <span data-role="da-task-title-value">{{ da_owc.task_title_value or title }}</span>
-                </div>
-                <div class="task-card__meta">
-                  <span class="task-pill" data-role="board-line-label">{{ line_match.label }}</span>
-                  <span>ID: {{ task_id }}</span>
-                  {% if created %}
-                    <span title="{{ it.created_at or created }}">{{ created }}</span>
-                  {% endif %}
-                </div>
-                <div class="task-card__meta" data-role="da-field-row-identity">
-                  <span data-role="da-role-profile">
-                    {{ da_owc.role_profile_label }}：{{ da_owc.role_profile_value or "—" }}
+            {# OWC-DA PR-1 Digital Anchor Task Area — operator-rebuild visual shell.
+               Reads as "one anchor-video production job": task identity +
+               role / scene / language production-state grid + result
+               banner + jump actions. All `data-role="da-*"` markers and
+               presenter contracts preserved; only visual layout updated.
+               Gated to Digital Anchor rows only — Hot Follow / Matrix
+               Script / baseline cards keep their existing branches. #}
+            <div class="task-card__left op-task-card__left" data-role="digital-anchor-card-left">
+              <div class="op-task-card__top">
+                {% if cover %}
+                  <img class="task-card__cover op-task-card__cover" src="{{ cover }}" alt="cover" />
+                {% else %}
+                  <div class="task-card__cover op-task-card__cover"></div>
+                {% endif %}
+                <div class="task-card__info op-task-card__heading">
+                  <span class="op-task-card__line-tag op-task-card__line-tag--anchor" data-role="board-line-tag">
+                    <span class="task-pill" data-role="board-line-label">{{ line_match.label }}</span>
+                    · 口播任务
                   </span>
-                  <span>&middot;</span>
-                  <span data-role="da-scene-template">
-                    {{ da_owc.scene_template_label }}：{{ da_owc.scene_template_value or "—" }}
-                  </span>
-                  <span>&middot;</span>
-                  <span data-role="da-target-language">
-                    {{ da_owc.target_language_label }}：{% if da_owc.target_language_value %}{{ da_owc.target_language_value | join(", ") }}{% else %}—{% endif %}
-                  </span>
-                </div>
-                <div class="task-card__meta" data-role="da-field-row-state">
-                  <span data-role="da-current-version-state"
-                        title="当前版本状态由统一 publish_readiness / board_bucket 推导（reminder #1）">
-                    {{ da_owc.current_version_state_label }}：{{ da_owc.current_version_state_label_value }}
-                  </span>
-                  <span>&middot;</span>
-                  <span data-role="da-current-blocker">
-                    {{ da_owc.current_blocker_label }}：{{ da_owc.current_blocker_value or "无" }}
-                  </span>
-                  <span>&middot;</span>
-                  <span data-role="da-delivery-pack-state"
-                        title="{{ da_owc.delivery_pack_state_tooltip }}">
-                    {{ da_owc.delivery_pack_state_label }}：{% if da_owc.delivery_pack_state_value is none %}—{% else %}{{ da_owc.delivery_pack_state_value }}{% endif %}
-                  </span>
-                  <span>&middot;</span>
-                  <span data-role="da-last-update">
-                    {{ da_owc.last_update_label }}：{{ da_owc.last_update_value or "—" }}
-                  </span>
+                  <div class="task-card__title op-task-card__title">
+                    <span data-role="da-task-title-label" class="op-tech-note" style="display:block; font-size:10px; margin:0 0 2px;">{{ da_owc.task_title_label }}</span>
+                    <span data-role="da-task-title-value">{{ da_owc.task_title_value or title }}</span>
+                  </div>
+                  <div class="task-card__meta op-task-card__id-row">
+                    <span><code>{{ task_id }}</code></span>
+                    {% if created %}
+                      <span title="{{ it.created_at or created }}">{{ created }}</span>
+                    {% endif %}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="task-card__right" data-role="digital-anchor-card-right">
-              <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
-              {% if da_eight_stage and da_eight_stage.stage_label %}
-                <span class="task-badge stage-badge stage-badge--{{ da_eight_stage.stage }}"
-                      data-role="da-eight-stage"
-                      data-stage="{{ da_eight_stage.stage }}"
-                      data-stage-index="{{ da_eight_stage.stage_index }}">{{ da_eight_stage.stage_label }}</span>
+
+              {# Production-state grid — 角色 / 场景 / 目标语言 / 当前版本 / 交付包 / 最近更新. Each item carries the existing data-role marker so structural tests still pass. #}
+              <div class="op-task-state" data-role="da-production-state">
+                <div class="op-task-state__item" data-role="da-role-profile">
+                  <span class="op-task-state__label">{{ da_owc.role_profile_label }}</span>
+                  <span class="op-task-state__value">{{ da_owc.role_profile_value or "—" }}</span>
+                </div>
+                <div class="op-task-state__item" data-role="da-scene-template">
+                  <span class="op-task-state__label">{{ da_owc.scene_template_label }}</span>
+                  <span class="op-task-state__value">{{ da_owc.scene_template_value or "—" }}</span>
+                </div>
+                <div class="op-task-state__item" data-role="da-target-language">
+                  <span class="op-task-state__label">{{ da_owc.target_language_label }}</span>
+                  <span class="op-task-state__value">
+                    {% if da_owc.target_language_value %}{{ da_owc.target_language_value | join("，") }}{% else %}—{% endif %}
+                  </span>
+                </div>
+                <div class="op-task-state__item" data-role="da-current-version-state"
+                     title="当前版本状态由统一 publish_readiness / board_bucket 推导（reminder #1）">
+                  <span class="op-task-state__label">{{ da_owc.current_version_state_label }}</span>
+                  <span class="op-task-state__value">{{ da_owc.current_version_state_label_value }}</span>
+                </div>
+                <div class="op-task-state__item" data-role="da-delivery-pack-state"
+                     title="{{ da_owc.delivery_pack_state_tooltip }}">
+                  <span class="op-task-state__label">{{ da_owc.delivery_pack_state_label }}</span>
+                  <span class="op-task-state__value op-task-state__value--soft">
+                    {% if da_owc.delivery_pack_state_value is none %}—{% else %}{{ da_owc.delivery_pack_state_value }}{% endif %}
+                  </span>
+                </div>
+                <div class="op-task-state__item" data-role="da-last-update">
+                  <span class="op-task-state__label">{{ da_owc.last_update_label }}</span>
+                  <span class="op-task-state__value op-task-state__value--soft">{{ da_owc.last_update_value or "—" }}</span>
+                </div>
+              </div>
+
+              {# Result banner — operator-language. The DA presenter
+                 currently exposes current_version_state but no
+                 result_status/next_action helper; we synthesise an
+                 operator banner from board bucket + blocker presence,
+                 not from a new producer (no contract / truth touch). #}
+              {% if da_owc.current_blocker_value %}
+                {% set _da_banner_tone = "blocked" %}
+                {% set _da_banner_head = da_owc.current_version_state_label_value %}
+              {% elif bucket_value == "publishable" %}
+                {% set _da_banner_tone = "ready" %}
+                {% set _da_banner_head = da_owc.current_version_state_label_value %}
+              {% elif bucket_value == "blocked" %}
+                {% set _da_banner_tone = "blocked" %}
+                {% set _da_banner_head = da_owc.current_version_state_label_value %}
+              {% else %}
+                {% set _da_banner_tone = "review" %}
+                {% set _da_banner_head = da_owc.current_version_state_label_value %}
               {% endif %}
-              <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}"
-                    data-role="operator-bucket"
-                    data-bucket-language="zh">{{ da_owc.current_version_state_label_value }}</span>
-              <div class="task-actions" data-role="da-actions">
+              <div class="op-task-banner op-task-banner--{{ _da_banner_tone }}"
+                   data-role="da-result-status"
+                   data-status-kind="{{ _da_banner_tone }}">
+                <div class="op-task-banner__head">
+                  <span>{{ _da_banner_head }}</span>
+                </div>
+                {% if da_owc.current_blocker_value %}
+                  <div class="op-task-banner__next" data-role="da-current-blocker">
+                    {{ da_owc.current_blocker_label }}：<span>{{ da_owc.current_blocker_value }}</span>
+                  </div>
+                {% else %}
+                  <div class="op-task-banner__next" data-role="da-current-blocker">
+                    {{ da_owc.current_blocker_label }}：无
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+            <div class="task-card__right op-task-card__right" data-role="digital-anchor-card-right">
+              <div class="op-task-card__badges">
+                <span class="task-badge {{ badge_class }}">{{ status_label }}</span>
+                {% if da_eight_stage and da_eight_stage.stage_label %}
+                  <span class="task-badge stage-badge stage-badge--{{ da_eight_stage.stage }}"
+                        data-role="da-eight-stage"
+                        data-stage="{{ da_eight_stage.stage }}"
+                        data-stage-index="{{ da_eight_stage.stage_index }}">{{ da_eight_stage.stage_label }}</span>
+                {% endif %}
+                <span class="task-badge bucket-badge bucket-badge--{{ bucket_value }}"
+                      data-role="operator-bucket"
+                      data-bucket-language="zh">{{ da_owc.current_version_state_label_value }}</span>
+              </div>
+              <div class="task-actions op-task-card__actions" data-role="da-actions">
                 <a href="{{ da_owc.workbench_action_href }}" class="btn-primary"
                    data-role="da-action-workbench">{{ da_owc.workbench_action_label }}</a>
                 <a href="{{ da_owc.delivery_action_href }}" class="btn-secondary"

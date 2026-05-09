@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/pipeline_lab.css" />
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <link rel="stylesheet" href="/static/css/operator_console.css">
   <style>
     :root { color-scheme: light; }
     body {
@@ -294,60 +295,61 @@
              publish-readiness banner. Single-source RC-A7: every block
              consuming `publishable` reads `compute_publish_readiness`
              output (via ms_pub_readiness) directly. #}
-          <div class="card" data-role="matrix-script-delivery-center-header" style="margin-top:10px;">
-            <div class="section-title">
-              <h2 data-role="ms-dc-title">DELIVERY CENTER · matrix_script · v1</h2>
-              <div class="secondary" data-role="ms-dc-subtitle">面向发布交付的只读视图；不发明事实，不引入 vendor / model / provider / engine 控件。</div>
-            </div>
-            <div class="meta-grid" style="margin-top:8px;">
-              <div class="meta-item" data-role="ms-dc-header-subject">
-                <strong>主题</strong>
-                <span>{{ task.title or "—" }}</span>
+          <div class="op-card op-card--accent-emerald" data-role="matrix-script-delivery-center-header" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--emerald">交付中心</span>
+                <h2 class="op-section-title" data-role="ms-dc-title">{{ task.title or "矩阵脚本任务" }}</h2>
+                <span class="op-pill op-pill--matrix"><span class="op-pill__dot"></span>矩阵脚本</span>
+                <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_pub_result.status_kind }}"
+                      data-role="ms-dc-header-result-pill">{{ ms_pub_result.status_label_zh or "—" }}</span>
               </div>
-              <div class="meta-item" data-role="ms-dc-header-stage"
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-subtitle">本页是矩阵脚本任务的发布交付中心：成片预览、必交付物清单、文案包、发布反馈、迭代与归档。</p>
+
+            <div class="op-meta-grid">
+              <div class="op-meta-item" data-role="ms-dc-header-subject">
+                <span class="op-meta-item__label">主题</span>
+                <span class="op-meta-item__value">{{ task.title or "—" }}</span>
+              </div>
+              <div class="op-meta-item" data-role="ms-dc-header-stage"
                    data-stage="{{ ms_pub_stage.stage or '' }}"
                    data-stage-index="{{ ms_pub_stage.stage_index if ms_pub_stage.stage_index is not none else '' }}">
-                <strong>当前阶段</strong>
-                <span>
-                  <span class="info-pill" data-role="ms-dc-header-stage-label">{{ ms_pub_stage.stage_label or "—" }}</span>
-                </span>
+                <span class="op-meta-item__label">当前阶段</span>
+                <span class="op-meta-item__value" data-role="ms-dc-header-stage-label">{{ ms_pub_stage.stage_label or "—" }}</span>
               </div>
-              <div class="meta-item" data-role="ms-dc-header-result"
+              <div class="op-meta-item" data-role="ms-dc-header-result"
                    data-status-kind="{{ ms_pub_result.status_kind or '' }}">
-                <strong>当前结果</strong>
-                <span>
-                  <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_pub_result.status_kind }}"
-                        data-role="ms-dc-header-result-pill">{{ ms_pub_result.status_label_zh or "—" }}</span>
-                  <span data-role="ms-dc-header-result-headline" style="margin-left:6px;">{{ ms_pub_result.headline_zh or "" }}</span>
-                </span>
+                <span class="op-meta-item__label">结果摘要</span>
+                <span class="op-meta-item__value" data-role="ms-dc-header-result-headline">{{ ms_pub_result.headline_zh or "—" }}</span>
               </div>
             </div>
-            {# Publish-readiness banner — RC-A7 single-source. Renders the
-               operator-language head_reason label sourced from the closed
-               publish_readiness head_reason enum via HEAD_REASON_LABELS_ZH
-               (resolved on the recommended_action lane). #}
+
+            {# Publish-readiness banner — RC-A7 single-source operator-language
+               restatement of the unified publish_readiness producer. #}
             <div data-role="ms-dc-readiness-banner"
                  data-publishable="{{ 'true' if ms_pub_readiness.publishable else 'false' }}"
                  data-head-reason="{{ ms_pub_readiness.head_reason or '' }}"
-                 style="margin-top:8px;padding:10px 12px;border-radius:6px;background:#f6f7f9;">
-              <strong>发布门禁</strong>
-              <span data-role="ms-dc-readiness-banner-value" style="margin-left:6px;">
-                {% if ms_pub_readiness.publishable %}
-                  <span class="info-pill ms-result-status__kind ms-result-status__kind--publishable_candidate">✓ 可发布</span>
-                {% else %}
-                  <span class="info-pill ms-result-status__kind ms-result-status__kind--blocked_pending_publish_readiness">◐ 待解除阻塞</span>
-                {% endif %}
-                {% if ms_pub_recommended.head_reason_label_zh %}
-                  <span class="muted t-secondary" style="margin-left:6px;"
-                        data-role="ms-dc-readiness-banner-head-reason">{{ ms_pub_recommended.head_reason_label_zh }}</span>
-                {% endif %}
-              </span>
-              {% if ms_pub_recommended.next_action_zh %}
-                <div data-role="ms-dc-readiness-banner-next-action" style="margin-top:6px;">
-                  <strong>下一步</strong>
-                  <span style="margin-left:6px;">{{ ms_pub_recommended.next_action_zh }}</span>
+                 class="op-banner {% if ms_pub_readiness.publishable %}op-banner--ready{% else %}op-banner--blocker{% endif %}"
+                 style="margin-top:14px;">
+              <div>
+                <div class="op-banner__title">
+                  {% if ms_pub_readiness.publishable %}
+                    <span data-role="ms-dc-readiness-banner-value">✓ 发布门禁已通过 · 可发布</span>
+                  {% else %}
+                    <span data-role="ms-dc-readiness-banner-value">◐ 发布门禁未通过 · 待解除阻塞</span>
+                  {% endif %}
+                  {% if ms_pub_recommended.head_reason_label_zh %}
+                    <span style="margin-left:6px; font-weight:400;"
+                          data-role="ms-dc-readiness-banner-head-reason">· {{ ms_pub_recommended.head_reason_label_zh }}</span>
+                  {% endif %}
                 </div>
-              {% endif %}
+                {% if ms_pub_recommended.next_action_zh %}
+                  <div class="op-banner__body" data-role="ms-dc-readiness-banner-next-action">
+                    下一步：<span>{{ ms_pub_recommended.next_action_zh }}</span>
+                  </div>
+                {% endif %}
+              </div>
             </div>
           </div>
 
@@ -366,11 +368,14 @@
              split-view (lives in Workbench Block E). When no
              recommended candidate exists, render a single tracked-gap
              operator-language line — never a fabricated thumbnail. #}
-          <div class="card" data-role="matrix-script-block-a-final-video-primary" style="margin-top:10px;">
-            <div class="section-title">
-              <h2 data-role="ms-dc-block-a-title">主交付 · final_video</h2>
-              <div class="secondary" data-role="ms-dc-block-a-subtitle">{{ ms_pub_delivery.final_video_primary.subtitle_zh or "本任务的核心交付，单独突出展示。" }}</div>
+          <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-a-final-video-primary" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--emerald">A · 主交付</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-a-title">最终成片 · final_video</h2>
+              </div>
             </div>
+            <p class="op-section-helper" data-role="ms-dc-block-a-subtitle">{{ ms_pub_delivery.final_video_primary.subtitle_zh or "本任务的核心交付物。⭐ 推荐候选由统一 publish_readiness 决定，本面板不展示伪造的 final_video 链接。" }}</p>
             {% set _recommended_variant = ms_pub_recommended.recommended_variant or {} %}
             {% if _recommended_variant.variation_id %}
               <div class="meta-grid" style="margin-top:8px;">
@@ -468,11 +473,14 @@
              amendment via delivery_comprehension.lanes. Per-row status
              from artifact_status_label_zh. RO-4.3: per-row status
              never re-derives lane truth. #}
-          <div class="card" data-role="matrix-script-block-b-required-deliverables" style="margin-top:10px;">
-            <div class="section-title">
-              <h2 data-role="ms-dc-block-b-title">必需交付物</h2>
-              <div class="secondary" data-role="ms-dc-block-b-subtitle">必需 / 可选 / 阻塞 zoning 来自 factory_delivery_contract_v1 Plan C；状态来自 delivery_comprehension。</div>
+          <div class="op-card op-card--accent-amber" data-role="matrix-script-block-b-required-deliverables" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--amber">B · 必交付</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-b-title">必需交付物</h2>
+              </div>
             </div>
+            <p class="op-section-helper" data-role="ms-dc-block-b-subtitle">运营关注：哪些是阻塞发布的必交付，哪些是必交付但不阻塞发布的。状态来自 delivery_comprehension 投射。</p>
             {% set _b_required_blocking = (ms_pub_delivery.lanes or {}).required_blocking or {} %}
             {% set _b_required_non_blocking = (ms_pub_delivery.lanes or {}).required_non_blocking or {} %}
             {% if (_b_required_blocking.rows or _b_required_non_blocking.rows) %}
@@ -533,11 +541,14 @@
              adversarial pack.required = True payload, this lane
              never blocks publish-readiness. #}
           {% set _c_optional = (ms_pub_delivery.lanes or {}).optional_non_blocking or {} %}
-          <div class="card" data-role="matrix-script-block-c-scene-pack" style="margin-top:10px;">
-            <div class="section-title">
-              <h2 data-role="ms-dc-block-c-title">可选交付物（非阻塞）</h2>
-              <div class="secondary" data-role="ms-dc-block-c-subtitle">scene_pack 始终非阻塞；SCENE_PACK_BLOCKING_ALLOWED = False（factory_delivery_contract_v1 Plan C）。</div>
+          <div class="op-card" data-role="matrix-script-block-c-scene-pack" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index">C · 可选</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-c-title">可选交付物 · scene_pack（不阻塞发布）</h2>
+              </div>
             </div>
+            <p class="op-section-helper" data-role="ms-dc-block-c-subtitle">scene_pack 是下游精修出口（CapCut / 外部剪辑工具）。生成与否不影响发布门禁。</p>
             <ul style="margin:8px 0 0 18px; padding:0;"
                 data-role="ms-dc-block-c-list"
                 data-optional-count="{{ _c_optional.row_count or 0 }}">
@@ -560,11 +571,14 @@
              delivery_copy_bundle_view. Tracked-gap rows render the
              explicit unresolved_explanation_zh; never a forbidden
              fragment (vendor/model/provider/engine identifier). #}
-          <div class="card" data-role="matrix-script-block-d-copy-bundle" style="margin-top:10px;">
-            <div class="section-title">
-              <h2 data-role="ms-dc-block-d-title">文案包</h2>
-              <div class="secondary" data-role="ms-dc-block-d-subtitle">{{ ms_pub_copy.panel_subtitle_zh or "面向运营的标题 / hashtags / CTA / 评论关键词；只读视图。" }}</div>
+          <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-d-copy-bundle" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index">D · 文案</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-d-title">发布文案包</h2>
+              </div>
             </div>
+            <p class="op-section-helper" data-role="ms-dc-block-d-subtitle">{{ ms_pub_copy.panel_subtitle_zh or "标题 / Hashtags / CTA / 评论关键词；当前为只读视图，运营手动复制到平台发布。" }}</p>
             {% if ms_pub_copy.subfields %}
               <div class="meta-grid" style="margin-top:8px;">
                 {% for sub in ms_pub_copy.subfields %}
@@ -610,11 +624,14 @@
              enum widening, no event mutation / deletion. RC-R8:
              publish_url column renders blank when source field is
              absent — never a fabricated URL. #}
-          <div class="card" data-role="matrix-script-block-e-publish-feedback" style="margin-top:10px;">
-            <div class="section-title">
-              <h2 data-role="ms-dc-block-e-title">发布状态 / 发布反馈</h2>
-              <div class="secondary" data-role="ms-dc-block-e-subtitle">每个 variation 一行回填记录；事件日志 append-only。</div>
+          <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-publish-feedback" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--violet">E · 发布反馈</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-e-title">发布状态 / 反馈回填</h2>
+              </div>
             </div>
+            <p class="op-section-helper" data-role="ms-dc-block-e-subtitle">每个候选独立一行回填发布状态；事件日志 append-only，不可删除。</p>
             {% set _e_rows = ms_pub_closure.variation_feedback or [] %}
             {% set _e_records = ms_pub_closure.feedback_closure_records or [] %}
             {% if _e_rows %}
@@ -760,11 +777,14 @@
              gap_summary_zh + next_input_zh per variation). Archive
              button posts an existing closure event — no new endpoint,
              no record_kind widening (BG-5 / PG-4 deferred). #}
-          <div class="card" data-role="matrix-script-block-f-iteration-archive" style="margin-top:10px;">
-            <div class="section-title">
-              <h2 data-role="ms-dc-block-f-title">迭代建议 / 归档</h2>
-              <div class="secondary" data-role="ms-dc-block-f-subtitle">{{ ms_pub_backfill.panel_subtitle_zh or "完成本轮发布后给出每个变体的下一步建议；不发明指标。" }}</div>
+          <div class="op-card op-card--accent-violet" data-role="matrix-script-block-f-iteration-archive" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--violet">F · 迭代</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-f-title">下一轮迭代建议 / 归档</h2>
+              </div>
             </div>
+            <p class="op-section-helper" data-role="ms-dc-block-f-subtitle">{{ ms_pub_backfill.panel_subtitle_zh or "完成本轮发布后给出每个候选的下一步建议；不发明任务级指标。" }}</p>
             {% if ms_pub_backfill.rows %}
               <ul style="margin:8px 0 0 18px; padding:0;"
                   data-role="ms-dc-block-f-iteration-list"
@@ -866,46 +886,58 @@
           </div>
         {% endif %}
 
-        <div class="card" id="matrix-script-delivery-comprehension-block"
-             data-role="matrix-script-delivery-comprehension" style="display:none;">
-          <div class="section-title">
-            <h2 data-role="ms-delivery-title">Matrix Script · 交付中心理解</h2>
-            <div class="secondary" data-role="ms-delivery-subtitle">只读理解层 · 不发明事实 · 不引入 vendor / model / provider / engine 控件。</div>
-          </div>
+        {# JS-hydrated comprehension shell — legacy diagnostic surface
+           preserved for tooling / tests but visually demoted into a
+           collapsed-by-default details. The operator surface above
+           (Block A-F) already covers all operator-relevant info; this
+           shell only renders when the publish-hub fetch payload carries
+           matrix_script_delivery_comprehension. #}
+        <details class="op-collapse" data-role="op-console-ms-delivery-comprehension-fold">
+          <summary>矩阵脚本 · 交付中心理解（旧版诊断层 · 可展开）</summary>
+          <div class="op-collapse__hint">仅当 publish_hub 返回 matrix_script_delivery_comprehension 时由 JS 填充；面向架构师 / 质检的只读重述。</div>
+          <div class="op-collapse__body">
+            <div class="card" id="matrix-script-delivery-comprehension-block"
+                 data-role="matrix-script-delivery-comprehension" style="display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-delivery-title">Matrix Script · 交付中心理解</h2>
+                <div class="secondary" data-role="ms-delivery-subtitle">只读理解层 · 不发明事实 · 不引入 vendor / model / provider / engine 控件。</div>
+              </div>
 
-          <div class="card" style="margin-top:10px; border:1px solid #2563eb; background:#eff6ff;"
-               data-role="ms-delivery-final-video-primary">
-            <div class="section-title">
-              <h2 data-role="ms-delivery-final-video-title">最终视频 · final_video（主交付）</h2>
-              <div class="secondary" data-role="ms-delivery-final-video-subtitle"></div>
+              <div class="card" style="margin-top:10px; border:1px solid #2563eb; background:#eff6ff;"
+                   data-role="ms-delivery-final-video-primary">
+                <div class="section-title">
+                  <h2 data-role="ms-delivery-final-video-title">最终视频 · final_video（主交付）</h2>
+                  <div class="secondary" data-role="ms-delivery-final-video-subtitle"></div>
+                </div>
+                <div class="muted" data-role="ms-delivery-final-video-explanation"></div>
+              </div>
+
+              <h3 style="margin:14px 0 6px;" data-role="ms-delivery-lanes-label">交付分区</h3>
+              <div data-role="ms-delivery-lane" data-lane-id="required_blocking" style="margin-top:8px;">
+                <strong data-role="ms-delivery-lane-label"></strong>
+                <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+                <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+              </div>
+              <div data-role="ms-delivery-lane" data-lane-id="required_non_blocking" style="margin-top:8px;">
+                <strong data-role="ms-delivery-lane-label"></strong>
+                <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+                <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+              </div>
+              <div data-role="ms-delivery-lane" data-lane-id="optional_non_blocking" style="margin-top:8px;">
+                <strong data-role="ms-delivery-lane-label"></strong>
+                <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+                <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+              </div>
+
+              <h3 style="margin:14px 0 6px;" data-role="ms-delivery-publish-blocking-label">发布阻塞解释</h3>
+              <div data-role="ms-delivery-publish-blocking-status"></div>
+              <ul data-role="ms-delivery-publish-blocking-rows" style="margin:6px 0 0 18px;"></ul>
+
+              <h3 style="margin:14px 0 6px;" data-role="ms-delivery-history-label">历史成功 vs 当前尝试</h3>
+              <div class="muted" data-role="ms-delivery-history-explanation"></div>
             </div>
-            <div class="muted" data-role="ms-delivery-final-video-explanation"></div>
           </div>
-
-          <h3 style="margin:14px 0 6px;" data-role="ms-delivery-lanes-label">交付分区</h3>
-          <div data-role="ms-delivery-lane" data-lane-id="required_blocking" style="margin-top:8px;">
-            <strong data-role="ms-delivery-lane-label"></strong>
-            <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
-            <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
-          </div>
-          <div data-role="ms-delivery-lane" data-lane-id="required_non_blocking" style="margin-top:8px;">
-            <strong data-role="ms-delivery-lane-label"></strong>
-            <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
-            <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
-          </div>
-          <div data-role="ms-delivery-lane" data-lane-id="optional_non_blocking" style="margin-top:8px;">
-            <strong data-role="ms-delivery-lane-label"></strong>
-            <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
-            <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
-          </div>
-
-          <h3 style="margin:14px 0 6px;" data-role="ms-delivery-publish-blocking-label">发布阻塞解释</h3>
-          <div data-role="ms-delivery-publish-blocking-status"></div>
-          <ul data-role="ms-delivery-publish-blocking-rows" style="margin:6px 0 0 18px;"></ul>
-
-          <h3 style="margin:14px 0 6px;" data-role="ms-delivery-history-label">历史成功 vs 当前尝试</h3>
-          <div class="muted" data-role="ms-delivery-history-explanation"></div>
-        </div>
+        </details>
 
         {# OWC-MS-RO PR-1 follow-up correction (PR #159 conditional-pass blocker
            closure 2026-05-08): stable anchor `id="publish-feedback"` makes the
@@ -996,63 +1028,57 @@
           <ul data-role="ms-closure-events-recent" class="muted" style="margin:6px 0 0 18px;"></ul>
         </div>
 
-        {# OWC-MS PR-3 / MS-W7: Matrix Script Delivery Center copy_bundle exposure.
-           Per docs/reviews/owc_ms_gate_spec_v1.md §3 MS-W7 + matrix_script_product_flow
-           §7.1, exposes 标题 / hashtags / CTA / 评论关键词 as a Delivery Center row
-           backed by existing projection truth + per-subfield operator-language
-           fallback when the source is unresolved. Hot Follow / Digital Anchor /
-           Baseline publish hubs render unchanged (gated container is invisible
-           for those kinds). No contract touch; no packet truth mutation. #}
-        <div class="card" id="matrix-script-delivery-copy-bundle-block"
-             data-role="matrix-script-delivery-copy-bundle" style="margin-top:10px; display:none;">
-          <div class="section-title">
-            <h2 data-role="ms-delivery-copy-bundle-title">Matrix Script · 交付中心 · copy_bundle</h2>
-            <div class="secondary" data-role="ms-delivery-copy-bundle-subtitle"></div>
-          </div>
-          <ul data-role="ms-delivery-copy-bundle-rows" style="margin:8px 0 0 18px;"></ul>
-          <div class="muted" data-role="ms-delivery-copy-bundle-tracked-gap" style="margin-top:8px;"></div>
-        </div>
+        {# Legacy MS PR-3 / RC PR-4 JS-hydrated diagnostic shells —
+           copy_bundle / 多渠道回填 / 发布-回填就绪解释. The operator
+           surface (Block A-F + closure block above) already exposes
+           the relevant payload to operators; these shells stay for
+           tooling / tests but are visually demoted into a single
+           collapsed details so they no longer compete with the
+           operator surface. JS continues to populate them when the
+           publish-hub fetch payload carries the corresponding bundle. #}
+        <details class="op-collapse" data-role="op-console-ms-secondary-shells-fold">
+          <summary>矩阵脚本 · 交付层 JS 诊断壳（copy_bundle / 多渠道回填 / 就绪解释 · 可展开）</summary>
+          <div class="op-collapse__hint">JS 在 publish_hub 加载后按需填充；展开仅用于核对 PR-3 / RC PR-4 的 lane 投射。</div>
+          <div class="op-collapse__body">
+            <div class="card" id="matrix-script-delivery-copy-bundle-block"
+                 data-role="matrix-script-delivery-copy-bundle" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-delivery-copy-bundle-title">Matrix Script · 交付中心 · copy_bundle</h2>
+                <div class="secondary" data-role="ms-delivery-copy-bundle-subtitle"></div>
+              </div>
+              <ul data-role="ms-delivery-copy-bundle-rows" style="margin:8px 0 0 18px;"></ul>
+              <div class="muted" data-role="ms-delivery-copy-bundle-tracked-gap" style="margin-top:8px;"></div>
+            </div>
 
-        {# OWC-MS PR-3 / MS-W8: Matrix Script Delivery Center 多渠道回填 rendering.
-           Per docs/reviews/owc_ms_gate_spec_v1.md §3 MS-W8 + matrix_script_product_flow
-           §7.3, exposes 发布渠道 / 账号 ID / 发布时间 / 发布链接 / 发布状态 /
-           指标入口 per variation_id lane. Pure projection over closure.variation_feedback[]
-           + closure.feedback_closure_records[] + channel_metrics[]. No closure
-           schema widening; account_id is rendered as an explicit tracked gap. #}
-        <div class="card" id="matrix-script-delivery-backfill-block"
-             data-role="matrix-script-delivery-backfill" style="margin-top:10px; display:none;">
-          <div class="section-title">
-            <h2 data-role="ms-delivery-backfill-title">Matrix Script · 交付中心 · 多渠道回填</h2>
-            <div class="secondary" data-role="ms-delivery-backfill-subtitle"></div>
-          </div>
-          <div class="muted" data-role="ms-delivery-backfill-legend" style="margin-top:6px;"></div>
-          <div data-role="ms-delivery-backfill-lanes" style="margin-top:8px;"></div>
-          <div class="muted" data-role="ms-delivery-backfill-empty" style="display:none; margin-top:8px;">
-            尚未生成 closure 记录；初始化 closure 后此处将按 variation 出现回填行。
-          </div>
-          <div class="muted" data-role="ms-delivery-backfill-tracked-gap" style="margin-top:8px;"></div>
-        </div>
+            <div class="card" id="matrix-script-delivery-backfill-block"
+                 data-role="matrix-script-delivery-backfill" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-delivery-backfill-title">Matrix Script · 交付中心 · 多渠道回填</h2>
+                <div class="secondary" data-role="ms-delivery-backfill-subtitle"></div>
+              </div>
+              <div class="muted" data-role="ms-delivery-backfill-legend" style="margin-top:6px;"></div>
+              <div data-role="ms-delivery-backfill-lanes" style="margin-top:8px;"></div>
+              <div class="muted" data-role="ms-delivery-backfill-empty" style="display:none; margin-top:8px;">
+                尚未生成 closure 记录；初始化 closure 后此处将按 variation 出现回填行。
+              </div>
+              <div class="muted" data-role="ms-delivery-backfill-tracked-gap" style="margin-top:8px;"></div>
+            </div>
 
-        {# RC PR-4 / RC-R7 + RC-R8 — Matrix Script publish/backfill readiness explanation per variation.
-           Server-rendered shell + JS-driven row population from
-           data.matrix_script_publish_backfill_readiness. Pure presentation over RC PR-1
-           publish_readiness producer + OWC-MS PR-3 delivery_comprehension lanes + read-only
-           closure publish_status. Closure schema unchanged; no fake final_video / media URL.
-           Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
-           §3 RC-R7 + §3 RC-R8 + §5 RC PR-4. #}
-        <div class="card" id="matrix-script-publish-backfill-readiness-block"
-             data-role="matrix-script-publish-backfill-readiness" style="margin-top:10px; display:none;">
-          <div class="section-title">
-            <h2 data-role="ms-publish-backfill-readiness-title">Matrix Script · 发布 / 回填就绪解释</h2>
-            <div class="secondary" data-role="ms-publish-backfill-readiness-subtitle"></div>
+            <div class="card" id="matrix-script-publish-backfill-readiness-block"
+                 data-role="matrix-script-publish-backfill-readiness" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-publish-backfill-readiness-title">Matrix Script · 发布 / 回填就绪解释</h2>
+                <div class="secondary" data-role="ms-publish-backfill-readiness-subtitle"></div>
+              </div>
+              <div class="muted" data-role="ms-publish-backfill-readiness-legend" style="margin-top:6px;"></div>
+              <div data-role="ms-publish-backfill-readiness-rows" style="margin-top:8px;"></div>
+              <div class="muted" data-role="ms-publish-backfill-readiness-empty" style="display:none; margin-top:8px;">
+                尚无可解释的变体（Phase B 未派生 / packet 未到位）。
+              </div>
+              <div class="muted" data-role="ms-publish-backfill-readiness-no-fake-final-note" style="margin-top:8px;"></div>
+            </div>
           </div>
-          <div class="muted" data-role="ms-publish-backfill-readiness-legend" style="margin-top:6px;"></div>
-          <div data-role="ms-publish-backfill-readiness-rows" style="margin-top:8px;"></div>
-          <div class="muted" data-role="ms-publish-backfill-readiness-empty" style="display:none; margin-top:8px;">
-            尚无可解释的变体（Phase B 未派生 / packet 未到位）。
-          </div>
-          <div class="muted" data-role="ms-publish-backfill-readiness-no-fake-final-note" style="margin-top:8px;"></div>
-        </div>
+        </details>
       {% endif %}
 
       {# Recovery PR-4: Digital Anchor publish-feedback closure operator surface.
@@ -1065,69 +1091,68 @@
          publish hubs render unchanged. #}
       {% set _da_kind = (task.category_key or task.kind or task.platform or "") | lower %}
       {% if _da_kind == "digital_anchor" %}
-        {# OWC-DA PR-3 / DA-W8: Digital Anchor Delivery Center · Delivery Pack
-           assembly view. Per docs/reviews/owc_da_gate_spec_v1.md §3 DA-W8 +
-           digital_anchor_product_flow §7.1, exposes the nine standard Delivery
-           Pack lanes (final_video primary + subtitle / dubbed_audio / metadata /
-           manifest / pack / role_usage / scene_usage / language_usage) backed by
-           existing delivery_binding_v1 truth + entry.scene_binding_hint +
-           entry.language_scope. Pure projection-side; no schema widening;
-           tracked-gap rendering when subfields absent. #}
-        <div class="card" id="digital-anchor-delivery-pack-block"
-             data-role="digital-anchor-delivery-pack" style="margin-top:10px; display:none;">
-          <div class="section-title">
-            <h2 data-role="da-delivery-pack-title">Digital Anchor · 交付中心 · Delivery Pack</h2>
-            <div class="secondary" data-role="da-delivery-pack-subtitle"></div>
-          </div>
+        {# Legacy DA PR-3 JS-hydrated diagnostic shells — Delivery Pack
+           lanes (DA-W8) + 多渠道回填 (DA-W9). The operator surface
+           (DA closure block below) already exposes the operator-relevant
+           channel/account fields; these JS-hydrated shells stay for
+           tooling / tests but are visually demoted into a single
+           collapsed details so they no longer compete with the operator
+           surface. JS continues to populate them when the publish-hub
+           fetch payload carries the corresponding bundle. #}
+        <details class="op-collapse" data-role="op-console-da-secondary-shells-fold">
+          <summary>数字人口播 · 交付层 JS 诊断壳（Delivery Pack / 多渠道回填 · 可展开）</summary>
+          <div class="op-collapse__hint">JS 在 publish_hub 加载后按需填充；展开仅用于核对 DA-W8 / DA-W9 的 lane 投射。</div>
+          <div class="op-collapse__body">
+            <div class="card" id="digital-anchor-delivery-pack-block"
+                 data-role="digital-anchor-delivery-pack" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="da-delivery-pack-title">Digital Anchor · 交付中心 · Delivery Pack</h2>
+                <div class="secondary" data-role="da-delivery-pack-subtitle"></div>
+              </div>
 
-          <div class="card" style="margin-top:10px; border:1px solid #2563eb; background:#eff6ff;"
-               data-role="da-delivery-pack-final-video-primary">
-            <div class="section-title">
-              <h2 data-role="da-delivery-pack-final-video-label"></h2>
-              <div class="secondary" data-role="da-delivery-pack-final-video-status"></div>
+              <div class="card" style="margin-top:10px; border:1px solid #2563eb; background:#eff6ff;"
+                   data-role="da-delivery-pack-final-video-primary">
+                <div class="section-title">
+                  <h2 data-role="da-delivery-pack-final-video-label"></h2>
+                  <div class="secondary" data-role="da-delivery-pack-final-video-status"></div>
+                </div>
+                <div class="muted" data-role="da-delivery-pack-final-video-explanation"></div>
+                <div class="muted t-secondary" data-role="da-delivery-pack-final-video-tracked-gap"></div>
+              </div>
+
+              <h3 style="margin:14px 0 6px;" data-role="da-delivery-pack-lanes-label">交付分区</h3>
+              <div class="muted t-secondary" data-role="da-delivery-pack-legend" style="margin-bottom:6px;"></div>
+              <div data-role="da-delivery-pack-lanes" style="margin-top:6px;"></div>
+
+              <div class="muted" data-role="da-delivery-pack-tracked-gap-summary" style="margin-top:8px;"></div>
             </div>
-            <div class="muted" data-role="da-delivery-pack-final-video-explanation"></div>
-            <div class="muted t-secondary" data-role="da-delivery-pack-final-video-tracked-gap"></div>
+
+            <div class="card" id="digital-anchor-delivery-backfill-block"
+                 data-role="digital-anchor-delivery-backfill" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="da-delivery-backfill-title">Digital Anchor · 交付中心 · 多渠道回填</h2>
+                <div class="secondary" data-role="da-delivery-backfill-subtitle"></div>
+              </div>
+              <div class="muted" data-role="da-delivery-backfill-legend" style="margin-top:6px;"></div>
+              <div data-role="da-delivery-backfill-lanes" style="margin-top:8px;"></div>
+              <div class="muted" data-role="da-delivery-backfill-empty" style="display:none; margin-top:8px;">
+                尚未生成 closure 记录；初始化 closure 后此处将按 row_scope（role / segment）出现回填行。
+              </div>
+              <div class="muted" data-role="da-delivery-backfill-tracked-gap" style="margin-top:8px;"></div>
+            </div>
           </div>
+        </details>
 
-          <h3 style="margin:14px 0 6px;" data-role="da-delivery-pack-lanes-label">交付分区</h3>
-          <div class="muted t-secondary" data-role="da-delivery-pack-legend" style="margin-bottom:6px;"></div>
-          <div data-role="da-delivery-pack-lanes" style="margin-top:6px;"></div>
-
-          <div class="muted" data-role="da-delivery-pack-tracked-gap-summary" style="margin-top:8px;"></div>
-        </div>
-
-        {# OWC-DA PR-3 / DA-W9: Digital Anchor Delivery Center · 多渠道回填 rendering.
-           Per docs/reviews/owc_da_gate_spec_v1.md §3 DA-W9 + digital_anchor_product_flow
-           §7.3, exposes 发布渠道 / 账号 ID / 发布时间 / 发布链接 / 发布状态 /
-           指标入口 per (role / segment) row lane. Pure projection over closure
-           role_feedback[] + segment_feedback[] + feedback_closure_records[] +
-           channel_metrics[]. No closure schema widening; account / channel
-           rendered as explicit tracked gaps. #}
-        <div class="card" id="digital-anchor-delivery-backfill-block"
-             data-role="digital-anchor-delivery-backfill" style="margin-top:10px; display:none;">
-          <div class="section-title">
-            <h2 data-role="da-delivery-backfill-title">Digital Anchor · 交付中心 · 多渠道回填</h2>
-            <div class="secondary" data-role="da-delivery-backfill-subtitle"></div>
-          </div>
-          <div class="muted" data-role="da-delivery-backfill-legend" style="margin-top:6px;"></div>
-          <div data-role="da-delivery-backfill-lanes" style="margin-top:8px;"></div>
-          <div class="muted" data-role="da-delivery-backfill-empty" style="display:none; margin-top:8px;">
-            尚未生成 closure 记录；初始化 closure 后此处将按 row_scope（role / segment）出现回填行。
-          </div>
-          <div class="muted" data-role="da-delivery-backfill-tracked-gap" style="margin-top:8px;"></div>
-        </div>
-
-        <div class="card" id="digital-anchor-closure-block"
+        <div class="op-card op-card--accent-blue" id="digital-anchor-closure-block"
              data-role="digital-anchor-closure" style="margin-top:10px;">
-          <div class="section-title">
-            <h2>Digital Anchor · 发布反馈闭环</h2>
-            <div class="secondary">
-              role / segment 双层反馈 + scoped publish_status。所有写回严格遵循
-              <code>digital_anchor_publish_feedback_closure_v1</code> +
-              <code>digital_anchor_publish_feedback_writeback_v1</code>。
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--blue">交付 · 反馈</span>
+              <h2 class="op-section-title">数字人口播 · 发布反馈与归档</h2>
+              <span class="op-pill op-pill--anchor"><span class="op-pill__dot"></span>数字人口播</span>
             </div>
           </div>
+          <p class="op-section-helper">按 role / segment 双层反馈回填发布状态；所有写回严格遵循封闭 closure 规约（<code>digital_anchor_publish_feedback_closure_v1</code> + <code>digital_anchor_publish_feedback_writeback_v1</code>）。</p>
 
           <h3 style="margin:14px 0 6px;">role_feedback[]</h3>
           <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;">

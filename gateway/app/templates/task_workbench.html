@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/static/pipeline_lab.css" />
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <link rel="stylesheet" href="/static/css/operator_console.css">
   <style>
     :root { color-scheme: light; }
     .page.workbench {
@@ -221,51 +222,41 @@
        original ready_gate string when present. #}
     {% set ops_pr = (ops.publish_readiness or {}) %}
     {% set ops_pr_inputs = (ops_pr.consumed_inputs or {}) %}
-    <div class="panel" data-role="operator-surface-strip">
-      <div class="section-title">
-        <h2>Operator surface</h2>
-        <div class="secondary">Read-only projection — single publish_readiness producer; Board / Workbench / Delivery consume the same result.</div>
-      </div>
-      <div class="meta-grid">
-        <div class="meta-item">
-          <strong>Publish readiness</strong>
-          <span data-role="operator-publish-readiness">
-            {{ "publishable" if ops_pr.publishable else "blocked" }}
-            {% if ops_pr.head_reason and not ops_pr.publishable %}
-              · <span data-role="operator-publish-readiness-head-reason">{{ ops_pr.head_reason }}</span>
-              {% if ops_pr_inputs.first_blocking_reason and ops_pr_inputs.first_blocking_reason != ops_pr.head_reason %}
-                <span data-role="operator-publish-readiness-detail" class="muted">({{ ops_pr_inputs.first_blocking_reason }})</span>
-              {% endif %}
-            {% endif %}
-          </span>
-        </div>
-        <div class="meta-item">
-          <strong>final_provenance</strong>
-          <span data-role="operator-final-provenance">{{ ops_pr_inputs.final_provenance or "—" }}</span>
-        </div>
-        <div class="meta-item">
-          <strong>Line panel</strong>
-          <span data-role="operator-line-panel-kind">{{ ops_workbench_panel.panel_kind or "—" }}</span>
-        </div>
-      </div>
+
+    {# Operator workflow stage strip (visual breadcrumb).
+       Order matches the eight-stage projection used by Task Area cards. #}
+    {% set op_console_line = ops_workbench_panel.panel_kind %}
+    {% set op_console_pub = "publishable" if ops_pr.publishable else "blocked" %}
+    <div class="op-stage-strip" data-role="op-console-stage-strip"
+         data-line="{{ op_console_line or '' }}"
+         data-publishable="{{ 'true' if ops_pr.publishable else 'false' }}">
+      {% set _stages = [
+        ("created", "已创建"),
+        ("pending_config", "待配置"),
+        ("generating", "生成中"),
+        ("awaiting_review", "待校对"),
+        ("final_ready", "成片完成"),
+        ("publishable", "可发布"),
+        ("backfilled", "已回填"),
+        ("archived", "已归档"),
+      ] %}
+      {% set _active_idx = 3 %}
+      {% if ops_pr.publishable %}{% set _active_idx = 5 %}{% endif %}
+      {% for stage in _stages %}
+        {% set _idx = loop.index0 %}
+        {% set _state = "done" if _idx < _active_idx else ("active" if _idx == _active_idx else "todo") %}
+        <span class="op-stage-strip__step" data-stage="{{ stage[0] }}" data-state="{{ _state }}">
+          <span class="op-stage-strip__num">{{ "✓" if _state == "done" else loop.index }}</span>
+          <span>{{ stage[1] }}</span>
+        </span>
+        {% if not loop.last %}<span class="op-stage-strip__sep" aria-hidden="true"></span>{% endif %}
+      {% endfor %}
     </div>
 
-    <div class="panel" data-role="operator-line-specific-panel" data-panel-kind="{{ ops_workbench_panel.panel_kind or '' }}">
-      <div class="section-title">
-        <h2>Line-specific panel</h2>
-        <div class="secondary">Mounted only via packet <code>line_specific_refs[]</code>. Workbench never invents truth.</div>
-      </div>
-      {% if ops_workbench_panel.panel_kind %}
-        <div class="muted">Panel kind: <strong>{{ ops_workbench_panel.panel_kind }}</strong></div>
-        <ul class="muted" style="margin:6px 0 0 18px;">
-          {% for ref in (ops_workbench_panel.refs or []) %}
-            <li><code>{{ ref.ref_id }}</code></li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <div class="muted">No <code>line_specific_refs[]</code> on this packet — slot remains empty.</div>
-      {% endif %}
-    </div>
+    {# Architect / debug strips moved into a collapsed-by-default block at
+       the BOTTOM of the page (see end of <main>). The surfaces themselves
+       are preserved verbatim — only their visual prominence is demoted —
+       so all existing data-role markers and tests still resolve. #}
 
     {% if ops_workbench_panel.panel_kind == "matrix_script" %}
       {% set ms_surface = ((ops.workbench or {}).matrix_script_variation_surface or {}) %}
@@ -313,59 +304,78 @@
          the existing publish-hub URL + #publish-feedback anchor (added by
          OWC-MS-RO PR-1 + correction). #}
       {% if (ms_script_structure.is_matrix_script or ms_result_summary.is_matrix_script) %}
-        <div class="panel" data-role="matrix-script-block-a-goal-summary">
-          <div class="section-title">
-            <h2 data-role="ms-block-a-title">Workbench A · 任务摘要</h2>
-            <div class="secondary" data-role="ms-block-a-subtitle">面向运营的目标 / 阻塞 / 下一步摘要；本面板只读，不发明事实。</div>
+        <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-a-goal-summary">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">A · 目标</span>
+              <h2 class="op-section-title" data-role="ms-block-a-title">任务摘要</h2>
+              <span class="op-pill op-pill--matrix"><span class="op-pill__dot"></span>矩阵脚本</span>
+            </div>
+            <div class="op-section-actions" data-role="ms-block-a-actions">
+              <a href="/tasks/{{ task.task_id }}/publish" class="btn-nav"
+                 data-role="ms-block-a-action-delivery">前往交付中心 →</a>
+              <a href="/tasks/{{ task.task_id }}/publish#publish-feedback" class="btn-nav"
+                 data-role="ms-block-a-action-publish-feedback">前往发布反馈</a>
+            </div>
           </div>
-          <div class="meta-grid">
-            <div class="meta-item" data-role="ms-block-a-subject">
-              <strong>主题</strong>
-              <span>{{ ms_script_structure.title_value or task.title or "—" }}</span>
+          <p class="op-section-helper" data-role="ms-block-a-subtitle">这一段告诉你：本任务在生产什么、当前卡在哪一步、运营下一步该做什么。</p>
+
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="ms-block-a-subject">
+              <span class="op-meta-item__label">主题</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.title_value or task.title or "—" }}</span>
             </div>
-            <div class="meta-item" data-role="ms-block-a-audience">
-              <strong>受众</strong>
-              <span>{{ ms_script_structure.axis_hints.audience_hint or "—" }}</span>
+            <div class="op-meta-item" data-role="ms-block-a-audience">
+              <span class="op-meta-item__label">受众</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.axis_hints.audience_hint or "—" }}</span>
             </div>
-            <div class="meta-item" data-role="ms-block-a-target-platform">
-              <strong>目标平台</strong>
-              <span>{{ ms_script_structure.target_platform_value or "—" }}</span>
+            <div class="op-meta-item" data-role="ms-block-a-target-platform">
+              <span class="op-meta-item__label">目标平台</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.target_platform_value or "—" }}</span>
             </div>
-            <div class="meta-item" data-role="ms-block-a-target-language">
-              <strong>目标语言</strong>
-              <span>
+            <div class="op-meta-item" data-role="ms-block-a-target-language">
+              <span class="op-meta-item__label">目标语言</span>
+              <span class="op-meta-item__value">
                 {% set _tl = (ms_script_structure.language_scope or {}).target_language %}
-                {% if _tl %}{{ _tl | join(", ") }}{% else %}—{% endif %}
+                {% if _tl %}{{ _tl | join("，") }}{% else %}—{% endif %}
               </span>
             </div>
           </div>
+
           {% if ms_result_summary and ms_result_summary.is_matrix_script %}
-            <div class="meta-grid" style="margin-top:8px;">
-              <div class="meta-item" data-role="ms-block-a-status"
+            <div class="op-meta-grid" style="margin-top:14px;">
+              <div class="op-meta-item" data-role="ms-block-a-status"
                    data-status-kind="{{ ms_result_summary.status_kind }}">
-                <strong>当前总状态</strong>
-                <span>
+                <span class="op-meta-item__label">当前总状态</span>
+                <span class="op-meta-item__value">
                   <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_result_summary.status_kind }}"
                         data-role="ms-block-a-status-kind">{{ ms_result_summary.status_label_zh }}</span>
                   <span data-role="ms-block-a-status-headline" style="margin-left:6px;">{{ ms_result_summary.headline_zh }}</span>
                 </span>
               </div>
-              <div class="meta-item" data-role="ms-block-a-blocker">
-                <strong>当前阻塞</strong>
-                <span data-role="ms-block-a-blocker-value">{{ ms_result_summary.head_reason_label_zh if ms_result_summary.head_reason else "无" }}</span>
+            </div>
+            {% if ms_result_summary.head_reason %}
+              <div class="op-banner op-banner--blocker">
+                <div>
+                  <div class="op-banner__title" data-role="ms-block-a-blocker">当前阻塞</div>
+                  <div class="op-banner__body" data-role="ms-block-a-blocker-value">{{ ms_result_summary.head_reason_label_zh }}</div>
+                </div>
               </div>
-              <div class="meta-item" data-role="ms-block-a-next-action">
-                <strong>下一步</strong>
-                <span data-role="ms-block-a-next-action-value">{{ ms_result_summary.next_action_zh }}</span>
+            {% else %}
+              <div class="op-banner op-banner--ready">
+                <div>
+                  <div class="op-banner__title" data-role="ms-block-a-blocker">无阻塞</div>
+                  <div class="op-banner__body" data-role="ms-block-a-blocker-value">所有必要素材已就位 · 可继续推进。</div>
+                </div>
+              </div>
+            {% endif %}
+            <div class="op-banner op-banner--next">
+              <div>
+                <div class="op-banner__title" data-role="ms-block-a-next-action">下一步建议</div>
+                <div class="op-banner__body" data-role="ms-block-a-next-action-value">{{ ms_result_summary.next_action_zh }}</div>
               </div>
             </div>
           {% endif %}
-          <div class="task-actions" data-role="ms-block-a-actions" style="margin-top:10px;">
-            <a href="/tasks/{{ task.task_id }}/publish" class="btn-secondary"
-               data-role="ms-block-a-action-delivery">前往交付中心</a>
-            <a href="/tasks/{{ task.task_id }}/publish#publish-feedback" class="btn-secondary"
-               data-role="ms-block-a-action-publish-feedback">前往发布反馈</a>
-          </div>
         </div>
       {% endif %}
 
@@ -377,40 +387,50 @@
          secondary diagnostics — Block B does not surface them per wireframe §4.5
          forbidden list ("operator-readable wording only"). #}
       {% if ms_script_structure.is_matrix_script %}
-        <div class="panel" data-role="matrix-script-block-b-script-structure">
-          <div class="section-title">
-            <h2 data-role="ms-block-b-title">Workbench B · 脚本结构</h2>
-            <div class="secondary" data-role="ms-block-b-subtitle">面向运营的 Hook / Body / CTA + 关键词 / 禁用词；只读视图。</div>
+        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-b-script-structure">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">B · 脚本</span>
+              <h2 class="op-section-title" data-role="ms-block-b-title">脚本结构</h2>
+            </div>
           </div>
-          {% for section in (ms_script_structure.sections or []) %}
-            <div class="meta-item" data-role="ms-block-b-section"
-                 data-section-id="{{ section.section_id }}"
-                 data-section-status="{{ section.body_status_code }}"
-                 style="margin-top:8px;">
-              <strong>{{ section.section_label_zh }}</strong>
-              {% if section.body_text %}
-                <span data-role="ms-block-b-section-body">{{ section.body_text }}</span>
-              {% else %}
-                <span class="muted" data-role="ms-block-b-section-empty">{{ section.body_status_label_zh }}</span>
-              {% endif %}
+          <p class="op-section-helper" data-role="ms-block-b-subtitle">三段式：Hook 抓人 → Body 信息 → CTA 行动。下方关键词与禁用词限定基本表达边界。</p>
+
+          <div class="op-script-grid">
+            {% for section in (ms_script_structure.sections or []) %}
+              {% set _section_tone = "hook" if section.section_id == "hook" else ("body" if section.section_id == "body" else ("cta" if section.section_id == "cta" else "body")) %}
+              <div class="op-script-card" data-role="ms-block-b-section"
+                   data-section-id="{{ section.section_id }}"
+                   data-section-status="{{ section.body_status_code }}">
+                <span class="op-script-card__tag op-script-card__tag--{{ _section_tone }}">{{ section.section_label_zh }}</span>
+                {% if section.body_text %}
+                  <div class="op-script-card__body" data-role="ms-block-b-section-body">{{ section.body_text }}</div>
+                {% else %}
+                  <div class="op-script-card__empty" data-role="ms-block-b-section-empty">{{ section.body_status_label_zh }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+
+          {% if ms_script_structure.taxonomy %}
+            <div class="op-script-grid" style="margin-top:14px;">
+              {% for tax in (ms_script_structure.taxonomy or []) %}
+                {% set _tax_tone = "keyword" if tax.taxonomy_id == "keywords" else ("banword" if tax.taxonomy_id == "banwords" else "body") %}
+                <div class="op-script-card" data-role="ms-block-b-taxonomy"
+                     data-taxonomy-id="{{ tax.taxonomy_id }}"
+                     data-taxonomy-status="{{ tax.values_status_code }}">
+                  <span class="op-script-card__tag op-script-card__tag--{{ _tax_tone }}">{{ tax.taxonomy_label_zh }}</span>
+                  {% if tax["values"] %}
+                    <div data-role="ms-block-b-taxonomy-values">
+                      {% for v in tax["values"] %}<span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">{{ v }}</span>{% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="op-script-card__empty" data-role="ms-block-b-taxonomy-empty">{{ tax.values_status_label_zh }}</div>
+                  {% endif %}
+                </div>
+              {% endfor %}
             </div>
-          {% endfor %}
-          {% for tax in (ms_script_structure.taxonomy or []) %}
-            <div class="meta-item" data-role="ms-block-b-taxonomy"
-                 data-taxonomy-id="{{ tax.taxonomy_id }}"
-                 data-taxonomy-status="{{ tax.values_status_code }}"
-                 style="margin-top:6px;">
-              <strong>{{ tax.taxonomy_label_zh }}</strong>
-              {# Item access (`tax["values"]`) — Jinja attribute access on a dict key named `values` resolves to `dict.values` (the bound method) and yields a non-iterable, raising `TypeError: 'builtin_function_or_method' object is not iterable` at render. Same shape as the §8.G axis-values fix. #}
-              {% if tax["values"] %}
-                <span data-role="ms-block-b-taxonomy-values">
-                  {% for v in tax["values"] %}<span class="info-pill" style="margin-right:4px;">{{ v }}</span>{% endfor %}
-                </span>
-              {% else %}
-                <span class="muted" data-role="ms-block-b-taxonomy-empty">{{ tax.values_status_label_zh }}</span>
-              {% endif %}
-            </div>
-          {% endfor %}
+          {% endif %}
         </div>
       {% endif %}
 
@@ -422,27 +442,27 @@
          handles; NO vendor / model / provider / engine column.
          Source: derive_matrix_script_readable_variants. #}
       {% if ms_readable_variants.is_matrix_script %}
-        <div class="panel" data-role="matrix-script-block-c-variant-strategy">
-          <div class="section-title">
-            <h2 data-role="ms-block-c-title">Workbench C · 变体策略</h2>
-            <div class="secondary" data-role="ms-block-c-subtitle">{{ ms_readable_variants.variant_candidates_label_zh }}</div>
-          </div>
-          <div class="meta-grid">
-            <div class="meta-item" data-role="ms-block-c-variant-count">
-              <strong>变体数</strong>
-              <span data-role="ms-block-c-variant-count-value">{{ ms_readable_variants.variant_count }}</span>
+        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-c-variant-strategy">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">C · 变体</span>
+              <h2 class="op-section-title" data-role="ms-block-c-title">变体策略</h2>
+              <span class="op-pill op-pill--info" data-role="ms-block-c-variant-count">
+                共 <span data-role="ms-block-c-variant-count-value">{{ ms_readable_variants.variant_count }}</span> 个候选
+              </span>
             </div>
           </div>
+          <p class="op-section-helper" data-role="ms-block-c-subtitle">{{ ms_readable_variants.variant_candidates_label_zh }}</p>
+
           {% if ms_readable_variants.variant_candidates %}
-            <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse; margin-top:8px;"
-                   data-role="ms-block-c-variant-table">
+            <table class="op-variant-table" data-role="ms-block-c-variant-table">
               <thead>
                 <tr>
-                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">变体</th>
-                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">差异点</th>
-                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">视角概要</th>
-                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">节奏 / 时长</th>
-                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">脚本片段</th>
+                  <th>候选</th>
+                  <th>差异点</th>
+                  <th>视角概要</th>
+                  <th>节奏 / 时长</th>
+                  <th>脚本片段</th>
                 </tr>
               </thead>
               <tbody>
@@ -451,22 +471,22 @@
                   <tr data-role="ms-block-c-variant-row"
                       data-variant-index="{{ _idx }}"
                       title="为什么存在此变体：{{ variant.differentiator_zh }}">
-                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                        data-role="ms-block-c-variant-label">候选 {{ _idx }}</td>
-                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                        data-role="ms-block-c-variant-differentiator">{{ variant.differentiator_zh or "—" }}</td>
-                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                        data-role="ms-block-c-variant-axis-summary">{{ variant.axis_summary_zh or "—" }}</td>
-                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                        data-role="ms-block-c-variant-length">{{ variant.length_hint_zh or "—" }}</td>
-                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                        data-role="ms-block-c-variant-bound-slot">{{ variant.bound_slot_label_zh }}</td>
+                    <td data-role="ms-block-c-variant-label">候选 {{ _idx }}</td>
+                    <td data-role="ms-block-c-variant-differentiator">{{ variant.differentiator_zh or "—" }}</td>
+                    <td data-role="ms-block-c-variant-axis-summary">{{ variant.axis_summary_zh or "—" }}</td>
+                    <td data-role="ms-block-c-variant-length">{{ variant.length_hint_zh or "—" }}</td>
+                    <td data-role="ms-block-c-variant-bound-slot">{{ variant.bound_slot_label_zh }}</td>
                   </tr>
                 {% endfor %}
               </tbody>
             </table>
           {% else %}
-            <div class="muted" data-role="ms-block-c-empty" style="margin-top:8px;">尚未生成变体；前往任务区或工作台触发生成后再查看。</div>
+            <div class="op-banner op-banner--review" data-role="ms-block-c-empty">
+              <div>
+                <div class="op-banner__title">尚未生成变体</div>
+                <div class="op-banner__body">前往任务区或下方"生成 / 重新生成"操作触发生成后再查看。</div>
+              </div>
+            </div>
           {% endif %}
         </div>
       {% endif %}
@@ -501,65 +521,54 @@
          IG-2 deferred to a future presenter-only PR; the secondary action
          here is bulk regeneration only. #}
       {% if ms_recommended_action.is_matrix_script %}
-        <div class="panel" data-role="matrix-script-block-d-generate-regenerate">
-          <div class="section-title">
-            <h2 data-role="ms-block-d-title">Workbench D · 生成 / 重新生成</h2>
-            <div class="secondary" data-role="ms-block-d-subtitle">面向运营的生成 / 重新生成操作；前置条件与阻塞原因来自统一 publish_readiness 上游。</div>
-          </div>
-          <div class="task-actions" data-role="ms-block-d-actions" style="margin-top:8px;">
-            {# Primary action: 生成 N 个变体. N is sourced from the existing
-               readable_variants helper's variant_count field, not from any
-               vendor / model / provider / engine concept. Disabled state
-               carries the operator-language reason from the recommended
-               action lane. #}
-            <button type="button"
-                    class="btn-primary"
-                    data-role="ms-block-d-primary-action"
-                    data-status-kind="{{ ms_recommended_action.status_kind }}"
-                    data-variant-count="{{ ms_readable_variants.variant_count or 0 }}"
-                    {% if ms_recommended_action.status_kind == "blocked_pending_publish_readiness" %}disabled aria-disabled="true"{% endif %}>
-              生成 {{ ms_readable_variants.variant_count or 0 }} 个变体
-            </button>
-            {# Secondary action: 重新生成被阻塞的变体 (M). M is sourced from
-               the existing delivery_ready_package.blocked_count aggregate
-               (RECOMMENDED_BUCKET_BLOCKED + PACKAGE_BLOCKED counters).
-               Enabled only when M > 0. #}
-            <button type="button"
-                    class="btn-secondary"
-                    data-role="ms-block-d-secondary-action"
-                    data-blocked-count="{{ ms_delivery_ready_package.blocked_count or 0 }}"
-                    {% if (ms_delivery_ready_package.blocked_count or 0) == 0 %}disabled aria-disabled="true"{% endif %}>
-              重新生成被阻塞的变体 ({{ ms_delivery_ready_package.blocked_count or 0 }})
-            </button>
-          </div>
-          <div class="meta-grid" style="margin-top:10px;">
-            {# Headline + next-action lane (RC-R4 single source). #}
-            <div class="meta-item" data-role="ms-block-d-headline"
-                 data-status-kind="{{ ms_recommended_action.status_kind }}">
-              <strong>当前结论</strong>
-              <span>
-                <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_recommended_action.status_kind }}"
-                      data-role="ms-block-d-status-kind">{{ ms_recommended_action.status_label_zh }}</span>
-                <span data-role="ms-block-d-headline-value" style="margin-left:6px;">{{ ms_recommended_action.headline_zh }}</span>
-              </span>
+        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-d-generate-regenerate">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">D · 行动</span>
+              <h2 class="op-section-title" data-role="ms-block-d-title">生成 / 重新生成</h2>
+              <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_recommended_action.status_kind }}"
+                    data-role="ms-block-d-status-kind">{{ ms_recommended_action.status_label_zh }}</span>
             </div>
-            <div class="meta-item" data-role="ms-block-d-next-action">
-              <strong>下一步</strong>
-              <span data-role="ms-block-d-next-action-value">{{ ms_recommended_action.next_action_zh }}</span>
+            <div class="op-section-actions task-actions" data-role="ms-block-d-actions">
+              <button type="button"
+                      class="btn-primary"
+                      data-role="ms-block-d-primary-action"
+                      data-status-kind="{{ ms_recommended_action.status_kind }}"
+                      data-variant-count="{{ ms_readable_variants.variant_count or 0 }}"
+                      {% if ms_recommended_action.status_kind == "blocked_pending_publish_readiness" %}disabled aria-disabled="true"{% endif %}>
+                ⚡ 生成 {{ ms_readable_variants.variant_count or 0 }} 个变体
+              </button>
+              <button type="button"
+                      class="btn-secondary"
+                      data-role="ms-block-d-secondary-action"
+                      data-blocked-count="{{ ms_delivery_ready_package.blocked_count or 0 }}"
+                      {% if (ms_delivery_ready_package.blocked_count or 0) == 0 %}disabled aria-disabled="true"{% endif %}>
+                ↻ 重新生成被阻塞的变体 ({{ ms_delivery_ready_package.blocked_count or 0 }})
+              </button>
             </div>
           </div>
-          {# Preconditions list — synthesized from already-attached
-             qc_diagnostics ready_gate_explanation. Each item carries its own
-             status badge in operator language; no advisory-rule mutation. #}
+          <p class="op-section-helper" data-role="ms-block-d-subtitle">面向运营的一键生成与定点重生；前置条件与阻塞原因来自统一 publish_readiness 上游，本面板不发明事实。</p>
+
+          <div class="op-banner op-banner--next">
+            <div>
+              <div class="op-banner__title" data-role="ms-block-d-headline">
+                <span data-role="ms-block-d-headline-value">{{ ms_recommended_action.headline_zh }}</span>
+              </div>
+              <div class="op-banner__body" data-role="ms-block-d-next-action">
+                下一步 · <span data-role="ms-block-d-next-action-value">{{ ms_recommended_action.next_action_zh }}</span>
+              </div>
+            </div>
+          </div>
+
           {% if ms_qc_diagnostics.is_matrix_script %}
-            <div data-role="ms-block-d-preconditions" style="margin-top:8px;">
-              <strong>当前前置条件</strong>
-              <ul style="margin:6px 0 0 16px; padding:0;">
+            <div data-role="ms-block-d-preconditions" style="margin-top:12px;">
+              <span class="op-meta-item__label">当前前置条件</span>
+              <ul style="margin:6px 0 0 16px; padding:0; color:#334155; font-size:13px;">
                 <li data-role="ms-block-d-precondition-ready-gate"
                     data-publishable="{{ 'true' if ms_qc_diagnostics.ready_gate_explanation.publishable else 'false' }}"
                     data-publish-ready="{{ 'true' if ms_qc_diagnostics.ready_gate_explanation.publish_ready else 'false' }}"
                     data-compose-ready="{{ 'true' if ms_qc_diagnostics.ready_gate_explanation.compose_ready else 'false' }}">
-                  Ready gate · <span data-role="ms-block-d-precondition-ready-gate-value">{{ ms_qc_diagnostics.ready_gate_explanation.head_reason_label_zh }}</span>
+                  发布门禁 · <span data-role="ms-block-d-precondition-ready-gate-value">{{ ms_qc_diagnostics.ready_gate_explanation.head_reason_label_zh }}</span>
                 </li>
                 {% for risk in (ms_qc_diagnostics.risk_items or []) %}
                   <li data-role="ms-block-d-precondition-risk"
@@ -571,24 +580,23 @@
               </ul>
             </div>
           {% endif %}
-          {# Blocker reason — operator language only; sourced from the
-             closed publish_readiness head_reason via HEAD_REASON_LABELS_ZH.
-             Never renders raw English enum value. #}
-          <div class="meta-item" data-role="ms-block-d-blocker" style="margin-top:8px;">
-            <strong>当前阻塞原因</strong>
-            <span data-role="ms-block-d-blocker-value">
-              {% if ms_recommended_action.head_reason_label_zh %}{{ ms_recommended_action.head_reason_label_zh }}{% else %}暂无{% endif %}
-            </span>
-          </div>
-          {# Reason-zh sentence — gives the operator a one-line why behind
-             the current decision (publishable / blocked / undetermined). #}
-          {% if ms_recommended_action.reason_zh %}
-            <div class="meta-item" data-role="ms-block-d-reason" style="margin-top:6px;">
-              <strong>说明</strong>
-              <span class="muted" data-role="ms-block-d-reason-value">{{ ms_recommended_action.reason_zh }}</span>
+
+          <div class="op-meta-grid" style="margin-top:12px;">
+            <div class="op-meta-item" data-role="ms-block-d-blocker">
+              <span class="op-meta-item__label">当前阻塞原因</span>
+              <span class="op-meta-item__value" data-role="ms-block-d-blocker-value">
+                {% if ms_recommended_action.head_reason_label_zh %}{{ ms_recommended_action.head_reason_label_zh }}{% else %}暂无{% endif %}
+              </span>
             </div>
-          {% endif %}
-          <div class="muted t-secondary" data-role="ms-block-d-no-vendor-note" style="margin-top:6px;">
+            {% if ms_recommended_action.reason_zh %}
+              <div class="op-meta-item" data-role="ms-block-d-reason">
+                <span class="op-meta-item__label">说明</span>
+                <span class="op-meta-item__value" style="font-weight:400; color:#475569;" data-role="ms-block-d-reason-value">{{ ms_recommended_action.reason_zh }}</span>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="op-tech-note" data-role="ms-block-d-no-vendor-note">
             生成模式由系统决定 · 不暴露 provider / model / vendor / engine 选择。
           </div>
         </div>
@@ -625,11 +633,15 @@
            each card looks up by id from the source-of-truth dicts. #}
         {% set ms_block_e_pkg_rows = (ms_delivery_ready_package.rows or []) %}
         {% set ms_block_e_review_rows = (ms_review_zone.review_status_rows or []) %}
-        <div class="panel" data-role="matrix-script-block-e-candidate-review">
-          <div class="section-title">
-            <h2 data-role="ms-block-e-title">Workbench E · 候选评审</h2>
-            <div class="secondary" data-role="ms-block-e-subtitle">每个候选独立评审；推荐 ⭐ 由统一 publish_readiness 决定，不发明事实，不展示 final_video 媒体链接。</div>
+        <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-candidate-review">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--violet">E · 评审</span>
+              <h2 class="op-section-title" data-role="ms-block-e-title">候选评审</h2>
+              <span class="op-pill op-pill--review">{{ ms_preview_compare.variations | length }} 候选并排</span>
+            </div>
           </div>
+          <p class="op-section-helper" data-role="ms-block-e-subtitle">每个候选独立预览 / 字幕 / 配音 / 质检；⭐ 推荐由统一 publish_readiness 决定，不发明事实、不展示 final_video 媒体链接。</p>
           {% set ms_block_e_recommended_id = (ms_recommended_action.recommended_variant or {}).variation_id %}
           {% for variation in ms_preview_compare.variations %}
             {% set _idx = loop.index %}
@@ -854,11 +866,24 @@
          button (publishing happens in the Delivery Center / Publish Feedback
          only); no second-source publishable derivation; no fabricated URLs. #}
       {% if ms_delivery_comprehension.is_matrix_script %}
-        <div class="panel" data-role="matrix-script-block-f-delivery-teaser">
-          <div class="section-title">
-            <h2 data-role="ms-block-f-title">Workbench F · 交付概览</h2>
-            <div class="secondary" data-role="ms-block-f-subtitle">面向 Delivery Center 的预览摘要；发布门禁与必交付项由统一 publish_readiness 收敛，本面板只读。</div>
+        <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-f-delivery-teaser">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">F · 交付</span>
+              <h2 class="op-section-title" data-role="ms-block-f-title">交付概览</h2>
+              {% if ms_publish_readiness.publishable %}
+                <span class="op-pill op-pill--ready"><span class="op-pill__dot"></span>可发布</span>
+              {% else %}
+                <span class="op-pill op-pill--blocked"><span class="op-pill__dot"></span>待解除阻塞</span>
+              {% endif %}
+            </div>
+            <div class="op-section-actions task-actions" data-role="ms-block-f-actions">
+              <a href="/tasks/{{ task.task_id }}/publish"
+                 class="btn-primary"
+                 data-role="ms-block-f-action-delivery-center">前往交付中心查看完整成片 →</a>
+            </div>
           </div>
+          <p class="op-section-helper" data-role="ms-block-f-subtitle">工作台一眼看懂"现在能不能发"；详细成片与发布表单在交付中心。</p>
           {# Publish gate banner — single-source publishability. #}
           <div data-role="ms-block-f-publish-gate"
                data-publishable="{{ 'true' if ms_publish_readiness.publishable else 'false' }}"
@@ -929,16 +954,19 @@
               {% endfor %}
             </ul>
           </div>
-          <div class="task-actions" data-role="ms-block-f-actions" style="margin-top:10px;">
-            <a href="/tasks/{{ task.task_id }}/publish"
-               class="btn-secondary"
-               data-role="ms-block-f-action-delivery-center">前往交付中心查看完整成片</a>
-          </div>
-          <div class="muted t-secondary" data-role="ms-block-f-no-fake-final-video-note" style="margin-top:6px;">
-            本面板不展示 final_video / 发布 URL · final_video 主体在 Delivery Center 渲染（RC-R8）。
+          <div class="op-tech-note" data-role="ms-block-f-no-fake-final-video-note">
+            本面板不展示 final_video / 发布 URL · final_video 主体在交付中心渲染（RC-R8）。
           </div>
         </div>
       {% endif %}
+
+      {# Matrix Script · 技术诊断（折叠）— 历史遗留的 PR-U2 / MS-W3 / Variation
+         / RC PR-2 / RC PR-3 / RC PR-4 二级诊断面板，统一收纳到一个折叠
+         <details>，默认收起。所有 data-role 锚点完整保留，结构测试不受影响。 #}
+      <details class="op-collapse" data-role="op-console-ms-secondary-fold">
+        <summary>矩阵脚本 · 二级诊断面板（架构师视图）</summary>
+        <div class="op-collapse__hint">展开查看 PR-U2 / MS-W3 / 变体面板 / 单脚本可读视图等内部诊断；不影响日常运营。</div>
+        <div class="op-collapse__body">
 
       {# PR-U2 Matrix Script Workbench operator-comprehension block. Additive — sits ABOVE the existing axes/cells/slots/attribution rows which are preserved verbatim below. Reads only ms_comp (presentation-layer projection over ms_surface + panel resolver). No new packet truth. No provider/model/vendor controls. #}
       {% if ms_comp.is_matrix_script %}
@@ -1820,11 +1848,17 @@
           {% endif %}
         </div>
       {% endif %}
+
+        </div> {# /op-collapse__body for matrix_script secondary diagnostics #}
+      </details>
     {% endif %}
 
     {# OWC-DA PR-2 — Digital Anchor Workbench Five-Panel Convergence (DA-W3 + DA-W4 + DA-W5 + DA-W6 + DA-W7).
-       Each panel is a pure presentation-layer projection over already-existing truth (role-speaker surface / delivery binding / publish feedback closure read-only). Hot Follow / Matrix Script / Baseline panels never enter this branch.
-       Authority: docs/reviews/owc_da_gate_spec_v1.md §3 DA-W3..W7. #}
+       Operator-console rebuild: panels are reordered to operator workflow
+       (brief → content → scene → role/speaker → language → review). All
+       data-role markers and underlying presenter contracts are preserved
+       verbatim. Hot Follow / Matrix Script / Baseline panels never enter
+       this branch. Authority: docs/reviews/owc_da_gate_spec_v1.md §3 DA-W3..W7. #}
     {% if ops_workbench_panel.panel_kind == "digital_anchor" %}
       {% set da_role_binding = ((ops.workbench or {}).digital_anchor_role_binding or {}) %}
       {% set da_content_structure = ((ops.workbench or {}).digital_anchor_content_structure or {}) %}
@@ -1832,147 +1866,147 @@
       {% set da_language_output = ((ops.workbench or {}).digital_anchor_language_output or {}) %}
       {% set da_review_zone = ((ops.workbench or {}).digital_anchor_review_zone or {}) %}
 
-      {# DA-W3 — Workbench A 角色绑定面 #}
-      {% if da_role_binding.is_digital_anchor %}
-        <div class="panel" data-role="digital-anchor-role-binding-panel">
-          <div class="section-title">
-            <h2 data-role="da-role-binding-title">{{ da_role_binding.panel_title_zh }}</h2>
-            <div class="secondary" data-role="da-role-binding-subtitle">{{ da_role_binding.panel_subtitle_zh }}</div>
+      {# DA · 任务摘要 — operator-language brief synthesised over the
+         already-resolved content_structure projection (no new presenter,
+         no new contract surface). Sits at the top of the DA workbench
+         so the operator sees the line + topic + language scope + output
+         intent without packet inspection. #}
+      <div class="op-card op-card--accent-blue" data-role="digital-anchor-brief-summary">
+        <div class="op-section-head">
+          <div class="op-section-head__main">
+            <span class="op-section-index op-section-index--blue">A · 任务摘要</span>
+            <h2 class="op-section-title" data-role="da-brief-title">数字人口播 · 任务摘要</h2>
+            <span class="op-pill op-pill--anchor"><span class="op-pill__dot"></span>数字人口播</span>
           </div>
-          <h3 style="margin:12px 0 6px;" data-role="da-role-binding-facets-label">{{ da_role_binding.role_facets_label_zh }}</h3>
-          <div class="meta-grid" data-role="da-role-binding-facets-grid">
-            {% for facet in (da_role_binding.role_facets or []) %}
-              <div class="meta-item" data-role="da-role-binding-facet" data-facet-id="{{ facet.facet_id }}" data-resolved="{{ 'true' if facet.is_resolved else 'false' }}">
-                <strong>{{ facet.label_zh }}</strong>
-                <span>{{ facet.value_label_zh or "—" }}</span>
-                <span class="muted t-secondary">{{ facet.guidance_zh }}</span>
-              </div>
-            {% endfor %}
-          </div>
-
-          <h3 style="margin:16px 0 6px;" data-role="da-role-binding-roles-label">{{ da_role_binding.role_summary_label_zh }}</h3>
-          {% if da_role_binding.role_summary_rows %}
-            <ul class="muted" data-role="da-role-binding-roles-list" style="margin:6px 0 0 18px;">
-              {% for row in da_role_binding.role_summary_rows %}
-                <li data-role="da-role-binding-role-row" data-role-id="{{ row.role_id }}">
-                  <code>{{ row.role_id }}</code> · {{ row.display_name or "—" }} · {{ row.framing_kind_label_zh }}
-                </li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <div class="muted" data-role="da-role-binding-roles-empty">尚未绑定角色。</div>
-          {% endif %}
-
-          <h3 style="margin:16px 0 6px;" data-role="da-role-binding-speakers-label">{{ da_role_binding.speaker_summary_label_zh }}</h3>
-          {% if da_role_binding.speaker_summary_rows %}
-            <ul class="muted" data-role="da-role-binding-speakers-list" style="margin:6px 0 0 18px;">
-              {% for row in da_role_binding.speaker_summary_rows %}
-                <li data-role="da-role-binding-speaker-row" data-segment-id="{{ row.segment_id }}">
-                  <code>{{ row.segment_id }}</code> · binds=<code>{{ row.binds_role_id or "—" }}</code> · 配音={{ row.dub_kind_label_zh }} · 对位={{ row.lip_sync_kind_label_zh }}{% if row.language_pick %} · 语言={{ row.language_pick }}{% endif %}
-                </li>
-              {% endfor %}
-            </ul>
-          {% else %}
-            <div class="muted" data-role="da-role-binding-speakers-empty">尚未规划段落。</div>
-          {% endif %}
-
-          <div class="muted t-secondary" style="margin-top:12px;" data-role="da-role-binding-asset-supply-hint">
-            <strong>{{ da_role_binding.asset_supply_browse_label_zh }}：</strong>
-            {{ da_role_binding.asset_supply_browse_role_pack_hint_zh }}<br />
-            {{ da_role_binding.asset_supply_browse_speaker_hint_zh }}
-          </div>
-          <div class="muted t-secondary" style="margin-top:6px;" data-role="da-role-binding-closed-set-explanation">
-            {{ da_role_binding.closed_set_explanation_zh }}
-          </div>
-          <div class="muted t-secondary" style="margin-top:6px;" data-role="da-role-binding-phase-b-forbidden">
-            {{ da_role_binding.phase_b_authoring_forbidden_label_zh }}
+          <div class="op-section-actions">
+            <a href="/tasks/{{ task.task_id }}/publish" class="btn-nav"
+               data-role="da-brief-action-delivery">前往交付中心 →</a>
           </div>
         </div>
-      {% endif %}
-
-      {# DA-W4 — Workbench B 内容结构面 (read-view) #}
-      {% if da_content_structure.is_digital_anchor %}
-        <div class="panel" data-role="digital-anchor-content-structure-panel">
-          <div class="section-title">
-            <h2 data-role="da-content-structure-title">{{ da_content_structure.panel_title_zh }}</h2>
-            <div class="secondary" data-role="da-content-structure-subtitle">{{ da_content_structure.panel_subtitle_zh }}</div>
+        <p class="op-section-helper">这一段告诉你：本任务正在产出哪个口播视频、面向哪些语言、当前关键约束。下方按生产顺序展开。</p>
+        <div class="op-meta-grid">
+          <div class="op-meta-item" data-role="da-brief-topic">
+            <span class="op-meta-item__label">主题</span>
+            <span class="op-meta-item__value">{{ da_content_structure.title_value or task.title or "—" }}</span>
           </div>
-          <div class="meta-grid">
-            <div class="meta-item" data-role="da-content-structure-title-row">
-              <strong>{{ da_content_structure.title_label_zh }}</strong>
-              <span>{{ da_content_structure.title_value or "—" }}</span>
-              <span class="muted t-secondary">{{ da_content_structure.title_status_label_zh }}</span>
+          <div class="op-meta-item" data-role="da-brief-language-scope">
+            <span class="op-meta-item__label">语言范围</span>
+            <span class="op-meta-item__value">
+              {% if da_content_structure.language_scope and da_content_structure.language_scope.source_language %}{{ da_content_structure.language_scope.source_language }}{% else %}—{% endif %}
+              {% if da_content_structure.language_scope and da_content_structure.language_scope.target_language %} → {{ da_content_structure.language_scope.target_language | join("，") }}{% endif %}
+            </span>
+          </div>
+          <div class="op-meta-item" data-role="da-brief-output-intent">
+            <span class="op-meta-item__label">输出意图</span>
+            <span class="op-meta-item__value">{{ da_content_structure.output_intent_value or "—" }}</span>
+          </div>
+          <div class="op-meta-item" data-role="da-brief-segment-hint">
+            <span class="op-meta-item__label">段落数提示</span>
+            <span class="op-meta-item__value">
+              {% if da_content_structure.speaker_segment_count_hint_value is not none %}{{ da_content_structure.speaker_segment_count_hint_value }} 段{% else %}—{% endif %}
+            </span>
+          </div>
+          <div class="op-meta-item" data-role="da-brief-operator-notes">
+            <span class="op-meta-item__label">运营备注</span>
+            <span class="op-meta-item__value">{{ da_content_structure.operator_notes_value or "—" }}</span>
+          </div>
+        </div>
+      </div>
+
+      {# DA-W4 — 内容结构（原 Workbench B；运营顺序中第二步） #}
+      {% if da_content_structure.is_digital_anchor %}
+        <div class="op-card op-card--accent-blue" data-role="digital-anchor-content-structure-panel">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--blue">B · 内容结构</span>
+              <h2 class="op-section-title" data-role="da-content-structure-title">{{ da_content_structure.panel_title_zh }}</h2>
             </div>
-            <div class="meta-item" data-role="da-content-structure-source-ref-row">
-              <strong>{{ da_content_structure.source_script_ref_label_zh }}</strong>
-              <span><code>{{ da_content_structure.source_script_ref_value or "—" }}</code></span>
-              <span class="muted t-secondary">{{ da_content_structure.source_script_ref_status_label_zh }}</span>
+          </div>
+          <p class="op-section-helper" data-role="da-content-structure-subtitle">{{ da_content_structure.panel_subtitle_zh }}</p>
+
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="da-content-structure-title-row">
+              <span class="op-meta-item__label">{{ da_content_structure.title_label_zh }}</span>
+              <span class="op-meta-item__value">{{ da_content_structure.title_value or "—" }}</span>
+              <span class="op-tech-note">{{ da_content_structure.title_status_label_zh }}</span>
             </div>
-            <div class="meta-item" data-role="da-content-structure-language-row">
-              <strong>{{ da_content_structure.language_scope_label_zh }}</strong>
-              <span>
+            <div class="op-meta-item" data-role="da-content-structure-source-ref-row">
+              <span class="op-meta-item__label">{{ da_content_structure.source_script_ref_label_zh }}</span>
+              <span class="op-meta-item__value"><code>{{ da_content_structure.source_script_ref_value or "—" }}</code></span>
+              <span class="op-tech-note">{{ da_content_structure.source_script_ref_status_label_zh }}</span>
+            </div>
+            <div class="op-meta-item" data-role="da-content-structure-language-row">
+              <span class="op-meta-item__label">{{ da_content_structure.language_scope_label_zh }}</span>
+              <span class="op-meta-item__value">
                 {% if da_content_structure.language_scope.source_language %}{{ da_content_structure.language_scope.source_language }}{% else %}—{% endif %}
                 {% if da_content_structure.language_scope.target_language %}→ {{ da_content_structure.language_scope.target_language | join(", ") }}{% endif %}
               </span>
             </div>
-            <div class="meta-item" data-role="da-content-structure-output-intent-row">
-              <strong>{{ da_content_structure.output_intent_label_zh }}</strong>
-              <span>{{ da_content_structure.output_intent_value or "—" }}</span>
+            <div class="op-meta-item" data-role="da-content-structure-output-intent-row">
+              <span class="op-meta-item__label">{{ da_content_structure.output_intent_label_zh }}</span>
+              <span class="op-meta-item__value">{{ da_content_structure.output_intent_value or "—" }}</span>
             </div>
-            <div class="meta-item" data-role="da-content-structure-segment-count-hint-row">
-              <strong>{{ da_content_structure.speaker_segment_count_hint_label_zh }}</strong>
-              <span>{% if da_content_structure.speaker_segment_count_hint_value is not none %}{{ da_content_structure.speaker_segment_count_hint_value }}{% else %}—{% endif %}</span>
+            <div class="op-meta-item" data-role="da-content-structure-segment-count-hint-row">
+              <span class="op-meta-item__label">{{ da_content_structure.speaker_segment_count_hint_label_zh }}</span>
+              <span class="op-meta-item__value">{% if da_content_structure.speaker_segment_count_hint_value is not none %}{{ da_content_structure.speaker_segment_count_hint_value }}{% else %}—{% endif %}</span>
             </div>
-            <div class="meta-item" data-role="da-content-structure-operator-notes-row">
-              <strong>{{ da_content_structure.operator_notes_label_zh }}</strong>
-              <span>{{ da_content_structure.operator_notes_value or "—" }}</span>
+            <div class="op-meta-item" data-role="da-content-structure-operator-notes-row">
+              <span class="op-meta-item__label">{{ da_content_structure.operator_notes_label_zh }}</span>
+              <span class="op-meta-item__value">{{ da_content_structure.operator_notes_value or "—" }}</span>
             </div>
           </div>
 
-          <h3 style="margin:16px 0 6px;" data-role="da-content-structure-sections-label">{{ da_content_structure.sections_label_zh }}</h3>
-          {% for section in (da_content_structure.sections or []) %}
-            <div class="meta-item" data-role="da-content-structure-section" data-section-id="{{ section.section_id }}" data-section-status="{{ section.body_status_code }}">
-              <strong>{{ section.section_label_zh }}</strong>
-              {% if section.body_text %}
-                <span data-role="da-content-structure-section-body">{{ section.body_text }}</span>
-              {% endif %}
-              <span class="muted t-secondary">{{ section.body_status_label_zh }}</span>
-            </div>
-          {% endfor %}
+          <h3 class="op-section-title" style="margin:18px 0 6px; font-size:15px;" data-role="da-content-structure-sections-label">{{ da_content_structure.sections_label_zh }}</h3>
+          <div class="op-script-grid">
+            {% for section in (da_content_structure.sections or []) %}
+              <div class="op-script-card" data-role="da-content-structure-section" data-section-id="{{ section.section_id }}" data-section-status="{{ section.body_status_code }}">
+                <span class="op-script-card__tag op-script-card__tag--body">{{ section.section_label_zh }}</span>
+                {% if section.body_text %}
+                  <div class="op-script-card__body" data-role="da-content-structure-section-body">{{ section.body_text }}</div>
+                {% else %}
+                  <div class="op-script-card__empty">{{ section.body_status_label_zh }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
 
-          <div class="muted t-secondary" style="margin-top:12px;" data-role="da-content-structure-phase-b-forbidden">
+          <div class="op-tech-note" data-role="da-content-structure-phase-b-forbidden">
             {{ da_content_structure.phase_b_authoring_forbidden_label_zh }}
           </div>
         </div>
       {% endif %}
 
-      {# DA-W5 — Workbench C 场景模板面 #}
+      {# DA-W5 — 场景模板（原 Workbench C；运营顺序中第三步） #}
       {% if da_scene_template.is_digital_anchor %}
-        <div class="panel" data-role="digital-anchor-scene-template-panel">
-          <div class="section-title">
-            <h2 data-role="da-scene-template-title">{{ da_scene_template.panel_title_zh }}</h2>
-            <div class="secondary" data-role="da-scene-template-subtitle">{{ da_scene_template.panel_subtitle_zh }}</div>
+        <div class="op-card op-card--accent-blue" data-role="digital-anchor-scene-template-panel">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--blue">C · 场景</span>
+              <h2 class="op-section-title" data-role="da-scene-template-title">{{ da_scene_template.panel_title_zh }}</h2>
+            </div>
           </div>
-          <div class="meta-grid">
-            <div class="meta-item" data-role="da-scene-template-ref-row" data-status="{{ da_scene_template.scene_template_ref_status_code }}">
-              <strong>{{ da_scene_template.scene_template_ref_label_zh }}</strong>
-              <span><code>{{ da_scene_template.scene_template_ref_value or "—" }}</code></span>
-              <span class="muted t-secondary">{{ da_scene_template.scene_template_ref_status_label_zh }}</span>
+          <p class="op-section-helper" data-role="da-scene-template-subtitle">{{ da_scene_template.panel_subtitle_zh }}</p>
+
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="da-scene-template-ref-row" data-status="{{ da_scene_template.scene_template_ref_status_code }}">
+              <span class="op-meta-item__label">{{ da_scene_template.scene_template_ref_label_zh }}</span>
+              <span class="op-meta-item__value"><code>{{ da_scene_template.scene_template_ref_value or "—" }}</code></span>
+              <span class="op-tech-note">{{ da_scene_template.scene_template_ref_status_label_zh }}</span>
             </div>
           </div>
 
-          <h3 style="margin:16px 0 6px;" data-role="da-scene-template-zones-label">{{ da_scene_template.scene_zones_label_zh }}</h3>
-          <div class="meta-grid" data-role="da-scene-template-zones-grid">
+          <h3 class="op-section-title" style="margin:18px 0 6px; font-size:15px;" data-role="da-scene-template-zones-label">{{ da_scene_template.scene_zones_label_zh }}</h3>
+          <div class="op-script-grid" data-role="da-scene-template-zones-grid">
             {% for zone in (da_scene_template.scene_zones or []) %}
-              <div class="meta-item" data-role="da-scene-template-zone" data-zone-id="{{ zone.zone_id }}" data-status="{{ zone.status_code }}">
-                <strong>{{ zone.label_zh }}</strong>
-                <span class="muted t-secondary">{{ zone.guidance_zh }}</span>
-                <span class="muted t-secondary">{{ zone.status_label_zh }}</span>
+              <div class="op-script-card" data-role="da-scene-template-zone" data-zone-id="{{ zone.zone_id }}" data-status="{{ zone.status_code }}">
+                <span class="op-script-card__tag op-script-card__tag--body">{{ zone.label_zh }}</span>
+                <div class="op-script-card__body">{{ zone.guidance_zh }}</div>
+                <span class="op-tech-note">{{ zone.status_label_zh }}</span>
               </div>
             {% endfor %}
           </div>
 
-          <h3 style="margin:16px 0 6px;" data-role="da-scene-template-segments-label">{{ da_scene_template.segment_scene_rows_label_zh }}</h3>
+          <h3 class="op-section-title" style="margin:18px 0 6px; font-size:15px;" data-role="da-scene-template-segments-label">{{ da_scene_template.segment_scene_rows_label_zh }}</h3>
           {% if da_scene_template.segment_scene_rows %}
             <ul class="muted" data-role="da-scene-template-segments-list" style="margin:6px 0 0 18px;">
               {% for row in da_scene_template.segment_scene_rows %}
@@ -1982,56 +2016,127 @@
               {% endfor %}
             </ul>
           {% else %}
-            <div class="muted" data-role="da-scene-template-segments-empty">尚未规划段落。</div>
+            <div class="op-banner op-banner--review" data-role="da-scene-template-segments-empty">
+              <div><div class="op-banner__title">尚未规划段落</div><div class="op-banner__body">在素材供给侧绑定 scene_template_ref 后，每个 segment 可与场景模板对位。</div></div>
+            </div>
           {% endif %}
 
-          <div class="muted t-secondary" style="margin-top:12px;" data-role="da-scene-template-asset-supply-hint">
+          <div class="op-tech-note" data-role="da-scene-template-asset-supply-hint">
             <strong>{{ da_scene_template.asset_supply_browse_label_zh }}：</strong>
             {{ da_scene_template.asset_supply_browse_scene_hint_zh }}
           </div>
-          <div class="muted t-secondary" style="margin-top:6px;" data-role="da-scene-template-authoring-forbidden">
+          <div class="op-tech-note" data-role="da-scene-template-authoring-forbidden">
             {{ da_scene_template.scene_authoring_forbidden_label_zh }}
           </div>
         </div>
       {% endif %}
 
-      {# DA-W6 — Workbench D 语言输出面 + multi-language navigator #}
-      {% if da_language_output.is_digital_anchor %}
-        <div class="panel" data-role="digital-anchor-language-output-panel">
-          <div class="section-title">
-            <h2 data-role="da-language-output-title">{{ da_language_output.panel_title_zh }}</h2>
-            <div class="secondary" data-role="da-language-output-subtitle">{{ da_language_output.panel_subtitle_zh }}</div>
-          </div>
-          <div class="meta-grid">
-            <div class="meta-item" data-role="da-language-output-scope-row">
-              <strong>{{ da_language_output.language_scope_label_zh }}</strong>
-              <span>
-                {% if da_language_output.language_scope.source_language %}{{ da_language_output.language_scope.source_language }}{% else %}—{% endif %}
-                {% if da_language_output.language_scope.target_language %}→ {{ da_language_output.language_scope.target_language | join(", ") }}{% endif %}
-              </span>
-            </div>
-            <div class="meta-item" data-role="da-language-output-subtitle-strategy-row" data-status="{{ da_language_output.subtitle_strategy_code }}">
-              <strong>{{ da_language_output.subtitle_strategy_label_zh }}</strong>
-              <span>{{ da_language_output.subtitle_strategy_label_value_zh }}</span>
-            </div>
-            <div class="meta-item" data-role="da-language-output-terminology-row">
-              <strong>{{ da_language_output.terminology_label_zh }}</strong>
-              <span>{{ da_language_output.terminology_value or "—" }}</span>
-              <span class="muted t-secondary">{{ da_language_output.terminology_status_label_zh }}</span>
+      {# DA-W3 — 角色与口播绑定（原 Workbench A；运营顺序中第四步）#}
+      {% if da_role_binding.is_digital_anchor %}
+        <div class="op-card op-card--accent-violet" data-role="digital-anchor-role-binding-panel">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--violet">D · 角色 / 口播</span>
+              <h2 class="op-section-title" data-role="da-role-binding-title">{{ da_role_binding.panel_title_zh }}</h2>
             </div>
           </div>
+          <p class="op-section-helper" data-role="da-role-binding-subtitle">{{ da_role_binding.panel_subtitle_zh }}</p>
 
-          <h3 style="margin:16px 0 6px;" data-role="da-language-output-facets-label">语言输出四要素</h3>
-          <div class="meta-grid" data-role="da-language-output-facets-grid">
-            {% for facet in (da_language_output.facets or []) %}
-              <div class="meta-item" data-role="da-language-output-facet" data-facet-id="{{ facet.facet_id }}">
-                <strong>{{ facet.label_zh }}</strong>
-                <span class="muted t-secondary">{{ facet.guidance_zh }}</span>
+          <h3 class="op-section-title" style="margin:14px 0 6px; font-size:15px;" data-role="da-role-binding-facets-label">{{ da_role_binding.role_facets_label_zh }}</h3>
+          <div class="op-meta-grid" data-role="da-role-binding-facets-grid">
+            {% for facet in (da_role_binding.role_facets or []) %}
+              <div class="op-meta-item" data-role="da-role-binding-facet" data-facet-id="{{ facet.facet_id }}" data-resolved="{{ 'true' if facet.is_resolved else 'false' }}">
+                <span class="op-meta-item__label">{{ facet.label_zh }}</span>
+                <span class="op-meta-item__value">{{ facet.value_label_zh or "—" }}</span>
+                <span class="op-tech-note">{{ facet.guidance_zh }}</span>
               </div>
             {% endfor %}
           </div>
 
-          <h3 style="margin:16px 0 6px;" data-role="da-language-output-per-language-label">{{ da_language_output.per_language_label_zh }}</h3>
+          <h3 class="op-section-title" style="margin:18px 0 6px; font-size:15px;" data-role="da-role-binding-roles-label">{{ da_role_binding.role_summary_label_zh }}</h3>
+          {% if da_role_binding.role_summary_rows %}
+            <ul class="muted" data-role="da-role-binding-roles-list" style="margin:6px 0 0 18px;">
+              {% for row in da_role_binding.role_summary_rows %}
+                <li data-role="da-role-binding-role-row" data-role-id="{{ row.role_id }}">
+                  <code>{{ row.role_id }}</code> · {{ row.display_name or "—" }} · {{ row.framing_kind_label_zh }}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="op-banner op-banner--review" data-role="da-role-binding-roles-empty">
+              <div><div class="op-banner__title">尚未绑定角色</div><div class="op-banner__body">先在素材供给侧选择 role_pack，再回到此面板核对绑定。</div></div>
+            </div>
+          {% endif %}
+
+          <h3 class="op-section-title" style="margin:18px 0 6px; font-size:15px;" data-role="da-role-binding-speakers-label">{{ da_role_binding.speaker_summary_label_zh }}</h3>
+          {% if da_role_binding.speaker_summary_rows %}
+            <ul class="muted" data-role="da-role-binding-speakers-list" style="margin:6px 0 0 18px;">
+              {% for row in da_role_binding.speaker_summary_rows %}
+                <li data-role="da-role-binding-speaker-row" data-segment-id="{{ row.segment_id }}">
+                  <code>{{ row.segment_id }}</code> · binds=<code>{{ row.binds_role_id or "—" }}</code> · 配音={{ row.dub_kind_label_zh }} · 对位={{ row.lip_sync_kind_label_zh }}{% if row.language_pick %} · 语言={{ row.language_pick }}{% endif %}
+                </li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="op-banner op-banner--review" data-role="da-role-binding-speakers-empty">
+              <div><div class="op-banner__title">尚未规划段落</div><div class="op-banner__body">声明 speaker_segment_count_hint 后，绑定每段的 dub / lip-sync。</div></div>
+            </div>
+          {% endif %}
+
+          <div class="op-tech-note" data-role="da-role-binding-asset-supply-hint">
+            <strong>{{ da_role_binding.asset_supply_browse_label_zh }}：</strong>
+            {{ da_role_binding.asset_supply_browse_role_pack_hint_zh }}<br />
+            {{ da_role_binding.asset_supply_browse_speaker_hint_zh }}
+          </div>
+          <div class="op-tech-note" data-role="da-role-binding-closed-set-explanation">
+            {{ da_role_binding.closed_set_explanation_zh }}
+          </div>
+          <div class="op-tech-note" data-role="da-role-binding-phase-b-forbidden">
+            {{ da_role_binding.phase_b_authoring_forbidden_label_zh }}
+          </div>
+        </div>
+      {% endif %}
+
+      {# DA-W6 — 语言输出策略（原 Workbench D；运营顺序中第五步） #}
+      {% if da_language_output.is_digital_anchor %}
+        <div class="op-card op-card--accent-blue" data-role="digital-anchor-language-output-panel">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--blue">E · 语言输出</span>
+              <h2 class="op-section-title" data-role="da-language-output-title">{{ da_language_output.panel_title_zh }}</h2>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="da-language-output-subtitle">{{ da_language_output.panel_subtitle_zh }}</p>
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="da-language-output-scope-row">
+              <span class="op-meta-item__label">{{ da_language_output.language_scope_label_zh }}</span>
+              <span class="op-meta-item__value">
+                {% if da_language_output.language_scope.source_language %}{{ da_language_output.language_scope.source_language }}{% else %}—{% endif %}
+                {% if da_language_output.language_scope.target_language %}→ {{ da_language_output.language_scope.target_language | join(", ") }}{% endif %}
+              </span>
+            </div>
+            <div class="op-meta-item" data-role="da-language-output-subtitle-strategy-row" data-status="{{ da_language_output.subtitle_strategy_code }}">
+              <span class="op-meta-item__label">{{ da_language_output.subtitle_strategy_label_zh }}</span>
+              <span class="op-meta-item__value">{{ da_language_output.subtitle_strategy_label_value_zh }}</span>
+            </div>
+            <div class="op-meta-item" data-role="da-language-output-terminology-row">
+              <span class="op-meta-item__label">{{ da_language_output.terminology_label_zh }}</span>
+              <span class="op-meta-item__value">{{ da_language_output.terminology_value or "—" }}</span>
+              <span class="op-tech-note">{{ da_language_output.terminology_status_label_zh }}</span>
+            </div>
+          </div>
+
+          <h3 class="op-section-title" style="margin:18px 0 6px; font-size:15px;" data-role="da-language-output-facets-label">语言输出四要素</h3>
+          <div class="op-script-grid" data-role="da-language-output-facets-grid">
+            {% for facet in (da_language_output.facets or []) %}
+              <div class="op-script-card" data-role="da-language-output-facet" data-facet-id="{{ facet.facet_id }}">
+                <span class="op-script-card__tag op-script-card__tag--body">{{ facet.label_zh }}</span>
+                <div class="op-script-card__empty">{{ facet.guidance_zh }}</div>
+              </div>
+            {% endfor %}
+          </div>
+
+          <h3 class="op-section-title" style="margin:18px 0 6px; font-size:15px;" data-role="da-language-output-per-language-label">{{ da_language_output.per_language_label_zh }}</h3>
           {% if da_language_output.per_language_rows %}
             <ul class="muted" data-role="da-language-output-per-language-list" style="margin:6px 0 0 18px;">
               {% for row in da_language_output.per_language_rows %}
@@ -2041,38 +2146,40 @@
               {% endfor %}
             </ul>
           {% else %}
-            <div class="muted" data-role="da-language-output-per-language-empty">尚未声明 target_language。</div>
+            <div class="op-banner op-banner--review" data-role="da-language-output-per-language-empty">
+              <div><div class="op-banner__title">尚未声明 target_language</div><div class="op-banner__body">在内容结构面声明目标语言后，每条语言的字幕 / 配音 / 对口型将在下方导航器中显示。</div></div>
+            </div>
           {% endif %}
 
-          <h3 style="margin:16px 0 6px;" data-role="da-language-output-navigator-label">{{ da_language_output.navigator_label_zh }}</h3>
+          <h3 class="op-section-title" style="margin:18px 0 6px; font-size:15px;" data-role="da-language-output-navigator-label">{{ da_language_output.navigator_label_zh }}</h3>
           {% if da_language_output.navigator_rows %}
-            <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;" data-role="da-language-output-navigator-table">
+            <table class="op-variant-table" data-role="da-language-output-navigator-table">
               <thead>
                 <tr>
-                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">language</th>
-                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">subtitle_bundle</th>
-                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">audio_bundle</th>
-                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">lip_sync_bundle</th>
+                  <th>language</th>
+                  <th>subtitle_bundle</th>
+                  <th>audio_bundle</th>
+                  <th>lip_sync_bundle</th>
                 </tr>
               </thead>
               <tbody>
                 {% for row in da_language_output.navigator_rows %}
                   <tr data-role="da-language-output-navigator-row" data-language="{{ row.language }}">
-                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"><code>{{ row.language }}</code></td>
+                    <td><code>{{ row.language }}</code></td>
                     {% set sub_kind = row.per_kind.get("subtitle_bundle") or {} %}
                     {% set audio_kind = row.per_kind.get("audio_bundle") or {} %}
                     {% set lip_kind = row.per_kind.get("lip_sync_bundle") or {} %}
-                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="da-language-output-navigator-cell" data-kind="subtitle_bundle">
+                    <td data-role="da-language-output-navigator-cell" data-kind="subtitle_bundle">
                       {% if sub_kind %}
                         {{ sub_kind.deliverable_id or "—" }}{% if sub_kind.required %} · 必{% endif %} · <code>{{ sub_kind.artifact_lookup or "—" }}</code>
                       {% else %}—{% endif %}
                     </td>
-                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="da-language-output-navigator-cell" data-kind="audio_bundle">
+                    <td data-role="da-language-output-navigator-cell" data-kind="audio_bundle">
                       {% if audio_kind %}
                         {{ audio_kind.deliverable_id or "—" }}{% if audio_kind.required %} · 必{% endif %} · <code>{{ audio_kind.artifact_lookup or "—" }}</code>
                       {% else %}—{% endif %}
                     </td>
-                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="da-language-output-navigator-cell" data-kind="lip_sync_bundle">
+                    <td data-role="da-language-output-navigator-cell" data-kind="lip_sync_bundle">
                       {% if lip_kind %}
                         {{ lip_kind.deliverable_id or "—" }}{% if lip_kind.required %} · 必{% endif %} · <code>{{ lip_kind.artifact_lookup or "—" }}</code>
                       {% else %}—{% endif %}
@@ -2085,27 +2192,30 @@
             <div class="muted" data-role="da-language-output-navigator-empty">delivery 暂未投射 per-language 行。</div>
           {% endif %}
 
-          <div class="muted t-secondary" style="margin-top:12px;" data-role="da-language-output-phase-b-forbidden">
+          <div class="op-tech-note" data-role="da-language-output-phase-b-forbidden">
             {{ da_language_output.phase_b_authoring_forbidden_label_zh }}
           </div>
         </div>
       {% endif %}
 
-      {# DA-W7 — Workbench E 预览与校对面 #}
+      {# DA-W7 — 预览 / 校对 / 质检（原 Workbench E；运营顺序最后一步） #}
       {% if da_review_zone.is_digital_anchor %}
-        <div class="panel" data-role="digital-anchor-review-zone-panel">
-          <div class="section-title">
-            <h2 data-role="da-review-zone-title">{{ da_review_zone.panel_title_zh }}</h2>
-            <div class="secondary" data-role="da-review-zone-subtitle">{{ da_review_zone.panel_subtitle_zh }}</div>
+        <div class="op-card op-card--accent-violet" data-role="digital-anchor-review-zone-panel">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--violet">F · 预览 / 校对</span>
+              <h2 class="op-section-title" data-role="da-review-zone-title">{{ da_review_zone.panel_title_zh }}</h2>
+            </div>
           </div>
+          <p class="op-section-helper" data-role="da-review-zone-subtitle">{{ da_review_zone.panel_subtitle_zh }}</p>
 
-          <h3 style="margin:12px 0 6px;" data-role="da-review-zone-zones-label">{{ da_review_zone.zones_label_zh }}</h3>
-          <div class="meta-grid" data-role="da-review-zone-zones-grid">
+          <h3 class="op-section-title" style="margin:14px 0 6px; font-size:15px;" data-role="da-review-zone-zones-label">{{ da_review_zone.zones_label_zh }}</h3>
+          <div class="op-script-grid" data-role="da-review-zone-zones-grid">
             {% for zone in (da_review_zone.zones or []) %}
-              <div class="meta-item" data-role="da-review-zone-zone" data-zone-id="{{ zone.zone_id }}">
-                <strong>{{ zone.zone_label_zh }}</strong>
-                <span>{{ zone.zone_guidance_zh }}</span>
-                <span class="muted t-secondary">回写：<code>POST {{ zone.endpoint_template }}</code> · event_kind=<code>{{ zone.event_kind }}</code> · review_zone=<code>{{ zone.zone_id }}</code></span>
+              <div class="op-script-card" data-role="da-review-zone-zone" data-zone-id="{{ zone.zone_id }}">
+                <span class="op-script-card__tag op-script-card__tag--body">{{ zone.zone_label_zh }}</span>
+                <div class="op-script-card__body">{{ zone.zone_guidance_zh }}</div>
+                <span class="op-tech-note">回写：<code>POST {{ zone.endpoint_template }}</code> · event_kind=<code>{{ zone.event_kind }}</code> · review_zone=<code>{{ zone.zone_id }}</code></span>
               </div>
             {% endfor %}
           </div>
@@ -2251,10 +2361,10 @@
             </script>
           {% endif %}
 
-          <div class="muted t-secondary" style="margin-top:12px;" data-role="da-review-zone-endpoint-explanation">
+          <div class="op-tech-note" data-role="da-review-zone-endpoint-explanation">
             {{ da_review_zone.closure_endpoint_explanation_zh }}
           </div>
-          <div class="muted t-secondary" style="margin-top:6px;" data-role="da-review-zone-phase-b-forbidden">
+          <div class="op-tech-note" data-role="da-review-zone-phase-b-forbidden">
             {{ da_review_zone.phase_b_authoring_forbidden_label_zh }}
           </div>
         </div>
@@ -2488,6 +2598,64 @@
         </div>
       </div>
     </div>
+
+    {# Architect / debug strips — relocated here from the top of the page
+       so the operator surface above is no longer dominated by packet
+       inspection. All `data-role` markers, helper bodies, and content
+       below are preserved verbatim; only the visual prominence is demoted.
+       Kept inside a single collapsed-by-default <details> so packet
+       state remains addressable on demand. #}
+    <details class="op-collapse" data-role="op-console-architect-fold">
+      <summary>技术诊断 · 包数据 / 面板挂载（架构师视图）</summary>
+      <div class="op-collapse__hint">面向架构师与质检的只读投射；不是日常运营所需信息。</div>
+      <div class="op-collapse__body">
+        <div class="panel" data-role="operator-surface-strip">
+          <div class="section-title">
+            <h2>Operator surface</h2>
+            <div class="secondary">Read-only projection — single publish_readiness producer; Board / Workbench / Delivery consume the same result.</div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item">
+              <strong>Publish readiness</strong>
+              <span data-role="operator-publish-readiness">
+                {{ "publishable" if ops_pr.publishable else "blocked" }}
+                {% if ops_pr.head_reason and not ops_pr.publishable %}
+                  · <span data-role="operator-publish-readiness-head-reason">{{ ops_pr.head_reason }}</span>
+                  {% if ops_pr_inputs.first_blocking_reason and ops_pr_inputs.first_blocking_reason != ops_pr.head_reason %}
+                    <span data-role="operator-publish-readiness-detail" class="muted">({{ ops_pr_inputs.first_blocking_reason }})</span>
+                  {% endif %}
+                {% endif %}
+              </span>
+            </div>
+            <div class="meta-item">
+              <strong>final_provenance</strong>
+              <span data-role="operator-final-provenance">{{ ops_pr_inputs.final_provenance or "—" }}</span>
+            </div>
+            <div class="meta-item">
+              <strong>Line panel</strong>
+              <span data-role="operator-line-panel-kind">{{ ops_workbench_panel.panel_kind or "—" }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel" data-role="operator-line-specific-panel" data-panel-kind="{{ ops_workbench_panel.panel_kind or '' }}">
+          <div class="section-title">
+            <h2>Line-specific panel</h2>
+            <div class="secondary">Mounted only via packet <code>line_specific_refs[]</code>. Workbench never invents truth.</div>
+          </div>
+          {% if ops_workbench_panel.panel_kind %}
+            <div class="muted">Panel kind: <strong>{{ ops_workbench_panel.panel_kind }}</strong></div>
+            <ul class="muted" style="margin:6px 0 0 18px;">
+              {% for ref in (ops_workbench_panel.refs or []) %}
+                <li><code>{{ ref.ref_id }}</code></li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <div class="muted">No <code>line_specific_refs[]</code> on this packet — slot remains empty.</div>
+          {% endif %}
+        </div>
+      </div>
+    </details>
 
     <details class="panel" id="debug-panel">
       <summary>{{ t("workbench.logs") }}</summary>
