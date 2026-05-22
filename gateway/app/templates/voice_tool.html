@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Voice Translation Tool</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 16px;
+      background: #f6f7f9;
+      color: #172033;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+    .surface {
+      background: #fff;
+      border: 1px solid #dfe3ea;
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.95fr) minmax(340px, 1.05fr);
+      gap: 14px;
+      align-items: start;
+    }
+    .panel-title { margin: 0 0 10px; font-size: 1rem; font-weight: 800; }
+    .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+    .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    label { font-size: 0.82rem; font-weight: 750; color: #4a5568; }
+    textarea, select, input {
+      width: 100%;
+      border: 1px solid #cfd6e2;
+      border-radius: 7px;
+      padding: 9px 10px;
+      background: #fff;
+      color: #111827;
+      font: inherit;
+    }
+    textarea { min-height: 148px; resize: vertical; line-height: 1.45; }
+    .preview textarea { min-height: 132px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    button, .download-link {
+      border: 1px solid #b7c1d0;
+      border-radius: 7px;
+      padding: 9px 12px;
+      background: #fff;
+      color: #172033;
+      font-weight: 800;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    button.primary {
+      background: #0f766e;
+      border-color: #0f766e;
+      color: #fff;
+    }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .status {
+      min-height: 22px;
+      color: #526071;
+      font-size: 0.9rem;
+      overflow-wrap: anywhere;
+    }
+    .status.error { color: #b42318; font-weight: 750; }
+    .audio-wrap {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    audio { width: 100%; }
+    .feedback-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .feedback-grid .wide { grid-column: span 2; }
+    .feedback-grid .full { grid-column: 1 / -1; }
+    .small-note { color: #697586; font-size: 0.84rem; }
+    @media (max-width: 860px) {
+      body { padding: 10px; }
+      .workspace, .field-row, .feedback-grid { grid-template-columns: 1fr; }
+      .feedback-grid .wide { grid-column: auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    {% set topbar_title = "Voice Translation Tool" %}
+    {% set topbar_subtitle = "Internal Burmese and Vietnamese speech validation" %}
+    {% set topbar_nav = [
+      {"label": "Tasks", "href": "/tasks", "active": False},
+      {"label": "Tools", "href": "/tools/hub", "active": False},
+      {"label": "Voice Tool", "href": "/voice-tool", "active": True},
+    ] %}
+    {% set topbar_actions = [
+      {"label": "Back to Tools", "href": "/tools/hub", "primary": False},
+    ] %}
+    {% include "_topbar.html" %}
+
+    <div class="workspace">
+      <section class="surface">
+        <h2 class="panel-title">Input</h2>
+        <div class="field">
+          <label for="source-text">Source Text</label>
+          <textarea id="source-text" placeholder="Paste Chinese or English source text here"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="source-language">Source Language</label>
+            <select id="source-language">
+              <option value="zh">Chinese</option>
+              <option value="en">English</option>
+              <option value="my">Burmese</option>
+              <option value="vi">Vietnamese</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="target-language">Target Language</label>
+            <select id="target-language">
+              <option value="my">Burmese</option>
+              <option value="vi">Vietnamese</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="style-preset">Style</label>
+            <select id="style-preset">
+              <option value="natural_human">Natural Human</option>
+              <option value="sales">Sales</option>
+              <option value="explainer">Explainer</option>
+              <option value="news">News</option>
+              <option value="calm">Calm</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="voice-preset">Voice</label>
+            <select id="voice-preset">
+              <option value="natural">Natural</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label for="speed">Speed</label>
+          <select id="speed">
+            <option value="normal">Normal</option>
+            <option value="slow">Slow</option>
+            <option value="fast">Fast</option>
+          </select>
+        </div>
+        <div class="actions">
+          <button class="primary" id="generate-btn" type="button">Generate</button>
+          <button id="translate-btn" type="button">Translate Only</button>
+          <button id="synthesize-btn" type="button">Synthesize Edited Text</button>
+        </div>
+        <div id="status" class="status"></div>
+      </section>
+
+      <section class="surface preview">
+        <h2 class="panel-title">Preview</h2>
+        <div class="field">
+          <label for="translated-text">Translated Text</label>
+          <textarea id="translated-text"></textarea>
+        </div>
+        <div class="field">
+          <label for="speech-text">Speech Text</label>
+          <textarea id="speech-text"></textarea>
+        </div>
+        <div class="audio-wrap">
+          <audio id="audio-preview" controls></audio>
+          <div class="actions">
+            <a id="download-mp3" class="download-link" href="#" style="display:none;">Download MP3</a>
+            <a id="download-wav" class="download-link" href="#" style="display:none;">Download WAV</a>
+          </div>
+          <div id="job-note" class="small-note"></div>
+        </div>
+      </section>
+    </div>
+
+    <section class="surface">
+      <h2 class="panel-title">Feedback</h2>
+      <div class="feedback-grid">
+        <div class="field">
+          <label for="naturalness-score">Naturalness</label>
+          <select id="naturalness-score"></select>
+        </div>
+        <div class="field">
+          <label for="translation-score">Translation</label>
+          <select id="translation-score"></select>
+        </div>
+        <div class="field">
+          <label for="speed-score">Speed</label>
+          <select id="speed-score"></select>
+        </div>
+        <div class="field">
+          <label for="voice-fit-score">Voice Fit</label>
+          <select id="voice-fit-score"></select>
+        </div>
+        <div class="field wide">
+          <label for="usable-for-publish">Usable For Publish</label>
+          <select id="usable-for-publish">
+            <option value="yes">Yes</option>
+            <option value="needs_edit">Needs Edit</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <div class="field wide">
+          <label for="failure-reason">Failure Reason</label>
+          <select id="failure-reason">
+            <option value="">None</option>
+            <option value="translation_wrong">Translation Wrong</option>
+            <option value="unnatural_voice">Unnatural Voice</option>
+            <option value="speed_wrong">Speed Wrong</option>
+            <option value="pronunciation_issue">Pronunciation Issue</option>
+            <option value="audio_error">Audio Error</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label for="feedback-comment">Comment</label>
+          <textarea id="feedback-comment" style="min-height:90px;"></textarea>
+        </div>
+      </div>
+      <div class="actions">
+        <button id="feedback-btn" type="button">Submit Feedback</button>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const state = { jobId: null };
+    const statusEl = document.getElementById("status");
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message || "";
+      statusEl.classList.toggle("error", Boolean(isError));
+    }
+
+    function value(id) {
+      return document.getElementById(id).value;
+    }
+
+    function setBusy(isBusy) {
+      ["generate-btn", "translate-btn", "synthesize-btn", "feedback-btn"].forEach((id) => {
+        document.getElementById(id).disabled = isBusy;
+      });
+    }
+
+    function renderJob(job) {
+      state.jobId = job.job_id;
+      document.getElementById("translated-text").value = job.translated_text || "";
+      document.getElementById("speech-text").value = job.speech_text || "";
+      document.getElementById("job-note").textContent = job.job_id ? `Job ${job.job_id}` : "";
+      const audio = document.getElementById("audio-preview");
+      const mp3 = document.getElementById("download-mp3");
+      const wav = document.getElementById("download-wav");
+      if (job.audio_url) {
+        audio.src = `${job.audio_url}?t=${Date.now()}`;
+      }
+      if (job.download_mp3_url) {
+        mp3.href = job.download_mp3_url;
+        mp3.style.display = "";
+      }
+      if (job.download_wav_url) {
+        wav.href = job.download_wav_url;
+        wav.style.display = "";
+      } else {
+        wav.style.display = "none";
+      }
+    }
+
+    async function postJson(url, payload) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = data.detail || {};
+        throw new Error(detail.message || data.detail || `HTTP ${res.status}`);
+      }
+      return data;
+    }
+
+    function basePayload() {
+      return {
+        source_text: value("source-text"),
+        source_language: value("source-language"),
+        target_language: value("target-language"),
+        style_preset: value("style-preset"),
+      };
+    }
+
+    document.getElementById("generate-btn").addEventListener("click", async () => {
+      setBusy(true);
+      setStatus("Generating...");
+      try {
+        const job = await postJson("/api/voice-tool/generate", {
+          ...basePayload(),
+          voice_preset: value("voice-preset"),
+          speed: value("speed"),
+        });
+        renderJob(job);
+        setStatus("Generated.");
+      } catch (err) {
+        setStatus(String(err.message || err), true);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    document.getElementById("translate-btn").addEventListener("click", async () => {
+      setBusy(true);
+      setStatus("Translating...");
+      try {
+        const job = await postJson("/api/voice-tool/translate", basePayload());
+        renderJob(job);
+        setStatus("Translated. Edit speech text if needed, then synthesize.");
+      } catch (err) {
+        setStatus(String(err.message || err), true);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    document.getElementById("synthesize-btn").addEventListener("click", async () => {
+      setBusy(true);
+      setStatus("Synthesizing...");
+      try {
+        const job = await postJson("/api/voice-tool/synthesize", {
+          job_id: state.jobId,
+          speech_text: value("speech-text"),
+          target_language: value("target-language"),
+          voice_preset: value("voice-preset"),
+          speed: value("speed"),
+        });
+        renderJob(job);
+        setStatus("Audio ready.");
+      } catch (err) {
+        setStatus(String(err.message || err), true);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    document.getElementById("feedback-btn").addEventListener("click", async () => {
+      if (!state.jobId) {
+        setStatus("Generate or synthesize a job before submitting feedback.", true);
+        return;
+      }
+      setBusy(true);
+      setStatus("Submitting feedback...");
+      try {
+        const job = await postJson("/api/voice-tool/feedback", {
+          job_id: state.jobId,
+          naturalness_score: Number(value("naturalness-score")),
+          translation_score: Number(value("translation-score")),
+          speed_score: Number(value("speed-score")),
+          voice_fit_score: Number(value("voice-fit-score")),
+          usable_for_publish: value("usable-for-publish"),
+          failure_reason: value("failure-reason") || null,
+          comment: value("feedback-comment"),
+        });
+        renderJob(job);
+        setStatus("Feedback saved.");
+      } catch (err) {
+        setStatus(String(err.message || err), true);
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    ["naturalness-score", "translation-score", "speed-score", "voice-fit-score"].forEach((id) => {
+      const el = document.getElementById(id);
+      [5, 4, 3, 2, 1].forEach((score) => {
+        const opt = document.createElement("option");
+        opt.value = String(score);
+        opt.textContent = String(score);
+        el.appendChild(opt);
+      });
+    });
+  </script>
+</body>
+</html>
