@@ -2,6 +2,15 @@
 
 Date: 2026-05-22
 Status: implementation note for standalone internal operator tool
+Branch: `VoiceTrans` independent validation branch; not merged into `main`.
+
+## Branch Validation Boundary
+
+`VoiceTrans` is reserved for Burmese / Vietnamese Voice Translation Tool
+operator validation and Gemini / Azure backend capability checks. Follow-up
+changes on this branch must stay narrow to operational validation needs and
+must not expand the tool into Hot Follow, Matrix Script, Digital Anchor,
+publish hub, production-line runtime, or any line contract.
 
 ## Reading Declaration
 
@@ -180,6 +189,12 @@ env AUTH_MODE=off PYTHONPYCACHEPREFIX=/private/tmp/apolloveo_pycache python3 -m 
 
 Result: blocked by the same pre-existing Python 3.9 import-time PEP-604 error
 in `gateway/app/auth.py`.
+
+Full app/server smoke for `/voice-tool` must be completed under Python 3.11 or
+the project-standard runtime/container before any merge decision. Required
+runtime smoke remains: start `gateway.app.main:app`, verify `GET /voice-tool`,
+generate Burmese and Vietnamese samples, verify job lookup/download, and submit
+feedback persistence through the HTTP API.
 
 ## Scope Boundary
 
