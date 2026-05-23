@@ -22,14 +22,11 @@ def _voice_locale(voice: str) -> str:
     return "en-US"
 
 
-def _build_ssml(text: str, voice: str, rate: str | None = None) -> str:
+def _build_ssml(text: str, voice: str) -> str:
     locale = _voice_locale(voice)
-    escaped_text = escape(text)
-    if rate:
-        escaped_text = f'<prosody rate="{escape(rate)}">{escaped_text}</prosody>'
     return (
         '<speak version="1.0" xml:lang="en-US">'
-        f'<voice xml:lang="{locale}" name="{escape(voice)}">{escaped_text}</voice>'
+        f'<voice xml:lang="{locale}" name="{escape(voice)}">{escape(text)}</voice>'
         "</speak>"
     )
 
@@ -51,7 +48,6 @@ async def generate_audio_azure_speech(
     speech_key: str,
     speech_region: str,
     output_format: str = "audio-24khz-48kbitrate-mono-mp3",
-    rate: str | None = None,
 ) -> None:
     if not speech_key:
         raise AzureSpeechError("TTS_AZURE_CONFIG_MISSING: missing AZURE_SPEECH_KEY")
@@ -69,7 +65,7 @@ async def generate_audio_azure_speech(
         "Content-Type": "application/ssml+xml",
         "X-Microsoft-OutputFormat": output_format or "audio-24khz-48kbitrate-mono-mp3",
     }
-    ssml = _build_ssml(text.strip(), voice.strip(), rate=rate)
+    ssml = _build_ssml(text.strip(), voice.strip())
 
     timeout = httpx.Timeout(60.0, connect=15.0)
     logger.info(
