@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Voice Translation Tool</title>
+  <title>语音翻译工具</title>
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css">
   <style>
@@ -30,6 +30,18 @@
       align-items: start;
     }
     .panel-title { margin: 0 0 10px; font-size: 1rem; font-weight: 800; }
+    .guidance {
+      margin: 0;
+      color: #465466;
+      line-height: 1.55;
+      font-size: 0.94rem;
+    }
+    .helper-text {
+      margin: -2px 0 0;
+      color: #697586;
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
     .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
     .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     label { font-size: 0.82rem; font-weight: 750; color: #4a5568; }
@@ -92,94 +104,106 @@
 </head>
 <body>
   <div class="page">
-    {% set topbar_title = "Voice Translation Tool" %}
-    {% set topbar_subtitle = "Internal Burmese and Vietnamese speech validation" %}
+    {% set topbar_title = "语音翻译工具" %}
+    {% set topbar_subtitle = "缅语 / 越南语拟人配音验证工具" %}
     {% set topbar_nav = [
-      {"label": "Tasks", "href": "/tasks", "active": False},
-      {"label": "Tools", "href": "/tools/hub", "active": False},
-      {"label": "Voice Tool", "href": "/voice-tool", "active": True},
+      {"label": "任务区", "href": "/tasks", "active": False},
+      {"label": "工具", "href": "/tools/hub", "active": False},
+      {"label": "语音工具", "href": "/voice-tool", "active": True},
     ] %}
     {% set topbar_actions = [
-      {"label": "Back to Tools", "href": "/tools/hub", "primary": False},
+      {"label": "返回工具", "href": "/tools/hub", "primary": False},
     ] %}
     {% include "_topbar.html" %}
 
+    <section class="surface">
+      <p class="guidance">
+        本工具用于缅语、越南语语音翻译与拟人配音验证。建议先输入中文或英文原文，选择目标语言后生成语音。生成后请试听，并填写自然度、翻译准确性、语速、音色适配等反馈。
+      </p>
+    </section>
+
     <div class="workspace">
       <section class="surface">
-        <h2 class="panel-title">Input</h2>
+        <h2 class="panel-title">输入</h2>
         <div class="field">
-          <label for="source-text">Source Text</label>
-          <textarea id="source-text" placeholder="Paste Chinese or English source text here"></textarea>
+          <label for="source-text">原文内容</label>
+          <textarea id="source-text" placeholder="请粘贴中文或英文原文"></textarea>
+          <p class="helper-text">建议输入 1–3 句话，先做短文案测试。长文案请分段生成。</p>
+        </div>
+        <div class="actions" aria-label="样本填充">
+          <button id="sample-my-btn" type="button">缅语自然口播样本</button>
+          <button id="sample-vi-btn" type="button">越南语销售表达样本</button>
+          <button id="sample-mixed-btn" type="button">中英混合测试样本</button>
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="source-language">Source Language</label>
+            <label for="source-language">原文语言</label>
             <select id="source-language">
-              <option value="zh">Chinese</option>
-              <option value="en">English</option>
-              <option value="my">Burmese</option>
-              <option value="vi">Vietnamese</option>
+              <option value="zh">中文（Chinese）</option>
+              <option value="en">英文（English）</option>
+              <option value="my">缅甸语（မြန်မာ）</option>
+              <option value="vi">越南语（Tiếng Việt）</option>
             </select>
           </div>
           <div class="field">
-            <label for="target-language">Target Language</label>
+            <label for="target-language">目标语言</label>
             <select id="target-language">
-              <option value="my">Burmese</option>
-              <option value="vi">Vietnamese</option>
+              <option value="my">缅甸语（မြန်မာ）</option>
+              <option value="vi">越南语（Tiếng Việt）</option>
             </select>
           </div>
         </div>
         <div class="field-row">
           <div class="field">
-            <label for="style-preset">Style</label>
+            <label for="style-preset">表达风格</label>
             <select id="style-preset">
-              <option value="natural_human">Natural Human</option>
-              <option value="sales">Sales</option>
-              <option value="explainer">Explainer</option>
-              <option value="news">News</option>
-              <option value="calm">Calm</option>
+              <option value="natural_human">自然真人口播</option>
+              <option value="sales">销售转化表达</option>
+              <option value="explainer">讲解说明</option>
+              <option value="news">新闻播报</option>
+              <option value="calm">温和清晰</option>
             </select>
           </div>
           <div class="field">
-            <label for="voice-preset">Voice</label>
+            <label for="voice-preset">音色</label>
             <select id="voice-preset">
-              <option value="natural">Natural</option>
-              <option value="female">Female</option>
-              <option value="male">Male</option>
+              <option value="natural">自然音色</option>
+              <option value="female">女声</option>
+              <option value="male">男声</option>
             </select>
           </div>
         </div>
         <div class="field">
-          <label for="speed">Speed</label>
+          <label for="speed">语速</label>
           <select id="speed">
-            <option value="normal">Normal</option>
-            <option value="slow">Slow</option>
-            <option value="fast">Fast</option>
+            <option value="normal">标准</option>
+            <option value="slow">慢速</option>
+            <option value="fast">快速</option>
           </select>
         </div>
         <div class="actions">
-          <button class="primary" id="generate-btn" type="button">Generate</button>
-          <button id="translate-btn" type="button">Translate Only</button>
-          <button id="synthesize-btn" type="button">Synthesize Edited Text</button>
+          <button class="primary" id="generate-btn" type="button">生成语音</button>
+          <button id="translate-btn" type="button">仅翻译</button>
+          <button id="synthesize-btn" type="button">用编辑后的文本合成</button>
         </div>
         <div id="status" class="status"></div>
       </section>
 
       <section class="surface preview">
-        <h2 class="panel-title">Preview</h2>
+        <h2 class="panel-title">预览</h2>
         <div class="field">
-          <label for="translated-text">Translated Text</label>
+          <label for="translated-text">翻译文本</label>
           <textarea id="translated-text"></textarea>
         </div>
         <div class="field">
-          <label for="speech-text">Speech Text</label>
+          <label for="speech-text">口播文本</label>
           <textarea id="speech-text"></textarea>
         </div>
         <div class="audio-wrap">
           <audio id="audio-preview" controls></audio>
           <div class="actions">
-            <a id="download-mp3" class="download-link" href="#" style="display:none;">Download MP3</a>
-            <a id="download-wav" class="download-link" href="#" style="display:none;">Download WAV</a>
+            <a id="download-mp3" class="download-link" href="#" style="display:none;">下载 MP3</a>
+            <a id="download-wav" class="download-link" href="#" style="display:none;">下载 WAV</a>
           </div>
           <div id="job-note" class="small-note"></div>
         </div>
@@ -187,51 +211,52 @@
     </div>
 
     <section class="surface">
-      <h2 class="panel-title">Feedback</h2>
+      <h2 class="panel-title">反馈评分</h2>
+      <p class="helper-text">反馈将用于优化翻译、语气、音色和语速配置。</p>
       <div class="feedback-grid">
         <div class="field">
-          <label for="naturalness-score">Naturalness</label>
+          <label for="naturalness-score">语音自然度</label>
           <select id="naturalness-score"></select>
         </div>
         <div class="field">
-          <label for="translation-score">Translation</label>
+          <label for="translation-score">翻译准确性</label>
           <select id="translation-score"></select>
         </div>
         <div class="field">
-          <label for="speed-score">Speed</label>
+          <label for="speed-score">语速</label>
           <select id="speed-score"></select>
         </div>
         <div class="field">
-          <label for="voice-fit-score">Voice Fit</label>
+          <label for="voice-fit-score">音色适配</label>
           <select id="voice-fit-score"></select>
         </div>
         <div class="field wide">
-          <label for="usable-for-publish">Usable For Publish</label>
+          <label for="usable-for-publish">是否可发布</label>
           <select id="usable-for-publish">
-            <option value="yes">Yes</option>
-            <option value="needs_edit">Needs Edit</option>
-            <option value="no">No</option>
+            <option value="yes">可以发布</option>
+            <option value="needs_edit">需要修改</option>
+            <option value="no">不可发布</option>
           </select>
         </div>
         <div class="field wide">
-          <label for="failure-reason">Failure Reason</label>
+          <label for="failure-reason">问题原因</label>
           <select id="failure-reason">
-            <option value="">None</option>
-            <option value="translation_wrong">Translation Wrong</option>
-            <option value="unnatural_voice">Unnatural Voice</option>
-            <option value="speed_wrong">Speed Wrong</option>
-            <option value="pronunciation_issue">Pronunciation Issue</option>
-            <option value="audio_error">Audio Error</option>
-            <option value="other">Other</option>
+            <option value="">无</option>
+            <option value="translation_wrong">翻译不准确</option>
+            <option value="unnatural_voice">语音不自然</option>
+            <option value="speed_wrong">语速不合适</option>
+            <option value="pronunciation_issue">发音问题</option>
+            <option value="audio_error">音频异常</option>
+            <option value="other">其他</option>
           </select>
         </div>
         <div class="field full">
-          <label for="feedback-comment">Comment</label>
+          <label for="feedback-comment">备注</label>
           <textarea id="feedback-comment" style="min-height:90px;"></textarea>
         </div>
       </div>
       <div class="actions">
-        <button id="feedback-btn" type="button">Submit Feedback</button>
+        <button id="feedback-btn" type="button">提交反馈</button>
       </div>
     </section>
   </div>
@@ -259,7 +284,7 @@
       state.jobId = job.job_id;
       document.getElementById("translated-text").value = job.translated_text || "";
       document.getElementById("speech-text").value = job.speech_text || "";
-      document.getElementById("job-note").textContent = job.job_id ? `Job ${job.job_id}` : "";
+      document.getElementById("job-note").textContent = job.job_id ? `任务 ${job.job_id}` : "";
       const audio = document.getElementById("audio-preview");
       const mp3 = document.getElementById("download-mp3");
       const wav = document.getElementById("download-wav");
@@ -303,7 +328,7 @@
 
     document.getElementById("generate-btn").addEventListener("click", async () => {
       setBusy(true);
-      setStatus("Generating...");
+      setStatus("正在生成语音...");
       try {
         const job = await postJson("/api/voice-tool/generate", {
           ...basePayload(),
@@ -311,7 +336,7 @@
           speed: value("speed"),
         });
         renderJob(job);
-        setStatus("Generated.");
+        setStatus("语音已生成，请试听。");
       } catch (err) {
         setStatus(String(err.message || err), true);
       } finally {
@@ -321,11 +346,11 @@
 
     document.getElementById("translate-btn").addEventListener("click", async () => {
       setBusy(true);
-      setStatus("Translating...");
+      setStatus("正在翻译...");
       try {
         const job = await postJson("/api/voice-tool/translate", basePayload());
         renderJob(job);
-        setStatus("Translated. Edit speech text if needed, then synthesize.");
+        setStatus("翻译完成。如需调整口播文本，请编辑后再合成。");
       } catch (err) {
         setStatus(String(err.message || err), true);
       } finally {
@@ -335,7 +360,7 @@
 
     document.getElementById("synthesize-btn").addEventListener("click", async () => {
       setBusy(true);
-      setStatus("Synthesizing...");
+      setStatus("正在合成音频...");
       try {
         const job = await postJson("/api/voice-tool/synthesize", {
           job_id: state.jobId,
@@ -345,7 +370,7 @@
           speed: value("speed"),
         });
         renderJob(job);
-        setStatus("Audio ready.");
+        setStatus("音频已生成，请试听。");
       } catch (err) {
         setStatus(String(err.message || err), true);
       } finally {
@@ -355,11 +380,11 @@
 
     document.getElementById("feedback-btn").addEventListener("click", async () => {
       if (!state.jobId) {
-        setStatus("Generate or synthesize a job before submitting feedback.", true);
+        setStatus("请先生成或合成一个任务，再提交反馈。", true);
         return;
       }
       setBusy(true);
-      setStatus("Submitting feedback...");
+      setStatus("正在提交反馈...");
       try {
         const job = await postJson("/api/voice-tool/feedback", {
           job_id: state.jobId,
@@ -372,7 +397,7 @@
           comment: value("feedback-comment"),
         });
         renderJob(job);
-        setStatus("Feedback saved.");
+        setStatus("反馈已保存。");
       } catch (err) {
         setStatus(String(err.message || err), true);
       } finally {
@@ -389,6 +414,47 @@
         el.appendChild(opt);
       });
     });
+
+    const samples = {
+      my: {
+        source: "今天我们介绍一款适合日常使用的产品。它操作简单，语气要自然亲切，像真人在给朋友做推荐。",
+        sourceLanguage: "zh",
+        targetLanguage: "my",
+        style: "natural_human",
+        voice: "natural",
+        speed: "normal",
+      },
+      vi: {
+        source: "This offer is designed for daily use. Please make the Vietnamese version clear, persuasive, and suitable for a short sales voiceover.",
+        sourceLanguage: "en",
+        targetLanguage: "vi",
+        style: "sales",
+        voice: "female",
+        speed: "normal",
+      },
+      mixed: {
+        source: "今天测试 one short bilingual script。请保持口播自然，不要逐字生硬翻译。",
+        sourceLanguage: "zh",
+        targetLanguage: "vi",
+        style: "explainer",
+        voice: "natural",
+        speed: "slow",
+      },
+    };
+
+    function fillSample(sample) {
+      document.getElementById("source-text").value = sample.source;
+      document.getElementById("source-language").value = sample.sourceLanguage;
+      document.getElementById("target-language").value = sample.targetLanguage;
+      document.getElementById("style-preset").value = sample.style;
+      document.getElementById("voice-preset").value = sample.voice;
+      document.getElementById("speed").value = sample.speed;
+      setStatus("样本已填入，可直接生成语音。");
+    }
+
+    document.getElementById("sample-my-btn").addEventListener("click", () => fillSample(samples.my));
+    document.getElementById("sample-vi-btn").addEventListener("click", () => fillSample(samples.vi));
+    document.getElementById("sample-mixed-btn").addEventListener("click", () => fillSample(samples.mixed));
   </script>
 </body>
 </html>
