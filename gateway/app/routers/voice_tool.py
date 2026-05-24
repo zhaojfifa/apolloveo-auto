@@ -27,11 +27,20 @@ class SynthesizeRequest(BaseModel):
     target_language: str
     voice_preset: str = "natural"
     speed: str = "normal"
+    voice_mode: str = "stable"
 
 
 class GenerateRequest(TranslateRequest):
     voice_preset: str = "natural"
     speed: str = "normal"
+    voice_mode: str = "stable"
+
+
+class SpeechVariantsRequest(BaseModel):
+    job_id: str | None = None
+    translated_text: str | None = Field(default=None, max_length=8000)
+    target_language: str
+    voice_mode: str = "humanized"
 
 
 class FeedbackRequest(BaseModel):
@@ -100,6 +109,31 @@ def get_voice_tool_job(
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=404, detail="job not found") from exc
     return service.storage.public_job_payload(job)
+
+
+@api_router.get("/options")
+def get_voice_tool_options(
+    target_language: str = "my", _: Any = Depends(require_operator_session)
+) -> dict[str, object]:
+    service = get_voice_tool_service()
+    try:
+        return service.public_options(target_language)
+    except VoiceToolError as exc:
+        raise HTTPException(status_code=400, detail={"code": exc.code, "message": str(exc)}) from exc
+
+
+@api_router.post("/speech-variants")
+def generate_voice_tool_speech_variants(
+    payload: SpeechVariantsRequest, _: Any = Depends(require_operator_session)
+) -> dict[str, Any]:
+    service = get_voice_tool_service()
+    try:
+        variants = service.generate_style_variants(**payload.dict())
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="job not found") from exc
+    except VoiceToolError as exc:
+        raise HTTPException(status_code=400, detail={"code": exc.code, "message": str(exc)}) from exc
+    return {"speech_variants": variants}
 
 
 @api_router.get("/download/{job_id}")

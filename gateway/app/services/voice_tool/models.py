@@ -10,6 +10,7 @@ SOURCE_LANGUAGES = frozenset({"zh", "en", "my", "vi"})
 TARGET_LANGUAGES = frozenset({"my", "vi"})
 STYLE_PRESETS = frozenset({"natural_human", "sales", "explainer", "news", "calm"})
 VOICE_PRESETS = frozenset({"male", "female", "natural"})
+VOICE_MODES = frozenset({"stable", "humanized"})
 SPEED_PRESETS = frozenset({"slow", "normal", "fast"})
 USABLE_FOR_PUBLISH_VALUES = frozenset({"yes", "needs_edit", "no"})
 FAILURE_REASONS = frozenset(
@@ -68,7 +69,9 @@ class VoiceToolJob:
     speech_text: str = ""
     style_preset: str = "natural_human"
     voice_preset: str = "natural"
+    voice_mode: str = "stable"
     speed: str = "normal"
+    speech_variants: dict[str, str] = field(default_factory=dict)
     provider_used_backend_only: dict[str, str] = field(default_factory=dict)
     audio_path: str | None = None
     manifest_path: str | None = None
@@ -85,7 +88,9 @@ class VoiceToolJob:
             "speech_text": self.speech_text,
             "style_preset": self.style_preset,
             "voice_preset": self.voice_preset,
+            "voice_mode": self.voice_mode,
             "speed": self.speed,
+            "speech_variants": dict(self.speech_variants),
             "provider_used_backend_only": dict(self.provider_used_backend_only),
             "audio_path": self.audio_path,
             "manifest_path": self.manifest_path,
@@ -104,7 +109,9 @@ class VoiceToolJob:
             speech_text=str(payload.get("speech_text") or ""),
             style_preset=str(payload.get("style_preset") or "natural_human"),
             voice_preset=str(payload.get("voice_preset") or "natural"),
+            voice_mode=str(payload.get("voice_mode") or "stable"),
             speed=str(payload.get("speed") or "normal"),
+            speech_variants=dict(payload.get("speech_variants") or {}),
             provider_used_backend_only=dict(payload.get("provider_used_backend_only") or {}),
             audio_path=str(payload.get("audio_path") or "") or None,
             manifest_path=str(payload.get("manifest_path") or "") or None,

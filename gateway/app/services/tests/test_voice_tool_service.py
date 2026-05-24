@@ -9,6 +9,7 @@ import pytest
 
 from gateway.app.services.providers.gemini import GeminiTextTranslateResult
 from gateway.app.services.voice_tool import VoiceToolError, VoiceToolService
+from gateway.app.services.voice_tool.service import STYLE_REWRITE_RULES
 from gateway.app.services.voice_tool.storage import VoiceToolStorage
 
 
@@ -18,7 +19,13 @@ class FakeTranslateClient:
 
     def translate_segments(self, request):
         self.requests.append(request)
-        return GeminiTextTranslateResult(translated={1: "မင်္ဂလာပါ။ သဘာဝကျကျ ပြောပါ။"})
+        hint = request.target_lang
+        if "faithful semantic translation only" in hint:
+            return GeminiTextTranslateResult(translated={1: "တည်ငြိမ်သော ဘာသာပြန်စာသား။"})
+        for style in STYLE_REWRITE_RULES:
+            if f"style={style}" in hint:
+                return GeminiTextTranslateResult(translated={1: f"{style} speech text"})
+        return GeminiTextTranslateResult(translated={1: "fallback speech text"})
 
 
 async def fake_tts(text, voice, output_path, **kwargs):
@@ -69,9 +76,14 @@ def test_translate_validates_request_and_writes_manifest(tmp_path: Path) -> None
     assert paths.speech_text.read_text(encoding="utf-8") == job.speech_text
     manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
     assert manifest["target_language"] == "my"
-    assert manifest["provider_used_backend_only"] == {"translation": "gemini"}
+    assert manifest["provider_used_backend_only"] == {
+        "translation": "gemini",
+        "speech_rewrite": "gemini",
+    }
     assert "provider_used_backend_only" not in service.storage.public_job_payload(job)
     assert "Burmese" in client.requests[0].target_lang
+    assert "style preset" not in client.requests[0].target_lang
+    assert "style=natural_human" in client.requests[1].target_lang
 
 
 def test_translate_rejects_unsupported_target_language(tmp_path: Path) -> None:
@@ -114,11 +126,13 @@ def test_synthesize_updates_existing_job_and_hides_provider_boundary(
     manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
     assert manifest["provider_used_backend_only"] == {
         "translation": "gemini",
+        "speech_rewrite": "gemini",
         "tts": "azure_speech",
     }
     public = service.storage.public_job_payload(updated)
     assert public["download_mp3_url"] == f"/api/voice-tool/download/{job.job_id}?format=mp3"
     assert "provider_used_backend_only" not in public
+    assert public["voice_mode"] == "stable"
 
 
 def test_feedback_persists_json_and_manifest_summary(tmp_path: Path) -> None:
@@ -168,6 +182,74 @@ def test_feedback_rejects_scores_outside_one_to_five(tmp_path: Path) -> None:
         )
 
     assert exc.value.code == "invalid_feedback"
+
+
+def test_speech_rewrite_is_separate_stage_and_templates_are_distinct(tmp_path: Path) -> None:
+    client = FakeTranslateClient()
+    service = _service(tmp_path, client)
+
+    variants = service.generate_style_variants(
+        translated_text="တည်ငြိမ်သော ဘာသာပြန်စာသား။",
+        target_language="my",
+        voice_mode="humanized",
+    )
+
+    assert set(variants) == {"natural_human", "sales", "explainer", "news", "calm"}
+    assert len(set(variants.values())) == 5
+    hints = [request.target_lang for request in client.requests]
+    assert any("style=natural_human" in hint for hint in hints)
+    assert any("style=sales" in hint for hint in hints)
+    assert any("Natural local human speech" in hint for hint in hints)
+    assert any("Persuasive product or marketing expression" in hint for hint in hints)
+
+
+def test_voice_mode_is_closed_enum(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+
+    with pytest.raises(VoiceToolError) as exc:
+        service.rewrite_speech_text(
+            translated_text="xin chao",
+            target_language="vi",
+            style_preset="calm",
+            voice_mode="experimental",
+        )
+
+    assert exc.value.code == "invalid_choice"
+
+
+def test_public_voice_options_deduplicate_identical_backend_voice(tmp_path: Path) -> None:
+    settings = _settings()
+    settings.azure_tts_voice_map = {
+        "mm_female_1": "my-MM-NilarNeural",
+        "mm_male_1": "my-MM-NilarNeural",
+    }
+    service = VoiceToolService(
+        storage=VoiceToolStorage(tmp_path / "artifacts" / "voice_tool"),
+        translate_client=FakeTranslateClient(),
+        settings_obj=settings,
+        tts_func=fake_tts,
+    )
+
+    options = service.public_options("my")["voice_options"]
+
+    assert options == [{"value": "natural", "label": "自然音色"}]
+
+
+def test_public_payload_and_ui_do_not_expose_provider_vendor_model(tmp_path: Path) -> None:
+    service = _service(tmp_path)
+    job = service.translate(
+        source_text="hello",
+        source_language="en",
+        target_language="vi",
+        style_preset="news",
+    )
+
+    public_text = json.dumps(service.storage.public_job_payload(job), ensure_ascii=False)
+    template = Path("gateway/app/templates/voice_tool.html").read_text(encoding="utf-8")
+
+    for token in ("provider_used_backend_only", "gemini", "azure", "vendor", "model"):
+        assert token not in public_text.lower()
+        assert token not in template.lower()
 
 
 @pytest.mark.parametrize(

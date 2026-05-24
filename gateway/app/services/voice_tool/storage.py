@@ -75,7 +75,9 @@ class VoiceToolStorage:
             "speech_text": job.speech_text,
             "style_preset": job.style_preset,
             "voice_preset": job.voice_preset,
+            "voice_mode": job.voice_mode,
             "speed": job.speed,
+            "speech_variants": dict(job.speech_variants),
             "audio_ready": bool(job.audio_path and Path(job.audio_path).exists()),
             "audio_url": f"/api/voice-tool/download/{job.job_id}" if job.audio_path else None,
             "download_mp3_url": (

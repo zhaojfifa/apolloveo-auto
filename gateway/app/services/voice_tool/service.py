@@ -22,6 +22,7 @@ from .models import (
     STYLE_PRESETS,
     TARGET_LANGUAGES,
     USABLE_FOR_PUBLISH_VALUES,
+    VOICE_MODES,
     VOICE_PRESETS,
     VoiceToolFeedback,
     VoiceToolJob,
@@ -73,12 +74,64 @@ class VoiceToolService:
             source_text=job.source_text,
             source_language=source_language,
             target_language=target_language,
-            style_preset=style_preset,
         )
         job.translated_text = translated
-        job.speech_text = _shape_speech_text(translated, style_preset)
+        job.speech_text = self.rewrite_speech_text(
+            translated_text=translated,
+            target_language=target_language,
+            style_preset=style_preset,
+            voice_mode="humanized",
+        )
         job.provider_used_backend_only["translation"] = "gemini"
+        job.provider_used_backend_only["speech_rewrite"] = "gemini"
         return self.storage.write_job(job)
+
+    def rewrite_speech_text(
+        self,
+        *,
+        translated_text: str,
+        target_language: str,
+        style_preset: str,
+        voice_mode: str = "humanized",
+    ) -> str:
+        self._validate_text(translated_text)
+        self._validate_language(target_language, TARGET_LANGUAGES, "target_language")
+        self._validate_choice(style_preset, STYLE_PRESETS, "style_preset")
+        self._validate_choice(voice_mode, VOICE_MODES, "voice_mode")
+        rewritten = self._rewrite_text(
+            translated_text=translated_text.strip(),
+            target_language=target_language,
+            style_preset=style_preset,
+            voice_mode=voice_mode,
+        )
+        return rewritten
+
+    def generate_style_variants(
+        self,
+        *,
+        translated_text: str | None = None,
+        target_language: str,
+        voice_mode: str = "humanized",
+        job_id: str | None = None,
+    ) -> dict[str, str]:
+        self._validate_language(target_language, TARGET_LANGUAGES, "target_language")
+        self._validate_choice(voice_mode, VOICE_MODES, "voice_mode")
+        job = self.storage.read_job(job_id) if job_id else None
+        base_text = translated_text if translated_text is not None else (job.translated_text if job else "")
+        self._validate_text(base_text)
+        variants = {
+            style: self.rewrite_speech_text(
+                translated_text=base_text,
+                target_language=target_language,
+                style_preset=style,
+                voice_mode=voice_mode,
+            )
+            for style in ("natural_human", "sales", "explainer", "news", "calm")
+        }
+        if job is not None:
+            job.speech_variants = variants
+            self.storage.write_job(job)
+        return variants
 
     async def synthesize(
         self,
@@ -87,11 +140,13 @@ class VoiceToolService:
         target_language: str,
         voice_preset: str,
         speed: str,
+        voice_mode: str = "stable",
         job_id: str | None = None,
     ) -> VoiceToolJob:
         self._validate_text(speech_text)
         self._validate_language(target_language, TARGET_LANGUAGES, "target_language")
         self._validate_choice(voice_preset, VOICE_PRESETS, "voice_preset")
+        self._validate_choice(voice_mode, VOICE_MODES, "voice_mode")
         self._validate_choice(speed, SPEED_PRESETS, "speed")
 
         if job_id:
@@ -107,6 +162,7 @@ class VoiceToolService:
                 speech_text=speech_text.strip(),
             )
         job.voice_preset = voice_preset
+        job.voice_mode = voice_mode
         job.speed = speed
 
         paths = self.storage.paths_for(job.job_id)
@@ -163,6 +219,7 @@ class VoiceToolService:
         style_preset: str,
         voice_preset: str,
         speed: str,
+        voice_mode: str = "stable",
     ) -> VoiceToolJob:
         job = self.translate(
             source_text=source_text,
@@ -170,16 +227,36 @@ class VoiceToolService:
             target_language=target_language,
             style_preset=style_preset,
         )
+        job.speech_text = self.rewrite_speech_text(
+            translated_text=job.translated_text,
+            target_language=target_language,
+            style_preset=style_preset,
+            voice_mode=voice_mode,
+        )
+        job.voice_mode = voice_mode
+        self.storage.write_job(job)
         return await self.synthesize(
             job_id=job.job_id,
             speech_text=job.speech_text,
             target_language=target_language,
             voice_preset=voice_preset,
+            voice_mode=voice_mode,
             speed=speed,
         )
 
     def get_job(self, job_id: str) -> VoiceToolJob:
         return self.storage.read_job(job_id)
+
+    def public_options(self, target_language: str) -> dict[str, object]:
+        self._validate_language(target_language, TARGET_LANGUAGES, "target_language")
+        return {
+            "target_language": target_language,
+            "voice_options": _public_voice_options(self._settings, target_language),
+            "voice_modes": [
+                {"value": "stable", "label": "标准稳定"},
+                {"value": "humanized", "label": "拟人增强（口播文本优化）"},
+            ],
+        }
 
     def submit_feedback(
         self,
@@ -224,14 +301,14 @@ class VoiceToolService:
         source_text: str,
         source_language: str,
         target_language: str,
-        style_preset: str,
     ) -> str:
         client = self._translate_client or self._build_gemini_client()
         target_name = LANGUAGE_NAMES[target_language]
         source_name = LANGUAGE_NAMES.get(source_language, source_language)
         target_hint = (
             f"{target_name}; source language is {source_name}; "
-            f"style preset is {style_preset}; optimize for natural human TTS speech"
+            "faithful semantic translation only; preserve facts; "
+            "do not apply marketing, news, calm, or conversational style"
         )
         try:
             result = client.translate_segments(
@@ -246,6 +323,36 @@ class VoiceToolService:
         if not translated:
             raise VoiceToolError("translation_empty", "Gemini returned no translated text")
         return translated
+
+    def _rewrite_text(
+        self,
+        *,
+        translated_text: str,
+        target_language: str,
+        style_preset: str,
+        voice_mode: str,
+    ) -> str:
+        client = self._translate_client or self._build_gemini_client()
+        target_name = LANGUAGE_NAMES[target_language]
+        prompt_hint = _speech_rewrite_prompt(
+            target_language=target_language,
+            target_name=target_name,
+            style_preset=style_preset,
+            voice_mode=voice_mode,
+        )
+        try:
+            result = client.translate_segments(
+                GeminiTextTranslateRequest(
+                    segments=(GeminiTextTranslateSegment(index=1, text=translated_text),),
+                    target_lang=prompt_hint,
+                )
+            )
+        except GeminiTextTranslateError as exc:
+            raise VoiceToolError("speech_rewrite_failed", str(exc)) from exc
+        rewritten = str(result.translated.get(1) or "").strip()
+        if not rewritten:
+            raise VoiceToolError("speech_rewrite_empty", "Gemini returned no speech text")
+        return rewritten
 
     def _build_gemini_client(self) -> GeminiTextTranslateClient:
         api_key = getattr(self._settings, "gemini_api_key", None)
@@ -291,6 +398,65 @@ def _shape_speech_text(text: str, style_preset: str) -> str:
     return shaped
 
 
+STYLE_REWRITE_RULES = {
+    "natural_human": (
+        "Natural local human speech: conversational, less written, smooth for a "
+        "real presenter, with small spoken transitions when helpful."
+    ),
+    "sales": (
+        "Persuasive product or marketing expression: stronger conversion tone, "
+        "clear benefit framing, but do not invent product facts."
+    ),
+    "explainer": (
+        "Clear structured explanation: easy to understand, orderly, suitable "
+        "for instructional voiceover."
+    ),
+    "news": (
+        "Formal objective broadcast style: concise, neutral, no hype, suitable "
+        "for news reading."
+    ),
+    "calm": (
+        "Gentle, clear, slower and steady expression: warm but not exaggerated."
+    ),
+}
+
+
+LANGUAGE_REWRITE_RULES = {
+    "my": (
+        "Use natural Burmese phrasing for spoken delivery. Avoid over-literal "
+        "translation from Chinese or English. Keep local speech rhythm."
+    ),
+    "vi": (
+        "Use natural Vietnamese phrasing for spoken delivery. Avoid word-for-word "
+        "translation. Keep the sentence flow local and easy to read aloud."
+    ),
+}
+
+
+def _speech_rewrite_prompt(
+    *,
+    target_language: str,
+    target_name: str,
+    style_preset: str,
+    voice_mode: str,
+) -> str:
+    humanized_rule = (
+        "Use a more human, oral wording pass."
+        if voice_mode == "humanized"
+        else "Keep wording stable and conservative while still suitable for speech."
+    )
+    return (
+        f"{target_name} speech rewrite; style={style_preset}. "
+        f"{STYLE_REWRITE_RULES[style_preset]} "
+        f"{LANGUAGE_REWRITE_RULES[target_language]} "
+        "Preserve original meaning. Do not add unsupported factual claims. "
+        "Keep length close to the translated text unless the selected style "
+        "requires mild expansion. For sales style, allow moderate persuasive "
+        "phrasing without changing product facts. "
+        f"{humanized_rule} Return only the rewritten speech text."
+    )
+
+
 def _resolve_voice(settings_obj, target_language: str, voice_preset: str) -> str:
     gender = "female" if voice_preset == "natural" else voice_preset
     prefix = "mm" if target_language == "my" else "vi"
@@ -307,6 +473,23 @@ def _resolve_voice(settings_obj, target_language: str, voice_preset: str) -> str
         }
         voice = defaults[target_language]
     return str(voice)
+
+
+def _public_voice_options(settings_obj, target_language: str) -> list[dict[str, str]]:
+    labels = {
+        "natural": "自然音色",
+        "female": "女声",
+        "male": "男声",
+    }
+    options: list[dict[str, str]] = []
+    seen_voices: set[str] = set()
+    for preset in ("natural", "female", "male"):
+        voice = _resolve_voice(settings_obj, target_language, preset)
+        if voice in seen_voices:
+            continue
+        seen_voices.add(voice)
+        options.append({"value": preset, "label": labels[preset]})
+    return options
 
 
 def _azure_rate(speed: str) -> str:
