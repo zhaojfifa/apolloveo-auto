@@ -18,20 +18,25 @@ class TranslateRequest(BaseModel):
     source_text: str = Field(..., min_length=1, max_length=8000)
     source_language: str
     target_language: str
-    style_preset: str = "natural_human"
+    style_preset: str | None = None
+    speaker_gender: str = "female"
+    expression_style: str = "natural"
+    usage_scene: str = "short_video_voiceover"
+    custom_humanize_prompt: str = Field(default="", max_length=1200)
 
 
 class SynthesizeRequest(BaseModel):
     job_id: str | None = None
     speech_text: str = Field(..., min_length=1, max_length=8000)
     target_language: str
-    voice_preset: str = "natural"
+    voice_preset: str | None = None
+    speaker_gender: str = "female"
     speed: str = "normal"
     voice_mode: str = "stable"
 
 
 class GenerateRequest(TranslateRequest):
-    voice_preset: str = "natural"
+    voice_preset: str | None = None
     speed: str = "normal"
     voice_mode: str = "stable"
 
@@ -40,6 +45,20 @@ class SpeechVariantsRequest(BaseModel):
     job_id: str | None = None
     translated_text: str | None = Field(default=None, max_length=8000)
     target_language: str
+    speaker_gender: str = "female"
+    usage_scene: str = "short_video_voiceover"
+    custom_humanize_prompt: str = Field(default="", max_length=1200)
+    voice_mode: str = "humanized"
+
+
+class SpeechRewriteRequest(BaseModel):
+    job_id: str | None = None
+    translated_text: str = Field(..., min_length=1, max_length=8000)
+    target_language: str
+    speaker_gender: str = "female"
+    expression_style: str = "natural"
+    usage_scene: str = "short_video_voiceover"
+    custom_humanize_prompt: str = Field(default="", max_length=1200)
     voice_mode: str = "humanized"
 
 
@@ -134,6 +153,40 @@ def generate_voice_tool_speech_variants(
     except VoiceToolError as exc:
         raise HTTPException(status_code=400, detail={"code": exc.code, "message": str(exc)}) from exc
     return {"speech_variants": variants}
+
+
+@api_router.post("/speech-rewrite")
+def rewrite_voice_tool_speech_text(
+    payload: SpeechRewriteRequest, _: Any = Depends(require_operator_session)
+) -> dict[str, Any]:
+    service = get_voice_tool_service()
+    try:
+        speech_text = service.rewrite_speech_text(
+            translated_text=payload.translated_text,
+            target_language=payload.target_language,
+            speaker_gender=payload.speaker_gender,
+            expression_style=payload.expression_style,
+            usage_scene=payload.usage_scene,
+            custom_humanize_prompt=payload.custom_humanize_prompt,
+            voice_mode=payload.voice_mode,
+        )
+        job = service.get_job(payload.job_id) if payload.job_id else None
+        if job is not None:
+            job.speech_text = speech_text
+            job.speaker_gender = payload.speaker_gender
+            job.voice_preset = payload.speaker_gender
+            job.expression_style = payload.expression_style
+            job.style_preset = service.legacy_style_for_expression(payload.expression_style)
+            job.usage_scene = payload.usage_scene
+            job.custom_humanize_prompt = payload.custom_humanize_prompt.strip()
+            job.voice_mode = payload.voice_mode
+            job = service.storage.write_job(job)
+            return service.storage.public_job_payload(job)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="job not found") from exc
+    except VoiceToolError as exc:
+        raise HTTPException(status_code=400, detail={"code": exc.code, "message": str(exc)}) from exc
+    return {"speech_text": speech_text}
 
 
 @api_router.get("/download/{job_id}")

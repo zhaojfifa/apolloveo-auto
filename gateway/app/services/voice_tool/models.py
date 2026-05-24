@@ -10,6 +10,9 @@ SOURCE_LANGUAGES = frozenset({"zh", "en", "my", "vi"})
 TARGET_LANGUAGES = frozenset({"my", "vi"})
 STYLE_PRESETS = frozenset({"natural_human", "sales", "explainer", "news", "calm"})
 VOICE_PRESETS = frozenset({"male", "female", "natural"})
+SPEAKER_GENDERS = frozenset({"female", "male"})
+EXPRESSION_STYLES = frozenset({"natural", "professional", "engaging"})
+USAGE_SCENES = frozenset({"short_video_voiceover", "product_intro"})
 VOICE_MODES = frozenset({"stable", "humanized"})
 SPEED_PRESETS = frozenset({"slow", "normal", "fast"})
 USABLE_FOR_PUBLISH_VALUES = frozenset({"yes", "needs_edit", "no"})
@@ -69,6 +72,11 @@ class VoiceToolJob:
     speech_text: str = ""
     style_preset: str = "natural_human"
     voice_preset: str = "natural"
+    speaker_gender: str = "female"
+    expression_style: str = "natural"
+    usage_scene: str = "short_video_voiceover"
+    custom_humanize_prompt: str = ""
+    humanized_strategy_backend_only: str = "gemini_rewrite_plus_tts"
     voice_mode: str = "stable"
     speed: str = "normal"
     speech_variants: dict[str, str] = field(default_factory=dict)
@@ -90,6 +98,11 @@ class VoiceToolJob:
             "speech_text": self.speech_text,
             "style_preset": self.style_preset,
             "voice_preset": self.voice_preset,
+            "speaker_gender": self.speaker_gender,
+            "expression_style": self.expression_style,
+            "usage_scene": self.usage_scene,
+            "custom_humanize_prompt": self.custom_humanize_prompt,
+            "humanized_strategy_backend_only": self.humanized_strategy_backend_only,
             "voice_mode": self.voice_mode,
             "speed": self.speed,
             "speech_variants": dict(self.speech_variants),
@@ -122,6 +135,14 @@ class VoiceToolJob:
             speech_text=str(payload.get("speech_text") or ""),
             style_preset=str(payload.get("style_preset") or "natural_human"),
             voice_preset=str(payload.get("voice_preset") or "natural"),
+            speaker_gender=str(payload.get("speaker_gender") or "female"),
+            expression_style=str(payload.get("expression_style") or "natural"),
+            usage_scene=str(payload.get("usage_scene") or "short_video_voiceover"),
+            custom_humanize_prompt=str(payload.get("custom_humanize_prompt") or ""),
+            humanized_strategy_backend_only=str(
+                payload.get("humanized_strategy_backend_only")
+                or "gemini_rewrite_plus_tts"
+            ),
             voice_mode=str(payload.get("voice_mode") or "stable"),
             speed=str(payload.get("speed") or "normal"),
             speech_variants=dict(payload.get("speech_variants") or {}),

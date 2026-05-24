@@ -15,13 +15,16 @@ from gateway.app.services.providers.gemini import (
 )
 
 from .models import (
+    EXPRESSION_STYLES,
     FAILURE_REASONS,
     LANGUAGE_NAMES,
+    SPEAKER_GENDERS,
     SOURCE_LANGUAGES,
     SPEED_PRESETS,
     STYLE_PRESETS,
     TARGET_LANGUAGES,
     USABLE_FOR_PUBLISH_VALUES,
+    USAGE_SCENES,
     VOICE_MODES,
     VOICE_PRESETS,
     VoiceToolFeedback,
@@ -56,12 +59,20 @@ class VoiceToolService:
         source_text: str,
         source_language: str,
         target_language: str,
-        style_preset: str,
+        style_preset: str | None = None,
+        speaker_gender: str = "female",
+        expression_style: str | None = None,
+        usage_scene: str = "short_video_voiceover",
+        custom_humanize_prompt: str = "",
     ) -> VoiceToolJob:
         self._validate_text(source_text)
         self._validate_language(source_language, SOURCE_LANGUAGES, "source_language")
         self._validate_language(target_language, TARGET_LANGUAGES, "target_language")
-        self._validate_choice(style_preset, STYLE_PRESETS, "style_preset")
+        expression_style = _normalize_expression_style(expression_style, style_preset)
+        style_preset = _style_preset_from_expression(expression_style)
+        self._validate_choice(speaker_gender, SPEAKER_GENDERS, "speaker_gender")
+        self._validate_choice(expression_style, EXPRESSION_STYLES, "expression_style")
+        self._validate_choice(usage_scene, USAGE_SCENES, "usage_scene")
 
         job = VoiceToolJob(
             job_id=_new_job_id(),
@@ -69,6 +80,11 @@ class VoiceToolService:
             source_language=source_language,
             target_language=target_language,
             style_preset=style_preset,
+            voice_preset=speaker_gender,
+            speaker_gender=speaker_gender,
+            expression_style=expression_style,
+            usage_scene=usage_scene,
+            custom_humanize_prompt=custom_humanize_prompt.strip(),
         )
         translated = self._translate_text(
             source_text=job.source_text,
@@ -79,7 +95,10 @@ class VoiceToolService:
         job.speech_text = self.rewrite_speech_text(
             translated_text=translated,
             target_language=target_language,
-            style_preset=style_preset,
+            expression_style=expression_style,
+            usage_scene=usage_scene,
+            speaker_gender=speaker_gender,
+            custom_humanize_prompt=custom_humanize_prompt,
             voice_mode="humanized",
         )
         job.provider_used_backend_only["translation"] = "gemini"
@@ -93,17 +112,27 @@ class VoiceToolService:
         *,
         translated_text: str,
         target_language: str,
-        style_preset: str,
+        style_preset: str | None = None,
+        speaker_gender: str = "female",
+        expression_style: str | None = None,
+        usage_scene: str = "short_video_voiceover",
+        custom_humanize_prompt: str = "",
         voice_mode: str = "humanized",
     ) -> str:
         self._validate_text(translated_text)
         self._validate_language(target_language, TARGET_LANGUAGES, "target_language")
-        self._validate_choice(style_preset, STYLE_PRESETS, "style_preset")
+        expression_style = _normalize_expression_style(expression_style, style_preset)
+        self._validate_choice(speaker_gender, SPEAKER_GENDERS, "speaker_gender")
+        self._validate_choice(expression_style, EXPRESSION_STYLES, "expression_style")
+        self._validate_choice(usage_scene, USAGE_SCENES, "usage_scene")
         self._validate_choice(voice_mode, VOICE_MODES, "voice_mode")
         rewritten = self._rewrite_text(
             translated_text=translated_text.strip(),
             target_language=target_language,
-            style_preset=style_preset,
+            speaker_gender=speaker_gender,
+            expression_style=expression_style,
+            usage_scene=usage_scene,
+            custom_humanize_prompt=custom_humanize_prompt.strip(),
             voice_mode=voice_mode,
         )
         return rewritten
@@ -113,10 +142,15 @@ class VoiceToolService:
         *,
         translated_text: str | None = None,
         target_language: str,
+        speaker_gender: str = "female",
+        usage_scene: str = "short_video_voiceover",
+        custom_humanize_prompt: str = "",
         voice_mode: str = "humanized",
         job_id: str | None = None,
     ) -> dict[str, str]:
         self._validate_language(target_language, TARGET_LANGUAGES, "target_language")
+        self._validate_choice(speaker_gender, SPEAKER_GENDERS, "speaker_gender")
+        self._validate_choice(usage_scene, USAGE_SCENES, "usage_scene")
         self._validate_choice(voice_mode, VOICE_MODES, "voice_mode")
         job = self.storage.read_job(job_id) if job_id else None
         base_text = translated_text if translated_text is not None else (job.translated_text if job else "")
@@ -125,14 +159,21 @@ class VoiceToolService:
             style: self.rewrite_speech_text(
                 translated_text=base_text,
                 target_language=target_language,
-                style_preset=style,
+                speaker_gender=speaker_gender,
+                expression_style=style,
+                usage_scene=usage_scene,
+                custom_humanize_prompt=custom_humanize_prompt,
                 voice_mode=voice_mode,
             )
-            for style in ("natural_human", "sales", "explainer", "news", "calm")
+            for style in ("natural", "professional", "engaging")
         }
         if job is not None:
             _record_stage_provider(job, "speech_rewrite", "gemini")
             job.speech_variants = variants
+            job.speaker_gender = speaker_gender
+            job.expression_style = job.expression_style or "natural"
+            job.usage_scene = usage_scene
+            job.custom_humanize_prompt = custom_humanize_prompt.strip()
             self.storage.write_job(job)
         return variants
 
@@ -141,14 +182,16 @@ class VoiceToolService:
         *,
         speech_text: str,
         target_language: str,
-        voice_preset: str,
-        speed: str,
+        voice_preset: str | None = None,
+        speaker_gender: str | None = None,
+        speed: str = "normal",
         voice_mode: str = "stable",
         job_id: str | None = None,
     ) -> VoiceToolJob:
         self._validate_text(speech_text)
         self._validate_language(target_language, TARGET_LANGUAGES, "target_language")
-        self._validate_choice(voice_preset, VOICE_PRESETS, "voice_preset")
+        speaker_gender = _normalize_speaker_gender(speaker_gender, voice_preset)
+        self._validate_choice(speaker_gender, SPEAKER_GENDERS, "speaker_gender")
         self._validate_choice(voice_mode, VOICE_MODES, "voice_mode")
         self._validate_choice(speed, SPEED_PRESETS, "speed")
 
@@ -164,14 +207,15 @@ class VoiceToolService:
                 target_language=target_language,
                 speech_text=speech_text.strip(),
             )
-        job.voice_preset = voice_preset
+        job.voice_preset = speaker_gender
+        job.speaker_gender = speaker_gender
         job.voice_mode = voice_mode
         job.speed = speed
         _record_stage_provider(job, "speech_synthesis", "azure_speech")
 
         paths = self.storage.paths_for(job.job_id)
         paths.root.mkdir(parents=True, exist_ok=True)
-        voice = _resolve_voice(self._settings, target_language, voice_preset)
+        voice = _resolve_voice(self._settings, target_language, speaker_gender)
         try:
             await asyncio.wait_for(
                 self._tts_func(
@@ -231,21 +275,33 @@ class VoiceToolService:
         source_text: str,
         source_language: str,
         target_language: str,
-        style_preset: str,
-        voice_preset: str,
-        speed: str,
+        style_preset: str | None = None,
+        voice_preset: str | None = None,
+        speaker_gender: str | None = None,
+        expression_style: str | None = None,
+        usage_scene: str = "short_video_voiceover",
+        custom_humanize_prompt: str = "",
+        speed: str = "normal",
         voice_mode: str = "stable",
     ) -> VoiceToolJob:
+        speaker_gender = _normalize_speaker_gender(speaker_gender, voice_preset)
+        expression_style = _normalize_expression_style(expression_style, style_preset)
         job = self.translate(
             source_text=source_text,
             source_language=source_language,
             target_language=target_language,
-            style_preset=style_preset,
+            speaker_gender=speaker_gender,
+            expression_style=expression_style,
+            usage_scene=usage_scene,
+            custom_humanize_prompt=custom_humanize_prompt,
         )
         job.speech_text = self.rewrite_speech_text(
             translated_text=job.translated_text,
             target_language=target_language,
-            style_preset=style_preset,
+            speaker_gender=speaker_gender,
+            expression_style=expression_style,
+            usage_scene=usage_scene,
+            custom_humanize_prompt=custom_humanize_prompt,
             voice_mode=voice_mode,
         )
         _record_stage_provider(job, "speech_rewrite", "gemini")
@@ -255,7 +311,7 @@ class VoiceToolService:
             job_id=job.job_id,
             speech_text=job.speech_text,
             target_language=target_language,
-            voice_preset=voice_preset,
+            speaker_gender=speaker_gender,
             voice_mode=voice_mode,
             speed=speed,
         )
@@ -268,11 +324,27 @@ class VoiceToolService:
         return {
             "target_language": target_language,
             "voice_options": _public_voice_options(self._settings, target_language),
+            "expression_styles": [
+                {"value": "natural", "label": "自然"},
+                {"value": "professional", "label": "专业"},
+                {"value": "engaging", "label": "有感染力"},
+            ],
+            "usage_scenes": [
+                {"value": "short_video_voiceover", "label": "短视频口播"},
+                {"value": "product_intro", "label": "商品介绍"},
+            ],
             "voice_modes": [
                 {"value": "stable", "label": "标准稳定"},
                 {"value": "humanized", "label": "拟人增强（口播文本优化）"},
             ],
         }
+
+    @staticmethod
+    def legacy_style_for_expression(expression_style: str) -> str:
+        VoiceToolService._validate_choice(
+            expression_style, EXPRESSION_STYLES, "expression_style"
+        )
+        return _style_preset_from_expression(expression_style)
 
     def submit_feedback(
         self,
@@ -345,7 +417,10 @@ class VoiceToolService:
         *,
         translated_text: str,
         target_language: str,
-        style_preset: str,
+        speaker_gender: str,
+        expression_style: str,
+        usage_scene: str,
+        custom_humanize_prompt: str,
         voice_mode: str,
     ) -> str:
         client = self._translate_client or self._build_gemini_client()
@@ -353,7 +428,10 @@ class VoiceToolService:
         prompt_hint = _speech_rewrite_prompt(
             target_language=target_language,
             target_name=target_name,
-            style_preset=style_preset,
+            speaker_gender=speaker_gender,
+            expression_style=expression_style,
+            usage_scene=usage_scene,
+            custom_humanize_prompt=custom_humanize_prompt,
             voice_mode=voice_mode,
         )
         try:
@@ -413,6 +491,39 @@ def _record_stage_error(job: VoiceToolJob, stage: str, error: str) -> None:
     job.stage_errors_backend_only[stage] = str(error or "").strip() or "unknown_error"
 
 
+def _normalize_speaker_gender(
+    speaker_gender: str | None, voice_preset: str | None = None
+) -> str:
+    value = speaker_gender or voice_preset or "female"
+    if value == "natural":
+        return "female"
+    return value
+
+
+def _normalize_expression_style(
+    expression_style: str | None, style_preset: str | None = None
+) -> str:
+    if expression_style:
+        return expression_style
+    if style_preset and style_preset not in STYLE_PRESETS:
+        raise VoiceToolError("invalid_choice", "style_preset is not supported")
+    return {
+        "natural_human": "natural",
+        "calm": "natural",
+        "explainer": "professional",
+        "news": "professional",
+        "sales": "engaging",
+    }.get(style_preset or "", "natural")
+
+
+def _style_preset_from_expression(expression_style: str) -> str:
+    return {
+        "natural": "natural_human",
+        "professional": "explainer",
+        "engaging": "sales",
+    }[expression_style]
+
+
 def _shape_speech_text(text: str, style_preset: str) -> str:
     shaped = re.sub(r"\s+", " ", str(text or "")).strip()
     if style_preset == "news":
@@ -423,24 +534,30 @@ def _shape_speech_text(text: str, style_preset: str) -> str:
 
 
 STYLE_REWRITE_RULES = {
-    "natural_human": (
-        "Natural local human speech: conversational, less written, smooth for a "
-        "real presenter, with small spoken transitions when helpful."
+    "natural": (
+        "Natural local human host delivery: conversational, warm, relaxed, "
+        "not mechanical, with wording a local presenter would comfortably say."
     ),
-    "sales": (
-        "Persuasive product or marketing expression: stronger conversion tone, "
-        "clear benefit framing, but do not invent product facts."
+    "professional": (
+        "Professional host delivery: clear, credible, structured, suitable for "
+        "product explanation without sounding stiff or overly written."
     ),
-    "explainer": (
-        "Clear structured explanation: easy to understand, orderly, suitable "
-        "for instructional voiceover."
+    "engaging": (
+        "Engaging local host delivery: energetic and persuasive for short video "
+        "or product intro, but do not invent claims or change product facts."
     ),
-    "news": (
-        "Formal objective broadcast style: concise, neutral, no hype, suitable "
-        "for news reading."
+}
+
+
+USAGE_SCENE_RULES = {
+    "short_video_voiceover": (
+        "Scene: short video voiceover. Keep sentences easy to speak, rhythmic, "
+        "and suitable for a concise host read."
     ),
-    "calm": (
-        "Gentle, clear, slower and steady expression: warm but not exaggerated."
+    "product_intro": (
+        "Scene: product intro. Make benefits clear and easy to understand. "
+        "For engaging style, moderate persuasive wording is allowed without "
+        "changing facts."
     ),
 }
 
@@ -461,7 +578,10 @@ def _speech_rewrite_prompt(
     *,
     target_language: str,
     target_name: str,
-    style_preset: str,
+    speaker_gender: str,
+    expression_style: str,
+    usage_scene: str,
+    custom_humanize_prompt: str,
     voice_mode: str,
 ) -> str:
     humanized_rule = (
@@ -470,19 +590,30 @@ def _speech_rewrite_prompt(
         else "Keep wording stable and conservative while still suitable for speech."
     )
     return (
-        f"{target_name} speech rewrite; style={style_preset}. "
-        f"{STYLE_REWRITE_RULES[style_preset]} "
+        f"{target_name} humanized speech rewrite; expression_style={expression_style}; "
+        f"speaker_gender={speaker_gender}; usage_scene={usage_scene}. "
+        f"{STYLE_REWRITE_RULES[expression_style]} "
+        f"{USAGE_SCENE_RULES[usage_scene]} "
         f"{LANGUAGE_REWRITE_RULES[target_language]} "
-        "Preserve original meaning. Do not add unsupported factual claims. "
-        "Keep length close to the translated text unless the selected style "
-        "requires mild expansion. For sales style, allow moderate persuasive "
-        "phrasing without changing product facts. "
+        "Output should sound like a local Burmese or Vietnamese human host. "
+        "Avoid machine translation tone. Avoid overly written language. "
+        "Keep suitable for short video spoken delivery. Preserve product facts "
+        "and core meaning. Do not invent claims. Respect speaker_gender only "
+        "as delivery style and voice selection; do not alter factual content. "
+        f"{_custom_prompt_rule(custom_humanize_prompt)} "
         f"{humanized_rule} Return only the rewritten speech text."
     )
 
 
+def _custom_prompt_rule(custom_humanize_prompt: str) -> str:
+    prompt = str(custom_humanize_prompt or "").strip()
+    if not prompt:
+        return ""
+    return f"Operator humanization note: {prompt[:600]}"
+
+
 def _resolve_voice(settings_obj, target_language: str, voice_preset: str) -> str:
-    gender = "female" if voice_preset == "natural" else voice_preset
+    gender = _normalize_speaker_gender(None, voice_preset)
     prefix = "mm" if target_language == "my" else "vi"
     voice_key = f"{prefix}_{gender}_1"
     voice_map = getattr(settings_obj, "azure_tts_voice_map", {}) or {}
@@ -501,13 +632,12 @@ def _resolve_voice(settings_obj, target_language: str, voice_preset: str) -> str
 
 def _public_voice_options(settings_obj, target_language: str) -> list[dict[str, str]]:
     labels = {
-        "natural": "自然音色",
-        "female": "女声",
-        "male": "男声",
+        "female": "女主播",
+        "male": "男主播",
     }
     options: list[dict[str, str]] = []
     seen_voices: set[str] = set()
-    for preset in ("natural", "female", "male"):
+    for preset in ("female", "male"):
         voice = _resolve_voice(settings_obj, target_language, preset)
         if voice in seen_voices:
             continue

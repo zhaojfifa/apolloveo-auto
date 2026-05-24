@@ -24,7 +24,7 @@ class FakeTranslateClient:
         if "faithful semantic translation only" in hint:
             return GeminiTextTranslateResult(translated={1: "တည်ငြိမ်သော ဘာသာပြန်စာသား။"})
         for style in STYLE_REWRITE_RULES:
-            if f"style={style}" in hint:
+            if f"expression_style={style}" in hint:
                 return GeminiTextTranslateResult(translated={1: f"{style} speech text"})
         return GeminiTextTranslateResult(translated={1: "fallback speech text"})
 
@@ -94,7 +94,9 @@ def test_translate_validates_request_and_writes_manifest(tmp_path: Path) -> None
     assert "stage_errors_backend_only" not in service.storage.public_job_payload(job)
     assert "Burmese" in client.requests[0].target_lang
     assert "style preset" not in client.requests[0].target_lang
-    assert "style=natural_human" in client.requests[1].target_lang
+    assert "expression_style=natural" in client.requests[1].target_lang
+    assert "speaker_gender=female" in client.requests[1].target_lang
+    assert "usage_scene=short_video_voiceover" in client.requests[1].target_lang
 
 
 def test_translate_rejects_unsupported_target_language(tmp_path: Path) -> None:
@@ -249,13 +251,13 @@ def test_speech_rewrite_is_separate_stage_and_templates_are_distinct(tmp_path: P
         voice_mode="humanized",
     )
 
-    assert set(variants) == {"natural_human", "sales", "explainer", "news", "calm"}
-    assert len(set(variants.values())) == 5
+    assert set(variants) == {"natural", "professional", "engaging"}
+    assert len(set(variants.values())) == 3
     hints = [request.target_lang for request in client.requests]
-    assert any("style=natural_human" in hint for hint in hints)
-    assert any("style=sales" in hint for hint in hints)
-    assert any("Natural local human speech" in hint for hint in hints)
-    assert any("Persuasive product or marketing expression" in hint for hint in hints)
+    assert any("expression_style=natural" in hint for hint in hints)
+    assert any("expression_style=engaging" in hint for hint in hints)
+    assert any("Natural local human host delivery" in hint for hint in hints)
+    assert any("Engaging local host delivery" in hint for hint in hints)
 
 
 def test_voice_mode_is_closed_enum(tmp_path: Path) -> None:
@@ -265,11 +267,65 @@ def test_voice_mode_is_closed_enum(tmp_path: Path) -> None:
         service.rewrite_speech_text(
             translated_text="xin chao",
             target_language="vi",
-            style_preset="calm",
+            expression_style="natural",
             voice_mode="experimental",
         )
 
     assert exc.value.code == "invalid_choice"
+
+
+@pytest.mark.parametrize(
+    ("field_name", "kwargs"),
+    [
+        ("speaker_gender", {"speaker_gender": "neutral"}),
+        ("expression_style", {"expression_style": "news"}),
+        ("usage_scene", {"usage_scene": "livestream"}),
+    ],
+)
+def test_humanized_host_controls_are_closed_enums(
+    tmp_path: Path, field_name: str, kwargs: dict[str, str]
+) -> None:
+    service = _service(tmp_path)
+
+    with pytest.raises(VoiceToolError) as exc:
+        service.rewrite_speech_text(
+            translated_text="xin chao",
+            target_language="vi",
+            **kwargs,
+        )
+
+    assert exc.value.code == "invalid_choice"
+    assert field_name in str(exc.value)
+
+
+def test_custom_humanize_prompt_persists_only_in_manifest(tmp_path: Path) -> None:
+    client = FakeTranslateClient()
+    service = _service(tmp_path, client)
+
+    job = service.translate(
+        source_text="hello",
+        source_language="en",
+        target_language="vi",
+        speaker_gender="male",
+        expression_style="engaging",
+        usage_scene="product_intro",
+        custom_humanize_prompt="更像本地真人主播，减少机器感。",
+    )
+
+    paths = service.storage.paths_for(job.job_id)
+    manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
+    assert manifest["speaker_gender"] == "male"
+    assert manifest["expression_style"] == "engaging"
+    assert manifest["usage_scene"] == "product_intro"
+    assert manifest["custom_humanize_prompt"] == "更像本地真人主播，减少机器感。"
+    assert manifest["humanized_strategy_backend_only"] == "gemini_rewrite_plus_tts"
+    public = service.storage.public_job_payload(job)
+    assert public["speaker_gender"] == "male"
+    assert public["expression_style"] == "engaging"
+    assert public["usage_scene"] == "product_intro"
+    assert "custom_humanize_prompt" not in public
+    assert "humanized_strategy_backend_only" not in public
+    assert "model" not in json.dumps(public).lower()
 
 
 def test_public_voice_options_deduplicate_identical_backend_voice(tmp_path: Path) -> None:
@@ -287,7 +343,7 @@ def test_public_voice_options_deduplicate_identical_backend_voice(tmp_path: Path
 
     options = service.public_options("my")["voice_options"]
 
-    assert options == [{"value": "natural", "label": "自然音色"}]
+    assert options == [{"value": "female", "label": "女主播"}]
 
 
 def test_public_payload_and_ui_do_not_expose_provider_vendor_model(tmp_path: Path) -> None:
