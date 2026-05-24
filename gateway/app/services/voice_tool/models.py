@@ -73,6 +73,8 @@ class VoiceToolJob:
     speed: str = "normal"
     speech_variants: dict[str, str] = field(default_factory=dict)
     provider_used_backend_only: dict[str, str] = field(default_factory=dict)
+    stage_providers_backend_only: dict[str, str] = field(default_factory=dict)
+    stage_errors_backend_only: dict[str, str] = field(default_factory=dict)
     audio_path: str | None = None
     manifest_path: str | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -92,6 +94,8 @@ class VoiceToolJob:
             "speed": self.speed,
             "speech_variants": dict(self.speech_variants),
             "provider_used_backend_only": dict(self.provider_used_backend_only),
+            "stage_providers_backend_only": dict(self.stage_providers_backend_only),
+            "stage_errors_backend_only": dict(self.stage_errors_backend_only),
             "audio_path": self.audio_path,
             "manifest_path": self.manifest_path,
             "created_at": self.created_at,
@@ -100,6 +104,15 @@ class VoiceToolJob:
 
     @classmethod
     def from_manifest(cls, payload: dict[str, Any]) -> "VoiceToolJob":
+        legacy_providers = dict(payload.get("provider_used_backend_only") or {})
+        stage_providers = dict(payload.get("stage_providers_backend_only") or {})
+        if not stage_providers and legacy_providers:
+            if legacy_providers.get("translation"):
+                stage_providers["semantic_translation"] = legacy_providers["translation"]
+            if legacy_providers.get("speech_rewrite"):
+                stage_providers["speech_rewrite"] = legacy_providers["speech_rewrite"]
+            if legacy_providers.get("tts"):
+                stage_providers["speech_synthesis"] = legacy_providers["tts"]
         return cls(
             job_id=str(payload.get("job_id") or ""),
             source_text=str(payload.get("source_text") or ""),
@@ -112,7 +125,9 @@ class VoiceToolJob:
             voice_mode=str(payload.get("voice_mode") or "stable"),
             speed=str(payload.get("speed") or "normal"),
             speech_variants=dict(payload.get("speech_variants") or {}),
-            provider_used_backend_only=dict(payload.get("provider_used_backend_only") or {}),
+            provider_used_backend_only=legacy_providers,
+            stage_providers_backend_only=stage_providers,
+            stage_errors_backend_only=dict(payload.get("stage_errors_backend_only") or {}),
             audio_path=str(payload.get("audio_path") or "") or None,
             manifest_path=str(payload.get("manifest_path") or "") or None,
             created_at=str(payload.get("created_at") or ""),

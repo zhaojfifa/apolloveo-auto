@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from gateway.app.providers.azure_speech import AzureSpeechError
 from gateway.app.services.providers.gemini import GeminiTextTranslateResult
 from gateway.app.services.voice_tool import VoiceToolError, VoiceToolService
 from gateway.app.services.voice_tool.service import STYLE_REWRITE_RULES
@@ -30,6 +31,10 @@ class FakeTranslateClient:
 
 async def fake_tts(text, voice, output_path, **kwargs):
     Path(output_path).write_bytes(b"fake-mp3-audio")
+
+
+async def fake_tts_failure(text, voice, output_path, **kwargs):
+    raise AzureSpeechError("synthetic synthesis failure")
 
 
 def _settings() -> SimpleNamespace:
@@ -80,7 +85,13 @@ def test_translate_validates_request_and_writes_manifest(tmp_path: Path) -> None
         "translation": "gemini",
         "speech_rewrite": "gemini",
     }
+    assert manifest["stage_providers_backend_only"] == {
+        "semantic_translation": "gemini",
+        "speech_rewrite": "gemini",
+    }
     assert "provider_used_backend_only" not in service.storage.public_job_payload(job)
+    assert "stage_providers_backend_only" not in service.storage.public_job_payload(job)
+    assert "stage_errors_backend_only" not in service.storage.public_job_payload(job)
     assert "Burmese" in client.requests[0].target_lang
     assert "style preset" not in client.requests[0].target_lang
     assert "style=natural_human" in client.requests[1].target_lang
@@ -129,10 +140,54 @@ def test_synthesize_updates_existing_job_and_hides_provider_boundary(
         "speech_rewrite": "gemini",
         "tts": "azure_speech",
     }
+    assert manifest["stage_providers_backend_only"] == {
+        "semantic_translation": "gemini",
+        "speech_rewrite": "gemini",
+        "speech_synthesis": "azure_speech",
+    }
     public = service.storage.public_job_payload(updated)
     assert public["download_mp3_url"] == f"/api/voice-tool/download/{job.job_id}?format=mp3"
     assert "provider_used_backend_only" not in public
+    assert "stage_providers_backend_only" not in public
+    assert "stage_errors_backend_only" not in public
     assert public["voice_mode"] == "stable"
+
+
+def test_synthesize_failure_persists_stage_error_without_audio(tmp_path: Path) -> None:
+    service = VoiceToolService(
+        storage=VoiceToolStorage(tmp_path / "artifacts" / "voice_tool"),
+        translate_client=FakeTranslateClient(),
+        settings_obj=_settings(),
+        tts_func=fake_tts_failure,
+    )
+    job = service.translate(
+        source_text="hello",
+        source_language="en",
+        target_language="my",
+        style_preset="calm",
+    )
+
+    with pytest.raises(VoiceToolError) as exc:
+        asyncio.run(
+            service.synthesize(
+                job_id=job.job_id,
+                speech_text="မင်္ဂလာပါ။",
+                target_language="my",
+                voice_preset="female",
+                speed="normal",
+            )
+        )
+
+    assert exc.value.code == "tts_failed"
+    paths = service.storage.paths_for(job.job_id)
+    manifest = json.loads(paths.manifest.read_text(encoding="utf-8"))
+    assert manifest["stage_providers_backend_only"]["speech_synthesis"] == "azure_speech"
+    assert (
+        manifest["stage_errors_backend_only"]["speech_synthesis"]
+        == "synthetic synthesis failure"
+    )
+    assert not paths.output_mp3.exists()
+    assert service.storage.public_job_payload(service.get_job(job.job_id))["audio_ready"] is False
 
 
 def test_feedback_persists_json_and_manifest_summary(tmp_path: Path) -> None:

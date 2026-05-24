@@ -84,6 +84,8 @@ class VoiceToolService:
         )
         job.provider_used_backend_only["translation"] = "gemini"
         job.provider_used_backend_only["speech_rewrite"] = "gemini"
+        _record_stage_provider(job, "semantic_translation", "gemini")
+        _record_stage_provider(job, "speech_rewrite", "gemini")
         return self.storage.write_job(job)
 
     def rewrite_speech_text(
@@ -129,6 +131,7 @@ class VoiceToolService:
             for style in ("natural_human", "sales", "explainer", "news", "calm")
         }
         if job is not None:
+            _record_stage_provider(job, "speech_rewrite", "gemini")
             job.speech_variants = variants
             self.storage.write_job(job)
         return variants
@@ -164,6 +167,7 @@ class VoiceToolService:
         job.voice_preset = voice_preset
         job.voice_mode = voice_mode
         job.speed = speed
+        _record_stage_provider(job, "speech_synthesis", "azure_speech")
 
         paths = self.storage.paths_for(job.job_id)
         paths.root.mkdir(parents=True, exist_ok=True)
@@ -185,25 +189,36 @@ class VoiceToolService:
                 ),
                 timeout=120,
             )
-        except TypeError:
-            await self._tts_func(
-                job.speech_text,
-                voice,
-                str(paths.output_mp3),
-                speech_key=getattr(self._settings, "azure_speech_key", ""),
-                speech_region=getattr(self._settings, "azure_speech_region", ""),
-                output_format=getattr(
-                    self._settings,
-                    "azure_tts_output_format",
-                    "audio-24khz-48kbitrate-mono-mp3",
-                ),
-            )
+        except TypeError as exc:
+            try:
+                await self._tts_func(
+                    job.speech_text,
+                    voice,
+                    str(paths.output_mp3),
+                    speech_key=getattr(self._settings, "azure_speech_key", ""),
+                    speech_region=getattr(self._settings, "azure_speech_region", ""),
+                    output_format=getattr(
+                        self._settings,
+                        "azure_tts_output_format",
+                        "audio-24khz-48kbitrate-mono-mp3",
+                    ),
+                )
+            except Exception as fallback_exc:
+                _record_stage_error(job, "speech_synthesis", str(fallback_exc))
+                self.storage.write_job(job)
+                raise VoiceToolError("tts_failed", str(fallback_exc)) from fallback_exc
         except AzureSpeechError as exc:
+            _record_stage_error(job, "speech_synthesis", str(exc))
+            self.storage.write_job(job)
             raise VoiceToolError("tts_failed", str(exc)) from exc
         except asyncio.TimeoutError as exc:
+            _record_stage_error(job, "speech_synthesis", "Azure speech synthesis timed out")
+            self.storage.write_job(job)
             raise VoiceToolError("tts_timeout", "Azure speech synthesis timed out") from exc
 
         if not paths.output_mp3.exists() or paths.output_mp3.stat().st_size <= 0:
+            _record_stage_error(job, "speech_synthesis", "Azure speech returned no audio")
+            self.storage.write_job(job)
             raise VoiceToolError("tts_empty_audio", "Azure speech returned no audio")
 
         job.audio_path = str(paths.output_mp3)
@@ -233,6 +248,7 @@ class VoiceToolService:
             style_preset=style_preset,
             voice_mode=voice_mode,
         )
+        _record_stage_provider(job, "speech_rewrite", "gemini")
         job.voice_mode = voice_mode
         self.storage.write_job(job)
         return await self.synthesize(
@@ -387,6 +403,14 @@ class VoiceToolService:
 
 def _new_job_id() -> str:
     return f"vt_{uuid4().hex}"
+
+
+def _record_stage_provider(job: VoiceToolJob, stage: str, provider: str) -> None:
+    job.stage_providers_backend_only[stage] = provider
+
+
+def _record_stage_error(job: VoiceToolJob, stage: str, error: str) -> None:
+    job.stage_errors_backend_only[stage] = str(error or "").strip() or "unknown_error"
 
 
 def _shape_speech_text(text: str, style_preset: str) -> str:
