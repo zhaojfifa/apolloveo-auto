@@ -172,6 +172,7 @@ def rewrite_voice_tool_speech_text(
         )
         job = service.get_job(payload.job_id) if payload.job_id else None
         if job is not None:
+            job.translated_text = payload.translated_text.strip()
             job.speech_text = speech_text
             job.speaker_gender = payload.speaker_gender
             job.voice_preset = payload.speaker_gender

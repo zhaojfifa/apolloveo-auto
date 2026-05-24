@@ -23,32 +23,38 @@
       border-radius: 8px;
       padding: 14px;
     }
-    .shortcut {
+    .top-action {
       display: grid;
       grid-template-columns: 1fr auto;
       gap: 12px;
       align-items: center;
     }
-    .stage-grid {
-      display: grid;
-      grid-template-columns: minmax(320px, 1fr) minmax(320px, 1fr);
-      gap: 14px;
-      align-items: start;
-    }
-    .stage-full { grid-column: 1 / -1; }
-    .panel-title { margin: 0 0 10px; font-size: 1rem; font-weight: 800; }
-    .guidance {
-      margin: 0;
+    .zone-title { margin: 0 0 8px; font-size: 1.05rem; font-weight: 850; }
+    .zone-purpose {
+      margin: 0 0 12px;
       color: #465466;
       line-height: 1.55;
       font-size: 0.94rem;
     }
-    .helper-text {
-      margin: -2px 0 0;
-      color: #697586;
-      font-size: 0.84rem;
-      line-height: 1.45;
+    .translation-grid {
+      display: grid;
+      grid-template-columns: minmax(300px, 1fr) minmax(300px, 1fr);
+      gap: 14px;
+      align-items: start;
     }
+    .control-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .feedback-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .feedback-grid .wide { grid-column: span 2; }
+    .feedback-grid .full { grid-column: 1 / -1; }
     .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
     .field-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
     label { font-size: 0.82rem; font-weight: 750; color: #4a5568; }
@@ -61,8 +67,14 @@
       color: #111827;
       font: inherit;
     }
-    textarea { min-height: 132px; resize: vertical; line-height: 1.45; }
-    #source-text { min-height: 156px; }
+    textarea { min-height: 180px; resize: vertical; line-height: 1.45; }
+    input, select { min-height: 40px; }
+    .helper-text {
+      margin: -2px 0 0;
+      color: #697586;
+      font-size: 0.84rem;
+      line-height: 1.45;
+    }
     .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     button, .download-link {
       border: 1px solid #b7c1d0;
@@ -91,21 +103,25 @@
       display: grid;
       grid-template-columns: 1fr;
       gap: 8px;
-      margin-top: 8px;
+      margin-top: 10px;
     }
     audio { width: 100%; }
-    .feedback-grid {
-      display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
+    details {
+      border: 1px solid #e1e6ef;
+      border-radius: 7px;
+      padding: 9px;
+      background: #fbfcfe;
+      margin-top: 10px;
     }
-    .feedback-grid .wide { grid-column: span 2; }
-    .feedback-grid .full { grid-column: 1 / -1; }
+    summary { cursor: pointer; font-weight: 800; color: #344054; }
+    details textarea { min-height: 110px; margin-top: 8px; }
     .small-note { color: #697586; font-size: 0.84rem; }
     @media (max-width: 860px) {
       body { padding: 10px; }
-      .shortcut, .stage-grid, .field-row, .feedback-grid { grid-template-columns: 1fr; }
-      .stage-full, .feedback-grid .wide { grid-column: auto; }
+      .top-action, .translation-grid, .control-grid, .field-row, .feedback-grid {
+        grid-template-columns: 1fr;
+      }
+      .feedback-grid .wide { grid-column: auto; }
     }
   </style>
 </head>
@@ -123,201 +139,173 @@
     ] %}
     {% include "_topbar.html" %}
 
-    <section class="surface shortcut">
-      <p class="guidance">
-        本工具按三步验证缅语、越南语本地真人主播感配音：先确认翻译，再优化口播文本，最后生成配音试听。可使用一键生成快速跑完整流程，但翻译文本和口播文本仍可手动修改。
+    <section class="surface top-action">
+      <p class="zone-purpose">
+        本工具用于缅语、越南语人声验证。运营只需要先确认目标语言文本，再调主播、风格、场景和语速生成拟人配音。
       </p>
-      <button class="primary" id="generate-btn" type="button">一键生成拟人语音</button>
+      <button class="primary" id="generate-btn" type="button">一键翻译并拟人配音</button>
     </section>
 
     <div id="status" class="status"></div>
 
-    <div class="stage-grid">
-      <section class="surface">
-        <h2 class="panel-title">① 翻译原文</h2>
+    <section class="surface">
+      <h2 class="zone-title">① 翻译：生成目标语言文本</h2>
+      <p class="zone-purpose">将中文或英文原文转换为缅语 / 越南语目标语言文本。</p>
+      <div class="translation-grid">
+        <div>
+          <div class="field">
+            <label for="source-text">原文内容</label>
+            <textarea id="source-text" placeholder="请粘贴中文或英文原文"></textarea>
+          </div>
+          <div class="actions" aria-label="样本填充">
+            <button id="sample-my-btn" type="button">缅语自然口播样本</button>
+            <button id="sample-vi-btn" type="button">越南语销售表达样本</button>
+            <button id="sample-mixed-btn" type="button">中英混合测试样本</button>
+          </div>
+          <div class="field-row" style="margin-top:10px;">
+            <div class="field">
+              <label for="source-language">原文语言</label>
+              <select id="source-language">
+                <option value="zh">中文（Chinese）</option>
+                <option value="en">英文（English）</option>
+                <option value="my">缅甸语（မြန်မာ）</option>
+                <option value="vi">越南语（Tiếng Việt）</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="target-language">目标语言</label>
+              <select id="target-language">
+                <option value="my">缅甸语（မြန်မာ）</option>
+                <option value="vi">越南语（Tiếng Việt）</option>
+              </select>
+            </div>
+          </div>
+          <div class="actions">
+            <button id="translate-btn" type="button">生成翻译</button>
+          </div>
+        </div>
         <div class="field">
-          <label for="source-text">原文内容</label>
-          <textarea id="source-text" placeholder="请粘贴中文或英文原文"></textarea>
-          <p class="helper-text">建议输入 1-3 句话，先做短文案测试。长文案请分段生成。</p>
-        </div>
-        <div class="actions" aria-label="样本填充">
-          <button id="sample-my-btn" type="button">缅语自然口播样本</button>
-          <button id="sample-vi-btn" type="button">越南语销售表达样本</button>
-          <button id="sample-mixed-btn" type="button">中英混合测试样本</button>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="source-language">原文语言</label>
-            <select id="source-language">
-              <option value="zh">中文（Chinese）</option>
-              <option value="en">英文（English）</option>
-              <option value="my">缅甸语（မြန်မာ）</option>
-              <option value="vi">越南语（Tiếng Việt）</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="target-language">目标语言</label>
-            <select id="target-language">
-              <option value="my">缅甸语（မြန်မာ）</option>
-              <option value="vi">越南语（Tiếng Việt）</option>
-            </select>
-          </div>
-        </div>
-        <div class="actions">
-          <button id="translate-btn" type="button">生成翻译</button>
-        </div>
-        <div class="field" style="margin-top:10px;">
-          <label for="translated-text">翻译文本</label>
+          <label for="translated-text">目标语言文本 / 翻译结果</label>
           <textarea id="translated-text"></textarea>
-          <p class="helper-text">翻译文本用于保证原文意思准确。请先确认翻译是否正确，可手动修改后再进入下一步。</p>
+          <p class="helper-text">本区只负责生成目标语言文本。翻译结果可以手动修改，确认后用于下方拟人配音。</p>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="surface">
-        <h2 class="panel-title">② 优化为本地真人口播</h2>
+    <section class="surface">
+      <h2 class="zone-title">② 拟人配音：生成本地真人主播感语音</h2>
+      <p class="zone-purpose">
+        使用已确认的目标语言文本，生成更像本地真人主播的拟人配音。
+      </p>
+      <div class="control-grid">
         <div class="field">
-          <label for="translated-text-stage2">翻译文本</label>
-          <textarea id="translated-text-stage2"></textarea>
-          <p class="helper-text">此处会同步 Stage 1 的翻译文本，也可以在生成口播前继续修改。</p>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="speaker-gender">主播性别</label>
-            <select id="speaker-gender">
-              <option value="female">女主播</option>
-              <option value="male">男主播</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="expression-style">表达风格</label>
-            <select id="expression-style">
-              <option value="natural">自然</option>
-              <option value="professional">专业</option>
-              <option value="engaging">有感染力</option>
-            </select>
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="usage-scene">使用场景</label>
-            <select id="usage-scene">
-              <option value="short_video_voiceover">短视频口播</option>
-              <option value="product_intro">商品介绍</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="custom-humanize-prompt">拟人提示词补充（可选）</label>
-            <input id="custom-humanize-prompt" placeholder="更像本地真人主播、减少机器感、语气自然" />
-          </div>
-        </div>
-        <div class="actions">
-          <button id="rewrite-btn" type="button">生成口播文本</button>
-        </div>
-        <div class="field" style="margin-top:10px;">
-          <label for="speech-text">口播文本</label>
-          <textarea id="speech-text"></textarea>
-          <p class="helper-text">口播文本会根据主播性别、表达风格和使用场景，优化为更像本地真人主播会说的话。这里不应改变核心事实。</p>
-        </div>
-      </section>
-
-      <section class="surface">
-        <h2 class="panel-title">③ 生成配音并试听</h2>
-        <div class="field">
-          <label for="speech-text-stage3">口播文本</label>
-          <textarea id="speech-text-stage3"></textarea>
-          <p class="helper-text">此处会同步 Stage 2 的口播文本，也可以在生成配音前继续修改。</p>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label for="speed">语速</label>
-            <select id="speed">
-              <option value="normal">标准</option>
-              <option value="slow">慢速</option>
-              <option value="fast">快速</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="stage3-speaker-gender">音色 / 主播声音</label>
-            <select id="stage3-speaker-gender">
-              <option value="female">女主播</option>
-              <option value="male">男主播</option>
-            </select>
-          </div>
-        </div>
-        <div class="field">
-          <label for="voice-mode">语音模式</label>
-          <select id="voice-mode">
-            <option value="humanized">拟人增强</option>
-            <option value="stable">标准稳定</option>
+          <label for="speaker-gender">主播性别</label>
+          <select id="speaker-gender">
+            <option value="female">女主播</option>
+            <option value="male">男主播</option>
           </select>
         </div>
-        <div class="actions">
-          <button id="synthesize-btn" type="button">生成配音</button>
+        <div class="field">
+          <label for="expression-style">表达风格</label>
+          <select id="expression-style">
+            <option value="natural">自然</option>
+            <option value="professional">专业</option>
+            <option value="engaging">有感染力</option>
+          </select>
         </div>
-        <div class="audio-wrap">
-          <audio id="audio-preview" controls></audio>
-          <div class="actions">
-            <a id="download-mp3" class="download-link" href="#" style="display:none;">下载 MP3</a>
-          </div>
-          <div id="job-note" class="small-note"></div>
-          <p class="helper-text">配音会使用口播文本生成音频。请重点判断声音是否自然、是否像真人、是否适合发布。</p>
+        <div class="field">
+          <label for="usage-scene">使用场景</label>
+          <select id="usage-scene">
+            <option value="short_video_voiceover">短视频口播</option>
+            <option value="product_intro">商品介绍</option>
+          </select>
         </div>
-      </section>
+        <div class="field">
+          <label for="speed">语速</label>
+          <select id="speed">
+            <option value="slow">慢</option>
+            <option value="normal" selected>标准</option>
+            <option value="fast">快</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="voice-gender">音色 / 主播声音</label>
+          <select id="voice-gender">
+            <option value="female">女主播</option>
+            <option value="male">男主播</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="custom-humanize-prompt">拟人提示词补充（可选）</label>
+          <input id="custom-humanize-prompt" placeholder="更像本地真人主播、减少机器感、语气自然" />
+        </div>
+      </div>
+      <p class="helper-text">
+        本区重点验证声音是否自然、是否像本地真人主播、是否适合发布。拟人提示词会影响口播表达和语音表现，但不应改变核心事实。
+      </p>
+      <div class="actions" style="margin-top:10px;">
+        <button class="primary" id="dubbing-btn" type="button">生成拟人配音</button>
+        <a id="download-mp3" class="download-link" href="#" style="display:none;">下载 MP3</a>
+      </div>
+      <div class="audio-wrap">
+        <audio id="audio-preview" controls></audio>
+        <div id="job-note" class="small-note"></div>
+      </div>
+      <details>
+        <summary>查看本次拟人优化文本</summary>
+        <textarea id="speech-text" readonly></textarea>
+      </details>
 
-      <section class="surface">
-        <h2 class="panel-title">④ 反馈评分</h2>
-        <p class="helper-text">反馈将用于优化翻译、语气、音色和语速配置。</p>
-        <div class="feedback-grid">
-          <div class="field">
-            <label for="naturalness-score">语音自然度</label>
-            <select id="naturalness-score"></select>
-          </div>
-          <div class="field">
-            <label for="human-likeness-score">真人感</label>
-            <select id="human-likeness-score"></select>
-          </div>
-          <div class="field">
-            <label for="usable-for-publish">是否可发布</label>
-            <select id="usable-for-publish">
-              <option value="yes">可以发布</option>
-              <option value="needs_edit">需要修改</option>
-              <option value="no">不可发布</option>
-            </select>
-          </div>
-          <div class="field">
-            <label for="translation-score">翻译准确性</label>
-            <select id="translation-score"></select>
-          </div>
-          <div class="field">
-            <label for="speed-score">语速</label>
-            <select id="speed-score"></select>
-          </div>
-          <div class="field">
-            <label for="voice-fit-score">音色适配</label>
-            <select id="voice-fit-score"></select>
-          </div>
-          <div class="field wide">
-            <label for="failure-reason">问题原因</label>
-            <select id="failure-reason">
-              <option value="">无</option>
-              <option value="translation_wrong">翻译不准确</option>
-              <option value="unnatural_voice">语音不自然</option>
-              <option value="speed_wrong">语速不合适</option>
-              <option value="pronunciation_issue">发音问题</option>
-              <option value="audio_error">音频异常</option>
-              <option value="other">其他</option>
-            </select>
-          </div>
-          <div class="field full">
-            <label for="feedback-comment">备注</label>
-            <textarea id="feedback-comment" style="min-height:90px;"></textarea>
-          </div>
+      <div class="feedback-grid">
+        <div class="field">
+          <label for="naturalness-score">语音自然度</label>
+          <select id="naturalness-score"></select>
         </div>
-        <div class="actions">
-          <button id="feedback-btn" type="button">提交反馈</button>
+        <div class="field">
+          <label for="human-likeness-score">真人感</label>
+          <select id="human-likeness-score"></select>
         </div>
-      </section>
-    </div>
+        <div class="field">
+          <label for="usable-for-publish">是否可发布</label>
+          <select id="usable-for-publish">
+            <option value="yes">可以发布</option>
+            <option value="needs_edit">需要修改</option>
+            <option value="no">不可发布</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="translation-score">翻译准确性</label>
+          <select id="translation-score"></select>
+        </div>
+        <div class="field">
+          <label for="speed-score">语速</label>
+          <select id="speed-score"></select>
+        </div>
+        <div class="field">
+          <label for="voice-fit-score">音色适配</label>
+          <select id="voice-fit-score"></select>
+        </div>
+        <div class="field wide">
+          <label for="failure-reason">问题原因</label>
+          <select id="failure-reason">
+            <option value="">无</option>
+            <option value="translation_wrong">翻译不准确</option>
+            <option value="unnatural_voice">语音不自然</option>
+            <option value="speed_wrong">语速不合适</option>
+            <option value="pronunciation_issue">发音问题</option>
+            <option value="audio_error">音频异常</option>
+            <option value="other">其他</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label for="feedback-comment">备注</label>
+          <input id="feedback-comment" />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="feedback-btn" type="button">提交反馈</button>
+      </div>
+    </section>
   </div>
 
   <script>
@@ -338,49 +326,30 @@
     }
 
     function setBusy(isBusy) {
-      ["generate-btn", "translate-btn", "rewrite-btn", "synthesize-btn", "feedback-btn"].forEach((id) => {
+      ["generate-btn", "translate-btn", "dubbing-btn", "feedback-btn"].forEach((id) => {
         document.getElementById(id).disabled = isBusy;
       });
     }
 
-    function syncTranslatedFromStage1() {
-      setValue("translated-text-stage2", value("translated-text"));
-    }
-
-    function syncTranslatedToStage1() {
-      setValue("translated-text", value("translated-text-stage2"));
-    }
-
-    function syncSpeechFromStage2() {
-      setValue("speech-text-stage3", value("speech-text"));
-    }
-
-    function syncSpeechToStage2() {
-      setValue("speech-text", value("speech-text-stage3"));
-    }
-
-    function syncSpeakerToStage3() {
-      setValue("stage3-speaker-gender", value("speaker-gender"));
+    function syncVoiceToGender() {
+      setValue("voice-gender", value("speaker-gender"));
     }
 
     function renderJob(job, options = {}) {
       state.jobId = job.job_id || state.jobId;
       if (options.includeTranslated !== false) {
         setValue("translated-text", job.translated_text || "");
-        setValue("translated-text-stage2", job.translated_text || "");
       }
-      if (options.includeSpeech !== false) {
-        setValue("speech-text", job.speech_text || "");
-        setValue("speech-text-stage3", job.speech_text || "");
+      if (job.speech_text) {
+        setValue("speech-text", job.speech_text);
       }
       if (job.speaker_gender) {
         setValue("speaker-gender", job.speaker_gender);
-        setValue("stage3-speaker-gender", job.speaker_gender);
+        setValue("voice-gender", job.speaker_gender);
       }
       if (job.expression_style) setValue("expression-style", job.expression_style);
       if (job.usage_scene) setValue("usage-scene", job.usage_scene);
       if (job.speed) setValue("speed", job.speed);
-      if (job.voice_mode) setValue("voice-mode", job.voice_mode);
 
       const audio = document.getElementById("audio-preview");
       const mp3 = document.getElementById("download-mp3");
@@ -423,19 +392,55 @@
       };
     }
 
+    async function generateDubbingFromTranslatedText() {
+      const translatedText = value("translated-text").trim();
+      if (!translatedText) {
+        throw new Error("请先生成或填写目标语言文本，再生成拟人配音。");
+      }
+      const rewrite = await postJson("/api/voice-tool/speech-rewrite", {
+        job_id: state.jobId,
+        translated_text: translatedText,
+        target_language: value("target-language"),
+        speaker_gender: value("speaker-gender"),
+        expression_style: value("expression-style"),
+        usage_scene: value("usage-scene"),
+        custom_humanize_prompt: value("custom-humanize-prompt"),
+        voice_mode: "humanized",
+      });
+      const speechText = rewrite.speech_text || "";
+      if (rewrite.job_id) {
+        renderJob(rewrite, { includeTranslated: false });
+      } else {
+        setValue("speech-text", speechText);
+      }
+      const finalSpeechText = value("speech-text").trim();
+      if (!finalSpeechText) {
+        throw new Error("拟人优化文本为空，无法生成配音。");
+      }
+      return postJson("/api/voice-tool/synthesize", {
+        job_id: state.jobId,
+        speech_text: finalSpeechText,
+        target_language: value("target-language"),
+        voice_preset: value("voice-gender"),
+        speaker_gender: value("voice-gender"),
+        speed: value("speed"),
+        voice_mode: "humanized",
+      });
+    }
+
     document.getElementById("generate-btn").addEventListener("click", async () => {
       setBusy(true);
-      setStatus("正在执行翻译、口播优化和配音生成...");
+      setStatus("正在一键生成翻译和拟人配音...");
       try {
         const job = await postJson("/api/voice-tool/generate", {
           ...basePayload(),
-          voice_preset: value("speaker-gender"),
+          voice_preset: value("voice-gender"),
           speaker_gender: value("speaker-gender"),
           speed: value("speed"),
-          voice_mode: value("voice-mode"),
+          voice_mode: "humanized",
         });
         renderJob(job);
-        setStatus("拟人语音已生成，请按阶段检查翻译、口播文本和音频。");
+        setStatus("翻译和拟人配音已生成，请试听并填写反馈。");
       } catch (err) {
         setStatus(String(err.message || err), true);
       } finally {
@@ -450,11 +455,9 @@
         const job = await postJson("/api/voice-tool/translate", basePayload());
         state.jobId = job.job_id;
         setValue("translated-text", job.translated_text || "");
-        syncTranslatedFromStage1();
         setValue("speech-text", "");
-        setValue("speech-text-stage3", "");
-        renderJob(job, { includeTranslated: false, includeSpeech: false, clearAudio: true });
-        setStatus("翻译已生成，请确认或修改后进入 Stage 2。");
+        renderJob(job, { includeTranslated: false, clearAudio: true });
+        setStatus("翻译已生成。请确认或修改目标语言文本，再到下方生成拟人配音。");
       } catch (err) {
         setStatus(String(err.message || err), true);
       } finally {
@@ -462,62 +465,13 @@
       }
     });
 
-    document.getElementById("rewrite-btn").addEventListener("click", async () => {
-      syncTranslatedToStage1();
-      const translated = value("translated-text-stage2");
-      if (!translated.trim()) {
-        setStatus("请先生成或填写翻译文本，再生成口播文本。", true);
-        return;
-      }
+    document.getElementById("dubbing-btn").addEventListener("click", async () => {
       setBusy(true);
-      setStatus("正在优化为本地真人口播...");
+      setStatus("正在生成拟人配音...");
       try {
-        const data = await postJson("/api/voice-tool/speech-rewrite", {
-          job_id: state.jobId,
-          translated_text: translated,
-          target_language: value("target-language"),
-          speaker_gender: value("speaker-gender"),
-          expression_style: value("expression-style"),
-          usage_scene: value("usage-scene"),
-          custom_humanize_prompt: value("custom-humanize-prompt"),
-          voice_mode: value("voice-mode"),
-        });
-        if (data.speech_text && !data.job_id) {
-          setValue("speech-text", data.speech_text);
-          setValue("speech-text-stage3", data.speech_text);
-        } else {
-          renderJob(data, { includeTranslated: false });
-        }
-        syncSpeakerToStage3();
-        setStatus("口播文本已生成，请确认或修改后进入 Stage 3。");
-      } catch (err) {
-        setStatus(String(err.message || err), true);
-      } finally {
-        setBusy(false);
-      }
-    });
-
-    document.getElementById("synthesize-btn").addEventListener("click", async () => {
-      syncSpeechToStage2();
-      const speechText = value("speech-text-stage3");
-      if (!speechText.trim()) {
-        setStatus("请先生成或填写口播文本，再生成配音。", true);
-        return;
-      }
-      setBusy(true);
-      setStatus("正在生成配音...");
-      try {
-        const job = await postJson("/api/voice-tool/synthesize", {
-          job_id: state.jobId,
-          speech_text: speechText,
-          target_language: value("target-language"),
-          voice_preset: value("stage3-speaker-gender"),
-          speaker_gender: value("stage3-speaker-gender"),
-          speed: value("speed"),
-          voice_mode: value("voice-mode"),
-        });
+        const job = await generateDubbingFromTranslatedText();
         renderJob(job, { includeTranslated: false });
-        setStatus("配音已生成，请试听并填写反馈。");
+        setStatus("拟人配音已生成，请试听。");
       } catch (err) {
         setStatus(String(err.message || err), true);
       } finally {
@@ -527,7 +481,7 @@
 
     document.getElementById("feedback-btn").addEventListener("click", async () => {
       if (!state.jobId) {
-        setStatus("请先生成或合成一个任务，再提交反馈。", true);
+        setStatus("请先生成翻译或配音任务，再提交反馈。", true);
         return;
       }
       setBusy(true);
@@ -602,23 +556,23 @@
       setValue("target-language", sample.targetLanguage);
       setValue("expression-style", sample.expressionStyle);
       setValue("speaker-gender", sample.speakerGender);
-      setValue("stage3-speaker-gender", sample.speakerGender);
+      setValue("voice-gender", sample.speakerGender);
       setValue("usage-scene", sample.usageScene);
       setValue("speed", sample.speed);
       updateVoiceOptions();
-      setStatus("样本已填入，可按阶段生成或一键生成拟人语音。");
+      setStatus("样本已填入，可先生成翻译，也可一键翻译并拟人配音。");
     }
 
     async function updateVoiceOptions() {
-      const currentStage2 = value("speaker-gender");
-      const currentStage3 = value("stage3-speaker-gender");
+      const currentSpeaker = value("speaker-gender");
+      const currentVoice = value("voice-gender");
       try {
         const res = await fetch(`/api/voice-tool/options?target_language=${encodeURIComponent(value("target-language"))}`);
         if (!res.ok) return;
         const data = await res.json();
         const options = data.voice_options || [];
-        ["speaker-gender", "stage3-speaker-gender"].forEach((id) => {
-          const current = id === "speaker-gender" ? currentStage2 : currentStage3;
+        ["speaker-gender", "voice-gender"].forEach((id) => {
+          const current = id === "speaker-gender" ? currentSpeaker : currentVoice;
           const select = document.getElementById(id);
           select.innerHTML = "";
           options.forEach((item) => {
@@ -640,11 +594,7 @@
     document.getElementById("sample-vi-btn").addEventListener("click", () => fillSample(samples.vi));
     document.getElementById("sample-mixed-btn").addEventListener("click", () => fillSample(samples.mixed));
     document.getElementById("target-language").addEventListener("change", updateVoiceOptions);
-    document.getElementById("translated-text").addEventListener("input", syncTranslatedFromStage1);
-    document.getElementById("translated-text-stage2").addEventListener("input", syncTranslatedToStage1);
-    document.getElementById("speech-text").addEventListener("input", syncSpeechFromStage2);
-    document.getElementById("speech-text-stage3").addEventListener("input", syncSpeechToStage2);
-    document.getElementById("speaker-gender").addEventListener("change", syncSpeakerToStage3);
+    document.getElementById("speaker-gender").addEventListener("change", syncVoiceToGender);
     document.addEventListener("DOMContentLoaded", updateVoiceOptions);
   </script>
 </body>
