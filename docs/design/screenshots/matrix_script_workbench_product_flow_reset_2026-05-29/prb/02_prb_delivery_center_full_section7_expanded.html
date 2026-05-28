@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{{ t("page.publish.title") }} - {{ task.task_id }}</title>
+  <title>page.publish.title - ms-prb-demo-001</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
   <link rel="stylesheet" href="/static/pipeline_lab.css" />
   <link rel="stylesheet" href="/static/i18n.css" />
@@ -156,33 +156,73 @@
 <body data-lang="zh">
   <div class="page publish">
     <div class="card">
-{% set topbar_title = t("page.publish.title") %}
-{% set topbar_subtitle = t("page.publish.subtitle", task_id=task.task_id) %}
-{% set topbar_nav = [
-  {"label": t("common.tasks"), "href": "/tasks", "active": True},
-  {"label": t("common.tools"), "href": "/tools/hub", "active": False},
-] %}
-{% set topbar_actions = [
-  {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
-] %}
-{% include "_topbar.html" %}
+
+
+
+
+
+<div class="topbar">
+  <div class="topbar-left">
+    
+      <div class="topbar-title">page.publish.title</div>
+    
+    
+      <div class="topbar-subtitle">page.publish.subtitle</div>
+    
+  </div>
+
+  <div class="topbar-center">
+    
+      <div class="segmented">
+        
+          <a class="segmented-item nav-pill ui-pill active" href="/tasks">
+            common.tasks
+          </a>
+        
+          <a class="segmented-item nav-pill ui-pill " href="/tools/hub">
+            common.tools
+          </a>
+        
+      </div>
+    
+  </div>
+
+  <div class="topbar-right">
+    <script>
+  window.__I18N__ = {"lang": "zh", "messages": {}};
+  window.__UI_LOCALE__ = "";
+</script>
+<div class="lang-tabs lang-switch">
+  
+</div>
+    
+      <div class="topbar-actions">
+        
+          <a class="btn ui-pill btn-ghost" href="/tasks">
+            common.back_task_board
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
 <div class="info-row" style="margin-top:10px;">
         <div class="info-pill">
-          <span>{{ t("publish.download_code") }}</span>
-          : <span id="download-code">{{ task.task_id[:6]|upper }}</span>
+          <span>publish.download_code</span>
+          : <span id="download-code">MS-PRB</span>
         </div>
       </div>
     </div>
 
     <div class="card" id="op-gate" style="display:none;">
       <div class="section-title">
-        <h2>{{ t("publish.gate.title") }}</h2>
-        <div class="secondary">{{ t("publish.gate.desc") }}</div>
+        <h2>publish.gate.title</h2>
+        <div class="secondary">publish.gate.desc</div>
       </div>
       <div class="copy-row" style="margin-top:10px;">
-        <input id="op-key-input" class="publish-textarea" placeholder="{{ t('publish.gate.need_key') }}" />
+        <input id="op-key-input" class="publish-textarea" placeholder="publish.gate.need_key" />
         <button type="button" class="btn-primary" id="op-key-save">
-          {{ t("action.unlock") }}
+          action.unlock
         </button>
         <span id="op-key-status" class="muted"></span>
       </div>
@@ -192,16 +232,16 @@
       <div class="card">
         <div class="tabs" role="tablist">
           <button class="tab-btn active" data-tab="tab-sop" type="button">
-            {{ t("publish.tab.sop") }}
+            publish.tab.sop
           </button>
           <button class="tab-btn" data-tab="tab-copy" type="button">
-            {{ t("publish.tab.copy") }}
+            publish.tab.copy
           </button>
           <button class="tab-btn" data-tab="tab-deliverables" type="button">
-            {{ t("publish.tab.deliverables") }}
+            publish.tab.deliverables
           </button>
           <button class="tab-btn" data-tab="tab-archive" type="button">
-            {{ t("publish.tab.archive") }}
+            publish.tab.archive
           </button>
         </div>
       </div>
@@ -209,143 +249,106 @@
     <div class="tab-panel active" id="tab-sop">
       <div class="card">
         <div class="section-title">
-          <h2>{{ t("publish.sop.title") }}</h2>
-          <div class="secondary">{{ t("publish.sop.desc") }}</div>
+          <h2>publish.sop.title</h2>
+          <div class="secondary">publish.sop.desc</div>
         </div>
-        <div class="block">{{ t("publish.sop.step1") }}</div>
-        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step2") }}</div>
-        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step3") }}</div>
-        <div class="block" style="margin-top:8px;">{{ t("publish.sop.step4") }}</div>
+        <div class="block">publish.sop.step1</div>
+        <div class="block" style="margin-top:8px;">publish.sop.step2</div>
+        <div class="block" style="margin-top:8px;">publish.sop.step3</div>
+        <div class="block" style="margin-top:8px;">publish.sop.step4</div>
       </div>
     </div>
     <div class="tab-panel" id="tab-copy">
       <div class="card">
         <div class="section-title">
-          <h2>{{ t("publish.copy.title") }}</h2>
-          <div class="secondary">{{ t("publish.copy.desc") }}</div>
+          <h2>publish.copy.title</h2>
+          <div class="secondary">publish.copy.desc</div>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>{{ t("publish.copy.caption") }}</label>
+          <label>publish.copy.caption</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-caption">{{ t("action.copy") }}</button>
+            <button type="button" class="copy-btn" data-copy-target="copy-caption">action.copy</button>
           </div>
           <textarea id="copy-caption" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>{{ t("publish.copy.hashtags") }}</label>
+          <label>publish.copy.hashtags</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-hashtags">{{ t("action.copy") }}</button>
+            <button type="button" class="copy-btn" data-copy-target="copy-hashtags">action.copy</button>
           </div>
           <textarea id="copy-hashtags" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>{{ t("publish.copy.comment") }}</label>
+          <label>publish.copy.comment</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">{{ t("action.copy") }}</button>
+            <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">action.copy</button>
           </div>
           <textarea id="copy-comment-cta" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>{{ t("publish.copy.link_text") }}</label>
+          <label>publish.copy.link_text</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-link-text">{{ t("action.copy") }}</button>
+            <button type="button" class="copy-btn" data-copy-target="copy-link-text">action.copy</button>
           </div>
           <textarea id="copy-link-text" class="publish-textarea"></textarea>
         </div>
         <div class="field" style="margin-top:10px;">
-          <label>{{ t("publish.copy.publish_time") }}</label>
+          <label>publish.copy.publish_time</label>
           <div class="copy-row">
-            <button type="button" class="copy-btn" data-copy-target="copy-publish-time">{{ t("action.copy") }}</button>
+            <button type="button" class="copy-btn" data-copy-target="copy-publish-time">action.copy</button>
           </div>
           <textarea id="copy-publish-time" class="publish-textarea"></textarea>
         </div>
       </div>
     </div>
 <div class="tab-panel" id="tab-deliverables">
-      {# PR-U3 Matrix Script Delivery Center comprehension block. Server-rendered only when task.kind == "matrix_script"; populated client-side from data.matrix_script_delivery_comprehension after the publish-hub fetch. Hot Follow / Digital Anchor / Baseline publish hubs render the existing layout below verbatim — gated container is invisible for those kinds. #}
-      {% set _ms_kind = (task.category_key or task.kind or task.platform or "") | lower %}
-      {% if _ms_kind == "matrix_script" %}
-        {# OWC-MS-RO PR-4 — Matrix Script Delivery Center + Publish Feedback +
-           Iteration / Archive (Blocks A / B / C / D / E / F). Per
-           docs/design/matrix_script_delivery_center_wireframe_v1.md §3-§9 +
-           docs/design/matrix_script_result_oriented_ui_implementation_slicing_v1.md §7
-           (PR-4 scope, RO-4.* acceptance evidence). Six additive
-           operator-result-first panels render at the TOP of the matrix_script
-           gate, ABOVE the existing PR-U3 / Recovery PR-3 / OWC-MS PR-3 / RC PR-4
-           JS-hydrated diagnostic shells (preserved verbatim BELOW per slicing
-           addendum §7.3). All values consumed from the page-route render-data
-           seam ``ms_publish_hub`` (built by
-           ``gateway/app/services/matrix_script/publish_hub_render_data.py::derive_matrix_script_publish_hub_render_data``).
-           No new endpoint, no new contract, no closed-enum widening, no
-           Hot Follow / Digital Anchor / Asset Supply file touch. #}
-        {% set ms_pub = ms_publish_hub or {} %}
-        {% set ms_pub_stage = ms_pub.eight_stage_state or {} %}
-        {% set ms_pub_result = ms_pub.task_area_result_status or {} %}
-        {% set ms_pub_readiness = ms_pub.publish_readiness or {} %}
-        {% set ms_pub_delivery = ms_pub.delivery_comprehension or {} %}
-        {% set ms_pub_preview = ms_pub.preview_compare or {} %}
-        {% set ms_pub_recommended = ms_pub.recommended_action or {} %}
-        {% set ms_pub_package = ms_pub.delivery_ready_package or {} %}
-        {% set ms_pub_copy = ms_pub.delivery_copy_bundle or {} %}
-        {% set ms_pub_backfill = ms_pub.publish_backfill_readiness or {} %}
-        {% set ms_pub_closure = ms_pub.publish_feedback_closure or {} %}
-        {% set ms_pub_endpoint = ms_pub.closure_endpoint_url %}
-        {% if ms_pub.is_matrix_script %}
-          {# ============================================================
-             PR-B reset (2026-05-29) · Matrix Script Delivery Center IA.
-             Six operator-visible sections rendered at the TOP of the
-             matrix_script gate. The legacy PR-3 / PR-4 Block A–F
-             markup + the PR-3 Recovery closure block + the JS-hydrated
-             diagnostic shells live BELOW inside a single collapsed
-             <details> (technical diagnostics), preserving every
-             data-role marker for back-compat with prior wave tests
-             while removing the operator-visible engineering vocabulary
-             from the primary scan.
+      
+      
+      
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+          
 
-             Strict boundaries: no generation controls; no
-             production-flow panels; no `event_kind` / `publish_readiness`
-             / `artifact_lookup` / `final_video` / `closure` as raw
-             English in primary copy; technical diagnostics collapsed.
-             ============================================================ #}
-
-          {# Section 1 · 交付结果介绍 — operator-language paragraph
-             summary. ms_pub_result.headline_zh + recommended next-action
-             give the operator one paragraph to read instead of a header
-             card with stage / status meta. The single result pill is
-             reused so the operator sees the same word as Workbench
-             Section 1. #}
+          
           <div class="op-card op-card--accent-emerald" data-role="matrix-script-dc-section-intro"
                data-redesign-wave="2026-05-29-prb" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
                 <span class="op-section-index op-section-index--emerald">1 · 介绍</span>
                 <h2 class="op-section-title" data-role="ms-dc-section-intro-title">交付结果介绍</h2>
-                <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_pub_result.status_kind }}"
-                      data-role="ms-dc-section-intro-result-pill">{{ ms_pub_result.status_label_zh or "未就绪" }}</span>
+                <span class="info-pill ms-result-status__kind ms-result-status__kind--blocked_pending_publish_readiness"
+                      data-role="ms-dc-section-intro-result-pill">未就绪</span>
               </div>
             </div>
             <p class="op-section-helper" data-role="ms-dc-section-intro-paragraph">
-              {% if ms_pub_readiness.publishable %}
-                本任务当前可交付：主视频已确认，必需交付物均就位。下方提供成片预览与下载，并在「发布设置」记录发布动作，「发布回填」回写发布状态。
-              {% else %}
+              
                 本任务当前不能交付：尚未生成主视频。下方展示交付清单与已具备的素材；待主视频生成完成后，可在「发布设置」记录发布动作。
-              {% endif %}
+              
             </p>
-            {% if ms_pub_recommended.next_action_zh %}
+            
               <p class="op-section-helper" data-role="ms-dc-section-intro-next-action">
-                下一步：{{ ms_pub_recommended.next_action_zh }}
+                下一步：等待生成能力接入；准备就绪后从工作台触发生成。
               </p>
-            {% endif %}
+            
           </div>
 
-          {# Section 2 · 主视频 — preview (or honest empty state) + download
-             entry. NO raw `final_video` heading; NO fabricated URL. The
-             preview hero either binds a real artifact when present or
-             renders the operator-language empty state. #}
-          {% set _prb_recommended = ms_pub_recommended.recommended_variant or {} %}
+          
+          
           <div class="op-card op-card--accent-emerald" data-role="matrix-script-dc-section-main-video"
                data-redesign-wave="2026-05-29-prb"
-               data-recommended-present="{{ 'true' if _prb_recommended.variation_id else 'false' }}"
+               data-recommended-present="false"
                style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
@@ -354,45 +357,26 @@
               </div>
             </div>
             <div class="op-main-video-preview" data-role="ms-dc-section-main-video-preview"
-                 data-preview-available="{{ 'true' if _prb_recommended.variation_id else 'false' }}"
+                 data-preview-available="false"
                  style="margin-top:10px; padding:36px 14px; min-height:180px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:12px; background:#fbfdff; text-align:center;">
-              {% if _prb_recommended.variation_id %}
-                <div data-role="ms-dc-section-main-video-preview-bound"
-                     data-bound-variation-id="{{ _prb_recommended.variation_id }}"
-                     style="font-size:14px; color:var(--op-fg-mid, #334155);">
-                  <strong>主视频已确认</strong> · 候选编号 {{ _prb_recommended.variation_id }}
-                  <div class="op-tech-note" style="margin-top:8px;">下载入口在下方「必需交付物」中。</div>
-                </div>
-              {% else %}
+              
                 <div data-role="ms-dc-section-main-video-preview-empty"
                      style="font-size:14px; line-height:1.6; color:var(--op-fg-soft, #64748b); max-width:560px; margin:0 auto;">
                   当前尚未生成主视频。已完成脚本结构与生成方案准备，成片生成能力接入后将在这里展示视频结果。
                 </div>
-              {% endif %}
+              
             </div>
             <p class="op-tech-note" data-role="ms-dc-section-main-video-no-fake-note" style="margin-top:8px;">
               本面板不展示伪造的成片链接；只有真实写入的成片才会出现下载入口。
             </p>
           </div>
 
-          {# Section 3 · 必需交付物 — operator-language rows for the five
-             fixed kinds (字幕 / 音频 / 文案包 / manifest / 交付包). Each
-             row carries 状态 + 下载 (when resolved) + "在 Workbench 重新
-             生成" CTA (when missing — links back to Workbench, never
-             inline regen here). Status sourced from delivery_comprehension
-             lanes (required_blocking + required_non_blocking joined by
-             kind). #}
-          {% set _prb_required_kinds_zh = {
-              "subtitle": "字幕",
-              "dub": "音频",
-              "copy_bundle": "文案包",
-              "manifest": "manifest",
-              "delivery_pack": "交付包",
-          } %}
-          {% set _prb_required_rows = ((ms_pub_delivery.lanes or {}).required_blocking or {}).rows or [] %}
-          {% set _prb_required_rows_nb = ((ms_pub_delivery.lanes or {}).required_non_blocking or {}).rows or [] %}
-          {% set _prb_status_by_kind = namespace(map={}) %}
-          {% for r in _prb_required_rows + _prb_required_rows_nb %}{% if _prb_status_by_kind.map.update({r.kind: r}) %}{% endif %}{% endfor %}
+          
+          
+          
+          
+          
+          
           <div class="op-card op-card--accent-amber" data-role="matrix-script-dc-section-required-deliverables"
                data-redesign-wave="2026-05-29-prb" style="margin-top:10px;">
             <div class="op-section-head">
@@ -405,48 +389,134 @@
               本任务的五项必需交付物：字幕、音频、文案包、manifest、交付包。状态来自交付清单；缺失项请回到工作台重新生成。
             </p>
             <ul style="margin:8px 0 0 0; padding:0; list-style:none;" data-role="ms-dc-section-required-list">
-              {% for kind_key, kind_label in _prb_required_kinds_zh.items() %}
-                {% set _row = _prb_status_by_kind.map.get(kind_key) %}
-                {% set _resolved = _row and _row.artifact_status_code == "current_fresh" %}
+              
+                
+                
                 <li data-role="ms-dc-section-required-row"
-                    data-deliverable-kind="{{ kind_key }}"
-                    data-resolved="{{ 'true' if _resolved else 'false' }}"
+                    data-deliverable-kind="subtitle"
+                    data-resolved="false"
                     style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
                   <span>
-                    <strong data-role="ms-dc-section-required-row-label">{{ kind_label }}</strong>
+                    <strong data-role="ms-dc-section-required-row-label">字幕</strong>
                     <span class="muted t-secondary" style="margin-left:8px;" data-role="ms-dc-section-required-row-status">
-                      {% if _resolved %}已就位{% elif _row %}{{ _row.artifact_status_label_zh or "缺失" }}{% else %}缺失{% endif %}
+                      尚未具备
                     </span>
                   </span>
                   <span class="task-actions">
-                    {% if _resolved %}
+                    
+                      <a class="btn-secondary"
+                         data-role="ms-dc-section-required-row-regenerate-cta"
+                         href="/tasks/ms-prb-demo-001/workbench">在 Workbench 重新生成</a>
+                    
+                  </span>
+                </li>
+              
+                
+                
+                <li data-role="ms-dc-section-required-row"
+                    data-deliverable-kind="dub"
+                    data-resolved="false"
+                    style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                  <span>
+                    <strong data-role="ms-dc-section-required-row-label">音频</strong>
+                    <span class="muted t-secondary" style="margin-left:8px;" data-role="ms-dc-section-required-row-status">
+                      尚未具备
+                    </span>
+                  </span>
+                  <span class="task-actions">
+                    
+                      <a class="btn-secondary"
+                         data-role="ms-dc-section-required-row-regenerate-cta"
+                         href="/tasks/ms-prb-demo-001/workbench">在 Workbench 重新生成</a>
+                    
+                  </span>
+                </li>
+              
+                
+                
+                <li data-role="ms-dc-section-required-row"
+                    data-deliverable-kind="copy_bundle"
+                    data-resolved="true"
+                    style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                  <span>
+                    <strong data-role="ms-dc-section-required-row-label">文案包</strong>
+                    <span class="muted t-secondary" style="margin-left:8px;" data-role="ms-dc-section-required-row-status">
+                      已就位
+                    </span>
+                  </span>
+                  <span class="task-actions">
+                    
                       <button type="button" class="btn-secondary"
                               data-role="ms-dc-section-required-row-download"
                               data-action="download"
                               title="下载入口在主视频生成能力接入后开放">下载</button>
-                    {% else %}
-                      <a class="btn-secondary"
-                         data-role="ms-dc-section-required-row-regenerate-cta"
-                         href="/tasks/{{ task.task_id }}/workbench">在 Workbench 重新生成</a>
-                    {% endif %}
+                    
                   </span>
                 </li>
-              {% endfor %}
+              
+                
+                
+                <li data-role="ms-dc-section-required-row"
+                    data-deliverable-kind="manifest"
+                    data-resolved="false"
+                    style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                  <span>
+                    <strong data-role="ms-dc-section-required-row-label">manifest</strong>
+                    <span class="muted t-secondary" style="margin-left:8px;" data-role="ms-dc-section-required-row-status">
+                      尚未具备
+                    </span>
+                  </span>
+                  <span class="task-actions">
+                    
+                      <a class="btn-secondary"
+                         data-role="ms-dc-section-required-row-regenerate-cta"
+                         href="/tasks/ms-prb-demo-001/workbench">在 Workbench 重新生成</a>
+                    
+                  </span>
+                </li>
+              
+                
+                
+                <li data-role="ms-dc-section-required-row"
+                    data-deliverable-kind="delivery_pack"
+                    data-resolved="false"
+                    style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                  <span>
+                    <strong data-role="ms-dc-section-required-row-label">交付包</strong>
+                    <span class="muted t-secondary" style="margin-left:8px;" data-role="ms-dc-section-required-row-status">
+                      尚未具备
+                    </span>
+                  </span>
+                  <span class="task-actions">
+                    
+                      <a class="btn-secondary"
+                         data-role="ms-dc-section-required-row-regenerate-cta"
+                         href="/tasks/ms-prb-demo-001/workbench">在 Workbench 重新生成</a>
+                    
+                  </span>
+                </li>
+              
             </ul>
           </div>
 
-          {# Section 4 · 可选交付物 — 其他变体 / scene_pack / supporting
-             material. Items render only when present (no empty rows for
-             absent supporting material). #}
-          {% set _prb_other_variants = [] %}
-          {% if ms_pub_preview.variations %}
-            {% for v in ms_pub_preview.variations %}
-              {% if not (_prb_recommended.variation_id and v.variation_id == _prb_recommended.variation_id) %}
-                {% set _ = _prb_other_variants.append(v) %}
-              {% endif %}
-            {% endfor %}
-          {% endif %}
-          {% set _prb_optional_rows = ((ms_pub_delivery.lanes or {}).optional_non_blocking or {}).rows or [] %}
+          
+          
+          
+            
+              
+                
+              
+            
+              
+                
+              
+            
+              
+                
+              
+            
+          
+          
           <div class="op-card" data-role="matrix-script-dc-section-optional-deliverables"
                data-redesign-wave="2026-05-29-prb" style="margin-top:10px;">
             <div class="op-section-head">
@@ -460,28 +530,35 @@
             </p>
             <details data-role="ms-dc-section-optional-other-variants-fold" style="margin-top:8px;">
               <summary style="cursor:pointer; font-size:13px;">
-                其他变体（{{ _prb_other_variants | length }} 个）
+                其他变体（3 个）
               </summary>
-              {% if _prb_other_variants %}
+              
                 <ul style="margin:6px 0 0 16px; padding:0; font-size:13px;"
                     data-role="ms-dc-section-optional-other-variants-list">
-                  {% for variation in _prb_other_variants %}
+                  
                     <li data-role="ms-dc-section-optional-other-variants-row"
-                        data-variant-index="{{ loop.index }}">
-                      候选 {{ loop.index }} · {{ variation.recommended_label_zh or "备选" }}
+                        data-variant-index="1">
+                      候选 1 · 推荐候选
                     </li>
-                  {% endfor %}
+                  
+                    <li data-role="ms-dc-section-optional-other-variants-row"
+                        data-variant-index="2">
+                      候选 2 · 备选
+                    </li>
+                  
+                    <li data-role="ms-dc-section-optional-other-variants-row"
+                        data-variant-index="3">
+                      候选 3 · 备选
+                    </li>
+                  
                 </ul>
-              {% else %}
-                <div class="muted t-secondary" data-role="ms-dc-section-optional-other-variants-empty"
-                     style="margin:6px 0 0 16px;">暂无其他变体。</div>
-              {% endif %}
+              
             </details>
             <div style="margin-top:8px;" data-role="ms-dc-section-optional-scene-pack">
               <strong>场景包</strong>
               <span class="muted t-secondary" style="margin-left:8px;"
                     data-role="ms-dc-section-optional-scene-pack-status">
-                {% if _prb_optional_rows %}{{ _prb_optional_rows[0].artifact_status_label_zh or "未生成" }}{% else %}未生成{% endif %}
+                未生成
               </span>
               <span class="muted t-secondary" style="margin-left:6px;">· 不阻塞发布</span>
             </div>
@@ -494,12 +571,7 @@
             </div>
           </div>
 
-          {# Section 5 · 发布设置 — operator publish form. The form posts
-             to the existing closure endpoint; no new endpoint, no
-             closed-enum widening. The legacy block-publish-settings
-             form below carries the bytewise-identical submission shape
-             — this new section is a slimmer operator-friendly wrapper
-             that reuses the same six fields and the same endpoint. #}
+          
           <div class="op-card op-card--accent-indigo" data-role="matrix-script-dc-section-publish-settings"
                data-redesign-wave="2026-05-29-prb" style="margin-top:10px;">
             <div class="op-section-head">
@@ -513,7 +585,7 @@
             </p>
             <form data-role="ms-dc-section-publish-settings-form"
                   method="post"
-                  action="/api/matrix-script/closures/{{ task.task_id }}/events"
+                  action="/api/matrix-script/closures/ms-prb-demo-001/events"
                   style="display:grid; gap:12px; grid-template-columns:repeat(2, minmax(0, 1fr)); margin-top:8px;">
               <input type="hidden" name="event_kind" value="operator_publish" data-role="ms-dc-section-publish-settings-event-kind" />
               <input type="hidden" name="actor_kind" value="operator" />
@@ -580,11 +652,8 @@
             </p>
           </div>
 
-          {# Section 6 · 发布回填 — publish URL + status + operator note +
-             metrics placeholder. Operator-language rows; raw event_kind
-             enum values are NOT rendered here (they live in the legacy
-             event-log inside the technical-diagnostics fold below). #}
-          {% set _prb_feedback_rows = ms_pub_closure.variation_feedback or [] %}
+          
+          
           <div class="op-card op-card--accent-violet" data-role="matrix-script-dc-section-publish-backfill"
                data-redesign-wave="2026-05-29-prb" style="margin-top:10px;">
             <div class="op-section-head">
@@ -596,38 +665,11 @@
             <p class="op-section-helper" data-role="ms-dc-section-publish-backfill-subtitle">
               发布完成后回填发布链接与状态；可附加运营备注。指标统计将在指标投射上线后接入。
             </p>
-            {% if _prb_feedback_rows %}
-              <ul style="margin:8px 0 0 0; padding:0; list-style:none;"
-                  data-role="ms-dc-section-publish-backfill-list">
-                {% for row in _prb_feedback_rows %}
-                  <li data-role="ms-dc-section-publish-backfill-row"
-                      data-variant-index="{{ loop.index }}"
-                      style="display:grid; gap:6px; grid-template-columns: 90px 1fr 1fr 1fr; padding:8px 0; border-bottom:1px solid #f1f5f9;">
-                    <span><strong>候选 {{ loop.index }}</strong></span>
-                    <span data-role="ms-dc-section-publish-backfill-row-url">
-                      <span class="muted t-secondary">发布链接：</span>
-                      {% if row.publish_url %}
-                        <a href="{{ row.publish_url }}" target="_blank" rel="noopener">已回填</a>
-                      {% else %}—{% endif %}
-                    </span>
-                    <span data-role="ms-dc-section-publish-backfill-row-status">
-                      <span class="muted t-secondary">发布状态：</span>
-                      {% if row.publish_status == "published" %}已发布
-                      {% elif row.publish_status == "failed" %}失败
-                      {% elif row.publish_status == "retracted" %}已撤回
-                      {% else %}待发布{% endif %}
-                    </span>
-                    <span data-role="ms-dc-section-publish-backfill-row-note">
-                      <span class="muted t-secondary">运营备注：</span>—
-                    </span>
-                  </li>
-                {% endfor %}
-              </ul>
-            {% else %}
+            
               <div class="muted" data-role="ms-dc-section-publish-backfill-empty" style="margin-top:8px;">
                 暂无回填记录。发布完成后，按候选行回填发布链接与状态。
               </div>
-            {% endif %}
+            
             <div data-role="ms-dc-section-publish-backfill-metrics" style="margin-top:10px; padding:10px; background:#f6f7f9; border-radius:6px;">
               <strong>指标统计</strong>
               <span class="muted t-secondary" style="margin-left:8px;"
@@ -637,22 +679,10 @@
               本面板只展示真实写入的发布链接；不展示伪造链接或占位 URL。
             </p>
           </div>
-        {% endif %}
+        
 
-        {# ============================================================
-           PR-B reset (2026-05-29) · 技术诊断 (collapsed, architect view).
-           Everything below this point — the legacy PR-3 / PR-4 Block
-           A–F op-cards, the PR-3 Recovery closure block, and the
-           pre-existing JS-hydrated diagnostic shells — lives inside a
-           single collapsed <details>. Their data-role markers are
-           preserved bytewise for back-compat with existing tests but
-           are NOT visible on the operator's primary scan. The forbidden
-           §5 vocabulary (publish_readiness / head_reason /
-           artifact_lookup / final_video raw / RC-R8 / closure raw
-           English / event_kind enum literals / etc.) may appear inside
-           this fold only.
-           ============================================================ #}
-        <details class="op-collapse" data-role="op-console-ms-dc-technical-diagnostics-fold">
+        
+        <details class="op-collapse" data-role="op-console-ms-dc-technical-diagnostics-fold" open>
           <summary>
             <span class="op-section-index" style="margin-right:8px;">7 · 诊断</span>
             矩阵脚本 · 交付中心 · 技术诊断（架构师视图，默认收起）
@@ -660,19 +690,16 @@
           <div class="op-collapse__hint">展开查看历史 Block A–F、发布反馈闭环表单、JS 诊断壳；含 event_kind / publish_url / publish_status / final_video / publish_readiness 等技术标识。日常运营操作不依赖本节。</div>
           <div class="op-collapse__body">
 
-        {% if ms_pub.is_matrix_script %}
-          {# Header — page subject + stage badge + result pill +
-             publish-readiness banner. Single-source RC-A7: every block
-             consuming `publishable` reads `compute_publish_readiness`
-             output (via ms_pub_readiness) directly. #}
+        
+          
           <div class="op-card op-card--accent-emerald" data-role="matrix-script-delivery-center-header" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
                 <span class="op-section-index op-section-index--emerald">① · 介绍</span>
-                <h2 class="op-section-title" data-role="ms-dc-title">交付结果介绍 · {{ task.title or "矩阵脚本任务" }}</h2>
+                <h2 class="op-section-title" data-role="ms-dc-title">交付结果介绍 · PR-B reset 演示任务</h2>
                 <span class="op-pill op-pill--matrix"><span class="op-pill__dot"></span>矩阵脚本</span>
-                <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_pub_result.status_kind }}"
-                      data-role="ms-dc-header-result-pill">{{ ms_pub_result.status_label_zh or "—" }}</span>
+                <span class="info-pill ms-result-status__kind ms-result-status__kind--blocked_pending_publish_readiness"
+                      data-role="ms-dc-header-result-pill">未就绪</span>
               </div>
             </div>
             <p class="op-section-helper" data-role="ms-dc-subtitle">本页是矩阵脚本任务的发布交付中心：成片预览、必交付物清单、文案包、发布反馈、迭代与归档。</p>
@@ -680,64 +707,47 @@
             <div class="op-meta-grid">
               <div class="op-meta-item" data-role="ms-dc-header-subject">
                 <span class="op-meta-item__label">主题</span>
-                <span class="op-meta-item__value">{{ task.title or "—" }}</span>
+                <span class="op-meta-item__value">PR-B reset 演示任务</span>
               </div>
               <div class="op-meta-item" data-role="ms-dc-header-stage"
-                   data-stage="{{ ms_pub_stage.stage or '' }}"
-                   data-stage-index="{{ ms_pub_stage.stage_index if ms_pub_stage.stage_index is not none else '' }}">
+                   data-stage="awaiting_review"
+                   data-stage-index="3">
                 <span class="op-meta-item__label">当前阶段</span>
-                <span class="op-meta-item__value" data-role="ms-dc-header-stage-label">{{ ms_pub_stage.stage_label or "—" }}</span>
+                <span class="op-meta-item__value" data-role="ms-dc-header-stage-label">待校对</span>
               </div>
               <div class="op-meta-item" data-role="ms-dc-header-result"
-                   data-status-kind="{{ ms_pub_result.status_kind or '' }}">
+                   data-status-kind="blocked_pending_publish_readiness">
                 <span class="op-meta-item__label">结果摘要</span>
-                <span class="op-meta-item__value" data-role="ms-dc-header-result-headline">{{ ms_pub_result.headline_zh or "—" }}</span>
+                <span class="op-meta-item__value" data-role="ms-dc-header-result-headline">尚未生成成片。</span>
               </div>
             </div>
 
-            {# Publish-readiness banner — RC-A7 single-source operator-language
-               restatement of the unified publish_readiness producer. #}
+            
             <div data-role="ms-dc-readiness-banner"
-                 data-publishable="{{ 'true' if ms_pub_readiness.publishable else 'false' }}"
-                 data-head-reason="{{ ms_pub_readiness.head_reason or '' }}"
-                 class="op-banner {% if ms_pub_readiness.publishable %}op-banner--ready{% else %}op-banner--blocker{% endif %}"
+                 data-publishable="false"
+                 data-head-reason="missing_final_video"
+                 class="op-banner op-banner--blocker"
                  style="margin-top:14px;">
               <div>
                 <div class="op-banner__title">
-                  {% if ms_pub_readiness.publishable %}
-                    <span data-role="ms-dc-readiness-banner-value">✓ 发布门禁已通过 · 可发布</span>
-                  {% else %}
+                  
                     <span data-role="ms-dc-readiness-banner-value">◐ 发布门禁未通过 · 待解除阻塞</span>
-                  {% endif %}
-                  {% if ms_pub_recommended.head_reason_label_zh %}
+                  
+                  
                     <span style="margin-left:6px; font-weight:400;"
-                          data-role="ms-dc-readiness-banner-head-reason">· {{ ms_pub_recommended.head_reason_label_zh }}</span>
-                  {% endif %}
+                          data-role="ms-dc-readiness-banner-head-reason">· 尚未生成成片</span>
+                  
                 </div>
-                {% if ms_pub_recommended.next_action_zh %}
+                
                   <div class="op-banner__body" data-role="ms-dc-readiness-banner-next-action">
-                    下一步：<span>{{ ms_pub_recommended.next_action_zh }}</span>
+                    下一步：<span>等待生成能力接入；准备就绪后从工作台触发生成。</span>
                   </div>
-                {% endif %}
+                
               </div>
             </div>
           </div>
 
-          {# Block A — 主交付 final_video. Operator answers "is there a
-             publishable video result yet" + "which candidate is currently
-             recommended". Sources joined by variation_id:
-              · recommended_action.recommended_variant.variation_id
-                  (single-source recommended marker)
-              · preview_compare.variations[] (variant tabs row)
-              · delivery_ready_package.rows[] (per-card tracked-gap
-                  explanation when package_status_kind != PACKAGE_READY)
-              · final_video_primary.title_zh / subtitle_zh / primacy_explanation_zh
-                  (operator-language framing)
-             Hard non-goals: no fake `final_video` URL or fabricated
-             `publish_url` echo (RC-R8); no inline player; no comparison
-             split-view (lives in Workbench Block E). When no
-             recommended candidate exists, render a single tracked-gap
-             operator-language line — never a fabricated thumbnail. #}
+          
           <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-a-final-video-primary" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
@@ -745,104 +755,64 @@
                 <h2 class="op-section-title" data-role="ms-dc-block-a-title">最终成片 · final_video</h2>
               </div>
             </div>
-            <p class="op-section-helper" data-role="ms-dc-block-a-subtitle">{{ ms_pub_delivery.final_video_primary.subtitle_zh or "本任务的核心交付物。⭐ 推荐候选由统一 publish_readiness 决定，本面板不展示伪造的 final_video 链接。" }}</p>
-            {% set _recommended_variant = ms_pub_recommended.recommended_variant or {} %}
-            {% if _recommended_variant.variation_id %}
-              <div class="meta-grid" style="margin-top:8px;">
-                <div class="meta-item" data-role="ms-dc-block-a-recommended"
-                     data-variation-id-attr="present"
-                     data-status-kind="{{ ms_pub_recommended.status_kind }}">
-                  <strong>推荐候选</strong>
-                  <span>
-                    <span class="info-pill ms-result-status__kind ms-result-status__kind--publishable_candidate"
-                          data-role="ms-dc-block-a-recommended-marker">⭐ 推荐</span>
-                    <span data-role="ms-dc-block-a-recommended-axis-summary" style="margin-left:6px;">{{ _recommended_variant.axis_summary_zh or "—" }}</span>
-                  </span>
-                </div>
-                <div class="meta-item" data-role="ms-dc-block-a-recommended-length">
-                  <strong>时长</strong>
-                  <span>{{ _recommended_variant.length_hint_zh or "—" }}</span>
-                </div>
-                <div class="meta-item" data-role="ms-dc-block-a-recommended-differentiator">
-                  <strong>差异点</strong>
-                  <span>{{ _recommended_variant.differentiator_zh or "—" }}</span>
-                </div>
-              </div>
-              {# Provenance pill — inferred label from publish_readiness +
-                 ready-gate state; first-class L3 final_provenance emission
-                 is BG-2 (deferred). Shown as inferred so operators see the
-                 source, not synthesised metadata. #}
-              <div data-role="ms-dc-block-a-provenance"
-                   data-publishable="{{ 'true' if ms_pub_readiness.publishable else 'false' }}"
-                   style="margin-top:6px;">
-                <strong>当前版本来源</strong>
-                <span class="muted t-secondary" style="margin-left:6px;">
-                  {% if ms_pub_readiness.publishable %}
-                    ◉ current（推荐候选已就绪 · 由统一 publish_readiness 推断）
-                  {% else %}
-                    ◐ 待解除阻塞 · 当前没有可发的 current 主成片
-                  {% endif %}
-                </span>
-              </div>
-              {# Primary media slot. RC-R8: tracked-gap operator-language
-                 only. No fabricated URL even when artifact_lookup later
-                 resolves. The Delivery Center renders the primary slot
-                 only as a server-side placeholder until inline-player
-                 affordance lands (IG-5 deferred). #}
-              <div data-role="ms-dc-block-a-primary-slot"
-                   style="margin-top:8px;padding:24px 12px;border:1px dashed #94a3b8;border-radius:6px;text-align:center;">
-                <div class="muted t-secondary" data-role="ms-dc-block-a-primary-slot-placeholder">
-                  [ 主成片 final_video · 服务器端占位符 ]
-                </div>
-                <div class="muted t-secondary" data-role="ms-dc-block-a-primary-slot-meta" style="margin-top:6px;">
-                  {{ _recommended_variant.length_hint_zh or "—" }} · {{ _recommended_variant.axis_summary_zh or "—" }}
-                </div>
-                <div class="muted t-secondary" data-role="ms-dc-block-a-primary-slot-no-fake-note" style="margin-top:6px;">
-                  本面板不展示 final_video 媒体链接或发布 URL（RC-R8）。
-                </div>
-              </div>
-            {% else %}
-              {# Empty state — no RECOMMENDED_BUCKET_PUBLISHABLE candidate
-                 yet. Single tracked-gap operator-language line per
-                 wireframe §4.5; no fabricated thumbnail. #}
+            <p class="op-section-helper" data-role="ms-dc-block-a-subtitle">本任务的核心交付物。</p>
+            
+            
+              
               <div data-role="ms-dc-block-a-empty"
-                   data-status-kind="{{ ms_pub_recommended.status_kind or 'undetermined_pending_review' }}"
+                   data-status-kind="blocked_pending_publish_readiness"
                    style="margin-top:8px;padding:14px 12px;border:1px dashed #cbd5e1;border-radius:6px;">
-                <strong data-role="ms-dc-block-a-empty-headline">{{ ms_pub_recommended.headline_zh or "暂无推荐主成片" }}</strong>
+                <strong data-role="ms-dc-block-a-empty-headline">建议先确认主视频生成方案。</strong>
                 <div class="muted t-secondary" data-role="ms-dc-block-a-empty-explanation" style="margin-top:6px;">
-                  {{ ms_pub_recommended.next_action_zh or "请回到工作台完成校对，待统一 publish_readiness 收敛后系统会自动给出推荐候选。" }}
+                  等待生成能力接入；准备就绪后从工作台触发生成。
                 </div>
               </div>
-            {% endif %}
-            {# Variant tabs — one tab per preview_compare row. The
-               recommended row carries ⭐ inline; never raw cell_id /
-               script_slot_ref / content:// in operator-visible labels. #}
-            {% if ms_pub_preview.variations %}
+            
+            
+            
               <div data-role="ms-dc-block-a-variant-tabs" style="margin-top:10px;">
                 <strong>变体</strong>
                 <span style="margin-left:6px;">
-                  {% for variation in ms_pub_preview.variations %}
-                    {% set _idx = loop.index %}
-                    {% set _is_recommended = (_recommended_variant.variation_id is defined) and (variation.variation_id == _recommended_variant.variation_id) %}
+                  
+                    
+                    
                     <span class="info-pill"
                           data-role="ms-dc-block-a-variant-tab"
-                          data-variant-index="{{ _idx }}"
-                          data-recommended-bucket="{{ variation.recommended_bucket }}"
-                          data-is-recommended="{{ 'true' if _is_recommended else 'false' }}"
+                          data-variant-index="1"
+                          data-recommended-bucket="publishable_candidate"
+                          data-is-recommended="false"
                           style="margin-right:4px;">
-                      候选 {{ _idx }}{% if _is_recommended %} ⭐{% endif %}
+                      候选 1
                     </span>
-                  {% endfor %}
+                  
+                    
+                    
+                    <span class="info-pill"
+                          data-role="ms-dc-block-a-variant-tab"
+                          data-variant-index="2"
+                          data-recommended-bucket="alternate_candidate"
+                          data-is-recommended="false"
+                          style="margin-right:4px;">
+                      候选 2
+                    </span>
+                  
+                    
+                    
+                    <span class="info-pill"
+                          data-role="ms-dc-block-a-variant-tab"
+                          data-variant-index="3"
+                          data-recommended-bucket="alternate_candidate"
+                          data-is-recommended="false"
+                          style="margin-right:4px;">
+                      候选 3
+                    </span>
+                  
                 </span>
               </div>
-            {% endif %}
+            
           </div>
 
-          {# Block B — 必需交付物. Per-row required + blocking_publish
-             columns sourced from factory_delivery_contract_v1 Plan C
-             amendment via delivery_comprehension.lanes. Per-row status
-             from artifact_status_label_zh. RO-4.3: per-row status
-             never re-derives lane truth. #}
+          
           <div class="op-card op-card--accent-amber" data-role="matrix-script-block-b-required-deliverables" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
@@ -851,13 +821,13 @@
               </div>
             </div>
             <p class="op-section-helper" data-role="ms-dc-block-b-subtitle">运营关注：哪些是阻塞发布的必交付，哪些是必交付但不阻塞发布的。状态来自 delivery_comprehension 投射。</p>
-            {% set _b_required_blocking = (ms_pub_delivery.lanes or {}).required_blocking or {} %}
-            {% set _b_required_non_blocking = (ms_pub_delivery.lanes or {}).required_non_blocking or {} %}
-            {% if (_b_required_blocking.rows or _b_required_non_blocking.rows) %}
+            
+            
+            
               <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse; margin-top:8px;"
                      data-role="ms-dc-block-b-table"
-                     data-required-blocking-count="{{ _b_required_blocking.row_count or 0 }}"
-                     data-required-non-blocking-count="{{ _b_required_non_blocking.row_count or 0 }}">
+                     data-required-blocking-count="4"
+                     data-required-non-blocking-count="1">
                 <thead>
                   <tr>
                     <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">交付物</th>
@@ -867,50 +837,85 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {% for row in (_b_required_blocking.rows or []) %}
+                  
                     <tr data-role="ms-dc-block-b-row"
-                        data-deliverable-kind="{{ row.kind }}"
+                        data-deliverable-kind="subtitle"
                         data-required-class="blocking"
-                        data-artifact-status="{{ row.artifact_status_code }}">
+                        data-artifact-status="unobservable_pending_upstream">
                       <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-b-row-label">{{ row.kind_label_zh or row.kind }}</td>
+                          data-role="ms-dc-block-b-row-label">字幕</td>
                       <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-b-row-zoning">{{ row.zoning_label_zh or "必需 · 阻塞发布" }}</td>
+                          data-role="ms-dc-block-b-row-zoning">必需 · 阻塞发布</td>
                       <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-b-row-status">{{ row.artifact_status_label_zh or "—" }}</td>
+                          data-role="ms-dc-block-b-row-status">尚未具备</td>
                       <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-b-row-explanation">{{ row.artifact_status_explanation_zh or "—" }}</td>
+                          data-role="ms-dc-block-b-row-explanation">等待主视频生成。</td>
                     </tr>
-                  {% endfor %}
-                  {% for row in (_b_required_non_blocking.rows or []) %}
+                  
                     <tr data-role="ms-dc-block-b-row"
-                        data-deliverable-kind="{{ row.kind }}"
-                        data-required-class="non_blocking"
-                        data-artifact-status="{{ row.artifact_status_code }}">
+                        data-deliverable-kind="dub"
+                        data-required-class="blocking"
+                        data-artifact-status="unobservable_pending_upstream">
                       <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-b-row-label">{{ row.kind_label_zh or row.kind }}</td>
+                          data-role="ms-dc-block-b-row-label">音频</td>
                       <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-b-row-zoning">{{ row.zoning_label_zh or "必需 · 不阻塞" }}</td>
+                          data-role="ms-dc-block-b-row-zoning">必需 · 阻塞发布</td>
                       <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-b-row-status">{{ row.artifact_status_label_zh or "—" }}</td>
+                          data-role="ms-dc-block-b-row-status">尚未具备</td>
                       <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-b-row-explanation">{{ row.artifact_status_explanation_zh or "—" }}</td>
+                          data-role="ms-dc-block-b-row-explanation">等待主视频生成。</td>
                     </tr>
-                  {% endfor %}
+                  
+                    <tr data-role="ms-dc-block-b-row"
+                        data-deliverable-kind="manifest"
+                        data-required-class="blocking"
+                        data-artifact-status="unobservable_pending_upstream">
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-label">manifest</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-zoning">必需 · 阻塞发布</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-status">尚未具备</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-explanation">等待生成。</td>
+                    </tr>
+                  
+                    <tr data-role="ms-dc-block-b-row"
+                        data-deliverable-kind="delivery_pack"
+                        data-required-class="blocking"
+                        data-artifact-status="unobservable_pending_upstream">
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-label">交付包</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-zoning">必需 · 阻塞发布</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-status">尚未具备</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-explanation">等待打包。</td>
+                    </tr>
+                  
+                  
+                    <tr data-role="ms-dc-block-b-row"
+                        data-deliverable-kind="copy_bundle"
+                        data-required-class="non_blocking"
+                        data-artifact-status="current_fresh">
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-label">文案包</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-zoning">必需 · 不阻塞</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-status">已具备</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-explanation">—</td>
+                    </tr>
+                  
                 </tbody>
               </table>
-            {% else %}
-              <div class="muted" data-role="ms-dc-block-b-empty" style="margin-top:8px;">尚未加载交付清单 · 请确认 packet 已落地。</div>
-            {% endif %}
+            
           </div>
 
-          {# Block C — 可选交付物 scene_pack (always non-blocking).
-             SCENE_PACK_BLOCKING_ALLOWED = False is enforced upstream;
-             this block renders the optional lane explicitly so
-             operators see the policy. RO-4.4 audit: even under
-             adversarial pack.required = True payload, this lane
-             never blocks publish-readiness. #}
-          {% set _c_optional = (ms_pub_delivery.lanes or {}).optional_non_blocking or {} %}
+          
+          
           <div class="op-card" data-role="matrix-script-block-c-scene-pack" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
@@ -921,26 +926,20 @@
             <p class="op-section-helper" data-role="ms-dc-block-c-subtitle">scene_pack 是下游精修出口（CapCut / 外部剪辑工具）。生成与否不影响发布门禁。</p>
             <ul style="margin:8px 0 0 18px; padding:0;"
                 data-role="ms-dc-block-c-list"
-                data-optional-count="{{ _c_optional.row_count or 0 }}">
-              {% for row in (_c_optional.rows or []) %}
+                data-optional-count="1">
+              
                 <li data-role="ms-dc-block-c-row"
-                    data-deliverable-kind="{{ row.kind }}"
-                    data-artifact-status="{{ row.artifact_status_code }}">
-                  <span data-role="ms-dc-block-c-row-label">{{ row.kind_label_zh or row.kind }}</span>
-                  · <span data-role="ms-dc-block-c-row-status">{{ row.artifact_status_label_zh or "—" }}</span>
+                    data-deliverable-kind="scene_pack"
+                    data-artifact-status="unobservable_pending_upstream">
+                  <span data-role="ms-dc-block-c-row-label">场景包</span>
+                  · <span data-role="ms-dc-block-c-row-status">未生成</span>
                   <span class="muted t-secondary">· 不阻塞发布 · 可在工作台请求生成</span>
                 </li>
-              {% else %}
-                <li class="muted" data-role="ms-dc-block-c-empty">未生成 scene_pack · 不阻塞发布 · 可在工作台请求生成</li>
-              {% endfor %}
+              
             </ul>
           </div>
 
-          {# Block D — 文案包. Operator-readable only. Free-text
-             editing deferred per wireframe §7.4. Single-source from
-             delivery_copy_bundle_view. Tracked-gap rows render the
-             explicit unresolved_explanation_zh; never a forbidden
-             fragment (vendor/model/provider/engine identifier). #}
+          
           <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-d-copy-bundle" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
@@ -948,55 +947,30 @@
                 <h2 class="op-section-title" data-role="ms-dc-block-d-title">发布文案包</h2>
               </div>
             </div>
-            <p class="op-section-helper" data-role="ms-dc-block-d-subtitle">{{ ms_pub_copy.panel_subtitle_zh or "标题 / Hashtags / CTA / 评论关键词；当前为只读视图，运营手动复制到平台发布。" }}</p>
-            {% if ms_pub_copy.subfields %}
+            <p class="op-section-helper" data-role="ms-dc-block-d-subtitle">标题 / Hashtags / CTA / 评论关键词。</p>
+            
               <div class="meta-grid" style="margin-top:8px;">
-                {% for sub in ms_pub_copy.subfields %}
+                
                   <div class="meta-item" data-role="ms-dc-block-d-subfield"
-                       data-subfield-id="{{ sub.subfield_id }}"
-                       data-status-code="{{ sub.status_code }}">
-                    <strong>{{ sub.label_zh }}</strong>
-                    {# Resolved status check matches the producer's closed
-                       constant `STATUS_RESOLVED = "resolved_from_existing_projection"`
-                       (gateway/app/services/matrix_script/delivery_copy_bundle_view.py:97).
-                       The earlier `"resolved"` literal here never matched
-                       the producer output; resolved values fell through
-                       to the unresolved branch and were rendered as
-                       tracked-gap. Fix: literal-match the producer's
-                       closed enum value. No enum widening — both
-                       STATUS_RESOLVED and STATUS_UNRESOLVED are
-                       producer-side closed constants. #}
-                    {% if sub.status_code == "resolved_from_existing_projection" and sub.value %}
-                      <span data-role="ms-dc-block-d-subfield-value">{{ sub.value }}</span>
-                    {% else %}
-                      <span class="muted" data-role="ms-dc-block-d-subfield-empty">{{ sub.unresolved_explanation_zh or sub.status_label_zh or "—" }}</span>
-                    {% endif %}
+                       data-subfield-id="title"
+                       data-status-code="resolved_from_existing_projection">
+                    <strong>标题</strong>
+                    
+                    
+                      <span data-role="ms-dc-block-d-subfield-value">PR-B reset 演示任务</span>
+                    
                   </div>
-                {% endfor %}
+                
               </div>
-              {% if ms_pub_copy.tracked_gap_summary_zh %}
+              
                 <div class="muted t-secondary" data-role="ms-dc-block-d-tracked-gap" style="margin-top:6px;">
-                  {{ ms_pub_copy.tracked_gap_summary_zh }}
+                  其他文案待生成。
                 </div>
-              {% endif %}
-            {% else %}
-              <div class="muted" data-role="ms-dc-block-d-empty" style="margin-top:8px;">尚未派生 copy_bundle · 请确认 packet 已落地。</div>
-            {% endif %}
+              
+            
           </div>
 
-          {# PR-3 (redesign 2026-05-28) · ⑤ 发布设置. New Mission §C
-             section inserted BETWEEN the existing copy-bundle block
-             and the publish-feedback block. Operator-facing form for
-             publish settings (platform + account + title + caption +
-             tags + scheduled time). Submit writes a single
-             operator_publish closure event via the existing endpoint
-             POST /api/matrix-script/closures/{task_id}/events with
-             event_kind=operator_publish. No new endpoint, no closed-
-             enum widening. Per approved product decision #3, the
-             platform input uses <datalist> with the closed 7-value
-             suggestion set (TikTok, YouTube Shorts, Instagram Reels,
-             抖音, 视频号, 小红书, 快手) but free-text is allowed —
-             not a closed enum on the contract layer. #}
+          
           <div class="op-card op-card--accent-indigo"
                data-role="matrix-script-block-publish-settings"
                data-redesign-wave="2026-05-28-pr3"
@@ -1012,8 +986,8 @@
             </p>
             <form data-role="ms-dc-publish-settings-form"
                   method="post"
-                  action="/api/matrix-script/closures/{{ task.task_id }}/events"
-                  data-closure-endpoint="/api/matrix-script/closures/{{ task.task_id }}/events"
+                  action="/api/matrix-script/closures/ms-prb-demo-001/events"
+                  data-closure-endpoint="/api/matrix-script/closures/ms-prb-demo-001/events"
                   style="display:grid; gap:12px; grid-template-columns:repeat(2, minmax(0, 1fr)); margin-top:8px;">
               <input type="hidden" name="event_kind" value="operator_publish" data-role="ms-dc-publish-settings-event-kind" />
               <input type="hidden" name="actor_kind" value="operator" />
@@ -1093,17 +1067,7 @@
             </p>
           </div>
 
-          {# Block ⑥ — 发布回填 (previously labelled Block E · 发布反馈;
-             relabelled by PR-3 to match Mission §C section numbering).
-             Per-variant row table sourced from closure.variation_feedback[];
-             append-only event log from closure.feedback_closure_records[].
-             "+ 记录发布事件" form posts to the existing
-             POST /api/matrix-script/closures/{task_id}/events with
-             event_kind ∈ D1_EVENT_KINDS + (optional)
-             review_zone ∈ REVIEW_ZONE_VALUES. No new endpoint, no
-             enum widening, no event mutation / deletion. RC-R8:
-             publish_url column renders blank when source field is
-             absent — never a fabricated URL. #}
+          
           <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-publish-feedback" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
@@ -1112,102 +1076,25 @@
               </div>
             </div>
             <p class="op-section-helper" data-role="ms-dc-block-e-subtitle">每个候选独立一行回填发布状态；事件日志 append-only，不可删除。</p>
-            {% set _e_rows = ms_pub_closure.variation_feedback or [] %}
-            {% set _e_records = ms_pub_closure.feedback_closure_records or [] %}
-            {% if _e_rows %}
-              <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse; margin-top:8px;"
-                     data-role="ms-dc-block-e-table"
-                     data-row-count="{{ _e_rows | length }}">
-                <thead>
-                  <tr>
-                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">候选</th>
-                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">发布状态</th>
-                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">链接</th>
-                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">最近事件</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for row in _e_rows %}
-                    {% set _idx = loop.index %}
-                    <tr data-role="ms-dc-block-e-row"
-                        data-variant-index="{{ _idx }}"
-                        data-publish-status="{{ row.publish_status }}">
-                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-e-row-variant-label">候选 {{ _idx }}</td>
-                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-e-row-publish-status">
-                        {% if row.publish_status == "published" %}
-                          <span class="info-pill ms-result-status__kind ms-result-status__kind--publishable_candidate">✓ 已发布</span>
-                        {% elif row.publish_status == "failed" %}
-                          <span class="info-pill ms-result-status__kind ms-result-status__kind--blocked_pending_publish_readiness">🚧 失败</span>
-                        {% elif row.publish_status == "retracted" %}
-                          <span class="info-pill ms-result-status__kind ms-result-status__kind--undetermined_pending_review">⊘ 已撤回</span>
-                        {% else %}
-                          <span class="info-pill ms-result-status__kind ms-result-status__kind--undetermined_pending_review">◐ 待发布</span>
-                        {% endif %}
-                      </td>
-                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-e-row-publish-url">
-                        {% if row.publish_url %}
-                          <a href="{{ row.publish_url }}" target="_blank" rel="noopener"
-                             data-role="ms-dc-block-e-row-publish-link">链接</a>
-                        {% else %}
-                          —
-                        {% endif %}
-                      </td>
-                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
-                          data-role="ms-dc-block-e-row-last-event"
-                          data-last-event-id="{{ row.last_event_id or '' }}">
-                        {{ row.last_event_id or "—" }}
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            {% else %}
+            
+            
+            
               <div class="muted" data-role="ms-dc-block-e-empty" style="margin-top:8px;">
                 尚未生成 closure 记录；初始化 closure 后此处将按 variation 出现回填行。
               </div>
-            {% endif %}
-            {# Append-only event log. Renders the closure
-               feedback_closure_records[] in original order; the closure
-               schema is append-only by contract — no mutation /
-               deletion affordance is rendered here. #}
+            
+            
             <h3 style="margin:14px 0 6px;" data-role="ms-dc-block-e-event-log-label">发布事件日志（append-only）</h3>
-            {% if _e_records %}
-              <ul style="margin:6px 0 0 18px; padding:0;"
-                  data-role="ms-dc-block-e-event-log"
-                  data-record-count="{{ _e_records | length }}">
-                {% for rec in _e_records %}
-                  <li data-role="ms-dc-block-e-event-log-row"
-                      data-event-id="{{ rec.event_id or '' }}"
-                      data-event-kind="{{ rec.event_kind }}"
-                      data-actor-kind="{{ rec.actor_kind or '' }}"
-                      data-recorded-at="{{ rec.recorded_at or '' }}">
-                    <span class="muted t-secondary" data-role="ms-dc-block-e-event-log-row-recorded-at">{{ rec.recorded_at or "—" }}</span>
-                    <span data-role="ms-dc-block-e-event-log-row-event-kind"><code>{{ rec.event_kind }}</code></span>
-                    {% if rec.variation_id %}<span data-role="ms-dc-block-e-event-log-row-variation"><code>{{ rec.variation_id }}</code></span>{% endif %}
-                    {% if rec.review_zone %}<span class="info-pill" data-role="ms-dc-block-e-event-log-row-review-zone" style="margin-left:4px;">{{ rec.review_zone }}</span>{% endif %}
-                  </li>
-                {% endfor %}
-              </ul>
-            {% else %}
+            
               <div class="muted" data-role="ms-dc-block-e-event-log-empty" style="margin-top:6px;">尚无事件记录</div>
-            {% endif %}
-            {# "+ 记录发布事件" form. Posts to the existing closure
-               endpoint with event_kind ∈ D1_EVENT_KINDS + (optional)
-               review_zone ∈ REVIEW_ZONE_VALUES. The form uses the
-               existing per-variation_id select (built client-side from
-               variation_feedback rows) so no new closed-enum is
-               authored. Disabled when the readiness banner is blocked
-               so operators cannot post a publish event before publish
-               readiness clears (per wireframe §8.5 closed precondition). #}
+            
+            
             <h3 style="margin:14px 0 6px;" data-role="ms-dc-block-e-record-form-label">+ 记录发布事件</h3>
-            {% if ms_pub_endpoint %}
+            
               <form data-role="ms-dc-block-e-record-form"
                     method="POST"
-                    action="{{ ms_pub_endpoint }}"
-                    data-publishable="{{ 'true' if ms_pub_readiness.publishable else 'false' }}"
+                    action="/api/matrix-script/closures/ms-prb-demo-001/events"
+                    data-publishable="false"
                     style="margin-top:6px;">
                 <input type="hidden" name="event_kind" value="operator_publish"
                        data-role="ms-dc-block-e-record-form-event-kind">
@@ -1217,9 +1104,7 @@
                   <span>候选（variation_id）</span>
                   <select name="variation_id" required
                           data-role="ms-dc-block-e-record-form-variation-id">
-                    {% for row in _e_rows %}
-                      <option value="{{ row.variation_id }}">候选 {{ loop.index }}</option>
-                    {% endfor %}
+                    
                   </select>
                 </label>
                 <label class="field" style="display:block;margin-bottom:6px;">
@@ -1238,25 +1123,21 @@
                 </label>
                 <button type="submit" class="btn-primary"
                         data-role="ms-dc-block-e-record-form-submit"
-                        {% if not ms_pub_readiness.publishable %}disabled aria-disabled="true"{% endif %}>
+                        disabled aria-disabled="true">
                   提交发布事件
                 </button>
-                {% if not ms_pub_readiness.publishable %}
+                
                   <span class="muted t-secondary" style="margin-left:6px;"
                         data-role="ms-dc-block-e-record-form-disabled-reason">发布门禁未通过 · 解除阻塞后再记录发布事件</span>
-                {% endif %}
+                
               </form>
-            {% endif %}
+            
             <div class="muted t-secondary" data-role="ms-dc-block-e-no-fake-publish-url-note" style="margin-top:6px;">
               本面板不展示伪造的 publish_url；publish_url 列仅在 closure 真实写入时渲染（RC-R8）。
             </div>
           </div>
 
-          {# Block F — 迭代建议 + 归档. Iteration recommendation lines
-             from publish_backfill_readiness rows (operator-language
-             gap_summary_zh + next_input_zh per variation). Archive
-             button posts an existing closure event — no new endpoint,
-             no record_kind widening (BG-5 / PG-4 deferred). #}
+          
           <div class="op-card op-card--accent-violet" data-role="matrix-script-block-f-iteration-archive" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
@@ -1264,92 +1145,12 @@
                 <h2 class="op-section-title" data-role="ms-dc-block-f-title">下一轮迭代建议 / 归档</h2>
               </div>
             </div>
-            <p class="op-section-helper" data-role="ms-dc-block-f-subtitle">{{ ms_pub_backfill.panel_subtitle_zh or "完成本轮发布后给出每个候选的下一步建议；不发明任务级指标。" }}</p>
-            {% if ms_pub_backfill.rows %}
-              <ul style="margin:8px 0 0 18px; padding:0;"
-                  data-role="ms-dc-block-f-iteration-list"
-                  data-row-count="{{ ms_pub_backfill.row_count or 0 }}"
-                  data-publishable-now-count="{{ ms_pub_backfill.publishable_now_count or 0 }}"
-                  data-gated-count="{{ ms_pub_backfill.gated_count or 0 }}"
-                  data-already-published-count="{{ ms_pub_backfill.already_published_count or 0 }}">
-                {% for row in ms_pub_backfill.rows %}
-                  {% set _idx = loop.index %}
-                  <li data-role="ms-dc-block-f-iteration-row"
-                      data-variant-index="{{ _idx }}"
-                      data-readiness-kind="{{ row.readiness_kind }}">
-                    <span data-role="ms-dc-block-f-iteration-row-label">候选 {{ _idx }}</span>
-                    · <span class="info-pill"
-                            data-role="ms-dc-block-f-iteration-row-readiness"
-                            data-readiness-kind="{{ row.readiness_kind }}">{{ row.readiness_label_zh }}</span>
-                    {% if row.gap_summary_zh %}
-                      <div class="muted t-secondary" data-role="ms-dc-block-f-iteration-row-gap-summary">{{ row.gap_summary_zh }}</div>
-                    {% endif %}
-                    {% if row.next_input_zh %}
-                      <div class="muted t-secondary" data-role="ms-dc-block-f-iteration-row-next-input">下一步: {{ row.next_input_zh }}</div>
-                    {% endif %}
-                  </li>
-                {% endfor %}
-              </ul>
-            {% else %}
+            <p class="op-section-helper" data-role="ms-dc-block-f-subtitle">完成本轮发布后给出每个候选的下一步建议；不发明任务级指标。</p>
+            
               <div class="muted" data-role="ms-dc-block-f-iteration-empty" style="margin-top:8px;">尚无可解释的变体（Phase B 未派生 / packet 未到位）。</div>
-            {% endif %}
-            {# Archive affordance — posts an existing closure event via
-               the standard POST /api/matrix-script/closures/{task_id}/events
-               endpoint. Implementation note (PR-4 conditional-pass
-               correction 2026-05-08): the wireframe §9.2 + slicing
-               addendum §7.4 RO-4.8 originally suggested
-               `event_kind == "operator_publish"` for the archive
-               event. The closure validator
-               (gateway/app/services/matrix_script/publish_feedback_closure.py
-               :198-210) ALWAYS overwrites
-               `variation_feedback[].publish_status` on
-               `operator_publish` — using it for archive would
-               un-publish already-published variations, which is a
-               state regression. Per the wireframe's
-               "(or system-decided)" parenthetical, this PR records
-               archive intent via `event_kind == "operator_note"`
-               (closed enum, no widening) with the operator-language
-               note text "归档此任务". The future
-               `record_kind == "archive_action"` event-shape
-               enrichment (PG-4) remains a follow-on closure schema
-               enhancement. The form is enabled when the closure has
-               at least one variation row (`_e_rows` non-empty);
-               otherwise the disabled fallback explains the
-               closure-existence prerequisite. #}
-            {% if _e_rows %}
-              <form data-role="ms-dc-block-f-archive-form"
-                    method="POST"
-                    action="{{ ms_pub_endpoint }}"
-                    style="margin-top:10px;">
-                <input type="hidden" name="event_kind" value="operator_note"
-                       data-role="ms-dc-block-f-archive-form-event-kind">
-                <input type="hidden" name="actor_kind" value="operator"
-                       data-role="ms-dc-block-f-archive-form-actor-kind">
-                <input type="hidden" name="operator_publish_notes" value="归档此任务"
-                       data-role="ms-dc-block-f-archive-form-notes">
-                <label class="field" style="display:inline-block;margin-right:8px;">
-                  <span>候选（variation_id）</span>
-                  <select name="variation_id" required
-                          data-role="ms-dc-block-f-archive-form-variation-id">
-                    {% for row in _e_rows %}
-                      <option value="{{ row.variation_id }}">候选 {{ loop.index }}</option>
-                    {% endfor %}
-                  </select>
-                </label>
-                <button type="submit"
-                        class="btn-secondary"
-                        data-role="ms-dc-block-f-archive-button">
-                  归档此任务
-                </button>
-                <span class="muted t-secondary" style="margin-left:6px;"
-                      data-role="ms-dc-block-f-archive-form-status"></span>
-                <span class="muted t-secondary" style="margin-left:6px;"
-                      data-role="ms-dc-block-f-archive-form-explanation">
-                  归档意图通过 closure operator_note 记录在所选候选行；
-                  明确的 record_kind == archive_action（PG-4）将由后续 closure 增补落地。
-                </span>
-              </form>
-            {% else %}
+            
+            
+            
               <div class="task-actions" data-role="ms-dc-block-f-archive-actions" style="margin-top:10px;">
                 <button type="button"
                         class="btn-secondary"
@@ -1359,19 +1160,14 @@
                   归档此任务
                 </button>
               </div>
-            {% endif %}
+            
             <div class="muted t-secondary" data-role="ms-dc-block-f-no-invented-truth-note" style="margin-top:6px;">
               本面板不发明任务级真值；建议来自既有 publish_backfill_readiness 投射，不基于尚未上线的指标分析（BG-5 待 Plan E 后续阶段）。
             </div>
           </div>
-        {% endif %}
+        
 
-        {# JS-hydrated comprehension shell — legacy diagnostic surface
-           preserved for tooling / tests but visually demoted into a
-           collapsed-by-default details. The operator surface above
-           (Block A-F) already covers all operator-relevant info; this
-           shell only renders when the publish-hub fetch payload carries
-           matrix_script_delivery_comprehension. #}
+        
         <details class="op-collapse" data-role="op-console-ms-delivery-comprehension-fold">
           <summary>矩阵脚本 · 交付中心理解（旧版诊断层 · 可展开）</summary>
           <div class="op-collapse__hint">仅当 publish_hub 返回 matrix_script_delivery_comprehension 时由 JS 填充；面向架构师 / 质检的只读重述。</div>
@@ -1419,26 +1215,10 @@
           </div>
         </details>
 
-        {# OWC-MS-RO PR-1 follow-up correction (PR #159 conditional-pass blocker
-           closure 2026-05-08): stable anchor `id="publish-feedback"` makes the
-           Task Area "打开发布反馈" button href `/tasks/{id}/publish#publish-feedback`
-           land on a real DOM target. The anchor lives inside the existing
-           `{% if _ms_kind == "matrix_script" %}` gate so Hot Follow / Digital Anchor
-           / baseline publish hubs do NOT carry this anchor (their card branches
-           remain bytewise unchanged). The anchor sits as an empty sibling above
-           the existing `matrix-script-closure-block` card so the Recovery PR-3 JS
-           reference at `document.getElementById("matrix-script-closure-block")`
-           keeps working unchanged. Authority:
-           docs/design/matrix_script_task_area_wireframe_v1.md §4.2 (jump button)
-           + docs/design/matrix_script_result_oriented_ui_plan_v1.md §11.3 (IG-1
-           closure path). #}
+        
         <a id="publish-feedback" aria-hidden="true" tabindex="-1"
            data-role="matrix-script-publish-feedback-anchor"></a>
-        {# Recovery PR-3: Matrix Script publish-feedback closure operator surface.
-           Per docs/contracts/matrix_script/publish_feedback_closure_contract_v1.md,
-           the closure is a separate ownership zone (Phase D); operator events flow
-           through POST /api/matrix-script/closures/{task_id}/events. Server-rendered
-           container + JS-driven row population from data.matrix_script_publish_feedback_closure. #}
+        
         <div class="card" id="matrix-script-closure-block"
              data-role="matrix-script-closure" style="margin-top:10px;">
           <div class="section-title">
@@ -1508,14 +1288,7 @@
           <ul data-role="ms-closure-events-recent" class="muted" style="margin:6px 0 0 18px;"></ul>
         </div>
 
-        {# Legacy MS PR-3 / RC PR-4 JS-hydrated diagnostic shells —
-           copy_bundle / 多渠道回填 / 发布-回填就绪解释. The operator
-           surface (Block A-F + closure block above) already exposes
-           the relevant payload to operators; these shells stay for
-           tooling / tests but are visually demoted into a single
-           collapsed details so they no longer compete with the
-           operator surface. JS continues to populate them when the
-           publish-hub fetch payload carries the corresponding bundle. #}
+        
         <details class="op-collapse" data-role="op-console-ms-secondary-shells-fold">
           <summary>矩阵脚本 · 交付层 JS 诊断壳（copy_bundle / 多渠道回填 / 就绪解释 · 可展开）</summary>
           <div class="op-collapse__hint">JS 在 publish_hub 加载后按需填充；展开仅用于核对 PR-3 / RC PR-4 的 lane 投射。</div>
@@ -1560,217 +1333,13 @@
           </div>
         </details>
 
-          </div> {# /op-collapse__body for PR-B technical diagnostics #}
-        </details> {# /op-console-ms-dc-technical-diagnostics-fold (PR-B Section 7) #}
-      {% endif %}
+          </div> 
+        </details> 
+      
 
-      {# Recovery PR-4: Digital Anchor publish-feedback closure operator surface.
-         Per docs/contracts/digital_anchor/publish_feedback_closure_contract_v1.md +
-         publish_feedback_writeback_contract_v1.md, the closure is a separate
-         ownership zone (Phase D). Operator events flow through
-         POST /api/digital-anchor/closures/{task_id}/{role-feedback,segment-feedback,publish-closure}.
-         Server-rendered container + JS-driven row population from
-         data.digital_anchor_publish_feedback_closure. Hot Follow / Matrix Script
-         publish hubs render unchanged. #}
-      {% set _da_kind = (task.category_key or task.kind or task.platform or "") | lower %}
-      {% if _da_kind == "digital_anchor" %}
-        {# Legacy DA PR-3 JS-hydrated diagnostic shells — Delivery Pack
-           lanes (DA-W8) + 多渠道回填 (DA-W9). The operator surface
-           (DA closure block below) already exposes the operator-relevant
-           channel/account fields; these JS-hydrated shells stay for
-           tooling / tests but are visually demoted into a single
-           collapsed details so they no longer compete with the operator
-           surface. JS continues to populate them when the publish-hub
-           fetch payload carries the corresponding bundle. #}
-        <details class="op-collapse" data-role="op-console-da-secondary-shells-fold">
-          <summary>数字人口播 · 交付层 JS 诊断壳（Delivery Pack / 多渠道回填 · 可展开）</summary>
-          <div class="op-collapse__hint">JS 在 publish_hub 加载后按需填充；展开仅用于核对 DA-W8 / DA-W9 的 lane 投射。</div>
-          <div class="op-collapse__body">
-            <div class="card" id="digital-anchor-delivery-pack-block"
-                 data-role="digital-anchor-delivery-pack" style="margin-top:10px; display:none;">
-              <div class="section-title">
-                <h2 data-role="da-delivery-pack-title">Digital Anchor · 交付中心 · Delivery Pack</h2>
-                <div class="secondary" data-role="da-delivery-pack-subtitle"></div>
-              </div>
-
-              <div class="card" style="margin-top:10px; border:1px solid #2563eb; background:#eff6ff;"
-                   data-role="da-delivery-pack-final-video-primary">
-                <div class="section-title">
-                  <h2 data-role="da-delivery-pack-final-video-label"></h2>
-                  <div class="secondary" data-role="da-delivery-pack-final-video-status"></div>
-                </div>
-                <div class="muted" data-role="da-delivery-pack-final-video-explanation"></div>
-                <div class="muted t-secondary" data-role="da-delivery-pack-final-video-tracked-gap"></div>
-              </div>
-
-              <h3 style="margin:14px 0 6px;" data-role="da-delivery-pack-lanes-label">交付分区</h3>
-              <div class="muted t-secondary" data-role="da-delivery-pack-legend" style="margin-bottom:6px;"></div>
-              <div data-role="da-delivery-pack-lanes" style="margin-top:6px;"></div>
-
-              <div class="muted" data-role="da-delivery-pack-tracked-gap-summary" style="margin-top:8px;"></div>
-            </div>
-
-            <div class="card" id="digital-anchor-delivery-backfill-block"
-                 data-role="digital-anchor-delivery-backfill" style="margin-top:10px; display:none;">
-              <div class="section-title">
-                <h2 data-role="da-delivery-backfill-title">Digital Anchor · 交付中心 · 多渠道回填</h2>
-                <div class="secondary" data-role="da-delivery-backfill-subtitle"></div>
-              </div>
-              <div class="muted" data-role="da-delivery-backfill-legend" style="margin-top:6px;"></div>
-              <div data-role="da-delivery-backfill-lanes" style="margin-top:8px;"></div>
-              <div class="muted" data-role="da-delivery-backfill-empty" style="display:none; margin-top:8px;">
-                尚未生成 closure 记录；初始化 closure 后此处将按 row_scope（role / segment）出现回填行。
-              </div>
-              <div class="muted" data-role="da-delivery-backfill-tracked-gap" style="margin-top:8px;"></div>
-            </div>
-          </div>
-        </details>
-
-        <div class="op-card op-card--accent-blue" id="digital-anchor-closure-block"
-             data-role="digital-anchor-closure" style="margin-top:10px;">
-          <div class="op-section-head">
-            <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--blue">交付 · 反馈</span>
-              <h2 class="op-section-title">数字人口播 · 发布反馈与归档</h2>
-              <span class="op-pill op-pill--anchor"><span class="op-pill__dot"></span>数字人口播</span>
-            </div>
-          </div>
-          <p class="op-section-helper">按 role / segment 双层反馈回填发布状态；所有写回严格遵循封闭 closure 规约（<code>digital_anchor_publish_feedback_closure_v1</code> + <code>digital_anchor_publish_feedback_writeback_v1</code>）。</p>
-
-          <h3 style="margin:14px 0 6px;">role_feedback[]</h3>
-          <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;">
-            <thead>
-              <tr>
-                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">role_id</th>
-                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">display_name</th>
-                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">role_feedback_kind</th>
-                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">linked_segments</th>
-              </tr>
-            </thead>
-            <tbody data-role="da-role-rows"></tbody>
-          </table>
-
-          <h3 style="margin:14px 0 6px;">segment_feedback[]</h3>
-          <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;">
-            <thead>
-              <tr>
-                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">segment_id</th>
-                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">binds_role_id</th>
-                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">segment_feedback_kind</th>
-                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">script_ref</th>
-              </tr>
-            </thead>
-            <tbody data-role="da-segment-rows"></tbody>
-          </table>
-
-          <div class="copy-row" style="margin-top:10px; gap:8px;">
-            <button id="btn-da-closure-init" type="button" class="btn-secondary">初始化 closure</button>
-            <span id="da-closure-status" class="muted"></span>
-          </div>
-
-          <h3 style="margin:14px 0 6px;">提交 role 反馈</h3>
-          <form id="da-role-feedback-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
-            <label class="field">
-              <span>role_id</span>
-              <input type="text" name="role_id" required />
-            </label>
-            <label class="field">
-              <span>role_feedback_kind</span>
-              <select name="role_feedback_kind" required>
-                <option value="accepted">accepted</option>
-                <option value="needs_revision">needs_revision</option>
-                <option value="not_used">not_used</option>
-              </select>
-            </label>
-            <label class="field" style="grid-column: 1 / -1;">
-              <span>role_feedback_note（可选）</span>
-              <textarea name="role_feedback_note" rows="2"></textarea>
-            </label>
-            <div class="copy-row" style="grid-column: 1 / -1;">
-              <button type="submit" class="btn-primary">提交 role 反馈</button>
-              <span id="da-role-feedback-status" class="muted"></span>
-            </div>
-          </form>
-
-          <h3 style="margin:14px 0 6px;">提交 segment 反馈</h3>
-          <form id="da-segment-feedback-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
-            <label class="field">
-              <span>segment_id</span>
-              <input type="text" name="segment_id" required />
-            </label>
-            <label class="field">
-              <span>segment_feedback_kind</span>
-              <select name="segment_feedback_kind" required>
-                <option value="accepted">accepted</option>
-                <option value="needs_revision">needs_revision</option>
-                <option value="not_used">not_used</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>audio_feedback_note</span>
-              <input type="text" name="audio_feedback_note" />
-            </label>
-            <label class="field">
-              <span>lip_sync_feedback_note</span>
-              <input type="text" name="lip_sync_feedback_note" />
-            </label>
-            <label class="field" style="grid-column: 1 / -1;">
-              <span>subtitle_feedback_note</span>
-              <input type="text" name="subtitle_feedback_note" />
-            </label>
-            <div class="copy-row" style="grid-column: 1 / -1;">
-              <button type="submit" class="btn-primary">提交 segment 反馈</button>
-              <span id="da-segment-feedback-status" class="muted"></span>
-            </div>
-          </form>
-
-          <h3 style="margin:14px 0 6px;">D.1 publish 反馈写回（active path）</h3>
-          <div class="muted t-secondary" style="margin-bottom:6px;">
-            按 <code>publish_feedback_writeback_contract_v1</code> §"Closed write-back event set"。
-            事件按 <code>row_scope</code>(role/segment) + <code>row_id</code> 定位单行；
-            <code>publish_status</code> ∈ {pending, published, failed, retracted}。
-          </div>
-          <form id="da-d1-event-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
-            <label class="field">
-              <span>event_kind</span>
-              <select name="event_kind" id="da-d1-event-kind" required>
-                <option value="publish_attempted">publish_attempted（operator）</option>
-                <option value="publish_accepted">publish_accepted（platform）</option>
-                <option value="publish_rejected">publish_rejected（platform）</option>
-                <option value="publish_retracted">publish_retracted（operator）</option>
-                <option value="metrics_snapshot">metrics_snapshot（platform）</option>
-                <option value="operator_note">operator_note（operator）</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>row_scope</span>
-              <select name="row_scope" required>
-                <option value="role">role</option>
-                <option value="segment">segment</option>
-              </select>
-            </label>
-            <label class="field">
-              <span>row_id（role_id 或 segment_id）</span>
-              <input type="text" name="row_id" required />
-            </label>
-            <label class="field" data-role="da-d1-payload-publish-url">
-              <span>payload.publish_url（仅 publish_accepted）</span>
-              <input type="url" name="publish_url" />
-            </label>
-            <label class="field" data-role="da-d1-payload-note" style="grid-column: 1 / -1; display:none;">
-              <span>payload.note（operator_note）</span>
-              <textarea name="note" rows="2"></textarea>
-            </label>
-            <div class="copy-row" style="grid-column: 1 / -1;">
-              <button type="submit" class="btn-primary">写入 D.1 事件</button>
-              <span id="da-d1-event-status" class="muted"></span>
-            </div>
-          </form>
-
-          <h3 style="margin:14px 0 6px;">最近事件（append-only）</h3>
-          <ul data-role="da-closure-events-recent" class="muted" style="margin:6px 0 0 18px;"></ul>
-        </div>
-      {% endif %}
+      
+      
+      
 
       <div class="card" data-role="operator-publish-gate-strip">
         <div class="section-title">
@@ -1791,72 +1360,72 @@
       </div>
       <div class="card">
         <div class="section-title">
-          <h2>{{ t("publish.deliverables.title") }}</h2>
-          <div class="secondary">{{ t("publish.deliverables.desc") }}</div>
+          <h2>publish.deliverables.title</h2>
+          <div class="secondary">publish.deliverables.desc</div>
         </div>
         <div id="deliverables-list" class="copy-row" style="margin-top:12px;"></div>
         <div class="muted" id="deliverables-empty" style="margin-top:8px; display:none;">
-          {{ t("publish.deliverables.empty") }}
+          publish.deliverables.empty
         </div>
         <div class="copy-row" style="margin-top:12px;">
-          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.bundle") }}</a>
+          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">publish.deliverables.bundle</a>
         </div>
         <div class="copy-row" style="margin-top:12px;">
           <img id="qr-image" alt="QR" style="width:180px;height:180px;border:1px solid #e5e7eb;background:#fff;" />
-          <div class="muted">{{ t("publish.deliverables.qr") }}</div>
+          <div class="muted">publish.deliverables.qr</div>
         </div>
         <div class="copy-row" style="margin-top:6px;">
-          <a id="qr-link" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.open_link") }}</a>
-          <button type="button" class="copy-btn" data-copy-target="qr-link">{{ t("publish.deliverables.copy_link") }}</button>
+          <a id="qr-link" href="#" target="_blank" rel="noopener">publish.deliverables.open_link</a>
+          <button type="button" class="copy-btn" data-copy-target="qr-link">publish.deliverables.copy_link</button>
         </div>
         <div class="copy-row" style="margin-top:6px;">
-          <a id="short-link" href="#" target="_blank" rel="noopener">{{ t("publish.deliverables.short_link") }}</a>
-          <button type="button" class="copy-btn" data-copy-target="short-link">{{ t("publish.deliverables.copy_short") }}</button>
+          <a id="short-link" href="#" target="_blank" rel="noopener">publish.deliverables.short_link</a>
+          <button type="button" class="copy-btn" data-copy-target="short-link">publish.deliverables.copy_short</button>
         </div>
       </div>
     </div>
 <div class="tab-panel" id="tab-archive">
       <div class="card">
         <div class="section-title">
-          <h2>{{ t("publish.archive.title") }}</h2>
-          <div class="secondary">{{ t("publish.archive.desc") }}</div>
+          <h2>publish.archive.title</h2>
+          <div class="secondary">publish.archive.desc</div>
         </div>
         <div class="info-row">
           <div class="info-pill">
-            {{ t("publish.archive.published_at") }}: <span id="published-at">-</span>
+            publish.archive.published_at: <span id="published-at">-</span>
           </div>
         </div>
         <div class="section-grid" style="margin-top:12px;">
           <div class="field">
-            <label>{{ t("publish.archive.location") }}</label>
+            <label>publish.archive.location</label>
             <input id="archive-location" class="publish-textarea" style="min-height:0;height:36px;" />
           </div>
           <div class="field">
-            <label>{{ t("publish.archive.status") }}</label>
+            <label>publish.archive.status</label>
             <input id="archive-status" class="publish-textarea" style="min-height:0;height:36px;" />
           </div>
           <div class="field">
-            <label>{{ t("publish.archive.published") }}</label>
+            <label>publish.archive.published</label>
             <div class="copy-row">
               <input type="checkbox" id="archive-published" />
-              <span class="muted">{{ t("publish.archive.published_hint") }}</span>
+              <span class="muted">publish.archive.published_hint</span>
             </div>
           </div>
           <div class="field">
-            <label>{{ t("publish.archive.download_url") }}</label>
+            <label>publish.archive.download_url</label>
             <div class="copy-row">
               <input id="archive-download-url" class="publish-textarea" style="min-height:0;height:36px;" />
-              <a id="archive-download-link" class="btn-secondary" href="#" target="_blank" rel="noopener">{{ t("publish.archive.open") }}</a>
+              <a id="archive-download-link" class="btn-secondary" href="#" target="_blank" rel="noopener">publish.archive.open</a>
             </div>
           </div>
           <div class="field">
-            <label>{{ t("publish.archive.key") }}</label>
+            <label>publish.archive.key</label>
             <input id="archive-key" class="publish-textarea" style="min-height:0;height:36px;" />
           </div>
         </div>
         <div class="action-row" style="margin-top:12px;">
-          <button id="archive-save-btn" class="btn-primary">{{ t("publish.archive.save") }}</button>
-          <button id="publish-btn" class="btn-success">{{ t("publish.archive.submit") }}</button>
+          <button id="archive-save-btn" class="btn-primary">publish.archive.save</button>
+          <button id="publish-btn" class="btn-success">publish.archive.submit</button>
           <span id="archive-save-status" class="muted"></span>
         </div>
       </div>
@@ -1864,8 +1433,8 @@
 
   <script src="/static/js/i18n_v185.js"></script>
   <script>
-    const TASK_ID = "{{ task.task_id }}";
-    const TASK_KIND = "{{ task.category_key or task.kind or task.platform or '' }}";
+    const TASK_ID = "ms-prb-demo-001";
+    const TASK_KIND = "matrix_script";
     const OP_KEY_STORAGE = "op_access_key";
     const LANG_STORAGE = "ui_lang_publish_hub";
 
