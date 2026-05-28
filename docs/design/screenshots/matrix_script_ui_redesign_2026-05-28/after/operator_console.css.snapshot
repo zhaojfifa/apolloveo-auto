@@ -1,0 +1,738 @@
+/* ApolloVeo · Operator Console additive layer.
+ *
+ * Builds on top of /static/css/ui_v185.css. Pure presentation. No identifiers
+ * here are referenced by tests; all behavior keeps working through existing
+ * data-role markers in the templates. The Apollo color base is preserved:
+ *   - emerald  #047857  (Matrix Script accent)
+ *   - blue     #2563eb  (Digital Anchor accent)
+ *   - indigo   #4f46e5  (primary action)
+ *   - amber    #b45309 / #f59e0b (blocker / pending)
+ *   - rose     #b91c1c  (failure)
+ *   - slate    #111827 #334155 #64748b #94a3b8 (text scale)
+ *   - bg       #f8fafc  (page) / #ffffff (card) / #f1f5f9 (chip)
+ *   - border   #e5e7eb  (card) / #cbd5e1 (input)
+ */
+
+:root {
+  --op-fg:        #0f172a;
+  --op-fg-mid:    #334155;
+  --op-fg-soft:   #64748b;
+  --op-fg-muted:  #94a3b8;
+  --op-bg:        #f8fafc;
+  --op-card-bg:   #ffffff;
+  --op-card-bd:   #e5e7eb;
+  --op-chip-bg:   #f1f5f9;
+
+  --op-emerald:   #047857;
+  --op-emerald-bg:#ecfdf5;
+  --op-emerald-bd:#a7f3d0;
+  --op-blue:      #1d4ed8;
+  --op-blue-bg:   #eff6ff;
+  --op-blue-bd:   #bfdbfe;
+  --op-indigo:    #4338ca;
+  --op-indigo-bg: #eef2ff;
+  --op-indigo-bd: #c7d2fe;
+  --op-amber:     #b45309;
+  --op-amber-bg:  #fffbeb;
+  --op-amber-bd:  #fde68a;
+  --op-rose:      #b91c1c;
+  --op-rose-bg:   #fef2f2;
+  --op-rose-bd:   #fecaca;
+  --op-violet:    #6d28d9;
+  --op-violet-bg: #f5f3ff;
+  --op-violet-bd: #ddd6fe;
+  --op-slate-bg:  #f1f5f9;
+  --op-slate-bd:  #e2e8f0;
+}
+
+/* ---------- Stage strip / breadcrumb ---------- */
+
+.op-stage-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--op-card-bd);
+  background: var(--op-card-bg);
+  border-radius: 12px;
+  flex-wrap: wrap;
+}
+.op-stage-strip__step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--op-fg-soft);
+  white-space: nowrap;
+}
+.op-stage-strip__num {
+  display: inline-flex;
+  width: 20px; height: 20px;
+  align-items: center; justify-content: center;
+  border-radius: 999px;
+  background: var(--op-slate-bg);
+  color: var(--op-fg-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+.op-stage-strip__step[data-state="done"]    .op-stage-strip__num { background: var(--op-emerald); color: #fff; }
+.op-stage-strip__step[data-state="active"]  .op-stage-strip__num { background: var(--op-indigo); color: #fff; box-shadow: 0 0 0 4px var(--op-indigo-bg); }
+.op-stage-strip__step[data-state="active"]  { color: var(--op-fg); font-weight: 700; }
+.op-stage-strip__step[data-state="done"]    { color: var(--op-fg-mid); }
+.op-stage-strip__sep {
+  flex: 0 1 24px;
+  height: 1px;
+  background: var(--op-slate-bd);
+}
+
+/* ---------- Operator card ---------- */
+
+.op-card {
+  background: var(--op-card-bg);
+  border: 1px solid var(--op-card-bd);
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin: 14px 0;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.op-card--accent-emerald { border-left: 4px solid var(--op-emerald); }
+.op-card--accent-blue    { border-left: 4px solid var(--op-blue); }
+.op-card--accent-indigo  { border-left: 4px solid var(--op-indigo); }
+.op-card--accent-amber   { border-left: 4px solid var(--op-amber); }
+.op-card--accent-violet  { border-left: 4px solid var(--op-violet); }
+
+/* ---------- Operator section title ---------- */
+
+.op-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.op-section-head__main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.op-section-index {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--op-indigo-bg);
+  color: var(--op-indigo);
+}
+.op-section-index--emerald { background: var(--op-emerald-bg); color: var(--op-emerald); }
+.op-section-index--blue    { background: var(--op-blue-bg);    color: var(--op-blue); }
+.op-section-index--violet  { background: var(--op-violet-bg);  color: var(--op-violet); }
+.op-section-index--amber   { background: var(--op-amber-bg);   color: var(--op-amber); }
+.op-section-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--op-fg);
+  margin: 0;
+}
+.op-section-helper {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--op-fg-soft);
+  line-height: 1.5;
+}
+.op-section-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* ---------- Operator pill (status chip) ---------- */
+
+.op-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  background: var(--op-slate-bg);
+  color: var(--op-fg-mid);
+  white-space: nowrap;
+}
+.op-pill--ready    { background: var(--op-emerald-bg); color: var(--op-emerald); border-color: var(--op-emerald-bd); }
+.op-pill--blocked  { background: var(--op-amber-bg);   color: var(--op-amber);   border-color: var(--op-amber-bd); }
+.op-pill--review   { background: var(--op-violet-bg);  color: var(--op-violet);  border-color: var(--op-violet-bd); }
+.op-pill--info     { background: var(--op-indigo-bg);  color: var(--op-indigo);  border-color: var(--op-indigo-bd); }
+.op-pill--neutral  { background: var(--op-slate-bg);   color: var(--op-fg-mid);  border-color: var(--op-slate-bd); }
+.op-pill--danger   { background: var(--op-rose-bg);    color: var(--op-rose);    border-color: var(--op-rose-bd); }
+.op-pill--matrix   { background: var(--op-emerald-bg); color: var(--op-emerald); border-color: var(--op-emerald-bd); }
+.op-pill--anchor   { background: var(--op-blue-bg);    color: var(--op-blue);    border-color: var(--op-blue-bd); }
+.op-pill__dot {
+  width: 6px; height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+/* ---------- Operator action banner (next-step / blocker call-out) ---------- */
+
+.op-banner {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  margin-top: 12px;
+}
+.op-banner--blocker { background: var(--op-amber-bg);  border: 1px solid var(--op-amber-bd);  color: #7c2d12; }
+.op-banner--next    { background: var(--op-indigo-bg); border: 1px solid var(--op-indigo-bd); color: #1e1b4b; }
+.op-banner--ready   { background: var(--op-emerald-bg);border: 1px solid var(--op-emerald-bd);color: #064e3b; }
+.op-banner--review  { background: var(--op-violet-bg); border: 1px solid var(--op-violet-bd); color: #4c1d95; }
+.op-banner__title {
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.op-banner__body { color: inherit; }
+
+/* ---------- Operator meta grid (subject / audience / language / platform) ---------- */
+
+.op-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 18px;
+}
+.op-meta-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 14px;
+  color: var(--op-fg-mid);
+  min-width: 0;
+}
+.op-meta-item__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--op-fg-soft);
+}
+.op-meta-item__value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--op-fg);
+  word-break: break-word;
+}
+
+/* ---------- Hook / Body / CTA cards ---------- */
+
+.op-script-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+.op-script-card {
+  border: 1px solid var(--op-slate-bd);
+  border-radius: 10px;
+  background: #fbfdff;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.op-script-card__tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+.op-script-card__tag--hook { background: var(--op-rose-bg);    color: var(--op-rose); }
+.op-script-card__tag--body { background: var(--op-indigo-bg);  color: var(--op-indigo); }
+.op-script-card__tag--cta  { background: var(--op-emerald-bg); color: var(--op-emerald); }
+.op-script-card__tag--keyword { background: var(--op-blue-bg);  color: var(--op-blue); }
+.op-script-card__tag--banword { background: var(--op-amber-bg); color: var(--op-amber); }
+.op-script-card__body {
+  color: var(--op-fg);
+  font-size: 14px;
+  line-height: 1.55;
+}
+.op-script-card__empty {
+  color: var(--op-fg-soft);
+  font-size: 13px;
+  font-style: italic;
+}
+
+/* ---------- Variant table ---------- */
+
+.op-variant-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  margin-top: 10px;
+}
+.op-variant-table thead th {
+  text-align: left;
+  padding: 8px 10px;
+  background: var(--op-slate-bg);
+  color: var(--op-fg-soft);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--op-slate-bd);
+}
+.op-variant-table tbody td {
+  padding: 10px;
+  border-bottom: 1px solid var(--op-slate-bd);
+  color: var(--op-fg-mid);
+  vertical-align: top;
+}
+.op-variant-table tbody tr:last-child td { border-bottom: 0; }
+.op-variant-table tbody tr.is-recommended { background: var(--op-amber-bg); }
+.op-variant-table tbody tr.is-recommended td:first-child { font-weight: 700; color: var(--op-fg); }
+
+/* ---------- Candidate review cards ---------- */
+
+.op-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin-top: 8px;
+}
+.op-candidate {
+  border: 1px solid var(--op-slate-bd);
+  border-radius: 12px;
+  background: #fff;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.op-candidate.is-recommended {
+  border-color: var(--op-amber);
+  background: linear-gradient(180deg, #fffbeb 0%, #ffffff 70%);
+  box-shadow: 0 2px 6px rgba(180, 83, 9, 0.08);
+}
+.op-candidate__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.op-candidate__title {
+  font-weight: 700;
+  color: var(--op-fg);
+  font-size: 15px;
+}
+.op-candidate__preview {
+  border: 1px dashed var(--op-card-bd);
+  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 8px;
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--op-fg-soft);
+}
+.op-candidate__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.op-candidate__chips strong {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--op-fg-soft);
+  letter-spacing: 0.04em;
+  margin-right: 4px;
+  align-self: center;
+}
+.op-candidate__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ---------- Deliverable list ---------- */
+
+.op-deliverable-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.op-deliverable {
+  border: 1px solid var(--op-slate-bd);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fbfdff;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.op-deliverable__name {
+  font-weight: 700;
+  color: var(--op-fg);
+  font-size: 13px;
+}
+.op-deliverable__meta {
+  font-size: 12px;
+  color: var(--op-fg-soft);
+}
+.op-deliverable[data-required-class="blocking"]    { border-left: 3px solid var(--op-amber); }
+.op-deliverable[data-required-class="non_blocking"]{ border-left: 3px solid var(--op-slate-bd); }
+.op-deliverable[data-artifact-status="resolved"]   { border-left-color: var(--op-emerald); }
+
+/* ---------- Collapsible "技术诊断" wrapper ---------- */
+
+.op-collapse {
+  margin-top: 16px;
+  border: 1px dashed var(--op-card-bd);
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: #fafafa;
+}
+.op-collapse > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--op-fg-soft);
+  font-size: 13px;
+  list-style: none;
+}
+.op-collapse > summary::-webkit-details-marker { display: none; }
+.op-collapse > summary::before {
+  content: "▸ ";
+  color: var(--op-fg-soft);
+  margin-right: 4px;
+}
+.op-collapse[open] > summary::before { content: "▾ "; }
+.op-collapse > .op-collapse__hint {
+  font-size: 12px;
+  color: var(--op-fg-muted);
+  margin-top: 4px;
+}
+.op-collapse > .op-collapse__body {
+  margin-top: 10px;
+  border-top: 1px solid var(--op-slate-bd);
+  padding-top: 10px;
+}
+
+/* ---------- Helper text de-emphasis (used by panels that previously
+   crammed architectural disclaimers into the operator surface) ---------- */
+.op-tech-note {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--op-fg-muted);
+  line-height: 1.5;
+}
+
+/* ---------- Page header for line-aware workbench / delivery ---------- */
+.op-page-head {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.op-page-head__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+.op-page-head__title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--op-fg);
+  margin: 0;
+}
+.op-page-head__line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--op-fg-soft);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.op-page-head__sub {
+  color: var(--op-fg-soft);
+  font-size: 13px;
+}
+
+/* ============================================================
+ * Task Area · operator-console rebuild
+ * ============================================================
+ *
+ * Wraps the legacy `task-card` class (in tasks.html) with an
+ * operator-friendly card shell. The legacy `task-card`/
+ * `task-card__left`/`task-card__right` classes stay so the
+ * existing filter JS and structural tests keep working — these
+ * `op-task-*` classes layer on top.
+ */
+
+.op-task-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  gap: 18px;
+  background: var(--op-card-bg);
+  border: 1px solid var(--op-card-bd);
+  border-radius: 14px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.op-task-card:hover {
+  border-color: rgba(15, 23, 42, 0.18);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+.op-task-card[data-line="matrix_script"] { border-left: 4px solid var(--op-emerald); }
+.op-task-card[data-line="digital_anchor"] { border-left: 4px solid var(--op-blue); }
+
+@media (max-width: 880px) {
+  .op-task-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+.op-task-card__left {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.op-task-card__top {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  min-width: 0;
+}
+.op-task-card__cover {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 100%);
+  flex-shrink: 0;
+  object-fit: cover;
+}
+.op-task-card__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+.op-task-card__line-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.op-task-card__line-tag--matrix  { color: var(--op-emerald); }
+.op-task-card__line-tag--anchor  { color: var(--op-blue); }
+.op-task-card__line-tag--baseline{ color: var(--op-fg-soft); }
+.op-task-card__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--op-fg);
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+.op-task-card__id-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 12px;
+  color: var(--op-fg-soft);
+  align-items: center;
+}
+.op-task-card__id-row code {
+  background: var(--op-slate-bg);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+/* The "production-state" mid-card — labelled fields rendered inline */
+.op-task-state {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 14px;
+  padding: 10px 12px;
+  background: #fbfdff;
+  border: 1px solid var(--op-slate-bd);
+  border-radius: 8px;
+}
+.op-task-state__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.op-task-state__label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--op-fg-muted);
+}
+.op-task-state__value {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--op-fg);
+  word-break: break-word;
+  line-height: 1.4;
+}
+.op-task-state__value--soft {
+  font-weight: 500;
+  color: var(--op-fg-mid);
+}
+.op-task-state__value--mono {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+}
+
+/* The result banner row inside a task card — operator-language status */
+.op-task-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.op-task-banner--ready    { background: var(--op-emerald-bg); border:1px solid var(--op-emerald-bd); color:#064e3b; }
+.op-task-banner--blocked  { background: var(--op-amber-bg);   border:1px solid var(--op-amber-bd);   color:#7c2d12; }
+.op-task-banner--review   { background: var(--op-violet-bg);  border:1px solid var(--op-violet-bd);  color:#4c1d95; }
+.op-task-banner--info     { background: var(--op-indigo-bg);  border:1px solid var(--op-indigo-bd);  color:#1e1b4b; }
+.op-task-banner__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-weight: 700;
+}
+.op-task-banner__next {
+  color: inherit;
+  font-weight: 500;
+  opacity: 0.92;
+}
+
+/* Lanes row — 脚本任务 / 变体任务 / 发布任务 */
+.op-task-lanes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+.op-task-lanes__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--op-fg-muted);
+  margin-right: 4px;
+}
+.op-task-lanes__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--op-slate-bg);
+  border: 1px solid var(--op-slate-bd);
+  color: var(--op-fg-mid);
+  font-weight: 600;
+  font-size: 11px;
+}
+.op-task-lanes__chip strong { color: var(--op-fg); font-weight: 700; }
+
+/* Right column inside a task card — stacked badges + actions */
+.op-task-card__right {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.op-task-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.op-task-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  align-items: stretch;
+}
+.op-task-card__actions a,
+.op-task-card__actions button {
+  text-align: center;
+  white-space: nowrap;
+}
+.op-task-card__actions .btn-primary,
+.op-task-card__actions .btn-secondary {
+  display: inline-flex;
+  justify-content: center;
+  font-size: 12px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+}
+
+@media (max-width: 880px) {
+  .op-task-card__right {
+    align-items: stretch;
+  }
+  .op-task-card__badges {
+    justify-content: flex-start;
+  }
+}
+
+/* Stage badge polish — matches the existing stage-badge data-role
+ * but adds operator-language colouring tied to publish-readiness. */
+.op-task-card .stage-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--op-slate-bg);
+  color: var(--op-fg-mid);
+  border: 1px solid var(--op-slate-bd);
+}
+.op-task-card .stage-badge[data-stage="archived"]      { background: var(--op-slate-bg); }
+.op-task-card .stage-badge[data-stage="backfilled"]    { background: var(--op-blue-bg);    color: var(--op-blue);    border-color: var(--op-blue-bd); }
+.op-task-card .stage-badge[data-stage="publishable"]   { background: var(--op-emerald-bg); color: var(--op-emerald); border-color: var(--op-emerald-bd); }
+.op-task-card .stage-badge[data-stage="final_ready"]   { background: var(--op-emerald-bg); color: var(--op-emerald); border-color: var(--op-emerald-bd); }
+.op-task-card .stage-badge[data-stage="awaiting_review"]{ background: var(--op-violet-bg); color: var(--op-violet);  border-color: var(--op-violet-bd); }
+.op-task-card .stage-badge[data-stage="generating"]    { background: var(--op-indigo-bg);  color: var(--op-indigo);  border-color: var(--op-indigo-bd); }
+.op-task-card .stage-badge[data-stage="pending_config"]{ background: var(--op-amber-bg);   color: var(--op-amber);   border-color: var(--op-amber-bd); }
+.op-task-card .stage-badge[data-stage="created"]       { background: var(--op-slate-bg);   color: var(--op-fg-mid);  border-color: var(--op-slate-bd); }

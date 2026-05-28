@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>矩阵脚本新建任务 - ApolloVeo</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css" />
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      background: #f8fafc;
+      color: #111827;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+    .entry-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 16px;
+      align-items: start;
+    }
+    .panel {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 18px;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+    }
+    .section-title {
+      margin: 0 0 14px;
+      font-size: 18px;
+      font-weight: 800;
+    }
+    .field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+    .field.full { grid-column: 1 / -1; }
+    label {
+      font-size: 14px;
+      font-weight: 700;
+      color: #334155;
+    }
+    input,
+    select,
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 11px;
+      font: inherit;
+      background: #fff;
+      color: #111827;
+    }
+    textarea { min-height: 108px; resize: vertical; }
+    .hint {
+      margin: 0;
+      color: #64748b;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .required {
+      color: #b91c1c;
+      font-weight: 800;
+    }
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+    .btn-primary,
+    .btn-secondary {
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-weight: 800;
+      text-decoration: none;
+      border: 1px solid transparent;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: #047857;
+      border-color: #047857;
+      color: #fff;
+    }
+    .btn-secondary {
+      background: #fff;
+      border-color: #cbd5e1;
+      color: #111827;
+    }
+    .route-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .route-list li {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px;
+      background: #f8fafc;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 1px 5px;
+    }
+    @media (max-width: 840px) {
+      .entry-shell { grid-template-columns: 1fr; }
+      .field-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page" data-role="matrix-script-create-entry" data-line-id="matrix_script">
+    {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
+    {% set topbar_title = "矩阵脚本" %}
+    {% set topbar_subtitle = "正式产线新建入口" %}
+    {% set topbar_nav = [
+      {"label": "任务", "href": "/tasks" ~ ui_q, "active": false},
+      {"label": "工具", "href": "/tools/hub" ~ ui_q, "active": false}
+    ] %}
+    {% set topbar_actions = [
+      {"label": "返回新建任务", "href": "/tasks/newtasks" ~ ui_q, "primary": false},
+      {"label": "返回任务看板", "href": "/tasks?kind=matrix_script" ~ ("&ui_locale=" ~ ui_locale if ui_locale else ""), "primary": false}
+    ] %}
+    {% include "_topbar.html" %}
+
+    <main class="entry-shell">
+      <form class="panel" method="post" action="/tasks/matrix-script/new{{ ui_q }}">
+        <h1 class="section-title">创建矩阵脚本任务</h1>
+        <p class="hint" style="margin-bottom:16px;">
+          这里只填写创建任务所需的产线输入。脚本变体、槽位细化和交付发布在任务创建后的工作台与交付页完成。
+        </p>
+
+        <div class="field-grid">
+          <div class="field full">
+            <label for="topic">主题 <span class="required">*</span></label>
+            <input id="topic" name="topic" required maxlength="160" placeholder="例如：新品短视频首发脚本" />
+          </div>
+
+          <div class="field full">
+            <label for="source_script_ref">源脚本引用 <span class="required">*</span></label>
+            <div style="display:flex; gap:8px; align-items:stretch;">
+              <input
+                id="source_script_ref"
+                name="source_script_ref"
+                type="text"
+                required
+                maxlength="512"
+                pattern="^(?:(?:content|task|asset|ref)://\S+|[A-Za-z0-9][A-Za-z0-9._\-:\/]{3,})$"
+                placeholder="content://matrix-script/source/<your-token>"
+                autocomplete="off"
+                spellcheck="false"
+                style="flex:1 1 auto;"
+              />
+              <button
+                type="button"
+                id="mint-source-script-ref"
+                class="btn-secondary"
+                data-mint-route="/tasks/matrix-script/source-script-refs/mint"
+                data-target-input="source_script_ref"
+                title="向产品请求一个新的不透明 content:// 句柄"
+                style="padding:8px 12px; white-space:nowrap;"
+              >铸造句柄</button>
+            </div>
+            <p class="hint">仅填写不透明引用：<code>content://</code>、<code>task://</code>、<code>asset://</code>、<code>ref://</code> 之一，或令牌 ID。<strong>不接受</strong>外部网页 URL（<code>https://</code> / <code>http://</code>）和对象存储桶（<code>s3://</code> / <code>gs://</code>）；这些不是产品内部可解析的不透明引用。<strong>不要</strong>把脚本正文粘贴进来——脚本正文由后续工作台阶段处理。</p>
+            <p class="hint"><strong>推荐方式（Plan E Option F2 已上线）</strong>：点击「铸造句柄」按钮，由产品分配一个全新的不透明 <code>content://matrix-script/source/&lt;product-minted-token&gt;</code> 句柄。产品拥有 <code>&lt;token&gt;</code> 的分配与唯一性。</p>
+            <p class="hint"><strong>过渡兼容</strong>：原 §8.F / §8.H 操作员自定 <code>&lt;token&gt;</code> 形式仍然接受（例如 <code>content://matrix-script/source/op-token-001</code>）；既有句柄无需迁移，因为它们与铸造句柄同属 <code>content://</code> 不透明方案集。<code>task://</code> / <code>asset://</code> / <code>ref://</code> 形式同样接受。</p>
+          </div>
+
+          <div class="field">
+            <label for="source_language">源语言 <span class="required">*</span></label>
+            <select id="source_language" name="source_language" required>
+              <option value="zh">中文</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="target_language">目标语言 <span class="required">*</span></label>
+            <select id="target_language" name="target_language" required>
+              <option value="mm">မြန်မာ</option>
+              <option value="vi">Tiếng Việt</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="target_platform">目标平台 <span class="required">*</span></label>
+            <input id="target_platform" name="target_platform" required maxlength="80" placeholder="例如：TikTok / Reels / Shorts" />
+          </div>
+
+          <div class="field">
+            <label for="variation_target_count">变体数量 <span class="required">*</span></label>
+            <input id="variation_target_count" name="variation_target_count" type="number" min="1" max="12" step="1" required value="4" />
+          </div>
+
+          <div class="field">
+            <label for="audience_hint">受众提示</label>
+            <input id="audience_hint" name="audience_hint" maxlength="120" placeholder="例如：新手用户 / 老客复购" />
+          </div>
+
+          <div class="field">
+            <label for="tone_hint">语气提示</label>
+            <input id="tone_hint" name="tone_hint" maxlength="120" placeholder="例如：专业可信 / 轻松直接" />
+          </div>
+
+          <div class="field">
+            <label for="length_hint">长度提示</label>
+            <input id="length_hint" name="length_hint" maxlength="80" placeholder="例如：15 秒 / 30 秒" />
+          </div>
+
+          <div class="field">
+            <label for="product_ref">产品引用</label>
+            <input id="product_ref" name="product_ref" maxlength="160" placeholder="产品名、SKU 或资料链接" />
+          </div>
+
+          <div class="field full">
+            <label for="operator_notes">补充备注</label>
+            <textarea id="operator_notes" name="operator_notes" placeholder="只填写创建阶段必要备注，不填写工作台执行细节"></textarea>
+          </div>
+        </div>
+
+        <div class="actions">
+          <a class="btn-secondary" href="/tasks/newtasks{{ ui_q }}">取消</a>
+          <button class="btn-primary" type="submit">创建并进入工作台</button>
+        </div>
+      </form>
+
+      <aside class="panel" aria-label="route mapping">
+        <h2 class="section-title">链路</h2>
+        <ul class="route-list">
+          <li><strong>入口</strong><br /><code>/tasks/matrix-script/new</code></li>
+          <li><strong>任务类型</strong><br /><code>matrix_script</code></li>
+          <li><strong>创建后</strong><br />进入任务工作台 <code>/tasks/{task_id}</code></li>
+          <li><strong>交付</strong><br />任务存在后进入 <code>/tasks/{task_id}/publish</code></li>
+        </ul>
+      </aside>
+    </main>
+  </div>
+  <script src="/static/js/i18n_v185.js"></script>
+  <script>
+    // Plan E PR-2 / Item E.MS.2 — operator-facing minting affordance.
+    // Calls the matrix-script-scoped POST mint endpoint and populates the
+    // source_script_ref input with a freshly product-minted opaque handle.
+    // The minted handle is contract-equivalent to operator-discipline handles
+    // (both are content:// opaque-by-construction URIs) — no migration of
+    // existing samples is required.
+    (function () {
+      var btn = document.getElementById('mint-source-script-ref');
+      if (!btn) { return; }
+      btn.addEventListener('click', function () {
+        var route = btn.getAttribute('data-mint-route');
+        var targetId = btn.getAttribute('data-target-input');
+        var input = document.getElementById(targetId);
+        if (!route || !input) { return; }
+        var originalLabel = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '铸造中…';
+        fetch(route, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({})
+        })
+          .then(function (resp) {
+            if (!resp.ok) { throw new Error('mint http ' + resp.status); }
+            return resp.json();
+          })
+          .then(function (payload) {
+            if (payload && typeof payload.source_script_ref === 'string') {
+              input.value = payload.source_script_ref;
+              input.focus();
+            } else {
+              throw new Error('mint response missing source_script_ref');
+            }
+          })
+          .catch(function () {
+            // Quiet fallback — operator may type an operator-discipline handle
+            // instead. The transitional convention remains accepted.
+            input.placeholder = 'content://matrix-script/source/<your-token>';
+          })
+          .finally(function () {
+            btn.disabled = false;
+            btn.textContent = originalLabel;
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

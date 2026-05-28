@@ -174,16 +174,6 @@
     @media (max-width: 880px) {
       .ms-new-shell { grid-template-columns: 1fr; }
       .ms-new-field-grid { grid-template-columns: 1fr; }
-      /* PR-1 (2026-05-28) — responsive degradation polish. The
-         op-page-head row currently uses justify-content: space-between
-         which floats the matrix-script pill above the title at narrow
-         viewport. Stack the pill below the title and shrink the title
-         font for cleaner mobile/tablet degradation. */
-      .op-page-head__row { flex-direction: column; align-items: flex-start; }
-      .op-page-head__row .op-pill { align-self: flex-start; margin-top: 4px; }
-      .op-page-head__title { font-size: 20px; }
-      /* Tabs wrap to two rows below 880px instead of overflowing. */
-      .ms-new-tabs { flex-wrap: wrap; }
     }
   </style>
 </head>
@@ -265,7 +255,7 @@
                         name="script_body"
                         maxlength="20000"
                         data-role="ms-new-script-body"
-                        placeholder="将脚本正文粘贴到这里..."></textarea>
+                        placeholder="将脚本正文粘贴到这里...&#10;&#10;系统会把正文存入会话内的脚本素材库（在线临时存储；网关重启会清空），并为本任务生成产品句柄。脚本正文不会被发送给任何外部模型、厂商或引擎。"></textarea>
               <p class="op-section-helper">
                 提交后会被存入会话内的脚本素材库（在线临时存储；网关重启会清空）。<strong>脚本正文不会发送给任何外部模型、厂商或引擎。</strong>
               </p>
@@ -310,72 +300,48 @@
           {# Live feedback for ingest / mint operations #}
           <div class="ms-new-feedback" data-role="ms-new-source-feedback" aria-live="polite"></div>
 
-          {# PR-1 (2026-05-28) — Operator surface: the opaque
-             ``source_script_ref`` field is HIDDEN by default. The form
-             still POSTs ``source_script_ref`` because the JS submit
-             pipeline ingests paste / upload bodies through
-             ``/tasks/matrix-script/source-script-refs/ingest`` and
-             populates ``#source_script_ref`` with the minted handle
-             before form.submit() runs. Architects / engineers can
-             reveal the technical reference block with ``?technical=1``
-             query param. Mission §A.4 confirms compatibility for
-             existing ``content://`` / ``task://`` / ``asset://`` /
-             ``ref://`` handles is preserved through the technical-mode
-             path. #}
-          {% if technical_mode %}
-            <details class="op-collapse" data-role="ms-new-technical-ref" open>
-              <summary>架构师 / 工程师：手动指定不透明脚本句柄（技术引用）</summary>
-              <div class="op-collapse__hint">
-                <strong>本节仅在 <code>?technical=1</code> 下可见</strong>。普通运营不会看到此节。
-                外部网页 URL（<code>https://</code> / <code>http://</code>）与对象存储桶 URI（<code>s3://</code> / <code>gs://</code>）不是产品内不透明句柄，会被入口拒绝。
-              </div>
-              <div class="op-collapse__body">
-                <div class="ms-new-field">
-                  <label for="source_script_ref">source_script_ref</label>
-                  <div style="display:flex; gap:8px; align-items:stretch;">
-                    <input
-                      id="source_script_ref"
-                      name="source_script_ref"
-                      type="text"
-                      required
-                      maxlength="512"
-                      pattern="^(?:(?:content|task|asset|ref)://\S+|[A-Za-z0-9][A-Za-z0-9._\-:\/]{3,})$"
-                      placeholder="content://matrix-script/source/<token>"
-                      autocomplete="off"
-                      spellcheck="false"
-                      data-role="ms-new-source-script-ref"
-                      style="flex:1 1 auto;"
-                    />
-                    <button
-                      type="button"
-                      class="ms-new-btn-secondary"
-                      data-role="ms-new-mint-button"
-                      data-mint-route="/tasks/matrix-script/source-script-refs/mint"
-                      data-target-input="source_script_ref"
-                      title="向产品请求一个新的不透明 content:// 句柄"
-                      style="padding:8px 12px; white-space:nowrap;"
-                    >铸造空句柄</button>
-                  </div>
-                  <p class="op-tech-note">
-                    接受方案：<code>content://</code> / <code>task://</code> / <code>asset://</code> / <code>ref://</code>，或纯令牌 ID。
-                    「铸造空句柄」只分配一个产品句柄，不存任何正文；如果你只是要把脚本传进来，请改用上面三个标签页。
-                  </p>
+          {# Technical reference (advanced) — opaque ref behind a collapsed
+             <details>. Operators NEVER need this for normal use. #}
+          <details class="op-collapse" data-role="ms-new-technical-ref">
+            <summary>高级：手动指定不透明脚本句柄（技术引用）</summary>
+            <div class="op-collapse__hint">
+              仅在你明确知道产品分配的句柄时使用。<strong>普通运营不需要展开此节。</strong>
+              外部网页 URL（<code>https://</code> / <code>http://</code>）与对象存储桶 URI（<code>s3://</code> / <code>gs://</code>）不是产品内不透明句柄，会被入口拒绝。
+            </div>
+            <div class="op-collapse__body">
+              <div class="ms-new-field">
+                <label for="source_script_ref">source_script_ref</label>
+                <div style="display:flex; gap:8px; align-items:stretch;">
+                  <input
+                    id="source_script_ref"
+                    name="source_script_ref"
+                    type="text"
+                    required
+                    maxlength="512"
+                    pattern="^(?:(?:content|task|asset|ref)://\S+|[A-Za-z0-9][A-Za-z0-9._\-:\/]{3,})$"
+                    placeholder="content://matrix-script/source/<token>"
+                    autocomplete="off"
+                    spellcheck="false"
+                    data-role="ms-new-source-script-ref"
+                    style="flex:1 1 auto;"
+                  />
+                  <button
+                    type="button"
+                    class="ms-new-btn-secondary"
+                    data-role="ms-new-mint-button"
+                    data-mint-route="/tasks/matrix-script/source-script-refs/mint"
+                    data-target-input="source_script_ref"
+                    title="向产品请求一个新的不透明 content:// 句柄"
+                    style="padding:8px 12px; white-space:nowrap;"
+                  >铸造空句柄</button>
                 </div>
+                <p class="op-tech-note">
+                  接受方案：<code>content://</code> / <code>task://</code> / <code>asset://</code> / <code>ref://</code>，或纯令牌 ID。
+                  「铸造空句柄」只分配一个产品句柄，不存任何正文；如果你只是要把脚本传进来，请改用上面三个标签页。
+                </p>
               </div>
-            </details>
-          {% else %}
-            {# Operator surface — single hidden input keeps the server
-               POST contract intact. The JS submit pipeline populates
-               this field from the ingest / select paths before
-               form.submit() runs. No mint button, no opaque-handle
-               vocabulary visible on the operator surface. #}
-            <input
-              id="source_script_ref"
-              name="source_script_ref"
-              type="hidden"
-              data-role="ms-new-source-script-ref"
-            />
-          {% endif %}
+            </div>
+          </details>
 
         </div>
 

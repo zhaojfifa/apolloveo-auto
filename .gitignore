@@ -29,3 +29,4 @@ _drafts
 venv/
 
 shortvideo.db
+.local_workspace/
