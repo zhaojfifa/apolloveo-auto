@@ -270,6 +270,101 @@
       {% set ms_recommended_action = ((ops.workbench or {}).matrix_script_recommended_action or {}) %}
       {% set ms_delivery_ready_package = ((ops.workbench or {}).matrix_script_delivery_ready_package or {}) %}
       {% set ms_delivery_comprehension = ((ops.workbench or {}).matrix_script_delivery_comprehension or {}) %}
+      {% set ms_main_video_result = ((ops.workbench or {}).matrix_script_main_video_result or {}) %}
+
+      {# PR-2A (redesign 2026-05-28) · 主视频结果 anchor block.
+         Renders at the TOP of the matrix_script workbench branch, ABOVE the
+         existing Block A 任务摘要, so the operator's first-screen answer to
+         "is the main video ready, and what do I do next?" is dominant.
+         Sourced exclusively from
+         derive_matrix_script_main_video_result; no second producer, no
+         packet truth mutation, no engineering identifiers in operator copy.
+         Action enablement rules: 生成主视频 / 重新生成 are
+         disabled-with-operator-tooltip until the generation backend lands
+         (Capability Expansion Wave); 确认为主版本 enables when a
+         current_fresh media variation exists and no confirmation is yet
+         recorded; 前往交付页面 always enabled. Confirm-main writes the
+         closure operator_note with the structured
+         [main-version-confirmed] prefix per the approved product
+         decision #1 (2026-05-28) — no new endpoint, no closed-enum
+         widening. RC-R8 no-fake-output discipline preserved: empty state
+         when no current_fresh media is honest operator copy, never a fake
+         URL or placeholder media player. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card op-card--accent-emerald" data-role="matrix-script-main-video-result"
+             data-state-kind="{{ ms_main_video_result.state_kind }}"
+             data-redesign-wave="2026-05-28-pr2a">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">★ · 主视频</span>
+              <h2 class="op-section-title" data-role="ms-main-video-result-title">{{ ms_main_video_result.panel_title_zh }}</h2>
+              <span class="op-pill op-pill--{% if ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% elif ms_main_video_result.state_kind == 'generating' %}info{% else %}blocked{% endif %}"
+                    data-role="ms-main-video-result-state-pill"
+                    data-state-kind="{{ ms_main_video_result.state_kind }}">
+                <span class="op-pill__dot"></span>{{ ms_main_video_result.state_label_zh }}
+              </span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-main-video-result-subtitle">{{ ms_main_video_result.panel_subtitle_zh }}</p>
+
+          {# Preview hero. Real artifact preview when current_fresh media
+             is bound; honest operator-language empty state otherwise.
+             NEVER a fake URL, NEVER a placeholder player widget. #}
+          <div class="op-main-video-preview" data-role="ms-main-video-result-preview"
+               data-preview-available="{{ 'true' if ms_main_video_result.preview.available else 'false' }}"
+               style="margin:14px 0; padding:48px 18px; min-height:220px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:12px; background:#fbfdff; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;">
+            {% if ms_main_video_result.preview.available %}
+              <div data-role="ms-main-video-result-preview-bound"
+                   data-bound-variation-id="{{ ms_main_video_result.preview.variation_id }}"
+                   style="font-size:14px; color:var(--op-fg-mid, #334155);">
+                <strong>主视频已生成</strong> · 候选编号 {{ ms_main_video_result.preview.variation_id }}
+                <div class="op-tech-note" style="margin-top:8px;">完整成片与下载在交付页面。本面板不内嵌外部链接。</div>
+              </div>
+            {% else %}
+              <div data-role="ms-main-video-result-preview-empty"
+                   style="font-size:14px; line-height:1.6; color:var(--op-fg-soft, #64748b); max-width:560px;">
+                {{ ms_main_video_result.preview.empty_state_message_zh }}
+              </div>
+            {% endif %}
+          </div>
+
+          {# Primary action bar — 4 buttons; state-dependent enablement.
+             生成主视频 / 重新生成 stay disabled-with-tooltip until the
+             generation worker lands (out of this wave's scope). #}
+          <div class="op-main-video-actions task-actions"
+               data-role="ms-main-video-result-actions"
+               style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+            {% for action in (ms_main_video_result.primary_actions or []) %}
+              {% if action.action_id == 'go_to_delivery' %}
+                <a class="btn-primary"
+                   data-role="ms-main-video-result-action"
+                   data-action-id="{{ action.action_id }}"
+                   data-enabled="true"
+                   href="{{ action.href }}">{{ action.label_zh }} →</a>
+              {% else %}
+                <button type="button"
+                        class="{% if action.action_id == 'confirm_main_version' and action.enabled %}btn-primary{% else %}btn-secondary{% endif %}"
+                        data-role="ms-main-video-result-action"
+                        data-action-id="{{ action.action_id }}"
+                        data-enabled="{{ 'true' if action.enabled else 'false' }}"
+                        {% if action.action_id == 'confirm_main_version' and action.enabled %}data-confirm-note-prefix="{{ ms_main_video_result.confirm_note_prefix }}" data-closure-endpoint="{{ ms_main_video_result.closure_event_endpoint_template | replace('{task_id}', task.task_id) }}" data-recommended-variation-id="{{ ms_main_video_result.recommended_variation_id or '' }}"{% endif %}
+                        {% if not action.enabled %}disabled aria-disabled="true" title="{{ action.disabled_reason_zh }}"{% endif %}>{{ action.label_zh }}</button>
+              {% endif %}
+            {% endfor %}
+          </div>
+
+          {# One-line blocker + next-action banner. Operator language only;
+             head_reason / publish_readiness raw enums NEVER appear here. #}
+          <div class="op-banner op-banner--{% if ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% else %}blocker{% endif %}"
+               data-role="ms-main-video-result-banner"
+               style="margin-top:12px;">
+            <div>
+              <div class="op-banner__title" data-role="ms-main-video-result-blocker">{{ ms_main_video_result.blocker_one_liner_zh }}</div>
+              <div class="op-banner__body" data-role="ms-main-video-result-next-action">{{ ms_main_video_result.next_action_one_liner_zh }}</div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
       {% set ms_publish_readiness = ops_pr %}
       {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
       {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
