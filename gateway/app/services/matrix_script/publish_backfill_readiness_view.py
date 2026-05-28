@@ -56,20 +56,20 @@ READINESS_LABELS_ZH = {
 
 READINESS_NEXT_INPUT_ZH = {
     READINESS_PUBLISHABLE_NOW: (
-        "在 Delivery Center 选择渠道与账号执行发布；本面板不展示 final_video / "
-        "媒体链接，操作后回到本面板查看回填状态。"
+        "在交付页面选择渠道与账号执行发布；本面板不展示完整成片或外部链接，"
+        "操作后回到本面板查看回填状态。"
     ),
     READINESS_GATED: (
-        "解除 publish_readiness 阻塞前置项后再尝试；具体阻塞原因见 head_reason，"
-        "未就绪的必交付分区缺口见 delivery_comprehension。"
+        "先解除发布门禁的阻塞项再继续；阻塞原因显示在「主视频结果」面板，"
+        "未就绪的必交付分区缺口可在交付页面查看。"
     ),
     READINESS_ALREADY_PUBLISHED: (
-        "回到 Delivery Center 多渠道回填面板补齐 channel / 时间 / 指标 snapshot；"
-        "本面板不重复展示 publish_url。"
+        "回到交付页面的多渠道回填面板补齐渠道、时间、指标快照；"
+        "本面板不重复展示发布链接。"
     ),
     READINESS_ALREADY_FAILED: (
-        "查看 closure 中该 variation 的最近一次发布失败原因；纠正后再次发布即可，"
-        "publish_readiness 仍由统一 producer 单独决定可发性。"
+        "查看该变体最近一次发布失败的原因；纠正后再次发布即可，"
+        "发布条件由统一上游决定可发性。"
     ),
     READINESS_TRACKED_GAP: (
         "等待 Phase B / 脚本投射 / 必交付物到位；本面板会随上游真值补齐重新出现。"

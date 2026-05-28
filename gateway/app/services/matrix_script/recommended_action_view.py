@@ -62,10 +62,10 @@ NEXT_ACTION_PUBLISHABLE_ZH = (
     "前往 Delivery Center 选择渠道与账号完成发布；发布完成后回到本面板复盘指标。"
 )
 NEXT_ACTION_BLOCKED_ZH = (
-    "解除 publish_readiness 阻塞前置项后再尝试；具体阻塞原因见 head_reason。"
+    "先解除发布门禁的阻塞项再继续；阻塞原因显示在「主视频结果」面板中。"
 )
 NEXT_ACTION_UNDETERMINED_ZH = (
-    "等待第一次成片产出并完成校对；publish_readiness 收敛后系统会自动推进推荐。"
+    "等待第一次成片产出并完成校对；发布条件就绪后系统会自动推进推荐。"
 )
 
 # Operator-language headline per recommended-bucket. Mirrors the gate
@@ -264,8 +264,8 @@ def derive_matrix_script_recommended_action(
             "next_action_zh": NEXT_ACTION_BLOCKED_ZH,
             "recommended_variant": None,
             "reason_zh": (
-                f"当前发布门禁阻塞；head_reason={head_reason_label or '—'}。"
-                "请按 Workbench E 的阻塞建议先解除前置项。"
+                f"当前发布门禁阻塞 · {head_reason_label or '—'}。"
+                "请在「可选变体」区按提示先解除前置项。"
             ),
             "head_reason": head_reason,
             "head_reason_label_zh": head_reason_label,

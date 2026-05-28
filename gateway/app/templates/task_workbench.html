@@ -731,7 +731,7 @@
               </button>
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-block-d-subtitle">面向运营的一键生成与定点重生；前置条件与阻塞原因来自统一 publish_readiness 上游，本面板不发明事实。</p>
+          <p class="op-section-helper" data-role="ms-block-d-subtitle">面向运营的一键生成与定点重生；前置条件与阻塞原因由发布门禁决定，本面板不发明事实。</p>
 
           <div class="op-banner op-banner--next">
             <div>
@@ -1155,7 +1155,13 @@
             <div class="op-meta-item" data-role="ms-block-f-need">
               <span class="op-meta-item__label">待补齐</span>
               <span class="op-meta-item__value">
-                {% if ms_publish_readiness.publishable and not ms_block_f_missing.items %}—{% else %}{% if ms_block_f_missing.items %}{{ ms_block_f_missing.items | join("、") }}{% else %}{{ ms_block_f_need_baseline | join("、") }}{% endif %}。{% endif %}
+                {# PR-2D fix (2026-05-28) — always render the mission
+                   §B.4 operator-language baseline list when not yet
+                   publishable. Per visual-validation issue #3: do
+                   NOT surface raw contract kind_label_zh ("变体清单 /
+                   脚本 slot 包") on the operator surface; that
+                   technical detail belongs in F · 诊断. #}
+                {% if ms_publish_readiness.publishable %}—{% else %}{{ ms_block_f_need_baseline | join("、") }}。{% endif %}
               </span>
             </div>
           </div>
