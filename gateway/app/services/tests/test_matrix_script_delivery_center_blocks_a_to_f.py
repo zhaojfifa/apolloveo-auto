@@ -616,11 +616,21 @@ def test_block_d_template_renders_subfield_rows_with_label_and_value() -> None:
 
 def test_block_d_template_no_free_text_editing_affordance() -> None:
     """Free-text editing deferred per wireframe §7.4. Block D must not
-    render a textarea / contenteditable div for any subfield."""
+    render a textarea / contenteditable div for any subfield.
+
+    PR-3 (2026-05-28) update: the PR-3 ⑤ 发布设置 form (with its
+    operator-typed publish title / caption / tags textarea) was
+    inserted between Block D and Block E. The slice end is now the
+    PR-3 ⑤ block opener instead of the publish-feedback block, so
+    Block D itself remains free-text-edit-free."""
+
     template = _read_publish_hub_template()
     inside = _ms_publish_hub_gate_body(template)
     block_d_open = inside.find('data-role="matrix-script-block-d-copy-bundle"')
-    block_e_open = inside.find('data-role="matrix-script-block-e-publish-feedback"')
+    block_e_open = inside.find('data-role="matrix-script-block-publish-settings"')
+    # Fallback: if PR-3 hasn't landed yet, slice up to the original Block E.
+    if block_e_open == -1:
+        block_e_open = inside.find('data-role="matrix-script-block-e-publish-feedback"')
     block_d_subtree = inside[block_d_open:block_e_open]
     assert "<textarea" not in block_d_subtree
     assert "contenteditable" not in block_d_subtree

@@ -1,0 +1,841 @@
+
+    {% if ops_workbench_panel.panel_kind == "matrix_script" %}
+      {% set ms_surface = ((ops.workbench or {}).matrix_script_variation_surface or {}) %}
+      {% set ms_comp = ((ops.workbench or {}).matrix_script_comprehension or {}) %}
+      {% set ms_script_structure = ((ops.workbench or {}).matrix_script_script_structure or {}) %}
+      {% set ms_preview_compare = ((ops.workbench or {}).matrix_script_preview_compare or {}) %}
+      {% set ms_review_zone = ((ops.workbench or {}).matrix_script_review_zone or {}) %}
+      {% set ms_qc_diagnostics = ((ops.workbench or {}).matrix_script_qc_diagnostics or {}) %}
+      {% set ms_result_summary = ((ops.workbench or {}).matrix_script_result_summary or {}) %}
+      {% set ms_readable_variants = ((ops.workbench or {}).matrix_script_readable_variants or {}) %}
+      {% set ms_recommended_action = ((ops.workbench or {}).matrix_script_recommended_action or {}) %}
+      {% set ms_delivery_ready_package = ((ops.workbench or {}).matrix_script_delivery_ready_package or {}) %}
+      {% set ms_delivery_comprehension = ((ops.workbench or {}).matrix_script_delivery_comprehension or {}) %}
+      {% set ms_publish_readiness = ops_pr %}
+      {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
+      {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
+      {% set ms_slot_detail = (ms_surface.slot_detail_surface or {}) %}
+      {% set ms_attribution = (ms_surface.attribution_refs or {}) %}
+      {% set ms_feedback = (ms_surface.publish_feedback_projection or {}) %}
+      {% set ms_axes = (ms_variation_plan.axes or []) %}
+      {% set ms_cells = (ms_variation_plan.cells or []) %}
+      {% set ms_slots = (ms_copy_bundle.slots or []) %}
+      {% set ms_slot_index = {} %}
+      {% for slot in ms_slots %}{% if ms_slot_index.update({slot.slot_id: slot}) %}{% endif %}{% endfor %}
+      {# OWC-MS-RO PR-2 — Matrix Script Workbench Blocks A / B / C (read-side
+         comprehension). Per matrix_script_workbench_wireframe_v1.md §3 / §4 / §5.
+         Three additive operator-result-first panels rendered ABOVE the existing
+         PR-U2 comprehension block + MS-W3 script structure block + Variation
+         Panel (which all stay verbatim BELOW as secondary diagnostics per
+         matrix_script_result_oriented_ui_implementation_slicing_v1.md §5.3).
+         Pure presentation-layer over already-attached helpers — no new helper
+         module, no projection mutation, no contract/schema/runtime change.
+         Authority pointers: matrix_script_result_oriented_ui_plan_v1.md
+         §0.1 (S001/S002/S003 sample anchor) + §4.4 (six-block primary path);
+         matrix_script_workbench_wireframe_v1.md §3.A / §4.B / §5.C; slicing
+         addendum §4 PR-2 scope. PR-3 (Blocks D/E/F) and PR-4 (Delivery Center)
+         are NOT in this PR. #}
+
+      {# Block A — Goal Summary. Operator answers "what is being produced",
+         "what is blocked", "what should I do next". Sources: subject /
+         audience / target_platform / target_language come from the existing
+         derive_matrix_script_script_structure_view; status / blocker /
+         next-action come from the existing derive_matrix_script_workbench_result_summary
+         (RC-R6 single source — no second producer). Jump buttons route to
+         the existing publish-hub URL + #publish-feedback anchor (added by
+         OWC-MS-RO PR-1 + correction). #}
+      {% if (ms_script_structure.is_matrix_script or ms_result_summary.is_matrix_script) %}
+        <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-a-goal-summary">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">A · 目标</span>
+              <h2 class="op-section-title" data-role="ms-block-a-title">任务摘要</h2>
+              <span class="op-pill op-pill--matrix"><span class="op-pill__dot"></span>矩阵脚本</span>
+            </div>
+            <div class="op-section-actions" data-role="ms-block-a-actions">
+              <a href="/tasks/{{ task.task_id }}/publish" class="btn-nav"
+                 data-role="ms-block-a-action-delivery">前往交付中心 →</a>
+              <a href="/tasks/{{ task.task_id }}/publish#publish-feedback" class="btn-nav"
+                 data-role="ms-block-a-action-publish-feedback">前往发布反馈</a>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-a-subtitle">这一段告诉你：本任务在生产什么、当前卡在哪一步、运营下一步该做什么。</p>
+
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="ms-block-a-subject">
+              <span class="op-meta-item__label">主题</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.title_value or task.title or "—" }}</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-block-a-audience">
+              <span class="op-meta-item__label">受众</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.axis_hints.audience_hint or "—" }}</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-block-a-target-platform">
+              <span class="op-meta-item__label">目标平台</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.target_platform_value or "—" }}</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-block-a-target-language">
+              <span class="op-meta-item__label">目标语言</span>
+              <span class="op-meta-item__value">
+                {% set _tl = (ms_script_structure.language_scope or {}).target_language %}
+                {% if _tl %}{{ _tl | join("，") }}{% else %}—{% endif %}
+              </span>
+            </div>
+          </div>
+
+          {% if ms_result_summary and ms_result_summary.is_matrix_script %}
+            <div class="op-meta-grid" style="margin-top:14px;">
+              <div class="op-meta-item" data-role="ms-block-a-status"
+                   data-status-kind="{{ ms_result_summary.status_kind }}">
+                <span class="op-meta-item__label">当前总状态</span>
+                <span class="op-meta-item__value">
+                  <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_result_summary.status_kind }}"
+                        data-role="ms-block-a-status-kind">{{ ms_result_summary.status_label_zh }}</span>
+                  <span data-role="ms-block-a-status-headline" style="margin-left:6px;">{{ ms_result_summary.headline_zh }}</span>
+                </span>
+              </div>
+            </div>
+            {% if ms_result_summary.head_reason %}
+              <div class="op-banner op-banner--blocker">
+                <div>
+                  <div class="op-banner__title" data-role="ms-block-a-blocker">当前阻塞</div>
+                  <div class="op-banner__body" data-role="ms-block-a-blocker-value">{{ ms_result_summary.head_reason_label_zh }}</div>
+                </div>
+              </div>
+            {% else %}
+              <div class="op-banner op-banner--ready">
+                <div>
+                  <div class="op-banner__title" data-role="ms-block-a-blocker">无阻塞</div>
+                  <div class="op-banner__body" data-role="ms-block-a-blocker-value">所有必要素材已就位 · 可继续推进。</div>
+                </div>
+              </div>
+            {% endif %}
+            <div class="op-banner op-banner--next">
+              <div>
+                <div class="op-banner__title" data-role="ms-block-a-next-action">下一步建议</div>
+                <div class="op-banner__body" data-role="ms-block-a-next-action-value">{{ ms_result_summary.next_action_zh }}</div>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {# Block B — Script Structure (operator-readable wording only). Renders
+         Hook (前 3 秒) / Body (中段) / CTA (结尾) sections + 关键词 + 禁用词,
+         all sourced from derive_matrix_script_script_structure_view. The
+         engineering details (source_script_ref handle, axis_hints,
+         variation_target_count) stay BELOW in the existing MS-W3 panel as
+         secondary diagnostics — Block B does not surface them per wireframe §4.5
+         forbidden list ("operator-readable wording only"). #}
+      {% if ms_script_structure.is_matrix_script %}
+        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-b-script-structure">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">B · 脚本</span>
+              <h2 class="op-section-title" data-role="ms-block-b-title">脚本结构</h2>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-b-subtitle">三段式：Hook 抓人 → Body 信息 → CTA 行动。下方关键词与禁用词限定基本表达边界。</p>
+
+          <div class="op-script-grid">
+            {% for section in (ms_script_structure.sections or []) %}
+              {% set _section_tone = "hook" if section.section_id == "hook" else ("body" if section.section_id == "body" else ("cta" if section.section_id == "cta" else "body")) %}
+              <div class="op-script-card" data-role="ms-block-b-section"
+                   data-section-id="{{ section.section_id }}"
+                   data-section-status="{{ section.body_status_code }}">
+                <span class="op-script-card__tag op-script-card__tag--{{ _section_tone }}">{{ section.section_label_zh }}</span>
+                {% if section.body_text %}
+                  <div class="op-script-card__body" data-role="ms-block-b-section-body">{{ section.body_text }}</div>
+                {% else %}
+                  <div class="op-script-card__empty" data-role="ms-block-b-section-empty">{{ section.body_status_label_zh }}</div>
+                {% endif %}
+              </div>
+            {% endfor %}
+          </div>
+
+          {% if ms_script_structure.taxonomy %}
+            <div class="op-script-grid" style="margin-top:14px;">
+              {% for tax in (ms_script_structure.taxonomy or []) %}
+                {% set _tax_tone = "keyword" if tax.taxonomy_id == "keywords" else ("banword" if tax.taxonomy_id == "banwords" else "body") %}
+                <div class="op-script-card" data-role="ms-block-b-taxonomy"
+                     data-taxonomy-id="{{ tax.taxonomy_id }}"
+                     data-taxonomy-status="{{ tax.values_status_code }}">
+                  <span class="op-script-card__tag op-script-card__tag--{{ _tax_tone }}">{{ tax.taxonomy_label_zh }}</span>
+                  {% if tax["values"] %}
+                    <div data-role="ms-block-b-taxonomy-values">
+                      {% for v in tax["values"] %}<span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">{{ v }}</span>{% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="op-script-card__empty" data-role="ms-block-b-taxonomy-empty">{{ tax.values_status_label_zh }}</div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {# Block C — Variant Strategy. Renders variant count + per-variant
+         differentiator table (variation_id labeled as 候选 N + axis_summary +
+         differentiator + length hint). Per-row tooltip carries the
+         "why this variant" explanation. NO raw axis tuple labels in operator
+         column headers; NO cell_id / slot_id / script_slot_ref / content://
+         handles; NO vendor / model / provider / engine column.
+         Source: derive_matrix_script_readable_variants. #}
+      {% if ms_readable_variants.is_matrix_script %}
+        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-c-variant-strategy">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">C · 变体</span>
+              <h2 class="op-section-title" data-role="ms-block-c-title">变体方案</h2>
+              <span class="op-pill op-pill--info" data-role="ms-block-c-variant-count">
+                共 <span data-role="ms-block-c-variant-count-value">{{ ms_readable_variants.variant_count }}</span> 个候选
+              </span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-c-subtitle">{{ ms_readable_variants.variant_candidates_label_zh }}</p>
+
+          {% if ms_readable_variants.variant_candidates %}
+            <table class="op-variant-table" data-role="ms-block-c-variant-table">
+              <thead>
+                <tr>
+                  <th>候选</th>
+                  <th>差异点</th>
+                  <th>视角概要</th>
+                  <th>节奏 / 时长</th>
+                  <th>脚本片段</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for variant in ms_readable_variants.variant_candidates %}
+                  {% set _idx = loop.index %}
+                  <tr data-role="ms-block-c-variant-row"
+                      data-variant-index="{{ _idx }}"
+                      title="为什么存在此变体：{{ variant.differentiator_zh }}">
+                    <td data-role="ms-block-c-variant-label">候选 {{ _idx }}</td>
+                    <td data-role="ms-block-c-variant-differentiator">{{ variant.differentiator_zh or "—" }}</td>
+                    <td data-role="ms-block-c-variant-axis-summary">{{ variant.axis_summary_zh or "—" }}</td>
+                    <td data-role="ms-block-c-variant-length">{{ variant.length_hint_zh or "—" }}</td>
+                    <td data-role="ms-block-c-variant-bound-slot">{{ variant.bound_slot_label_zh }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <div class="op-banner op-banner--review" data-role="ms-block-c-empty">
+              <div>
+                <div class="op-banner__title">尚未生成变体</div>
+                <div class="op-banner__body">前往任务区或下方"生成 / 重新生成"操作触发生成后再查看。</div>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {# OWC-MS-RO PR-3 — Matrix Script Workbench Blocks D / E / F (action-side
+         review). Per matrix_script_workbench_wireframe_v1.md §6 / §7 / §8.
+         Three additive operator-result-first panels rendered BELOW Blocks
+         A / B / C (PR-2 substrate, just above) and ABOVE the existing PR-U2
+         comprehension block + MS-W3 / MS-W4 / MS-W5 / MS-W6 / RC PR-2 / RC PR-4
+         secondary diagnostics (preserved verbatim below per
+         matrix_script_result_oriented_ui_implementation_slicing_v1.md §6.3).
+         Pure presentation-layer over already-attached helpers — no new helper
+         module, no new endpoint, no projection mutation, no contract / schema /
+         runtime change, no closed-enum widening. Authority pointers:
+         matrix_script_result_oriented_ui_plan_v1.md §0.1 (S001/S002/S003 sample
+         anchor) + §4.4 (six-block primary path);
+         matrix_script_workbench_wireframe_v1.md §6.D / §7.E / §8.F; slicing
+         addendum §6 PR-3 scope. PR-4 (Delivery Center A–F + Publish Feedback)
+         is NOT in this PR. #}
+
+      {# Block D — Generate / Regenerate. Operator answers "what should I do
+         next" (primary action) + "what is blocked right now" (preconditions /
+         blocker). Sources: derive_matrix_script_recommended_action (RC-R4
+         single-line decision lane — headline / next-action / blocker label
+         operator-language-only); variant count from
+         derive_matrix_script_readable_variants.variant_count;
+         blocked-variant count from
+         derive_matrix_script_delivery_ready_package.blocked_count.
+         Hard non-goals: no provider / model / vendor / engine selector;
+         no auto-trigger on page load; no free-text override of generation
+         parameters (deferred). Per-variant `cell_id` execution dispatch is
+         IG-2 deferred to a future presenter-only PR; the secondary action
+         here is bulk regeneration only. #}
+      {% if ms_recommended_action.is_matrix_script %}
+        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-d-generate-regenerate">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">D · 生成</span>
+              <h2 class="op-section-title" data-role="ms-block-d-title">生成进度</h2>
+              <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_recommended_action.status_kind }}"
+                    data-role="ms-block-d-status-kind">{{ ms_recommended_action.status_label_zh }}</span>
+            </div>
+            <div class="op-section-actions task-actions" data-role="ms-block-d-actions">
+              <button type="button"
+                      class="btn-primary"
+                      data-role="ms-block-d-primary-action"
+                      data-status-kind="{{ ms_recommended_action.status_kind }}"
+                      data-variant-count="{{ ms_readable_variants.variant_count or 0 }}"
+                      {% if ms_recommended_action.status_kind == "blocked_pending_publish_readiness" %}disabled aria-disabled="true"{% endif %}>
+                ⚡ 生成 {{ ms_readable_variants.variant_count or 0 }} 个变体
+              </button>
+              <button type="button"
+                      class="btn-secondary"
+                      data-role="ms-block-d-secondary-action"
+                      data-blocked-count="{{ ms_delivery_ready_package.blocked_count or 0 }}"
+                      {% if (ms_delivery_ready_package.blocked_count or 0) == 0 %}disabled aria-disabled="true"{% endif %}>
+                ↻ 重新生成被阻塞的变体 ({{ ms_delivery_ready_package.blocked_count or 0 }})
+              </button>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-d-subtitle">面向运营的一键生成与定点重生；前置条件与阻塞原因来自统一 publish_readiness 上游，本面板不发明事实。</p>
+
+          <div class="op-banner op-banner--next">
+            <div>
+              <div class="op-banner__title" data-role="ms-block-d-headline">
+                <span data-role="ms-block-d-headline-value">{{ ms_recommended_action.headline_zh }}</span>
+              </div>
+              <div class="op-banner__body" data-role="ms-block-d-next-action">
+                下一步 · <span data-role="ms-block-d-next-action-value">{{ ms_recommended_action.next_action_zh }}</span>
+              </div>
+            </div>
+          </div>
+
+          {% if ms_qc_diagnostics.is_matrix_script %}
+            <div data-role="ms-block-d-preconditions" style="margin-top:12px;">
+              <span class="op-meta-item__label">当前前置条件</span>
+              <ul style="margin:6px 0 0 16px; padding:0; color:#334155; font-size:13px;">
+                <li data-role="ms-block-d-precondition-ready-gate"
+                    data-publishable="{{ 'true' if ms_qc_diagnostics.ready_gate_explanation.publishable else 'false' }}"
+                    data-publish-ready="{{ 'true' if ms_qc_diagnostics.ready_gate_explanation.publish_ready else 'false' }}"
+                    data-compose-ready="{{ 'true' if ms_qc_diagnostics.ready_gate_explanation.compose_ready else 'false' }}">
+                  发布门禁 · <span data-role="ms-block-d-precondition-ready-gate-value">{{ ms_qc_diagnostics.ready_gate_explanation.head_reason_label_zh }}</span>
+                </li>
+                {% for risk in (ms_qc_diagnostics.risk_items or []) %}
+                  <li data-role="ms-block-d-precondition-risk"
+                      data-risk-id="{{ risk.advisory_id or '' }}"
+                      data-risk-level="{{ risk.level or '' }}">
+                    <span data-role="ms-block-d-precondition-risk-value">{{ risk.operator_hint or risk.explanation_zh or "—" }}</span>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+
+          <div class="op-meta-grid" style="margin-top:12px;">
+            <div class="op-meta-item" data-role="ms-block-d-blocker">
+              <span class="op-meta-item__label">当前阻塞原因</span>
+              <span class="op-meta-item__value" data-role="ms-block-d-blocker-value">
+                {% if ms_recommended_action.head_reason_label_zh %}{{ ms_recommended_action.head_reason_label_zh }}{% else %}暂无{% endif %}
+              </span>
+            </div>
+            {% if ms_recommended_action.reason_zh %}
+              <div class="op-meta-item" data-role="ms-block-d-reason">
+                <span class="op-meta-item__label">说明</span>
+                <span class="op-meta-item__value" style="font-weight:400; color:#475569;" data-role="ms-block-d-reason-value">{{ ms_recommended_action.reason_zh }}</span>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="op-tech-note" data-role="ms-block-d-no-vendor-note">
+            生成模式由系统决定 · 不暴露 provider / model / vendor / engine 选择。
+          </div>
+        </div>
+      {% endif %}
+
+      {# Block E — Candidate Review. Operator answers "which candidate is
+         currently recommended" (⭐ marker) + "what is blocked right now per
+         variant" + "is there a publishable result yet per variant".
+         Sources joined per variation_id:
+           · derive_matrix_script_preview_compare_view.variations[]
+           · derive_matrix_script_delivery_ready_package.rows[]
+           · derive_matrix_script_review_zone_view.review_status_rows[]
+           · derive_matrix_script_qc_diagnostics_view.quality_items[] (shared
+             across cards — duration / clarity / subtitle readability are
+             task-level diagnostics in the current attempt).
+         Card actions:
+           · 选定为推荐版本 — closed-state transition is IG-4 deferred;
+             current behavior is operator_note-only via the existing closure
+             endpoint. Disabled-with-tooltip placeholder in this PR.
+           · 提交分区评审意见 — opens the per-zone submit form sourced from
+             review_zone_view.review_status_rows[].per_zone[zone_id].submit_form.
+             Posts to POST /api/matrix-script/closures/{task_id}/events with
+             event_kind=operator_note + review_zone ∈ REVIEW_ZONE_VALUES.
+             No new endpoint; no closed-enum widening.
+           · 重新生成此变体 — per-cell_id execution dispatch is IG-2 deferred.
+             Disabled-with-tooltip placeholder in this PR.
+         Hard non-goals: no per-variant vendor / model / provider / engine
+         label; no raw cell_id / slot_id / axis-tuple in operator-visible
+         columns; no fake final_video / fabricated publish_url for tracked-gap
+         rows (RC-R8 audit); no closure event mutation / deletion. #}
+      {% if ms_preview_compare.is_matrix_script and ms_preview_compare.variations %}
+        {# Build a per-variation index over the helpers we need to join
+           by variation_id. Jinja's loop.* can't join across helpers, so
+           each card looks up by id from the source-of-truth dicts. #}
+        {% set ms_block_e_pkg_rows = (ms_delivery_ready_package.rows or []) %}
+        {% set ms_block_e_review_rows = (ms_review_zone.review_status_rows or []) %}
+        {# 2026-05-28 redesign — honesty audit: do ANY variations have a
+           resolved preview/final media (preview_status_code == "current_fresh"
+           or "historical")? If not, render a single operator-language
+           message in place of N empty candidate cards. The per-variation
+           cards' data-role markers stay reachable when any one variation
+           is resolved. #}
+        {% set ms_block_e_any_resolved = namespace(value=False) %}
+        {% for variation in ms_preview_compare.variations %}
+          {% if variation.preview_status_code in ("current_fresh", "historical") %}
+            {% set ms_block_e_any_resolved.value = True %}
+          {% endif %}
+        {% endfor %}
+        <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-candidate-review"
+             data-any-preview-resolved="{{ 'true' if ms_block_e_any_resolved.value else 'false' }}">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--violet">E · 评审</span>
+              <h2 class="op-section-title" data-role="ms-block-e-title">候选评审</h2>
+              {% if ms_block_e_any_resolved.value %}
+                <span class="op-pill op-pill--review">{{ ms_preview_compare.variations | length }} 候选并排</span>
+              {% else %}
+                <span class="op-pill op-pill--neutral" data-role="ms-block-e-no-preview-pill">暂无可预览成片</span>
+              {% endif %}
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-e-subtitle">候选评审区呈现每个变体的真实成片与质检；当前阶段成片生成能力尚未接入，因此本区暂以单一说明替代占位卡片。</p>
+          {% if not ms_block_e_any_resolved.value %}
+            {# Mission-mandated empty-state. Replaces N empty per-candidate
+               cards with one honest message. #}
+            <div class="op-banner op-banner--review" data-role="ms-block-e-no-preview-available">
+              <div>
+                <div class="op-banner__title">当前暂无可预览成片</div>
+                <div class="op-banner__body">已完成脚本结构与变体方案；成片生成能力接入后将在这里展示候选视频。</div>
+              </div>
+            </div>
+            <div class="op-tech-note" data-role="ms-block-e-no-fake-final-video-note" style="margin-top:10px;">
+              本面板不展示 final_video / 媒体链接 / 发布 URL — 上述项由统一 publish_readiness 与 Delivery Center 收敛（RC-R8）。
+            </div>
+          {% else %}
+          {% set ms_block_e_recommended_id = (ms_recommended_action.recommended_variant or {}).variation_id %}
+          {% for variation in ms_preview_compare.variations %}
+            {% set _idx = loop.index %}
+            {% set _vid = variation.variation_id %}
+            {% set _pkg_row = namespace(value=None) %}
+            {% for row in ms_block_e_pkg_rows %}{% if row.variation_id == _vid %}{% set _pkg_row.value = row %}{% endif %}{% endfor %}
+            {% set _review_row = namespace(value=None) %}
+            {% for row in ms_block_e_review_rows %}{% if row.variation_id == _vid %}{% set _review_row.value = row %}{% endif %}{% endfor %}
+            {% set _is_recommended = (ms_block_e_recommended_id is not none) and (_vid == ms_block_e_recommended_id) %}
+            {% set _is_publishable_bucket = variation.recommended_bucket == "publishable_candidate" %}
+            <div class="panel" data-role="ms-block-e-candidate-card"
+                 data-variant-index="{{ _idx }}"
+                 data-recommended-bucket="{{ variation.recommended_bucket }}"
+                 data-is-recommended="{{ 'true' if _is_recommended else 'false' }}"
+                 style="margin-top:10px;">
+              <div class="section-title">
+                <h3 data-role="ms-block-e-card-title">
+                  候选 {{ _idx }}
+                  {% if _is_recommended %}
+                    <span class="info-pill ms-result-status__kind ms-result-status__kind--publishable_candidate"
+                          data-role="ms-block-e-card-recommended-marker"
+                          aria-label="recommended">⭐ 推荐</span>
+                  {% endif %}
+                </h3>
+                <div class="secondary" data-role="ms-block-e-card-subtitle">
+                  <span class="info-pill" data-role="ms-block-e-card-status-pill"
+                        data-status-kind="{{ variation.recommended_bucket }}">{{ variation.recommended_label_zh }}</span>
+                </div>
+              </div>
+              <div class="meta-grid" style="margin-top:8px;">
+                {# Preview slot — tracked-gap operator-language line when the
+                   manifest artifact_lookup has not resolved a final media
+                   handle. Never a fabricated URL or fake final_video. The
+                   template never echoes raw cell_id / slot_id / content://
+                   handles in operator-visible text. #}
+                <div class="meta-item" data-role="ms-block-e-card-preview-slot"
+                     data-preview-status="{{ variation.preview_status_code }}">
+                  <strong>预览</strong>
+                  <span data-role="ms-block-e-card-preview-status">{{ variation.preview_status_label_zh }}</span>
+                  {% if variation.preview_status_explanation_zh %}
+                    <div class="muted t-secondary" data-role="ms-block-e-card-preview-explanation">{{ variation.preview_status_explanation_zh }}</div>
+                  {% endif %}
+                </div>
+                <div class="meta-item" data-role="ms-block-e-card-duration">
+                  <strong>时长</strong>
+                  <span data-role="ms-block-e-card-duration-value">
+                    {% if _pkg_row.value %}{{ _pkg_row.value.length_hint_zh or "—" }}{% else %}—{% endif %}
+                  </span>
+                </div>
+                {# Package readiness pill — RC-R5 closed PACKAGE_* enum
+                   sourced from delivery_ready_package_view. Never a
+                   fake URL. #}
+                <div class="meta-item" data-role="ms-block-e-card-package-status"
+                     data-package-status="{{ (_pkg_row.value.package_status_kind if _pkg_row.value else '') }}">
+                  <strong>交付包</strong>
+                  <span data-role="ms-block-e-card-package-status-value">
+                    {% if _pkg_row.value %}{{ _pkg_row.value.package_status_label_zh }}{% else %}—{% endif %}
+                  </span>
+                </div>
+              </div>
+              {# Subtitle / audio status — sourced from the qc_diagnostics
+                 artifact_status_items keyed by required deliverable kind.
+                 The closed PACKAGE_* enum already covers package
+                 readiness; this row gives the operator a per-stream
+                 glance (subtitle / dub / metadata) without re-deriving
+                 lane truth. Field names mirror the
+                 qc_diagnostics_view._artifact_status_items() shape:
+                 `kind` / `kind_label_zh` / `artifact_status_code` /
+                 `artifact_status_label_zh`. #}
+              {% if ms_qc_diagnostics.artifact_status_items %}
+                <div data-role="ms-block-e-card-stream-status" style="margin-top:6px;">
+                  <strong>流状态</strong>
+                  <span>
+                    {% for item in ms_qc_diagnostics.artifact_status_items %}
+                      <span class="info-pill"
+                            data-role="ms-block-e-card-stream-pill"
+                            data-stream-kind="{{ item.kind }}"
+                            data-stream-status="{{ item.artifact_status_code }}"
+                            style="margin-right:4px;">
+                        {{ item.kind_label_zh or item.kind }} · {{ item.artifact_status_label_zh }}
+                      </span>
+                    {% endfor %}
+                  </span>
+                </div>
+              {% endif %}
+              {# QC three-item checks — duration / clarity / subtitle readability.
+                 Closed three-item set per qc_diagnostics_view. items not yet
+                 observable on existing truth render the
+                 unobservable_pending_upstream sentinel in operator language.
+                 Field names mirror the qc_diagnostics_view._quality_item()
+                 shape: `quality_id` / `label_zh` / `status_code` /
+                 `value_label_zh`. #}
+              {% if ms_qc_diagnostics.quality_items %}
+                <div data-role="ms-block-e-card-qc" style="margin-top:6px;">
+                  <strong>质检</strong>
+                  <span>
+                    {% for item in ms_qc_diagnostics.quality_items %}
+                      <span class="info-pill"
+                            data-role="ms-block-e-card-qc-item"
+                            data-qc-id="{{ item.quality_id }}"
+                            data-qc-status="{{ item.status_code }}"
+                            style="margin-right:4px;">
+                        {{ item.label_zh }}{% if item.value_label_zh %} · {{ item.value_label_zh }}{% endif %}
+                      </span>
+                    {% endfor %}
+                  </span>
+                </div>
+              {% endif %}
+              {# Review-zone chips — four operator-language chips per
+                 REVIEW_ZONE_VALUES order; status from the per-(variation, zone)
+                 history index already projected by review_zone_view. #}
+              {% if ms_review_zone.zones and _review_row.value %}
+                <div data-role="ms-block-e-card-review-zones" style="margin-top:6px;">
+                  <strong>评审区</strong>
+                  <span>
+                    {% for zone in ms_review_zone.zones %}
+                      {% set _zone_state = (_review_row.value.per_zone or {})[zone.zone_id] or {} %}
+                      <span class="info-pill"
+                            data-role="ms-block-e-card-review-zone-chip"
+                            data-zone-id="{{ zone.zone_id }}"
+                            data-zone-reviewed="{{ 'true' if _zone_state.is_reviewed else 'false' }}"
+                            data-zone-history-count="{{ _zone_state.history_count or 0 }}"
+                            style="margin-right:4px;">
+                        {{ zone.zone_label_zh }} · {% if _zone_state.is_reviewed %}✓{% else %}○{% endif %}
+                      </span>
+                    {% endfor %}
+                  </span>
+                </div>
+              {% endif %}
+              {# Card actions row. 选定为推荐版本 + 重新生成此变体 are deferred
+                 (IG-4 / IG-2); they render as disabled-with-tooltip
+                 placeholders so the operator sees the affordance shape but
+                 cannot trigger un-spec'd state transitions. 提交分区评审意见
+                 toggles the per-zone form panel below the card. #}
+              <div class="task-actions" data-role="ms-block-e-card-actions" style="margin-top:10px;">
+                <button type="button"
+                        class="btn-secondary"
+                        data-role="ms-block-e-card-action-select-recommended"
+                        data-variation-id-attr="present"
+                        title="选定为推荐版本：当前阶段以 closure operator_note 记录意图；明确的 record_kind 状态切换（IG-4）将由后续 closure 增补落地。"
+                        disabled aria-disabled="true">
+                  选定为推荐版本
+                </button>
+                <button type="button"
+                        class="btn-primary"
+                        data-role="ms-block-e-card-action-submit-review"
+                        data-action="toggle-zone-form"
+                        aria-expanded="false"
+                        aria-controls="ms-block-e-card-zone-form-{{ _idx }}">
+                  提交分区评审意见
+                </button>
+                <button type="button"
+                        class="btn-secondary"
+                        data-role="ms-block-e-card-action-regenerate"
+                        title="重新生成此变体：当前阶段仅支持批量重新生成被阻塞的变体（Block D 次操作）；按 cell_id 单变体派发（IG-2）将在后续 presenter 改造中落地。"
+                        disabled aria-disabled="true">
+                  重新生成此变体
+                </button>
+              </div>
+              {# Per-card zone-form panel. Renders the four zone forms
+                 already shaped by review_zone_view.review_status_rows
+                 (per_zone[zone_id].submit_form). Each form posts to
+                 POST /api/matrix-script/closures/{task_id}/events with
+                 event_kind=operator_note + variation_id + review_zone.
+                 Hidden by default; the toggle button above expands it.
+                 No new endpoint; no closed-enum widening. #}
+              {% if _review_row.value and ms_review_zone.zones %}
+                <div data-role="ms-block-e-card-zone-form-panel"
+                     id="ms-block-e-card-zone-form-{{ _idx }}"
+                     hidden
+                     style="margin-top:10px;padding:10px;background:#f6f7f9;border-radius:6px;">
+                  <div class="muted" data-role="ms-block-e-card-zone-form-subtitle">
+                    {{ ms_review_zone.closure_endpoint_explanation_zh }}
+                  </div>
+                  {% for zone in ms_review_zone.zones %}
+                    {% set _zone_state = (_review_row.value.per_zone or {})[zone.zone_id] or {} %}
+                    {% set _form = _zone_state.submit_form %}
+                    {% if _form %}
+                      <form data-role="ms-block-e-card-zone-form"
+                            data-zone-id="{{ zone.zone_id }}"
+                            method="{{ _form.method }}"
+                            action="{{ _form.action }}"
+                            style="margin-top:6px;">
+                        <strong>{{ zone.zone_label_zh }}</strong>
+                        <input type="hidden" name="event_kind" value="{{ _form.event_kind }}" data-role="ms-block-e-card-zone-form-event-kind">
+                        <input type="hidden" name="actor_kind" value="{{ _form.actor_kind }}" data-role="ms-block-e-card-zone-form-actor-kind">
+                        <input type="hidden" name="variation_id" value="{{ _form.variation_id }}" data-role="ms-block-e-card-zone-form-variation-id">
+                        <input type="hidden" name="review_zone" value="{{ _form.review_zone }}" data-role="ms-block-e-card-zone-form-review-zone">
+                        <textarea name="operator_publish_notes"
+                                  data-role="ms-block-e-card-zone-form-textarea"
+                                  placeholder="{{ zone.input_placeholder_zh }}"
+                                  rows="2"
+                                  style="width:100%;margin-top:4px;"></textarea>
+                        <button type="submit"
+                                class="btn-primary"
+                                data-role="ms-block-e-card-zone-form-submit">{{ zone.submit_label_zh }}</button>
+                        <span class="muted t-secondary" style="margin-left:6px;">{{ zone.zone_guidance_zh }}</span>
+                      </form>
+                    {% endif %}
+                  {% endfor %}
+                </div>
+              {% endif %}
+            </div>
+          {% endfor %}
+          <div class="muted t-secondary" data-role="ms-block-e-no-fake-final-video-note" style="margin-top:6px;">
+            本面板不展示 final_video / 媒体链接 / 发布 URL — 上述项由统一 publish_readiness 与 Delivery Center 收敛（RC-R8）。
+          </div>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {# Block F — Delivery Teaser. Operator answers "is there a publishable
+         video result yet" — at workbench-level glance before jumping to the
+         Delivery Center. Sources:
+           · compute_publish_readiness (publishable + head_reason; single
+             producer per RC-A7);
+           · derive_matrix_script_delivery_comprehension.lanes
+             (required_blocking / required_non_blocking / optional_non_blocking
+             with per-row artifact status);
+           · SCENE_PACK_BLOCKING_ALLOWED enforcement (defensive,
+             matrix_script/delivery_binding.py).
+         Hard non-goals: no inline final_video player; no publish action
+         button (publishing happens in the Delivery Center / Publish Feedback
+         only); no second-source publishable derivation; no fabricated URLs. #}
+      {% if ms_delivery_comprehension.is_matrix_script %}
+        {# 2026-05-28 redesign — Mission §4 says workbench shows a SHORT
+           delivery status card; full per-deliverable detail belongs in
+           Delivery Center. We compute a "have / need" split honestly from
+           the same delivery_comprehension lane data, render mission-
+           mandated default copy when nothing is resolved, and link out to
+           the Delivery Center. The detailed per-row markers
+           (ms-block-f-required-row / ms-block-f-optional-row) are no
+           longer rendered in the workbench per Mission §4; coordinators
+           inspect them in the Delivery Center surface. #}
+        {% set ms_block_f_required_rows = (ms_delivery_comprehension.lanes.required_blocking.rows or []) + (ms_delivery_comprehension.lanes.required_non_blocking.rows or []) %}
+        {% set ms_block_f_resolved = namespace(items=[]) %}
+        {% set ms_block_f_missing = namespace(items=[]) %}
+        {% for row in ms_block_f_required_rows %}
+          {% if row.artifact_status_code == "current_fresh" %}
+            {% set _ = ms_block_f_resolved.items.append(row.kind_label_zh or row.kind) %}
+          {% else %}
+            {% set _ = ms_block_f_missing.items.append(row.kind_label_zh or row.kind) %}
+          {% endif %}
+        {% endfor %}
+        {# Phase B authored truth (script structure + variant plan) is
+           always present on a contract-clean Matrix Script task today —
+           it is the "已具备" baseline before any media generation. #}
+        {% set ms_block_f_have_baseline = ["脚本结构", "变体方案"] %}
+        {% set ms_block_f_need_baseline = ["成片", "字幕", "音频", "manifest", "交付包"] %}
+        <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-f-delivery-teaser"
+             data-redesign-wave="2026-05-28-ms-ui">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">F · 交付</span>
+              <h2 class="op-section-title" data-role="ms-block-f-title">交付摘要</h2>
+              {% if ms_publish_readiness.publishable %}
+                <span class="op-pill op-pill--ready"><span class="op-pill__dot"></span>可发布</span>
+              {% else %}
+                <span class="op-pill op-pill--blocked"><span class="op-pill__dot"></span>当前不能交付</span>
+              {% endif %}
+            </div>
+            <div class="op-section-actions task-actions" data-role="ms-block-f-actions">
+              <a href="/tasks/{{ task.task_id }}/publish"
+                 class="btn-primary"
+                 data-role="ms-block-f-action-delivery-center">前往交付中心查看完整成片 →</a>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-f-subtitle">工作台仅显示交付状态摘要；逐项交付物详情、零碎产物与发布表单在交付中心。</p>
+          {% if not ms_publish_readiness.publishable %}
+            <div class="op-banner op-banner--blocker" data-role="ms-block-f-headline-blocker">
+              <div>
+                <div class="op-banner__title">当前不能交付：尚未生成成片。</div>
+                <div class="op-banner__body">下方为运营可读的「已具备」与「待补齐」摘要；详细产物状态在交付中心。</div>
+              </div>
+            </div>
+          {% else %}
+            <div class="op-banner op-banner--ready" data-role="ms-block-f-headline-ready">
+              <div>
+                <div class="op-banner__title">可发布 · 所有必要素材已就位。</div>
+                <div class="op-banner__body">前往交付中心查看成片与发布表单。</div>
+              </div>
+            </div>
+          {% endif %}
+          <div class="op-meta-grid" style="margin-top:10px;">
+            <div class="op-meta-item" data-role="ms-block-f-have">
+              <span class="op-meta-item__label">已具备</span>
+              <span class="op-meta-item__value">
+                {{ ms_block_f_have_baseline | join("、") }}{% if ms_block_f_resolved.items %}、{{ ms_block_f_resolved.items | join("、") }}{% endif %}。
+              </span>
+            </div>
+            <div class="op-meta-item" data-role="ms-block-f-need">
+              <span class="op-meta-item__label">待补齐</span>
+              <span class="op-meta-item__value">
+                {% if ms_publish_readiness.publishable and not ms_block_f_missing.items %}—{% else %}{% if ms_block_f_missing.items %}{{ ms_block_f_missing.items | join("、") }}{% else %}{{ ms_block_f_need_baseline | join("、") }}{% endif %}。{% endif %}
+              </span>
+            </div>
+          </div>
+          <p class="op-tech-note" data-role="ms-block-f-scene-pack-note" style="margin-top:8px;">
+            场景包（scene_pack）始终为可选 · 不阻塞发布。
+          </p>
+          <div class="op-tech-note" data-role="ms-block-f-no-fake-final-video-note">
+            本面板不展示 final_video / 发布 URL · final_video 主体在交付中心渲染（RC-R8）。
+          </div>
+        </div>
+      {% endif %}
+
+      {# 2026-05-28 redesign — Mission §2 calls Block F · 技术诊断 (collapsed
+         by default). The existing PR-164 二级诊断面板 fold is repurposed as
+         that block. All historic data-role markers inside the fold are
+         preserved bytewise so existing OWC-MS / OWC-DA / RC tests still
+         resolve their selectors. #}
+      <details class="op-collapse" data-role="op-console-ms-secondary-fold">
+        <summary>
+          <span class="op-section-index" style="margin-right:8px;">F · 诊断</span>
+          矩阵脚本 · 技术诊断（架构师视图，默认收起）
+        </summary>
+        <div class="op-collapse__hint">展开查看 PR-U2 / MS-W3 / 变体面板 / 单脚本可读视图等内部诊断；包括 head_reason / artifact_lookup / publish_readiness / final_provenance 等技术标识。日常运营操作不依赖本节。</div>
+        <div class="op-collapse__body">
+
+      {# PR-U2 Matrix Script Workbench operator-comprehension block. Additive — sits ABOVE the existing axes/cells/slots/attribution rows which are preserved verbatim below. Reads only ms_comp (presentation-layer projection over ms_surface + panel resolver). No new packet truth. No provider/model/vendor controls. #}
+      {% if ms_comp.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-comprehension-panel">
+          <div class="section-title">
+            <h2 data-role="ms-comp-title">{{ ms_comp.panel_title_zh }}</h2>
+            <div class="secondary" data-role="ms-comp-subtitle">{{ ms_comp.panel_subtitle_zh }}</div>
+          </div>
+
+          {% if ms_result_summary and ms_result_summary.is_matrix_script %}
+            {# RC PR-1 RC-R6 — Workbench result-oriented summary header. Restates the unified `publish_readiness` producer's `publishable` + `head_reason` as one of "ready: do X next" / "blocked: missing Y" / "completed", in operator language only. No second producer. Authority: docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md §3 RC-R6 + §5 RC PR-1. #}
+            <div data-role="ms-comp-result-status"
+                 data-status-kind="{{ ms_result_summary.status_kind }}"
+                 style="margin:12px 0 6px;padding:10px 12px;border-radius:6px;background:#f6f7f9;">
+              <div>
+                <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_result_summary.status_kind }}"
+                      data-role="ms-comp-result-status-kind">{{ ms_result_summary.status_label_zh }}</span>
+                <strong data-role="ms-comp-result-status-headline" style="margin-left:6px;">{{ ms_result_summary.headline_zh }}</strong>
+              </div>
+              <div class="secondary" data-role="ms-comp-result-status-next-action" style="margin-top:4px;">{{ ms_result_summary.next_action_zh }}</div>
+              {% if ms_result_summary.head_reason %}
+                <div class="secondary" data-role="ms-comp-result-status-head-reason"
+                     data-head-reason="{{ ms_result_summary.head_reason }}"
+                     style="margin-top:4px;">
+                  head_reason = <code>{{ ms_result_summary.head_reason }}</code> · {{ ms_result_summary.head_reason_label_zh }}
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          <h3 style="margin:12px 0 6px;" data-role="ms-comp-four-zone-label">{{ ms_comp.four_zone_alignment_label_zh }}</h3>
+          <div class="meta-grid" data-role="ms-comp-four-zone-grid">
+            {% for zone in (ms_comp.four_zone_alignment or []) %}
+              <div class="meta-item" data-role="ms-comp-zone" data-zone-id="{{ zone.zone_id }}" data-zone-bound="{{ 'true' if zone.is_bound else 'false' }}">
+                <strong>{{ zone.zone_label_zh }}</strong>
+                <span>
+                  {% if zone.is_bound %}
+                    {% for ref in zone.bound_refs %}
+                      <span class="info-pill" style="margin-right:4px;"><code>{{ ref.ref_id }}</code>{% if ref.version %}@{{ ref.version }}{% endif %}</span>
+                    {% endfor %}
+                  {% else %}
+                    <span class="muted">{{ zone.empty_label_zh }}</span>
+                  {% endif %}
+                </span>
+              </div>
+            {% endfor %}
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-comp-identity-label">{{ ms_comp.task_identity_label_zh }}</h3>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-comp-identity-axes">
+              <strong>axes</strong>
+              <span>{{ ms_comp.task_identity_summary.axes_count }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-comp-identity-cells">
+              <strong>cells</strong>
+              <span>{{ ms_comp.task_identity_summary.cells_count }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-comp-identity-slots">
+              <strong>slots</strong>
+              <span>{{ ms_comp.task_identity_summary.slots_count }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-comp-identity-ready-state">
+              <strong>ready_state</strong>
+              <span>{{ ms_comp.task_identity_summary.ready_state_label_zh }}</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-comp-next-step-header">下一步</h3>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-comp-next-step" data-next-step-zone="{{ ms_comp.next_step_zone }}">
+              <strong>{{ ms_comp.next_step_label_zh }}</strong>
+              <span class="muted">{{ ms_comp.next_step_explanation_zh }}</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-comp-variation-summary-label">{{ ms_comp.variation_summary_label_zh }}</h3>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-comp-variation-summary">
+              <strong>合计</strong>
+              <span>{{ ms_comp.variation_summary.summary_text_zh }}</span>
+            </div>
+          </div>
+          {% if ms_comp.should_group_cells %}
+            <div class="muted t-secondary" style="margin-top:6px;" data-role="ms-comp-grouping-hint">
+              变体数超过 {{ ms_comp.cell_grouping_threshold }} 组，按 axis 元组聚合便于阅读：
+            </div>
+            <ul class="muted" data-role="ms-comp-grouping-list" style="margin:6px 0 0 18px;">
+              {% for group in (ms_comp.axis_tuple_groupings or []) %}
+                <li><code>{{ group.group_key }}</code> · {{ group.count }} 组（示例 cell：{{ group.sample_cell_ids | join(", ") }}）</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% endif %}
+      {# OWC-MS PR-2 / MS-W3 — Workbench A 脚本结构区 read-view. Read-only over task.config.entry. No source_script_ref dereference; no Phase B authoring. Sits ABOVE the existing Variation Panel (Workbench B). Authority: docs/reviews/owc_ms_gate_spec_v1.md §3 MS-W3. #}
+      {% if ms_script_structure.is_matrix_script %}
+        <div class="panel" data-role="matrix-script-script-structure-panel">
+          <div class="section-title">
+            <h2 data-role="ms-script-structure-title">{{ ms_script_structure.panel_title_zh }}</h2>
+            <div class="secondary" data-role="ms-script-structure-subtitle">{{ ms_script_structure.panel_subtitle_zh }}</div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-script-structure-title-row">
+              <strong>{{ ms_script_structure.title_label_zh }}</strong>
+              <span>{{ ms_script_structure.title_value or "—" }}</span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-source-ref-row">

@@ -257,9 +257,18 @@ from gateway.app.services.matrix_script.create_entry import (  # noqa: E402
     build_matrix_script_entry,
     build_matrix_script_task_payload,
 )
+from gateway.app.services.matrix_script.source_script_body_store import (  # noqa: E402
+    BodyStoreError,
+    SOURCE_KIND_PASTE,
+    SOURCE_KIND_UPLOAD,
+    peek_body,
+)
 from gateway.app.services.matrix_script.source_script_ref_minting import (  # noqa: E402
+    MATRIX_SCRIPT_INGEST_ROUTE,
     MATRIX_SCRIPT_MINT_ROUTE,
+    MATRIX_SCRIPT_PEEK_ROUTE,
     mint_source_script_ref,
+    mint_source_script_ref_with_body,
 )
 from gateway.app.services.digital_anchor.create_entry import (  # noqa: E402
     DIGITAL_ANCHOR_ALLOWED_FIELDS,
@@ -610,12 +619,29 @@ async def temporary_connected_delivery(request: Request, line_id: str) -> HTMLRe
 
 @pages_router.get(MATRIX_SCRIPT_CREATE_ROUTE, response_class=HTMLResponse)
 async def tasks_matrix_script_new(request: Request) -> HTMLResponse:
-    """Render the formal Matrix Script create-entry page."""
+    """Render the formal Matrix Script create-entry page.
 
+    Query params:
+        ``technical=1`` reveals the architect-only "高级 / 技术引用" details
+        block on the page (operator-discipline ``source_script_ref`` input +
+        "铸造空句柄" mint button). When absent or not equal to "1" the
+        page renders the operator-only surface — paste / upload / select
+        primary tabs; no opaque-handle vocabulary anywhere on the visible
+        operator surface; a single ``<input type="hidden"
+        name="source_script_ref">`` keeps the server contract intact so
+        the JS ingest pipeline still populates the field before form
+        submit (Mission §A.4 — keep compatibility for existing
+        content://, task://, asset://, ref:// handles).
+    """
+
+    technical_mode = request.query_params.get("technical") == "1"
     return render_template(
         request=request,
         name="matrix_script_new.html",
-        ctx={"features": get_features()},
+        ctx={
+            "features": get_features(),
+            "technical_mode": technical_mode,
+        },
     )
 
 
@@ -685,6 +711,103 @@ async def mint_matrix_script_source_script_ref(request: Request) -> JSONResponse
         requested_by = None
     payload = mint_source_script_ref(requested_by=requested_by)
     return JSONResponse(content=dict(payload))
+
+
+@pages_router.post(MATRIX_SCRIPT_INGEST_ROUTE)
+async def ingest_matrix_script_source_script_body(request: Request) -> JSONResponse:
+    """Mint a handle AND store the operator-paste / operator-upload body text.
+
+    Backing endpoint for the 2026-05-28 Matrix Script Operator UI Redesign
+    wave. The operator pastes a script (or uploads a script document parsed
+    to text client-side) and this endpoint:
+
+    1. Mints a fresh ``content://matrix-script/source/<token>`` via the
+       existing F2 minting service (no widening of the closed scheme set).
+    2. Stores the body text in the volatile in-process body store keyed
+       by the new token (per :mod:`source_script_body_store`).
+    3. Returns the same envelope as the mint endpoint plus three additive
+       fields (``body_char_count`` / ``body_byte_size`` / ``body_source_kind``)
+       and ``has_body=True``.
+
+    The body is stored locally only — NEVER sent to any provider, model,
+    vendor, or engine. The packet still carries only the opaque handle.
+    Gateway restart clears the store.
+
+    Request body (JSON only):
+        {"body": "...script text...", "source_kind": "operator_paste",
+         "requested_by": "operator-handle"}  # source_kind and requested_by optional
+
+    On invalid body / oversize content the service raises HTTP 400 with
+    the underlying validation message.
+    """
+
+    body_text = ""
+    source_kind = SOURCE_KIND_PASTE
+    requested_by: object | None = None
+    try:
+        if request.headers.get("content-type", "").startswith("application/json"):
+            payload = await request.json()
+            if isinstance(payload, dict):
+                raw_body = payload.get("body")
+                if isinstance(raw_body, str):
+                    body_text = raw_body
+                raw_kind = payload.get("source_kind")
+                if isinstance(raw_kind, str) and raw_kind in (
+                    SOURCE_KIND_PASTE,
+                    SOURCE_KIND_UPLOAD,
+                ):
+                    source_kind = raw_kind
+                requested_by = payload.get("requested_by")
+    except Exception as exc:  # noqa: BLE001 — translate parse errors to HTTP 400
+        raise HTTPException(status_code=400, detail=f"invalid JSON body: {exc}")
+
+    if not body_text or not body_text.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="body is required and must not be empty or whitespace-only",
+        )
+
+    try:
+        envelope = mint_source_script_ref_with_body(
+            body_text=body_text,
+            source_kind=source_kind,
+            requested_by=requested_by,
+        )
+    except BodyStoreError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return JSONResponse(content=dict(envelope))
+
+
+@pages_router.get(MATRIX_SCRIPT_PEEK_ROUTE)
+async def peek_matrix_script_source_script_body(token: str) -> JSONResponse:
+    """Return the stored body for ``token`` or HTTP 404 if absent.
+
+    Read-only peek endpoint backing the Workbench Block B 脚本结构 surface:
+    when the operator pasted body content at task creation, Block B can
+    render the real script text instead of the unresolved sentinel.
+
+    The body is returned verbatim plus its size + source_kind metadata so
+    operator-facing surfaces can render an honest "stored body preview"
+    panel. Tokens that were never ingested (operator supplied a pre-existing
+    handle directly, or the gateway restarted since ingest) return HTTP 404
+    so the surface can fall back to the existing STATUS_UNRESOLVED sentinel.
+
+    Token is treated as opaque; no validation beyond non-empty.
+    """
+
+    if not token or not token.strip():
+        raise HTTPException(status_code=400, detail="token must not be empty")
+    peek = peek_body(token.strip())
+    if peek is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                "token not found in body store; either the gateway restarted "
+                "(volatile store) or the handle was supplied directly (no "
+                "ingested body)."
+            ),
+        )
+    return JSONResponse(content=dict(peek))
 
 
 # Closed form-key set for /tasks/digital-anchor/new POST. Mirrors the

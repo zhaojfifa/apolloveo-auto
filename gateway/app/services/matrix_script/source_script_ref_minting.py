@@ -45,9 +45,20 @@ from gateway.app.services.matrix_script.create_entry import (
     SOURCE_SCRIPT_REF_ACCEPTED_SCHEMES,
     _validate_source_script_ref_shape,
 )
+from gateway.app.services.matrix_script.source_script_body_store import (
+    BODY_MAX_BYTES,
+    SOURCE_KIND_PASTE,
+    SOURCE_KIND_UPLOAD,
+    SOURCE_KIND_VALUES,
+    BodyStoreError,
+    put_body,
+)
 
 MATRIX_SCRIPT_MINT_ROUTE = "/tasks/matrix-script/source-script-refs/mint"
+MATRIX_SCRIPT_INGEST_ROUTE = "/tasks/matrix-script/source-script-refs/ingest"
+MATRIX_SCRIPT_PEEK_ROUTE = "/tasks/matrix-script/source-script-refs/{token}/peek"
 MINTING_POLICY = "operator_request_v1"
+INGESTING_POLICY = "operator_body_ingest_v1"
 MINT_TOKEN_PREFIX = "mint"
 _MINT_TOKEN_HEX_LENGTH = 16
 _REQUESTED_BY_MAX_LENGTH = 120
@@ -122,10 +133,79 @@ def mint_source_script_ref(*, requested_by: object | None = None) -> Mapping[str
     }
 
 
+def mint_source_script_ref_with_body(
+    *,
+    body_text: str,
+    source_kind: str,
+    requested_by: object | None = None,
+) -> Mapping[str, object]:
+    """Mint a fresh handle AND store the operator-supplied body text.
+
+    Companion to :func:`mint_source_script_ref` for the 2026-05-28 Matrix
+    Script Operator UI Redesign wave. The operator pastes a script body
+    (or uploads a script document, parsed to text client-side) and this
+    function:
+
+    1. Allocates a fresh opaque ``content://matrix-script/source/<token>``
+       handle via :func:`mint_source_script_ref` (no widening of the
+       closed scheme set).
+    2. Stores the body text in the in-process
+       :mod:`source_script_body_store` keyed by the new ``token``.
+    3. Returns the same closed-key envelope as ``mint_source_script_ref``
+       plus three additive integer / string fields describing the stored
+       body (``body_char_count`` / ``body_byte_size`` / ``body_source_kind``)
+       and a flag ``has_body=True`` so callers can distinguish ingested
+       handles from bare-mint handles.
+
+    The body store is in-process and volatile — gateway restart clears it.
+    The packet still carries only the opaque handle; the body never enters
+    packet truth, never reaches any provider/model/vendor/engine, and is
+    not durably persisted.
+
+    Raises :class:`fastapi.HTTPException` (HTTP 400) on body validation
+    failure (empty / oversize / unknown source_kind) via
+    :class:`BodyStoreError` translation at the route boundary; this
+    function itself raises :class:`BodyStoreError` directly so it remains
+    HTTP-framework-agnostic.
+    """
+
+    if source_kind not in SOURCE_KIND_VALUES:
+        raise BodyStoreError(
+            f"source_kind={source_kind!r} not in closed set {sorted(SOURCE_KIND_VALUES)}"
+        )
+    # Allocate handle first — re-uses the existing minting discipline +
+    # validator round-trip. If minting fails for any reason the body is
+    # never stored.
+    mint_payload = dict(mint_source_script_ref(requested_by=requested_by))
+    record = put_body(
+        token=mint_payload["token"],
+        body_text=body_text,
+        source_kind=source_kind,
+        requested_by=mint_payload.get("requested_by", ""),
+    )
+    mint_payload.update(
+        {
+            "policy": INGESTING_POLICY,
+            "has_body": True,
+            "body_char_count": record.char_count,
+            "body_byte_size": record.byte_size,
+            "body_source_kind": record.source_kind,
+        }
+    )
+    return mint_payload
+
+
 __all__ = [
+    "BODY_MAX_BYTES",
+    "INGESTING_POLICY",
+    "MATRIX_SCRIPT_INGEST_ROUTE",
     "MATRIX_SCRIPT_MINT_ROUTE",
+    "MATRIX_SCRIPT_PEEK_ROUTE",
     "MINTING_POLICY",
     "MINT_TOKEN_PREFIX",
+    "SOURCE_KIND_PASTE",
+    "SOURCE_KIND_UPLOAD",
     "SOURCE_SCRIPT_REF_ACCEPTED_SCHEMES",
     "mint_source_script_ref",
+    "mint_source_script_ref_with_body",
 ]

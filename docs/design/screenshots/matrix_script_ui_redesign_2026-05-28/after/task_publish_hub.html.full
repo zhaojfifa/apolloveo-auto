@@ -298,8 +298,8 @@
           <div class="op-card op-card--accent-emerald" data-role="matrix-script-delivery-center-header" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
-                <span class="op-section-index op-section-index--emerald">① · 介绍</span>
-                <h2 class="op-section-title" data-role="ms-dc-title">交付结果介绍 · {{ task.title or "矩阵脚本任务" }}</h2>
+                <span class="op-section-index op-section-index--emerald">交付中心</span>
+                <h2 class="op-section-title" data-role="ms-dc-title">{{ task.title or "矩阵脚本任务" }}</h2>
                 <span class="op-pill op-pill--matrix"><span class="op-pill__dot"></span>矩阵脚本</span>
                 <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_pub_result.status_kind }}"
                       data-role="ms-dc-header-result-pill">{{ ms_pub_result.status_label_zh or "—" }}</span>
@@ -371,7 +371,7 @@
           <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-a-final-video-primary" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
-                <span class="op-section-index op-section-index--emerald">② · 主视频</span>
+                <span class="op-section-index op-section-index--emerald">A · 主交付</span>
                 <h2 class="op-section-title" data-role="ms-dc-block-a-title">最终成片 · final_video</h2>
               </div>
             </div>
@@ -476,7 +476,7 @@
           <div class="op-card op-card--accent-amber" data-role="matrix-script-block-b-required-deliverables" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
-                <span class="op-section-index op-section-index--amber">③ · 必需</span>
+                <span class="op-section-index op-section-index--amber">B · 必交付</span>
                 <h2 class="op-section-title" data-role="ms-dc-block-b-title">必需交付物</h2>
               </div>
             </div>
@@ -544,7 +544,7 @@
           <div class="op-card" data-role="matrix-script-block-c-scene-pack" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
-                <span class="op-section-index">④ · 可选</span>
+                <span class="op-section-index">C · 可选</span>
                 <h2 class="op-section-title" data-role="ms-dc-block-c-title">可选交付物 · scene_pack（不阻塞发布）</h2>
               </div>
             </div>
@@ -574,7 +574,7 @@
           <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-d-copy-bundle" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
-                <span class="op-section-index">④ · 文案包</span>
+                <span class="op-section-index">D · 文案</span>
                 <h2 class="op-section-title" data-role="ms-dc-block-d-title">发布文案包</h2>
               </div>
             </div>
@@ -614,120 +614,10 @@
             {% endif %}
           </div>
 
-          {# PR-3 (redesign 2026-05-28) · ⑤ 发布设置. New Mission §C
-             section inserted BETWEEN the existing copy-bundle block
-             and the publish-feedback block. Operator-facing form for
-             publish settings (platform + account + title + caption +
-             tags + scheduled time). Submit writes a single
-             operator_publish closure event via the existing endpoint
-             POST /api/matrix-script/closures/{task_id}/events with
-             event_kind=operator_publish. No new endpoint, no closed-
-             enum widening. Per approved product decision #3, the
-             platform input uses <datalist> with the closed 7-value
-             suggestion set (TikTok, YouTube Shorts, Instagram Reels,
-             抖音, 视频号, 小红书, 快手) but free-text is allowed —
-             not a closed enum on the contract layer. #}
-          <div class="op-card op-card--accent-indigo"
-               data-role="matrix-script-block-publish-settings"
-               data-redesign-wave="2026-05-28-pr3"
-               style="margin-top:10px;">
-            <div class="op-section-head">
-              <div class="op-section-head__main">
-                <span class="op-section-index">⑤ · 发布</span>
-                <h2 class="op-section-title" data-role="ms-dc-publish-settings-title">发布设置</h2>
-              </div>
-            </div>
-            <p class="op-section-helper" data-role="ms-dc-publish-settings-subtitle">
-              填写发布平台与账号、文案与标签，确认后系统记录一次发布事件并出现在下方「发布回填」中。系统不直接对外发布，发布动作由运营在对应平台上完成。
-            </p>
-            <form data-role="ms-dc-publish-settings-form"
-                  method="post"
-                  action="/api/matrix-script/closures/{{ task.task_id }}/events"
-                  data-closure-endpoint="/api/matrix-script/closures/{{ task.task_id }}/events"
-                  style="display:grid; gap:12px; grid-template-columns:repeat(2, minmax(0, 1fr)); margin-top:8px;">
-              <input type="hidden" name="event_kind" value="operator_publish" data-role="ms-dc-publish-settings-event-kind" />
-              <input type="hidden" name="actor_kind" value="operator" />
-              <div style="display:grid; gap:6px;">
-                <label for="ms-publish-platform" style="font-weight:700; font-size:13px; color:#334155;">发布平台</label>
-                <input id="ms-publish-platform"
-                       name="publish_platform"
-                       list="ms-publish-platform-suggestions"
-                       data-role="ms-dc-publish-settings-platform"
-                       placeholder="选择或输入平台"
-                       autocomplete="off"
-                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
-                <datalist id="ms-publish-platform-suggestions" data-role="ms-dc-publish-settings-platform-suggestions">
-                  <option value="TikTok"></option>
-                  <option value="YouTube Shorts"></option>
-                  <option value="Instagram Reels"></option>
-                  <option value="抖音"></option>
-                  <option value="视频号"></option>
-                  <option value="小红书"></option>
-                  <option value="快手"></option>
-                </datalist>
-              </div>
-              <div style="display:grid; gap:6px;">
-                <label for="ms-publish-account" style="font-weight:700; font-size:13px; color:#334155;">账号</label>
-                <input id="ms-publish-account"
-                       name="publish_account"
-                       data-role="ms-dc-publish-settings-account"
-                       placeholder="例如：品牌官号 / 运营手号"
-                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
-              </div>
-              <div style="display:grid; gap:6px; grid-column:1 / -1;">
-                <label for="ms-publish-title" style="font-weight:700; font-size:13px; color:#334155;">标题</label>
-                <input id="ms-publish-title"
-                       name="publish_title"
-                       data-role="ms-dc-publish-settings-title-input"
-                       placeholder="发布标题（≤50 字）"
-                       maxlength="120"
-                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
-              </div>
-              <div style="display:grid; gap:6px; grid-column:1 / -1;">
-                <label for="ms-publish-caption" style="font-weight:700; font-size:13px; color:#334155;">文案</label>
-                <textarea id="ms-publish-caption"
-                          name="publish_caption"
-                          data-role="ms-dc-publish-settings-caption"
-                          rows="3"
-                          placeholder="发布文案"
-                          style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit;"></textarea>
-              </div>
-              <div style="display:grid; gap:6px;">
-                <label for="ms-publish-tags" style="font-weight:700; font-size:13px; color:#334155;">标签</label>
-                <input id="ms-publish-tags"
-                       name="publish_tags"
-                       data-role="ms-dc-publish-settings-tags"
-                       placeholder="#tag1 #tag2"
-                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
-              </div>
-              <div style="display:grid; gap:6px;">
-                <label for="ms-publish-scheduled" style="font-weight:700; font-size:13px; color:#334155;">计划发布时间</label>
-                <input id="ms-publish-scheduled"
-                       name="publish_scheduled_at"
-                       type="datetime-local"
-                       data-role="ms-dc-publish-settings-scheduled"
-                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
-              </div>
-              <div style="grid-column:1 / -1; display:flex; gap:8px; justify-content:flex-end; margin-top:4px;">
-                <button type="button"
-                        class="btn-secondary"
-                        data-role="ms-dc-publish-settings-skip"
-                        data-skip-event-kind="operator_retract">跳过发布</button>
-                <button type="submit"
-                        class="btn-primary"
-                        data-role="ms-dc-publish-settings-submit">标记为已发布</button>
-              </div>
-            </form>
-            <p class="op-tech-note" data-role="ms-dc-publish-settings-honesty-note" style="margin-top:10px;">
-              本表单不直接对外发布；提交只是在系统内记录一次发布事件（写入会话内的发布反馈）。外部发布请在对应平台手动完成。
-            </p>
-          </div>
-
-          {# Block ⑥ — 发布回填 (previously labelled Block E · 发布反馈;
-             relabelled by PR-3 to match Mission §C section numbering).
-             Per-variant row table sourced from closure.variation_feedback[];
-             append-only event log from closure.feedback_closure_records[].
-             "+ 记录发布事件" form posts to the existing
+          {# Block E — 发布状态 / 发布反馈. Per-variant row table sourced
+             from closure.variation_feedback[]; append-only event log
+             from closure.feedback_closure_records[]. "+ 记录发布事件"
+             form posts to the existing
              POST /api/matrix-script/closures/{task_id}/events with
              event_kind ∈ D1_EVENT_KINDS + (optional)
              review_zone ∈ REVIEW_ZONE_VALUES. No new endpoint, no
@@ -737,8 +627,8 @@
           <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-publish-feedback" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
-                <span class="op-section-index op-section-index--violet">⑥ · 回填</span>
-                <h2 class="op-section-title" data-role="ms-dc-block-e-title">发布回填</h2>
+                <span class="op-section-index op-section-index--violet">E · 发布反馈</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-e-title">发布状态 / 反馈回填</h2>
               </div>
             </div>
             <p class="op-section-helper" data-role="ms-dc-block-e-subtitle">每个候选独立一行回填发布状态；事件日志 append-only，不可删除。</p>
@@ -890,7 +780,7 @@
           <div class="op-card op-card--accent-violet" data-role="matrix-script-block-f-iteration-archive" style="margin-top:10px;">
             <div class="op-section-head">
               <div class="op-section-head__main">
-                <span class="op-section-index op-section-index--violet">⑥ · 归档</span>
+                <span class="op-section-index op-section-index--violet">F · 迭代</span>
                 <h2 class="op-section-title" data-role="ms-dc-block-f-title">下一轮迭代建议 / 归档</h2>
               </div>
             </div>
