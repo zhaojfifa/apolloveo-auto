@@ -291,7 +291,9 @@
          when no current_fresh media is honest operator copy, never a fake
          URL or placeholder media player. #}
       {% if ms_main_video_result.is_matrix_script %}
-        <div class="op-card op-card--accent-emerald" data-role="matrix-script-main-video-result"
+        <div class="op-card op-card--accent-emerald"
+             id="matrix-script-main-video-result"
+             data-role="matrix-script-main-video-result"
              data-state-kind="{{ ms_main_video_result.state_kind }}"
              data-redesign-wave="2026-05-28-pr2a">
           <div class="op-section-head">
@@ -365,6 +367,89 @@
           </div>
         </div>
       {% endif %}
+
+      {# PR-2B (redesign 2026-05-28) · Observable production flow stepper.
+         Compact 3-step navigation strip rendered BELOW the main video
+         result anchor and ABOVE Block A 任务摘要. Steps:
+           ● 脚本结构  ──  ○ 变体选择  ──  ○ 生成
+         Each step is a same-page anchor to the corresponding block.
+         The stepper is a navigation aid only — collapsed-height
+         ≤120px per Mission §B.2; no operator authoring affordances;
+         no engineering vocabulary; no provider/model/vendor/engine
+         surface. Status per step derived inline from already-attached
+         helpers (script_structure, readable_variants,
+         main_video_result); no new producer, no contract change. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        {% set ms_stepper_section_count = (ms_script_structure.sections or []) | length %}
+        {% set ms_stepper_variant_count = ms_readable_variants.variant_count or 0 %}
+        {% set ms_stepper_state = ms_main_video_result.state_kind %}
+        {% set ms_step1_state = 'done' if ms_stepper_section_count >= 3 else ('active' if ms_stepper_section_count > 0 else 'todo') %}
+        {% set ms_step2_state = 'done' if ms_stepper_variant_count > 0 else ('active' if ms_script_structure.is_matrix_script else 'todo') %}
+        {% set ms_step3_state = 'done' if ms_stepper_state == 'deliverable' else ('active' if ms_stepper_state in ('awaiting_review', 'generating') else 'todo') %}
+        <div class="op-card" data-role="matrix-script-production-flow-stepper"
+             data-redesign-wave="2026-05-28-pr2b"
+             style="padding:14px 18px;">
+          <div class="op-section-head" style="margin-bottom:6px;">
+            <div class="op-section-head__main">
+              <span class="op-section-index">流 · 流程</span>
+              <h3 class="op-section-title" style="font-size:15px;" data-role="ms-production-flow-stepper-title">生产流程可观测</h3>
+            </div>
+          </div>
+          <p class="op-section-helper" style="margin-bottom:8px;" data-role="ms-production-flow-stepper-subtitle">
+            脚本结构 → 变体选择 → 生成。运营观测用 · 详情见下方分区。
+          </p>
+          <div class="op-stage-strip" data-role="ms-production-flow-stepper-strip" style="border:none; padding:0;">
+            <a href="#matrix-script-block-b-script-structure"
+               class="op-stage-strip__step"
+               data-role="ms-production-flow-stepper-step"
+               data-step-id="script_structure"
+               data-step-state="{{ ms_step1_state }}"
+               data-state="{{ ms_step1_state }}"
+               style="text-decoration:none; color:inherit;">
+              <span class="op-stage-strip__num">{{ '✓' if ms_step1_state == 'done' else '1' }}</span>
+              <span><strong>脚本结构</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  {% if ms_stepper_section_count >= 3 %}3 段已具备
+                  {% elif ms_stepper_section_count > 0 %}{{ ms_stepper_section_count }} 段已具备
+                  {% else %}未具备{% endif %}
+                </span>
+              </span>
+            </a>
+            <span class="op-stage-strip__sep" aria-hidden="true"></span>
+            <a href="#matrix-script-block-c-variant-strategy"
+               class="op-stage-strip__step"
+               data-role="ms-production-flow-stepper-step"
+               data-step-id="variant_selection"
+               data-step-state="{{ ms_step2_state }}"
+               data-state="{{ ms_step2_state }}"
+               style="text-decoration:none; color:inherit;">
+              <span class="op-stage-strip__num">{{ '✓' if ms_step2_state == 'done' else '2' }}</span>
+              <span><strong>变体选择</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  {% if ms_stepper_variant_count > 0 %}{{ ms_stepper_variant_count }} 个候选已派生
+                  {% else %}未派生{% endif %}
+                </span>
+              </span>
+            </a>
+            <span class="op-stage-strip__sep" aria-hidden="true"></span>
+            <a href="#matrix-script-main-video-result"
+               class="op-stage-strip__step"
+               data-role="ms-production-flow-stepper-step"
+               data-step-id="generation"
+               data-step-state="{{ ms_step3_state }}"
+               data-state="{{ ms_step3_state }}"
+               style="text-decoration:none; color:inherit;">
+              <span class="op-stage-strip__num">{{ '✓' if ms_step3_state == 'done' else '3' }}</span>
+              <span><strong>生成</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  {{ ms_main_video_result.state_label_zh }}
+                </span>
+              </span>
+            </a>
+          </div>
+        </div>
+      {% endif %}
+
       {% set ms_publish_readiness = ops_pr %}
       {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
       {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
@@ -482,7 +567,9 @@
          secondary diagnostics — Block B does not surface them per wireframe §4.5
          forbidden list ("operator-readable wording only"). #}
       {% if ms_script_structure.is_matrix_script %}
-        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-b-script-structure">
+        <div class="op-card op-card--accent-indigo"
+             id="matrix-script-block-b-script-structure"
+             data-role="matrix-script-block-b-script-structure">
           <div class="op-section-head">
             <div class="op-section-head__main">
               <span class="op-section-index">B · 脚本</span>
@@ -537,7 +624,9 @@
          handles; NO vendor / model / provider / engine column.
          Source: derive_matrix_script_readable_variants. #}
       {% if ms_readable_variants.is_matrix_script %}
-        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-c-variant-strategy">
+        <div class="op-card op-card--accent-indigo"
+             id="matrix-script-block-c-variant-strategy"
+             data-role="matrix-script-block-c-variant-strategy">
           <div class="op-section-head">
             <div class="op-section-head__main">
               <span class="op-section-index">C · 变体</span>
