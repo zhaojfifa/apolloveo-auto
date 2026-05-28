@@ -97,5 +97,8 @@ def test_stepper_step_state_attribute_set_per_step() -> None:
 
 
 def test_stepper_carries_redesign_wave_attribute() -> None:
+    """PR-A reset (2026-05-29) replaces the PR-2B anchor strip with an
+    inline-expandable stepper; the wave attribute is updated accordingly."""
+
     source = _read()
-    assert 'data-redesign-wave="2026-05-28-pr2b"' in source
+    assert 'data-redesign-wave="2026-05-29-pra"' in source

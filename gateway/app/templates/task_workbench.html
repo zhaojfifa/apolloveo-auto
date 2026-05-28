@@ -368,17 +368,14 @@
         </div>
       {% endif %}
 
-      {# PR-2B (redesign 2026-05-28) · Observable production flow stepper.
-         Compact 3-step navigation strip rendered BELOW the main video
-         result anchor and ABOVE Block A 任务摘要. Steps:
-           ● 脚本结构  ──  ○ 变体选择  ──  ○ 生成
-         Each step is a same-page anchor to the corresponding block.
-         The stepper is a navigation aid only — collapsed-height
-         ≤120px per Mission §B.2; no operator authoring affordances;
-         no engineering vocabulary; no provider/model/vendor/engine
-         surface. Status per step derived inline from already-attached
-         helpers (script_structure, readable_variants,
-         main_video_result); no new producer, no contract change. #}
+      {# PR-A reset (2026-05-29) · Section 2 · 生产流程可观测.
+         Compact 3-step strip rendered BELOW Section 1. Each step is a
+         <details> collapsed by default; clicking expands inline detail.
+         The expanded detail is the ONLY surviving operator-visible home
+         for what Blocks B / C / D used to render. Engineering vocabulary
+         (axis tuples, cell_id, slot_id, provider/model/vendor/engine,
+         publish_readiness/head_reason raw enums) is forbidden here and
+         lives only inside Section 5 (技术诊断). #}
       {% if ms_main_video_result.is_matrix_script %}
         {% set ms_stepper_section_count = (ms_script_structure.sections or []) | length %}
         {% set ms_stepper_variant_count = ms_readable_variants.variant_count or 0 %}
@@ -387,7 +384,7 @@
         {% set ms_step2_state = 'done' if ms_stepper_variant_count > 0 else ('active' if ms_script_structure.is_matrix_script else 'todo') %}
         {% set ms_step3_state = 'done' if ms_stepper_state == 'deliverable' else ('active' if ms_stepper_state in ('awaiting_review', 'generating') else 'todo') %}
         <div class="op-card" data-role="matrix-script-production-flow-stepper"
-             data-redesign-wave="2026-05-28-pr2b"
+             data-redesign-wave="2026-05-29-pra"
              style="padding:14px 18px;">
           <div class="op-section-head" style="margin-bottom:6px;">
             <div class="op-section-head__main">
@@ -396,57 +393,160 @@
             </div>
           </div>
           <p class="op-section-helper" style="margin-bottom:8px;" data-role="ms-production-flow-stepper-subtitle">
-            脚本结构 → 变体选择 → 生成。运营观测用 · 详情见下方分区。
+            脚本结构 → 变体选择 → 生成。点击每一步展开运营可读详情。
           </p>
-          <div class="op-stage-strip" data-role="ms-production-flow-stepper-strip" style="border:none; padding:0;">
-            <a href="#matrix-script-block-b-script-structure"
-               class="op-stage-strip__step"
-               data-role="ms-production-flow-stepper-step"
-               data-step-id="script_structure"
-               data-step-state="{{ ms_step1_state }}"
-               data-state="{{ ms_step1_state }}"
-               style="text-decoration:none; color:inherit;">
+          <div class="op-stage-strip" data-role="ms-production-flow-stepper-strip" style="border:none; padding:0; display:flex; gap:8px; align-items:center;">
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="script_structure"
+                  data-step-state="{{ ms_step1_state }}"
+                  data-state="{{ ms_step1_state }}">
               <span class="op-stage-strip__num">{{ '✓' if ms_step1_state == 'done' else '1' }}</span>
               <span><strong>脚本结构</strong>
                 <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
-                  {% if ms_stepper_section_count >= 3 %}3 段已具备
-                  {% elif ms_stepper_section_count > 0 %}{{ ms_stepper_section_count }} 段已具备
-                  {% else %}未具备{% endif %}
+                  {% if ms_stepper_section_count >= 3 %}3 段已具备{% elif ms_stepper_section_count > 0 %}{{ ms_stepper_section_count }} 段已具备{% else %}未具备{% endif %}
                 </span>
               </span>
-            </a>
-            <span class="op-stage-strip__sep" aria-hidden="true"></span>
-            <a href="#matrix-script-block-c-variant-strategy"
-               class="op-stage-strip__step"
-               data-role="ms-production-flow-stepper-step"
-               data-step-id="variant_selection"
-               data-step-state="{{ ms_step2_state }}"
-               data-state="{{ ms_step2_state }}"
-               style="text-decoration:none; color:inherit;">
+            </span>
+            <span class="op-stage-strip__sep" aria-hidden="true">→</span>
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="variant_selection"
+                  data-step-state="{{ ms_step2_state }}"
+                  data-state="{{ ms_step2_state }}">
               <span class="op-stage-strip__num">{{ '✓' if ms_step2_state == 'done' else '2' }}</span>
               <span><strong>变体选择</strong>
                 <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
-                  {% if ms_stepper_variant_count > 0 %}{{ ms_stepper_variant_count }} 个候选已派生
-                  {% else %}未派生{% endif %}
+                  {% if ms_stepper_variant_count > 0 %}{{ ms_stepper_variant_count }} 个候选{% else %}未派生{% endif %}
                 </span>
               </span>
-            </a>
-            <span class="op-stage-strip__sep" aria-hidden="true"></span>
-            <a href="#matrix-script-main-video-result"
-               class="op-stage-strip__step"
-               data-role="ms-production-flow-stepper-step"
-               data-step-id="generation"
-               data-step-state="{{ ms_step3_state }}"
-               data-state="{{ ms_step3_state }}"
-               style="text-decoration:none; color:inherit;">
+            </span>
+            <span class="op-stage-strip__sep" aria-hidden="true">→</span>
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="generation"
+                  data-step-state="{{ ms_step3_state }}"
+                  data-state="{{ ms_step3_state }}">
               <span class="op-stage-strip__num">{{ '✓' if ms_step3_state == 'done' else '3' }}</span>
               <span><strong>生成</strong>
                 <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
                   {{ ms_main_video_result.state_label_zh }}
                 </span>
               </span>
-            </a>
+            </span>
           </div>
+
+          {# Inline expandable detail per step. Collapsed by default. The
+             detail content is operator-language only: NO axis tuples, NO
+             raw engineering identifiers, NO provider/model/vendor/engine
+             surface. Detail bodies are the post-reset homes for Block B /
+             Block C / Block D content. #}
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="script_structure"
+                   style="margin-top:10px; padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>脚本结构</strong> · 展开 Hook / Body / CTA / 关键词 / 禁用词
+            </summary>
+            <div style="padding:8px 4px 0;">
+              {% if ms_script_structure.is_matrix_script %}
+                <div class="op-script-grid" data-role="ms-step1-detail-sections">
+                  {% for section in (ms_script_structure.sections or []) %}
+                    {% set _section_tone = "hook" if section.section_id == "hook" else ("body" if section.section_id == "body" else ("cta" if section.section_id == "cta" else "body")) %}
+                    <div class="op-script-card" data-role="ms-step1-detail-section"
+                         data-section-id="{{ section.section_id }}"
+                         data-section-status="{{ section.body_status_code }}">
+                      <span class="op-script-card__tag op-script-card__tag--{{ _section_tone }}">{{ section.section_label_zh }}</span>
+                      {% if section.body_text %}
+                        <div class="op-script-card__body" data-role="ms-step1-detail-section-body">{{ section.body_text }}</div>
+                      {% else %}
+                        <div class="op-script-card__empty" data-role="ms-step1-detail-section-empty">{{ section.body_status_label_zh }}</div>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                </div>
+                {% if ms_script_structure.taxonomy %}
+                  <div class="op-script-grid" style="margin-top:8px;">
+                    {% for tax in (ms_script_structure.taxonomy or []) %}
+                      {% set _tax_tone = "keyword" if tax.taxonomy_id == "keywords" else ("banword" if tax.taxonomy_id == "banwords" else "body") %}
+                      <div class="op-script-card" data-role="ms-step1-detail-taxonomy"
+                           data-taxonomy-id="{{ tax.taxonomy_id }}">
+                        <span class="op-script-card__tag op-script-card__tag--{{ _tax_tone }}">{{ tax.taxonomy_label_zh }}</span>
+                        {% if tax["values"] %}
+                          <div data-role="ms-step1-detail-taxonomy-values">
+                            {% for v in tax["values"] %}<span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">{{ v }}</span>{% endfor %}
+                          </div>
+                        {% else %}
+                          <div class="op-script-card__empty">{{ tax.values_status_label_zh }}</div>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% else %}
+                <div class="op-script-card__empty" data-role="ms-step1-detail-empty">尚未具备脚本结构。</div>
+              {% endif %}
+            </div>
+          </details>
+
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="variant_selection"
+                   style="padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>变体选择</strong> · 主推版本 / 变体数量 / 差异维度
+            </summary>
+            <div style="padding:8px 4px 0;" data-role="ms-step2-detail">
+              <div class="op-meta-grid">
+                <div class="op-meta-item" data-role="ms-step2-detail-main-version">
+                  <span class="op-meta-item__label">主推版本</span>
+                  <span class="op-meta-item__value">
+                    {% if (ms_recommended_action.recommended_variant or {}).variation_id %}候选 {{ (ms_recommended_action.recommended_variant or {}).variation_id }}{% else %}—{% endif %}
+                  </span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step2-detail-variant-count">
+                  <span class="op-meta-item__label">变体数量</span>
+                  <span class="op-meta-item__value">{{ ms_readable_variants.variant_count or 0 }} 个</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step2-detail-differentiator-dimensions">
+                  <span class="op-meta-item__label">差异维度</span>
+                  <span class="op-meta-item__value">语气 / 时长 / 受众 / 开头方式 / 画面方向</span>
+                </div>
+              </div>
+              {% if (ms_readable_variants.variant_candidates or []) %}
+                <ul style="margin:8px 0 0 16px; padding:0; font-size:13px; color:#334155;" data-role="ms-step2-detail-variant-list">
+                  {% for variant in ms_readable_variants.variant_candidates %}
+                    <li data-role="ms-step2-detail-variant-row" data-variant-index="{{ loop.index }}">
+                      候选 {{ loop.index }} · {{ variant.differentiator_zh or "—" }}{% if variant.length_hint_zh %} · {{ variant.length_hint_zh }}{% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+          </details>
+
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="generation"
+                   style="padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>生成</strong> · 主视频状态 / 当前阻塞 / 下一步
+            </summary>
+            <div style="padding:8px 4px 0;" data-role="ms-step3-detail">
+              <div class="op-meta-grid">
+                <div class="op-meta-item" data-role="ms-step3-detail-state">
+                  <span class="op-meta-item__label">主视频状态</span>
+                  <span class="op-meta-item__value">{{ ms_main_video_result.state_label_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step3-detail-blocker">
+                  <span class="op-meta-item__label">当前阻塞</span>
+                  <span class="op-meta-item__value">{{ ms_main_video_result.blocker_one_liner_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step3-detail-next-action">
+                  <span class="op-meta-item__label">下一步</span>
+                  <span class="op-meta-item__value">{{ ms_main_video_result.next_action_one_liner_zh }}</span>
+                </div>
+              </div>
+              <p class="op-tech-note" style="margin-top:6px;">生成动作集中在第一屏「主视频结果」操作区；本步骤仅做只读观测。</p>
+            </div>
+          </details>
         </div>
       {% endif %}
 
@@ -461,6 +561,143 @@
       {% set ms_slots = (ms_copy_bundle.slots or []) %}
       {% set ms_slot_index = {} %}
       {% for slot in ms_slots %}{% if ms_slot_index.update({slot.slot_id: slot}) %}{% endif %}{% endfor %}
+
+      {# PR-A reset (2026-05-29) · Section 3 · 可选变体 (tertiary).
+         Compact: 当前主推版本 + N-1 其他变体 (folded) + 追加生成 / 同时生成
+         多个变体 (disabled-with-tooltip). Empty state is ONE
+         operator-language message (Mission §B.3 wording). No large
+         backend-style variant tables; no per-variant raw cell_id /
+         slot_id / axis tuples; no fake final_video. Per-variant review-
+         zone forms are deferred to Section 5 for back-compat (PR-A
+         preserves data-role markers there). #}
+      {% if ms_preview_compare.is_matrix_script %}
+        {% set ms_s3_any_resolved = namespace(value=False) %}
+        {% for variation in (ms_preview_compare.variations or []) %}
+          {% if variation.preview_status_code in ("current_fresh", "historical") %}{% set ms_s3_any_resolved.value = True %}{% endif %}
+        {% endfor %}
+        {% set ms_s3_total = (ms_preview_compare.variations or []) | length %}
+        {% set ms_s3_recommended_id = (ms_recommended_action.recommended_variant or {}).variation_id %}
+        <div class="op-card" data-role="matrix-script-section-optional-variants"
+             data-redesign-wave="2026-05-29-pra"
+             data-any-preview-resolved="{{ 'true' if ms_s3_any_resolved.value else 'false' }}">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">3 · 变体</span>
+              <h2 class="op-section-title" data-role="ms-section-optional-variants-title">可选变体</h2>
+              {% if ms_s3_any_resolved.value %}
+                <span class="op-pill op-pill--review" data-role="ms-section-optional-variants-pill">1 主推 + {{ ms_s3_total - 1 }} 备选</span>
+              {% else %}
+                <span class="op-pill op-pill--neutral" data-role="ms-section-optional-variants-pill">暂未生成</span>
+              {% endif %}
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-optional-variants-subtitle">变体是次要内容；主视频在第一屏。下方为本任务的备选脚本变体一览。</p>
+
+          {% if not ms_s3_any_resolved.value %}
+            <div class="op-banner op-banner--review" data-role="ms-section-optional-variants-empty">
+              <div>
+                <div class="op-banner__title">暂未生成变体视频</div>
+                <div class="op-banner__body">你可以先生成主视频，或选择同时生成多个变体。</div>
+              </div>
+            </div>
+          {% else %}
+            {# 主推版本 + 其他变体 (folded). #}
+            {% for variation in (ms_preview_compare.variations or []) %}
+              {% set _is_main = (ms_s3_recommended_id is not none) and (variation.variation_id == ms_s3_recommended_id) %}
+              {% if _is_main %}
+                <div class="op-meta-item" data-role="ms-section-optional-variants-main-version"
+                     data-variation-id-present="true" style="margin-top:8px;">
+                  <span class="op-meta-item__label">当前主推版本</span>
+                  <span class="op-meta-item__value">候选 {{ loop.index }} · {{ variation.recommended_label_zh }}</span>
+                </div>
+              {% endif %}
+            {% endfor %}
+            <details data-role="ms-section-optional-variants-others-fold" style="margin-top:8px;">
+              <summary style="cursor:pointer; font-size:13px;">
+                其他变体（{% set _other = ms_s3_total - 1 if ms_s3_total > 0 else 0 %}{{ _other if _other > 0 else 0 }} 个，点击展开）
+              </summary>
+              <ul style="margin:6px 0 0 16px; padding:0; font-size:13px;" data-role="ms-section-optional-variants-others-list">
+                {% for variation in (ms_preview_compare.variations or []) %}
+                  {% set _is_main = (ms_s3_recommended_id is not none) and (variation.variation_id == ms_s3_recommended_id) %}
+                  {% if not _is_main %}
+                    <li data-role="ms-section-optional-variants-other-row" data-variant-index="{{ loop.index }}">
+                      候选 {{ loop.index }} · {{ variation.recommended_label_zh }}
+                    </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            </details>
+          {% endif %}
+
+          <div class="op-section-actions task-actions" data-role="ms-section-optional-variants-actions" style="margin-top:10px;">
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-optional-variants-action-add"
+                    title="生成主视频能力接入后开放：追加单个变体。"
+                    disabled aria-disabled="true">追加生成变体</button>
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-optional-variants-action-batch"
+                    title="生成主视频能力接入后开放：同时生成多个变体。"
+                    disabled aria-disabled="true">同时生成多个变体</button>
+          </div>
+          <p class="op-tech-note" style="margin-top:8px;">本面板不展示完整成片或外部链接；完整成片在交付页面。</p>
+        </div>
+      {% endif %}
+
+      {# PR-A reset (2026-05-29) · Section 4 · 交付入口 (lightweight).
+         Two-line summary + single CTA. NO deliverable rows; NO publish
+         form; NO publish-feedback table; NO state pill restating Section
+         1's pill. Full delivery + publish lives in Delivery Center. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card" data-role="matrix-script-section-delivery-entry"
+             data-redesign-wave="2026-05-29-pra"
+             data-publishable="{{ 'true' if ops_pr.publishable else 'false' }}">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">4 · 交付</span>
+              <h2 class="op-section-title" data-role="ms-section-delivery-entry-title">交付入口</h2>
+            </div>
+          </div>
+          {% if ops_pr.publishable %}
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">可交付 · 已确认主版本。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">前往交付页面填写发布设置或回填发布状态。</p>
+          {% else %}
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">当前不能交付：尚未生成主视频。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">生成完成后，可前往交付页面查看成片、字幕、音频、文案包与发布设置。</p>
+          {% endif %}
+          <div class="op-section-actions task-actions" style="margin-top:8px;">
+            <a class="btn-primary"
+               data-role="ms-section-delivery-entry-cta"
+               href="/tasks/{{ task.task_id }}/publish">前往交付页面 →</a>
+          </div>
+        </div>
+      {% endif %}
+
+      {# ============================================================
+         PR-A reset (2026-05-29) · Section 5 · 技术诊断 (collapsed,
+         architect view). Everything below this point — including the
+         retired legacy Block A / B / C / D / E / F op-cards and the
+         pre-existing PR-U2 / MS-W3 / Variation Panel / RC PR-2..PR-4
+         diagnostics — lives inside a single collapsed <details>. The
+         data-role markers of the retired legacy blocks are preserved
+         for back-compat with existing structural tests; they are not
+         visible on the operator's primary scan.
+
+         Forbidden in primary view (Sections 1–4): source_script_ref,
+         content://, publish_readiness, head_reason, artifact_lookup,
+         final_video (raw field), RC-R8, closure (raw English),
+         slot_pack, provenance, variation_axis, audience=[b2b,b2c],
+         tone=[…], length=[…], provider, model, vendor, engine,
+         任务 ID as a heading. These tokens may appear ONLY inside this
+         fold.
+         ============================================================ #}
+      <details class="op-collapse" data-role="op-console-ms-technical-diagnostics-fold">
+        <summary>
+          <span class="op-section-index" style="margin-right:8px;">5 · 诊断</span>
+          矩阵脚本 · 技术诊断（架构师视图，默认收起）
+        </summary>
+        <div class="op-collapse__hint">展开查看历史 A–F 区块、PR-U2 / MS-W3 / 变体面板 / 单脚本可读视图等内部诊断；包括 head_reason / artifact_lookup / publish_readiness / final_provenance 等技术标识。日常运营操作不依赖本节。</div>
+        <div class="op-collapse__body">
+
       {# OWC-MS-RO PR-2 — Matrix Script Workbench Blocks A / B / C (read-side
          comprehension). Per matrix_script_workbench_wireframe_v1.md §3 / §4 / §5.
          Three additive operator-result-first panels rendered ABOVE the existing
@@ -2070,6 +2307,9 @@
 
         </div> {# /op-collapse__body for matrix_script secondary diagnostics #}
       </details>
+
+        </div> {# /op-collapse__body for PR-A Section 5 technical diagnostics #}
+      </details> {# /op-console-ms-technical-diagnostics-fold (PR-A Section 5) #}
     {% endif %}
 
     {# OWC-DA PR-2 — Digital Anchor Workbench Five-Panel Convergence (DA-W3 + DA-W4 + DA-W5 + DA-W6 + DA-W7).
