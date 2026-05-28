@@ -66,12 +66,14 @@ def test_block_e_renders_empty_state_marker_when_no_preview_resolved() -> None:
 
 
 def test_block_e_empty_state_mission_copy_present() -> None:
+    """PR-2C update (2026-05-28): Block E renamed from 候选评审 to
+    可选变体 per Mission §B.3. The empty-state wording is now Mission
+    §B.3 verbatim, replacing the PR-0 wording per approved product
+    decision #2."""
+
     source = _read()
-    # Mission §3 exact wording
-    assert "当前暂无可预览成片" in source
-    assert (
-        "已完成脚本结构与变体方案；成片生成能力接入后将在这里展示候选视频。" in source
-    )
+    assert "暂未生成变体视频" in source
+    assert "你可以先生成主视频，或选择同时生成多个变体。" in source
 
 
 def test_block_e_card_data_role_marker_root_preserved_for_back_compat() -> None:

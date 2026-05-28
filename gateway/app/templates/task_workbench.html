@@ -829,31 +829,37 @@
             {% set ms_block_e_any_resolved.value = True %}
           {% endif %}
         {% endfor %}
+        {# PR-2C (redesign 2026-05-28) · Block E renamed from 候选评审
+           to 可选变体. Restructured as "1 主推版本 + N 其他变体".
+           Empty state uses Mission §B.3 verbatim wording. Per-variant
+           review-zone forms preserved bytewise inside the expanded
+           variant details. #}
         <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-candidate-review"
-             data-any-preview-resolved="{{ 'true' if ms_block_e_any_resolved.value else 'false' }}">
+             data-any-preview-resolved="{{ 'true' if ms_block_e_any_resolved.value else 'false' }}"
+             data-redesign-wave="2026-05-28-pr2c">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--violet">E · 评审</span>
-              <h2 class="op-section-title" data-role="ms-block-e-title">候选评审</h2>
+              <span class="op-section-index op-section-index--violet">E · 变体</span>
+              <h2 class="op-section-title" data-role="ms-block-e-title">可选变体</h2>
               {% if ms_block_e_any_resolved.value %}
-                <span class="op-pill op-pill--review">{{ ms_preview_compare.variations | length }} 候选并排</span>
+                <span class="op-pill op-pill--review">1 主推 + {{ (ms_preview_compare.variations | length) - 1 }} 备选</span>
               {% else %}
-                <span class="op-pill op-pill--neutral" data-role="ms-block-e-no-preview-pill">暂无可预览成片</span>
+                <span class="op-pill op-pill--neutral" data-role="ms-block-e-no-preview-pill">暂未生成</span>
               {% endif %}
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-block-e-subtitle">候选评审区呈现每个变体的真实成片与质检；当前阶段成片生成能力尚未接入，因此本区暂以单一说明替代占位卡片。</p>
+          <p class="op-section-helper" data-role="ms-block-e-subtitle">主视频的备选脚本变体在这里展开；主推版本由 publish_readiness 与 closure 操作决定。</p>
           {% if not ms_block_e_any_resolved.value %}
-            {# Mission-mandated empty-state. Replaces N empty per-candidate
-               cards with one honest message. #}
+            {# Mission §B.3 verbatim empty-state. PR-2C update — replaces
+               the PR-0 wording to match the approved product decision #2. #}
             <div class="op-banner op-banner--review" data-role="ms-block-e-no-preview-available">
               <div>
-                <div class="op-banner__title">当前暂无可预览成片</div>
-                <div class="op-banner__body">已完成脚本结构与变体方案；成片生成能力接入后将在这里展示候选视频。</div>
+                <div class="op-banner__title">暂未生成变体视频</div>
+                <div class="op-banner__body">你可以先生成主视频，或选择同时生成多个变体。</div>
               </div>
             </div>
             <div class="op-tech-note" data-role="ms-block-e-no-fake-final-video-note" style="margin-top:10px;">
-              本面板不展示 final_video / 媒体链接 / 发布 URL — 上述项由统一 publish_readiness 与 Delivery Center 收敛（RC-R8）。
+              本面板不展示完整成片或外部链接；完整成片在交付页面。
             </div>
           {% else %}
           {% set ms_block_e_recommended_id = (ms_recommended_action.recommended_variant or {}).variation_id %}
