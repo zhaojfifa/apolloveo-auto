@@ -1,0 +1,2199 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>page.workbench.title - ms-pra-demo-001</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
+  <link rel="stylesheet" href="/static/pipeline_lab.css" />
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <link rel="stylesheet" href="/static/css/operator_console.css">
+  <style>
+    :root { color-scheme: light; }
+    .page.workbench {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .header-card {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .back-link {
+      color: #1d4ed8;
+      text-decoration: none;
+      font-weight: 700;
+    }
+
+    .btn-primary {
+      background: #2563eb;
+      color: #ffffff;
+      border: 1px solid #2563eb;
+    }
+    .btn-primary:hover { filter: brightness(.95); }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+      border: 1px solid #d1d5db;
+    }
+    .btn-secondary:hover { filter: brightness(.98); }
+    .btn-primary:disabled,
+    .btn-secondary:disabled {
+      opacity: 0.7;
+      color: #111827;
+    }
+    h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+    .status-pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .badge-ready { background: #dcfce7; color: #15803d; }
+    .badge-processing { background: #fef3c7; color: #b45309; }
+    .badge-error { background: #fee2e2; color: #b91c1c; }
+    .meta-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px 16px;
+    }
+    .meta-item { font-size: 0.95rem; color: #374151; }
+    .meta-item strong {
+      display: block;
+      color: #0f172a;
+      font-size: 0.8rem;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .muted { color: #64748b; font-size: 0.85rem; }
+    .deliverables-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+    .deliverable-card {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 14px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #f8fafc;
+    }
+    .deliverable-card.primary { border-color: rgba(37, 99, 235, 0.35); background: #eef2ff; }
+    .deliverable-title { font-weight: 700; font-size: 1rem; color: #0f172a; }
+    .deliverable-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .download-link {
+      color: #1d4ed8;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .download-link.disabled { color: #9ca3af; pointer-events: none; }
+    .copy-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .copy-btn {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #cbd5f5; }
+    .info-row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .info-pill {
+      background: #f1f5f9;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .publish-textarea { width: 100%; min-height: 120px; }
+    .steps-grid { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .step-card {
+      border: 1px solid rgba(15, 23, 42, 0.08);
+      border-radius: 14px;
+      padding: 12px;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .step-card h3 { margin: 0; font-size: 1rem; }
+    pre.output-log {
+      background: #0f172a;
+      color: #e2e8f0;
+      border-radius: 12px;
+      padding: 12px;
+      max-height: 240px;
+      overflow: auto;
+      white-space: pre-wrap;
+    }
+    details.panel summary { cursor: pointer; font-weight: 700; }
+    @media (max-width: 768px) {
+      .header-row { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page workbench">
+    <div class="card header-card">
+
+
+
+
+
+<div class="topbar">
+  <div class="topbar-left">
+    
+      <div class="topbar-title">ui.workbench.title</div>
+    
+    
+      <div class="topbar-subtitle">page.workbench.subtitle</div>
+    
+  </div>
+
+  <div class="topbar-center">
+    
+      <div class="segmented">
+        
+          <a class="segmented-item nav-pill ui-pill active" href="/tasks">
+            common.tasks
+          </a>
+        
+          <a class="segmented-item nav-pill ui-pill " href="/tools/hub">
+            common.tools
+          </a>
+        
+      </div>
+    
+  </div>
+
+  <div class="topbar-right">
+    <script>
+  window.__I18N__ = {"lang": "zh", "messages": {}};
+  window.__UI_LOCALE__ = "";
+</script>
+<div class="lang-tabs lang-switch">
+  
+</div>
+    
+      <div class="topbar-actions">
+        
+          <a class="btn ui-pill btn-ghost" href="/tasks">
+            common.back_task_board
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+      
+       
+    </div>
+
+    
+    
+    
+    
+    
+    
+
+    
+    
+    
+    <div class="op-stage-strip" data-role="op-console-stage-strip"
+         data-line="matrix_script"
+         data-publishable="false">
+      
+      
+      
+      
+        
+        
+        <span class="op-stage-strip__step" data-stage="created" data-state="done">
+          <span class="op-stage-strip__num">✓</span>
+          <span>已创建</span>
+        </span>
+        <span class="op-stage-strip__sep" aria-hidden="true"></span>
+      
+        
+        
+        <span class="op-stage-strip__step" data-stage="pending_config" data-state="done">
+          <span class="op-stage-strip__num">✓</span>
+          <span>待配置</span>
+        </span>
+        <span class="op-stage-strip__sep" aria-hidden="true"></span>
+      
+        
+        
+        <span class="op-stage-strip__step" data-stage="generating" data-state="done">
+          <span class="op-stage-strip__num">✓</span>
+          <span>生成中</span>
+        </span>
+        <span class="op-stage-strip__sep" aria-hidden="true"></span>
+      
+        
+        
+        <span class="op-stage-strip__step" data-stage="awaiting_review" data-state="active">
+          <span class="op-stage-strip__num">4</span>
+          <span>待校对</span>
+        </span>
+        <span class="op-stage-strip__sep" aria-hidden="true"></span>
+      
+        
+        
+        <span class="op-stage-strip__step" data-stage="final_ready" data-state="todo">
+          <span class="op-stage-strip__num">5</span>
+          <span>成片完成</span>
+        </span>
+        <span class="op-stage-strip__sep" aria-hidden="true"></span>
+      
+        
+        
+        <span class="op-stage-strip__step" data-stage="publishable" data-state="todo">
+          <span class="op-stage-strip__num">6</span>
+          <span>可发布</span>
+        </span>
+        <span class="op-stage-strip__sep" aria-hidden="true"></span>
+      
+        
+        
+        <span class="op-stage-strip__step" data-stage="backfilled" data-state="todo">
+          <span class="op-stage-strip__num">7</span>
+          <span>已回填</span>
+        </span>
+        <span class="op-stage-strip__sep" aria-hidden="true"></span>
+      
+        
+        
+        <span class="op-stage-strip__step" data-stage="archived" data-state="todo">
+          <span class="op-stage-strip__num">8</span>
+          <span>已归档</span>
+        </span>
+        
+      
+    </div>
+
+    
+
+    
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+
+      
+      
+        <div class="op-card op-card--accent-emerald"
+             id="matrix-script-main-video-result"
+             data-role="matrix-script-main-video-result"
+             data-state-kind="not_generated"
+             data-redesign-wave="2026-05-28-pr2a">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">★ · 主视频</span>
+              <h2 class="op-section-title" data-role="ms-main-video-result-title">主视频结果</h2>
+              <span class="op-pill op-pill--blocked"
+                    data-role="ms-main-video-result-state-pill"
+                    data-state-kind="not_generated">
+                <span class="op-pill__dot"></span>未生成
+              </span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-main-video-result-subtitle">本任务尚未生成主视频。下方为生产流程与可选变体的观测视图。</p>
+
+          
+          <div class="op-main-video-preview" data-role="ms-main-video-result-preview"
+               data-preview-available="false"
+               style="margin:14px 0; padding:48px 18px; min-height:220px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:12px; background:#fbfdff; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;">
+            
+              <div data-role="ms-main-video-result-preview-empty"
+                   style="font-size:14px; line-height:1.6; color:var(--op-fg-soft, #64748b); max-width:560px;">
+                当前尚未生成主视频。已完成脚本结构与生成方案准备，成片生成能力接入后将在这里展示视频结果。
+              </div>
+            
+          </div>
+
+          
+          <div class="op-main-video-actions task-actions"
+               data-role="ms-main-video-result-actions"
+               style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+            
+              
+                <button type="button"
+                        class="btn-secondary"
+                        data-role="ms-main-video-result-action"
+                        data-action-id="generate_main_video"
+                        data-enabled="false"
+                        
+                        disabled aria-disabled="true" title="生成能力接入后开放（资格扩展波）。">生成主视频</button>
+              
+            
+              
+                <button type="button"
+                        class="btn-secondary"
+                        data-role="ms-main-video-result-action"
+                        data-action-id="regenerate"
+                        data-enabled="false"
+                        
+                        disabled aria-disabled="true" title="生成能力接入后开放。">重新生成</button>
+              
+            
+              
+                <button type="button"
+                        class="btn-secondary"
+                        data-role="ms-main-video-result-action"
+                        data-action-id="confirm_main_version"
+                        data-enabled="false"
+                        
+                        disabled aria-disabled="true" title="尚无新鲜成片可确认。">确认为主版本</button>
+              
+            
+              
+                <a class="btn-primary"
+                   data-role="ms-main-video-result-action"
+                   data-action-id="go_to_delivery"
+                   data-enabled="true"
+                   href="/tasks/ms-pra-demo-001/publish">前往交付页面 →</a>
+              
+            
+          </div>
+
+          
+          <div class="op-banner op-banner--blocker"
+               data-role="ms-main-video-result-banner"
+               style="margin-top:12px;">
+            <div>
+              <div class="op-banner__title" data-role="ms-main-video-result-blocker">当前阻塞:尚未生成主视频。</div>
+              <div class="op-banner__body" data-role="ms-main-video-result-next-action">下一步:等待生成能力接入;可前往交付页面预览交付清单。</div>
+            </div>
+          </div>
+        </div>
+      
+
+      
+
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+      
+
+      
+
+      
+      
+        <div class="op-card op-card--accent-indigo"
+             data-role="matrix-script-section-script-understanding"
+             data-redesign-wave="2026-05-30-phase2b">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">B · 脚本</span>
+              <h2 class="op-section-title" data-role="ms-section-script-understanding-title">脚本理解</h2>
+              <span class="op-pill op-pill--ready"><span class="op-pill__dot"></span>已具备</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-script-understanding-subtitle">系统读懂的脚本三段式 · 关键词 · 禁用词 · 卖点 · 目标平台 · 时长 · 目标语言。</p>
+          <div class="op-meta-grid">
+            
+              <div class="op-meta-item" data-role="ms-section-script-understanding-segment"
+                   data-section-id="hook">
+                <span class="op-meta-item__label">Hook · 前 3 秒</span>
+                <span class="op-meta-item__value">
+                  三秒钩:你的内容值不值得被看完?
+                </span>
+              </div>
+            
+              <div class="op-meta-item" data-role="ms-section-script-understanding-segment"
+                   data-section-id="body">
+                <span class="op-meta-item__label">Body · 中段</span>
+                <span class="op-meta-item__value">
+                  信息密度:三段式叙事，每段给出明确收益。
+                </span>
+              </div>
+            
+              <div class="op-meta-item" data-role="ms-section-script-understanding-segment"
+                   data-section-id="cta">
+                <span class="op-meta-item__label">CTA · 结尾</span>
+                <span class="op-meta-item__value">
+                  行动指引:关注 + 评论你的下一个选题。
+                </span>
+              </div>
+            
+            <div class="op-meta-item" data-role="ms-section-script-understanding-selling-points"
+                 data-status-code="selling_points_pending_upstream">
+              <span class="op-meta-item__label">卖点</span>
+              <span class="op-meta-item__value op-tech-note">卖点项尚未由 content_structure 投射；可在 J 节查看占位字段。</span>
+            </div>
+            
+              <div class="op-meta-item" data-role="ms-section-script-understanding-taxonomy"
+                   data-taxonomy-id="keywords">
+                <span class="op-meta-item__label">关键词</span>
+                <span class="op-meta-item__value">
+                  内容运营 · 短视频
+                </span>
+              </div>
+            
+              <div class="op-meta-item" data-role="ms-section-script-understanding-taxonomy"
+                   data-taxonomy-id="banwords">
+                <span class="op-meta-item__label">禁用词</span>
+                <span class="op-meta-item__value">
+                  夸大宣传 · 绝对化承诺
+                </span>
+              </div>
+            
+            <div class="op-meta-item" data-role="ms-section-script-understanding-target-platform">
+              <span class="op-meta-item__label">目标平台</span>
+              <span class="op-meta-item__value">TikTok</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-script-understanding-target-language">
+              <span class="op-meta-item__label">目标语言</span>
+              <span class="op-meta-item__value">
+                
+                zh-CN、en
+              </span>
+            </div>
+          </div>
+        </div>
+      
+
+      
+      
+        
+        <div class="op-card op-card--accent-emerald"
+             data-role="matrix-script-section-generation-plan"
+             data-redesign-wave="2026-05-30-phase2b"
+             data-status-code="plan_pending_upstream">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">C · 计划</span>
+              <h2 class="op-section-title" data-role="ms-section-generation-plan-title">视频生成计划 · 故事板</h2>
+              <span class="op-pill op-pill--review" data-role="ms-section-generation-plan-status-pill">当前占位 · 后台待接入</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-generation-plan-subtitle">系统将在「方案生成」能力接入后产出可编辑分镜方案；当前展示的是基于脚本理解的占位草案，<b>未声明已就绪</b>。</p>
+
+          
+          <ul style="margin:8px 0 0 0; padding:0; list-style:none; display:grid; gap:10px;"
+              data-role="ms-section-generation-plan-scene-list"
+              data-scene-count="3">
+            
+            
+            
+              
+              
+              <li data-role="ms-section-generation-plan-scene-row"
+                  data-scene-index="1"
+                  data-status-code="plan_pending_upstream"
+                  style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+                <div style="display:flex; gap:10px; align-items:baseline; margin-bottom:8px;">
+                  <span data-role="ms-section-generation-plan-scene-number"
+                        style="font-weight:700; color:var(--op-accent, #2563eb); font-size:16px; background:#eff6ff; border-radius:6px; padding:1px 10px;">场景 1</span>
+                  <strong style="font-size:14px;">Hook · 前 3 秒</strong>
+                  <span class="op-pill op-pill--neutral" data-role="ms-section-generation-plan-scene-status">当前占位</span>
+                </div>
+                <div class="op-meta-grid" style="font-size:12px; grid-template-columns:repeat(2, 1fr);">
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-script-segment">
+                    <span class="op-meta-item__label">脚本片段</span>
+                    <span class="op-meta-item__value">三秒钩:你的内容值不值得被看完?</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-visual-intent">
+                    <span class="op-meta-item__label">视觉意图</span>
+                    <span class="op-meta-item__value">人物近景 · 自然光 · 情绪密度高</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-background-suggestion">
+                    <span class="op-meta-item__label">背景建议 <span class="op-pill op-pill--neutral" style="font-size:10px;">未接入素材匹配</span></span>
+                    <span class="op-meta-item__value">厨房 / 阳台 / 农场（自然采光）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-broll-suggestion">
+                    <span class="op-meta-item__label">B-Roll 建议 <span class="op-pill op-pill--neutral" style="font-size:10px;">未接入素材匹配</span></span>
+                    <span class="op-meta-item__value">微笑女性 · 切到主体特写</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-product-material-slot">
+                    <span class="op-meta-item__label">产品素材位 <span class="op-pill op-pill--neutral" style="font-size:10px;">运营可上传</span></span>
+                    <span class="op-meta-item__value">[空槽位]</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-role">
+                    <span class="op-meta-item__label">角色 / 出镜</span>
+                    <span class="op-meta-item__value">AI 主播 · 温和女声 zh-CN</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-voiceover">
+                    <span class="op-meta-item__label">旁白</span>
+                    <span class="op-meta-item__value">三秒钩:你的内容值不值得被看完?（默认 = 脚本片段，可编辑）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-subtitle">
+                    <span class="op-meta-item__label">字幕</span>
+                    <span class="op-meta-item__value">三秒钩:你的内容值不值得被看完?…（关键词高亮）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-music-mood">
+                    <span class="op-meta-item__label">音乐情绪</span>
+                    <span class="op-meta-item__value">上扬 · 轻快</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-aspect-ratio">
+                    <span class="op-meta-item__label">画幅</span>
+                    <span class="op-meta-item__value">9:16</span>
+                  </div>
+                </div>
+              </li>
+            
+              
+              
+              <li data-role="ms-section-generation-plan-scene-row"
+                  data-scene-index="2"
+                  data-status-code="plan_pending_upstream"
+                  style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+                <div style="display:flex; gap:10px; align-items:baseline; margin-bottom:8px;">
+                  <span data-role="ms-section-generation-plan-scene-number"
+                        style="font-weight:700; color:var(--op-accent, #2563eb); font-size:16px; background:#eff6ff; border-radius:6px; padding:1px 10px;">场景 2</span>
+                  <strong style="font-size:14px;">Body · 中段</strong>
+                  <span class="op-pill op-pill--neutral" data-role="ms-section-generation-plan-scene-status">当前占位</span>
+                </div>
+                <div class="op-meta-grid" style="font-size:12px; grid-template-columns:repeat(2, 1fr);">
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-script-segment">
+                    <span class="op-meta-item__label">脚本片段</span>
+                    <span class="op-meta-item__value">信息密度:三段式叙事，每段给出明确收益。</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-visual-intent">
+                    <span class="op-meta-item__label">视觉意图</span>
+                    <span class="op-meta-item__value">食材特写 · 颗粒感 · 慢动作可选</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-background-suggestion">
+                    <span class="op-meta-item__label">背景建议 <span class="op-pill op-pill--neutral" style="font-size:10px;">未接入素材匹配</span></span>
+                    <span class="op-meta-item__value">超市 / 农场（干净背景）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-broll-suggestion">
+                    <span class="op-meta-item__label">B-Roll 建议 <span class="op-pill op-pill--neutral" style="font-size:10px;">未接入素材匹配</span></span>
+                    <span class="op-meta-item__value">主体特写 ×2 · 真实试用镜头</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-product-material-slot">
+                    <span class="op-meta-item__label">产品素材位 <span class="op-pill op-pill--neutral" style="font-size:10px;">运营可上传</span></span>
+                    <span class="op-meta-item__value">[空槽位]</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-role">
+                    <span class="op-meta-item__label">角色 / 出镜</span>
+                    <span class="op-meta-item__value">同 1 号主角</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-voiceover">
+                    <span class="op-meta-item__label">旁白</span>
+                    <span class="op-meta-item__value">信息密度:三段式叙事，每段给出明确收益。（默认 = 脚本片段，可编辑）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-subtitle">
+                    <span class="op-meta-item__label">字幕</span>
+                    <span class="op-meta-item__value">信息密度:三段式叙事，每段给出明确收益。…（关键词高亮）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-music-mood">
+                    <span class="op-meta-item__label">音乐情绪</span>
+                    <span class="op-meta-item__value">上扬</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-aspect-ratio">
+                    <span class="op-meta-item__label">画幅</span>
+                    <span class="op-meta-item__value">9:16</span>
+                  </div>
+                </div>
+              </li>
+            
+              
+              
+              <li data-role="ms-section-generation-plan-scene-row"
+                  data-scene-index="3"
+                  data-status-code="plan_pending_upstream"
+                  style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+                <div style="display:flex; gap:10px; align-items:baseline; margin-bottom:8px;">
+                  <span data-role="ms-section-generation-plan-scene-number"
+                        style="font-weight:700; color:var(--op-accent, #2563eb); font-size:16px; background:#eff6ff; border-radius:6px; padding:1px 10px;">场景 3</span>
+                  <strong style="font-size:14px;">CTA · 结尾</strong>
+                  <span class="op-pill op-pill--neutral" data-role="ms-section-generation-plan-scene-status">当前占位</span>
+                </div>
+                <div class="op-meta-grid" style="font-size:12px; grid-template-columns:repeat(2, 1fr);">
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-script-segment">
+                    <span class="op-meta-item__label">脚本片段</span>
+                    <span class="op-meta-item__value">行动指引:关注 + 评论你的下一个选题。</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-visual-intent">
+                    <span class="op-meta-item__label">视觉意图</span>
+                    <span class="op-meta-item__value">直视镜头 · 字幕强化 · 收尾 sting</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-background-suggestion">
+                    <span class="op-meta-item__label">背景建议 <span class="op-pill op-pill--neutral" style="font-size:10px;">未接入素材匹配</span></span>
+                    <span class="op-meta-item__value">保持情绪一致性 · 同 1 号</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-broll-suggestion">
+                    <span class="op-meta-item__label">B-Roll 建议 <span class="op-pill op-pill--neutral" style="font-size:10px;">未接入素材匹配</span></span>
+                    <span class="op-meta-item__value">慢镜头举起主体 · 终镜定格</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-product-material-slot">
+                    <span class="op-meta-item__label">产品素材位 <span class="op-pill op-pill--neutral" style="font-size:10px;">运营可上传</span></span>
+                    <span class="op-meta-item__value">[空槽位]</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-role">
+                    <span class="op-meta-item__label">角色 / 出镜</span>
+                    <span class="op-meta-item__value">同 1 号主角</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-voiceover">
+                    <span class="op-meta-item__label">旁白</span>
+                    <span class="op-meta-item__value">行动指引:关注 + 评论你的下一个选题。（默认 = 脚本片段，可编辑）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-subtitle">
+                    <span class="op-meta-item__label">字幕</span>
+                    <span class="op-meta-item__value">行动指引:关注 + 评论你的下一个选题。…（关键词高亮）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-music-mood">
+                    <span class="op-meta-item__label">音乐情绪</span>
+                    <span class="op-meta-item__value">上扬 · 收尾 sting</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-aspect-ratio">
+                    <span class="op-meta-item__label">画幅</span>
+                    <span class="op-meta-item__value">9:16</span>
+                  </div>
+                </div>
+              </li>
+            
+          </ul>
+          <p class="op-tech-note" data-role="ms-section-generation-plan-honest-disclaimer" style="margin-top:10px;">
+            上述分镜为占位草案；正式方案需由后端方案生成能力产出，当前不声明任何镜头已就绪。
+          </p>
+        </div>
+      
+
+      
+      
+        <div class="op-card op-card--accent-amber"
+             data-role="matrix-script-section-visual-materials"
+             data-redesign-wave="2026-05-30-phase2b"
+             data-status-code="broll_pending_upstream">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--amber">D · 画面</span>
+              <h2 class="op-section-title" data-role="ms-section-visual-materials-title">画面与素材</h2>
+              <span class="op-pill op-pill--neutral" data-role="ms-section-visual-materials-status-pill">当前占位</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-visual-materials-subtitle">素材匹配能力尚未接入；下方为背景 / B-Roll / 产品素材的占位槽。</p>
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="ms-section-visual-materials-bg-slot"
+                 data-status-code="broll_pending_upstream">
+              <span class="op-meta-item__label">背景候选槽</span>
+              <span class="op-meta-item__value op-tech-note">尚未接入：素材库与运营上传素材的匹配结果将在此处展开。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-visual-materials-broll-slot"
+                 data-status-code="broll_pending_upstream">
+              <span class="op-meta-item__label">B-Roll 候选槽</span>
+              <span class="op-meta-item__value op-tech-note">尚未接入：每个镜头的 B-Roll 候选将在此处展开。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-visual-materials-product-slot"
+                 data-status-code="broll_pending_upstream">
+              <span class="op-meta-item__label">产品素材槽</span>
+              <span class="op-meta-item__value op-tech-note">尚未接入：运营在「新建」上传的产品镜头将在此处出现。</span>
+            </div>
+          </div>
+          <div class="op-section-actions task-actions" data-role="ms-section-visual-materials-actions" style="margin-top:8px;">
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-visual-materials-replace-bg"
+                    title="素材匹配能力尚未接入。"
+                    disabled aria-disabled="true">替换背景</button>
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-visual-materials-replace-broll"
+                    title="同上。"
+                    disabled aria-disabled="true">替换 B-Roll</button>
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-visual-materials-regenerate"
+                    title="视觉匹配 worker 尚未接入。"
+                    disabled aria-disabled="true">重新生成视觉建议</button>
+          </div>
+          <p class="op-tech-note" data-role="ms-section-visual-materials-commercial-note" style="margin-top:6px;">
+            素材接入后，每个候选会标注商业可用 / 需审核 / 运营上传。
+          </p>
+        </div>
+      
+
+      
+      
+        <div class="op-card op-card--accent-violet"
+             data-role="matrix-script-section-role-voice"
+             data-redesign-wave="2026-05-30-phase2b"
+             data-status-code="voice_preview_pending_voicetrans">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--violet">E · 角色</span>
+              <h2 class="op-section-title" data-role="ms-section-role-voice-title">角色与声音</h2>
+              <span class="op-pill op-pill--neutral" data-role="ms-section-role-voice-status-pill">当前占位</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-role-voice-subtitle">角色资产由数字人口播线供应；语音由 VoiceTrans 作为未来运营时层供应方接入。本节只面向运营做偏好选择，技术细节在 J 节。</p>
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="ms-section-role-voice-role-choice">
+              <span class="op-meta-item__label">角色</span>
+              <span class="op-meta-item__value">AI 主播 · 温和女声（默认占位）</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-role-voice-persona">
+              <span class="op-meta-item__label">气质</span>
+              <span class="op-meta-item__value">温和 / 真诚（占位）</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-role-voice-voice-style">
+              <span class="op-meta-item__label">语气</span>
+              <span class="op-meta-item__value">自然亲切（占位）</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-role-voice-target-language">
+              <span class="op-meta-item__label">目标语言</span>
+              <span class="op-meta-item__value">
+                
+                zh-CN、en
+              </span>
+            </div>
+          </div>
+          <div data-role="ms-section-role-voice-preview-slot"
+               data-status-code="voice_preview_pending_voicetrans"
+               style="margin-top:10px; padding:14px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:8px; text-align:center; background:#fbfdff;">
+            <span class="op-tech-note" data-role="ms-section-role-voice-preview-label">🔊 语音预览占位 · VoiceTrans 桥接尚未接入。</span>
+          </div>
+          <p class="op-tech-note" data-role="ms-section-role-voice-no-iframe-note" style="margin-top:8px;">
+            本节不嵌入 VoiceTrans 页面；运营时层接入后由系统选择供应方，不向运营暴露供应商名。
+          </p>
+        </div>
+      
+
+      
+      
+        <div class="op-card"
+             data-role="matrix-script-section-subtitle-music"
+             data-redesign-wave="2026-05-30-phase2b"
+             data-status-code="subtitle_style_pending_compose">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">F · 字幕音乐</span>
+              <h2 class="op-section-title" data-role="ms-section-subtitle-music-title">字幕与音乐</h2>
+              <span class="op-pill op-pill--neutral" data-role="ms-section-subtitle-music-status-pill">当前占位</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-subtitle-music-subtitle">字幕样式与背景音乐控制接入后将在此处实时预览；当前为占位。</p>
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="ms-section-subtitle-music-font"
+                 data-status-code="subtitle_style_pending_compose">
+              <span class="op-meta-item__label">字体（占位）</span>
+              <span class="op-meta-item__value">思源黑 Bold · 大字 · 关键词高亮</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-subtitle-music-position"
+                 data-status-code="subtitle_style_pending_compose">
+              <span class="op-meta-item__label">位置（占位）</span>
+              <span class="op-meta-item__value">底部居中</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-subtitle-music-bgm-mood"
+                 data-status-code="bgm_pending_upstream">
+              <span class="op-meta-item__label">BGM 情绪（占位）</span>
+              <span class="op-meta-item__value">上扬 / 轻快</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-subtitle-music-bgm-volume"
+                 data-status-code="bgm_pending_upstream">
+              <span class="op-meta-item__label">音量（占位）</span>
+              <span class="op-meta-item__value">35%（自动避让旁白）</span>
+            </div>
+          </div>
+          <div class="op-section-actions task-actions" data-role="ms-section-subtitle-music-actions" style="margin-top:8px;">
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-subtitle-music-replace-music"
+                    title="替换 / 上传背景音乐的能力尚未接入。"
+                    disabled aria-disabled="true">替换 / 上传背景音乐</button>
+          </div>
+        </div>
+      
+
+      
+      
+        
+        
+          
+        
+          
+        
+          
+        
+        
+        
+        <div class="op-card" data-role="matrix-script-section-optional-variants"
+             data-redesign-wave="2026-05-30-phase2b"
+             data-any-preview-resolved="false">
+          
+          <div data-role="matrix-script-section-video-versions"
+               data-redesign-wave="2026-05-30-phase2b"></div>
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">G · 变体</span>
+              <h2 class="op-section-title" data-role="ms-section-optional-variants-title">视频变体</h2>
+              
+                <span class="op-pill op-pill--neutral" data-role="ms-section-optional-variants-pill">暂未生成</span>
+              
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-optional-variants-subtitle">每一个变体都是一个视频版本。系统会告诉你「哪里不同 / 为什么测这一版 / 推荐哪个」。运营无须看 axis 元组。</p>
+
+          
+          <div data-role="ms-section-video-versions-list"
+               style="display:grid; gap:10px; margin-top:10px;">
+            
+            <div data-role="ms-section-video-versions-card"
+                 data-version-id="V1"
+                 data-is-recommended="true"
+                 data-status-code="variants_pending_capability"
+                 style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+              <div style="display:flex; gap:10px; align-items:baseline;">
+                <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V1 · 厨房 · 上扬</strong>
+                <span class="op-pill op-pill--ready"
+                      data-role="ms-section-video-versions-card-recommended-marker">⭐ 推荐</span>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">当前占位 · 待生成</span>
+              </div>
+              <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
+                  <span class="op-meta-item__label">哪里不同</span>
+                  <span class="op-meta-item__value">背景：温馨厨房 · BGM：上扬 · 字幕：大字高亮</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
+                  <span class="op-meta-item__label">为什么测这一版</span>
+                  <span class="op-meta-item__value">主流情绪基线版，覆盖大多数账号 / 时段。</span>
+                </div>
+              </div>
+            </div>
+
+            
+            <div data-role="ms-section-video-versions-card"
+                 data-version-id="V2"
+                 data-is-recommended="false"
+                 data-status-code="variants_pending_capability"
+                 style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+              <div style="display:flex; gap:10px; align-items:baseline;">
+                <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V2 · 农场 · 真情实感</strong>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">当前占位 · 待生成</span>
+              </div>
+              <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
+                  <span class="op-meta-item__label">哪里不同</span>
+                  <span class="op-meta-item__value">背景：农场摘菜 · BGM：舒缓 · 字幕：极简</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
+                  <span class="op-meta-item__label">为什么测这一版</span>
+                  <span class="op-meta-item__value">测试真情实感对完播率的影响。</span>
+                </div>
+              </div>
+            </div>
+
+            
+            <div data-role="ms-section-video-versions-card"
+                 data-version-id="V3"
+                 data-is-recommended="false"
+                 data-status-code="variants_pending_capability"
+                 style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+              <div style="display:flex; gap:10px; align-items:baseline;">
+                <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V3 · 超市 · 快节奏</strong>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">当前占位 · 待生成</span>
+              </div>
+              <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
+                  <span class="op-meta-item__label">哪里不同</span>
+                  <span class="op-meta-item__value">背景：超市果蔬区 · BGM：上扬快 · 字幕：大字 + 切镜紧</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
+                  <span class="op-meta-item__label">为什么测这一版</span>
+                  <span class="op-meta-item__value">测试 30 秒以内快剪对停留时长的影响。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          
+          
+            <div class="op-banner op-banner--review" data-role="ms-section-optional-variants-empty" style="margin-top:10px;">
+              <div>
+                <div class="op-banner__title">暂未生成变体视频</div>
+                <div class="op-banner__body">你可以先生成主视频，或选择同时生成多个变体。</div>
+              </div>
+            </div>
+          
+
+          <div class="op-section-actions task-actions" data-role="ms-section-optional-variants-actions" style="margin-top:10px;">
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-optional-variants-action-add"
+                    title="生成主视频能力接入后开放：追加单个变体。"
+                    disabled aria-disabled="true">追加生成变体</button>
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-optional-variants-action-batch"
+                    title="生成主视频能力接入后开放：同时生成多个变体。"
+                    disabled aria-disabled="true">同时生成多个变体</button>
+          </div>
+          <p class="op-tech-note" style="margin-top:8px;">本面板不展示完整成片或外部链接；完整成片在交付页面。</p>
+        </div>
+      
+
+      
+      
+        <div class="op-card"
+             data-role="matrix-script-section-review-tuning"
+             data-redesign-wave="2026-05-30-phase2b">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">H · 校对</span>
+              <h2 class="op-section-title" data-role="ms-section-review-tuning-title">校对与微调</h2>
+              <span class="op-pill op-pill--neutral" data-role="ms-section-review-tuning-status-pill">待主视频</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-review-tuning-subtitle">主视频生成后，按四个分区做人工校对：画面 / 旁白 / 字幕 / 文案+CTA。运营可在任一分区提交意见。</p>
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="ms-section-review-tuning-zone"
+                 data-zone-id="visual_match" data-status-code="review_pending_main_video">
+              <span class="op-meta-item__label">画面匹配检查</span>
+              <span class="op-meta-item__value">待主视频生成。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-review-tuning-zone"
+                 data-zone-id="voiceover" data-status-code="review_pending_main_video">
+              <span class="op-meta-item__label">旁白校对</span>
+              <span class="op-meta-item__value">待主视频生成。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-review-tuning-zone"
+                 data-zone-id="subtitle" data-status-code="review_pending_main_video">
+              <span class="op-meta-item__label">字幕校对</span>
+              <span class="op-meta-item__value">待主视频生成。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-review-tuning-zone"
+                 data-zone-id="copy_cta" data-status-code="review_pending_main_video">
+              <span class="op-meta-item__label">文案 / CTA 校对</span>
+              <span class="op-meta-item__value">待主视频生成。</span>
+            </div>
+          </div>
+          <div class="op-section-actions task-actions" data-role="ms-section-review-tuning-actions" style="margin-top:10px;">
+            <button type="button" class="btn-primary"
+                    data-role="ms-section-review-tuning-accept"
+                    title="主视频生成后开放。"
+                    disabled aria-disabled="true">接受当前主版本</button>
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-review-tuning-regenerate"
+                    title="主视频生成后开放。"
+                    disabled aria-disabled="true">重新生成</button>
+          </div>
+        </div>
+      
+
+      
+      
+        <div class="op-card" data-role="matrix-script-section-delivery-entry"
+             data-redesign-wave="2026-05-29-pra"
+             data-publishable="false">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">4 · 交付</span>
+              <h2 class="op-section-title" data-role="ms-section-delivery-entry-title">交付入口</h2>
+            </div>
+          </div>
+          
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">当前不能交付：尚未生成主视频。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">生成完成后，可前往交付页面查看成片、字幕、音频、文案包与发布设置。</p>
+          
+          <div class="op-section-actions task-actions" style="margin-top:8px;">
+            <a class="btn-primary"
+               data-role="ms-section-delivery-entry-cta"
+               href="/tasks/ms-pra-demo-001/publish">前往交付页面 →</a>
+          </div>
+        </div>
+      
+
+      
+      <details class="op-collapse" data-role="op-console-ms-technical-diagnostics-fold">
+        <summary>
+          <span class="op-section-index" style="margin-right:8px;">5 · 诊断</span>
+          矩阵脚本 · 技术诊断（架构师视图，默认收起）
+        </summary>
+        <div class="op-collapse__hint">展开查看历史 A–F 区块、PR-U2 / MS-W3 / 变体面板 / 单脚本可读视图等内部诊断；包括 head_reason / artifact_lookup / publish_readiness / final_provenance 等技术标识。日常运营操作不依赖本节。</div>
+        <div class="op-collapse__body">
+
+
+      
+      
+      
+        
+        
+        
+        
+        
+        
+        <div class="op-card" data-role="matrix-script-production-flow-stepper"
+             data-redesign-wave="2026-05-29-pra"
+             style="padding:14px 18px;">
+          <div class="op-section-head" style="margin-bottom:6px;">
+            <div class="op-section-head__main">
+              <span class="op-section-index">流 · 流程</span>
+              <h3 class="op-section-title" style="font-size:15px;" data-role="ms-production-flow-stepper-title">生产流程可观测</h3>
+            </div>
+          </div>
+          <p class="op-section-helper" style="margin-bottom:8px;" data-role="ms-production-flow-stepper-subtitle">
+            脚本结构 → 变体选择 → 生成。点击每一步展开运营可读详情。
+          </p>
+          <div class="op-stage-strip" data-role="ms-production-flow-stepper-strip" style="border:none; padding:0; display:flex; gap:8px; align-items:center;">
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="script_structure"
+                  data-step-state="done"
+                  data-state="done">
+              <span class="op-stage-strip__num">✓</span>
+              <span><strong>脚本结构</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  3 段已具备
+                </span>
+              </span>
+            </span>
+            <span class="op-stage-strip__sep" aria-hidden="true">→</span>
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="variant_selection"
+                  data-step-state="done"
+                  data-state="done">
+              <span class="op-stage-strip__num">✓</span>
+              <span><strong>变体选择</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  3 个候选
+                </span>
+              </span>
+            </span>
+            <span class="op-stage-strip__sep" aria-hidden="true">→</span>
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="generation"
+                  data-step-state="todo"
+                  data-state="todo">
+              <span class="op-stage-strip__num">3</span>
+              <span><strong>生成</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  未生成
+                </span>
+              </span>
+            </span>
+          </div>
+
+          
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="script_structure"
+                   style="margin-top:10px; padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>脚本结构</strong> · 展开 Hook / Body / CTA / 关键词 / 禁用词
+            </summary>
+            <div style="padding:8px 4px 0;">
+              
+                <div class="op-script-grid" data-role="ms-step1-detail-sections">
+                  
+                    
+                    <div class="op-script-card" data-role="ms-step1-detail-section"
+                         data-section-id="hook"
+                         data-section-status="current_fresh">
+                      <span class="op-script-card__tag op-script-card__tag--hook">Hook · 前 3 秒</span>
+                      
+                        <div class="op-script-card__body" data-role="ms-step1-detail-section-body">三秒钩:你的内容值不值得被看完?</div>
+                      
+                    </div>
+                  
+                    
+                    <div class="op-script-card" data-role="ms-step1-detail-section"
+                         data-section-id="body"
+                         data-section-status="current_fresh">
+                      <span class="op-script-card__tag op-script-card__tag--body">Body · 中段</span>
+                      
+                        <div class="op-script-card__body" data-role="ms-step1-detail-section-body">信息密度:三段式叙事，每段给出明确收益。</div>
+                      
+                    </div>
+                  
+                    
+                    <div class="op-script-card" data-role="ms-step1-detail-section"
+                         data-section-id="cta"
+                         data-section-status="current_fresh">
+                      <span class="op-script-card__tag op-script-card__tag--cta">CTA · 结尾</span>
+                      
+                        <div class="op-script-card__body" data-role="ms-step1-detail-section-body">行动指引:关注 + 评论你的下一个选题。</div>
+                      
+                    </div>
+                  
+                </div>
+                
+                  <div class="op-script-grid" style="margin-top:8px;">
+                    
+                      
+                      <div class="op-script-card" data-role="ms-step1-detail-taxonomy"
+                           data-taxonomy-id="keywords">
+                        <span class="op-script-card__tag op-script-card__tag--keyword">关键词</span>
+                        
+                          <div data-role="ms-step1-detail-taxonomy-values">
+                            <span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">内容运营</span><span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">短视频</span>
+                          </div>
+                        
+                      </div>
+                    
+                      
+                      <div class="op-script-card" data-role="ms-step1-detail-taxonomy"
+                           data-taxonomy-id="banwords">
+                        <span class="op-script-card__tag op-script-card__tag--banword">禁用词</span>
+                        
+                          <div data-role="ms-step1-detail-taxonomy-values">
+                            <span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">夸大宣传</span><span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">绝对化承诺</span>
+                          </div>
+                        
+                      </div>
+                    
+                  </div>
+                
+              
+            </div>
+          </details>
+
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="variant_selection"
+                   style="padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>变体选择</strong> · 主推版本 / 变体数量 / 差异维度
+            </summary>
+            <div style="padding:8px 4px 0;" data-role="ms-step2-detail">
+              <div class="op-meta-grid">
+                <div class="op-meta-item" data-role="ms-step2-detail-main-version">
+                  <span class="op-meta-item__label">主推版本</span>
+                  <span class="op-meta-item__value">
+                    候选 v1
+                  </span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step2-detail-variant-count">
+                  <span class="op-meta-item__label">变体数量</span>
+                  <span class="op-meta-item__value">3 个</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step2-detail-differentiator-dimensions">
+                  <span class="op-meta-item__label">差异维度</span>
+                  <span class="op-meta-item__value">语气 / 时长 / 受众 / 开头方式 / 画面方向</span>
+                </div>
+              </div>
+              
+                <ul style="margin:8px 0 0 16px; padding:0; font-size:13px; color:#334155;" data-role="ms-step2-detail-variant-list">
+                  
+                    <li data-role="ms-step2-detail-variant-row" data-variant-index="1">
+                      候选 1 · 节奏更紧凑 · 30 秒
+                    </li>
+                  
+                    <li data-role="ms-step2-detail-variant-row" data-variant-index="2">
+                      候选 2 · 口语化更强 · 45 秒
+                    </li>
+                  
+                    <li data-role="ms-step2-detail-variant-row" data-variant-index="3">
+                      候选 3 · 信息更完整 · 60 秒
+                    </li>
+                  
+                </ul>
+              
+            </div>
+          </details>
+
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="generation"
+                   style="padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>生成</strong> · 主视频状态 / 当前阻塞 / 下一步
+            </summary>
+            <div style="padding:8px 4px 0;" data-role="ms-step3-detail">
+              <div class="op-meta-grid">
+                <div class="op-meta-item" data-role="ms-step3-detail-state">
+                  <span class="op-meta-item__label">主视频状态</span>
+                  <span class="op-meta-item__value">未生成</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step3-detail-blocker">
+                  <span class="op-meta-item__label">当前阻塞</span>
+                  <span class="op-meta-item__value">当前阻塞:尚未生成主视频。</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step3-detail-next-action">
+                  <span class="op-meta-item__label">下一步</span>
+                  <span class="op-meta-item__value">下一步:等待生成能力接入;可前往交付页面预览交付清单。</span>
+                </div>
+              </div>
+              <p class="op-tech-note" style="margin-top:6px;">生成动作集中在第一屏「主视频结果」操作区；本步骤仅做只读观测。</p>
+            </div>
+          </details>
+        </div>
+      
+
+      
+
+      
+      
+        <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-a-goal-summary">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">A · 目标</span>
+              <h2 class="op-section-title" data-role="ms-block-a-title">任务摘要</h2>
+              <span class="op-pill op-pill--matrix"><span class="op-pill__dot"></span>矩阵脚本</span>
+            </div>
+            <div class="op-section-actions" data-role="ms-block-a-actions">
+              <a href="/tasks/ms-pra-demo-001/publish" class="btn-nav"
+                 data-role="ms-block-a-action-delivery">前往交付中心 →</a>
+              <a href="/tasks/ms-pra-demo-001/publish#publish-feedback" class="btn-nav"
+                 data-role="ms-block-a-action-publish-feedback">前往发布反馈</a>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-a-subtitle">这一段告诉你：本任务在生产什么、当前卡在哪一步、运营下一步该做什么。</p>
+
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="ms-block-a-subject">
+              <span class="op-meta-item__label">主题</span>
+              <span class="op-meta-item__value">PR-A reset 演示任务</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-block-a-audience">
+              <span class="op-meta-item__label">受众</span>
+              <span class="op-meta-item__value">B2C 短视频运营新手</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-block-a-target-platform">
+              <span class="op-meta-item__label">目标平台</span>
+              <span class="op-meta-item__value">TikTok</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-block-a-target-language">
+              <span class="op-meta-item__label">目标语言</span>
+              <span class="op-meta-item__value">
+                
+                zh-CN，en
+              </span>
+            </div>
+          </div>
+
+          
+            <div class="op-meta-grid" style="margin-top:14px;">
+              <div class="op-meta-item" data-role="ms-block-a-status"
+                   data-status-kind="blocked_pending_publish_readiness">
+                <span class="op-meta-item__label">当前总状态</span>
+                <span class="op-meta-item__value">
+                  <span class="info-pill ms-result-status__kind ms-result-status__kind--blocked_pending_publish_readiness"
+                        data-role="ms-block-a-status-kind">未就绪</span>
+                  <span data-role="ms-block-a-status-headline" style="margin-left:6px;">尚未生成成片。</span>
+                </span>
+              </div>
+            </div>
+            
+              <div class="op-banner op-banner--blocker">
+                <div>
+                  <div class="op-banner__title" data-role="ms-block-a-blocker">当前阻塞</div>
+                  <div class="op-banner__body" data-role="ms-block-a-blocker-value">尚未生成成片</div>
+                </div>
+              </div>
+            
+            <div class="op-banner op-banner--next">
+              <div>
+                <div class="op-banner__title" data-role="ms-block-a-next-action">下一步建议</div>
+                <div class="op-banner__body" data-role="ms-block-a-next-action-value">等待生成能力接入。</div>
+              </div>
+            </div>
+          
+        </div>
+      
+
+      
+      
+        <div class="op-card op-card--accent-indigo"
+             id="matrix-script-block-b-script-structure"
+             data-role="matrix-script-block-b-script-structure">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">B · 脚本</span>
+              <h2 class="op-section-title" data-role="ms-block-b-title">脚本结构</h2>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-b-subtitle">三段式：Hook 抓人 → Body 信息 → CTA 行动。下方关键词与禁用词限定基本表达边界。</p>
+
+          <div class="op-script-grid">
+            
+              
+              <div class="op-script-card" data-role="ms-block-b-section"
+                   data-section-id="hook"
+                   data-section-status="current_fresh">
+                <span class="op-script-card__tag op-script-card__tag--hook">Hook · 前 3 秒</span>
+                
+                  <div class="op-script-card__body" data-role="ms-block-b-section-body">三秒钩:你的内容值不值得被看完?</div>
+                
+              </div>
+            
+              
+              <div class="op-script-card" data-role="ms-block-b-section"
+                   data-section-id="body"
+                   data-section-status="current_fresh">
+                <span class="op-script-card__tag op-script-card__tag--body">Body · 中段</span>
+                
+                  <div class="op-script-card__body" data-role="ms-block-b-section-body">信息密度:三段式叙事，每段给出明确收益。</div>
+                
+              </div>
+            
+              
+              <div class="op-script-card" data-role="ms-block-b-section"
+                   data-section-id="cta"
+                   data-section-status="current_fresh">
+                <span class="op-script-card__tag op-script-card__tag--cta">CTA · 结尾</span>
+                
+                  <div class="op-script-card__body" data-role="ms-block-b-section-body">行动指引:关注 + 评论你的下一个选题。</div>
+                
+              </div>
+            
+          </div>
+
+          
+            <div class="op-script-grid" style="margin-top:14px;">
+              
+                
+                <div class="op-script-card" data-role="ms-block-b-taxonomy"
+                     data-taxonomy-id="keywords"
+                     data-taxonomy-status="current_fresh">
+                  <span class="op-script-card__tag op-script-card__tag--keyword">关键词</span>
+                  
+                    <div data-role="ms-block-b-taxonomy-values">
+                      <span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">内容运营</span><span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">短视频</span>
+                    </div>
+                  
+                </div>
+              
+                
+                <div class="op-script-card" data-role="ms-block-b-taxonomy"
+                     data-taxonomy-id="banwords"
+                     data-taxonomy-status="current_fresh">
+                  <span class="op-script-card__tag op-script-card__tag--banword">禁用词</span>
+                  
+                    <div data-role="ms-block-b-taxonomy-values">
+                      <span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">夸大宣传</span><span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">绝对化承诺</span>
+                    </div>
+                  
+                </div>
+              
+            </div>
+          
+        </div>
+      
+
+      
+      
+        <div class="op-card op-card--accent-indigo"
+             id="matrix-script-block-c-variant-strategy"
+             data-role="matrix-script-block-c-variant-strategy">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">C · 变体</span>
+              <h2 class="op-section-title" data-role="ms-block-c-title">变体方案</h2>
+              <span class="op-pill op-pill--info" data-role="ms-block-c-variant-count">
+                共 <span data-role="ms-block-c-variant-count-value">3</span> 个候选
+              </span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-c-subtitle">共 3 个候选已派生</p>
+
+          
+            <table class="op-variant-table" data-role="ms-block-c-variant-table">
+              <thead>
+                <tr>
+                  <th>候选</th>
+                  <th>差异点</th>
+                  <th>视角概要</th>
+                  <th>节奏 / 时长</th>
+                  <th>脚本片段</th>
+                </tr>
+              </thead>
+              <tbody>
+                
+                  
+                  <tr data-role="ms-block-c-variant-row"
+                      data-variant-index="1"
+                      title="为什么存在此变体：节奏更紧凑">
+                    <td data-role="ms-block-c-variant-label">候选 1</td>
+                    <td data-role="ms-block-c-variant-differentiator">节奏更紧凑</td>
+                    <td data-role="ms-block-c-variant-axis-summary">短时长 · 高密度</td>
+                    <td data-role="ms-block-c-variant-length">30 秒</td>
+                    <td data-role="ms-block-c-variant-bound-slot">已绑定脚本片段</td>
+                  </tr>
+                
+                  
+                  <tr data-role="ms-block-c-variant-row"
+                      data-variant-index="2"
+                      title="为什么存在此变体：口语化更强">
+                    <td data-role="ms-block-c-variant-label">候选 2</td>
+                    <td data-role="ms-block-c-variant-differentiator">口语化更强</td>
+                    <td data-role="ms-block-c-variant-axis-summary">中时长 · 故事化</td>
+                    <td data-role="ms-block-c-variant-length">45 秒</td>
+                    <td data-role="ms-block-c-variant-bound-slot">已绑定脚本片段</td>
+                  </tr>
+                
+                  
+                  <tr data-role="ms-block-c-variant-row"
+                      data-variant-index="3"
+                      title="为什么存在此变体：信息更完整">
+                    <td data-role="ms-block-c-variant-label">候选 3</td>
+                    <td data-role="ms-block-c-variant-differentiator">信息更完整</td>
+                    <td data-role="ms-block-c-variant-axis-summary">长时长 · 教学型</td>
+                    <td data-role="ms-block-c-variant-length">60 秒</td>
+                    <td data-role="ms-block-c-variant-bound-slot">已绑定脚本片段</td>
+                  </tr>
+                
+              </tbody>
+            </table>
+          
+        </div>
+      
+
+      
+
+      
+      
+        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-d-generate-regenerate">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">D · 生成</span>
+              <h2 class="op-section-title" data-role="ms-block-d-title">生成进度</h2>
+              <span class="info-pill ms-result-status__kind ms-result-status__kind--blocked_pending_publish_readiness"
+                    data-role="ms-block-d-status-kind">待生成</span>
+            </div>
+            <div class="op-section-actions task-actions" data-role="ms-block-d-actions">
+              <button type="button"
+                      class="btn-primary"
+                      data-role="ms-block-d-primary-action"
+                      data-status-kind="blocked_pending_publish_readiness"
+                      data-variant-count="3"
+                      disabled aria-disabled="true">
+                ⚡ 生成 3 个变体
+              </button>
+              <button type="button"
+                      class="btn-secondary"
+                      data-role="ms-block-d-secondary-action"
+                      data-blocked-count="0"
+                      disabled aria-disabled="true">
+                ↻ 重新生成被阻塞的变体 (0)
+              </button>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-d-subtitle">面向运营的一键生成与定点重生；前置条件与阻塞原因由发布门禁决定，本面板不发明事实。</p>
+
+          <div class="op-banner op-banner--next">
+            <div>
+              <div class="op-banner__title" data-role="ms-block-d-headline">
+                <span data-role="ms-block-d-headline-value">建议先确认主视频生成方案。</span>
+              </div>
+              <div class="op-banner__body" data-role="ms-block-d-next-action">
+                下一步 · <span data-role="ms-block-d-next-action-value">等待生成能力接入;准备就绪后从主视频结果触发生成。</span>
+              </div>
+            </div>
+          </div>
+
+          
+            <div data-role="ms-block-d-preconditions" style="margin-top:12px;">
+              <span class="op-meta-item__label">当前前置条件</span>
+              <ul style="margin:6px 0 0 16px; padding:0; color:#334155; font-size:13px;">
+                <li data-role="ms-block-d-precondition-ready-gate"
+                    data-publishable="false"
+                    data-publish-ready="false"
+                    data-compose-ready="false">
+                  发布门禁 · <span data-role="ms-block-d-precondition-ready-gate-value">尚未生成成片</span>
+                </li>
+                
+              </ul>
+            </div>
+          
+
+          <div class="op-meta-grid" style="margin-top:12px;">
+            <div class="op-meta-item" data-role="ms-block-d-blocker">
+              <span class="op-meta-item__label">当前阻塞原因</span>
+              <span class="op-meta-item__value" data-role="ms-block-d-blocker-value">
+                尚未生成成片
+              </span>
+            </div>
+            
+              <div class="op-meta-item" data-role="ms-block-d-reason">
+                <span class="op-meta-item__label">说明</span>
+                <span class="op-meta-item__value" style="font-weight:400; color:#475569;" data-role="ms-block-d-reason-value">本任务的主视频成片能力仍在接入中。</span>
+              </div>
+            
+          </div>
+
+          <div class="op-tech-note" data-role="ms-block-d-no-vendor-note">
+            生成模式由系统决定 · 不暴露 provider / model / vendor / engine 选择。
+          </div>
+        </div>
+      
+
+      
+      
+        
+        
+        
+        
+        
+        
+          
+        
+          
+        
+          
+        
+        
+        <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-candidate-review"
+             data-any-preview-resolved="false"
+             data-redesign-wave="2026-05-28-pr2c">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--violet">E · 变体</span>
+              <h2 class="op-section-title" data-role="ms-block-e-title">可选变体</h2>
+              
+                <span class="op-pill op-pill--neutral" data-role="ms-block-e-no-preview-pill">暂未生成</span>
+              
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-e-subtitle">主视频的备选脚本变体在这里展开；主推版本由 publish_readiness 与 closure 操作决定。</p>
+          
+            
+            <div class="op-banner op-banner--review" data-role="ms-block-e-no-preview-available">
+              <div>
+                <div class="op-banner__title">暂未生成变体视频</div>
+                <div class="op-banner__body">你可以先生成主视频，或选择同时生成多个变体。</div>
+              </div>
+            </div>
+            <div class="op-tech-note" data-role="ms-block-e-no-fake-final-video-note" style="margin-top:10px;">
+              本面板不展示完整成片或外部链接；完整成片在交付页面。
+            </div>
+          
+        </div>
+      
+
+      
+      
+        
+        <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-f-delivery-teaser"
+             data-redesign-wave="2026-05-28-ms-ui">
+        
+        
+        
+        
+        
+        
+        
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">F · 交付</span>
+              <h2 class="op-section-title" data-role="ms-block-f-title">交付摘要</h2>
+              
+                <span class="op-pill op-pill--blocked"><span class="op-pill__dot"></span>当前不能交付</span>
+              
+            </div>
+            <div class="op-section-actions task-actions" data-role="ms-block-f-actions">
+              <a href="/tasks/ms-pra-demo-001/publish"
+                 class="btn-primary"
+                 data-role="ms-block-f-action-delivery-center">前往交付中心查看完整成片 →</a>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-block-f-subtitle">工作台仅显示交付状态摘要；逐项交付物详情、零碎产物与发布表单在交付中心。</p>
+          
+            <div class="op-banner op-banner--blocker" data-role="ms-block-f-headline-blocker">
+              <div>
+                <div class="op-banner__title">当前不能交付：尚未生成成片。</div>
+                <div class="op-banner__body">下方为运营可读的「已具备」与「待补齐」摘要；详细产物状态在交付中心。</div>
+              </div>
+            </div>
+          
+          <div class="op-meta-grid" style="margin-top:10px;">
+            <div class="op-meta-item" data-role="ms-block-f-have">
+              <span class="op-meta-item__label">已具备</span>
+              <span class="op-meta-item__value">
+                脚本结构、变体方案。
+              </span>
+            </div>
+            <div class="op-meta-item" data-role="ms-block-f-need">
+              <span class="op-meta-item__label">待补齐</span>
+              <span class="op-meta-item__value">
+                
+                成片、字幕、音频、manifest、交付包。
+              </span>
+            </div>
+          </div>
+          <p class="op-tech-note" data-role="ms-block-f-scene-pack-note" style="margin-top:8px;">
+            场景包（scene_pack）始终为可选 · 不阻塞发布。
+          </p>
+          <div class="op-tech-note" data-role="ms-block-f-no-fake-final-video-note">
+            本面板不展示 final_video / 发布 URL · final_video 主体在交付中心渲染（RC-R8）。
+          </div>
+        </div>
+      
+
+      
+      <details class="op-collapse" data-role="op-console-ms-secondary-fold">
+        <summary>
+          <span class="op-section-index" style="margin-right:8px;">F · 诊断</span>
+          矩阵脚本 · 技术诊断（架构师视图，默认收起）
+        </summary>
+        <div class="op-collapse__hint">展开查看 PR-U2 / MS-W3 / 变体面板 / 单脚本可读视图等内部诊断；包括 head_reason / artifact_lookup / publish_readiness / final_provenance 等技术标识。日常运营操作不依赖本节。</div>
+        <div class="op-collapse__body">
+
+      
+      
+      
+      
+        <div class="panel" data-role="matrix-script-script-structure-panel">
+          <div class="section-title">
+            <h2 data-role="ms-script-structure-title"></h2>
+            <div class="secondary" data-role="ms-script-structure-subtitle"></div>
+          </div>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-script-structure-title-row">
+              <strong></strong>
+              <span>PR-A reset 演示任务</span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-source-ref-row">
+              <strong></strong>
+              <span><code>—</code></span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-source-ref-explanation">
+              <span class="muted t-secondary"></span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-language-row">
+              <strong></strong>
+              <span>
+                —
+                → zh-CN, en
+              </span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-target-platform-row">
+              <strong></strong>
+              <span>TikTok</span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-variation-target-count-row">
+              <strong></strong>
+              <span></span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-script-structure-axis-hints-label"></h3>
+          <div class="meta-grid">
+            <div class="meta-item" data-role="ms-script-structure-tone-hint">
+              <strong>tone_hint</strong>
+              <span>—</span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-audience-hint">
+              <strong>audience_hint</strong>
+              <span>B2C 短视频运营新手</span>
+            </div>
+            <div class="meta-item" data-role="ms-script-structure-length-hint">
+              <strong>length_hint</strong>
+              <span>—</span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-script-structure-sections-label"></h3>
+          
+            <div class="meta-item" data-role="ms-script-structure-section" data-section-id="hook" data-section-status="current_fresh">
+              <strong>Hook · 前 3 秒</strong>
+              
+                <span data-role="ms-script-structure-section-body">三秒钩:你的内容值不值得被看完?</span>
+              
+              <span class="muted t-secondary">已具备</span>
+            </div>
+          
+            <div class="meta-item" data-role="ms-script-structure-section" data-section-id="body" data-section-status="current_fresh">
+              <strong>Body · 中段</strong>
+              
+                <span data-role="ms-script-structure-section-body">信息密度:三段式叙事，每段给出明确收益。</span>
+              
+              <span class="muted t-secondary">已具备</span>
+            </div>
+          
+            <div class="meta-item" data-role="ms-script-structure-section" data-section-id="cta" data-section-status="current_fresh">
+              <strong>CTA · 结尾</strong>
+              
+                <span data-role="ms-script-structure-section-body">行动指引:关注 + 评论你的下一个选题。</span>
+              
+              <span class="muted t-secondary">已具备</span>
+            </div>
+          
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-script-structure-taxonomy-label"></h3>
+          
+            <div class="meta-item" data-role="ms-script-structure-taxonomy-item" data-taxonomy-id="keywords" data-taxonomy-status="current_fresh">
+              <strong>关键词</strong>
+              
+              
+                <span data-role="ms-script-structure-taxonomy-values">
+                  <span class="info-pill" style="margin-right:4px;">内容运营</span><span class="info-pill" style="margin-right:4px;">短视频</span>
+                </span>
+              
+              <span class="muted t-secondary">已具备</span>
+            </div>
+          
+            <div class="meta-item" data-role="ms-script-structure-taxonomy-item" data-taxonomy-id="banwords" data-taxonomy-status="current_fresh">
+              <strong>禁用词</strong>
+              
+              
+                <span data-role="ms-script-structure-taxonomy-values">
+                  <span class="info-pill" style="margin-right:4px;">夸大宣传</span><span class="info-pill" style="margin-right:4px;">绝对化承诺</span>
+                </span>
+              
+              <span class="muted t-secondary">已具备</span>
+            </div>
+          
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="ms-script-structure-phase-b-forbidden">
+            
+          </div>
+        </div>
+      
+
+      <div class="panel" data-role="matrix-script-variation-panel">
+        <div class="section-title">
+          <h2>Matrix Script — Variation Panel</h2>
+          <div class="secondary">
+            Read-only projection of
+            <code>matrix_script_workbench_variation_surface_v1</code>.
+            Source: <code>line_specific_refs[].delta</code>. No vendor / model / provider controls.
+          </div>
+        </div>
+
+        <h3 style="margin:12px 0 6px;">Axes</h3>
+        
+          <div class="muted">No axes resolved on this packet.</div>
+        
+
+        <h3 style="margin:16px 0 6px;">Cells × Slots</h3>
+        
+          <div class="muted">No cells resolved on this packet.</div>
+        
+
+        <h3 style="margin:16px 0 6px;">Slot detail</h3>
+        <div class="muted t-secondary" style="margin-bottom:6px;">
+          Join: <code>variation_plan.cells[].script_slot_ref == copy_bundle.slots[].slot_id</code>
+        </div>
+        
+          <div class="muted">No slots resolved on this packet.</div>
+        
+
+        <h3 style="margin:16px 0 6px;">Attribution refs</h3>
+        <div class="meta-grid">
+          <div class="meta-item">
+            <strong>generic_refs</strong>
+            <span>
+              —
+            </span>
+          </div>
+          <div class="meta-item">
+            <strong>line_specific_refs</strong>
+            <span>
+              —
+            </span>
+          </div>
+          <div class="meta-item">
+            <strong>capability_plan</strong>
+            <span>
+              —
+            </span>
+          </div>
+          <div class="meta-item">
+            <strong>worker_profile_ref</strong>
+            <span><code>—</code></span>
+          </div>
+        </div>
+
+        <h3 style="margin:16px 0 6px;">Publish feedback projection</h3>
+        <div class="meta-grid">
+          <div class="meta-item">
+            <strong>reference_line</strong>
+            <span>—</span>
+          </div>
+          <div class="meta-item">
+            <strong>validator_report</strong>
+            <span>
+              —
+            </span>
+          </div>
+          <div class="meta-item">
+            <strong>ready_state</strong>
+            <span>—</span>
+          </div>
+          <div class="meta-item">
+            <strong>feedback_writeback</strong>
+            <span class="muted">not_implemented_phase_b</span>
+          </div>
+        </div>
+      </div>
+
+      
+      
+        <div class="panel" data-role="matrix-script-preview-compare-panel">
+          <div class="section-title">
+            <h2 data-role="ms-preview-compare-title"></h2>
+            <div class="secondary" data-role="ms-preview-compare-subtitle"></div>
+          </div>
+
+          <h3 style="margin:12px 0 6px;" data-role="ms-preview-compare-variations-label"> · 共  组</h3>
+          
+            <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse;" data-role="ms-preview-compare-variations-table">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">variation_id</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">axis 选择</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">script_slot / body_ref</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">预览状态</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">发布状态</th>
+                  <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">推荐版本</th>
+                </tr>
+              </thead>
+              <tbody>
+                
+                  <tr data-role="ms-preview-compare-variation-row" data-variation-id="v1" data-recommended-bucket="publishable_candidate">
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"><code>v1</code></td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                      
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                      <code>—</code>
+                      
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-preview-status" data-status="unobservable_pending_upstream">
+                      暂无可预览成片
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-publish-status" data-publish-status="">
+                      
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-recommended">
+                      <strong>推荐候选</strong>
+                      
+                    </td>
+                  </tr>
+                
+                  <tr data-role="ms-preview-compare-variation-row" data-variation-id="v2" data-recommended-bucket="alternate_candidate">
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"><code>v2</code></td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                      
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                      <code>—</code>
+                      
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-preview-status" data-status="unobservable_pending_upstream">
+                      暂无可预览成片
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-publish-status" data-publish-status="">
+                      
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-recommended">
+                      <strong>备选候选</strong>
+                      
+                    </td>
+                  </tr>
+                
+                  <tr data-role="ms-preview-compare-variation-row" data-variation-id="v3" data-recommended-bucket="alternate_candidate">
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;"><code>v3</code></td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                      
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;">
+                      <code>—</code>
+                      
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-preview-status" data-status="unobservable_pending_upstream">
+                      暂无可预览成片
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-publish-status" data-publish-status="">
+                      
+                    </td>
+                    <td style="padding:6px; border-bottom:1px solid #f1f5f9;" data-role="ms-preview-compare-recommended">
+                      <strong>备选候选</strong>
+                      
+                    </td>
+                  </tr>
+                
+              </tbody>
+            </table>
+          
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-preview-compare-diff-hints-label"></h3>
+          
+            <div class="muted">无差异项可比对。</div>
+          
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="ms-preview-compare-recommended-explanation">
+            <strong>：</strong>
+          </div>
+          <div class="muted t-secondary" style="margin-top:6px;" data-role="ms-preview-compare-granularity-note">
+            
+          </div>
+        </div>
+      
+
+      
+      
+        <div class="panel" data-role="matrix-script-recommended-action-panel"
+             data-status-kind="blocked_pending_publish_readiness">
+          <div class="section-title">
+            <h2 data-role="ms-recommended-action-title"></h2>
+            <div class="secondary" data-role="ms-recommended-action-subtitle"></div>
+          </div>
+
+          <div data-role="ms-recommended-action-headline-row" style="padding:10px 12px; border-radius:6px; background:#f6f7f9; margin:6px 0;">
+            <div>
+              <span class="info-pill ms-recommended-action__kind ms-recommended-action__kind--blocked_pending_publish_readiness"
+                    data-role="ms-recommended-action-status">待生成</span>
+              <strong data-role="ms-recommended-action-headline" style="margin-left:6px;">建议先确认主视频生成方案。</strong>
+            </div>
+            <div class="secondary" data-role="ms-recommended-action-next-action" style="margin-top:4px;">等待生成能力接入;准备就绪后从主视频结果触发生成。</div>
+          </div>
+
+          
+            <div data-role="ms-recommended-action-variant-card"
+                 data-variation-id="v1"
+                 style="padding:10px 12px; border:1px solid #d1fae5; border-radius:6px; background:#f0fdf4; margin:6px 0;">
+              <div>
+                <strong data-role="ms-recommended-action-variant-id">推荐变体：v1</strong>
+                <span class="info-pill" style="margin-left:6px;" data-role="ms-recommended-action-variant-axis-summary"></span>
+                
+              </div>
+              
+              <div class="muted t-secondary" data-role="ms-recommended-action-variant-slot-bound">
+                尚未绑定脚本片段
+              </div>
+            </div>
+            <div class="muted t-secondary" data-role="ms-recommended-action-reason" style="margin-top:6px;">推荐依据：本任务的主视频成片能力仍在接入中。</div>
+          
+
+          <div class="muted t-secondary" data-role="ms-recommended-action-no-publish-claim-note" style="margin-top:10px;"></div>
+        </div>
+      
+
+      
+      
+        <div class="panel" data-role="matrix-script-readable-variants-panel">
+          <div class="section-title">
+            <h2 data-role="ms-readable-title"></h2>
+            <div class="secondary" data-role="ms-readable-subtitle"></div>
+          </div>
+
+          <h3 style="margin:12px 0 6px;" data-role="ms-readable-shared-label"></h3>
+          <div class="meta-grid" data-role="ms-readable-shared-sections">
+            
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-readable-variants-label">共 3 个候选已派生 · 共 3 组</h3>
+          
+            <div data-role="ms-readable-variant-list">
+              
+                <div class="meta-item" data-role="ms-readable-variant-card"
+                     data-variation-id=""
+                     data-has-bound-slot="false"
+                     style="padding:10px 12px; margin:6px 0; border:1px solid #e5e7eb; border-radius:6px;">
+                  <div>
+                    <strong data-role="ms-readable-variant-id">变体 </strong>
+                    <span class="info-pill" style="margin-left:6px;" data-role="ms-readable-variant-axis-summary">短时长 · 高密度</span>
+                    
+                      <span class="muted t-secondary" style="margin-left:6px;" data-role="ms-readable-variant-length">目标时长：30 秒</span>
+                    
+                  </div>
+                  <div class="muted t-secondary" data-role="ms-readable-variant-differentiator">节奏更紧凑</div>
+                  <div class="muted t-secondary" data-role="ms-readable-variant-slot-bound">
+                    已绑定脚本片段
+                    <div></div>
+                  </div>
+                  <div data-role="ms-readable-variant-sections" style="margin-top:6px;">
+                    
+                  </div>
+                </div>
+              
+                <div class="meta-item" data-role="ms-readable-variant-card"
+                     data-variation-id=""
+                     data-has-bound-slot="false"
+                     style="padding:10px 12px; margin:6px 0; border:1px solid #e5e7eb; border-radius:6px;">
+                  <div>
+                    <strong data-role="ms-readable-variant-id">变体 </strong>
+                    <span class="info-pill" style="margin-left:6px;" data-role="ms-readable-variant-axis-summary">中时长 · 故事化</span>
+                    
+                      <span class="muted t-secondary" style="margin-left:6px;" data-role="ms-readable-variant-length">目标时长：45 秒</span>
+                    
+                  </div>
+                  <div class="muted t-secondary" data-role="ms-readable-variant-differentiator">口语化更强</div>
+                  <div class="muted t-secondary" data-role="ms-readable-variant-slot-bound">
+                    已绑定脚本片段
+                    <div></div>
+                  </div>
+                  <div data-role="ms-readable-variant-sections" style="margin-top:6px;">
+                    
+                  </div>
+                </div>
+              
+                <div class="meta-item" data-role="ms-readable-variant-card"
+                     data-variation-id=""
+                     data-has-bound-slot="false"
+                     style="padding:10px 12px; margin:6px 0; border:1px solid #e5e7eb; border-radius:6px;">
+                  <div>
+                    <strong data-role="ms-readable-variant-id">变体 </strong>
+                    <span class="info-pill" style="margin-left:6px;" data-role="ms-readable-variant-axis-summary">长时长 · 教学型</span>
+                    
+                      <span class="muted t-secondary" style="margin-left:6px;" data-role="ms-readable-variant-length">目标时长：60 秒</span>
+                    
+                  </div>
+                  <div class="muted t-secondary" data-role="ms-readable-variant-differentiator">信息更完整</div>
+                  <div class="muted t-secondary" data-role="ms-readable-variant-slot-bound">
+                    已绑定脚本片段
+                    <div></div>
+                  </div>
+                  <div data-role="ms-readable-variant-sections" style="margin-top:6px;">
+                    
+                  </div>
+                </div>
+              
+            </div>
+          
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="ms-readable-no-fake-final-note">
+            
+          </div>
+          <div class="muted t-secondary" style="margin-top:4px;" data-role="ms-readable-no-phase-b-note">
+            
+          </div>
+        </div>
+      
+
+      
+      
+        <div class="panel" data-role="matrix-script-delivery-ready-package-panel">
+          <div class="section-title">
+            <h2 data-role="ms-delivery-ready-package-title"></h2>
+            <div class="secondary" data-role="ms-delivery-ready-package-subtitle"></div>
+          </div>
+          <div class="muted t-secondary" data-role="ms-delivery-ready-package-legend" style="margin-top:6px;">
+            分级：
+            
+            · 共  行（就绪  · 部分  · 阻塞 0 · 跟踪缺口 ）
+          </div>
+          
+            <div class="muted">尚未有可投射的变体（Phase B 未派生）。</div>
+          
+          <div class="muted t-secondary" style="margin-top:10px;" data-role="ms-delivery-ready-package-no-fake-final-note"></div>
+          <div class="muted t-secondary" style="margin-top:4px;" data-role="ms-delivery-ready-package-no-publish-claim-note"></div>
+        </div>
+      
+
+      
+      
+        <div class="panel" data-role="matrix-script-review-zone-panel">
+          <div class="section-title">
+            <h2 data-role="ms-review-zone-title"></h2>
+            <div class="secondary" data-role="ms-review-zone-subtitle"></div>
+          </div>
+
+          <h3 style="margin:12px 0 6px;" data-role="ms-review-zone-zones-label"></h3>
+          <div class="meta-grid" data-role="ms-review-zone-zones-grid">
+            
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-review-zone-status-label"></h3>
+          
+            <div class="muted">尚未有可校对的变体。</div>
+          
+
+          
+          
+
+          <div class="muted t-secondary" style="margin-top:12px;" data-role="ms-review-zone-endpoint-explanation">
+            提交分区评审意见后，通过现有 closure 端点写入意图记录。
+          </div>
+          <div class="muted t-secondary" style="margin-top:6px;" data-role="ms-review-zone-phase-b-forbidden">
+            
+          </div>
+        </div>
+      
+
+      
+      
+        <div class="panel" data-role="matrix-script-qc-diagnostics-panel">
+          <div class="section-title">
+            <h2 data-role="ms-qc-title"></h2>
+            <div class="secondary" data-role="ms-qc-subtitle"></div>
+          </div>
+
+          <h3 style="margin:12px 0 6px;" data-role="ms-qc-ready-gate-label"></h3>
+          <div class="meta-grid" data-role="ms-qc-ready-gate-grid">
+            <div class="meta-item" data-role="ms-qc-ready-gate-publishable">
+              <strong>publishable</strong>
+              <span>False</span>
+            </div>
+            <div class="meta-item" data-role="ms-qc-ready-gate-head-reason" data-head-reason="missing_final_video">
+              <strong>head_reason</strong>
+              <span>尚未生成成片</span>
+              
+            </div>
+            <div class="meta-item" data-role="ms-qc-ready-gate-final-fresh">
+              <strong>final_fresh</strong>
+              <span></span>
+            </div>
+            <div class="meta-item" data-role="ms-qc-ready-gate-final-provenance">
+              <strong>final_provenance</strong>
+              <span>—</span>
+            </div>
+            <div class="meta-item" data-role="ms-qc-ready-gate-blocking-count">
+              <strong>blocking_count</strong>
+              <span></span>
+            </div>
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-qc-risk-items-label"></h3>
+          
+            <div class="muted">当前无 L4 advisory。</div>
+          
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-qc-compliance-items-label"></h3>
+          <ul class="muted" data-role="ms-qc-compliance-items-list" style="margin:6px 0 0 18px;">
+            
+          </ul>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-qc-quality-items-label"></h3>
+          <div class="meta-grid" data-role="ms-qc-quality-items-grid">
+            
+          </div>
+
+          <h3 style="margin:16px 0 6px;" data-role="ms-qc-artifact-status-label"></h3>
+          
+            <div class="muted">尚未有交付物可投射。</div>
+          
+
+          
+        </div>
+      
+
+        </div> 
+      </details>
+
+        </div> 
+      </details> 
+    
+
+    
+    
+
+    
+
+    
+
+    
+  </div>
+
+  <script src="/static/js/i18n_v185.js"></script>
+  
+</body>
+</html>

@@ -260,7 +260,7 @@ def _matrix_helpers() -> dict:
 
 
 def build_context() -> dict:
-    task = {"task_id": "ms-pra-demo-001", "title": "PR-A reset 演示任务"}
+    task = {"task_id": "ms-pra-demo-001", "title": "PR-A reset 演示任务", "kind": "matrix_script", "category_key": "matrix_script", "platform": "matrix_script", "status": "processing"}
     task_json = {
         "operator_surfaces": {
             "publish_readiness": {

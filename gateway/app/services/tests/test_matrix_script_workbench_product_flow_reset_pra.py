@@ -107,8 +107,15 @@ def test_section1_main_video_result_present(primary_slice: str) -> None:
     assert 'data-role="matrix-script-main-video-result"' in primary_slice
 
 
-def test_section2_production_flow_stepper_present(primary_slice: str) -> None:
-    assert 'data-role="matrix-script-production-flow-stepper"' in primary_slice
+def test_section2_production_flow_stepper_present(matrix_branch: str) -> None:
+    """Phase 2B fidelity fix (2026-05-30): the PR-A production-flow
+    stepper was relocated from the operator primary scan into the §J
+    technical-diagnostics fold (architect view). The anchor remains in
+    the matrix_script gate for back-compat with downstream structural
+    tests; it just no longer competes with the new script-to-video IA
+    for first-screen attention."""
+
+    assert 'data-role="matrix-script-production-flow-stepper"' in matrix_branch
 
 
 def test_section3_optional_variants_present(primary_slice: str) -> None:
@@ -124,11 +131,15 @@ def test_section5_diagnostics_fold_present(matrix_branch: str) -> None:
 
 
 def test_primary_sections_in_design_order(primary_slice: str) -> None:
+    """Phase 2B fidelity fix (2026-05-30) ordering: §A 主视频结果 → §G
+    视频变体 (= legacy matrix-script-section-optional-variants anchor) →
+    §I 交付入口. The PR-A standalone production-flow-stepper has been
+    relocated into §J (architect view); ordering is now A → G → I."""
+
     pos1 = primary_slice.find('data-role="matrix-script-main-video-result"')
-    pos2 = primary_slice.find('data-role="matrix-script-production-flow-stepper"')
     pos3 = primary_slice.find('data-role="matrix-script-section-optional-variants"')
     pos4 = primary_slice.find('data-role="matrix-script-section-delivery-entry"')
-    assert -1 < pos1 < pos2 < pos3 < pos4
+    assert -1 < pos1 < pos3 < pos4
 
 
 def test_section5_fold_after_all_primary_sections(matrix_branch: str) -> None:
@@ -178,40 +189,46 @@ def test_section1_empty_state_copy_present_in_helper_contract(
 # --------------------------------------------------------------------------
 
 
-def test_stepper_has_three_inline_details(primary_slice: str) -> None:
-    occurrences = primary_slice.count('data-role="ms-production-flow-step-detail"')
+def test_stepper_has_three_inline_details(matrix_branch: str) -> None:
+    """Phase 2B fidelity fix: the PR-A stepper now lives inside §J fold,
+    so its three inline details are part of the matrix_script gate but
+    not the operator primary scan."""
+
+    occurrences = matrix_branch.count('data-role="ms-production-flow-step-detail"')
     assert occurrences == 3
 
 
-def test_stepper_step_ids_match_design_order(primary_slice: str) -> None:
-    pos_script = primary_slice.find('data-step-id="script_structure"')
-    pos_variant = primary_slice.find('data-step-id="variant_selection"')
-    pos_generation = primary_slice.find('data-step-id="generation"')
+def test_stepper_step_ids_match_design_order(matrix_branch: str) -> None:
+    """Step-id ordering preserved inside the §J fold."""
+
+    pos_script = matrix_branch.find('data-step-id="script_structure"')
+    pos_variant = matrix_branch.find('data-step-id="variant_selection"')
+    pos_generation = matrix_branch.find('data-step-id="generation"')
     assert -1 < pos_script < pos_variant < pos_generation
 
 
-def test_step1_detail_renders_hook_body_cta_sections(primary_slice: str) -> None:
-    assert 'data-role="ms-step1-detail-section"' in primary_slice
-    assert 'data-role="ms-step1-detail-section-body"' in primary_slice
+def test_step1_detail_renders_hook_body_cta_sections(matrix_branch: str) -> None:
+    assert 'data-role="ms-step1-detail-section"' in matrix_branch
+    assert 'data-role="ms-step1-detail-section-body"' in matrix_branch
 
 
-def test_step2_detail_carries_main_version_and_count(primary_slice: str) -> None:
-    assert 'data-role="ms-step2-detail-main-version"' in primary_slice
-    assert 'data-role="ms-step2-detail-variant-count"' in primary_slice
-    assert 'data-role="ms-step2-detail-differentiator-dimensions"' in primary_slice
+def test_step2_detail_carries_main_version_and_count(matrix_branch: str) -> None:
+    assert 'data-role="ms-step2-detail-main-version"' in matrix_branch
+    assert 'data-role="ms-step2-detail-variant-count"' in matrix_branch
+    assert 'data-role="ms-step2-detail-differentiator-dimensions"' in matrix_branch
 
 
-def test_step2_detail_uses_operator_language_axes(primary_slice: str) -> None:
+def test_step2_detail_uses_operator_language_axes(matrix_branch: str) -> None:
     """The five differentiator dimensions are operator-language only:
     语气 / 时长 / 受众 / 开头方式 / 画面方向. NO raw axis tuples."""
 
-    assert "语气 / 时长 / 受众 / 开头方式 / 画面方向" in primary_slice
+    assert "语气 / 时长 / 受众 / 开头方式 / 画面方向" in matrix_branch
 
 
-def test_step3_detail_mirrors_section1_pill_text(primary_slice: str) -> None:
-    assert 'data-role="ms-step3-detail-state"' in primary_slice
-    assert 'data-role="ms-step3-detail-blocker"' in primary_slice
-    assert 'data-role="ms-step3-detail-next-action"' in primary_slice
+def test_step3_detail_mirrors_section1_pill_text(matrix_branch: str) -> None:
+    assert 'data-role="ms-step3-detail-state"' in matrix_branch
+    assert 'data-role="ms-step3-detail-blocker"' in matrix_branch
+    assert 'data-role="ms-step3-detail-next-action"' in matrix_branch
 
 
 # --------------------------------------------------------------------------

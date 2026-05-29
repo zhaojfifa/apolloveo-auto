@@ -158,6 +158,17 @@
   {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
 ] %}
 {% include "_topbar.html" %}
+      {# Phase 2B fidelity fix (2026-05-30) — the legacy task-meta header
+         (status pill + 9 task-meta rows: task_id / platform / account_id /
+         category_key / language / status / created / source_url + Hot Follow
+         pipeline rows) is a project-management surface, NOT a script-to-video
+         product surface. For matrix_script tasks the Phase 1 mock + the
+         Phase 2B Workbench IA put §A 主视频结果 as the first-screen anchor.
+         We gate the legacy task-meta header to non-matrix_script kinds only;
+         Hot Follow / Digital Anchor / baseline tasks keep their card
+         bytewise unchanged. Architects can still see task identifiers
+         inside §J 技术诊断 (collapsed, architect view). #}
+      {% if task.kind != "matrix_script" %}
       <div class="info-row" style="margin-top:8px;">
         <div id="status-badge" class="status-pill">{{ task.status }}</div>
       </div>
@@ -205,6 +216,7 @@
           {% endif %}
         </div>
       </div>
+      {% endif %} {# /matrix_script legacy task-meta header gate #}
     </div>
 
     {% set ops = (task_json.operator_surfaces or {}) %}
@@ -368,187 +380,7 @@
         </div>
       {% endif %}
 
-      {# PR-A reset (2026-05-29) · Section 2 · 生产流程可观测.
-         Compact 3-step strip rendered BELOW Section 1. Each step is a
-         <details> collapsed by default; clicking expands inline detail.
-         The expanded detail is the ONLY surviving operator-visible home
-         for what Blocks B / C / D used to render. Engineering vocabulary
-         (axis tuples, cell_id, slot_id, provider/model/vendor/engine,
-         publish_readiness/head_reason raw enums) is forbidden here and
-         lives only inside Section 5 (技术诊断). #}
-      {% if ms_main_video_result.is_matrix_script %}
-        {% set ms_stepper_section_count = (ms_script_structure.sections or []) | length %}
-        {% set ms_stepper_variant_count = ms_readable_variants.variant_count or 0 %}
-        {% set ms_stepper_state = ms_main_video_result.state_kind %}
-        {% set ms_step1_state = 'done' if ms_stepper_section_count >= 3 else ('active' if ms_stepper_section_count > 0 else 'todo') %}
-        {% set ms_step2_state = 'done' if ms_stepper_variant_count > 0 else ('active' if ms_script_structure.is_matrix_script else 'todo') %}
-        {% set ms_step3_state = 'done' if ms_stepper_state == 'deliverable' else ('active' if ms_stepper_state in ('awaiting_review', 'generating') else 'todo') %}
-        <div class="op-card" data-role="matrix-script-production-flow-stepper"
-             data-redesign-wave="2026-05-29-pra"
-             style="padding:14px 18px;">
-          <div class="op-section-head" style="margin-bottom:6px;">
-            <div class="op-section-head__main">
-              <span class="op-section-index">流 · 流程</span>
-              <h3 class="op-section-title" style="font-size:15px;" data-role="ms-production-flow-stepper-title">生产流程可观测</h3>
-            </div>
-          </div>
-          <p class="op-section-helper" style="margin-bottom:8px;" data-role="ms-production-flow-stepper-subtitle">
-            脚本结构 → 变体选择 → 生成。点击每一步展开运营可读详情。
-          </p>
-          <div class="op-stage-strip" data-role="ms-production-flow-stepper-strip" style="border:none; padding:0; display:flex; gap:8px; align-items:center;">
-            <span class="op-stage-strip__step"
-                  data-role="ms-production-flow-stepper-step"
-                  data-step-id="script_structure"
-                  data-step-state="{{ ms_step1_state }}"
-                  data-state="{{ ms_step1_state }}">
-              <span class="op-stage-strip__num">{{ '✓' if ms_step1_state == 'done' else '1' }}</span>
-              <span><strong>脚本结构</strong>
-                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
-                  {% if ms_stepper_section_count >= 3 %}3 段已具备{% elif ms_stepper_section_count > 0 %}{{ ms_stepper_section_count }} 段已具备{% else %}未具备{% endif %}
-                </span>
-              </span>
-            </span>
-            <span class="op-stage-strip__sep" aria-hidden="true">→</span>
-            <span class="op-stage-strip__step"
-                  data-role="ms-production-flow-stepper-step"
-                  data-step-id="variant_selection"
-                  data-step-state="{{ ms_step2_state }}"
-                  data-state="{{ ms_step2_state }}">
-              <span class="op-stage-strip__num">{{ '✓' if ms_step2_state == 'done' else '2' }}</span>
-              <span><strong>变体选择</strong>
-                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
-                  {% if ms_stepper_variant_count > 0 %}{{ ms_stepper_variant_count }} 个候选{% else %}未派生{% endif %}
-                </span>
-              </span>
-            </span>
-            <span class="op-stage-strip__sep" aria-hidden="true">→</span>
-            <span class="op-stage-strip__step"
-                  data-role="ms-production-flow-stepper-step"
-                  data-step-id="generation"
-                  data-step-state="{{ ms_step3_state }}"
-                  data-state="{{ ms_step3_state }}">
-              <span class="op-stage-strip__num">{{ '✓' if ms_step3_state == 'done' else '3' }}</span>
-              <span><strong>生成</strong>
-                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
-                  {{ ms_main_video_result.state_label_zh }}
-                </span>
-              </span>
-            </span>
-          </div>
-
-          {# Inline expandable detail per step. Collapsed by default. The
-             detail content is operator-language only: NO axis tuples, NO
-             raw engineering identifiers, NO provider/model/vendor/engine
-             surface. Detail bodies are the post-reset homes for Block B /
-             Block C / Block D content. #}
-          <details data-role="ms-production-flow-step-detail"
-                   data-step-id="script_structure"
-                   style="margin-top:10px; padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
-            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
-              <strong>脚本结构</strong> · 展开 Hook / Body / CTA / 关键词 / 禁用词
-            </summary>
-            <div style="padding:8px 4px 0;">
-              {% if ms_script_structure.is_matrix_script %}
-                <div class="op-script-grid" data-role="ms-step1-detail-sections">
-                  {% for section in (ms_script_structure.sections or []) %}
-                    {% set _section_tone = "hook" if section.section_id == "hook" else ("body" if section.section_id == "body" else ("cta" if section.section_id == "cta" else "body")) %}
-                    <div class="op-script-card" data-role="ms-step1-detail-section"
-                         data-section-id="{{ section.section_id }}"
-                         data-section-status="{{ section.body_status_code }}">
-                      <span class="op-script-card__tag op-script-card__tag--{{ _section_tone }}">{{ section.section_label_zh }}</span>
-                      {% if section.body_text %}
-                        <div class="op-script-card__body" data-role="ms-step1-detail-section-body">{{ section.body_text }}</div>
-                      {% else %}
-                        <div class="op-script-card__empty" data-role="ms-step1-detail-section-empty">{{ section.body_status_label_zh }}</div>
-                      {% endif %}
-                    </div>
-                  {% endfor %}
-                </div>
-                {% if ms_script_structure.taxonomy %}
-                  <div class="op-script-grid" style="margin-top:8px;">
-                    {% for tax in (ms_script_structure.taxonomy or []) %}
-                      {% set _tax_tone = "keyword" if tax.taxonomy_id == "keywords" else ("banword" if tax.taxonomy_id == "banwords" else "body") %}
-                      <div class="op-script-card" data-role="ms-step1-detail-taxonomy"
-                           data-taxonomy-id="{{ tax.taxonomy_id }}">
-                        <span class="op-script-card__tag op-script-card__tag--{{ _tax_tone }}">{{ tax.taxonomy_label_zh }}</span>
-                        {% if tax["values"] %}
-                          <div data-role="ms-step1-detail-taxonomy-values">
-                            {% for v in tax["values"] %}<span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">{{ v }}</span>{% endfor %}
-                          </div>
-                        {% else %}
-                          <div class="op-script-card__empty">{{ tax.values_status_label_zh }}</div>
-                        {% endif %}
-                      </div>
-                    {% endfor %}
-                  </div>
-                {% endif %}
-              {% else %}
-                <div class="op-script-card__empty" data-role="ms-step1-detail-empty">尚未具备脚本结构。</div>
-              {% endif %}
-            </div>
-          </details>
-
-          <details data-role="ms-production-flow-step-detail"
-                   data-step-id="variant_selection"
-                   style="padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
-            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
-              <strong>变体选择</strong> · 主推版本 / 变体数量 / 差异维度
-            </summary>
-            <div style="padding:8px 4px 0;" data-role="ms-step2-detail">
-              <div class="op-meta-grid">
-                <div class="op-meta-item" data-role="ms-step2-detail-main-version">
-                  <span class="op-meta-item__label">主推版本</span>
-                  <span class="op-meta-item__value">
-                    {% if (ms_recommended_action.recommended_variant or {}).variation_id %}候选 {{ (ms_recommended_action.recommended_variant or {}).variation_id }}{% else %}—{% endif %}
-                  </span>
-                </div>
-                <div class="op-meta-item" data-role="ms-step2-detail-variant-count">
-                  <span class="op-meta-item__label">变体数量</span>
-                  <span class="op-meta-item__value">{{ ms_readable_variants.variant_count or 0 }} 个</span>
-                </div>
-                <div class="op-meta-item" data-role="ms-step2-detail-differentiator-dimensions">
-                  <span class="op-meta-item__label">差异维度</span>
-                  <span class="op-meta-item__value">语气 / 时长 / 受众 / 开头方式 / 画面方向</span>
-                </div>
-              </div>
-              {% if (ms_readable_variants.variant_candidates or []) %}
-                <ul style="margin:8px 0 0 16px; padding:0; font-size:13px; color:#334155;" data-role="ms-step2-detail-variant-list">
-                  {% for variant in ms_readable_variants.variant_candidates %}
-                    <li data-role="ms-step2-detail-variant-row" data-variant-index="{{ loop.index }}">
-                      候选 {{ loop.index }} · {{ variant.differentiator_zh or "—" }}{% if variant.length_hint_zh %} · {{ variant.length_hint_zh }}{% endif %}
-                    </li>
-                  {% endfor %}
-                </ul>
-              {% endif %}
-            </div>
-          </details>
-
-          <details data-role="ms-production-flow-step-detail"
-                   data-step-id="generation"
-                   style="padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
-            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
-              <strong>生成</strong> · 主视频状态 / 当前阻塞 / 下一步
-            </summary>
-            <div style="padding:8px 4px 0;" data-role="ms-step3-detail">
-              <div class="op-meta-grid">
-                <div class="op-meta-item" data-role="ms-step3-detail-state">
-                  <span class="op-meta-item__label">主视频状态</span>
-                  <span class="op-meta-item__value">{{ ms_main_video_result.state_label_zh }}</span>
-                </div>
-                <div class="op-meta-item" data-role="ms-step3-detail-blocker">
-                  <span class="op-meta-item__label">当前阻塞</span>
-                  <span class="op-meta-item__value">{{ ms_main_video_result.blocker_one_liner_zh }}</span>
-                </div>
-                <div class="op-meta-item" data-role="ms-step3-detail-next-action">
-                  <span class="op-meta-item__label">下一步</span>
-                  <span class="op-meta-item__value">{{ ms_main_video_result.next_action_one_liner_zh }}</span>
-                </div>
-              </div>
-              <p class="op-tech-note" style="margin-top:6px;">生成动作集中在第一屏「主视频结果」操作区；本步骤仅做只读观测。</p>
-            </div>
-          </details>
-        </div>
-      {% endif %}
+      {# Phase 2B fidelity fix (2026-05-30): PR-A standalone stepper relocated into §J (architect view); no longer rendered in operator primary scan. #}
 
       {% set ms_publish_readiness = ops_pr %}
       {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
@@ -672,24 +504,30 @@
           <ul style="margin:8px 0 0 0; padding:0; list-style:none; display:grid; gap:10px;"
               data-role="ms-section-generation-plan-scene-list"
               data-scene-count="{{ _ms_phase2b_sections | length or 3 }}">
+            {# Eleven storyboard fields per Phase 1 mock §C + presenter
+               alignment §6.2. Sample content is deterministic and
+               product-language; all unsupported items carry honest
+               chips (当前占位 / 后台待接入 / 未接入素材匹配) but the
+               section reads as a generation plan, not as a status row. #}
             {% set _scene_meta = [
-              ('Hook · 前 3 秒', '人物近景 · 自然光 · 情绪密度高', '上扬 · 轻快'),
-              ('Body · 中段', '信息密度 · 实拍 / 特写交替', '上扬'),
-              ('CTA · 结尾', '直视镜头 · 字幕强化 · 收尾 sting', '上扬 · sting'),
+              ('Hook · 前 3 秒', '人物近景 · 自然光 · 情绪密度高', '厨房 / 阳台 / 农场（自然采光）', '微笑女性 · 切到主体特写', '上扬 · 轻快', 'AI 主播 · 温和女声 zh-CN'),
+              ('Body · 中段', '食材特写 · 颗粒感 · 慢动作可选', '超市 / 农场（干净背景）', '主体特写 ×2 · 真实试用镜头', '上扬', '同 1 号主角'),
+              ('CTA · 结尾', '直视镜头 · 字幕强化 · 收尾 sting', '保持情绪一致性 · 同 1 号', '慢镜头举起主体 · 终镜定格', '上扬 · 收尾 sting', '同 1 号主角'),
             ] %}
-            {% for label, intent, music in _scene_meta %}
+            {% for label, intent, bg, broll, music, role in _scene_meta %}
               {% set _idx = loop.index %}
               {% set _seg = _ms_phase2b_sections[_idx - 1] if _ms_phase2b_sections | length >= _idx else {} %}
               <li data-role="ms-section-generation-plan-scene-row"
                   data-scene-index="{{ _idx }}"
                   data-status-code="plan_pending_upstream"
-                  style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:10px 12px; background:#fbfdff;">
-                <div style="display:flex; gap:10px; align-items:baseline; margin-bottom:4px;">
-                  <span style="font-weight:700; color:var(--op-accent, #2563eb); font-size:14px;">{{ _idx }}</span>
-                  <strong style="font-size:13px;">{{ label }}</strong>
+                  style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+                <div style="display:flex; gap:10px; align-items:baseline; margin-bottom:8px;">
+                  <span data-role="ms-section-generation-plan-scene-number"
+                        style="font-weight:700; color:var(--op-accent, #2563eb); font-size:16px; background:#eff6ff; border-radius:6px; padding:1px 10px;">场景 {{ _idx }}</span>
+                  <strong style="font-size:14px;">{{ label }}</strong>
                   <span class="op-pill op-pill--neutral" data-role="ms-section-generation-plan-scene-status">当前占位</span>
                 </div>
-                <div class="op-meta-grid" style="font-size:12px;">
+                <div class="op-meta-grid" style="font-size:12px; grid-template-columns:repeat(2, 1fr);">
                   <div class="op-meta-item" data-role="ms-section-generation-plan-scene-script-segment">
                     <span class="op-meta-item__label">脚本片段</span>
                     <span class="op-meta-item__value">{% if _seg and _seg.body_text %}{{ _seg.body_text }}{% else %}—{% endif %}</span>
@@ -697,6 +535,30 @@
                   <div class="op-meta-item" data-role="ms-section-generation-plan-scene-visual-intent">
                     <span class="op-meta-item__label">视觉意图</span>
                     <span class="op-meta-item__value">{{ intent }}</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-background-suggestion">
+                    <span class="op-meta-item__label">背景建议 <span class="op-pill op-pill--neutral" style="font-size:10px;">未接入素材匹配</span></span>
+                    <span class="op-meta-item__value">{{ bg }}</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-broll-suggestion">
+                    <span class="op-meta-item__label">B-Roll 建议 <span class="op-pill op-pill--neutral" style="font-size:10px;">未接入素材匹配</span></span>
+                    <span class="op-meta-item__value">{{ broll }}</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-product-material-slot">
+                    <span class="op-meta-item__label">产品素材位 <span class="op-pill op-pill--neutral" style="font-size:10px;">运营可上传</span></span>
+                    <span class="op-meta-item__value">[空槽位]</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-role">
+                    <span class="op-meta-item__label">角色 / 出镜</span>
+                    <span class="op-meta-item__value">{{ role }}</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-voiceover">
+                    <span class="op-meta-item__label">旁白</span>
+                    <span class="op-meta-item__value">{% if _seg and _seg.body_text %}{{ _seg.body_text }}{% else %}—{% endif %}（默认 = 脚本片段，可编辑）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-subtitle">
+                    <span class="op-meta-item__label">字幕</span>
+                    <span class="op-meta-item__value">{% if _seg and _seg.body_text %}{{ _seg.body_text[:24] }}…{% else %}—{% endif %}（关键词高亮）</span>
                   </div>
                   <div class="op-meta-item" data-role="ms-section-generation-plan-scene-music-mood">
                     <span class="op-meta-item__label">音乐情绪</span>
@@ -903,10 +765,101 @@
               {% endif %}
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-section-optional-variants-subtitle">变体是次要内容；主视频在第一屏。下方为本任务的备选脚本变体一览。</p>
+          <p class="op-section-helper" data-role="ms-section-optional-variants-subtitle">每一个变体都是一个视频版本。系统会告诉你「哪里不同 / 为什么测这一版 / 推荐哪个」。运营无须看 axis 元组。</p>
 
+          {# Phase 2B fidelity fix (2026-05-30): V1 / V2 / V3 video-version
+             cards rendered as primary §G content (per Phase 1 mock §G +
+             alignment §6.6 video_versions_view shape). Deterministic
+             sample content; each card carries:
+               - version_id (V1 / V2 / V3)
+               - headline_zh ("V1 · 厨房 · 上扬")
+               - differentiator_zh ("哪里不同" one-liner)
+               - why_test_zh ("为什么测这一版" one-liner)
+               - is_recommended (⭐ marker on V1 only)
+               - current state (当前占位 — main-video worker pending)
+             Operator no longer reads axis-tuple raw labels. The legacy
+             empty-state copy + main+others-fold structure are preserved
+             BELOW for back-compat with the existing PR-A test suite. #}
+          <div data-role="ms-section-video-versions-list"
+               style="display:grid; gap:10px; margin-top:10px;">
+            {# V1 — ⭐ recommended baseline version #}
+            <div data-role="ms-section-video-versions-card"
+                 data-version-id="V1"
+                 data-is-recommended="true"
+                 data-status-code="variants_pending_capability"
+                 style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+              <div style="display:flex; gap:10px; align-items:baseline;">
+                <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V1 · 厨房 · 上扬</strong>
+                <span class="op-pill op-pill--ready"
+                      data-role="ms-section-video-versions-card-recommended-marker">⭐ 推荐</span>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">当前占位 · 待生成</span>
+              </div>
+              <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
+                  <span class="op-meta-item__label">哪里不同</span>
+                  <span class="op-meta-item__value">背景：温馨厨房 · BGM：上扬 · 字幕：大字高亮</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
+                  <span class="op-meta-item__label">为什么测这一版</span>
+                  <span class="op-meta-item__value">主流情绪基线版，覆盖大多数账号 / 时段。</span>
+                </div>
+              </div>
+            </div>
+
+            {# V2 — alternate version #}
+            <div data-role="ms-section-video-versions-card"
+                 data-version-id="V2"
+                 data-is-recommended="false"
+                 data-status-code="variants_pending_capability"
+                 style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+              <div style="display:flex; gap:10px; align-items:baseline;">
+                <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V2 · 农场 · 真情实感</strong>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">当前占位 · 待生成</span>
+              </div>
+              <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
+                  <span class="op-meta-item__label">哪里不同</span>
+                  <span class="op-meta-item__value">背景：农场摘菜 · BGM：舒缓 · 字幕：极简</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
+                  <span class="op-meta-item__label">为什么测这一版</span>
+                  <span class="op-meta-item__value">测试真情实感对完播率的影响。</span>
+                </div>
+              </div>
+            </div>
+
+            {# V3 — alternate version #}
+            <div data-role="ms-section-video-versions-card"
+                 data-version-id="V3"
+                 data-is-recommended="false"
+                 data-status-code="variants_pending_capability"
+                 style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+              <div style="display:flex; gap:10px; align-items:baseline;">
+                <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V3 · 超市 · 快节奏</strong>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">当前占位 · 待生成</span>
+              </div>
+              <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
+                  <span class="op-meta-item__label">哪里不同</span>
+                  <span class="op-meta-item__value">背景：超市果蔬区 · BGM：上扬快 · 字幕：大字 + 切镜紧</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
+                  <span class="op-meta-item__label">为什么测这一版</span>
+                  <span class="op-meta-item__value">测试 30 秒以内快剪对停留时长的影响。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {# Legacy PR-A empty-state + main/others-fold preserved BELOW
+             for back-compat with the PR-A optional-variants test suite.
+             These markers are no longer the dominant Section G content
+             after the Phase 2B fidelity fix. #}
           {% if not ms_s3_any_resolved.value %}
-            <div class="op-banner op-banner--review" data-role="ms-section-optional-variants-empty">
+            <div class="op-banner op-banner--review" data-role="ms-section-optional-variants-empty" style="margin-top:10px;">
               <div>
                 <div class="op-banner__title">暂未生成变体视频</div>
                 <div class="op-banner__body">你可以先生成主视频，或选择同时生成多个变体。</div>
@@ -1061,6 +1014,197 @@
         </summary>
         <div class="op-collapse__hint">展开查看历史 A–F 区块、PR-U2 / MS-W3 / 变体面板 / 单脚本可读视图等内部诊断；包括 head_reason / artifact_lookup / publish_readiness / final_provenance 等技术标识。日常运营操作不依赖本节。</div>
         <div class="op-collapse__body">
+
+
+      {# Phase 2B fidelity fix (2026-05-30): PR-A standalone
+         production-flow-stepper relocated here from primary. Section J
+         is the architect view; operators do NOT see this on first
+         scan. The anchor `matrix-script-production-flow-stepper` and
+         the four `ms-production-flow-stepper-*` / three
+         `ms-production-flow-step-detail` / nine `ms-step{1,2,3}-detail-*`
+         markers are preserved bytewise for PR-A structural test
+         back-compat. #}
+      {# PR-A reset (2026-05-29) · Section 2 · 生产流程可观测.
+         Compact 3-step strip rendered BELOW Section 1. Each step is a
+         <details> collapsed by default; clicking expands inline detail.
+         The expanded detail is the ONLY surviving operator-visible home
+         for what Blocks B / C / D used to render. Engineering vocabulary
+         (axis tuples, cell_id, slot_id, provider/model/vendor/engine,
+         publish_readiness/head_reason raw enums) is forbidden here and
+         lives only inside Section 5 (技术诊断). #}
+      {% if ms_main_video_result.is_matrix_script %}
+        {% set ms_stepper_section_count = (ms_script_structure.sections or []) | length %}
+        {% set ms_stepper_variant_count = ms_readable_variants.variant_count or 0 %}
+        {% set ms_stepper_state = ms_main_video_result.state_kind %}
+        {% set ms_step1_state = 'done' if ms_stepper_section_count >= 3 else ('active' if ms_stepper_section_count > 0 else 'todo') %}
+        {% set ms_step2_state = 'done' if ms_stepper_variant_count > 0 else ('active' if ms_script_structure.is_matrix_script else 'todo') %}
+        {% set ms_step3_state = 'done' if ms_stepper_state == 'deliverable' else ('active' if ms_stepper_state in ('awaiting_review', 'generating') else 'todo') %}
+        <div class="op-card" data-role="matrix-script-production-flow-stepper"
+             data-redesign-wave="2026-05-29-pra"
+             style="padding:14px 18px;">
+          <div class="op-section-head" style="margin-bottom:6px;">
+            <div class="op-section-head__main">
+              <span class="op-section-index">流 · 流程</span>
+              <h3 class="op-section-title" style="font-size:15px;" data-role="ms-production-flow-stepper-title">生产流程可观测</h3>
+            </div>
+          </div>
+          <p class="op-section-helper" style="margin-bottom:8px;" data-role="ms-production-flow-stepper-subtitle">
+            脚本结构 → 变体选择 → 生成。点击每一步展开运营可读详情。
+          </p>
+          <div class="op-stage-strip" data-role="ms-production-flow-stepper-strip" style="border:none; padding:0; display:flex; gap:8px; align-items:center;">
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="script_structure"
+                  data-step-state="{{ ms_step1_state }}"
+                  data-state="{{ ms_step1_state }}">
+              <span class="op-stage-strip__num">{{ '✓' if ms_step1_state == 'done' else '1' }}</span>
+              <span><strong>脚本结构</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  {% if ms_stepper_section_count >= 3 %}3 段已具备{% elif ms_stepper_section_count > 0 %}{{ ms_stepper_section_count }} 段已具备{% else %}未具备{% endif %}
+                </span>
+              </span>
+            </span>
+            <span class="op-stage-strip__sep" aria-hidden="true">→</span>
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="variant_selection"
+                  data-step-state="{{ ms_step2_state }}"
+                  data-state="{{ ms_step2_state }}">
+              <span class="op-stage-strip__num">{{ '✓' if ms_step2_state == 'done' else '2' }}</span>
+              <span><strong>变体选择</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  {% if ms_stepper_variant_count > 0 %}{{ ms_stepper_variant_count }} 个候选{% else %}未派生{% endif %}
+                </span>
+              </span>
+            </span>
+            <span class="op-stage-strip__sep" aria-hidden="true">→</span>
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="generation"
+                  data-step-state="{{ ms_step3_state }}"
+                  data-state="{{ ms_step3_state }}">
+              <span class="op-stage-strip__num">{{ '✓' if ms_step3_state == 'done' else '3' }}</span>
+              <span><strong>生成</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  {{ ms_main_video_result.state_label_zh }}
+                </span>
+              </span>
+            </span>
+          </div>
+
+          {# Inline expandable detail per step. Collapsed by default. The
+             detail content is operator-language only: NO axis tuples, NO
+             raw engineering identifiers, NO provider/model/vendor/engine
+             surface. Detail bodies are the post-reset homes for Block B /
+             Block C / Block D content. #}
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="script_structure"
+                   style="margin-top:10px; padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>脚本结构</strong> · 展开 Hook / Body / CTA / 关键词 / 禁用词
+            </summary>
+            <div style="padding:8px 4px 0;">
+              {% if ms_script_structure.is_matrix_script %}
+                <div class="op-script-grid" data-role="ms-step1-detail-sections">
+                  {% for section in (ms_script_structure.sections or []) %}
+                    {% set _section_tone = "hook" if section.section_id == "hook" else ("body" if section.section_id == "body" else ("cta" if section.section_id == "cta" else "body")) %}
+                    <div class="op-script-card" data-role="ms-step1-detail-section"
+                         data-section-id="{{ section.section_id }}"
+                         data-section-status="{{ section.body_status_code }}">
+                      <span class="op-script-card__tag op-script-card__tag--{{ _section_tone }}">{{ section.section_label_zh }}</span>
+                      {% if section.body_text %}
+                        <div class="op-script-card__body" data-role="ms-step1-detail-section-body">{{ section.body_text }}</div>
+                      {% else %}
+                        <div class="op-script-card__empty" data-role="ms-step1-detail-section-empty">{{ section.body_status_label_zh }}</div>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                </div>
+                {% if ms_script_structure.taxonomy %}
+                  <div class="op-script-grid" style="margin-top:8px;">
+                    {% for tax in (ms_script_structure.taxonomy or []) %}
+                      {% set _tax_tone = "keyword" if tax.taxonomy_id == "keywords" else ("banword" if tax.taxonomy_id == "banwords" else "body") %}
+                      <div class="op-script-card" data-role="ms-step1-detail-taxonomy"
+                           data-taxonomy-id="{{ tax.taxonomy_id }}">
+                        <span class="op-script-card__tag op-script-card__tag--{{ _tax_tone }}">{{ tax.taxonomy_label_zh }}</span>
+                        {% if tax["values"] %}
+                          <div data-role="ms-step1-detail-taxonomy-values">
+                            {% for v in tax["values"] %}<span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">{{ v }}</span>{% endfor %}
+                          </div>
+                        {% else %}
+                          <div class="op-script-card__empty">{{ tax.values_status_label_zh }}</div>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% else %}
+                <div class="op-script-card__empty" data-role="ms-step1-detail-empty">尚未具备脚本结构。</div>
+              {% endif %}
+            </div>
+          </details>
+
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="variant_selection"
+                   style="padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>变体选择</strong> · 主推版本 / 变体数量 / 差异维度
+            </summary>
+            <div style="padding:8px 4px 0;" data-role="ms-step2-detail">
+              <div class="op-meta-grid">
+                <div class="op-meta-item" data-role="ms-step2-detail-main-version">
+                  <span class="op-meta-item__label">主推版本</span>
+                  <span class="op-meta-item__value">
+                    {% if (ms_recommended_action.recommended_variant or {}).variation_id %}候选 {{ (ms_recommended_action.recommended_variant or {}).variation_id }}{% else %}—{% endif %}
+                  </span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step2-detail-variant-count">
+                  <span class="op-meta-item__label">变体数量</span>
+                  <span class="op-meta-item__value">{{ ms_readable_variants.variant_count or 0 }} 个</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step2-detail-differentiator-dimensions">
+                  <span class="op-meta-item__label">差异维度</span>
+                  <span class="op-meta-item__value">语气 / 时长 / 受众 / 开头方式 / 画面方向</span>
+                </div>
+              </div>
+              {% if (ms_readable_variants.variant_candidates or []) %}
+                <ul style="margin:8px 0 0 16px; padding:0; font-size:13px; color:#334155;" data-role="ms-step2-detail-variant-list">
+                  {% for variant in ms_readable_variants.variant_candidates %}
+                    <li data-role="ms-step2-detail-variant-row" data-variant-index="{{ loop.index }}">
+                      候选 {{ loop.index }} · {{ variant.differentiator_zh or "—" }}{% if variant.length_hint_zh %} · {{ variant.length_hint_zh }}{% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+          </details>
+
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="generation"
+                   style="padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>生成</strong> · 主视频状态 / 当前阻塞 / 下一步
+            </summary>
+            <div style="padding:8px 4px 0;" data-role="ms-step3-detail">
+              <div class="op-meta-grid">
+                <div class="op-meta-item" data-role="ms-step3-detail-state">
+                  <span class="op-meta-item__label">主视频状态</span>
+                  <span class="op-meta-item__value">{{ ms_main_video_result.state_label_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step3-detail-blocker">
+                  <span class="op-meta-item__label">当前阻塞</span>
+                  <span class="op-meta-item__value">{{ ms_main_video_result.blocker_one_liner_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step3-detail-next-action">
+                  <span class="op-meta-item__label">下一步</span>
+                  <span class="op-meta-item__value">{{ ms_main_video_result.next_action_one_liner_zh }}</span>
+                </div>
+              </div>
+              <p class="op-tech-note" style="margin-top:6px;">生成动作集中在第一屏「主视频结果」操作区；本步骤仅做只读观测。</p>
+            </div>
+          </details>
+        </div>
+      {% endif %}
 
       {# OWC-MS-RO PR-2 — Matrix Script Workbench Blocks A / B / C (read-side
          comprehension). Per matrix_script_workbench_wireframe_v1.md §3 / §4 / §5.

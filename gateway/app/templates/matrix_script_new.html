@@ -191,7 +191,7 @@
   <div class="ms-new-page" data-role="matrix-script-create-entry" data-line-id="matrix_script">
     {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
     {% set topbar_title = "矩阵脚本" %}
-    {% set topbar_subtitle = "正式产线新建入口" %}
+    {% set topbar_subtitle = "脚本转视频 · 生成方案入口" %}
     {% set topbar_nav = [
       {"label": "任务", "href": "/tasks" ~ ui_q, "active": false},
       {"label": "工具", "href": "/tools/hub" ~ ui_q, "active": false}
@@ -205,9 +205,9 @@
     <div class="op-page-head" style="margin:10px 0 18px;">
       <div class="op-page-head__row">
         <div>
-          <h1 class="op-page-head__title" data-role="ms-new-page-title">创建矩阵脚本任务</h1>
+          <h1 class="op-page-head__title" data-role="ms-new-page-title">生成脚本视频方案</h1>
           <div class="op-page-head__sub" data-role="ms-new-page-subtitle">
-            创建后，系统会解析脚本结构、生成变体方案，并进入工作台评审。
+            输入脚本、素材和目标平台，系统先生成可确认的视频方案：脚本理解、分镜、背景 / B-Roll、角色、旁白、字幕、音乐与视频变体。
           </div>
         </div>
         <span class="op-pill op-pill--matrix" data-role="ms-new-line-pill">
@@ -471,11 +471,12 @@
             <h2 class="op-section-title">提交后会发生什么</h2>
           </div>
         </div>
-        <ol style="margin:0; padding-left:18px; color:var(--op-fg-mid, #334155); font-size:13px; line-height:1.7;">
-          <li>系统把脚本正文存入会话内的脚本素材库，并生成一个不透明的产品句柄。</li>
-          <li>句柄进入产线，触发解析与变体方案生成（当前为确定性骨架，<strong>不</strong>调用任何外部模型）。</li>
-          <li>跳转到任务工作台，可查看任务摘要 / 脚本结构 / 变体方案 / 生成进度 / 候选评审 / 交付摘要。</li>
-          <li>成片生成能力上线后，候选评审区会出现可预览的成片；当前阶段会显示「暂无可预览成片」。</li>
+        <ol style="margin:0; padding-left:18px; color:var(--op-fg-mid, #334155); font-size:13px; line-height:1.7;"
+            data-role="ms-new-route-map-script-to-video-steps">
+          <li>生成<strong>脚本理解</strong>：Hook / Body / CTA / 卖点。</li>
+          <li>生成<strong>视频方案</strong>：分镜、背景、B-Roll、商品素材位。</li>
+          <li>生成<strong>角色与音频计划</strong>：角色、旁白、字幕、音乐。</li>
+          <li>进入<strong>工作台确认方案</strong>，再生成主视频。</li>
         </ol>
         <details class="op-collapse" style="margin-top:14px;" data-role="ms-new-route-map-technical">
           <summary>技术链路（架构师视图）</summary>

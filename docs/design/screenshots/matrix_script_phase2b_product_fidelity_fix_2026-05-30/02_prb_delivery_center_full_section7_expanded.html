@@ -1,0 +1,2917 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>page.publish.title - ms-prb-demo-001</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
+  <link rel="stylesheet" href="/static/pipeline_lab.css" />
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <link rel="stylesheet" href="/static/css/operator_console.css">
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      background: #f3f4f6;
+    }
+    .page.publish {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 16px;
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+    .btn-primary {
+      background: #2563eb;
+      color: #ffffff;
+      border: 1px solid #2563eb;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+      border: 1px solid #d1d5db;
+    }
+    .btn-primary,
+    .btn-secondary {
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .btn-primary:hover { filter: brightness(.95); }
+    .btn-secondary:hover { filter: brightness(.98); }
+    .muted { color: #64748b; font-size: 0.85rem; }
+    .section-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .link-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .download-link {
+      color: #1d4ed8;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .download-link.disabled { color: #9ca3af; pointer-events: none; }
+    a.disabled { color: #9ca3af; pointer-events: none; }
+    .info-row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .info-pill {
+      background: #f1f5f9;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .copy-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .copy-btn {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #cbd5f5; }
+    .publish-textarea { width: 100%; min-height: 120px; }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tab-btn {
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #111827;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #111827;
+      color: #ffffff;
+      border-color: #111827;
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .bilingual { display: flex; flex-direction: column; gap: 4px; }
+    .qr-placeholder {
+      width: 180px;
+      height: 180px;
+      border: 1px dashed #cbd5e1;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-weight: 600;
+      text-align: center;
+      padding: 12px;
+    }
+    .lang-toggle {
+      display: inline-flex;
+      gap: 6px;
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
+      padding: 2px;
+      background: #ffffff;
+    }
+    .lang-btn {
+      border: none;
+      background: transparent;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .lang-btn.active {
+      background: #111827;
+      color: #ffffff;
+    }
+    .i18n.zh { display: inline; }
+    .i18n.mm { display: inline; }
+    .i18n.mm:not(.block)::before { content: ""; }
+    .i18n.block { display: block; }
+  </style>
+</head>
+<body data-lang="zh">
+  <div class="page publish">
+    <div class="card">
+
+
+
+
+
+<div class="topbar">
+  <div class="topbar-left">
+    
+      <div class="topbar-title">page.publish.title</div>
+    
+    
+      <div class="topbar-subtitle">page.publish.subtitle</div>
+    
+  </div>
+
+  <div class="topbar-center">
+    
+      <div class="segmented">
+        
+          <a class="segmented-item nav-pill ui-pill active" href="/tasks">
+            common.tasks
+          </a>
+        
+          <a class="segmented-item nav-pill ui-pill " href="/tools/hub">
+            common.tools
+          </a>
+        
+      </div>
+    
+  </div>
+
+  <div class="topbar-right">
+    <script>
+  window.__I18N__ = {"lang": "zh", "messages": {}};
+  window.__UI_LOCALE__ = "";
+</script>
+<div class="lang-tabs lang-switch">
+  
+</div>
+    
+      <div class="topbar-actions">
+        
+          <a class="btn ui-pill btn-ghost" href="/tasks">
+            common.back_task_board
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+<div class="info-row" style="margin-top:10px;">
+        <div class="info-pill">
+          <span>publish.download_code</span>
+          : <span id="download-code">MS-PRB</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="op-gate" style="display:none;">
+      <div class="section-title">
+        <h2>publish.gate.title</h2>
+        <div class="secondary">publish.gate.desc</div>
+      </div>
+      <div class="copy-row" style="margin-top:10px;">
+        <input id="op-key-input" class="publish-textarea" placeholder="publish.gate.need_key" />
+        <button type="button" class="btn-primary" id="op-key-save">
+          action.unlock
+        </button>
+        <span id="op-key-status" class="muted"></span>
+      </div>
+    </div>
+
+    <div id="hub-content" style="display:none;">
+      <div class="card">
+        <div class="tabs" role="tablist">
+          <button class="tab-btn active" data-tab="tab-sop" type="button">
+            publish.tab.sop
+          </button>
+          <button class="tab-btn" data-tab="tab-copy" type="button">
+            publish.tab.copy
+          </button>
+          <button class="tab-btn" data-tab="tab-deliverables" type="button">
+            publish.tab.deliverables
+          </button>
+          <button class="tab-btn" data-tab="tab-archive" type="button">
+            publish.tab.archive
+          </button>
+        </div>
+      </div>
+
+    <div class="tab-panel active" id="tab-sop">
+      <div class="card">
+        <div class="section-title">
+          <h2>publish.sop.title</h2>
+          <div class="secondary">publish.sop.desc</div>
+        </div>
+        <div class="block">publish.sop.step1</div>
+        <div class="block" style="margin-top:8px;">publish.sop.step2</div>
+        <div class="block" style="margin-top:8px;">publish.sop.step3</div>
+        <div class="block" style="margin-top:8px;">publish.sop.step4</div>
+      </div>
+    </div>
+    <div class="tab-panel" id="tab-copy">
+      <div class="card">
+        <div class="section-title">
+          <h2>publish.copy.title</h2>
+          <div class="secondary">publish.copy.desc</div>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>publish.copy.caption</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-caption">action.copy</button>
+          </div>
+          <textarea id="copy-caption" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>publish.copy.hashtags</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-hashtags">action.copy</button>
+          </div>
+          <textarea id="copy-hashtags" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>publish.copy.comment</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">action.copy</button>
+          </div>
+          <textarea id="copy-comment-cta" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>publish.copy.link_text</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-link-text">action.copy</button>
+          </div>
+          <textarea id="copy-link-text" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>publish.copy.publish_time</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-publish-time">action.copy</button>
+          </div>
+          <textarea id="copy-publish-time" class="publish-textarea"></textarea>
+        </div>
+      </div>
+    </div>
+<div class="tab-panel" id="tab-deliverables">
+      
+      
+      
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+          
+
+          
+          <div class="op-card op-card--accent-emerald" data-role="matrix-script-dc-section-intro"
+               data-redesign-wave="2026-05-29-prb" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--emerald">1 · 介绍</span>
+                <h2 class="op-section-title" data-role="ms-dc-section-intro-title">交付结果介绍</h2>
+                <span class="info-pill ms-result-status__kind ms-result-status__kind--blocked_pending_publish_readiness"
+                      data-role="ms-dc-section-intro-result-pill">未就绪</span>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-section-intro-paragraph">
+              
+                本任务当前不能交付：尚未生成主视频。下方展示交付清单与已具备的素材；待主视频生成完成后，可在「发布设置」记录发布动作。
+              
+            </p>
+            
+              <p class="op-section-helper" data-role="ms-dc-section-intro-next-action">
+                下一步：等待生成能力接入；准备就绪后从工作台触发生成。
+              </p>
+            
+          </div>
+
+          
+          
+          <div class="op-card op-card--accent-emerald" data-role="matrix-script-dc-section-main-video"
+               data-redesign-wave="2026-05-29-prb"
+               data-recommended-present="false"
+               style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--emerald">2 · 主视频</span>
+                <h2 class="op-section-title" data-role="ms-dc-section-main-video-title">主视频</h2>
+              </div>
+            </div>
+            <div class="op-main-video-preview" data-role="ms-dc-section-main-video-preview"
+                 data-preview-available="false"
+                 style="margin-top:10px; padding:36px 14px; min-height:180px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:12px; background:#fbfdff; text-align:center;">
+              
+                <div data-role="ms-dc-section-main-video-preview-empty"
+                     style="font-size:14px; line-height:1.6; color:var(--op-fg-soft, #64748b); max-width:560px; margin:0 auto;">
+                  当前尚未生成主视频。已完成脚本结构与生成方案准备，成片生成能力接入后将在这里展示视频结果。
+                </div>
+              
+            </div>
+            <p class="op-tech-note" data-role="ms-dc-section-main-video-no-fake-note" style="margin-top:8px;">
+              本面板不展示伪造的成片链接；只有真实写入的成片才会出现下载入口。
+            </p>
+          </div>
+
+          
+          
+          
+          
+          
+          
+          <div class="op-card op-card--accent-amber" data-role="matrix-script-dc-section-required-deliverables"
+               data-redesign-wave="2026-05-29-prb" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--amber">3 · 必需</span>
+                <h2 class="op-section-title" data-role="ms-dc-section-required-title">必需交付物</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-section-required-subtitle">
+              本任务的五项必需交付物：字幕、音频、文案包、manifest、交付包。状态来自交付清单；缺失项请回到工作台重新生成。
+            </p>
+            <ul style="margin:8px 0 0 0; padding:0; list-style:none;" data-role="ms-dc-section-required-list">
+              
+                
+                
+                <li data-role="ms-dc-section-required-row"
+                    data-deliverable-kind="subtitle"
+                    data-resolved="false"
+                    style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                  <span>
+                    <strong data-role="ms-dc-section-required-row-label">字幕</strong>
+                    <span class="muted t-secondary" style="margin-left:8px;" data-role="ms-dc-section-required-row-status">
+                      尚未具备
+                    </span>
+                  </span>
+                  <span class="task-actions">
+                    
+                      <a class="btn-secondary"
+                         data-role="ms-dc-section-required-row-regenerate-cta"
+                         href="/tasks/ms-prb-demo-001/workbench">在 Workbench 重新生成</a>
+                    
+                  </span>
+                </li>
+              
+                
+                
+                <li data-role="ms-dc-section-required-row"
+                    data-deliverable-kind="dub"
+                    data-resolved="false"
+                    style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                  <span>
+                    <strong data-role="ms-dc-section-required-row-label">音频</strong>
+                    <span class="muted t-secondary" style="margin-left:8px;" data-role="ms-dc-section-required-row-status">
+                      尚未具备
+                    </span>
+                  </span>
+                  <span class="task-actions">
+                    
+                      <a class="btn-secondary"
+                         data-role="ms-dc-section-required-row-regenerate-cta"
+                         href="/tasks/ms-prb-demo-001/workbench">在 Workbench 重新生成</a>
+                    
+                  </span>
+                </li>
+              
+                
+                
+                <li data-role="ms-dc-section-required-row"
+                    data-deliverable-kind="copy_bundle"
+                    data-resolved="true"
+                    style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                  <span>
+                    <strong data-role="ms-dc-section-required-row-label">文案包</strong>
+                    <span class="muted t-secondary" style="margin-left:8px;" data-role="ms-dc-section-required-row-status">
+                      已就位
+                    </span>
+                  </span>
+                  <span class="task-actions">
+                    
+                      <button type="button" class="btn-secondary"
+                              data-role="ms-dc-section-required-row-download"
+                              data-action="download"
+                              title="下载入口在主视频生成能力接入后开放">下载</button>
+                    
+                  </span>
+                </li>
+              
+                
+                
+                <li data-role="ms-dc-section-required-row"
+                    data-deliverable-kind="manifest"
+                    data-resolved="false"
+                    style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                  <span>
+                    <strong data-role="ms-dc-section-required-row-label">manifest</strong>
+                    <span class="muted t-secondary" style="margin-left:8px;" data-role="ms-dc-section-required-row-status">
+                      尚未具备
+                    </span>
+                  </span>
+                  <span class="task-actions">
+                    
+                      <a class="btn-secondary"
+                         data-role="ms-dc-section-required-row-regenerate-cta"
+                         href="/tasks/ms-prb-demo-001/workbench">在 Workbench 重新生成</a>
+                    
+                  </span>
+                </li>
+              
+                
+                
+                <li data-role="ms-dc-section-required-row"
+                    data-deliverable-kind="delivery_pack"
+                    data-resolved="false"
+                    style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid #f1f5f9;">
+                  <span>
+                    <strong data-role="ms-dc-section-required-row-label">交付包</strong>
+                    <span class="muted t-secondary" style="margin-left:8px;" data-role="ms-dc-section-required-row-status">
+                      尚未具备
+                    </span>
+                  </span>
+                  <span class="task-actions">
+                    
+                      <a class="btn-secondary"
+                         data-role="ms-dc-section-required-row-regenerate-cta"
+                         href="/tasks/ms-prb-demo-001/workbench">在 Workbench 重新生成</a>
+                    
+                  </span>
+                </li>
+              
+            </ul>
+          </div>
+
+          
+          
+          
+            
+              
+                
+              
+            
+              
+                
+              
+            
+              
+                
+              
+            
+          
+          
+          <div class="op-card" data-role="matrix-script-dc-section-optional-deliverables"
+               data-redesign-wave="2026-05-29-prb" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index">4 · 可选</span>
+                <h2 class="op-section-title" data-role="ms-dc-section-optional-title">可选交付物</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-section-optional-subtitle">
+              其他变体、场景包与补充素材；这些不阻塞发布。
+            </p>
+            <details data-role="ms-dc-section-optional-other-variants-fold" style="margin-top:8px;">
+              <summary style="cursor:pointer; font-size:13px;">
+                其他变体（3 个）
+              </summary>
+              
+                <ul style="margin:6px 0 0 16px; padding:0; font-size:13px;"
+                    data-role="ms-dc-section-optional-other-variants-list">
+                  
+                    <li data-role="ms-dc-section-optional-other-variants-row"
+                        data-variant-index="1">
+                      候选 1 · 推荐候选
+                    </li>
+                  
+                    <li data-role="ms-dc-section-optional-other-variants-row"
+                        data-variant-index="2">
+                      候选 2 · 备选
+                    </li>
+                  
+                    <li data-role="ms-dc-section-optional-other-variants-row"
+                        data-variant-index="3">
+                      候选 3 · 备选
+                    </li>
+                  
+                </ul>
+              
+            </details>
+            <div style="margin-top:8px;" data-role="ms-dc-section-optional-scene-pack">
+              <strong>场景包</strong>
+              <span class="muted t-secondary" style="margin-left:8px;"
+                    data-role="ms-dc-section-optional-scene-pack-status">
+                未生成
+              </span>
+              <span class="muted t-secondary" style="margin-left:6px;">· 不阻塞发布</span>
+            </div>
+            <div style="margin-top:6px;" data-role="ms-dc-section-optional-supporting-material">
+              <strong>补充素材</strong>
+              <span class="muted t-secondary" style="margin-left:8px;"
+                    data-role="ms-dc-section-optional-supporting-material-status">
+                暂未提供
+              </span>
+            </div>
+          </div>
+
+          
+          <div class="op-card op-card--accent-indigo" data-role="matrix-script-dc-section-publish-settings"
+               data-redesign-wave="2026-05-29-prb" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index">5 · 发布</span>
+                <h2 class="op-section-title" data-role="ms-dc-section-publish-settings-title">发布设置</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-section-publish-settings-subtitle">
+              填写发布平台、账号、标题、文案、标签与计划发布时间。系统不直接对外发布；提交后会在「发布回填」记录一次发布事件。
+            </p>
+            <form data-role="ms-dc-section-publish-settings-form"
+                  method="post"
+                  action="/api/matrix-script/closures/ms-prb-demo-001/events"
+                  style="display:grid; gap:12px; grid-template-columns:repeat(2, minmax(0, 1fr)); margin-top:8px;">
+              <input type="hidden" name="event_kind" value="operator_publish" data-role="ms-dc-section-publish-settings-event-kind" />
+              <input type="hidden" name="actor_kind" value="operator" />
+              <div style="display:grid; gap:6px;">
+                <label for="ms-prb-publish-platform" style="font-weight:700; font-size:13px; color:#334155;">平台</label>
+                <input id="ms-prb-publish-platform"
+                       name="publish_platform"
+                       list="ms-prb-publish-platform-suggestions"
+                       data-role="ms-dc-section-publish-settings-platform"
+                       placeholder="选择或输入发布平台"
+                       autocomplete="off"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+                <datalist id="ms-prb-publish-platform-suggestions">
+                  <option value="TikTok"></option>
+                  <option value="YouTube Shorts"></option>
+                  <option value="Instagram Reels"></option>
+                  <option value="抖音"></option>
+                  <option value="视频号"></option>
+                  <option value="小红书"></option>
+                  <option value="快手"></option>
+                </datalist>
+              </div>
+              <div style="display:grid; gap:6px;">
+                <label for="ms-prb-publish-account" style="font-weight:700; font-size:13px; color:#334155;">账号</label>
+                <input id="ms-prb-publish-account" name="publish_account"
+                       data-role="ms-dc-section-publish-settings-account"
+                       placeholder="发布账号"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="display:grid; gap:6px; grid-column:1 / -1;">
+                <label for="ms-prb-publish-title" style="font-weight:700; font-size:13px; color:#334155;">标题</label>
+                <input id="ms-prb-publish-title" name="publish_title"
+                       data-role="ms-dc-section-publish-settings-title-input"
+                       placeholder="发布标题" maxlength="120"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="display:grid; gap:6px; grid-column:1 / -1;">
+                <label for="ms-prb-publish-caption" style="font-weight:700; font-size:13px; color:#334155;">文案</label>
+                <textarea id="ms-prb-publish-caption" name="publish_caption"
+                          data-role="ms-dc-section-publish-settings-caption"
+                          rows="3" placeholder="发布文案"
+                          style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit;"></textarea>
+              </div>
+              <div style="display:grid; gap:6px;">
+                <label for="ms-prb-publish-tags" style="font-weight:700; font-size:13px; color:#334155;">标签</label>
+                <input id="ms-prb-publish-tags" name="publish_tags"
+                       data-role="ms-dc-section-publish-settings-tags"
+                       placeholder="#tag1 #tag2"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="display:grid; gap:6px;">
+                <label for="ms-prb-publish-scheduled" style="font-weight:700; font-size:13px; color:#334155;">计划发布时间</label>
+                <input id="ms-prb-publish-scheduled" name="publish_scheduled_at" type="datetime-local"
+                       data-role="ms-dc-section-publish-settings-scheduled"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="grid-column:1 / -1; display:flex; justify-content:flex-end; gap:8px;">
+                <button type="submit" class="btn-primary"
+                        data-role="ms-dc-section-publish-settings-submit">标记为已发布</button>
+              </div>
+            </form>
+            <p class="op-tech-note" data-role="ms-dc-section-publish-settings-honesty-note" style="margin-top:10px;">
+              本表单不直接对外发布。
+            </p>
+          </div>
+
+          
+          
+          <div class="op-card op-card--accent-violet" data-role="matrix-script-dc-section-publish-backfill"
+               data-redesign-wave="2026-05-29-prb" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--violet">6 · 回填</span>
+                <h2 class="op-section-title" data-role="ms-dc-section-publish-backfill-title">发布回填</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-section-publish-backfill-subtitle">
+              发布完成后回填发布链接与状态；可附加运营备注。指标统计将在指标投射上线后接入。
+            </p>
+            
+              <div class="muted" data-role="ms-dc-section-publish-backfill-empty" style="margin-top:8px;">
+                暂无回填记录。发布完成后，按候选行回填发布链接与状态。
+              </div>
+            
+            <div data-role="ms-dc-section-publish-backfill-metrics" style="margin-top:10px; padding:10px; background:#f6f7f9; border-radius:6px;">
+              <strong>指标统计</strong>
+              <span class="muted t-secondary" style="margin-left:8px;"
+                    data-role="ms-dc-section-publish-backfill-metrics-placeholder">指标投射尚未上线 · 暂不展示数值。</span>
+            </div>
+            <p class="op-tech-note" data-role="ms-dc-section-publish-backfill-no-fake-note" style="margin-top:6px;">
+              本面板只展示真实写入的发布链接；不展示伪造链接或占位 URL。
+            </p>
+          </div>
+        
+
+        
+        <details class="op-collapse" data-role="op-console-ms-dc-technical-diagnostics-fold" open>
+          <summary>
+            <span class="op-section-index" style="margin-right:8px;">7 · 诊断</span>
+            矩阵脚本 · 交付中心 · 技术诊断（架构师视图，默认收起）
+          </summary>
+          <div class="op-collapse__hint">展开查看历史 Block A–F、发布反馈闭环表单、JS 诊断壳；含 event_kind / publish_url / publish_status / final_video / publish_readiness 等技术标识。日常运营操作不依赖本节。</div>
+          <div class="op-collapse__body">
+
+        
+          
+          <div class="op-card op-card--accent-emerald" data-role="matrix-script-delivery-center-header" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--emerald">① · 介绍</span>
+                <h2 class="op-section-title" data-role="ms-dc-title">交付结果介绍 · PR-B reset 演示任务</h2>
+                <span class="op-pill op-pill--matrix"><span class="op-pill__dot"></span>矩阵脚本</span>
+                <span class="info-pill ms-result-status__kind ms-result-status__kind--blocked_pending_publish_readiness"
+                      data-role="ms-dc-header-result-pill">未就绪</span>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-subtitle">本页是矩阵脚本任务的发布交付中心：成片预览、必交付物清单、文案包、发布反馈、迭代与归档。</p>
+
+            <div class="op-meta-grid">
+              <div class="op-meta-item" data-role="ms-dc-header-subject">
+                <span class="op-meta-item__label">主题</span>
+                <span class="op-meta-item__value">PR-B reset 演示任务</span>
+              </div>
+              <div class="op-meta-item" data-role="ms-dc-header-stage"
+                   data-stage="awaiting_review"
+                   data-stage-index="3">
+                <span class="op-meta-item__label">当前阶段</span>
+                <span class="op-meta-item__value" data-role="ms-dc-header-stage-label">待校对</span>
+              </div>
+              <div class="op-meta-item" data-role="ms-dc-header-result"
+                   data-status-kind="blocked_pending_publish_readiness">
+                <span class="op-meta-item__label">结果摘要</span>
+                <span class="op-meta-item__value" data-role="ms-dc-header-result-headline">尚未生成成片。</span>
+              </div>
+            </div>
+
+            
+            <div data-role="ms-dc-readiness-banner"
+                 data-publishable="false"
+                 data-head-reason="missing_final_video"
+                 class="op-banner op-banner--blocker"
+                 style="margin-top:14px;">
+              <div>
+                <div class="op-banner__title">
+                  
+                    <span data-role="ms-dc-readiness-banner-value">◐ 发布门禁未通过 · 待解除阻塞</span>
+                  
+                  
+                    <span style="margin-left:6px; font-weight:400;"
+                          data-role="ms-dc-readiness-banner-head-reason">· 尚未生成成片</span>
+                  
+                </div>
+                
+                  <div class="op-banner__body" data-role="ms-dc-readiness-banner-next-action">
+                    下一步：<span>等待生成能力接入；准备就绪后从工作台触发生成。</span>
+                  </div>
+                
+              </div>
+            </div>
+          </div>
+
+          
+          <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-a-final-video-primary" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--emerald">② · 主视频</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-a-title">最终成片 · final_video</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-a-subtitle">本任务的核心交付物。</p>
+            
+            
+              
+              <div data-role="ms-dc-block-a-empty"
+                   data-status-kind="blocked_pending_publish_readiness"
+                   style="margin-top:8px;padding:14px 12px;border:1px dashed #cbd5e1;border-radius:6px;">
+                <strong data-role="ms-dc-block-a-empty-headline">建议先确认主视频生成方案。</strong>
+                <div class="muted t-secondary" data-role="ms-dc-block-a-empty-explanation" style="margin-top:6px;">
+                  等待生成能力接入；准备就绪后从工作台触发生成。
+                </div>
+              </div>
+            
+            
+            
+              <div data-role="ms-dc-block-a-variant-tabs" style="margin-top:10px;">
+                <strong>变体</strong>
+                <span style="margin-left:6px;">
+                  
+                    
+                    
+                    <span class="info-pill"
+                          data-role="ms-dc-block-a-variant-tab"
+                          data-variant-index="1"
+                          data-recommended-bucket="publishable_candidate"
+                          data-is-recommended="false"
+                          style="margin-right:4px;">
+                      候选 1
+                    </span>
+                  
+                    
+                    
+                    <span class="info-pill"
+                          data-role="ms-dc-block-a-variant-tab"
+                          data-variant-index="2"
+                          data-recommended-bucket="alternate_candidate"
+                          data-is-recommended="false"
+                          style="margin-right:4px;">
+                      候选 2
+                    </span>
+                  
+                    
+                    
+                    <span class="info-pill"
+                          data-role="ms-dc-block-a-variant-tab"
+                          data-variant-index="3"
+                          data-recommended-bucket="alternate_candidate"
+                          data-is-recommended="false"
+                          style="margin-right:4px;">
+                      候选 3
+                    </span>
+                  
+                </span>
+              </div>
+            
+          </div>
+
+          
+          <div class="op-card op-card--accent-amber" data-role="matrix-script-block-b-required-deliverables" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--amber">③ · 必需</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-b-title">必需交付物</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-b-subtitle">运营关注：哪些是阻塞发布的必交付，哪些是必交付但不阻塞发布的。状态来自 delivery_comprehension 投射。</p>
+            
+            
+            
+              <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse; margin-top:8px;"
+                     data-role="ms-dc-block-b-table"
+                     data-required-blocking-count="4"
+                     data-required-non-blocking-count="1">
+                <thead>
+                  <tr>
+                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">交付物</th>
+                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">必需 / 可选</th>
+                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">状态</th>
+                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  
+                    <tr data-role="ms-dc-block-b-row"
+                        data-deliverable-kind="subtitle"
+                        data-required-class="blocking"
+                        data-artifact-status="unobservable_pending_upstream">
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-label">字幕</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-zoning">必需 · 阻塞发布</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-status">尚未具备</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-explanation">等待主视频生成。</td>
+                    </tr>
+                  
+                    <tr data-role="ms-dc-block-b-row"
+                        data-deliverable-kind="dub"
+                        data-required-class="blocking"
+                        data-artifact-status="unobservable_pending_upstream">
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-label">音频</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-zoning">必需 · 阻塞发布</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-status">尚未具备</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-explanation">等待主视频生成。</td>
+                    </tr>
+                  
+                    <tr data-role="ms-dc-block-b-row"
+                        data-deliverable-kind="manifest"
+                        data-required-class="blocking"
+                        data-artifact-status="unobservable_pending_upstream">
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-label">manifest</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-zoning">必需 · 阻塞发布</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-status">尚未具备</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-explanation">等待生成。</td>
+                    </tr>
+                  
+                    <tr data-role="ms-dc-block-b-row"
+                        data-deliverable-kind="delivery_pack"
+                        data-required-class="blocking"
+                        data-artifact-status="unobservable_pending_upstream">
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-label">交付包</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-zoning">必需 · 阻塞发布</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-status">尚未具备</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-explanation">等待打包。</td>
+                    </tr>
+                  
+                  
+                    <tr data-role="ms-dc-block-b-row"
+                        data-deliverable-kind="copy_bundle"
+                        data-required-class="non_blocking"
+                        data-artifact-status="current_fresh">
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-label">文案包</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-zoning">必需 · 不阻塞</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-status">已具备</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-explanation">—</td>
+                    </tr>
+                  
+                </tbody>
+              </table>
+            
+          </div>
+
+          
+          
+          <div class="op-card" data-role="matrix-script-block-c-scene-pack" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index">④ · 可选</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-c-title">可选交付物 · scene_pack（不阻塞发布）</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-c-subtitle">scene_pack 是下游精修出口（CapCut / 外部剪辑工具）。生成与否不影响发布门禁。</p>
+            <ul style="margin:8px 0 0 18px; padding:0;"
+                data-role="ms-dc-block-c-list"
+                data-optional-count="1">
+              
+                <li data-role="ms-dc-block-c-row"
+                    data-deliverable-kind="scene_pack"
+                    data-artifact-status="unobservable_pending_upstream">
+                  <span data-role="ms-dc-block-c-row-label">场景包</span>
+                  · <span data-role="ms-dc-block-c-row-status">未生成</span>
+                  <span class="muted t-secondary">· 不阻塞发布 · 可在工作台请求生成</span>
+                </li>
+              
+            </ul>
+          </div>
+
+          
+          <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-d-copy-bundle" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index">④ · 文案包</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-d-title">发布文案包</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-d-subtitle">标题 / Hashtags / CTA / 评论关键词。</p>
+            
+              <div class="meta-grid" style="margin-top:8px;">
+                
+                  <div class="meta-item" data-role="ms-dc-block-d-subfield"
+                       data-subfield-id="title"
+                       data-status-code="resolved_from_existing_projection">
+                    <strong>标题</strong>
+                    
+                    
+                      <span data-role="ms-dc-block-d-subfield-value">PR-B reset 演示任务</span>
+                    
+                  </div>
+                
+              </div>
+              
+                <div class="muted t-secondary" data-role="ms-dc-block-d-tracked-gap" style="margin-top:6px;">
+                  其他文案待生成。
+                </div>
+              
+            
+          </div>
+
+          
+          <div class="op-card op-card--accent-indigo"
+               data-role="matrix-script-block-publish-settings"
+               data-redesign-wave="2026-05-28-pr3"
+               style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index">⑤ · 发布</span>
+                <h2 class="op-section-title" data-role="ms-dc-publish-settings-title">发布设置</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-publish-settings-subtitle">
+              填写发布平台与账号、文案与标签，确认后系统记录一次发布事件并出现在下方「发布回填」中。系统不直接对外发布，发布动作由运营在对应平台上完成。
+            </p>
+            <form data-role="ms-dc-publish-settings-form"
+                  method="post"
+                  action="/api/matrix-script/closures/ms-prb-demo-001/events"
+                  data-closure-endpoint="/api/matrix-script/closures/ms-prb-demo-001/events"
+                  style="display:grid; gap:12px; grid-template-columns:repeat(2, minmax(0, 1fr)); margin-top:8px;">
+              <input type="hidden" name="event_kind" value="operator_publish" data-role="ms-dc-publish-settings-event-kind" />
+              <input type="hidden" name="actor_kind" value="operator" />
+              <div style="display:grid; gap:6px;">
+                <label for="ms-publish-platform" style="font-weight:700; font-size:13px; color:#334155;">发布平台</label>
+                <input id="ms-publish-platform"
+                       name="publish_platform"
+                       list="ms-publish-platform-suggestions"
+                       data-role="ms-dc-publish-settings-platform"
+                       placeholder="选择或输入平台"
+                       autocomplete="off"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+                <datalist id="ms-publish-platform-suggestions" data-role="ms-dc-publish-settings-platform-suggestions">
+                  <option value="TikTok"></option>
+                  <option value="YouTube Shorts"></option>
+                  <option value="Instagram Reels"></option>
+                  <option value="抖音"></option>
+                  <option value="视频号"></option>
+                  <option value="小红书"></option>
+                  <option value="快手"></option>
+                </datalist>
+              </div>
+              <div style="display:grid; gap:6px;">
+                <label for="ms-publish-account" style="font-weight:700; font-size:13px; color:#334155;">账号</label>
+                <input id="ms-publish-account"
+                       name="publish_account"
+                       data-role="ms-dc-publish-settings-account"
+                       placeholder="例如：品牌官号 / 运营手号"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="display:grid; gap:6px; grid-column:1 / -1;">
+                <label for="ms-publish-title" style="font-weight:700; font-size:13px; color:#334155;">标题</label>
+                <input id="ms-publish-title"
+                       name="publish_title"
+                       data-role="ms-dc-publish-settings-title-input"
+                       placeholder="发布标题（≤50 字）"
+                       maxlength="120"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="display:grid; gap:6px; grid-column:1 / -1;">
+                <label for="ms-publish-caption" style="font-weight:700; font-size:13px; color:#334155;">文案</label>
+                <textarea id="ms-publish-caption"
+                          name="publish_caption"
+                          data-role="ms-dc-publish-settings-caption"
+                          rows="3"
+                          placeholder="发布文案"
+                          style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit;"></textarea>
+              </div>
+              <div style="display:grid; gap:6px;">
+                <label for="ms-publish-tags" style="font-weight:700; font-size:13px; color:#334155;">标签</label>
+                <input id="ms-publish-tags"
+                       name="publish_tags"
+                       data-role="ms-dc-publish-settings-tags"
+                       placeholder="#tag1 #tag2"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="display:grid; gap:6px;">
+                <label for="ms-publish-scheduled" style="font-weight:700; font-size:13px; color:#334155;">计划发布时间</label>
+                <input id="ms-publish-scheduled"
+                       name="publish_scheduled_at"
+                       type="datetime-local"
+                       data-role="ms-dc-publish-settings-scheduled"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="grid-column:1 / -1; display:flex; gap:8px; justify-content:flex-end; margin-top:4px;">
+                <button type="button"
+                        class="btn-secondary"
+                        data-role="ms-dc-publish-settings-skip"
+                        data-skip-event-kind="operator_retract">跳过发布</button>
+                <button type="submit"
+                        class="btn-primary"
+                        data-role="ms-dc-publish-settings-submit">标记为已发布</button>
+              </div>
+            </form>
+            <p class="op-tech-note" data-role="ms-dc-publish-settings-honesty-note" style="margin-top:10px;">
+              本表单不直接对外发布；提交只是在系统内记录一次发布事件（写入会话内的发布反馈）。外部发布请在对应平台手动完成。
+            </p>
+          </div>
+
+          
+          <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-publish-feedback" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--violet">⑥ · 回填</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-e-title">发布回填</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-e-subtitle">每个候选独立一行回填发布状态；事件日志 append-only，不可删除。</p>
+            
+            
+            
+              <div class="muted" data-role="ms-dc-block-e-empty" style="margin-top:8px;">
+                尚未生成 closure 记录；初始化 closure 后此处将按 variation 出现回填行。
+              </div>
+            
+            
+            <h3 style="margin:14px 0 6px;" data-role="ms-dc-block-e-event-log-label">发布事件日志（append-only）</h3>
+            
+              <div class="muted" data-role="ms-dc-block-e-event-log-empty" style="margin-top:6px;">尚无事件记录</div>
+            
+            
+            <h3 style="margin:14px 0 6px;" data-role="ms-dc-block-e-record-form-label">+ 记录发布事件</h3>
+            
+              <form data-role="ms-dc-block-e-record-form"
+                    method="POST"
+                    action="/api/matrix-script/closures/ms-prb-demo-001/events"
+                    data-publishable="false"
+                    style="margin-top:6px;">
+                <input type="hidden" name="event_kind" value="operator_publish"
+                       data-role="ms-dc-block-e-record-form-event-kind">
+                <input type="hidden" name="actor_kind" value="operator"
+                       data-role="ms-dc-block-e-record-form-actor-kind">
+                <label class="field" style="display:block;margin-bottom:6px;">
+                  <span>候选（variation_id）</span>
+                  <select name="variation_id" required
+                          data-role="ms-dc-block-e-record-form-variation-id">
+                    
+                  </select>
+                </label>
+                <label class="field" style="display:block;margin-bottom:6px;">
+                  <span>publish_url</span>
+                  <input type="url" name="publish_url"
+                         placeholder="https://… (留空则状态保持 pending)"
+                         data-role="ms-dc-block-e-record-form-publish-url" />
+                </label>
+                <label class="field" style="display:block;margin-bottom:6px;">
+                  <span>publish_status</span>
+                  <select name="publish_status"
+                          data-role="ms-dc-block-e-record-form-publish-status">
+                    <option value="pending">pending</option>
+                    <option value="retracted">retracted</option>
+                  </select>
+                </label>
+                <button type="submit" class="btn-primary"
+                        data-role="ms-dc-block-e-record-form-submit"
+                        disabled aria-disabled="true">
+                  提交发布事件
+                </button>
+                
+                  <span class="muted t-secondary" style="margin-left:6px;"
+                        data-role="ms-dc-block-e-record-form-disabled-reason">发布门禁未通过 · 解除阻塞后再记录发布事件</span>
+                
+              </form>
+            
+            <div class="muted t-secondary" data-role="ms-dc-block-e-no-fake-publish-url-note" style="margin-top:6px;">
+              本面板不展示伪造的 publish_url；publish_url 列仅在 closure 真实写入时渲染（RC-R8）。
+            </div>
+          </div>
+
+          
+          <div class="op-card op-card--accent-violet" data-role="matrix-script-block-f-iteration-archive" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--violet">⑥ · 归档</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-f-title">下一轮迭代建议 / 归档</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-f-subtitle">完成本轮发布后给出每个候选的下一步建议；不发明任务级指标。</p>
+            
+              <div class="muted" data-role="ms-dc-block-f-iteration-empty" style="margin-top:8px;">尚无可解释的变体（Phase B 未派生 / packet 未到位）。</div>
+            
+            
+            
+              <div class="task-actions" data-role="ms-dc-block-f-archive-actions" style="margin-top:10px;">
+                <button type="button"
+                        class="btn-secondary"
+                        data-role="ms-dc-block-f-archive-button"
+                        title="尚未生成 closure 记录；记录任意发布事件后再尝试归档。"
+                        disabled aria-disabled="true">
+                  归档此任务
+                </button>
+              </div>
+            
+            <div class="muted t-secondary" data-role="ms-dc-block-f-no-invented-truth-note" style="margin-top:6px;">
+              本面板不发明任务级真值；建议来自既有 publish_backfill_readiness 投射，不基于尚未上线的指标分析（BG-5 待 Plan E 后续阶段）。
+            </div>
+          </div>
+        
+
+        
+        <details class="op-collapse" data-role="op-console-ms-delivery-comprehension-fold">
+          <summary>矩阵脚本 · 交付中心理解（旧版诊断层 · 可展开）</summary>
+          <div class="op-collapse__hint">仅当 publish_hub 返回 matrix_script_delivery_comprehension 时由 JS 填充；面向架构师 / 质检的只读重述。</div>
+          <div class="op-collapse__body">
+            <div class="card" id="matrix-script-delivery-comprehension-block"
+                 data-role="matrix-script-delivery-comprehension" style="display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-delivery-title">Matrix Script · 交付中心理解</h2>
+                <div class="secondary" data-role="ms-delivery-subtitle">只读理解层 · 不发明事实 · 不引入 vendor / model / provider / engine 控件。</div>
+              </div>
+
+              <div class="card" style="margin-top:10px; border:1px solid #2563eb; background:#eff6ff;"
+                   data-role="ms-delivery-final-video-primary">
+                <div class="section-title">
+                  <h2 data-role="ms-delivery-final-video-title">最终视频 · final_video（主交付）</h2>
+                  <div class="secondary" data-role="ms-delivery-final-video-subtitle"></div>
+                </div>
+                <div class="muted" data-role="ms-delivery-final-video-explanation"></div>
+              </div>
+
+              <h3 style="margin:14px 0 6px;" data-role="ms-delivery-lanes-label">交付分区</h3>
+              <div data-role="ms-delivery-lane" data-lane-id="required_blocking" style="margin-top:8px;">
+                <strong data-role="ms-delivery-lane-label"></strong>
+                <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+                <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+              </div>
+              <div data-role="ms-delivery-lane" data-lane-id="required_non_blocking" style="margin-top:8px;">
+                <strong data-role="ms-delivery-lane-label"></strong>
+                <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+                <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+              </div>
+              <div data-role="ms-delivery-lane" data-lane-id="optional_non_blocking" style="margin-top:8px;">
+                <strong data-role="ms-delivery-lane-label"></strong>
+                <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+                <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+              </div>
+
+              <h3 style="margin:14px 0 6px;" data-role="ms-delivery-publish-blocking-label">发布阻塞解释</h3>
+              <div data-role="ms-delivery-publish-blocking-status"></div>
+              <ul data-role="ms-delivery-publish-blocking-rows" style="margin:6px 0 0 18px;"></ul>
+
+              <h3 style="margin:14px 0 6px;" data-role="ms-delivery-history-label">历史成功 vs 当前尝试</h3>
+              <div class="muted" data-role="ms-delivery-history-explanation"></div>
+            </div>
+          </div>
+        </details>
+
+        
+        <a id="publish-feedback" aria-hidden="true" tabindex="-1"
+           data-role="matrix-script-publish-feedback-anchor"></a>
+        
+        <div class="card" id="matrix-script-closure-block"
+             data-role="matrix-script-closure" style="margin-top:10px;">
+          <div class="section-title">
+            <h2>Matrix Script · 发布反馈闭环</h2>
+            <div class="secondary">
+              每个 variation（cell_id）对应一行可操作的发布反馈记录。事件按 contract 走
+              <code>POST /api/matrix-script/closures/{task_id}/events</code>。所有写回均严格遵循
+              <code>matrix_script_publish_feedback_closure_v1</code> 的封闭枚举。
+            </div>
+          </div>
+          <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse; margin-top:8px;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">variation_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">publish_status</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">publish_url</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">last_event_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">action</th>
+              </tr>
+            </thead>
+            <tbody data-role="ms-closure-rows"></tbody>
+          </table>
+          <div class="muted" data-role="ms-closure-empty" style="display:none; margin-top:8px;">
+            尚未生成 closure 记录；点击下方 “初始化 closure” 即可基于当前 packet 创建。
+          </div>
+          <div class="copy-row" style="margin-top:8px; gap:8px;">
+            <button id="btn-ms-closure-init" type="button" class="btn-secondary">初始化 closure</button>
+            <span id="ms-closure-status" class="muted"></span>
+          </div>
+
+          <h3 style="margin:14px 0 6px;">触发事件</h3>
+          <form id="ms-closure-event-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
+            <label class="field">
+              <span>variation_id</span>
+              <select name="variation_id" id="ms-closure-variation-select" required></select>
+            </label>
+            <label class="field">
+              <span>event_kind</span>
+              <select name="event_kind" id="ms-closure-event-kind" required>
+                <option value="operator_publish">operator_publish</option>
+                <option value="operator_retract">operator_retract</option>
+                <option value="operator_note">operator_note</option>
+              </select>
+            </label>
+            <label class="field" data-role="ms-closure-publish-url-field">
+              <span>publish_url（仅 operator_publish）</span>
+              <input type="url" name="publish_url" id="ms-closure-publish-url" />
+            </label>
+            <label class="field" data-role="ms-closure-publish-status-field">
+              <span>publish_status</span>
+              <select name="publish_status" id="ms-closure-publish-status">
+                <option value="pending">pending</option>
+                <option value="retracted">retracted</option>
+              </select>
+            </label>
+            <label class="field" data-role="ms-closure-note-field" style="grid-column: 1 / -1; display:none;">
+              <span>operator_publish_notes（仅 operator_note）</span>
+              <textarea name="operator_publish_notes" id="ms-closure-notes" rows="2"></textarea>
+            </label>
+            <div class="copy-row" style="grid-column: 1 / -1;">
+              <button type="submit" class="btn-primary">提交事件</button>
+              <span id="ms-closure-event-status" class="muted"></span>
+            </div>
+          </form>
+
+          <h3 style="margin:14px 0 6px;">最近事件（append-only）</h3>
+          <ul data-role="ms-closure-events-recent" class="muted" style="margin:6px 0 0 18px;"></ul>
+        </div>
+
+        
+        <details class="op-collapse" data-role="op-console-ms-secondary-shells-fold">
+          <summary>矩阵脚本 · 交付层 JS 诊断壳（copy_bundle / 多渠道回填 / 就绪解释 · 可展开）</summary>
+          <div class="op-collapse__hint">JS 在 publish_hub 加载后按需填充；展开仅用于核对 PR-3 / RC PR-4 的 lane 投射。</div>
+          <div class="op-collapse__body">
+            <div class="card" id="matrix-script-delivery-copy-bundle-block"
+                 data-role="matrix-script-delivery-copy-bundle" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-delivery-copy-bundle-title">Matrix Script · 交付中心 · copy_bundle</h2>
+                <div class="secondary" data-role="ms-delivery-copy-bundle-subtitle"></div>
+              </div>
+              <ul data-role="ms-delivery-copy-bundle-rows" style="margin:8px 0 0 18px;"></ul>
+              <div class="muted" data-role="ms-delivery-copy-bundle-tracked-gap" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="card" id="matrix-script-delivery-backfill-block"
+                 data-role="matrix-script-delivery-backfill" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-delivery-backfill-title">Matrix Script · 交付中心 · 多渠道回填</h2>
+                <div class="secondary" data-role="ms-delivery-backfill-subtitle"></div>
+              </div>
+              <div class="muted" data-role="ms-delivery-backfill-legend" style="margin-top:6px;"></div>
+              <div data-role="ms-delivery-backfill-lanes" style="margin-top:8px;"></div>
+              <div class="muted" data-role="ms-delivery-backfill-empty" style="display:none; margin-top:8px;">
+                尚未生成 closure 记录；初始化 closure 后此处将按 variation 出现回填行。
+              </div>
+              <div class="muted" data-role="ms-delivery-backfill-tracked-gap" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="card" id="matrix-script-publish-backfill-readiness-block"
+                 data-role="matrix-script-publish-backfill-readiness" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-publish-backfill-readiness-title">Matrix Script · 发布 / 回填就绪解释</h2>
+                <div class="secondary" data-role="ms-publish-backfill-readiness-subtitle"></div>
+              </div>
+              <div class="muted" data-role="ms-publish-backfill-readiness-legend" style="margin-top:6px;"></div>
+              <div data-role="ms-publish-backfill-readiness-rows" style="margin-top:8px;"></div>
+              <div class="muted" data-role="ms-publish-backfill-readiness-empty" style="display:none; margin-top:8px;">
+                尚无可解释的变体（Phase B 未派生 / packet 未到位）。
+              </div>
+              <div class="muted" data-role="ms-publish-backfill-readiness-no-fake-final-note" style="margin-top:8px;"></div>
+            </div>
+          </div>
+        </details>
+
+          </div> 
+        </details> 
+      
+
+      
+      
+      
+
+      <div class="card" data-role="operator-publish-gate-strip">
+        <div class="section-title">
+          <h2>Publish gate</h2>
+          <div class="secondary">Single derived gate. Optional items never block this.</div>
+        </div>
+        <div class="copy-row" style="gap:12px;">
+          <span data-role="operator-publish-gate" id="op-publish-gate">—</span>
+          <span data-role="operator-publish-gate-reason" id="op-publish-gate-reason" class="muted"></span>
+        </div>
+        <div class="copy-row" style="gap:12px; margin-top:8px;">
+          <strong>Last publish status:</strong>
+          <span data-role="operator-publish-status" id="op-publish-status">not_published</span>
+          <span data-role="operator-publish-channel" id="op-publish-channel" class="muted"></span>
+          <a data-role="operator-publish-url" id="op-publish-url" href="#" target="_blank" rel="noopener" style="display:none;">link</a>
+          <span data-role="operator-published-at" id="op-published-at" class="muted"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">
+          <h2>publish.deliverables.title</h2>
+          <div class="secondary">publish.deliverables.desc</div>
+        </div>
+        <div id="deliverables-list" class="copy-row" style="margin-top:12px;"></div>
+        <div class="muted" id="deliverables-empty" style="margin-top:8px; display:none;">
+          publish.deliverables.empty
+        </div>
+        <div class="copy-row" style="margin-top:12px;">
+          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">publish.deliverables.bundle</a>
+        </div>
+        <div class="copy-row" style="margin-top:12px;">
+          <img id="qr-image" alt="QR" style="width:180px;height:180px;border:1px solid #e5e7eb;background:#fff;" />
+          <div class="muted">publish.deliverables.qr</div>
+        </div>
+        <div class="copy-row" style="margin-top:6px;">
+          <a id="qr-link" href="#" target="_blank" rel="noopener">publish.deliverables.open_link</a>
+          <button type="button" class="copy-btn" data-copy-target="qr-link">publish.deliverables.copy_link</button>
+        </div>
+        <div class="copy-row" style="margin-top:6px;">
+          <a id="short-link" href="#" target="_blank" rel="noopener">publish.deliverables.short_link</a>
+          <button type="button" class="copy-btn" data-copy-target="short-link">publish.deliverables.copy_short</button>
+        </div>
+      </div>
+    </div>
+<div class="tab-panel" id="tab-archive">
+      <div class="card">
+        <div class="section-title">
+          <h2>publish.archive.title</h2>
+          <div class="secondary">publish.archive.desc</div>
+        </div>
+        <div class="info-row">
+          <div class="info-pill">
+            publish.archive.published_at: <span id="published-at">-</span>
+          </div>
+        </div>
+        <div class="section-grid" style="margin-top:12px;">
+          <div class="field">
+            <label>publish.archive.location</label>
+            <input id="archive-location" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+          <div class="field">
+            <label>publish.archive.status</label>
+            <input id="archive-status" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+          <div class="field">
+            <label>publish.archive.published</label>
+            <div class="copy-row">
+              <input type="checkbox" id="archive-published" />
+              <span class="muted">publish.archive.published_hint</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>publish.archive.download_url</label>
+            <div class="copy-row">
+              <input id="archive-download-url" class="publish-textarea" style="min-height:0;height:36px;" />
+              <a id="archive-download-link" class="btn-secondary" href="#" target="_blank" rel="noopener">publish.archive.open</a>
+            </div>
+          </div>
+          <div class="field">
+            <label>publish.archive.key</label>
+            <input id="archive-key" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+        </div>
+        <div class="action-row" style="margin-top:12px;">
+          <button id="archive-save-btn" class="btn-primary">publish.archive.save</button>
+          <button id="publish-btn" class="btn-success">publish.archive.submit</button>
+          <span id="archive-save-status" class="muted"></span>
+        </div>
+      </div>
+    </div>
+
+  <script src="/static/js/i18n_v185.js"></script>
+  <script>
+    const TASK_ID = "ms-prb-demo-001";
+    const TASK_KIND = "matrix_script";
+    const OP_KEY_STORAGE = "op_access_key";
+    const LANG_STORAGE = "ui_lang_publish_hub";
+
+        // UI language policy: show ZH + MM together in UI (English stays in code/logs only).
+function resolveLang(serverLang) {
+      const saved = localStorage.getItem(LANG_STORAGE);
+      return saved || serverLang || "zh";
+    }
+
+    function applyLang(lang) {
+      document.body.dataset.lang = lang;
+      localStorage.setItem(LANG_STORAGE, lang);
+      const toggle = document.getElementById("lang-toggle");
+      if (!toggle) return;
+      toggle.querySelectorAll(".lang-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.lang === lang);
+      });
+    }
+
+    function getOpKey() {
+      return sessionStorage.getItem(OP_KEY_STORAGE) || "";
+    }
+
+    function setOpKey(value) {
+      sessionStorage.setItem(OP_KEY_STORAGE, value);
+    }
+
+    function showGate(message) {
+      const gate = document.getElementById("op-gate");
+      const hub = document.getElementById("hub-content");
+      if (gate) gate.style.display = "";
+      if (hub) hub.style.display = "none";
+      const statusEl = document.getElementById("op-key-status");
+      if (statusEl) statusEl.textContent = message || "";
+    }
+
+    function hideGate() {
+      const gate = document.getElementById("op-gate");
+      const hub = document.getElementById("hub-content");
+      if (gate) gate.style.display = "none";
+      if (hub) hub.style.display = "";
+    }
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value || "-";
+    }
+
+    function setLink(id, href) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (href) {
+        el.href = href;
+        el.classList.remove("disabled");
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+      }
+    }
+
+    function setInputValue(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.value = value || "";
+    }
+
+    function setArchiveLink(url) {
+      const el = document.getElementById("archive-download-link");
+      if (!el) return;
+      if (url) {
+        el.href = url;
+        el.classList.remove("disabled");
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+      }
+    }
+
+    function renderDeliverables(deliverables) {
+      const list = document.getElementById("deliverables-list");
+      const empty = document.getElementById("deliverables-empty");
+      if (!list) return;
+      list.innerHTML = "";
+      const order = ["pack_zip", "scenes_zip", "origin_srt", "mm_srt", "mm_txt", "mm_audio", "edit_bundle_zip"];
+      let count = 0;
+      order.forEach((key) => {
+        const item = deliverables && deliverables[key];
+        if (!item || !item.url) return;
+        const row = document.createElement("div");
+        row.className = "link-row";
+        const link = document.createElement("a");
+        link.className = "download-link";
+        link.href = item.url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = item.label || key;
+        row.appendChild(link);
+        list.appendChild(row);
+        count += 1;
+      });
+      if (empty) empty.style.display = count ? "none" : "";
+    }
+
+    // PR-U3: Matrix Script Delivery Center comprehension renderer.
+    // Renders only when the server-side container exists (gated by
+    // task.kind == "matrix_script") and the payload carries a
+    // matrix_script_delivery_comprehension bundle. Hot Follow / Digital
+    // Anchor / Baseline publish hubs short-circuit at the container check.
+    function renderMatrixScriptDeliveryComprehension(comp) {
+      const block = document.getElementById("matrix-script-delivery-comprehension-block");
+      if (!block) return;
+      if (!comp || !comp.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const setRoleText = (role, value) => {
+        const el = block.querySelector(`[data-role="${role}"]`);
+        if (el) el.textContent = value || "";
+      };
+
+      setRoleText("ms-delivery-title", comp.panel_title_zh);
+      setRoleText("ms-delivery-subtitle", comp.panel_subtitle_zh);
+
+      const fv = comp.final_video_primary || {};
+      setRoleText("ms-delivery-final-video-title", fv.title_zh);
+      setRoleText("ms-delivery-final-video-subtitle", fv.subtitle_zh);
+      setRoleText("ms-delivery-final-video-explanation", fv.primacy_explanation_zh);
+
+      setRoleText("ms-delivery-lanes-label", comp.lanes_label_zh);
+      const lanes = comp.lanes || {};
+      ["required_blocking", "required_non_blocking", "optional_non_blocking"].forEach((laneId) => {
+        const laneEl = block.querySelector(`[data-role="ms-delivery-lane"][data-lane-id="${laneId}"]`);
+        if (!laneEl) return;
+        const lane = lanes[laneId] || { rows: [] };
+        const labelEl = laneEl.querySelector('[data-role="ms-delivery-lane-label"]');
+        const explEl = laneEl.querySelector('[data-role="ms-delivery-lane-explanation"]');
+        const rowsEl = laneEl.querySelector('[data-role="ms-delivery-lane-rows"]');
+        if (labelEl) labelEl.textContent = (lane.lane_label_zh || "") + "（" + (lane.row_count || 0) + " 项）";
+        if (explEl) explEl.textContent = lane.lane_explanation_zh || "";
+        if (rowsEl) {
+          rowsEl.innerHTML = "";
+          (lane.rows || []).forEach((row) => {
+            const li = document.createElement("li");
+            li.dataset.deliverableId = row.deliverable_id || "";
+            li.dataset.artifactStatusCode = row.artifact_status_code || "";
+            li.textContent =
+              (row.kind_label_zh || row.kind || "—") +
+              " · " + (row.zoning_label_zh || "") +
+              " · " + (row.artifact_status_label_zh || "");
+            rowsEl.appendChild(li);
+          });
+        }
+      });
+
+      setRoleText("ms-delivery-publish-blocking-label", comp.publish_blocking_explanation_label_zh);
+      const blocking = comp.publish_blocking_explanation || {};
+      const statusEl = block.querySelector('[data-role="ms-delivery-publish-blocking-status"]');
+      if (statusEl) {
+        statusEl.textContent = blocking.reason_label_zh || "";
+        statusEl.dataset.isBlocked = blocking.is_blocked ? "true" : "false";
+      }
+      const blockingRowsEl = block.querySelector('[data-role="ms-delivery-publish-blocking-rows"]');
+      if (blockingRowsEl) {
+        blockingRowsEl.innerHTML = "";
+        (blocking.blocking_rows || []).forEach((br) => {
+          const li = document.createElement("li");
+          li.textContent =
+            (br.kind_label_zh || "") + " · " + (br.artifact_status_label_zh || "");
+          blockingRowsEl.appendChild(li);
+        });
+      }
+
+      setRoleText("ms-delivery-history-label", comp.history_vs_current_label_zh);
+      setRoleText("ms-delivery-history-explanation", comp.history_vs_current_explanation_zh);
+    }
+
+    // OWC-MS PR-3 / MS-W7: Matrix Script Delivery Center copy_bundle exposure
+    // renderer. Renders only when the server-side container exists (gated by
+    // task.kind == "matrix_script") and the payload carries a non-empty
+    // matrix_script_delivery_copy_bundle bundle. Hot Follow / Digital Anchor /
+    // Baseline publish hubs short-circuit at the container check.
+    function renderMatrixScriptDeliveryCopyBundle(bundle) {
+      const block = document.getElementById("matrix-script-delivery-copy-bundle-block");
+      if (!block) return;
+      if (!bundle || !bundle.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="ms-delivery-copy-bundle-title"]');
+      if (titleEl) titleEl.textContent = bundle.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="ms-delivery-copy-bundle-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = bundle.panel_subtitle_zh || "";
+
+      const rowsEl = block.querySelector('[data-role="ms-delivery-copy-bundle-rows"]');
+      if (rowsEl) {
+        rowsEl.innerHTML = "";
+        (bundle.subfields || []).forEach((sub) => {
+          const li = document.createElement("li");
+          li.dataset.subfieldId = sub.subfield_id || "";
+          li.dataset.statusCode = sub.status_code || "";
+          const labelEl = document.createElement("strong");
+          labelEl.textContent = (sub.label_zh || sub.subfield_id || "—") + "：";
+          li.appendChild(labelEl);
+          const valueSpan = document.createElement("span");
+          valueSpan.dataset.role = "ms-delivery-copy-bundle-value";
+          if (sub.value) {
+            valueSpan.textContent = sub.value;
+          } else {
+            valueSpan.textContent = "—";
+            valueSpan.classList.add("muted");
+          }
+          li.appendChild(valueSpan);
+          const statusSpan = document.createElement("span");
+          statusSpan.className = "muted";
+          statusSpan.style.marginLeft = "8px";
+          statusSpan.dataset.role = "ms-delivery-copy-bundle-status";
+          statusSpan.textContent = "[" + (sub.status_label_zh || sub.status_code || "") + "]";
+          li.appendChild(statusSpan);
+          if (sub.unresolved_explanation_zh) {
+            const expl = document.createElement("div");
+            expl.className = "muted t-secondary";
+            expl.dataset.role = "ms-delivery-copy-bundle-explanation";
+            expl.style.marginLeft = "12px";
+            expl.textContent = sub.unresolved_explanation_zh;
+            li.appendChild(expl);
+          }
+          rowsEl.appendChild(li);
+        });
+      }
+
+      const gapEl = block.querySelector('[data-role="ms-delivery-copy-bundle-tracked-gap"]');
+      if (gapEl) gapEl.textContent = bundle.tracked_gap_summary_zh || "";
+    }
+
+    // OWC-MS PR-3 / MS-W8: Matrix Script Delivery Center 多渠道回填 renderer.
+    // Reads only data.matrix_script_delivery_backfill; renders one lane per
+    // variation_id with six operator-language fields (channel / account /
+    // publish_time / publish_url / publish_status / metrics_snapshot). No
+    // second truth path; account_id surfaces as an explicit tracked gap.
+    function renderMatrixScriptDeliveryBackfill(backfill) {
+      const block = document.getElementById("matrix-script-delivery-backfill-block");
+      if (!block) return;
+      if (!backfill || !backfill.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="ms-delivery-backfill-title"]');
+      if (titleEl) titleEl.textContent = backfill.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="ms-delivery-backfill-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = backfill.panel_subtitle_zh || "";
+      const legendEl = block.querySelector('[data-role="ms-delivery-backfill-legend"]');
+      if (legendEl) {
+        const legend = backfill.field_legend_zh || [];
+        legendEl.textContent = legend.length ? "字段：" + legend.join(" / ") : "";
+      }
+
+      const lanesEl = block.querySelector('[data-role="ms-delivery-backfill-lanes"]');
+      const emptyEl = block.querySelector('[data-role="ms-delivery-backfill-empty"]');
+      if (lanesEl) {
+        lanesEl.innerHTML = "";
+        const lanes = backfill.lanes || [];
+        if (!lanes.length) {
+          if (emptyEl) emptyEl.style.display = "";
+        } else {
+          if (emptyEl) emptyEl.style.display = "none";
+          lanes.forEach((lane) => {
+            const laneCard = document.createElement("div");
+            laneCard.className = "card";
+            laneCard.style.marginTop = "8px";
+            laneCard.dataset.role = "ms-delivery-backfill-lane";
+            laneCard.dataset.variationId = lane.variation_id || "";
+
+            const laneTitle = document.createElement("strong");
+            laneTitle.dataset.role = "ms-delivery-backfill-lane-label";
+            laneTitle.textContent = lane.lane_label_zh || ("variation_id · " + (lane.variation_id || "—"));
+            laneCard.appendChild(laneTitle);
+
+            const fieldsList = document.createElement("ul");
+            fieldsList.style.margin = "6px 0 0 18px";
+            fieldsList.dataset.role = "ms-delivery-backfill-lane-fields";
+            (lane.fields || []).forEach((fld) => {
+              const li = document.createElement("li");
+              li.dataset.fieldId = fld.field_id || "";
+              li.dataset.statusCode = fld.status_code || "";
+              const labelEl = document.createElement("strong");
+              labelEl.textContent = (fld.label_zh || fld.field_id || "—") + "：";
+              li.appendChild(labelEl);
+
+              const valueSpan = document.createElement("span");
+              valueSpan.dataset.role = "ms-delivery-backfill-field-value";
+              if (fld.field_id === "metrics_snapshot") {
+                const pairs = fld.metrics_pairs || [];
+                if (pairs.length) {
+                  valueSpan.textContent = pairs
+                    .map((p) => (p.label_zh || p.metric_id || "—") + "=" + p.value)
+                    .join(" / ");
+                } else {
+                  valueSpan.textContent = "—";
+                  valueSpan.classList.add("muted");
+                }
+              } else if (fld.field_id === "publish_status") {
+                const labelTextRaw = fld.value_label_zh || "";
+                if (fld.value) {
+                  valueSpan.textContent = labelTextRaw
+                    ? labelTextRaw + "（" + fld.value + "）"
+                    : fld.value;
+                } else {
+                  valueSpan.textContent = labelTextRaw || "—";
+                  if (!labelTextRaw) valueSpan.classList.add("muted");
+                }
+              } else if (fld.value) {
+                valueSpan.textContent = fld.value;
+              } else {
+                valueSpan.textContent = "—";
+                valueSpan.classList.add("muted");
+              }
+              li.appendChild(valueSpan);
+
+              const statusSpan = document.createElement("span");
+              statusSpan.className = "muted";
+              statusSpan.style.marginLeft = "8px";
+              statusSpan.dataset.role = "ms-delivery-backfill-field-status";
+              statusSpan.textContent = "[" + (fld.status_label_zh || fld.status_code || "") + "]";
+              li.appendChild(statusSpan);
+
+              if (fld.tracked_gap_explanation_zh) {
+                const expl = document.createElement("div");
+                expl.className = "muted t-secondary";
+                expl.dataset.role = "ms-delivery-backfill-field-tracked-gap";
+                expl.style.marginLeft = "12px";
+                expl.textContent = fld.tracked_gap_explanation_zh;
+                li.appendChild(expl);
+              }
+              fieldsList.appendChild(li);
+            });
+            laneCard.appendChild(fieldsList);
+            lanesEl.appendChild(laneCard);
+          });
+        }
+      }
+
+      const gapEl = block.querySelector('[data-role="ms-delivery-backfill-tracked-gap"]');
+      if (gapEl) gapEl.textContent = backfill.tracked_gap_summary_zh || "";
+    }
+
+    // RC PR-4 / RC-R7 + RC-R8: Matrix Script publish/backfill readiness
+    // explanation renderer. Reads only data.matrix_script_publish_backfill_readiness;
+    // renders one row per variation_id with operator-language readiness label +
+    // next-input + gap summary. No second truth path; never renders publish_url
+    // or any media URL string. Authority:
+    // docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
+    // §3 RC-R7 + §3 RC-R8 + §5 RC PR-4.
+    function renderMatrixScriptPublishBackfillReadiness(readiness) {
+      const block = document.getElementById("matrix-script-publish-backfill-readiness-block");
+      if (!block) return;
+      if (!readiness || !readiness.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="ms-publish-backfill-readiness-title"]');
+      if (titleEl) titleEl.textContent = readiness.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="ms-publish-backfill-readiness-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = readiness.panel_subtitle_zh || "";
+
+      const legendEl = block.querySelector('[data-role="ms-publish-backfill-readiness-legend"]');
+      if (legendEl) {
+        const legend = readiness.readiness_legend_zh || [];
+        const counters = "（可发 " + (readiness.publishable_now_count || 0)
+          + " · 阻塞 " + (readiness.gated_count || 0)
+          + " · 已发布 " + (readiness.already_published_count || 0)
+          + " · 失败 " + (readiness.already_failed_count || 0)
+          + " · 跟踪缺口 " + (readiness.tracked_gap_count || 0) + "）";
+        legendEl.textContent = (legend.length ? "分级：" + legend.join(" / ") + " " : "") + counters;
+      }
+
+      const rowsEl = block.querySelector('[data-role="ms-publish-backfill-readiness-rows"]');
+      const emptyEl = block.querySelector('[data-role="ms-publish-backfill-readiness-empty"]');
+      if (rowsEl) {
+        rowsEl.innerHTML = "";
+        const rows = readiness.rows || [];
+        if (!rows.length) {
+          if (emptyEl) emptyEl.style.display = "";
+        } else {
+          if (emptyEl) emptyEl.style.display = "none";
+          rows.forEach((row) => {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.style.marginTop = "8px";
+            card.dataset.role = "ms-publish-backfill-readiness-row";
+            card.dataset.variationId = row.variation_id || "";
+            card.dataset.readinessKind = row.readiness_kind || "";
+
+            const head = document.createElement("div");
+            const idStrong = document.createElement("strong");
+            idStrong.textContent = "变体 " + (row.variation_id || "—");
+            head.appendChild(idStrong);
+            const kindPill = document.createElement("span");
+            kindPill.className = "info-pill";
+            kindPill.style.marginLeft = "6px";
+            kindPill.dataset.role = "ms-publish-backfill-readiness-kind";
+            kindPill.textContent = row.readiness_label_zh || "";
+            head.appendChild(kindPill);
+            const axisPill = document.createElement("span");
+            axisPill.className = "info-pill";
+            axisPill.style.marginLeft = "6px";
+            axisPill.textContent = row.axis_summary_zh || "—";
+            head.appendChild(axisPill);
+            card.appendChild(head);
+
+            const nextInput = document.createElement("div");
+            nextInput.className = "muted t-secondary";
+            nextInput.dataset.role = "ms-publish-backfill-readiness-next-input";
+            nextInput.style.marginTop = "4px";
+            nextInput.textContent = row.next_input_zh || "";
+            card.appendChild(nextInput);
+
+            if (row.gap_summary_zh) {
+              const gap = document.createElement("div");
+              gap.className = "muted t-secondary";
+              gap.dataset.role = "ms-publish-backfill-readiness-gap";
+              gap.style.marginTop = "4px";
+              gap.textContent = "缺口：" + row.gap_summary_zh;
+              card.appendChild(gap);
+            }
+            if (row.head_reason) {
+              const hr = document.createElement("div");
+              hr.className = "muted t-secondary";
+              hr.dataset.role = "ms-publish-backfill-readiness-head-reason";
+              hr.dataset.headReason = row.head_reason;
+              hr.style.marginTop = "4px";
+              hr.textContent = "head_reason = " + row.head_reason
+                + (row.head_reason_label_zh ? " · " + row.head_reason_label_zh : "");
+              card.appendChild(hr);
+            }
+            if (row.closure_publish_status_label_zh) {
+              const cs = document.createElement("div");
+              cs.className = "muted t-secondary";
+              cs.dataset.role = "ms-publish-backfill-readiness-closure-status";
+              cs.style.marginTop = "4px";
+              cs.textContent = "closure publish_status：" + row.closure_publish_status_label_zh;
+              card.appendChild(cs);
+            }
+            rowsEl.appendChild(card);
+          });
+        }
+      }
+
+      const noteEl = block.querySelector('[data-role="ms-publish-backfill-readiness-no-fake-final-note"]');
+      if (noteEl) noteEl.textContent = readiness.no_final_video_url_note_zh || "";
+    }
+
+    // OWC-DA PR-3 / DA-W8: Digital Anchor Delivery Center · Delivery Pack
+    // assembly renderer. Renders only when the server-side container exists
+    // (gated by task.kind == "digital_anchor") and the payload carries a
+    // digital_anchor_delivery_pack bundle. Hot Follow / Matrix Script /
+    // Baseline publish hubs short-circuit at the container check.
+    function renderDigitalAnchorDeliveryPack(pack) {
+      const block = document.getElementById("digital-anchor-delivery-pack-block");
+      if (!block) return;
+      if (!pack || !pack.is_digital_anchor) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const setRoleText = (role, value) => {
+        const el = block.querySelector(`[data-role="${role}"]`);
+        if (el) el.textContent = value || "";
+      };
+
+      setRoleText("da-delivery-pack-title", pack.panel_title_zh);
+      setRoleText("da-delivery-pack-subtitle", pack.panel_subtitle_zh);
+
+      const lanes = pack.lanes || {};
+      const order = pack.lane_order || [];
+
+      const fv = lanes.final_video || {};
+      setRoleText("da-delivery-pack-final-video-label", fv.label_zh);
+      setRoleText("da-delivery-pack-final-video-status", fv.status_label_zh ? "[" + fv.status_label_zh + "]" : "");
+      setRoleText("da-delivery-pack-final-video-explanation", fv.primacy_explanation_zh);
+      setRoleText("da-delivery-pack-final-video-tracked-gap", fv.tracked_gap_explanation_zh);
+
+      setRoleText("da-delivery-pack-lanes-label", "交付分区");
+      const legend = (pack.lane_legend_zh || []).join(" / ");
+      setRoleText("da-delivery-pack-legend", legend ? "字段：" + legend : "");
+
+      const lanesEl = block.querySelector('[data-role="da-delivery-pack-lanes"]');
+      if (lanesEl) {
+        lanesEl.innerHTML = "";
+        order.forEach((laneId) => {
+          if (laneId === "final_video") return; // primacy lane rendered above
+          const lane = lanes[laneId];
+          if (!lane) return;
+          const laneCard = document.createElement("div");
+          laneCard.className = "card";
+          laneCard.style.marginTop = "8px";
+          laneCard.dataset.role = "da-delivery-pack-lane";
+          laneCard.dataset.laneId = laneId;
+          laneCard.dataset.statusCode = lane.status_code || "";
+
+          const titleEl = document.createElement("strong");
+          titleEl.dataset.role = "da-delivery-pack-lane-label";
+          titleEl.textContent = lane.label_zh || laneId;
+          laneCard.appendChild(titleEl);
+
+          const statusSpan = document.createElement("span");
+          statusSpan.className = "muted";
+          statusSpan.style.marginLeft = "8px";
+          statusSpan.dataset.role = "da-delivery-pack-lane-status";
+          statusSpan.textContent = "[" + (lane.status_label_zh || lane.status_code || "") + "]";
+          laneCard.appendChild(statusSpan);
+
+          const detail = document.createElement("div");
+          detail.className = "muted t-secondary";
+          detail.style.marginTop = "4px";
+          detail.dataset.role = "da-delivery-pack-lane-detail";
+
+          if (laneId === "subtitle" || laneId === "dubbed_audio" || laneId === "pack") {
+            const parts = [];
+            if (lane.deliverable_id) parts.push("deliverable_id=" + lane.deliverable_id);
+            if (lane.deliverable_kind_label_zh) parts.push("kind=" + lane.deliverable_kind_label_zh);
+            parts.push("required=" + (lane.required ? "true" : "false"));
+            if (lane.artifact_lookup) parts.push("artifact_lookup=" + (typeof lane.artifact_lookup === "string" ? lane.artifact_lookup : "ArtifactHandle"));
+            detail.textContent = parts.join(" · ");
+          } else if (laneId === "metadata") {
+            const parts = [];
+            if (lane.line_id) parts.push("line_id=" + lane.line_id);
+            if (lane.packet_version) parts.push("packet_version=" + lane.packet_version);
+            if (lane.notes) parts.push("notes=" + lane.notes);
+            detail.textContent = parts.join(" · ") || "—";
+          } else if (laneId === "manifest") {
+            const parts = [];
+            if (lane.manifest_id) parts.push("manifest_id=" + lane.manifest_id);
+            if (lane.deliverable_profile_ref) parts.push("deliverable_profile_ref=" + lane.deliverable_profile_ref);
+            if (lane.asset_sink_profile_ref) parts.push("asset_sink_profile_ref=" + lane.asset_sink_profile_ref);
+            if (lane.packet_ready_state) parts.push("packet_ready_state=" + lane.packet_ready_state);
+            if (lane.write_policy) parts.push("write_policy=" + lane.write_policy);
+            detail.textContent = parts.join(" · ") || "—";
+          } else if (laneId === "role_usage") {
+            const roles = lane.roles || [];
+            if (roles.length === 0) {
+              detail.textContent = "—";
+            } else {
+              const ul = document.createElement("ul");
+              ul.style.margin = "4px 0 0 18px";
+              ul.dataset.role = "da-delivery-pack-role-rows";
+              roles.forEach((role) => {
+                const li = document.createElement("li");
+                li.dataset.roleId = role.role_id || "";
+                const segCount = (role.segment_ids || []).length;
+                li.textContent =
+                  (role.role_display_name || role.role_id || "—") +
+                  " · " + (role.role_framing_label_zh || role.role_framing_kind || "—") +
+                  " · 段落数=" + segCount;
+                ul.appendChild(li);
+              });
+              detail.appendChild(ul);
+            }
+          } else if (laneId === "scene_usage") {
+            if (lane.scene_binding_hint) {
+              detail.textContent = "scene_binding_hint=" + lane.scene_binding_hint;
+            } else {
+              detail.textContent = lane.tracked_gap_explanation_zh || "—";
+            }
+          } else if (laneId === "language_usage") {
+            const rows = lane.language_rows || [];
+            if (rows.length === 0) {
+              detail.textContent = "—";
+            } else {
+              const ul = document.createElement("ul");
+              ul.style.margin = "4px 0 0 18px";
+              ul.dataset.role = "da-delivery-pack-language-rows";
+              rows.forEach((row) => {
+                const li = document.createElement("li");
+                li.dataset.language = row.language || "";
+                const flags = [];
+                if (row.is_source_language) flags.push("源");
+                if (row.is_target_language) flags.push("目标");
+                li.textContent =
+                  row.language +
+                  (flags.length ? "（" + flags.join("/") + "）" : "") +
+                  " · 段落数=" + (row.segment_count || 0);
+                ul.appendChild(li);
+              });
+              detail.appendChild(ul);
+            }
+          } else {
+            detail.textContent = "—";
+          }
+          laneCard.appendChild(detail);
+          lanesEl.appendChild(laneCard);
+        });
+      }
+
+      const gapEl = block.querySelector('[data-role="da-delivery-pack-tracked-gap-summary"]');
+      if (gapEl) gapEl.textContent = pack.tracked_gap_summary_zh || "";
+    }
+
+    // OWC-DA PR-3 / DA-W9: Digital Anchor Delivery Center · 多渠道回填 renderer.
+    // Reads only data.digital_anchor_delivery_backfill; renders one lane per
+    // (role / segment) row with six operator-language fields (channel /
+    // account / publish_time / publish_url / publish_status / metrics_snapshot).
+    // No second truth path; channel + account surface as explicit tracked gaps.
+    function renderDigitalAnchorDeliveryBackfill(backfill) {
+      const block = document.getElementById("digital-anchor-delivery-backfill-block");
+      if (!block) return;
+      if (!backfill || !backfill.is_digital_anchor) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="da-delivery-backfill-title"]');
+      if (titleEl) titleEl.textContent = backfill.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="da-delivery-backfill-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = backfill.panel_subtitle_zh || "";
+      const legendEl = block.querySelector('[data-role="da-delivery-backfill-legend"]');
+      if (legendEl) {
+        const legend = backfill.field_legend_zh || [];
+        legendEl.textContent = legend.length ? "字段：" + legend.join(" / ") : "";
+      }
+
+      const lanesEl = block.querySelector('[data-role="da-delivery-backfill-lanes"]');
+      const emptyEl = block.querySelector('[data-role="da-delivery-backfill-empty"]');
+      if (lanesEl) {
+        lanesEl.innerHTML = "";
+        const lanes = backfill.lanes || [];
+        if (!lanes.length) {
+          if (emptyEl) emptyEl.style.display = "";
+        } else {
+          if (emptyEl) emptyEl.style.display = "none";
+          lanes.forEach((lane) => {
+            const laneCard = document.createElement("div");
+            laneCard.className = "card";
+            laneCard.style.marginTop = "8px";
+            laneCard.dataset.role = "da-delivery-backfill-lane";
+            laneCard.dataset.rowScope = lane.row_scope || "";
+            laneCard.dataset.rowId = lane.row_id || "";
+
+            const laneTitle = document.createElement("strong");
+            laneTitle.dataset.role = "da-delivery-backfill-lane-label";
+            laneTitle.textContent = lane.lane_label_zh || ((lane.row_scope || "") + " · " + (lane.row_id || "—"));
+            laneCard.appendChild(laneTitle);
+
+            const fieldsList = document.createElement("ul");
+            fieldsList.style.margin = "6px 0 0 18px";
+            fieldsList.dataset.role = "da-delivery-backfill-lane-fields";
+            (lane.fields || []).forEach((fld) => {
+              const li = document.createElement("li");
+              li.dataset.fieldId = fld.field_id || "";
+              li.dataset.statusCode = fld.status_code || "";
+              const labelEl = document.createElement("strong");
+              labelEl.textContent = (fld.label_zh || fld.field_id || "—") + "：";
+              li.appendChild(labelEl);
+
+              const valueSpan = document.createElement("span");
+              valueSpan.dataset.role = "da-delivery-backfill-field-value";
+              if (fld.field_id === "metrics_snapshot") {
+                const pairs = fld.metrics_pairs || [];
+                if (pairs.length) {
+                  valueSpan.textContent = pairs
+                    .map((p) => (p.label_zh || p.metric_id || "—") + "=" + p.value)
+                    .join(" / ");
+                } else {
+                  valueSpan.textContent = "—";
+                  valueSpan.classList.add("muted");
+                }
+              } else if (fld.field_id === "publish_status") {
+                const labelTextRaw = fld.value_label_zh || "";
+                if (fld.value) {
+                  valueSpan.textContent = labelTextRaw
+                    ? labelTextRaw + "（" + fld.value + "）"
+                    : fld.value;
+                } else {
+                  valueSpan.textContent = labelTextRaw || "—";
+                  if (!labelTextRaw) valueSpan.classList.add("muted");
+                }
+              } else if (fld.value) {
+                valueSpan.textContent = fld.value;
+              } else {
+                valueSpan.textContent = "—";
+                valueSpan.classList.add("muted");
+              }
+              li.appendChild(valueSpan);
+
+              const statusSpan = document.createElement("span");
+              statusSpan.className = "muted";
+              statusSpan.style.marginLeft = "8px";
+              statusSpan.dataset.role = "da-delivery-backfill-field-status";
+              statusSpan.textContent = "[" + (fld.status_label_zh || fld.status_code || "") + "]";
+              li.appendChild(statusSpan);
+
+              if (fld.tracked_gap_explanation_zh) {
+                const expl = document.createElement("div");
+                expl.className = "muted t-secondary";
+                expl.dataset.role = "da-delivery-backfill-field-tracked-gap";
+                expl.style.marginLeft = "12px";
+                expl.textContent = fld.tracked_gap_explanation_zh;
+                li.appendChild(expl);
+              }
+              fieldsList.appendChild(li);
+            });
+            laneCard.appendChild(fieldsList);
+            lanesEl.appendChild(laneCard);
+          });
+        }
+      }
+
+      const gapEl = block.querySelector('[data-role="da-delivery-backfill-tracked-gap"]');
+      if (gapEl) gapEl.textContent = backfill.tracked_gap_summary_zh || "";
+    }
+
+    function renderCopyBundle(copy) {
+      const captionEl = document.getElementById("copy-caption");
+      if (captionEl && !captionEl.value) captionEl.value = copy.caption || "";
+      const hashtagsEl = document.getElementById("copy-hashtags");
+      if (hashtagsEl && !hashtagsEl.value) hashtagsEl.value = copy.hashtags || "";
+      const ctaEl = document.getElementById("copy-comment-cta");
+      if (ctaEl && !ctaEl.value) ctaEl.value = copy.comment_cta || "";
+      const linkEl = document.getElementById("copy-link-text");
+      if (linkEl && !linkEl.value) linkEl.value = copy.link_text || "";
+      const timeEl = document.getElementById("copy-publish-time");
+      if (timeEl && !timeEl.value) timeEl.value = copy.publish_time_suggestion || "";
+    }
+
+    async function fetchText(kind) {
+      const headers = {};
+      const opKey = getOpKey();
+      if (opKey) headers["X-OP-KEY"] = opKey;
+      const url = `/api/tasks/${encodeURIComponent(TASK_ID)}/text?kind=${encodeURIComponent(kind)}`;
+      const resp = await fetch(url, { headers });
+      if (!resp.ok) return "";
+      const text = await resp.text();
+      return (text || "").trim();
+    }
+
+    async function fillCaptionFallback(copy) {
+      const captionEl = document.getElementById("copy-caption");
+      if (!captionEl || captionEl.value) return;
+      const fromPayload = (copy && copy.caption) || "";
+      if (fromPayload) {
+        captionEl.value = fromPayload;
+        return;
+      }
+      const candidates = ["mm_edited", "mm_txt", "origin_srt"];
+      for (const kind of candidates) {
+        try {
+          const text = await fetchText(kind);
+          if (text) {
+            captionEl.value = text;
+            break;
+          }
+        } catch (err) {
+          continue;
+        }
+      }
+    }
+
+    function renderArchive(archive) {
+      setText("published-at", archive.published_at || "-");
+      setInputValue("archive-location", archive.archive_location || archive.publish_provider || "");
+      setInputValue("archive-status", archive.status || archive.publish_status || "");
+      setInputValue("archive-key", archive.archive_key || archive.publish_key || "");
+      const downloadUrl = archive.download_url || archive.publish_url || "";
+      setInputValue("archive-download-url", downloadUrl);
+      setArchiveLink(downloadUrl);
+      const published = Boolean(archive.published || archive.published_at) && archive.published_at !== "-";
+      const publishedEl = document.getElementById("archive-published");
+      if (publishedEl) publishedEl.checked = published;
+    }
+
+    // Recovery PR-3: Matrix Script publish-feedback closure renderer.
+    // Reads only data.matrix_script_publish_feedback_closure; emits no
+    // provider/model/vendor/engine identifiers; submits events through the
+    // contract-backed POST /api/matrix-script/closures/{task_id}/events.
+    function renderMatrixScriptClosure(closure) {
+      const block = document.getElementById("matrix-script-closure-block");
+      if (!block) return;
+      const tbody = block.querySelector('[data-role="ms-closure-rows"]');
+      const emptyEl = block.querySelector('[data-role="ms-closure-empty"]');
+      const variationSelect = document.getElementById("ms-closure-variation-select");
+      const eventsEl = block.querySelector('[data-role="ms-closure-events-recent"]');
+      if (!closure || !closure.variation_feedback) {
+        if (tbody) tbody.innerHTML = "";
+        if (emptyEl) emptyEl.style.display = "";
+        if (variationSelect) variationSelect.innerHTML = "";
+        if (eventsEl) eventsEl.innerHTML = "";
+        return;
+      }
+      if (emptyEl) emptyEl.style.display = "none";
+      if (tbody) {
+        tbody.innerHTML = "";
+        (closure.variation_feedback || []).forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.dataset.variationId = row.variation_id || "";
+          const cells = [
+            row.variation_id || "—",
+            row.publish_status || "pending",
+            row.publish_url || "—",
+            row.last_event_id || "—",
+            "",
+          ];
+          cells.forEach((value, idx) => {
+            const td = document.createElement("td");
+            td.style.padding = "6px";
+            td.style.borderBottom = "1px solid #f1f5f9";
+            if (idx === 0 || idx === 3) {
+              const code = document.createElement("code");
+              code.textContent = value;
+              td.appendChild(code);
+            } else if (idx === 4) {
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "btn-secondary";
+              btn.textContent = "选择";
+              btn.addEventListener("click", () => {
+                if (variationSelect) variationSelect.value = row.variation_id || "";
+              });
+              td.appendChild(btn);
+            } else {
+              td.textContent = value;
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+      if (variationSelect) {
+        variationSelect.innerHTML = "";
+        (closure.variation_feedback || []).forEach((row) => {
+          const opt = document.createElement("option");
+          opt.value = row.variation_id || "";
+          opt.textContent = row.variation_id || "";
+          variationSelect.appendChild(opt);
+        });
+      }
+      if (eventsEl) {
+        eventsEl.innerHTML = "";
+        const records = (closure.feedback_closure_records || []).slice(-5).reverse();
+        records.forEach((record) => {
+          const li = document.createElement("li");
+          li.textContent =
+            (record.recorded_at || "—") +
+            " · " +
+            (record.event_kind || "—") +
+            " · variation=" +
+            (record.variation_id || "—") +
+            " · actor=" +
+            (record.actor_kind || "—");
+          eventsEl.appendChild(li);
+        });
+      }
+    }
+
+    function bindMatrixScriptClosureForm() {
+      const form = document.getElementById("ms-closure-event-form");
+      const initBtn = document.getElementById("btn-ms-closure-init");
+      const eventKindSelect = document.getElementById("ms-closure-event-kind");
+      const urlField = document.querySelector('[data-role="ms-closure-publish-url-field"]');
+      const statusField = document.querySelector('[data-role="ms-closure-publish-status-field"]');
+      const noteField = document.querySelector('[data-role="ms-closure-note-field"]');
+      const formStatusEl = document.getElementById("ms-closure-event-status");
+      const initStatusEl = document.getElementById("ms-closure-status");
+      if (!form) return;
+
+      function syncFieldVisibility() {
+        const kind = (eventKindSelect && eventKindSelect.value) || "";
+        if (urlField) urlField.style.display = kind === "operator_publish" ? "" : "none";
+        if (statusField) statusField.style.display = kind === "operator_publish" ? "" : "none";
+        if (noteField) noteField.style.display = kind === "operator_note" ? "" : "none";
+      }
+      if (eventKindSelect) eventKindSelect.addEventListener("change", syncFieldVisibility);
+      syncFieldVisibility();
+
+      async function refreshClosure() {
+        try {
+          const resp = await fetch(
+            `/api/matrix-script/closures/${encodeURIComponent(TASK_ID)}/peek`
+          );
+          if (!resp.ok) return;
+          const body = await resp.json();
+          renderMatrixScriptClosure(body && body.closure);
+        } catch (err) { /* presentation-only; never crash */ }
+      }
+
+      if (initBtn) {
+        initBtn.addEventListener("click", async () => {
+          if (initStatusEl) initStatusEl.textContent = "正在初始化…";
+          try {
+            const resp = await fetch(
+              `/api/matrix-script/closures/${encodeURIComponent(TASK_ID)}`
+            );
+            const body = await resp.json();
+            if (!resp.ok) {
+              if (initStatusEl) initStatusEl.textContent = "失败：" + (body.detail || resp.status);
+              return;
+            }
+            renderMatrixScriptClosure(body);
+            if (initStatusEl) initStatusEl.textContent = "已就绪";
+          } catch (err) {
+            if (initStatusEl) initStatusEl.textContent = "失败：" + (err && err.message);
+          }
+        });
+      }
+
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const kind = (eventKindSelect && eventKindSelect.value) || "";
+        const variationId = document.getElementById("ms-closure-variation-select").value;
+        if (!variationId) {
+          if (formStatusEl) formStatusEl.textContent = "请先选择 variation_id（点击表格中的 “选择”）";
+          return;
+        }
+        const event = {
+          event_kind: kind,
+          variation_id: variationId,
+          recorded_at: new Date().toISOString(),
+        };
+        if (kind === "operator_publish") {
+          const url = document.getElementById("ms-closure-publish-url").value || null;
+          const status = document.getElementById("ms-closure-publish-status").value || "pending";
+          event.payload = { publish_status: status };
+          if (url) event.payload.publish_url = url;
+        } else if (kind === "operator_note") {
+          const note = document.getElementById("ms-closure-notes").value || "";
+          event.payload = { operator_publish_notes: note };
+        } else if (kind === "operator_retract") {
+          event.payload = {};
+        }
+        if (formStatusEl) formStatusEl.textContent = "提交中…";
+        try {
+          const resp = await fetch(
+            `/api/matrix-script/closures/${encodeURIComponent(TASK_ID)}/events`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(event),
+            }
+          );
+          const body = await resp.json();
+          if (!resp.ok) {
+            if (formStatusEl) formStatusEl.textContent = "失败：" + (body.detail || resp.status);
+            return;
+          }
+          renderMatrixScriptClosure(body && body.closure);
+          if (formStatusEl) formStatusEl.textContent = "已写入 event_id=" + (body.event_id || "—");
+        } catch (err) {
+          if (formStatusEl) formStatusEl.textContent = "失败：" + (err && err.message);
+        }
+      });
+
+      // Initial fetch (no auto-create) so any pre-existing closure renders.
+      refreshClosure();
+    }
+
+    // Recovery PR-4: Digital Anchor publish-feedback closure renderer.
+    // Reads only data.digital_anchor_publish_feedback_closure; submits events
+    // through the contract-backed POST /api/digital-anchor/closures/{task_id}/...
+    function renderDigitalAnchorClosure(closure) {
+      const block = document.getElementById("digital-anchor-closure-block");
+      if (!block) return;
+      const roleTbody = block.querySelector('[data-role="da-role-rows"]');
+      const segmentTbody = block.querySelector('[data-role="da-segment-rows"]');
+      const eventsEl = block.querySelector('[data-role="da-closure-events-recent"]');
+      if (!closure) {
+        if (roleTbody) roleTbody.innerHTML = "";
+        if (segmentTbody) segmentTbody.innerHTML = "";
+        if (eventsEl) eventsEl.innerHTML = "";
+        return;
+      }
+      function renderRows(tbody, rows, columns) {
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        (rows || []).forEach((row) => {
+          const tr = document.createElement("tr");
+          columns.forEach((col) => {
+            const td = document.createElement("td");
+            td.style.padding = "6px";
+            td.style.borderBottom = "1px solid #f1f5f9";
+            const value = row[col];
+            if (Array.isArray(value)) {
+              td.textContent = value.join(", ");
+            } else {
+              td.textContent = (value === null || value === undefined) ? "—" : String(value);
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+      renderRows(roleTbody, closure.role_feedback, [
+        "role_id",
+        "role_display_name",
+        "role_feedback_kind",
+        "linked_segments",
+      ]);
+      renderRows(segmentTbody, closure.segment_feedback, [
+        "segment_id",
+        "binds_role_id",
+        "segment_feedback_kind",
+        "script_ref",
+      ]);
+      if (eventsEl) {
+        eventsEl.innerHTML = "";
+        const records = (closure.feedback_closure_records || []).slice(-5).reverse();
+        records.forEach((record) => {
+          const li = document.createElement("li");
+          li.textContent =
+            (record.recorded_at || "—") +
+            " · " +
+            (record.record_kind || "—") +
+            " · roles=[" + (record.role_ids || []).join(",") + "]" +
+            " · segments=[" + (record.segment_ids || []).join(",") + "]";
+          eventsEl.appendChild(li);
+        });
+      }
+    }
+
+    function bindDigitalAnchorClosureForms() {
+      const block = document.getElementById("digital-anchor-closure-block");
+      if (!block) return;
+      const initBtn = document.getElementById("btn-da-closure-init");
+      const initStatusEl = document.getElementById("da-closure-status");
+      const roleForm = document.getElementById("da-role-feedback-form");
+      const roleStatus = document.getElementById("da-role-feedback-status");
+      const segmentForm = document.getElementById("da-segment-feedback-form");
+      const segmentStatus = document.getElementById("da-segment-feedback-status");
+      const d1Form = document.getElementById("da-d1-event-form");
+      const d1Status = document.getElementById("da-d1-event-status");
+      const d1EventKind = document.getElementById("da-d1-event-kind");
+
+      async function refreshClosure() {
+        try {
+          const resp = await fetch(
+            `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}/peek`
+          );
+          if (!resp.ok) return;
+          const body = await resp.json();
+          renderDigitalAnchorClosure(body && body.closure);
+        } catch (err) { /* presentation-only */ }
+      }
+
+      if (initBtn) {
+        initBtn.addEventListener("click", async () => {
+          if (initStatusEl) initStatusEl.textContent = "正在初始化…";
+          try {
+            const resp = await fetch(
+              `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}`
+            );
+            const body = await resp.json();
+            if (!resp.ok) {
+              if (initStatusEl) initStatusEl.textContent = "失败：" + (body.detail || resp.status);
+              return;
+            }
+            renderDigitalAnchorClosure(body);
+            if (initStatusEl) initStatusEl.textContent = "已就绪";
+          } catch (err) {
+            if (initStatusEl) initStatusEl.textContent = "失败：" + (err && err.message);
+          }
+        });
+      }
+
+      async function postEvent(form, statusEl, path) {
+        const data = {};
+        new FormData(form).forEach((value, key) => {
+          if (typeof value === "string" && value.length > 0) data[key] = value;
+        });
+        if (statusEl) statusEl.textContent = "提交中…";
+        try {
+          const resp = await fetch(
+            `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}/${path}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            }
+          );
+          const body = await resp.json();
+          if (!resp.ok) {
+            if (statusEl) statusEl.textContent = "失败：" + (body.detail || resp.status);
+            return;
+          }
+          renderDigitalAnchorClosure(body && body.closure);
+          if (statusEl) statusEl.textContent = "已写入 record_id=" + (body.record_id || "—");
+        } catch (err) {
+          if (statusEl) statusEl.textContent = "失败：" + (err && err.message);
+        }
+      }
+
+      if (roleForm) {
+        roleForm.addEventListener("submit", (ev) => {
+          ev.preventDefault();
+          postEvent(roleForm, roleStatus, "role-feedback");
+        });
+      }
+      if (segmentForm) {
+        segmentForm.addEventListener("submit", (ev) => {
+          ev.preventDefault();
+          postEvent(segmentForm, segmentStatus, "segment-feedback");
+        });
+      }
+      function syncD1FieldVisibility() {
+        const kind = (d1EventKind && d1EventKind.value) || "";
+        const urlField = block.querySelector('[data-role="da-d1-payload-publish-url"]');
+        const noteField = block.querySelector('[data-role="da-d1-payload-note"]');
+        if (urlField) urlField.style.display = kind === "publish_accepted" ? "" : "none";
+        if (noteField) noteField.style.display = kind === "operator_note" ? "" : "none";
+      }
+      if (d1EventKind) d1EventKind.addEventListener("change", syncD1FieldVisibility);
+      syncD1FieldVisibility();
+
+      if (d1Form) {
+        d1Form.addEventListener("submit", async (ev) => {
+          ev.preventDefault();
+          const formData = new FormData(d1Form);
+          const eventKind = formData.get("event_kind") || "";
+          const body = {
+            event_kind: eventKind,
+            row_scope: formData.get("row_scope") || "",
+            row_id: formData.get("row_id") || "",
+            recorded_at: new Date().toISOString(),
+            payload: {},
+          };
+          if (eventKind === "publish_accepted") {
+            const url = formData.get("publish_url");
+            if (url) body.payload.publish_url = url;
+          } else if (eventKind === "operator_note") {
+            const note = formData.get("note");
+            if (note) body.payload.note = note;
+          }
+          if (d1Status) d1Status.textContent = "提交中…";
+          try {
+            const resp = await fetch(
+              `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}/events`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+              }
+            );
+            const respBody = await resp.json();
+            if (!resp.ok) {
+              if (d1Status) d1Status.textContent = "失败：" + (respBody.detail || resp.status);
+              return;
+            }
+            renderDigitalAnchorClosure(respBody && respBody.closure);
+            if (d1Status) d1Status.textContent = "已写入 record_id=" + (respBody.record_id || "—");
+          } catch (err) {
+            if (d1Status) d1Status.textContent = "失败：" + (err && err.message);
+          }
+        });
+      }
+      refreshClosure();
+    }
+
+    function renderOperatorSurfaces(ops) {
+      const delivery = (ops && ops.delivery) || {};
+      const mirror = delivery.publish_status_mirror || {};
+      const gateEl = document.getElementById("op-publish-gate");
+      const gateReasonEl = document.getElementById("op-publish-gate-reason");
+      if (gateEl) gateEl.textContent = delivery.publish_gate ? "open" : "blocked";
+      if (gateReasonEl) gateReasonEl.textContent = delivery.publish_gate_head_reason || "";
+      setText("op-publish-status", mirror.publish_status || "not_published");
+      setText("op-publish-channel", mirror.publish_channel ? `· ${mirror.publish_channel}` : "");
+      setText("op-published-at", mirror.last_published_at ? `· ${mirror.last_published_at}` : "");
+      const urlEl = document.getElementById("op-publish-url");
+      if (urlEl) {
+        if (mirror.publish_url) {
+          urlEl.href = mirror.publish_url;
+          urlEl.style.display = "";
+        } else {
+          urlEl.removeAttribute("href");
+          urlEl.style.display = "none";
+        }
+      }
+    }
+
+    function copyTextFromElement(el) {
+      if (!el) return;
+      let text = "";
+      if (el.tagName === "A") {
+        text = el.getAttribute("href") || "";
+      } else if (el.tagName === "TEXTAREA") {
+        text = el.value || "";
+      } else {
+        text = el.textContent || "";
+      }
+      if (!text || text === "#") return;
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    document.querySelectorAll("[data-copy-target]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.getAttribute("data-copy-target");
+        const target = document.getElementById(targetId);
+        copyTextFromElement(target);
+      });
+    });
+
+    async function fetchPublishHub() {
+      const opKey = getOpKey();
+      if (!opKey) {
+        showGate(window.__V185_I18N__.t("publish.gate.need_key"));
+        return;
+      }
+      const kind = (TASK_KIND || "").toLowerCase();
+      const publishHubUrl = kind === "apollo_avatar"
+        ? `/api/apollo/avatar/${encodeURIComponent(TASK_ID)}/publish_hub`
+        : `/api/tasks/${encodeURIComponent(TASK_ID)}/publish_hub`;
+      const resp = await fetch(publishHubUrl, {
+        headers: { "X-OP-KEY": opKey },
+      });
+      if (resp.status === 401 || resp.status === 403) {
+        showGate(window.__V185_I18N__.t("publish.gate.invalid_key"));
+        return;
+      }
+      if (!resp.ok) {
+        showGate(window.__V185_I18N__.t("publish.gate.load_failed", { status: resp.status }));
+        return;
+      }
+      hideGate();
+      const data = await resp.json();
+      setText("download-code", data.download_code || "-");
+      renderDeliverables(data.deliverables || {});
+      renderMatrixScriptDeliveryComprehension(data.matrix_script_delivery_comprehension || null);
+      renderMatrixScriptDeliveryCopyBundle(data.matrix_script_delivery_copy_bundle || null);
+      renderMatrixScriptDeliveryBackfill(data.matrix_script_delivery_backfill || null);
+      renderMatrixScriptPublishBackfillReadiness(data.matrix_script_publish_backfill_readiness || null);
+      renderMatrixScriptClosure(data.matrix_script_publish_feedback_closure || null);
+      renderDigitalAnchorDeliveryPack(data.digital_anchor_delivery_pack || null);
+      renderDigitalAnchorDeliveryBackfill(data.digital_anchor_delivery_backfill || null);
+      renderDigitalAnchorClosure(data.digital_anchor_publish_feedback_closure || null);
+      renderCopyBundle(data.copy_bundle || {});
+      await fillCaptionFallback(data.copy_bundle || {});
+      renderArchive(data.archive || {});
+      renderOperatorSurfaces(data.operator_surfaces || {});
+      const editLink = document.getElementById("edit-bundle-link");
+      if (editLink && data.deliverables && data.deliverables.edit_bundle_zip) {
+        editLink.href = data.deliverables.edit_bundle_zip.url;
+        editLink.classList.remove("disabled");
+      } else if (editLink) {
+        editLink.href = "#";
+        editLink.classList.add("disabled");
+      }
+      const sopEl = document.getElementById("sop-markdown");
+      if (sopEl) sopEl.textContent = data.sop_markdown || "";
+      const mobile = data.mobile || {};
+      const shortLink = mobile.short_url || mobile.short_link || mobile.qr_target || mobile.qr_url;
+      const qrTarget = shortLink || mobile.qr_target || mobile.qr_url;
+      if (qrTarget) {
+        const abs = new URL(qrTarget, window.location.origin).toString();
+        const qrImg = document.getElementById("qr-image");
+        if (qrImg) {
+          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(abs)}`;
+        }
+        setLink("qr-link", abs);
+      }
+      if (shortLink) {
+        setLink("short-link", new URL(shortLink, window.location.origin).toString());
+      }
+      const serverLang = data.ui_lang;
+      const savedLang = localStorage.getItem("ui_lang_publish_hub");
+      if (!savedLang && serverLang) {
+        applyLang(serverLang);
+      }
+    }
+
+    const publishBtn = document.getElementById("publish-btn");
+    if (publishBtn) {
+      publishBtn.addEventListener("click", async () => {
+      const statusEl = document.getElementById("publish-status");
+      if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submitting");
+      try {
+        const opKey = getOpKey();
+        const headers = { "Content-Type": "application/json" };
+        if (opKey) headers["X-OP-KEY"] = opKey;
+        const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ task_id: TASK_ID, force: false }),
+        });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submit_failed", { detail: `${resp.status} ${detail}` });
+            return;
+          }
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submitted");
+          await fetchPublishHub();
+        } catch (err) {
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submit_error", { error: err });
+        }
+      });
+    }
+
+    const archiveSaveBtn = document.getElementById("archive-save-btn");
+    if (archiveSaveBtn) {
+      archiveSaveBtn.addEventListener("click", async () => {
+        const statusEl = document.getElementById("archive-save-status");
+        if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.saving");
+        const payload = {
+          archive: {
+            archive_location: document.getElementById("archive-location")?.value?.trim() || "",
+            status: document.getElementById("archive-status")?.value?.trim() || "",
+            published: Boolean(document.getElementById("archive-published")?.checked),
+            download_url: document.getElementById("archive-download-url")?.value?.trim() || "",
+            archive_key: document.getElementById("archive-key")?.value?.trim() || "",
+          },
+        };
+        Object.assign(payload, payload.archive);
+        try {
+          const opKey = getOpKey();
+          const headers = { "Content-Type": "application/json" };
+          if (opKey) headers["X-OP-KEY"] = opKey;
+          const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.save_failed", { detail: `${resp.status} ${detail}` });
+            return;
+          }
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.saved");
+          await fetchPublishHub();
+        } catch (err) {
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.save_error", { error: err });
+        }
+      });
+    }
+
+    const archiveUrlInput = document.getElementById("archive-download-url");
+    if (archiveUrlInput) {
+      archiveUrlInput.addEventListener("input", () => {
+        setArchiveLink(archiveUrlInput.value.trim());
+      });
+    }
+
+    const saveBtn = document.getElementById("op-key-save");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => {
+        const input = document.getElementById("op-key-input");
+        const value = input ? input.value.trim() : "";
+        if (!value) {
+          showGate(window.__V185_I18N__.t("publish.gate.need_key"));
+          return;
+        }
+        setOpKey(value);
+        fetchPublishHub().catch(() => {});
+      });
+    }
+
+    // OWC-MS-RO PR-4 conditional-pass correction (2026-05-08): Block F
+    // archive form JSON submit handler. Intercepts the form's default
+    // multipart/url-encoded submit and posts a JSON event to the existing
+    // POST /api/matrix-script/closures/{task_id}/events endpoint, which
+    // is JSON-only per the closure router
+    // (gateway/app/routers/matrix_script_closure.py:108-147 — calls
+    // `await request.json()` and 400-rejects non-JSON bodies). The
+    // payload shape mirrors the existing closure JSON pattern reused by
+    // bindMatrixScriptClosureForm above:
+    //   { event_kind, variation_id, actor_kind, recorded_at,
+    //     payload: { operator_publish_notes } }
+    // event_kind is the closed `operator_note` member of the existing
+    // EVENT_KINDS frozenset (no enum widening); operator_publish_notes
+    // carries the operator-language archive intent marker. The function
+    // is a no-op when the form is absent (Hot Follow / Digital Anchor /
+    // baseline publish hubs do not render it; matrix_script tasks
+    // without a closure render the disabled fallback button instead).
+    function bindMatrixScriptArchiveForm() {
+      const form = document.querySelector(
+        '[data-role="ms-dc-block-f-archive-form"]'
+      );
+      if (!form) return;
+      const variationSelect = form.querySelector(
+        '[data-role="ms-dc-block-f-archive-form-variation-id"]'
+      );
+      const eventKindEl = form.querySelector('input[name="event_kind"]');
+      const actorKindEl = form.querySelector('input[name="actor_kind"]');
+      const notesEl = form.querySelector('input[name="operator_publish_notes"]');
+      const statusEl = form.querySelector(
+        '[data-role="ms-dc-block-f-archive-form-status"]'
+      );
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const variationId = (variationSelect && variationSelect.value) || "";
+        if (!variationId) {
+          if (statusEl) statusEl.textContent = "请先选择候选";
+          return;
+        }
+        const event = {
+          event_kind: (eventKindEl && eventKindEl.value) || "operator_note",
+          variation_id: variationId,
+          actor_kind: (actorKindEl && actorKindEl.value) || "operator",
+          recorded_at: new Date().toISOString(),
+          payload: {
+            operator_publish_notes:
+              (notesEl && notesEl.value) || "归档此任务",
+          },
+        };
+        const action = form.getAttribute("action");
+        if (statusEl) statusEl.textContent = "提交中…";
+        try {
+          const resp = await fetch(action, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(event),
+          });
+          let body = null;
+          try { body = await resp.json(); } catch (parseErr) { body = null; }
+          if (!resp.ok) {
+            const detail = (body && body.detail) || resp.status;
+            if (statusEl) statusEl.textContent = "失败：" + detail;
+            return;
+          }
+          const eventId = (body && body.event_id) || "—";
+          if (statusEl) {
+            statusEl.textContent = "已归档（事件 ID：" + eventId + "）";
+          }
+        } catch (err) {
+          if (statusEl) {
+            statusEl.textContent = "失败：" + (err && err.message);
+          }
+        }
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // Recovery PR-3: bind the Matrix Script closure form once. The form
+      // surface only renders when the server emitted the gated container
+      // (task.kind == "matrix_script"); for other lines the call is a no-op.
+      try { bindMatrixScriptClosureForm(); } catch (err) { /* noop */ }
+      // OWC-MS-RO PR-4 conditional-pass correction: bind the Block F
+      // archive form to the JSON closure-event path. No-op when the
+      // form is absent.
+      try { bindMatrixScriptArchiveForm(); } catch (err) { /* noop */ }
+      try { bindDigitalAnchorClosureForms(); } catch (err) { /* noop */ }
+      const tabs = document.querySelectorAll(".tab-btn");
+      const panels = document.querySelectorAll(".tab-panel");
+      function activate(id) {
+        tabs.forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === id));
+        panels.forEach((panel) => panel.classList.toggle("active", panel.id === id));
+      }
+      tabs.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.tab;
+          if (id) activate(id);
+        });
+      });
+      const hash = window.location.hash.replace("#", "");
+      if (hash) activate(`tab-${hash}`);
+      const initialLang = resolveLang(null);
+      applyLang(initialLang);
+      const langToggle = document.getElementById("lang-toggle");
+      if (langToggle) {
+        langToggle.addEventListener("click", (event) => {
+          const btn = event.target.closest(".lang-btn");
+          if (!btn) return;
+          const lang = btn.dataset.lang;
+          if (!lang) return;
+          applyLang(lang);
+        });
+      }
+
+      if (!getOpKey()) {
+        showGate(window.__V185_I18N__.t("publish.gate.need_key"));
+        return;
+      }
+      fetchPublishHub().catch(() => {});
+    });
+  </script>
+</body>
+</html>
