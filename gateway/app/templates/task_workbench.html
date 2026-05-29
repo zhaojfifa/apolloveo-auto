@@ -284,23 +284,10 @@
       {% set ms_delivery_comprehension = ((ops.workbench or {}).matrix_script_delivery_comprehension or {}) %}
       {% set ms_main_video_result = ((ops.workbench or {}).matrix_script_main_video_result or {}) %}
 
-      {# Phase 2C (2026-05-30) · operator-readability capability banner.
-         ONE top-level orientation line so the operator understands the
-         workbench as a script-to-video workspace whose generation /
-         material steps open up as capability lands — not a backend
-         status board. Copy / layout only; no new truth, no closed enum,
-         no packet write. Operator language only. #}
-      {% if ms_main_video_result.is_matrix_script %}
-        <div class="op-banner op-banner--info"
-             data-role="matrix-script-capability-banner"
-             data-redesign-wave="2026-05-30-phase2c"
-             style="margin-bottom:12px;">
-          <div>
-            <div class="op-banner__title" data-role="matrix-script-capability-banner-title">脚本转视频工作台</div>
-            <div class="op-banner__body" data-role="matrix-script-capability-banner-body">这里把一条脚本拆解成可生成的视频方案。成片生成与素材匹配能力接入后，本工作台将开放生成与替换操作；当前阶段以方案确认与偏好选择兜底，已选偏好会作为后续生成的输入。</div>
-          </div>
-        </div>
-      {% endif %}
+      {# Phase 2D (2026-05-30) · result-oriented IA: the capability banner
+         was relocated to BELOW §A 主视频结果 so the operator's first /
+         dominant surface is the result panel, not an orientation line.
+         The banner block now renders right after §A. #}
 
       {# PR-2A (redesign 2026-05-28) · 主视频结果 anchor block.
          Renders at the TOP of the matrix_script workbench branch, ABOVE the
@@ -328,7 +315,7 @@
              data-redesign-wave="2026-05-28-pr2a">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--emerald">★ · 主视频</span>
+              <span class="op-section-index op-section-index--emerald">① · 主视频</span>
               <h2 class="op-section-title" data-role="ms-main-video-result-title">{{ ms_main_video_result.panel_title_zh }}</h2>
               <span class="op-pill op-pill--{% if ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% elif ms_main_video_result.state_kind == 'generating' %}info{% else %}blocked{% endif %}"
                     data-role="ms-main-video-result-state-pill"
@@ -398,6 +385,43 @@
         </div>
       {% endif %}
 
+      {# Phase 2C (2026-05-30) · operator-readability capability banner.
+         ONE orientation line; relocated by Phase 2D to render BELOW §A so
+         the result panel is the dominant first surface. Copy / layout only;
+         no new truth, no closed enum, no packet write. Operator language. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-banner op-banner--info"
+             data-role="matrix-script-capability-banner"
+             data-redesign-wave="2026-05-30-phase2c"
+             style="margin-bottom:12px;">
+          <div>
+            <div class="op-banner__title" data-role="matrix-script-capability-banner-title">脚本转视频工作台</div>
+            <div class="op-banner__body" data-role="matrix-script-capability-banner-body">这里把一条脚本拆解成可生成的视频方案。成片生成与素材匹配能力接入后，本工作台将开放生成与替换操作；当前阶段以方案确认与偏好选择兜底，已选偏好会作为后续生成的输入。</div>
+          </div>
+        </div>
+      {% endif %}
+
+      {# Phase 2D (2026-05-30) · result-oriented IA group header ② ·
+         生成方案确认. Merges the legacy §B 脚本理解 + §C 视频生成计划 into
+         one operator decision: confirm the generation plan. The storyboard
+         (§C) stays the primary visible content; 脚本理解 (§B) is demoted to
+         a collapsed supporting detail just below. Copy / layout only; the
+         §B / §C container anchors + sub-anchors are preserved unchanged. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card op-card--accent-emerald"
+             data-role="ms-section-plan-confirm"
+             data-redesign-wave="2026-05-30-phase2d"
+             style="margin-bottom:4px;">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">② · 方案</span>
+              <h2 class="op-section-title" data-role="ms-section-plan-confirm-title">生成方案确认</h2>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-plan-confirm-summary">系统已根据脚本整理出视频方向和分镜草案，请先确认是否符合你的成片预期。脚本理解（三段式 / 关键词 / 禁用词 / 受众 / 语气 / 时长）作为支撑细节收在下方，分镜草案为这一段的主视图。</p>
+        </div>
+      {% endif %}
+
       {# Phase 2B fidelity fix (2026-05-30): PR-A standalone stepper relocated into §J (architect view); no longer rendered in operator primary scan. #}
 
       {% set ms_publish_readiness = ops_pr %}
@@ -444,15 +468,22 @@
         <div class="op-card op-card--accent-indigo"
              data-role="matrix-script-section-script-understanding"
              data-redesign-wave="2026-05-30-phase2b">
+          {# Phase 2D (2026-05-30) · demoted from a primary <h2> section to a
+             compact supporting detail INSIDE 生成方案确认 (②). The storyboard
+             plan (§C) is the dominant visible content; 脚本理解 reads as
+             collapsed supporting detail. All sub-anchors + data-status-code
+             values are preserved verbatim inside the <details>. #}
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">B · 脚本</span>
-              <h2 class="op-section-title" data-role="ms-section-script-understanding-title">脚本理解</h2>
+              <span class="op-section-index">支撑</span>
+              <h3 class="op-section-subtitle" data-role="ms-section-script-understanding-title">脚本理解（支撑细节）</h3>
               <span class="op-pill op-pill--ready"><span class="op-pill__dot"></span>已具备</span>
             </div>
           </div>
           <p class="op-section-helper" data-role="ms-section-script-understanding-subtitle">这是系统从脚本里读懂的内容：三段式结构、关键词、禁用词、卖点，以及目标受众、语气、时长、平台与语言。后续生成会以此为准。</p>
-          <div class="op-meta-grid">
+          <details data-role="ms-section-script-understanding-fold">
+            <summary style="cursor:pointer; color:var(--op-muted,#6b7280); font-size:13px;">展开脚本理解细节（三段式 / 关键词 / 禁用词 / 受众 / 语气 / 时长 / 平台 / 语言）</summary>
+          <div class="op-meta-grid" style="margin-top:10px;">
             {% for section in (ms_script_structure.sections or []) %}
               <div class="op-meta-item" data-role="ms-section-script-understanding-segment"
                    data-section-id="{{ section.section_id }}">
@@ -500,6 +531,7 @@
               </span>
             </div>
           </div>
+          </details>
         </div>
       {% endif %}
 
@@ -518,10 +550,14 @@
              data-role="matrix-script-section-generation-plan"
              data-redesign-wave="2026-05-30-phase2b"
              data-status-code="plan_pending_upstream">
+          {# Phase 2D (2026-05-30) · the storyboard is the DOMINANT visible
+             content of 生成方案确认 (②). Heading demoted from <h2> to <h3>
+             so 生成方案确认 is the single primary heading; the scene list
+             below stays fully visible. data-role + string preserved. #}
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--emerald">C · 计划</span>
-              <h2 class="op-section-title" data-role="ms-section-generation-plan-title">视频生成计划 · 故事板</h2>
+              <span class="op-section-index op-section-index--emerald">分镜草案</span>
+              <h3 class="op-section-subtitle" data-role="ms-section-generation-plan-title">视频生成计划 · 故事板</h3>
               <span class="op-pill op-pill--review" data-role="ms-section-generation-plan-status-pill">占位草案</span>
             </div>
           </div>
@@ -608,6 +644,31 @@
         </div>
       {% endif %}
 
+      {# Phase 2D (2026-05-30) · result-oriented IA group header ③ ·
+         成片要素调整. Merges §D 画面与素材 + §E 角色与声音 + §F 字幕与音乐
+         into one primary section read as operator-adjustable video intent.
+         The three legacy cards below are demoted from <h2> to compact
+         <h3> subcards; all container + sub-anchors preserved in order. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card op-card--accent-amber"
+             data-role="ms-section-final-elements"
+             data-redesign-wave="2026-05-30-phase2d"
+             style="margin-bottom:4px;">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--amber">③ · 要素</span>
+              <h2 class="op-section-title" data-role="ms-section-final-elements-title">成片要素调整</h2>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-final-elements-summary">系统已给出默认成片配置，你可以按账号风格微调。下面三张卡分别对应画面与素材、角色与声音、字幕与音乐。</p>
+          <ul data-role="ms-section-final-elements-examples" style="margin:6px 0 0 0; padding-left:18px; color:var(--op-muted,#6b7280); font-size:13px; line-height:1.7;">
+            <li>画面与素材：海边 / 圣女果特写 / 试吃动作 / 递向镜头</li>
+            <li>角色与声音：清爽女声 / 自然种草 / 甜美但不过度广告感</li>
+            <li>字幕与音乐：大字高亮 / 底部居中 / 轻快上扬 BGM</li>
+          </ul>
+        </div>
+      {% endif %}
+
       {# Section D · 画面与素材 — placeholder for background / B-Roll /
          product material slots. No helper today; Phase 5 Asset Supply
          bridge will populate. Status code: broll_pending_upstream. #}
@@ -618,8 +679,8 @@
              data-status-code="broll_pending_upstream">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--amber">D · 画面</span>
-              <h2 class="op-section-title" data-role="ms-section-visual-materials-title">画面与素材</h2>
+              <span class="op-section-index op-section-index--amber">画面</span>
+              <h3 class="op-section-subtitle" data-role="ms-section-visual-materials-title">画面与素材</h3>
               <span class="op-pill op-pill--neutral" data-role="ms-section-visual-materials-status-pill">当前占位</span>
             </div>
           </div>
@@ -689,8 +750,8 @@
              data-status-code="voice_preview_pending_voicetrans">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--violet">E · 角色</span>
-              <h2 class="op-section-title" data-role="ms-section-role-voice-title">角色与声音</h2>
+              <span class="op-section-index op-section-index--violet">角色</span>
+              <h3 class="op-section-subtitle" data-role="ms-section-role-voice-title">角色与声音</h3>
               <span class="op-pill op-pill--neutral" data-role="ms-section-role-voice-status-pill">当前占位</span>
             </div>
           </div>
@@ -737,8 +798,8 @@
              data-status-code="subtitle_style_pending_compose">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">F · 字幕音乐</span>
-              <h2 class="op-section-title" data-role="ms-section-subtitle-music-title">字幕与音乐</h2>
+              <span class="op-section-index">字幕音乐</span>
+              <h3 class="op-section-subtitle" data-role="ms-section-subtitle-music-title">字幕与音乐</h3>
               <span class="op-pill op-pill--neutral" data-role="ms-section-subtitle-music-status-pill">当前占位</span>
             </div>
           </div>
@@ -797,6 +858,27 @@
                     title="替换 / 上传背景音乐的能力尚未接入。"
                     disabled aria-disabled="true">替换 / 上传背景音乐</button>
           </div>
+        </div>
+      {% endif %}
+
+      {# Phase 2D (2026-05-30) · result-oriented IA group header ④ ·
+         视频版本（可选）. Demotes the variant section: variants are an
+         OPTIONAL step the operator can generate AFTER confirming the main
+         video. The §G card below keeps its locked <h2>视频变体</h2> heading
+         + all anchors; this header only reframes it as optional. No claim
+         that any version has already been generated. #}
+      {% if ms_preview_compare.is_matrix_script %}
+        <div class="op-card"
+             data-role="ms-section-video-versions-group"
+             data-redesign-wave="2026-05-30-phase2d"
+             style="margin-bottom:4px;">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">④ · 版本</span>
+              <h2 class="op-section-title" data-role="ms-section-video-versions-group-title">视频版本（可选）</h2>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-video-versions-group-summary">这一步是可选的：确认主视频后，你可以再生成多个视频版本来对比测试。下面列出的 V1 / V2 / V3 是建议方向，尚未生成；会标注「哪里不同 / 为什么测这一版 / 适合哪些账号或场景」。</p>
         </div>
       {% endif %}
 
@@ -1002,17 +1084,24 @@
          path at the runtime layer; the section J fold below carries
          the actual closure forms for back-compat. #}
       {% if ms_main_video_result.is_matrix_script %}
+        {# Phase 2D (2026-05-30): 校对与微调 is NO LONGER a primary section.
+           Per result-oriented IA it only becomes relevant AFTER the main
+           video lands, so it is collapsed into a default-closed <details>
+           (the heading is demoted out of the primary <h2> set). The
+           container anchor matrix-script-section-review-tuning + all four
+           ms-section-review-tuning-zone sub-anchors + review_pending_main_video
+           status codes are preserved in place, between §G and §I, above the
+           §J technical-diagnostics fold. #}
         <div class="op-card"
              data-role="matrix-script-section-review-tuning"
              data-redesign-wave="2026-05-30-phase2b">
-          <div class="op-section-head">
-            <div class="op-section-head__main">
-              <span class="op-section-index">H · 校对</span>
-              <h2 class="op-section-title" data-role="ms-section-review-tuning-title">校对与微调</h2>
+          <details data-role="ms-section-review-tuning-fold">
+            <summary style="cursor:pointer;">
+              <span class="op-section-index">校对</span>
+              <span class="op-section-subtitle" data-role="ms-section-review-tuning-title" style="font-weight:600;">校对与微调（主视频生成后开放）</span>
               <span class="op-pill op-pill--neutral" data-role="ms-section-review-tuning-status-pill">待主视频</span>
-            </div>
-          </div>
-          <p class="op-section-helper" data-role="ms-section-review-tuning-subtitle">主视频生成后，按四个分区做人工校对：画面 / 旁白 / 字幕 / 文案+CTA。运营可在任一分区提交意见。</p>
+            </summary>
+          <p class="op-section-helper" data-role="ms-section-review-tuning-subtitle" style="margin-top:8px;">主视频生成后，按四个分区做人工校对：画面 / 旁白 / 字幕 / 文案+CTA。运营可在任一分区提交意见。</p>
           <div class="op-meta-grid">
             <div class="op-meta-item" data-role="ms-section-review-tuning-zone"
                  data-zone-id="visual_match" data-status-code="review_pending_main_video">
@@ -1045,6 +1134,7 @@
                     title="主视频生成后开放。"
                     disabled aria-disabled="true">重新生成</button>
           </div>
+          </details>
         </div>
       {% endif %}
 
@@ -1058,7 +1148,7 @@
              data-publishable="{{ 'true' if ops_pr.publishable else 'false' }}">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">4 · 交付</span>
+              <span class="op-section-index">⑤ · 交付</span>
               <h2 class="op-section-title" data-role="ms-section-delivery-entry-title">交付入口</h2>
             </div>
           </div>
