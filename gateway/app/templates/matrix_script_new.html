@@ -379,24 +379,112 @@
 
         </div>
 
-        {# ===================== Card 2 · 任务基本信息 ===================== #}
-        <div class="op-card" data-role="ms-new-card-task-meta">
+        {# ============================================================
+           Fidelity fix (2026-05-30b) — Phase 2B New Task entry cards
+           per Phase 1 mock § ① and presenter alignment §5.1. The
+           legacy single 任务基本信息 card is restructured into FOUR
+           product-language cards (Card 2 素材 / Card 3 目标 · 画幅
+           · 语言 / Card 4 角色 · 声音 · 字幕 / Card 5 变体策略).
+           Every POST-required name= attribute (topic / source_language
+           / target_language / target_platform / variation_target_count
+           / audience_hint / tone_hint / length_hint / product_ref /
+           operator_notes) is preserved bytewise so the existing safe
+           POST + build_matrix_script_task_payload contract continues
+           to work. New presenter-only fields (aspect ratio radio,
+           role / voice / subtitle / B-Roll preference selectors,
+           variant-axis checkboxes) are operator-intent capture only
+           and do NOT introduce new payload fields.
+           ============================================================ #}
+
+        {# ===================== Card 2 · 素材 ===================== #}
+        <div class="op-card" data-role="ms-new-card-product-material"
+             data-redesign-wave="2026-05-30-phase2b-fidelity-b">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">2 · 任务</span>
-              <h2 class="op-section-title">任务基本信息</h2>
+              <span class="op-section-index">2 · 素材</span>
+              <h2 class="op-section-title">产品 / 素材</h2>
             </div>
           </div>
-          <p class="op-section-helper">
-            这一段决定任务的主题、目标语言与平台、需要的变体数量。变体生成的细节（轴 / 配音 / 字幕）在工作台进一步评审。
-          </p>
-
+          <p class="op-section-helper">上传或填写产品资料；运营在工作台「画面与素材」(D) 一节可继续替换 B-Roll。</p>
           <div class="ms-new-field-grid">
             <div class="ms-new-field full">
-              <label for="topic">主题 <span class="ms-new-required">*</span></label>
-              <input id="topic" name="topic" required maxlength="160" placeholder="例如：新品短视频首发脚本" />
+              <label for="product_ref">产品名称 / SKU / 资料链接</label>
+              <input id="product_ref" name="product_ref" maxlength="160" placeholder="例如：温室小番茄 SKU-T01 · https://example.invalid/product" />
             </div>
+            <div class="ms-new-field full">
+              <label>上传商品图 / 商品视频片段 <span class="op-pill op-pill--neutral" style="font-size:11px; margin-left:4px;">当前占位 · 后台待接入</span></label>
+              <div data-role="ms-new-product-material-upload-slot"
+                   data-status-code="materials_pending_upstream"
+                   style="padding:14px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:8px; background:#fbfdff; color:var(--op-fg-soft, #64748b); font-size:13px;">
+                上传槽占位。素材上传 / 匹配能力接入后，可在此处提交商品图与视频片段；当前阶段无需提交。
+              </div>
+            </div>
+            <div class="ms-new-field full">
+              <label for="ms-new-material-description">素材说明</label>
+              <textarea id="ms-new-material-description"
+                        data-role="ms-new-product-material-description"
+                        rows="2" maxlength="320"
+                        style="min-height:60px; font-family: system-ui, sans-serif; font-size:14px;"
+                        placeholder="例如：成熟番茄特写、农场环境、品牌 Logo 等可识别要点"></textarea>
+            </div>
+            <div class="ms-new-field full">
+              <label for="ms-new-broll-preference">背景 / B-Roll 偏好</label>
+              <select id="ms-new-broll-preference"
+                      data-role="ms-new-broll-preference">
+                <option value="prefer_upload">优先使用上传素材</option>
+                <option value="prefer_library">优先使用素材库</option>
+                <option value="mixed">混合（默认）</option>
+                <option value="no_preference">无偏好</option>
+              </select>
+            </div>
+          </div>
+          <p class="op-tech-note" style="margin-top:8px;">本卡为运营意图采集；素材匹配 / 上传 worker 尚未接入。</p>
+        </div>
 
+        {# ===================== Card 3 · 目标 · 画幅 · 语言 ===================== #}
+        <div class="op-card" data-role="ms-new-card-target-aspect-language"
+             data-redesign-wave="2026-05-30-phase2b-fidelity-b">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">3 · 目标</span>
+              <h2 class="op-section-title">目标 · 画幅 · 语言</h2>
+            </div>
+          </div>
+          <p class="op-section-helper">视频主题、目标平台、画幅、语言、时长、受众。这些会进入工作台的「脚本理解」(B)。</p>
+          <div class="ms-new-field-grid">
+            <div class="ms-new-field full">
+              <label for="topic">视频主题 <span class="ms-new-required">*</span></label>
+              <input id="topic" name="topic" required maxlength="160" placeholder="例如：温室小番茄上市首发短视频" />
+            </div>
+            <div class="ms-new-field">
+              <label for="target_platform">目标平台 <span class="ms-new-required">*</span></label>
+              <input id="target_platform" name="target_platform" required maxlength="80"
+                     list="ms-new-platform-suggestions"
+                     placeholder="选择或输入平台" />
+              <datalist id="ms-new-platform-suggestions" data-role="ms-new-platform-suggestions">
+                <option value="TikTok"></option>
+                <option value="YouTube Shorts"></option>
+                <option value="Instagram Reels"></option>
+                <option value="抖音"></option>
+                <option value="视频号"></option>
+                <option value="小红书"></option>
+                <option value="快手"></option>
+              </datalist>
+            </div>
+            <div class="ms-new-field">
+              <label>画幅 / 比例 <span class="op-pill op-pill--neutral" style="font-size:11px; margin-left:4px;">运营意图</span></label>
+              <div data-role="ms-new-aspect-ratio-group" style="display:flex; gap:10px; align-items:center;">
+                <label style="font-weight:400; display:flex; align-items:center; gap:4px;">
+                  <input type="radio" data-role="ms-new-aspect-ratio-option" value="9:16" checked /> 9:16
+                </label>
+                <label style="font-weight:400; display:flex; align-items:center; gap:4px;">
+                  <input type="radio" data-role="ms-new-aspect-ratio-option" value="16:9" /> 16:9
+                </label>
+                <label style="font-weight:400; display:flex; align-items:center; gap:4px;">
+                  <input type="radio" data-role="ms-new-aspect-ratio-option" value="1:1" /> 1:1
+                </label>
+              </div>
+            </div>
             <div class="ms-new-field">
               <label for="source_language">源语言 <span class="ms-new-required">*</span></label>
               <select id="source_language" name="source_language" required>
@@ -404,7 +492,6 @@
                 <option value="en">English</option>
               </select>
             </div>
-
             <div class="ms-new-field">
               <label for="target_language">目标语言 <span class="ms-new-required">*</span></label>
               <select id="target_language" name="target_language" required>
@@ -412,41 +499,100 @@
                 <option value="vi">Tiếng Việt（越南语）</option>
               </select>
             </div>
-
             <div class="ms-new-field">
-              <label for="target_platform">目标平台 <span class="ms-new-required">*</span></label>
-              <input id="target_platform" name="target_platform" required maxlength="80" placeholder="例如：TikTok / Reels / Shorts" />
+              <label for="length_hint">视频时长</label>
+              <input id="length_hint" name="length_hint" maxlength="80" placeholder="例如：15 秒 / 30 秒 / 60 秒" />
             </div>
-
             <div class="ms-new-field">
-              <label for="variation_target_count">变体数量 <span class="ms-new-required">*</span></label>
-              <input id="variation_target_count" name="variation_target_count" type="number" min="1" max="12" step="1" required value="4" />
+              <label for="audience_hint">目标受众</label>
+              <input id="audience_hint" name="audience_hint" maxlength="120" placeholder="例如：20–35 城市女性 · 关注健康饮食" />
             </div>
+          </div>
+        </div>
 
+        {# ===================== Card 4 · 角色 · 声音 · 字幕 ===================== #}
+        <div class="op-card" data-role="ms-new-card-role-voice-subtitle"
+             data-redesign-wave="2026-05-30-phase2b-fidelity-b">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">4 · 角色</span>
+              <h2 class="op-section-title">角色 · 声音 · 字幕</h2>
+              <span class="op-pill op-pill--neutral" style="font-size:11px;">运营意图</span>
+            </div>
+          </div>
+          <p class="op-section-helper">在工作台「角色与声音」(E) 与「字幕与音乐」(F) 中可继续微调。本卡只采集偏好，不调用任何外部模型。</p>
+          <div class="ms-new-field-grid">
             <div class="ms-new-field">
-              <label for="audience_hint">受众提示</label>
-              <input id="audience_hint" name="audience_hint" maxlength="120" placeholder="例如：新手用户 / 老客复购" />
+              <label for="ms-new-role-preference">角色偏好</label>
+              <select id="ms-new-role-preference" data-role="ms-new-role-preference">
+                <option value="none">无角色 · 仅画面</option>
+                <option value="ai_host">AI 主播（数字人口播线供应）</option>
+                <option value="local_host">本地主播（已注册）</option>
+                <option value="custom_character">自定义角色</option>
+              </select>
             </div>
-
             <div class="ms-new-field">
-              <label for="tone_hint">语气提示</label>
-              <input id="tone_hint" name="tone_hint" maxlength="120" placeholder="例如：专业可信 / 轻松直接" />
+              <label for="ms-new-voice-preference">声音偏好</label>
+              <select id="ms-new-voice-preference" data-role="ms-new-voice-preference">
+                <option value="natural_female">女声自然</option>
+                <option value="professional_male">男声专业</option>
+                <option value="casual_direct">轻松直接</option>
+                <option value="no_voiceover">无旁白</option>
+              </select>
+              <small style="color:var(--op-fg-soft, #64748b); font-size:11px; margin-top:2px; display:block;">语音由 VoiceTrans 作为未来运营时层供应方桥接 · 当前不调用。</small>
             </div>
-
             <div class="ms-new-field">
-              <label for="length_hint">长度提示</label>
-              <input id="length_hint" name="length_hint" maxlength="80" placeholder="例如：15 秒 / 30 秒" />
+              <label for="ms-new-subtitle-style">字幕风格</label>
+              <select id="ms-new-subtitle-style" data-role="ms-new-subtitle-style">
+                <option value="large_highlight">大字高亮（推荐短视频）</option>
+                <option value="brand_color">品牌色</option>
+                <option value="standard">常规字幕</option>
+                <option value="minimal">极简</option>
+              </select>
             </div>
-
             <div class="ms-new-field">
-              <label for="product_ref">产品引用</label>
-              <input id="product_ref" name="product_ref" maxlength="160" placeholder="产品名、SKU 或资料链接" />
+              <label for="tone_hint">目标语言旁白说明</label>
+              <input id="tone_hint" name="tone_hint" maxlength="120" placeholder="例如：自然亲切 / 专业可信 / 轻松直接" />
             </div>
+          </div>
+          <p class="op-tech-note" data-role="ms-new-voicetrans-future-provider-note" style="margin-top:8px;">
+            VoiceTrans 桥接尚未接入；本卡不嵌入 VoiceTrans 页面，也不向运营暴露 vendor / model / engine。
+          </p>
+        </div>
 
+        {# ===================== Card 5 · 变体策略 ===================== #}
+        <div class="op-card" data-role="ms-new-card-variant-strategy"
+             data-redesign-wave="2026-05-30-phase2b-fidelity-b">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">5 · 变体</span>
+              <h2 class="op-section-title">变体策略</h2>
+            </div>
+          </div>
+          <p class="op-section-helper">每个变体都是一个视频版本。运营在工作台「视频变体」(G) 可继续调整。</p>
+          <div class="ms-new-field-grid">
+            <div class="ms-new-field">
+              <label for="variation_target_count">测试版本数量 <span class="ms-new-required">*</span></label>
+              <input id="variation_target_count" name="variation_target_count" type="number" min="1" max="12" step="1" required value="3" />
+              <small style="color:var(--op-fg-soft, #64748b); font-size:11px; margin-top:2px; display:block;">默认 3 个测试版本（V1 主推 + V2 / V3 备选）。</small>
+            </div>
             <div class="ms-new-field full">
-              <label for="operator_notes">补充备注</label>
-              <textarea id="operator_notes" name="operator_notes" rows="3"
-                        style="min-height:80px; font-family: system-ui, sans-serif; font-size:14px;"
+              <label>差异维度（运营意图勾选；不影响 POST 字段）</label>
+              <div data-role="ms-new-variant-axes-group" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; font-size:13px;">
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="background" checked /> 背景 / B-Roll 变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="product_material" /> 商品素材变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="voiceover" /> 旁白变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="subtitle_style" checked /> 字幕样式变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="bgm" /> BGM 变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="pacing_aspect" checked /> 节奏 / 画幅变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="role" /> 角色变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="main_only" /> 仅生成主视频（不生成测试版本）</label>
+              </div>
+            </div>
+            <div class="ms-new-field full">
+              <label for="operator_notes">运营备注</label>
+              <textarea id="operator_notes" name="operator_notes" rows="2"
+                        style="min-height:60px; font-family: system-ui, sans-serif; font-size:14px;"
                         placeholder="只填写创建阶段必要备注，不填写工作台执行细节"></textarea>
             </div>
           </div>
