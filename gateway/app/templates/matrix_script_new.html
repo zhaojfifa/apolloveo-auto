@@ -714,20 +714,54 @@
         });
       }
 
+      var AUTH_EXPIRED_MESSAGE = '登录已失效，请重新登录后再提交脚本。';
+      var SAFE_LOGIN_NEXT = '/tasks/matrix-script/new?ui_locale=zh';
+
       function ingestBody(body, sourceKind) {
         return fetch(ingestRoute, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
           body: JSON.stringify({ body: body, source_kind: sourceKind })
         }).then(function (resp) {
+          var ctype = (resp.headers.get('content-type') || '').toLowerCase();
+          var looksHtml = ctype.indexOf('text/html') !== -1;
+          // Auth gate / session expiry. The API now returns 401/403 JSON,
+          // but a legacy gate could 302-redirect the fetch to the HTML
+          // login page. In NONE of these cases is the body valid JSON, so
+          // we must NOT call resp.json() blindly (that is what produced the
+          // "Unexpected token '<'" error on the operator's screen).
+          if (resp.status === 401 || resp.status === 403 || resp.redirected || looksHtml) {
+            var authErr = new Error(AUTH_EXPIRED_MESSAGE);
+            authErr.authRequired = true;
+            throw authErr;
+          }
+          if (ctype.indexOf('application/json') === -1) {
+            throw new Error('入库失败：服务返回了非预期的响应格式 (HTTP ' + resp.status + ')。');
+          }
           return resp.json().then(function (data) {
             if (!resp.ok) {
-              var msg = (data && data.detail) || ('入库失败 HTTP ' + resp.status);
+              var msg = (data && (data.message || data.detail)) || ('入库失败 HTTP ' + resp.status);
               throw new Error(msg);
             }
             return data;
           });
         });
+      }
+
+      // Shared ingest-error handler. Restores the submit affordance, shows
+      // an operator-readable message, and — only when the failure is an
+      // expired/absent session — routes to the login page with a SAFE next
+      // that returns to this operator page (never the POST-only ingest
+      // endpoint).
+      function onIngestError(err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '生成视频方案 →';
+        setFeedback('error', String((err && err.message) || err || '入库失败'));
+        if (err && err.authRequired) {
+          setTimeout(function () {
+            window.location.href = '/auth/login?next=' + encodeURIComponent(SAFE_LOGIN_NEXT);
+          }, 1600);
+        }
       }
 
       // Mint-empty button inside the technical-ref details — same UX as the
@@ -800,11 +834,7 @@
               setFeedback('success', '已入库 ' + (payload.body_char_count || 0) + ' 字符；正在提交任务...');
               form.submit();
             })
-            .catch(function (err) {
-              submitBtn.disabled = false;
-              submitBtn.textContent = '创建并进入工作台';
-              setFeedback('error', String((err && err.message) || err || '入库失败'));
-            });
+            .catch(onIngestError);
           return;
         }
         if (activeMode === 'upload') {
@@ -823,11 +853,7 @@
               setFeedback('success', '已入库 ' + (payload.body_char_count || 0) + ' 字符；正在提交任务...');
               form.submit();
             })
-            .catch(function (err) {
-              submitBtn.disabled = false;
-              submitBtn.textContent = '创建并进入工作台';
-              setFeedback('error', String((err && err.message) || err || '入库失败'));
-            });
+            .catch(onIngestError);
           return;
         }
       });
