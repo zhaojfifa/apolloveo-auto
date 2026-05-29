@@ -284,6 +284,24 @@
       {% set ms_delivery_comprehension = ((ops.workbench or {}).matrix_script_delivery_comprehension or {}) %}
       {% set ms_main_video_result = ((ops.workbench or {}).matrix_script_main_video_result or {}) %}
 
+      {# Phase 2C (2026-05-30) · operator-readability capability banner.
+         ONE top-level orientation line so the operator understands the
+         workbench as a script-to-video workspace whose generation /
+         material steps open up as capability lands — not a backend
+         status board. Copy / layout only; no new truth, no closed enum,
+         no packet write. Operator language only. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-banner op-banner--info"
+             data-role="matrix-script-capability-banner"
+             data-redesign-wave="2026-05-30-phase2c"
+             style="margin-bottom:12px;">
+          <div>
+            <div class="op-banner__title" data-role="matrix-script-capability-banner-title">脚本转视频工作台</div>
+            <div class="op-banner__body" data-role="matrix-script-capability-banner-body">这里把一条脚本拆解成可生成的视频方案。成片生成与素材匹配能力接入后，本工作台将开放生成与替换操作；当前阶段以方案确认与偏好选择兜底，已选偏好会作为后续生成的输入。</div>
+          </div>
+        </div>
+      {% endif %}
+
       {# PR-2A (redesign 2026-05-28) · 主视频结果 anchor block.
          Renders at the TOP of the matrix_script workbench branch, ABOVE the
          existing Block A 任务摘要, so the operator's first-screen answer to
@@ -433,7 +451,7 @@
               <span class="op-pill op-pill--ready"><span class="op-pill__dot"></span>已具备</span>
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-section-script-understanding-subtitle">系统读懂的脚本三段式 · 关键词 · 禁用词 · 卖点 · 目标平台 · 时长 · 目标语言。</p>
+          <p class="op-section-helper" data-role="ms-section-script-understanding-subtitle">这是系统从脚本里读懂的内容：三段式结构、关键词、禁用词、卖点，以及目标受众、语气、时长、平台与语言。后续生成会以此为准。</p>
           <div class="op-meta-grid">
             {% for section in (ms_script_structure.sections or []) %}
               <div class="op-meta-item" data-role="ms-section-script-understanding-segment"
@@ -447,7 +465,19 @@
             <div class="op-meta-item" data-role="ms-section-script-understanding-selling-points"
                  data-status-code="selling_points_pending_upstream">
               <span class="op-meta-item__label">卖点</span>
-              <span class="op-meta-item__value op-tech-note">卖点项尚未由 content_structure 投射；可在 J 节查看占位字段。</span>
+              <span class="op-meta-item__value op-tech-note">卖点项接入后会在这里逐条展开；当前阶段以脚本主旨为准。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-script-understanding-target-audience">
+              <span class="op-meta-item__label">目标受众</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.target_audience_value or "以脚本主旨为准" }}</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-script-understanding-tone">
+              <span class="op-meta-item__label">语气</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.tone_value or "以脚本主旨为准" }}</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-script-understanding-duration">
+              <span class="op-meta-item__label">时长</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.duration_value or "以脚本与平台默认为准" }}</span>
             </div>
             {% for tax in (ms_script_structure.taxonomy or []) %}
               <div class="op-meta-item" data-role="ms-section-script-understanding-taxonomy"
@@ -492,10 +522,10 @@
             <div class="op-section-head__main">
               <span class="op-section-index op-section-index--emerald">C · 计划</span>
               <h2 class="op-section-title" data-role="ms-section-generation-plan-title">视频生成计划 · 故事板</h2>
-              <span class="op-pill op-pill--review" data-role="ms-section-generation-plan-status-pill">当前占位 · 后台待接入</span>
+              <span class="op-pill op-pill--review" data-role="ms-section-generation-plan-status-pill">占位草案</span>
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-section-generation-plan-subtitle">系统将在「方案生成」能力接入后产出可编辑分镜方案；当前展示的是基于脚本理解的占位草案，<b>未声明已就绪</b>。</p>
+          <p class="op-section-helper" data-role="ms-section-generation-plan-subtitle">这是基于脚本理解整理的分镜草案，帮助你预览成片节奏。方案生成能力接入后，会替换为可逐镜编辑的真实分镜，<b>当前未声明任何镜头已就绪</b>。</p>
 
           {# Storyboard / scene list — 3 placeholder rows derived from
              script_understanding sections (Hook / Body / CTA). Each row
@@ -573,7 +603,7 @@
             {% endfor %}
           </ul>
           <p class="op-tech-note" data-role="ms-section-generation-plan-honest-disclaimer" style="margin-top:10px;">
-            上述分镜为占位草案；正式方案需由后端方案生成能力产出，当前不声明任何镜头已就绪。
+            上述分镜为占位草案；方案生成能力接入后会替换为真实分镜，每个镜头可单独编辑。当前不声明任何镜头已就绪。
           </p>
         </div>
       {% endif %}
@@ -593,36 +623,52 @@
               <span class="op-pill op-pill--neutral" data-role="ms-section-visual-materials-status-pill">当前占位</span>
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-section-visual-materials-subtitle">素材匹配能力尚未接入；下方为背景 / B-Roll / 产品素材的占位槽。</p>
-          <div class="op-meta-grid">
-            <div class="op-meta-item" data-role="ms-section-visual-materials-bg-slot"
-                 data-status-code="broll_pending_upstream">
-              <span class="op-meta-item__label">背景候选槽</span>
-              <span class="op-meta-item__value op-tech-note">尚未接入：素材库与运营上传素材的匹配结果将在此处展开。</span>
-            </div>
-            <div class="op-meta-item" data-role="ms-section-visual-materials-broll-slot"
-                 data-status-code="broll_pending_upstream">
-              <span class="op-meta-item__label">B-Roll 候选槽</span>
-              <span class="op-meta-item__value op-tech-note">尚未接入：每个镜头的 B-Roll 候选将在此处展开。</span>
-            </div>
-            <div class="op-meta-item" data-role="ms-section-visual-materials-product-slot"
-                 data-status-code="broll_pending_upstream">
-              <span class="op-meta-item__label">产品素材槽</span>
-              <span class="op-meta-item__value op-tech-note">尚未接入：运营在「新建」上传的产品镜头将在此处出现。</span>
-            </div>
+          <p class="op-section-helper" data-role="ms-section-visual-materials-subtitle">素材匹配能力接入后，会在这里出现背景、B-Roll 与产品素材候选；当前可先记录素材意图，作为后续匹配的输入。</p>
+          {# Phase 2C (2026-05-30): three repeated pending slots consolidated
+             into ONE operator-facing intent panel as the primary read. The
+             original bg / broll / product slot anchors are preserved below
+             (back-compat with script-to-video phase2b structural tests) but
+             demoted into a collapsed detail so they no longer dominate the
+             scan. Copy / layout only; no upload endpoint, no packet write,
+             no fake media. #}
+          <div data-role="ms-section-visual-materials-intent-panel"
+               data-status-code="broll_pending_upstream"
+               style="margin-top:8px; padding:14px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:10px; background:#fffdf7;">
+            <div style="font-size:14px; color:var(--op-fg-mid, #334155);"><strong>素材意图</strong></div>
+            <p class="op-meta-item__value" style="margin-top:6px; line-height:1.6;">把这条视频需要的背景、B-Roll 与产品镜头先写清楚：拍什么场景、要不要真人出镜、有没有自带产品素材。匹配能力接入后，系统会按这里的意图给出候选，你再选用或替换。</p>
           </div>
+          <details data-role="ms-section-visual-materials-slots-fold" style="margin-top:8px;">
+            <summary style="cursor:pointer; font-size:13px;">查看背景 / B-Roll / 产品素材候选位（接入后开放）</summary>
+            <div class="op-meta-grid" style="margin-top:8px;">
+              <div class="op-meta-item" data-role="ms-section-visual-materials-bg-slot"
+                   data-status-code="broll_pending_upstream">
+                <span class="op-meta-item__label">背景候选位</span>
+                <span class="op-meta-item__value op-tech-note">素材库与运营上传素材的匹配结果将在此处展开。</span>
+              </div>
+              <div class="op-meta-item" data-role="ms-section-visual-materials-broll-slot"
+                   data-status-code="broll_pending_upstream">
+                <span class="op-meta-item__label">B-Roll 候选位</span>
+                <span class="op-meta-item__value op-tech-note">每个镜头的 B-Roll 候选将在此处展开。</span>
+              </div>
+              <div class="op-meta-item" data-role="ms-section-visual-materials-product-slot"
+                   data-status-code="broll_pending_upstream">
+                <span class="op-meta-item__label">产品素材位</span>
+                <span class="op-meta-item__value op-tech-note">运营在「新建」上传的产品镜头将在此处出现。</span>
+              </div>
+            </div>
+          </details>
           <div class="op-section-actions task-actions" data-role="ms-section-visual-materials-actions" style="margin-top:8px;">
             <button type="button" class="btn-secondary"
                     data-role="ms-section-visual-materials-replace-bg"
-                    title="素材匹配能力尚未接入。"
+                    title="背景候选接入后开放替换。"
                     disabled aria-disabled="true">替换背景</button>
             <button type="button" class="btn-secondary"
                     data-role="ms-section-visual-materials-replace-broll"
-                    title="同上。"
+                    title="B-Roll 候选接入后开放替换。"
                     disabled aria-disabled="true">替换 B-Roll</button>
             <button type="button" class="btn-secondary"
                     data-role="ms-section-visual-materials-regenerate"
-                    title="视觉匹配 worker 尚未接入。"
+                    title="素材匹配能力接入后开放重新推荐。"
                     disabled aria-disabled="true">重新生成视觉建议</button>
           </div>
           <p class="op-tech-note" data-role="ms-section-visual-materials-commercial-note" style="margin-top:6px;">
@@ -648,7 +694,7 @@
               <span class="op-pill op-pill--neutral" data-role="ms-section-role-voice-status-pill">当前占位</span>
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-section-role-voice-subtitle">角色资产由数字人口播线供应；语音由 VoiceTrans 作为未来运营时层供应方接入。本节只面向运营做偏好选择，技术细节在 J 节。</p>
+          <p class="op-section-helper" data-role="ms-section-role-voice-subtitle">在这里选择这条视频要用的角色与声音偏好：是否真人出镜、声音气质、语气与目标语言。语音预览能力接入后会在这里实时试听；当前阶段以偏好选择为准，所选偏好会作为后续生成的输入。</p>
           <div class="op-meta-grid">
             <div class="op-meta-item" data-role="ms-section-role-voice-role-choice">
               <span class="op-meta-item__label">角色</span>
@@ -672,11 +718,11 @@
           </div>
           <div data-role="ms-section-role-voice-preview-slot"
                data-status-code="voice_preview_pending_voicetrans"
-               style="margin-top:10px; padding:14px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:8px; text-align:center; background:#fbfdff;">
-            <span class="op-tech-note" data-role="ms-section-role-voice-preview-label">🔊 语音预览占位 · VoiceTrans 桥接尚未接入。</span>
+               style="margin-top:10px;">
+            <span class="op-pill op-pill--neutral" data-role="ms-section-role-voice-preview-label">🔊 试听能力接入后开放</span>
           </div>
           <p class="op-tech-note" data-role="ms-section-role-voice-no-iframe-note" style="margin-top:8px;">
-            本节不嵌入 VoiceTrans 页面；运营时层接入后由系统选择供应方，不向运营暴露供应商名。
+            语音由系统统一接入，本节不嵌入任何外部页面；运营只需在这里选择声音偏好，不需要关心底层实现。
           </p>
         </div>
       {% endif %}
@@ -696,29 +742,55 @@
               <span class="op-pill op-pill--neutral" data-role="ms-section-subtitle-music-status-pill">当前占位</span>
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-section-subtitle-music-subtitle">字幕样式与背景音乐控制接入后将在此处实时预览；当前为占位。</p>
+          <p class="op-section-helper" data-role="ms-section-subtitle-music-subtitle">已沿用新建页中的字幕与声音偏好；可在此处调整展示样式。预览生成后这些选择会应用到成片。</p>
+          {# Phase 2C (2026-05-30): subtitle / BGM controls become selectable
+             so the operator can express display intent. UI-only — these
+             <select> elements carry NO name= attribute, submit nothing, and
+             write no packet / route / storage truth. The data-role anchors
+             and data-status-code values are preserved bytewise for the
+             script-to-video phase2b structural tests. #}
           <div class="op-meta-grid">
             <div class="op-meta-item" data-role="ms-section-subtitle-music-font"
                  data-status-code="subtitle_style_pending_compose">
-              <span class="op-meta-item__label">字体（占位）</span>
-              <span class="op-meta-item__value">思源黑 Bold · 大字 · 关键词高亮</span>
+              <span class="op-meta-item__label">字体</span>
+              <select class="op-input" data-role="ms-section-subtitle-music-font-select" aria-label="字幕字体">
+                <option>思源黑 Bold · 大字 · 关键词高亮</option>
+                <option>思源黑 Regular · 常规</option>
+                <option>圆体 · 亲和</option>
+              </select>
             </div>
             <div class="op-meta-item" data-role="ms-section-subtitle-music-position"
                  data-status-code="subtitle_style_pending_compose">
-              <span class="op-meta-item__label">位置（占位）</span>
-              <span class="op-meta-item__value">底部居中</span>
+              <span class="op-meta-item__label">位置</span>
+              <select class="op-input" data-role="ms-section-subtitle-music-position-select" aria-label="字幕位置">
+                <option>底部居中</option>
+                <option>底部偏上</option>
+                <option>顶部</option>
+              </select>
             </div>
             <div class="op-meta-item" data-role="ms-section-subtitle-music-bgm-mood"
                  data-status-code="bgm_pending_upstream">
-              <span class="op-meta-item__label">BGM 情绪（占位）</span>
-              <span class="op-meta-item__value">上扬 / 轻快</span>
+              <span class="op-meta-item__label">BGM 情绪</span>
+              <select class="op-input" data-role="ms-section-subtitle-music-bgm-mood-select" aria-label="背景音乐情绪">
+                <option>上扬 / 轻快</option>
+                <option>舒缓 / 温暖</option>
+                <option>快节奏 / 动感</option>
+                <option>无背景音乐</option>
+              </select>
             </div>
             <div class="op-meta-item" data-role="ms-section-subtitle-music-bgm-volume"
                  data-status-code="bgm_pending_upstream">
-              <span class="op-meta-item__label">音量（占位）</span>
-              <span class="op-meta-item__value">35%（自动避让旁白）</span>
+              <span class="op-meta-item__label">音量</span>
+              <select class="op-input" data-role="ms-section-subtitle-music-bgm-volume-select" aria-label="背景音乐音量">
+                <option>35%（自动避让旁白）</option>
+                <option>20%（更轻）</option>
+                <option>50%（更明显）</option>
+              </select>
             </div>
           </div>
+          <p class="op-tech-note" style="margin-top:6px;">
+            <span class="op-pill op-pill--neutral" data-role="ms-section-subtitle-music-preview-chip">预览生成后生效</span>
+          </p>
           <div class="op-section-actions task-actions" data-role="ms-section-subtitle-music-actions" style="margin-top:8px;">
             <button type="button" class="btn-secondary"
                     data-role="ms-section-subtitle-music-replace-music"
@@ -765,7 +837,7 @@
               {% endif %}
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-section-optional-variants-subtitle">每一个变体都是一个视频版本。系统会告诉你「哪里不同 / 为什么测这一版 / 推荐哪个」。运营无须看 axis 元组。</p>
+          <p class="op-section-helper" data-role="ms-section-optional-variants-subtitle">每一个变体都是一个完整的视频版本。系统会告诉你「哪里不同 / 为什么测这一版 / 适合哪些账号 · 场景 / 推荐哪个」，你照着选就行。</p>
 
           {# Phase 2B fidelity fix (2026-05-30): V1 / V2 / V3 video-version
              cards rendered as primary §G content (per Phase 1 mock §G +
@@ -793,7 +865,7 @@
                 <span class="op-pill op-pill--ready"
                       data-role="ms-section-video-versions-card-recommended-marker">⭐ 推荐</span>
                 <span class="op-pill op-pill--neutral"
-                      data-role="ms-section-video-versions-card-status">当前占位 · 待生成</span>
+                      data-role="ms-section-video-versions-card-status">待生成</span>
               </div>
               <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
                 <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
@@ -803,6 +875,10 @@
                 <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
                   <span class="op-meta-item__label">为什么测这一版</span>
                   <span class="op-meta-item__value">主流情绪基线版，覆盖大多数账号 / 时段。</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-audience">
+                  <span class="op-meta-item__label">适合哪些账号 / 场景</span>
+                  <span class="op-meta-item__value">大众生活号 · 黄金时段首发 · 想要稳妥起量的账号。</span>
                 </div>
               </div>
             </div>
@@ -816,7 +892,9 @@
               <div style="display:flex; gap:10px; align-items:baseline;">
                 <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V2 · 农场 · 真情实感</strong>
                 <span class="op-pill op-pill--neutral"
-                      data-role="ms-section-video-versions-card-status">当前占位 · 待生成</span>
+                      data-role="ms-section-video-versions-card-alt-marker">备选</span>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">待生成</span>
               </div>
               <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
                 <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
@@ -826,6 +904,10 @@
                 <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
                   <span class="op-meta-item__label">为什么测这一版</span>
                   <span class="op-meta-item__value">测试真情实感对完播率的影响。</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-audience">
+                  <span class="op-meta-item__label">适合哪些账号 / 场景</span>
+                  <span class="op-meta-item__value">原产地 / 溯源人设号 · 信任感优先的种草场景。</span>
                 </div>
               </div>
             </div>
@@ -839,7 +921,9 @@
               <div style="display:flex; gap:10px; align-items:baseline;">
                 <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V3 · 超市 · 快节奏</strong>
                 <span class="op-pill op-pill--neutral"
-                      data-role="ms-section-video-versions-card-status">当前占位 · 待生成</span>
+                      data-role="ms-section-video-versions-card-alt-marker">备选</span>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">待生成</span>
               </div>
               <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
                 <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
@@ -849,6 +933,10 @@
                 <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
                   <span class="op-meta-item__label">为什么测这一版</span>
                   <span class="op-meta-item__value">测试 30 秒以内快剪对停留时长的影响。</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-audience">
+                  <span class="op-meta-item__label">适合哪些账号 / 场景</span>
+                  <span class="op-meta-item__value">年轻快消号 · 信息流快节奏场景 · 主打停留时长。</span>
                 </div>
               </div>
             </div>

@@ -525,26 +525,26 @@
             <div class="ms-new-field">
               <label for="ms-new-role-preference">角色偏好</label>
               <select id="ms-new-role-preference" data-role="ms-new-role-preference">
-                <option value="none">无角色 · 仅画面</option>
-                <option value="ai_host">AI 主播（数字人口播线供应）</option>
-                <option value="local_host">本地主播（已注册）</option>
+                <option value="none">无角色 · 仅画面（推荐：纯 B-Roll + 字幕）</option>
+                <option value="ai_host">AI 主播（推荐：讲解型短视频）</option>
+                <option value="local_host">本地主播 · 已注册（推荐：本地化投放）</option>
                 <option value="custom_character">自定义角色</option>
               </select>
             </div>
             <div class="ms-new-field">
               <label for="ms-new-voice-preference">声音偏好</label>
               <select id="ms-new-voice-preference" data-role="ms-new-voice-preference">
-                <option value="natural_female">女声自然</option>
-                <option value="professional_male">男声专业</option>
+                <option value="natural_female">女声自然（推荐：生活种草）</option>
+                <option value="professional_male">男声专业（推荐：测评说明）</option>
                 <option value="casual_direct">轻松直接</option>
                 <option value="no_voiceover">无旁白</option>
               </select>
-              <small style="color:var(--op-fg-soft, #64748b); font-size:11px; margin-top:2px; display:block;">语音由 VoiceTrans 作为未来运营时层供应方桥接 · 当前不调用。</small>
+              <small style="color:var(--op-fg-soft, #64748b); font-size:11px; margin-top:2px; display:block;">语音由系统统一接入 · 当前阶段只采集偏好，不调用任何外部能力。</small>
             </div>
             <div class="ms-new-field">
               <label for="ms-new-subtitle-style">字幕风格</label>
               <select id="ms-new-subtitle-style" data-role="ms-new-subtitle-style">
-                <option value="large_highlight">大字高亮（推荐短视频）</option>
+                <option value="large_highlight">大字高亮（推荐：短视频首屏）</option>
                 <option value="brand_color">品牌色</option>
                 <option value="standard">常规字幕</option>
                 <option value="minimal">极简</option>
@@ -556,7 +556,7 @@
             </div>
           </div>
           <p class="op-tech-note" data-role="ms-new-voicetrans-future-provider-note" style="margin-top:8px;">
-            VoiceTrans 桥接尚未接入；本卡不嵌入 VoiceTrans 页面，也不向运营暴露 vendor / model / engine。
+            语音能力接入后由系统统一选择，本卡不嵌入任何外部页面，也不需要运营关心底层实现。
           </p>
         </div>
 
