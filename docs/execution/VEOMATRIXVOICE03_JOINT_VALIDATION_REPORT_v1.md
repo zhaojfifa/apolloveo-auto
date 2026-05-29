@@ -193,3 +193,123 @@ This branch creation **does NOT modify any file** relative to the validated fide
 Live smoke confirms the New Task page (Phase 2B fidelity copy + CTA), the Delivery Center (PR-B 6-section IA + §7 fold), and the VoiceTrans page (`/voice-tool`) all return 200 with the expected operator-language content markers. The Matrix Script Workbench's Phase 2B 10-section IA is fully validated at source level + rendered Jinja snapshot + 468-test regression; the live-smoke gate-not-entering issue under packet-unbound conditions is documented as Known blocker #1 (inherited; not a Phase 2B regression) and does not block joint manual validation against a packet-bound task fixture or with the projection-fallback extension applied.
 
 Stopped after pushing the branch and writing this report. **No Phase 3 packet binding. No VoiceTrans bridge. No Asset Supply bridge. No video worker.**
+
+---
+
+## 11. Audit addendum (2026-05-30) — Root-cause F discovered on `/tasks/matrix-script/new`
+
+User-reported observation against the deployed `https://apolloveo-auto.onrender.com/tasks/matrix-script/new?ui_locale=zh`:
+
+- H1 `生成脚本视频方案` ✓ present
+- CTA `生成视频方案` ✓ present
+- **But primary form body still shows the old structure:**
+  - `脚本来源` (Card 1, legacy)
+  - `任务基本信息` (Card 2, legacy)
+- **And the four Phase-1-mock entry cards are MISSING:**
+  - `产品 / 素材`
+  - `目标 · 画幅 · 语言`
+  - `角色 · 声音 · 字幕`
+  - `变体策略`
+
+### 11.1 Diagnostic results
+
+| Check | Result |
+|---|---|
+| `git merge-base --is-ancestor 076cddc HEAD` | ✅ 076cddc present |
+| `git merge-base --is-ancestor 4220fcd HEAD` | ✅ 4220fcd present |
+| `git diff origin/fix/ms-script-to-video-phase2b-product-fidelity-20260530 -- gateway/app/templates/matrix_script_new.html` | **0 lines** — V03 source matches the validated fidelity-fix branch bytewise |
+| `git diff … -- gateway/app/templates/task_workbench.html` | **0 lines** — same |
+| Render deploy commit (`/healthz/build`) | `git_sha=dc797c5…` — matches current V03 HEAD |
+| Source-level marker audit on `matrix_script_new.html` | `生成脚本视频方案` ✓ 1 · `生成视频方案 →` ✓ 1 · `脚本来源` **2** · `任务基本信息` **2** · `产品 / 素材` **0** · `目标 · 画幅 · 语言` **0** · `角色 · 声音 · 字幕` **0** · `变体策略` **0** · `datalist` (platform selector) **0** |
+| Legacy entry-form fields still present | `audience_hint` 2 · `length_hint` 2 · `operator_notes` 2 · `existing_source_script_ref` 3 |
+
+### 11.2 Root cause classification
+
+**Classification: F — "Phase 2B fidelity did not fully implement the New Task entry card structure."**
+
+Rejected alternatives:
+- **A** (wrong base) — rejected; ancestry includes 076cddc + 4220fcd; base is `origin/fix/ms-script-to-video-phase2b-product-fidelity-20260530` per `git status`.
+- **B** (missing commits) — rejected; both validated commits are in ancestry.
+- **C** (VoiceTrans merge reverted) — rejected; no merge was performed (VoiceTrans is in ancestry via VeoMatrixVoice01 chain). Template diff vs fidelity-fix branch is 0 lines.
+- **D** (stale deploy) — rejected; Render `/healthz/build` reports `git_sha=dc797c5`, exactly matching V03 HEAD.
+- **E** (stale build) — rejected; same evidence as D.
+- **F** (Phase 2B fidelity didn't fully implement entry cards) — **confirmed.** Source-level grep shows the four new entry-card sections (`产品 / 素材`, `目标 · 画幅 · 语言`, `角色 · 声音 · 字幕`, `变体策略`) are absent from `gateway/app/templates/matrix_script_new.html`. The H1 / CTA / sidebar / topbar-subtitle were renamed by the fidelity fix (076cddc); the form body Card 1 (`脚本来源`) + Card 2 (`任务基本信息`) were left at PR-1's structure. The required four additional cards from the Phase 1 mock §① (mock cards 2 / 3 / 4 / 5) and from the presenter-alignment spec §5.1 ("ADD (presenter-only)" rows) were **never added**.
+
+### 11.3 Why the prior visual validation missed it
+
+The Phase 2B fidelity visual validation report at commit `4220fcd` audited the New Task page via source-level grep for:
+- H1 = `生成脚本视频方案` ✓ (present)
+- CTA = `生成视频方案 →` ✓ (present)
+- Old phrases absent ✓ (all 0)
+- Sidebar 4-step copy ✓ (present)
+
+The report did **not** assert on the presence of the four new entry-card sections, only on the absence of the eight legacy phrases. The legacy phrases (`创建矩阵脚本任务`, `正式产线新建入口`, `任务摘要`, `脚本结构`, `变体方案`, `生成进度`, `候选评审`, `交付摘要`) genuinely are absent; the legacy cards `脚本来源` and `任务基本信息` were not on the forbidden list because they are operator-language section titles, not the legacy A–F backend vocabulary. The card-IA gap therefore slipped through the 4220fcd PASS verdict.
+
+### 11.4 Fix policy applied
+
+Per mission §7 rule **"F: Stop and report. Do not invent new UI. We need a separate fidelity correction."**
+
+This branch operator does **not** modify code. The four missing entry cards require a separate fidelity-correction wave to be authored per the Phase 1 mock §① card structure (mock cards 2 / 3 / 4 / 5) and the presenter-alignment spec §5.1 (presenter-only fields). That correction is **out of scope for this audit branch**.
+
+### 11.5 Updated test results
+
+Running the Phase 2B test suites confirms the gap is NOT caught by existing tests:
+
+```
+python3 -m pytest \
+  gateway/app/services/tests/test_matrix_script_workbench_phase2b_product_fidelity.py \
+  gateway/app/services/tests/test_matrix_script_workbench_script_to_video_phase2b.py
+  → 97 passed (44 fidelity + 53 structural) — none assert on the 4 new entry cards
+```
+
+The 44 fidelity tests check H1 / CTA / sidebar / topbar-subtitle / absence-of-legacy-phrases but do not check presence-of-new-cards. The 53 structural tests focus on Workbench, not New Task. A follow-up correction wave should add 4 new test cases:
+
+- `test_new_task_card_product_material_present` — `data-role="ms-new-card-product-material"` or similar.
+- `test_new_task_card_target_aspect_language_present` — `产品 / 素材` / `目标 · 画幅 · 语言` cards.
+- `test_new_task_card_role_voice_subtitle_present`.
+- `test_new_task_card_variant_strategy_present`.
+
+### 11.6 Render deploy audit
+
+```
+$ curl -s https://apolloveo-auto.onrender.com/healthz/build
+{"service":"shortvideo-v1-capcut","version":"v1.7-day1","git_sha":"dc797c59886124b75d262267daf4add2fe1d0726","has_pack_v17_youcut":true,"edge_tts":true,"r2_enabled":true,"pack_v17_status":"frozen"}
+```
+
+Render is serving exactly the current V03 HEAD `dc797c5` (no stale deploy). The "old form" the operator sees is the genuine source-level state of the validated fidelity-fix branch.
+
+### 11.7 Files changed during this audit
+
+**Zero source-code files.** Only this report file is modified (the audit addendum §11 is appended to the existing report). No template, no Python, no test, no contract, no schema, no packet, no closed-enum change.
+
+### 11.8 Revised explicit no-change statement
+
+This audit + report-update wave makes **no** changes to:
+
+- **Code / templates / Python** — zero source files modified.
+- **Contracts** (`docs/contracts/` untouched).
+- **Schemas** (`schemas/` untouched).
+- **Packets** (no `production_packet*.json` mutation).
+- **Closed enums** (bytewise stable).
+- **Runtime workers** (no worker added; no endpoint; no router edit).
+- **Hot Follow / Digital Anchor / Asset Supply / VoiceTrans runtime** (all bytewise unchanged).
+- **Generic factory readiness logic** (no projection re-derivation).
+- **No fake `final_video` / thumbnail / media URL / `publish_url` / generated media** (no new render output produced).
+
+### 11.9 Revised verdict
+
+**VeoMatrixVoice03 is BLOCKED before joint manual validation.**
+
+Reason: the New Task page (`/tasks/matrix-script/new`) does not match the accepted Phase 1 mock §① product intent. The legacy two-card form structure (`脚本来源` + `任务基本信息`) is still primary; the four Phase 1 mock entry cards (`产品 / 素材`, `目标 · 画幅 · 语言`, `角色 · 声音 · 字幕`, `变体策略`) are absent. This is **upstream fidelity gap on the validated branch** (`fix/ms-script-to-video-phase2b-product-fidelity-20260530` at 076cddc) that the 4220fcd visual validation report missed.
+
+Recommended next branch (NOT authorised by this audit):
+
+```
+fix/ms-script-to-video-phase2b-new-task-entry-cards-20260530b
+```
+
+Scope: add the four Phase 1 mock §① entry cards as presenter-only sections under `gateway/app/templates/matrix_script_new.html` (between the legacy `脚本来源` card and `任务基本信息` card, or replacing `任务基本信息` if the architect prefers), each carrying operator-language placeholder fields per the presenter alignment spec §5.1; add four corresponding fidelity test cases; preserve the existing safe POST + task-creation contract; preserve `audience_hint` / `length_hint` / `operator_notes` / `existing_source_script_ref` as either operator-renamed or technical-mode-only fields.
+
+The recommended branch is **not** opened by this audit. The mission preamble forbids inventing UI; the correction wave needs its own product-design sign-off.
+
+Stop here. No code change. No Phase 3 start.
