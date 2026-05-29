@@ -1,0 +1,827 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Matrix Script · 脚本转视频 · 设计预览 v1 (Phase 1 静态可点击稿)</title>
+<!--
+  Phase 1 Static Clickable Mock — Matrix Script Script-to-Video Workbench.
+
+  This is a DESIGN ARTIFACT ONLY.
+
+    - No backend wiring.
+    - No FastAPI route.
+    - No template includes (single self-contained HTML; runs offline).
+    - No generated media. Every preview slot, thumbnail, or audio
+      affordance is a TEXT placeholder that says it is unsupported.
+    - No provider / model / vendor / engine controls.
+    - No raw `final_video` / `publish_url` / `event_kind` / `closure` /
+      `head_reason` / `artifact_lookup` / `publish_readiness` vocabulary
+      in the operator-visible primary copy.
+    - VoiceTrans is referenced as a future audio/language provider via a
+      label only; no embedded UI.
+
+  Authority: docs/design/matrix_script_kapwing_benchmark_product_advice_v1.md
+  Sample script (per mission): 美女十分开心地吃西红柿，说，西红柿亚克西。
+-->
+<style>
+:root {
+  --fg: #0f172a; --fg-mid: #334155; --fg-soft: #64748b;
+  --bg: #f8fafc; --card: #ffffff; --bd: #e2e8f0; --bd-strong: #cbd5e1;
+  --accent: #2563eb; --accent-emerald: #059669; --accent-amber: #d97706;
+  --accent-violet: #7c3aed; --accent-indigo: #4f46e5;
+  --pill-todo: #f1f5f9; --pill-ready: #ecfdf5; --pill-blocked: #fef2f2;
+  --pill-info: #eff6ff;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+  font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft Yahei", Roboto, Helvetica, Arial, sans-serif; }
+header.mock-banner {
+  background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
+  color: #fff; padding: 10px 24px; font-size: 13px;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+header.mock-banner b { font-weight: 700; }
+header.mock-banner small { opacity: .85; }
+nav.mock-tabs {
+  background: #0f172a; color: #cbd5e1; padding: 0 24px;
+  display: flex; gap: 4px; overflow-x: auto;
+}
+nav.mock-tabs a {
+  display: inline-block; padding: 12px 18px; color: #cbd5e1;
+  text-decoration: none; font-weight: 600; font-size: 13px;
+  border-bottom: 3px solid transparent;
+}
+nav.mock-tabs a:hover { color: #fff; background: #1e293b; }
+nav.mock-tabs a.active { color: #fff; border-bottom-color: #38bdf8; background: #1e293b; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px; }
+.page { display: none; }
+.page.active { display: block; }
+.page h1 { margin: 0 0 6px; font-size: 22px; }
+.page > p.lead { margin: 0 0 18px; color: var(--fg-soft); font-size: 14px; }
+
+.card {
+  background: var(--card); border: 1px solid var(--bd); border-radius: 12px;
+  padding: 18px 20px; margin-bottom: 14px;
+}
+.card.emerald { border-left: 4px solid var(--accent-emerald); }
+.card.amber   { border-left: 4px solid var(--accent-amber); }
+.card.violet  { border-left: 4px solid var(--accent-violet); }
+.card.indigo  { border-left: 4px solid var(--accent-indigo); }
+.card-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.card-head h2 { font-size: 17px; margin: 0; }
+.card-head .index { font-size: 12px; font-weight: 700; color: var(--accent);
+  background: var(--pill-info); padding: 2px 8px; border-radius: 999px; }
+.card-head .index.emerald { color: var(--accent-emerald); background: #d1fae5; }
+.card-head .index.amber   { color: var(--accent-amber); background: #fef3c7; }
+.card-head .index.violet  { color: var(--accent-violet); background: #ede9fe; }
+.card-head .index.indigo  { color: var(--accent-indigo); background: #e0e7ff; }
+.helper { color: var(--fg-soft); font-size: 13px; margin: 0 0 10px; }
+
+.pill { display: inline-block; padding: 2px 10px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; }
+.pill.todo    { background: var(--pill-todo); color: var(--fg-mid); }
+.pill.ready   { background: var(--pill-ready); color: #065f46; }
+.pill.review  { background: #fef9c3; color: #854d0e; }
+.pill.blocker { background: var(--pill-blocked); color: #991b1b; }
+.pill.info    { background: var(--pill-info); color: var(--accent); }
+
+.meta-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px 18px; }
+.meta-grid .item { display: flex; flex-direction: column; gap: 2px; }
+.meta-grid .item label { font-size: 11px; color: var(--fg-soft); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.meta-grid .item span { font-size: 14px; color: var(--fg); }
+
+.btn { display: inline-block; padding: 8px 14px; border-radius: 8px;
+  font-weight: 600; font-size: 13px; cursor: pointer; border: 1px solid transparent; text-decoration: none; }
+.btn.primary   { background: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.05); }
+.btn.secondary { background: #fff; color: var(--fg); border-color: var(--bd-strong); }
+.btn.secondary:hover { background: #f1f5f9; }
+.btn[disabled], .btn.disabled { opacity: .55; cursor: not-allowed; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+
+.banner { background: var(--pill-info); border-left: 4px solid var(--accent);
+  padding: 10px 14px; border-radius: 6px; margin-top: 10px; }
+.banner.blocker { background: var(--pill-blocked); border-left-color: #dc2626; }
+.banner.ready   { background: var(--pill-ready); border-left-color: var(--accent-emerald); }
+.banner .title { font-weight: 700; }
+.banner .body  { color: var(--fg-mid); font-size: 13px; margin-top: 2px; }
+
+.preview-hero {
+  margin: 10px 0; padding: 36px 18px; min-height: 200px;
+  border: 1px dashed var(--bd-strong); border-radius: 12px; background: #fbfdff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 8px; text-align: center;
+}
+.preview-hero .label { font-size: 14px; color: var(--fg-soft); max-width: 560px; line-height: 1.6; }
+.preview-hero .note  { font-size: 12px; color: var(--fg-soft); margin-top: 6px; }
+
+.scene-list { display: flex; flex-direction: column; gap: 12px; }
+.scene { display: grid; grid-template-columns: 60px 1fr; gap: 16px;
+  border: 1px solid var(--bd); border-radius: 10px; padding: 14px; background: #fafafa; }
+.scene .num { font-size: 24px; font-weight: 700; color: var(--accent);
+  background: #eff6ff; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+.scene .body { display: grid; gap: 6px; }
+.scene .body .row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; font-size: 13px; }
+.scene .body .row label { color: var(--fg-soft); font-weight: 600; }
+.scene .body .row .val   { color: var(--fg); }
+.scene .body .row .val .placeholder-chip {
+  display: inline-block; padding: 2px 8px; border-radius: 6px;
+  background: var(--pill-todo); color: var(--fg-soft); font-size: 12px;
+  font-weight: 600; margin-left: 4px;
+}
+
+.candidate-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-top: 8px; }
+.candidate { border: 1px solid var(--bd); border-radius: 10px; padding: 10px;
+  background: #fafafa; display: flex; flex-direction: column; gap: 4px; }
+.candidate .thumb {
+  height: 100px; border: 1px dashed var(--bd-strong); border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--fg-soft); font-size: 12px; background: #fff;
+}
+.candidate .name { font-weight: 600; font-size: 13px; }
+.candidate .meta { font-size: 12px; color: var(--fg-soft); }
+.candidate .actions { display: flex; gap: 4px; margin-top: 4px; }
+.candidate .actions .btn { padding: 4px 10px; font-size: 12px; }
+.commercial-chip { display: inline-block; padding: 1px 6px; border-radius: 4px;
+  font-size: 11px; font-weight: 600; }
+.commercial-chip.ok       { background: #d1fae5; color: #065f46; }
+.commercial-chip.review   { background: #fef9c3; color: #854d0e; }
+.commercial-chip.upload   { background: #e0e7ff; color: #3730a3; }
+
+.form-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 10px; }
+.form-grid label.full { grid-column: 1 / -1; }
+.form-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px;
+  color: var(--fg-mid); font-weight: 700; }
+.form-grid label input, .form-grid label textarea, .form-grid label select {
+  font: inherit; padding: 8px 10px; border: 1px solid var(--bd-strong);
+  border-radius: 6px; background: #fff; color: var(--fg); }
+.form-grid label small { font-weight: 400; color: var(--fg-soft); font-size: 11px; }
+.form-grid .submit-row { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
+
+.tab-strip { display: flex; gap: 4px; margin: 6px 0 12px; border-bottom: 1px solid var(--bd); }
+.tab-strip .seg { padding: 8px 12px; font-weight: 600; font-size: 13px;
+  color: var(--fg-soft); cursor: pointer; border-bottom: 2px solid transparent; }
+.tab-strip .seg.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.variant-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; }
+.variant-table th, .variant-table td { padding: 8px 10px; text-align: left;
+  border-bottom: 1px solid var(--bd); vertical-align: top; }
+.variant-table th { background: #f1f5f9; font-size: 12px; color: var(--fg-soft); text-transform: uppercase; }
+.variant-table .star { color: #f59e0b; font-weight: 700; }
+
+details.collapse { border: 1px solid var(--bd); border-radius: 8px;
+  margin-top: 8px; padding: 10px 14px; background: #fafafa; }
+details.collapse > summary { cursor: pointer; font-weight: 600; }
+
+details.section7 { border: 1px solid var(--bd-strong); border-radius: 12px;
+  padding: 14px 18px; background: #f1f5f9; margin-top: 14px; }
+details.section7 > summary { font-weight: 700; color: var(--fg-mid); }
+details.section7 .note { font-size: 12px; color: var(--fg-soft); margin: 6px 0 0; }
+details.section7 .legacy { margin-top: 10px; padding: 10px; background: #fff;
+  border: 1px dashed var(--bd-strong); border-radius: 6px; font-size: 12px;
+  color: var(--fg-soft); }
+details.section7 .legacy code { background: #e2e8f0; padding: 1px 4px; border-radius: 3px; }
+
+.flag { display: inline-block; padding: 1px 6px; border-radius: 4px;
+  background: #fee2e2; color: #991b1b; font-size: 11px; font-weight: 700; margin-left: 6px; }
+.flag.placeholder { background: #fef9c3; color: #854d0e; }
+.flag.future      { background: #e0e7ff; color: #3730a3; }
+.flag.supported   { background: #d1fae5; color: #065f46; }
+
+.subtle-divider { height: 1px; background: var(--bd); margin: 14px 0; }
+
+footer.mock-footer {
+  max-width: 1180px; margin: 24px auto; padding: 18px 24px;
+  color: var(--fg-soft); font-size: 12px; line-height: 1.7; border-top: 1px dashed var(--bd);
+}
+footer.mock-footer code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<header class="mock-banner">
+  <div>
+    <b>ApolloVeo · Matrix Script · 脚本转视频 · 静态可点击设计预览 v1</b>
+    &nbsp;·&nbsp; Phase 1 / Mock Only / No Backend
+  </div>
+  <small>样例脚本：美女十分开心地吃西红柿，说，西红柿亚克西。</small>
+</header>
+
+<nav class="mock-tabs" role="tablist">
+  <a href="#entry"     data-tab="entry"     class="active">① 新建 · 生成视频方案</a>
+  <a href="#workbench" data-tab="workbench">② 工作台 · 视频生成计划</a>
+  <a href="#delivery"  data-tab="delivery" >③ 交付中心 · 主视频 + 发布</a>
+</nav>
+
+<main>
+
+<!-- ========================================================== -->
+<!-- ENTRY PAGE                                                  -->
+<!-- ========================================================== -->
+<section id="entry" class="page active" data-pane="entry" data-role="mock-entry-page">
+  <h1>① 新建 · 把脚本变成视频方案 <span class="flag placeholder">静态预览</span></h1>
+  <p class="lead">这一页是脚本转视频的入口，不是任务表单。运营粘贴脚本、上传素材、表达偏好；下一步进入工作台审阅可编辑的「视频生成计划」。</p>
+
+  <div class="card emerald" data-role="mock-entry-script-card">
+    <div class="card-head">
+      <span class="index emerald">1 · 脚本</span>
+      <h2>选择脚本来源</h2>
+      <span class="pill info">paste · upload · 选择已有</span>
+    </div>
+    <p class="helper">三选一。下方为粘贴模式的演示输入。</p>
+    <div class="form-grid">
+      <label class="full">
+        <span>粘贴脚本</span>
+        <textarea rows="3" data-role="mock-entry-script-paste">美女十分开心地吃西红柿，说，西红柿亚克西。</textarea>
+        <small>支持纯文本、Markdown、Word 段落直接粘贴。运营可读语言为唯一表达层。</small>
+      </label>
+    </div>
+    <div class="btn-row">
+      <button class="btn secondary" type="button">上传 .txt / .docx / .md</button>
+      <button class="btn secondary" type="button">从素材库选择已有脚本</button>
+    </div>
+  </div>
+
+  <div class="card" data-role="mock-entry-materials-card">
+    <div class="card-head">
+      <span class="index">2 · 产品 / 素材</span>
+      <h2>上传产品 / 参考素材</h2>
+    </div>
+    <p class="helper">上传产品镜头、Logo、参考图、参考视频。系统会在「画面与素材」步骤参与匹配。</p>
+    <div class="btn-row">
+      <button class="btn secondary" type="button" title="演示用，不实际上传">上传产品镜头</button>
+      <button class="btn secondary" type="button" title="演示用">上传参考图</button>
+      <button class="btn secondary" type="button" title="演示用">上传参考视频</button>
+    </div>
+    <p class="helper" style="margin-top:8px;">已上传：<i>暂无（静态预览，无后端）。</i></p>
+  </div>
+
+  <div class="card" data-role="mock-entry-targets-card">
+    <div class="card-head">
+      <span class="index">3 · 目标 · 画幅 · 语言</span>
+      <h2>面向哪个平台与受众？</h2>
+    </div>
+    <div class="form-grid">
+      <label>
+        <span>目标平台</span>
+        <input type="text" list="entry-platforms" value="抖音" />
+        <datalist id="entry-platforms">
+          <option value="TikTok"></option>
+          <option value="YouTube Shorts"></option>
+          <option value="Instagram Reels"></option>
+          <option value="抖音"></option>
+          <option value="视频号"></option>
+          <option value="小红书"></option>
+          <option value="快手"></option>
+        </datalist>
+      </label>
+      <label>
+        <span>画幅</span>
+        <select><option>9:16（竖屏 · 短视频）</option><option>16:9（横屏）</option><option>1:1（方形）</option></select>
+      </label>
+      <label>
+        <span>目标语言</span>
+        <select multiple size="2"><option selected>zh-CN</option><option>en</option><option>ja</option><option>my</option></select>
+      </label>
+      <label>
+        <span>受众</span>
+        <input type="text" value="20–35 城市女性 · 关注健康饮食" />
+      </label>
+    </div>
+  </div>
+
+  <div class="card" data-role="mock-entry-style-card">
+    <div class="card-head">
+      <span class="index">4 · 角色 · 声音 · 字幕</span>
+      <h2>表达偏好（在工作台可继续微调）</h2>
+      <span class="flag placeholder">运营语言 only</span>
+    </div>
+    <div class="form-grid">
+      <label>
+        <span>角色偏好</span>
+        <select><option>无角色 · 仅画面</option><option>AI 主播（数字人口播线供应）</option><option>本地主持人（已注册）</option><option>自定义角色</option></select>
+        <small>角色资产来自数字人口播线；本页仅作偏好选择。</small>
+      </label>
+      <label>
+        <span>声音偏好</span>
+        <select><option>温和女声</option><option>坚定男声</option><option>活泼女声</option><option>无旁白</option></select>
+        <small>语音由 VoiceTrans 桥接 · 当前为占位预览。</small>
+      </label>
+      <label>
+        <span>字幕风格</span>
+        <select><option>大字 + 关键词高亮</option><option>标准</option><option>极简</option></select>
+      </label>
+      <label>
+        <span>背景 / B-Roll 偏好</span>
+        <select><option>优先使用上传素材</option><option>优先使用素材库</option><option>混合</option></select>
+      </label>
+    </div>
+  </div>
+
+  <div class="card" data-role="mock-entry-variant-card">
+    <div class="card-head">
+      <span class="index">5 · 变体策略</span>
+      <h2>同时生成几个视频版本？</h2>
+    </div>
+    <div class="form-grid">
+      <label>
+        <span>变体数量</span>
+        <select><option>1（单版本）</option><option selected>3（推荐：跑量测试）</option><option>6（账号矩阵）</option></select>
+      </label>
+      <label>
+        <span>差异维度</span>
+        <input type="text" value="背景 / 节奏 / 字幕风格" />
+        <small>视频版本之间的差异；不是 axis 元组。</small>
+      </label>
+    </div>
+  </div>
+
+  <div class="card" data-role="mock-entry-cta-card" style="background: linear-gradient(180deg, #fafdff 0%, #eff6ff 100%);">
+    <div class="card-head">
+      <span class="index">→ 提交</span>
+      <h2>生成视频方案</h2>
+      <span class="flag placeholder">CTA 为静态演示，不触发后端</span>
+    </div>
+    <p class="helper">点击后系统会先生成「视频方案 / 故事板」供你审阅；只有你确认方案后，系统才会进入主视频生成。</p>
+    <div class="btn-row">
+      <a class="btn primary" href="#workbench" data-tab-link="workbench">生成视频方案 →</a>
+      <button class="btn secondary" type="button">仅保存为草稿</button>
+    </div>
+    <p class="helper" style="margin-top:8px;font-size:12px;">老 CTA「创建任务」已被替换。本页面是 script-to-video 入口，不是任务表单。</p>
+  </div>
+</section>
+
+
+<!-- ========================================================== -->
+<!-- WORKBENCH PAGE                                              -->
+<!-- ========================================================== -->
+<section id="workbench" class="page" data-pane="workbench" data-role="mock-workbench-page">
+  <h1>② 工作台 · 矩阵脚本 · 脚本转视频 <span class="flag placeholder">静态预览</span></h1>
+  <p class="lead">先看主视频结果（A） → 看脚本理解（B） → 审阅视频生成计划（C，核心） → 调画面与素材（D）、角色与声音（E）、字幕与音乐（F） → 看视频变体（G） → 校对（H） → 进入交付（I）。</p>
+
+  <!-- ============ A · 主视频结果 ============ -->
+  <div class="card emerald" data-role="mock-section-a-main-video-result">
+    <div class="card-head">
+      <span class="index emerald">A · 主视频</span>
+      <h2>主视频结果</h2>
+      <span class="pill todo">未生成</span>
+      <span class="flag placeholder">backend pending</span>
+    </div>
+    <p class="helper">主视频是否已经生成？当前能不能交付？什么阻塞？下一步怎么做？</p>
+    <div class="preview-hero" data-role="mock-section-a-preview-hero">
+      <div class="label">
+        当前尚未生成主视频。已完成脚本结构与生成方案准备，<br/>
+        成片生成能力接入后将在这里展示视频结果。
+      </div>
+      <div class="note">此处不展示任何伪造的视频或外链。</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary disabled" disabled title="主视频生成 worker 尚未接入（能力扩展波）。">生成主视频</button>
+      <button class="btn secondary disabled" disabled title="同上。">重新生成</button>
+      <button class="btn secondary disabled" disabled title="先生成主视频，再确认主版本。">接受为主版本</button>
+      <a class="btn secondary" href="#delivery" data-tab-link="delivery">前往交付页面</a>
+    </div>
+    <div class="banner blocker">
+      <div class="title">当前阻塞：尚未生成主视频。</div>
+      <div class="body">下一步：先在「视频生成计划」(C) 审阅并确认方案；生成能力接入后从此处触发主视频生成。</div>
+    </div>
+  </div>
+
+  <!-- ============ B · 脚本理解 ============ -->
+  <div class="card" data-role="mock-section-b-script-understanding">
+    <div class="card-head">
+      <span class="index">B · 脚本</span>
+      <h2>脚本理解</h2>
+      <span class="pill ready">已具备</span>
+    </div>
+    <p class="helper">系统读懂的脚本三段式 + 关键词 + 禁用词 + 平台与时长目标。</p>
+    <div class="meta-grid">
+      <div class="item"><label>Hook · 前 3 秒</label><span>美女登场，咬一口西红柿。情绪：开心。</span></div>
+      <div class="item"><label>Body · 中段</label><span>展示西红柿新鲜度 / 食用过程 / 真情实感。</span></div>
+      <div class="item"><label>CTA · 结尾</label><span>「西红柿亚克西」语带笑声，可挂引导评论。</span></div>
+      <div class="item"><label>卖点</label><span>真情实感 · 真人试吃 · 短平快 · 易模仿</span></div>
+      <div class="item"><label>关键词</label><span>西红柿 · 亚克西 · 开心 · 试吃</span></div>
+      <div class="item"><label>禁用词</label><span>夸大宣传 · 包瘦 · 治愈</span></div>
+      <div class="item"><label>目标平台 · 时长</label><span>抖音 · 15–30 秒</span></div>
+      <div class="item"><label>目标语言</label><span>zh-CN（可挂英文字幕变体）</span></div>
+    </div>
+  </div>
+
+  <!-- ============ C · 视频生成计划 (核心) ============ -->
+  <div class="card indigo" data-role="mock-section-c-generation-plan">
+    <div class="card-head">
+      <span class="index indigo">C · 计划</span>
+      <h2>视频生成计划 · 故事板 <span class="flag supported">核心产品对象</span></h2>
+      <span class="pill info">3 个镜头</span>
+    </div>
+    <p class="helper">系统根据脚本自动生成的可编辑分镜方案。<b>每个镜头都可单独替换 B-Roll / 重生成视觉 / 改旁白 / 改字幕</b>。请确认或微调后进入主视频生成。</p>
+    <div class="scene-list">
+
+      <div class="scene" data-role="mock-section-c-scene" data-scene-index="1">
+        <div class="num">1</div>
+        <div class="body">
+          <div class="row"><label>脚本片段</label><div class="val">美女登场，对着镜头微笑。</div></div>
+          <div class="row"><label>视觉意图</label><div class="val">人物近景 · 自然光 · 高情绪密度</div></div>
+          <div class="row"><label>背景建议</label><div class="val">厨房 / 阳台 / 农场 · 自然采光 <span class="placeholder-chip">未匹配</span></div></div>
+          <div class="row"><label>B-Roll 建议</label><div class="val">微笑女性 · 切到西红柿摆台 <span class="placeholder-chip">未接入素材匹配</span></div></div>
+          <div class="row"><label>产品素材位</label><div class="val">[空 · 可上传] <span class="placeholder-chip">运营可填</span></div></div>
+          <div class="row"><label>角色 / 出镜</label><div class="val">AI 主播（温和女声 zh-CN） · 或本地主持人</div></div>
+          <div class="row"><label>旁白</label><div class="val">[默认 = 脚本片段] · 可编辑</div></div>
+          <div class="row"><label>字幕</label><div class="val">「美女开心试吃」 · 关键词高亮：<b>开心</b></div></div>
+          <div class="row"><label>音乐情绪</label><div class="val">上扬 / 轻快</div></div>
+          <div class="row"><label>画幅</label><div class="val">9:16</div></div>
+        </div>
+      </div>
+
+      <div class="scene" data-role="mock-section-c-scene" data-scene-index="2">
+        <div class="num">2</div>
+        <div class="body">
+          <div class="row"><label>脚本片段</label><div class="val">特写：女主开心地咬一口西红柿，汁水迸出。</div></div>
+          <div class="row"><label>视觉意图</label><div class="val">食材特写 · 颗粒感 · 自然光 · 慢动作可选</div></div>
+          <div class="row"><label>背景建议</label><div class="val">超市 / 农场 / 海边 · 干净背景 <span class="placeholder-chip">未匹配</span></div></div>
+          <div class="row"><label>B-Roll 建议</label><div class="val">西红柿特写 ×2 · 新鲜蔬菜镜头 ×1 <span class="placeholder-chip">未接入素材匹配</span></div></div>
+          <div class="row"><label>产品素材位</label><div class="val">[空 · 可上传产品镜头]</div></div>
+          <div class="row"><label>角色 / 出镜</label><div class="val">人物 + 食材特写</div></div>
+          <div class="row"><label>旁白</label><div class="val">「这西红柿真新鲜」（可改）</div></div>
+          <div class="row"><label>字幕</label><div class="val">「新鲜 · 现摘」 · 关键词高亮：<b>新鲜</b></div></div>
+          <div class="row"><label>音乐情绪</label><div class="val">上扬</div></div>
+          <div class="row"><label>画幅</label><div class="val">9:16</div></div>
+        </div>
+      </div>
+
+      <div class="scene" data-role="mock-section-c-scene" data-scene-index="3">
+        <div class="num">3</div>
+        <div class="body">
+          <div class="row"><label>脚本片段</label><div class="val">女主举起西红柿，对镜头说：「西红柿亚克西！」</div></div>
+          <div class="row"><label>视觉意图</label><div class="val">CTA 镜头 · 直视镜头 · 笑容 + 字幕强化</div></div>
+          <div class="row"><label>背景建议</label><div class="val">同 1 号背景 · 保留情绪一致性 <span class="placeholder-chip">未匹配</span></div></div>
+          <div class="row"><label>B-Roll 建议</label><div class="val">慢镜头举起西红柿 · 终镜定格 <span class="placeholder-chip">未接入</span></div></div>
+          <div class="row"><label>产品素材位</label><div class="val">[空 · 可换 Logo / 品牌词]</div></div>
+          <div class="row"><label>角色 / 出镜</label><div class="val">同 1 号主角</div></div>
+          <div class="row"><label>旁白</label><div class="val">「西红柿亚克西！」（带笑）</div></div>
+          <div class="row"><label>字幕</label><div class="val">「西红柿亚克西」 · 大字 · 关键词高亮：<b>亚克西</b></div></div>
+          <div class="row"><label>音乐情绪</label><div class="val">上扬 · 收尾 sting</div></div>
+          <div class="row"><label>画幅</label><div class="val">9:16</div></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="btn-row">
+      <button class="btn primary disabled" disabled title="方案编辑器 worker 尚未接入（presenter placeholder）。">重新生成方案</button>
+      <button class="btn secondary disabled" disabled title="单镜头重生成尚未接入。">追加镜头</button>
+      <button class="btn secondary disabled" disabled title="结构调整尚未接入。">调整镜头顺序</button>
+    </div>
+    <p class="helper" style="margin-top:8px;font-size:12px;">本节是 PR-A reset 之上的产品扩展：脚本理解（B）+ 视频生成计划（C）+ 画面与素材（D）+ 角色与声音（E）+ 字幕与音乐（F）共同组成「方案审阅」阶段，对应 Kapwing benchmark 的 plan-before-generation 模式。</p>
+  </div>
+
+  <!-- ============ D · 画面与素材 ============ -->
+  <div class="card amber" data-role="mock-section-d-visuals">
+    <div class="card-head">
+      <span class="index amber">D · 画面</span>
+      <h2>画面与素材</h2>
+      <span class="flag placeholder">素材库 / B-Roll 工作流尚未接入</span>
+    </div>
+    <p class="helper">系统根据每个镜头的视觉意图，建议背景候选、B-Roll 候选；运营可一键替换。商业风险标识可见。</p>
+
+    <h3 style="margin:6px 0 4px;font-size:13px;color:var(--fg-mid);">背景候选（Scene 1 视图）</h3>
+    <div class="candidate-grid">
+      <div class="candidate"><div class="thumb">🏠 厨房</div><div class="name">温馨厨房</div><div class="meta">stock · 4K · <span class="commercial-chip ok">商用可</span></div><div class="actions"><button class="btn secondary" type="button">选用</button></div></div>
+      <div class="candidate"><div class="thumb">🌅 阳台</div><div class="name">清晨阳台</div><div class="meta">stock · 1080p · <span class="commercial-chip ok">商用可</span></div><div class="actions"><button class="btn secondary" type="button">选用</button></div></div>
+      <div class="candidate"><div class="thumb">🌾 农场</div><div class="name">农场摘菜</div><div class="meta">stock · 1080p · <span class="commercial-chip review">需审核</span></div><div class="actions"><button class="btn secondary" type="button">选用</button></div></div>
+      <div class="candidate"><div class="thumb">🛒 超市</div><div class="name">超市果蔬区</div><div class="meta">stock · 4K · <span class="commercial-chip ok">商用可</span></div><div class="actions"><button class="btn secondary" type="button">选用</button></div></div>
+    </div>
+
+    <h3 style="margin:14px 0 4px;font-size:13px;color:var(--fg-mid);">B-Roll 候选（Scene 2 视图）</h3>
+    <div class="candidate-grid">
+      <div class="candidate"><div class="thumb">🍅 特写</div><div class="name">西红柿特写</div><div class="meta">stock · 4K · <span class="commercial-chip ok">商用可</span></div><div class="actions"><button class="btn secondary" type="button">选用</button></div></div>
+      <div class="candidate"><div class="thumb">🥗 蔬菜</div><div class="name">新鲜蔬菜组合</div><div class="meta">stock · 4K · <span class="commercial-chip ok">商用可</span></div><div class="actions"><button class="btn secondary" type="button">选用</button></div></div>
+      <div class="candidate"><div class="thumb">👩 吃</div><div class="name">人物试吃慢动作</div><div class="meta">stock · 1080p · <span class="commercial-chip ok">商用可</span></div><div class="actions"><button class="btn secondary" type="button">选用</button></div></div>
+      <div class="candidate"><div class="thumb">⬆️ 上传</div><div class="name">+ 上传产品镜头</div><div class="meta"><span class="commercial-chip upload">运营上传</span></div><div class="actions"><button class="btn secondary" type="button">上传</button></div></div>
+    </div>
+
+    <h3 style="margin:14px 0 4px;font-size:13px;color:var(--fg-mid);">已上传产品素材</h3>
+    <p class="helper">暂无上传。在「① 新建」上传产品镜头，或在此处点击「+ 上传」。</p>
+
+    <div class="btn-row">
+      <button class="btn secondary disabled" disabled title="视觉匹配 worker 尚未接入。">重新生成视觉建议</button>
+      <button class="btn secondary disabled" disabled title="单镜头重生成尚未接入。">仅重生成此镜头</button>
+    </div>
+  </div>
+
+  <!-- ============ E · 角色与声音 ============ -->
+  <div class="card violet" data-role="mock-section-e-role-voice">
+    <div class="card-head">
+      <span class="index violet">E · 角色</span>
+      <h2>角色与声音</h2>
+      <span class="flag future">数字人口播 · VoiceTrans 桥接 (尚未接入)</span>
+    </div>
+    <p class="helper">角色资产由数字人口播线供应；语音由 VoiceTrans 桥接（未来阶段）。本节只面向运营做偏好选择，技术细节在 J 节。</p>
+    <div class="meta-grid">
+      <div class="item">
+        <label>角色</label>
+        <span>
+          <select><option>AI 主播 · 温和女声 (默认)</option><option>无角色 · 仅画面</option><option>本地主持人 #1</option><option>本地主持人 #2</option><option>自定义角色（在数字人口播线注册）</option></select>
+        </span>
+      </div>
+      <div class="item">
+        <label>角色气质</label>
+        <span>
+          <select><option>温和 / 真诚</option><option>权威 / 自信</option><option>活泼 / 玩味</option><option>专业 / 中性</option></select>
+        </span>
+      </div>
+      <div class="item"><label>性别</label><span><select><option>女</option><option>男</option><option>不限</option></select></span></div>
+      <div class="item"><label>语气风格</label><span><select><option>自然亲切</option><option>开心欢快</option><option>低声细语</option><option>朗读感</option></select></span></div>
+      <div class="item"><label>目标语言</label><span>zh-CN（继承自 ① 新建）</span></div>
+      <div class="item"><label>语速</label><span><select><option>0.9x</option><option selected>1.0x</option><option>1.1x</option><option>1.2x</option></select></span></div>
+    </div>
+    <div class="preview-hero" style="min-height:120px;margin-top:14px;">
+      <div class="label">🔊 语音预览占位 · <span class="flag future">VoiceTrans 桥接尚未接入</span></div>
+      <div class="note">该播放按钮在 VoiceTrans 接入后开放；不会在此处伪造音频或外链。</div>
+    </div>
+    <p class="helper" style="margin-top:8px;font-size:12px;">VoiceTrans 是独立工具（/voice-tool）；未来作为音频/语言供给桥接进入此处，不会以 iframe 形式嵌入。</p>
+  </div>
+
+  <!-- ============ F · 字幕与音乐 ============ -->
+  <div class="card" data-role="mock-section-f-subtitle-music">
+    <div class="card-head">
+      <span class="index">F · 字幕音乐</span>
+      <h2>字幕与音乐</h2>
+      <span class="flag placeholder">样式接入 / BGM worker 尚未接入</span>
+    </div>
+    <div class="meta-grid">
+      <div class="item"><label>字幕语言</label><span>zh-CN（来自 ① 新建）</span></div>
+      <div class="item"><label>字体</label><span><select><option>思源黑 Bold (默认)</option><option>苹方</option><option>微软雅黑</option><option>手写体</option></select></span></div>
+      <div class="item"><label>字号</label><span><select><option>大（推荐短视频）</option><option>中</option><option>小</option></select></span></div>
+      <div class="item"><label>颜色</label><span>白色 + 黑色描边</span></div>
+      <div class="item"><label>位置</label><span><select><option>底部居中</option><option>顶部居中</option><option>居中</option></select></span></div>
+      <div class="item"><label>关键词高亮</label><span>「开心」「新鲜」「亚克西」</span></div>
+    </div>
+    <div class="subtle-divider"></div>
+    <h3 style="margin:6px 0;font-size:14px;">背景音乐</h3>
+    <div class="form-grid">
+      <label>
+        <span>BGM 情绪</span>
+        <select><option>上扬 / 轻快（推荐：与脚本情绪匹配）</option><option>舒缓</option><option>紧张</option><option>无 BGM</option></select>
+      </label>
+      <label>
+        <span>音量</span>
+        <input type="range" min="0" max="100" value="35" />
+        <small>自动避让旁白音量（presenter placeholder）。</small>
+      </label>
+      <label class="full">
+        <button class="btn secondary" type="button">替换 / 上传音乐</button>
+        <small>替换音乐 worker 尚未接入。</small>
+      </label>
+    </div>
+  </div>
+
+  <!-- ============ G · 视频变体 ============ -->
+  <div class="card violet" data-role="mock-section-g-variants">
+    <div class="card-head">
+      <span class="index violet">G · 变体</span>
+      <h2>视频变体（视频级，而不是 axis 配置行）</h2>
+      <span class="pill info">3 个视频版本</span>
+    </div>
+    <p class="helper">每一个变体都是一个视频版本。系统会告诉你「哪里不同 / 为什么测这一版 / 推荐哪个」。运营无须看 axis 元组。</p>
+    <table class="variant-table">
+      <thead><tr><th>版本</th><th>哪里不同</th><th>为什么测</th><th>推荐</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><b>V1 · 厨房 · 上扬</b></td>
+          <td>背景：温馨厨房 · BGM：上扬 · 字幕：大字高亮</td>
+          <td>主流情绪基线版，覆盖大多数账号 / 时段。</td>
+          <td><span class="star">⭐ 推荐</span></td>
+        </tr>
+        <tr>
+          <td>V2 · 农场 · 真情实感</td>
+          <td>背景：农场摘菜 · BGM：舒缓 · 字幕：极简</td>
+          <td>测试真情实感对完播率的影响。</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td>V3 · 超市 · 快节奏</td>
+          <td>背景：超市果蔬区 · BGM：上扬快 · 字幕：大字 + 切镜紧</td>
+          <td>测试 30 秒以内快剪对停留时长的影响。</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="btn-row">
+      <button class="btn secondary disabled" disabled title="视频生成 worker 尚未接入。">追加视频版本</button>
+      <button class="btn secondary disabled" disabled title="同上。">同时生成所有版本</button>
+    </div>
+  </div>
+
+  <!-- ============ H · 校对与微调 ============ -->
+  <div class="card" data-role="mock-section-h-review">
+    <div class="card-head">
+      <span class="index">H · 校对</span>
+      <h2>校对与微调</h2>
+      <span class="flag placeholder">主视频未生成时全部为占位状态</span>
+    </div>
+    <p class="helper">主视频生成后，按四个分区做人工校对：画面 / 旁白 / 字幕 / 文案 + CTA。运营可在任一分区提交意见。</p>
+    <div class="meta-grid">
+      <div class="item"><label>画面匹配检查</label><span><span class="pill todo">待生成</span> 视觉与脚本意图是否一致</span></div>
+      <div class="item"><label>旁白校对</label><span><span class="pill todo">待生成</span> 发音 / 语气 / 重音 / 情绪</span></div>
+      <div class="item"><label>字幕校对</label><span><span class="pill todo">待生成</span> 文本 / 关键词高亮 / 位置</span></div>
+      <div class="item"><label>文案 / CTA 校对</label><span><span class="pill todo">待生成</span> 末镜 CTA 表达</span></div>
+    </div>
+    <div class="btn-row">
+      <button class="btn primary disabled" disabled>接受当前主版本</button>
+      <button class="btn secondary disabled" disabled>重新生成</button>
+    </div>
+  </div>
+
+  <!-- ============ I · 交付入口 ============ -->
+  <div class="card emerald" data-role="mock-section-i-delivery-entry">
+    <div class="card-head">
+      <span class="index emerald">I · 交付</span>
+      <h2>交付入口</h2>
+    </div>
+    <p class="helper">当前不能交付：尚未生成主视频。生成完成后，可前往交付页面查看成片、字幕、音频、文案包与发布设置。</p>
+    <div class="btn-row">
+      <a class="btn primary" href="#delivery" data-tab-link="delivery">前往交付页面 →</a>
+    </div>
+  </div>
+
+  <!-- ============ J · 技术诊断 ============ -->
+  <details class="section7" data-role="mock-section-j-technical-diagnostics">
+    <summary>J · 技术诊断（架构师视图，默认收起）</summary>
+    <div class="note">日常运营操作不依赖本节。展开仅用于审计：历史 A–F 区块标记、helper 投射、closure 写回路径、变体 axis 元组等。</div>
+    <div class="legacy">
+      Retired primary markers preserved here for back-compat:
+      <code>matrix-script-block-a-goal-summary</code>,
+      <code>matrix-script-block-b-script-structure</code>,
+      <code>matrix-script-block-c-variant-strategy</code>,
+      <code>matrix-script-block-d-generate-regenerate</code>,
+      <code>matrix-script-block-e-candidate-review</code>,
+      <code>matrix-script-block-f-delivery-teaser</code>.
+      工程标识 (publish_readiness / head_reason / artifact_lookup /
+      final_video / RC-R8 / event_kind / closure) 仅在本节出现。
+    </div>
+  </details>
+</section>
+
+
+<!-- ========================================================== -->
+<!-- DELIVERY CENTER PAGE                                        -->
+<!-- ========================================================== -->
+<section id="delivery" class="page" data-pane="delivery" data-role="mock-delivery-page">
+  <h1>③ 交付中心 · 主视频 + 发布 <span class="flag placeholder">静态预览</span></h1>
+  <p class="lead">面向 final video 的交付：主视频、字幕、音频、文案包、manifest、其他视频版本、发布设置、发布回填。老 1.85 pack / SOP 逻辑已经隔离在「技术诊断」中。</p>
+
+  <!-- 1 介绍 -->
+  <div class="card emerald" data-role="mock-dc-section-intro">
+    <div class="card-head">
+      <span class="index emerald">1 · 介绍</span>
+      <h2>交付结果介绍</h2>
+      <span class="pill todo">未就绪</span>
+    </div>
+    <p class="helper">本任务当前不能交付：尚未生成主视频。下方展示交付清单与已具备的素材；待主视频生成完成后，可在「发布设置」记录发布动作。</p>
+    <p class="helper">下一步：在工作台「视频生成计划」(C) 审阅方案；准备就绪后从 A 区触发主视频生成。</p>
+  </div>
+
+  <!-- 2 主视频 -->
+  <div class="card emerald" data-role="mock-dc-section-main-video">
+    <div class="card-head">
+      <span class="index emerald">2 · 主视频</span>
+      <h2>主视频</h2>
+      <span class="pill info">9:16 · 抖音</span>
+    </div>
+    <div class="preview-hero">
+      <div class="label">当前尚未生成主视频。已完成脚本结构与生成方案准备，<br/>成片生成能力接入后将在这里展示视频结果。</div>
+      <div class="note">本面板不展示伪造的成片链接；只有真实写入的成片才会出现下载入口。</div>
+    </div>
+    <div class="btn-row">
+      <button class="btn secondary disabled" disabled title="主视频生成 worker 尚未接入。">下载主视频</button>
+    </div>
+  </div>
+
+  <!-- 3 必需交付物 -->
+  <div class="card amber" data-role="mock-dc-section-required">
+    <div class="card-head">
+      <span class="index amber">3 · 必需</span>
+      <h2>必需交付物</h2>
+    </div>
+    <p class="helper">五项必需交付：字幕 / 音频 / 文案包 / manifest / 交付包。缺失项请回到工作台重新生成。</p>
+    <ul style="margin:6px 0;padding:0;list-style:none;">
+      <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);"><span><b>字幕</b> <span class="pill todo">缺失</span></span><a class="btn secondary" href="#workbench" data-tab-link="workbench">在 Workbench 重新生成</a></li>
+      <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);"><span><b>音频</b> <span class="pill todo">缺失</span></span><a class="btn secondary" href="#workbench" data-tab-link="workbench">在 Workbench 重新生成</a></li>
+      <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);"><span><b>文案包</b> <span class="pill ready">已具备</span></span><button class="btn secondary disabled" disabled title="下载入口在主视频接入后开放。">下载</button></li>
+      <li style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--bd);"><span><b>manifest</b> <span class="pill todo">缺失</span></span><a class="btn secondary" href="#workbench" data-tab-link="workbench">在 Workbench 重新生成</a></li>
+      <li style="display:flex;justify-content:space-between;padding:8px 0;"><span><b>交付包</b> <span class="pill todo">缺失</span></span><a class="btn secondary" href="#workbench" data-tab-link="workbench">在 Workbench 重新生成</a></li>
+    </ul>
+  </div>
+
+  <!-- 4 可选交付物 -->
+  <div class="card" data-role="mock-dc-section-optional">
+    <div class="card-head">
+      <span class="index">4 · 可选</span>
+      <h2>可选交付物</h2>
+    </div>
+    <p class="helper">其他视频版本（V2 / V3）、场景包、补充素材。这些不阻塞发布。</p>
+    <details class="collapse">
+      <summary>其他视频版本（2 个 · 未生成）</summary>
+      <ul style="margin:6px 0 0 16px;font-size:13px;color:var(--fg-mid);">
+        <li>V2 · 农场 · 真情实感 — 未生成</li>
+        <li>V3 · 超市 · 快节奏 — 未生成</li>
+      </ul>
+    </details>
+    <div style="margin-top:8px;"><b>场景包</b> <span class="pill todo">未生成</span> · 不阻塞发布</div>
+    <div style="margin-top:6px;"><b>补充素材</b> <span class="pill todo">暂未提供</span></div>
+  </div>
+
+  <!-- 5 发布设置 -->
+  <div class="card indigo" data-role="mock-dc-section-publish-settings">
+    <div class="card-head">
+      <span class="index indigo">5 · 发布</span>
+      <h2>发布设置</h2>
+      <span class="flag placeholder">静态表单</span>
+    </div>
+    <p class="helper">填写发布平台、账号、标题、文案、标签与计划发布时间。系统不直接对外发布；提交后会在「发布回填」记录一次发布事件。</p>
+    <div class="form-grid">
+      <label><span>平台</span><input list="dc-platforms" value="抖音" /><datalist id="dc-platforms"><option>TikTok</option><option>YouTube Shorts</option><option>Instagram Reels</option><option>抖音</option><option>视频号</option><option>小红书</option><option>快手</option></datalist></label>
+      <label><span>账号</span><input value="@brand_official_001" /></label>
+      <label class="full"><span>标题</span><input value="美女试吃西红柿 · 西红柿亚克西！" /></label>
+      <label class="full"><span>文案</span><textarea rows="2">这个西红柿真的太好吃了，亚克西！🍅 你最近吃到过这么好的西红柿吗？评论区告诉我～</textarea></label>
+      <label><span>标签</span><input value="#西红柿 #亚克西 #真情实感" /></label>
+      <label><span>计划发布时间</span><input type="datetime-local" /></label>
+      <div class="submit-row"><button class="btn primary disabled" disabled title="主视频未生成时不开放。">标记为已发布</button></div>
+    </div>
+    <p class="helper" style="margin-top:8px;font-size:12px;">本表单不直接对外发布。</p>
+  </div>
+
+  <!-- 6 发布回填 -->
+  <div class="card violet" data-role="mock-dc-section-backfill">
+    <div class="card-head">
+      <span class="index violet">6 · 回填</span>
+      <h2>发布回填</h2>
+    </div>
+    <p class="helper">发布完成后回填发布链接与状态；可附加运营备注。指标统计将在指标投射上线后接入。</p>
+    <p class="helper">暂无回填记录。发布完成后，按候选行回填发布链接与状态。</p>
+    <div style="margin-top:10px;padding:10px;background:#f1f5f9;border-radius:6px;">
+      <b>指标统计</b> <span style="color:var(--fg-soft);margin-left:8px;">指标投射尚未上线 · 暂不展示数值。</span>
+    </div>
+  </div>
+
+  <!-- 7 技术诊断 -->
+  <details class="section7" data-role="mock-dc-section-technical">
+    <summary>7 · 技术诊断（架构师视图，默认收起）</summary>
+    <div class="note">日常运营操作不依赖本节。展开仅用于审计：历史 Block A–F、closure 反馈表单、JS 诊断壳、1.85 pack / SOP 旧逻辑等。</div>
+    <div class="legacy">
+      Quarantined here:
+      <code>matrix-script-delivery-center-header</code>,
+      <code>matrix-script-block-a-final-video-primary</code>,
+      <code>matrix-script-block-b-required-deliverables</code>,
+      <code>matrix-script-block-c-scene-pack</code>,
+      <code>matrix-script-block-d-copy-bundle</code>,
+      <code>matrix-script-block-publish-settings</code>,
+      <code>matrix-script-block-e-publish-feedback</code>,
+      <code>matrix-script-block-f-iteration-archive</code>,
+      <code>matrix-script-closure</code>.
+      raw event_kind / publish_url / publish_status / publish_readiness /
+      head_reason / final_video / RC-R8 / 1.85 pack-SOP 词汇仅在本节出现。
+    </div>
+  </details>
+</section>
+
+</main>
+
+<footer class="mock-footer">
+<b>设计预览说明 · Phase 1</b><br/>
+本页面是 <b>静态可点击设计稿</b>，不与后端通信，不会创建任务，不会触发任何生成 worker，不会发送邮件、不会调用 closure 端点、不会下载任何文件。<br/>
+所有 <code>disabled</code> 按钮均带 honest tooltip 解释当前未接入的能力 · 所有预览 / 缩略图均为文字占位符 · 没有 <code>vendor / model / provider / engine</code> 控件 · 没有伪造的 <code>final_video</code> / <code>publish_url</code> / 媒体外链。<br/>
+权威：<code>docs/design/matrix_script_kapwing_benchmark_product_advice_v1.md</code>（accepted commit <code>e03764e</code>）。
+</footer>
+
+<script>
+// Static tab switcher — no XHR, no fetch, no postMessage. Pure DOM.
+(function () {
+  function activate(name) {
+    document.querySelectorAll('nav.mock-tabs a').forEach(function (a) {
+      a.classList.toggle('active', a.getAttribute('data-tab') === name);
+    });
+    document.querySelectorAll('main .page').forEach(function (p) {
+      p.classList.toggle('active', p.getAttribute('data-pane') === name);
+    });
+    if (location.hash !== '#' + name) {
+      history.replaceState(null, '', '#' + name);
+    }
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest('[data-tab], [data-tab-link]');
+    if (!t) return;
+    var name = t.getAttribute('data-tab') || t.getAttribute('data-tab-link');
+    if (!name) return;
+    e.preventDefault();
+    activate(name);
+  });
+  var initial = (location.hash || '#entry').slice(1);
+  if (['entry','workbench','delivery'].indexOf(initial) >= 0) activate(initial);
+})();
+</script>
+</body>
+</html>
