@@ -1,0 +1,2636 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>发布中心 - 2be4843363da</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Myanmar:wght@400;600;700&display=swap" />
+  <link rel="stylesheet" href="/static/pipeline_lab.css" />
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css">
+  <link rel="stylesheet" href="/static/css/operator_console.css">
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      background: #f3f4f6;
+    }
+    .page.publish {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 16px;
+    }
+    .header-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    h1 { margin: 0; font-size: 1.6rem; font-weight: 800; }
+    .btn-primary {
+      background: #2563eb;
+      color: #ffffff;
+      border: 1px solid #2563eb;
+    }
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #111827;
+      border: 1px solid #d1d5db;
+    }
+    .btn-primary,
+    .btn-secondary {
+      padding: 8px 12px;
+      border-radius: 8px;
+      text-decoration: none;
+      font-weight: 700;
+      display: inline-flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .btn-primary:hover { filter: brightness(.95); }
+    .btn-secondary:hover { filter: brightness(.98); }
+    .muted { color: #64748b; font-size: 0.85rem; }
+    .section-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .link-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .download-link {
+      color: #1d4ed8;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .download-link.disabled { color: #9ca3af; pointer-events: none; }
+    a.disabled { color: #9ca3af; pointer-events: none; }
+    .info-row { display: flex; flex-wrap: wrap; gap: 12px; }
+    .info-pill {
+      background: #f1f5f9;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+    }
+    .copy-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .copy-btn {
+      background: #e2e8f0;
+      border: none;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #cbd5f5; }
+    .publish-textarea { width: 100%; min-height: 120px; }
+    .tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tab-btn {
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #111827;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #111827;
+      color: #ffffff;
+      border-color: #111827;
+    }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    .bilingual { display: flex; flex-direction: column; gap: 4px; }
+    .qr-placeholder {
+      width: 180px;
+      height: 180px;
+      border: 1px dashed #cbd5e1;
+      background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-weight: 600;
+      text-align: center;
+      padding: 12px;
+    }
+    .lang-toggle {
+      display: inline-flex;
+      gap: 6px;
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
+      padding: 2px;
+      background: #ffffff;
+    }
+    .lang-btn {
+      border: none;
+      background: transparent;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .lang-btn.active {
+      background: #111827;
+      color: #ffffff;
+    }
+    .i18n.zh { display: inline; }
+    .i18n.mm { display: inline; }
+    .i18n.mm:not(.block)::before { content: ""; }
+    .i18n.block { display: block; }
+  </style>
+</head>
+<body data-lang="zh">
+  <div class="page publish">
+    <div class="card">
+
+
+
+
+
+<div class="topbar">
+  <div class="topbar-left">
+    
+      <div class="topbar-title">发布中心</div>
+    
+    
+      <div class="topbar-subtitle">任务ID: 2be4843363da</div>
+    
+  </div>
+
+  <div class="topbar-center">
+    
+      <div class="segmented">
+        
+          <a class="segmented-item nav-pill ui-pill active" href="/tasks">
+            任务
+          </a>
+        
+          <a class="segmented-item nav-pill ui-pill " href="/tools/hub">
+            工具
+          </a>
+        
+      </div>
+    
+  </div>
+
+  <div class="topbar-right">
+    <script>
+  window.__I18N__ = {"dict": {"mm": {"action.back_tasks": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1005\u102c\u101b\u1004\u103a\u1038", "action.back_tools": "\u1000\u102d\u101b\u102d\u101a\u102c\u1019\u103b\u102c\u1038", "action.copy": "\u1000\u1030\u1038\u101a\u1030", "action.create": "\u1016\u1014\u103a\u1010\u102e\u1038\u1015\u103c\u102e\u1038 \u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a", "action.delete": "\u1016\u103b\u1000\u103a", "action.download": "\u1012\u1031\u102b\u1004\u103a\u1038\u101c\u102f\u1012\u103a", "action.download_disabled": "\u1012\u1031\u102b\u1004\u103a\u1038\u101c\u102f\u1012\u103a", "action.force_download": "\u1021\u1010\u1004\u103a\u1038\u1012\u1031\u102b\u1004\u103a\u1038\u101c\u102f\u1012\u103a", "action.json": "JSON", "action.new_task": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1021\u101e\u1005\u103a", "action.open": "\u1016\u103d\u1004\u1037\u103a", "action.open_detail": "\u1021\u101e\u1031\u1038\u1005\u102d\u1010\u103a\u101d\u1004\u103a\u101b\u1014\u103a", "action.refresh": "\u1015\u103c\u1014\u103a\u1005\u1005\u103a", "action.reset": "\u1015\u103c\u1014\u103a\u1005\u101b\u1014\u103a", "action.run": "\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a", "action.save": "\u101e\u102d\u1019\u103a\u1038\u1006\u100a\u103a\u1038", "action.submit": "\u1010\u1004\u103a\u101e\u103d\u1004\u103a\u1038", "action.unlock": "\u1016\u103d\u1004\u1037\u103a", "admin.tools.save": "Save defaults", "admin.tools.title": "Tools admin", "auth.login.button": "Login", "auth.login.desc": "Enter operator name and OP_ACCESS_KEY. Supports admin/operator.", "auth.login.invalid": "\u1000\u102e\u1038 \u1019\u1019\u103e\u1014\u103a\u1015\u102b", "auth.login.key_label": "\u1000\u102e\u1038", "auth.login.key_placeholder": "OP_ACCESS_KEY", "auth.login.operator_label": "\u1021\u1000\u1031\u102c\u1004\u1037\u103a", "auth.login.operator_placeholder": "ops / admin", "auth.login.title": "Operator Login", "category": "Category", "category_beauty": "Beauty", "category_other": "Other", "category_suitcase": "Suitcase", "common.back_task_board": "\u2190 \u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1005\u102c\u101b\u1004\u103a\u1038", "common.burmese": "\u1019\u103c\u1014\u103a\u1019\u102c", "common.chinese": "\u4e2d\u6587", "common.clear_filters": "\u1005\u1005\u103a\u1011\u102f\u1010\u103a\u1019\u103e\u102f\u1016\u103b\u1000\u103a", "common.delete": "\u1016\u103b\u1000\u103a", "common.details": "\u1021\u101e\u1031\u1038\u1005\u102d\u1010\u103a", "common.docs": "\u1005\u102c\u1010\u1019\u103a\u1038", "common.download": "\u1012\u1031\u102b\u1004\u103a\u1038\u101c\u102f\u1015\u103a", "common.new_task": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1021\u101e\u1005\u103a", "common.open": "\u1016\u103d\u1004\u1037\u103a", "common.search": "\u101b\u103e\u102c\u1016\u103d\u1031", "common.tasks": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038", "common.tools": "\u1000\u102d\u101b\u102d\u101a\u102c", "created": "Created", "delete": "Delete", "detail": "Detail", "download": "Download", "hot.follow.action.dub": "Re-Dub", "hot.follow.action.pack": "Re-Pack", "hot.follow.action.parse": "Re-Parse", "hot.follow.action.scenes": "Generate Scenes", "hot.follow.action.subtitles": "Re-Subtitles", "hot.follow.delivery.cta": "Delivery Center", "hot.follow.delivery.deliverables": "Deliverables", "hot.follow.delivery.empty": "No deliverables yet.", "hot.follow.delivery.notes": "Notes", "hot.follow.delivery.notes.placeholder": "Optional notes", "hot.follow.delivery.publish": "Publish Backfill", "hot.follow.delivery.publish_cta": "Backfill Publish", "hot.follow.delivery.published_url": "Published URL", "hot.follow.delivery.subtitle": "Deliverables download and publish backfill", "hot.follow.delivery.title": "Hot Follow - Delivery Center", "hot.follow.nav": "Hot Follow", "hot.follow.new.bgm_keep": "Keep original", "hot.follow.new.bgm_mix": "BGM mix ratio (0-1)", "hot.follow.new.bgm_mute": "Mute", "hot.follow.new.bgm_replace": "Replace audio", "hot.follow.new.bgm_title": "BGM Settings", "hot.follow.new.cta": "Create \u0026 Run", "hot.follow.new.form_title": "Create Task", "hot.follow.new.local_video": "\u1012\u1031\u101e\u1010\u103d\u1004\u103a\u1038 \u1017\u102e\u1012\u102e\u101a\u102d\u102f", "hot.follow.new.local_video_hint": "mp4 / mov / mkv \u1000\u102d\u102f \u1015\u1036\u1037\u1015\u102d\u102f\u1038\u1015\u103c\u102e\u1038 Hot Follow workbench \u101e\u102d\u102f\u1037 \u1006\u1000\u103a\u101e\u103d\u102c\u1038\u1019\u100a\u103a", "hot.follow.new.probe_title": "Link Preview", "hot.follow.new.source_language": "\u1019\u1030\u101b\u1004\u103a\u1038\u1017\u102e\u1012\u102e\u101a\u102d\u102f \u1018\u102c\u101e\u102c\u1005\u1000\u102c\u1038", "hot.follow.new.source_language.en": "English", "hot.follow.new.source_language.zh": "\u4e2d\u6587", "hot.follow.new.source_mode": "\u101b\u1004\u103a\u1038\u1019\u103c\u1005\u103a \u101b\u103d\u1031\u1038\u1001\u103b\u101a\u103a\u1019\u103e\u102f", "hot.follow.new.source_mode.link": "\u101c\u1004\u1037\u103a\u1001\u103a", "hot.follow.new.source_mode.local": "\u1012\u1031\u101e\u1010\u103d\u1004\u103a\u1038 \u1017\u102e\u1012\u102e\u101a\u102d\u102f", "hot.follow.new.subtitle": "Paste a link to create a hot follow task", "hot.follow.new.title": "Hot Follow - New", "hot.follow.step.dub": "Dubbing", "hot.follow.step.pack": "Pack", "hot.follow.step.parse": "Parse", "hot.follow.step.scenes": "Scenes", "hot.follow.step.subtitles": "Subtitles", "hot.follow.subtitle": "Deconstruct and replicate trending videos", "hot.follow.title": "Hot Follow", "hot.follow.workbench.cta": "Back to Workbench", "hot.follow.workbench.events_title": "Events", "hot.follow.workbench.pipeline_title": "Pipeline Steps", "hot.follow.workbench.subtitle": "Track progress and control steps", "hot.follow.workbench.title": "Hot Follow - Workbench", "id": "ID", "json": "JSON", "label.account": "\u1021\u1000\u1031\u102c\u1004\u1037\u103a", "label.auto_category_hint": "\u1021\u1031\u102c\u103a\u1010\u102d\u102f \u1021\u1019\u103b\u102d\u102f\u1038\u1021\u1005\u102c\u1038: Suitcase \u00b7 \u1018\u102c\u101e\u102c: Burmese \u00b7 UI: Chinese", "label.category": "\u1021\u1019\u103b\u102d\u102f\u1038\u1021\u1005\u102c\u1038", "label.category_other": "\u1021\u1001\u103c\u102c\u1038", "label.created": "\u1016\u1014\u103a\u1010\u102e\u1038\u1001\u103b\u102d\u1014\u103a", "label.detail": "\u1021\u101e\u1031\u1038\u1005\u102d\u1010\u103a", "label.downloads": "\u1012\u1031\u102b\u1004\u103a\u1038\u101c\u102f\u1015\u103a\u1019\u103b\u102c\u1038", "label.dub_mode": "\u1021\u101e\u1036\u1016\u1019\u103a\u1038", "label.dub_mode.auto": "Auto fallback", "label.dub_mode.edge": "Edge TTS", "label.dub_mode.lovo": "LOVO", "label.id": "ID", "label.json": "JSON", "label.lang.mm": "\u1019\u103c\u1014\u103a\u1019\u102c (MM)", "label.language": "\u1018\u102c\u101e\u102c", "label.last_step": "\u1014\u1031\u102c\u1000\u103a\u1006\u102f\u1036\u1038 \u1021\u1006\u1004\u1037\u103a", "label.more_tools": "\u1014\u1031\u102c\u1000\u103a\u1011\u1015\u103a \u1000\u102d\u101b\u102d\u101a\u102c\u1019\u103b\u102c\u1038\u1000\u102d\u102f Tools Hub \u1019\u103e\u102c\u104b", "label.note": "\u1019\u103e\u1010\u103a\u1001\u103b\u1000\u103a", "label.note.placeholder": "\u1021\u1031\u102c\u103a\u1015\u101b\u1031\u1010\u102c \u1019\u103e\u1010\u103a\u1001\u103b\u1000\u103a", "label.pack": "\u1015\u1000\u103a\u1000\u1031\u1037\u1001\u103a", "label.pipeline_hint": "\u1005\u102c\u1010\u1014\u103a\u1038\u1011\u102d\u102f\u1038/\u1021\u101e\u1036\u1016\u1019\u103a\u1038\u101e\u102c \u101e\u1010\u103a\u1019\u103e\u1010\u103a\u1015\u102b\u104b \u1021\u1001\u103c\u102c\u1038\u1000\u102d\u101b\u102d\u101a\u102c\u1019\u103b\u102c\u1038\u1000\u102d\u102f Workbench \u1019\u103e\u102c\u104b", "label.pipeline_tools": "\u101c\u1019\u103a\u1038\u1000\u103c\u1031\u102c\u1004\u103a\u1038\u1000\u102d\u101b\u102d\u101a\u102c\u1019\u103b\u102c\u1038", "label.platform": "\u1015\u101c\u1000\u103a\u1016\u1031\u102c\u1004\u103a\u1038", "label.platform_douyin": "Douyin", "label.platform_fb": "Facebook", "label.platform_tiktok": "TikTok", "label.platform_xhs": "XHS", "label.publish": "\u1011\u102f\u1010\u103a\u101d\u1031", "label.source": "\u1021\u101b\u1004\u103a\u1038\u1021\u1019\u103c\u1005\u103a", "label.source_url": "\u1021\u101b\u1004\u103a\u1038\u1021\u1019\u103c\u1005\u103a \u101c\u1004\u1037\u103a\u1001\u103a", "label.source_url.placeholder": "\u1021\u101b\u1004\u103a\u1038\u1021\u1019\u103c\u1005\u103a \u101c\u1004\u1037\u103a\u1001\u103a\u1000\u1030\u1038\u1011\u100a\u1037\u103a\u1015\u102b (Douyin/XHS/TK/FB)", "label.status": "\u1021\u1001\u103c\u1031\u1021\u1014\u1031", "label.style": "\u1005\u1010\u102d\u102f\u1004\u103a", "label.style.fast": "\u1019\u103c\u1014\u103a\u1019\u103c\u1014\u103a \u101e\u102f\u1036\u1038\u101e\u1015\u103a", "label.style.story": "\u1007\u102c\u1010\u103a\u101c\u1019\u103a\u1038", "label.style_preset": "\u1005\u1010\u102d\u102f\u1004\u103a \u1015\u101b\u102e\u1006\u1000\u103a", "label.style_preset.hint": "\u1005\u1010\u102d\u102f\u1004\u103a\u1014\u103e\u1004\u1037\u103a \u1005\u102f\u1005\u100a\u103a\u1038\u1015\u102f\u1036 \u101e\u1010\u103a\u1019\u103e\u1010\u103a\u1015\u102b", "label.submit.error.missing_link": "\u1021\u101b\u1004\u103a\u1038\u1021\u1019\u103c\u1005\u103a \u101c\u1004\u1037\u103a\u1001\u103a \u1019\u1016\u103c\u1005\u103a\u1019\u1014\u1031\u101c\u102d\u102f\u1021\u1015\u103a\u1015\u102b\u101e\u100a\u103a", "label.submit.status.created": "\u1010\u102c\u101d\u1014\u103a {task_id} \u1016\u1014\u103a\u1010\u102e\u1038\u1015\u103c\u102e\u1038\u104a \u1021\u1001\u103c\u1031\u1021\u1014\u1031: {status}", "label.submit.status.failed": "\u1010\u1004\u103a\u1019\u101b\u1015\u102b: {error}", "label.submit.status.submitting": "\u1010\u1004\u103a\u1014\u1031\u101e\u100a\u103a\u2026", "label.subtitles_mode": "\u1005\u102c\u1010\u1014\u103a\u1038\u1011\u102d\u102f\u1038/\u1018\u102c\u101e\u102c\u1015\u103c\u1014\u103a", "label.subtitles_mode.whisper_gemini": "Whisper + Gemini (ASR + translate)", "label.subtitles_mode.whisper_only": "Whisper only (ASR only)", "label.summary": "\u1021\u1014\u103e\u1005\u103a\u1001\u103b\u102f\u1015\u103a", "label.task_id": "\u1010\u102c\u101d\u1014\u103a ID", "label.title": "\u1001\u1031\u102b\u1004\u103a\u1038\u1005\u1009\u103a", "label.title.optional": "\u1001\u1031\u102b\u1004\u103a\u1038\u1005\u1009\u103a (\u101b\u103d\u1031\u1038\u1001\u103b\u101a\u103a\u101b\u1014\u103a)", "label.title.placeholder": "\u101b\u103d\u1031\u1038\u1001\u103b\u101a\u103a\u101b\u1014\u103a \u1001\u1031\u102b\u1004\u103a\u1038\u1005\u1009\u103a", "label.video_type": "\u1017\u102e\u1012\u102e\u101a\u102d\u102f\u1021\u1019\u103b\u102d\u102f\u1038\u1021\u1005\u102c\u1038", "label.video_type.hint": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038 \u101b\u100a\u103a\u101b\u103d\u101a\u103a\u1001\u103b\u1000\u103a\u101b\u103d\u1031\u1038\u1015\u102b", "label.video_type.review": "\u101e\u102f\u1036\u1038\u101e\u1015\u103a\u1001\u103b\u1000\u103a", "label.video_type.scenario": "\u1007\u102c\u1010\u103a\u101c\u1019\u103a\u1038\u1006\u1014\u103a", "lang": "Language", "lang.mm": "Burmese", "lang.vi": "Vietnamese", "lang.zh": "Chinese", "legend": "Legend", "nav.tasks": "Tasks", "nav.tools": "Tools", "new_suitcase_task": "New Task", "no_tasks": "No tasks yet", "open": "Open", "pack": "Pack", "page.publish.subtitle": "Task ID: {task_id}", "page.publish.title": "Publish Hub", "page.tasks.board.subtitle": "Loaded {count} tasks", "page.tasks.board.title": "Task Board", "page.tasks.new.subtitle": "Paste link \u2192 generate Smart Pack + README", "page.tasks.new.title": "New Task", "page.tools.detail.title": "Tool Detail", "page.tools.hub.subtitle": "Tool registry \u0026 entry points (SSOT)", "page.tools.hub.title": "Tools Hub", "page.workbench.subtitle": "Task ID: {task_id}", "page.workbench.title": "Workbench", "platform": "Platform", "publish": "Publish", "publish.archive.desc": "Archive confirms delivery, not published.", "publish.archive.download_url": "Download URL", "publish.archive.key": "Archive key", "publish.archive.location": "Archive location", "publish.archive.open": "Open", "publish.archive.published": "Published", "publish.archive.published_at": "Published at", "publish.archive.published_hint": "Check to mark published", "publish.archive.save": "Save archive", "publish.archive.status": "Status", "publish.archive.submit": "Submit archive", "publish.archive.title": "Archive", "publish.copy.caption": "Caption", "publish.copy.comment": "Comment CTA", "publish.copy.desc": "Editable fields; edits are not saved.", "publish.copy.hashtags": "Hashtags", "publish.copy.link_text": "Link text", "publish.copy.publish_time": "Publish time suggestion", "publish.copy.title": "Copy Bundle", "publish.deliverables.bundle": "Edit Bundle (ZIP)", "publish.deliverables.copy_link": "Copy link", "publish.deliverables.copy_short": "Copy short link", "publish.deliverables.desc": "Show only generated artifacts.", "publish.deliverables.empty": "No deliverables available.", "publish.deliverables.open_link": "Open link", "publish.deliverables.qr": "Scan to download bundle", "publish.deliverables.short_link": "Short link", "publish.deliverables.title": "Deliverables", "publish.download_code": "Download code", "publish.gate.desc": "Enter OP Access Key to load publish data.", "publish.gate.invalid_key": "OP Access Key is invalid.", "publish.gate.load_failed": "Load failed: HTTP {status}", "publish.gate.need_key": "OP Access Key is required.", "publish.gate.title": "Operator gate", "publish.sop.desc": "v1.85 delivery steps.", "publish.sop.step1": "1) Download pack.zip or scenes.zip in Deliverables.", "publish.sop.step2": "2) Import into mobile editor (e.g., CapCut) and verify.", "publish.sop.step3": "3) Use Copy Bundle for title/hashtags/comment CTA.", "publish.sop.step4": "4) v1.85 is edit delivery only; publish bundle comes in 2.0.", "publish.sop.title": "SOP", "publish.status.save_error": "Save error: {error}", "publish.status.save_failed": "Save failed: {detail}", "publish.status.saved": "Saved.", "publish.status.saving": "Saving...", "publish.status.submit_error": "Submit error: {error}", "publish.status.submit_failed": "Submit failed: {detail}", "publish.status.submitted": "Submitted.", "publish.status.submitting": "Submitting...", "publish.tab.archive": "Archive", "publish.tab.copy": "Copy Bundle", "publish.tab.deliverables": "Deliverables", "publish.tab.sop": "SOP", "source": "Source", "status": "Status", "status.error": "\u1019\u1021\u1031\u102c\u1004\u103a\u1019\u103c\u1004\u103a", "status.failed": "\u1019\u1021\u1031\u102c\u1004\u103a\u1019\u103c\u1004\u103a", "status.not_ready": "Not ready", "status.pending": "\u1005\u1031\u102c\u1004\u1037\u103a\u1006\u102d\u102f\u1004\u103a\u1038", "status.processing": "\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a\u1014\u1031", "status.queued": "\u1005\u1031\u102c\u1004\u1037\u103a\u1006\u102d\u102f\u1004\u103a\u1038", "status.ready": "\u1021\u1006\u1004\u103a\u101e\u1004\u1037\u103a", "status.unknown": "Unknown", "status_error": "Failed", "status_pending": "Queued", "status_processing": "Processing", "status_ready": "Ready", "status_unknown": "Unknown", "task_count": "Task count", "task_not_found": "Task not found", "tasks.badge.pack_exists": "Pack Exists", "tasks.badge.pack_ready": "Pack Ready", "tasks.badge.video": "Video", "tasks.board.subhead": "v1.9 Release | \u1015\u1005\u1039\u1005\u100a\u103a\u1038\u1021\u1001\u103c\u1031\u1015\u103c\u102f \u1019\u103c\u1004\u103a\u1000\u103d\u1004\u103a\u1038", "tasks.delete_confirm": "\u1012\u102e\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1000\u102d\u102f \u1016\u103b\u1000\u103a\u1019\u101c\u102c\u1038?", "tasks.delete_failed": "\u1016\u103b\u1000\u103a\u1019\u101b\u1015\u102b: {error}", "tasks.deleting": "\u1016\u103b\u1000\u103a\u1014\u1031\u101e\u100a\u103a\u2026", "tasks.dub": "\u1021\u101e\u1036\u1016\u1019\u103a\u1038", "tasks.empty": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1019\u101b\u103e\u102d\u101e\u1031\u1038\u1015\u102b\u104b", "tasks.filter.scene.all": "\u1021\u1001\u1014\u103a\u1038\u1021\u102c\u1038\u101c\u102f\u1036\u1038", "tasks.filter.scene.avatar": "\u1012\u1005\u103a\u1002\u103b\u1005\u103a\u1010\u101a\u103a\u101c\u1030", "tasks.filter.scene.baseline": "\u1021\u1001\u103c\u1031\u1001\u1036", "tasks.filter.scene.hot_follow": "\u101f\u1031\u102c\u1037\u101c\u102d\u102f\u1000\u103a", "tasks.filter.status.all": "\u1021\u1001\u103c\u1031\u1021\u1014\u1031\u1021\u102c\u1038\u101c\u102f\u1036\u1038", "tasks.filter.status.attention": "\u1021\u102c\u101b\u102f\u1036\u1005\u102d\u102f\u1000\u103a\u101b\u1014\u103a", "tasks.filter.status.done": "\u1015\u103c\u102e\u1038\u1006\u102f\u1036\u1038", "tasks.filter.status.processing": "\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a\u1014\u1031", "tasks.filtered_n": "\u1005\u1005\u103a\u1011\u102f\u1010\u103a\u1015\u103c\u102e\u1038 {n} \u1001\u102f", "tasks.legend": "Legend", "tasks.legend.failed": "\u1019\u1021\u1031\u102c\u1004\u103a\u1019\u103c\u1004\u103a", "tasks.legend.processing": "\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a\u1014\u1031", "tasks.legend.queued": "\u1005\u1031\u102c\u1004\u1037\u103a\u1006\u102d\u102f\u1004\u103a\u1038", "tasks.legend.ready": "\u1021\u1006\u1004\u103a\u101e\u1004\u1037\u103a", "tasks.load_failed": "\u1016\u103d\u1004\u1037\u103a\u1019\u101b\u1015\u102b: {error}", "tasks.loaded": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038 {n} \u1001\u102f \u1016\u103d\u1004\u1037\u103a\u1011\u102c\u1038\u101e\u100a\u103a", "tasks.loaded_n": "\u1010\u102c\u101d\u1014\u103a {n} \u1001\u102f \u1010\u1004\u103a\u1015\u103c\u102e\u1038", "tasks.loading": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1019\u103b\u102c\u1038 \u1005\u1005\u103a\u1006\u1031\u1038\u1014\u1031\u101e\u100a\u103a\u2026", "tasks.new.local_upload.choose_file": "\u1012\u1031\u101e\u1010\u103d\u1004\u103a\u1038 \u1017\u102e\u1012\u102e\u101a\u102d\u102f \u101b\u103d\u1031\u1038\u101b\u1014\u103a", "tasks.new.local_upload.error": "\u1010\u1004\u103a\u1019\u101b\u1015\u102b\u104a \u1014\u1031\u102c\u1000\u103a\u1019\u103e \u1011\u1015\u103a\u1005\u1019\u103a\u1038\u1015\u102b", "tasks.new.local_upload.error_no_file": "\u1017\u102e\u1012\u102e\u101a\u102d\u102f \u1016\u102d\u102f\u1004\u103a\u1000\u102d\u102f \u101b\u103d\u1031\u1038\u1001\u103b\u101a\u103a\u1015\u102b", "tasks.new.local_upload.error_upload_failed": "\u1010\u1004\u103a\u1019\u101b\u1015\u102b\u104a \u1014\u1031\u102c\u1000\u103a\u1019\u103e \u1011\u1015\u103a\u1005\u1019\u103a\u1038\u1015\u102b", "tasks.new.local_upload.hint": "mp4/mov/mkv \u1000\u102d\u102f \u1015\u1036\u1037\u1015\u102d\u102f\u1038\u101e\u100a\u103a\u104a \u1010\u1004\u103a\u1015\u103c\u102e\u1038\u101e\u103d\u102c\u1038\u101c\u103b\u103e\u1004\u103a \u1006\u1000\u103a\u101c\u1000\u103a\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a\u1019\u100a\u103a", "tasks.new.local_upload.submit": "\u1010\u1004\u103a\u1015\u103c\u102e\u1038 \u1016\u1014\u103a\u1010\u102e\u1038", "tasks.new.local_upload.uploading": "\u1010\u1004\u103a\u1014\u1031\u101e\u100a\u103a...", "tasks.new.source_mode": "\u101b\u1004\u103a\u1038\u1019\u103c\u1005\u103a \u101b\u103d\u1031\u1038\u1001\u103b\u101a\u103a\u1019\u103e\u102f", "tasks.new.source_mode.local": "\u1012\u1031\u101e\u1010\u103d\u1004\u103a\u1038 \u1017\u102e\u1012\u102e\u101a\u102d\u102f", "tasks.new.source_mode.url": "\u101c\u1004\u1037\u103a\u1001\u103a", "tasks.no_tasks": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038 \u1019\u101b\u103e\u102d\u101e\u1031\u1038\u1015\u102b", "tasks.pack_unavailable": "\u1019\u101b\u103e\u102d\u101e\u1031\u1038\u1015\u102b", "tasks.publish_hub": "\u1011\u102f\u1010\u103a\u101d\u1031\u1005\u1004\u103a\u1010\u102c", "tasks.scene.avatar.desc": "Recreate a real persona and follow a driving video. Supports lip-sync.", "tasks.scene.avatar.title": "Avatar IP", "tasks.scene.baseline.desc": "General editing pipeline: dedupe, remix, basic dubbing.", "tasks.scene.baseline.title": "Baseline Editing", "tasks.scene.hot.desc": "Deconstruct target videos for pixel-level replication. Auto-extract script \u0026 storyboard.", "tasks.scene.hot.title": "Hot Follow", "tasks.status.failed": "\u1019\u1021\u1031\u102c\u1004\u103a\u1019\u103c\u1004\u103a", "tasks.status.processing": "\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a\u1014\u1031", "tasks.status.queued": "\u1005\u1031\u102c\u1004\u1037\u103a\u1006\u102d\u102f\u1004\u103a\u1038", "tasks.status.ready": "\u1021\u1006\u1004\u103a\u101e\u1004\u1037\u103a", "tasks.subtitles": "\u1005\u102c\u1010\u1014\u103a\u1038\u1011\u102d\u102f\u1038", "tasks.table.category": "\u1021\u1019\u103b\u102d\u102f\u1038\u1021\u1005\u102c\u1038", "tasks.table.created": "\u1016\u1014\u103a\u1010\u102e\u1038\u1001\u103b\u102d\u1014\u103a", "tasks.table.detail": "\u1021\u101e\u1031\u1038\u1005\u102d\u1010\u103a", "tasks.table.id": "ID", "tasks.table.language": "\u1018\u102c\u101e\u102c", "tasks.table.pack": "\u1015\u1000\u103a\u1000\u1031\u1037\u1001\u103a", "tasks.table.platform": "\u1015\u101c\u1000\u103a\u1016\u1031\u102c\u1004\u103a\u1038", "tasks.table.publish": "\u1011\u102f\u1010\u103a\u101d\u1031", "tasks.table.source": "\u1021\u101b\u1004\u103a\u1038\u1021\u1019\u103c\u1005\u103a", "tasks.table.status": "\u1021\u1001\u103c\u1031\u1021\u1014\u1031", "tasks.table.title": "\u1001\u1031\u102b\u1004\u103a\u1038\u1005\u1009\u103a", "tasks.untitled": "\u1021\u1019\u100a\u103a\u1019\u1015\u102b\u101e\u1031\u102c \u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038", "tasks.wizard.header_subtitle": "Select the type of task to create", "tasks.wizard.header_title": "Choose a Task Scenario", "tasks.wizard.hint_avatar": "Best for on-camera persona \u0026 brand spokesperson content", "tasks.wizard.hint_baseline": "Best for general processing and batch remixing", "tasks.wizard.hint_hot": "Best for quickly replicating viral formats at scale", "tasks.wizard.hint_title": "Tips", "tasks.wizard.page_title": "Choose a Task Scenario - ShortVideo", "tasks.wizard.start": "Start", "tasks.wizard.subtitle": "Select the type of task to create. Each type has an optimized workflow.", "tasks.wizard.title": "Choose a Task Scenario", "tasks.workbench.subtitles.clean_ready": "Subtitle stream \u1019\u1015\u102b\u1010\u1032\u1037 clean video \u1000\u102d\u102f \u1015\u103c\u102f\u101c\u102f\u1015\u103a\u1015\u103c\u102e\u1038\u1015\u102b\u1015\u103c\u102e\u104b", "tasks.workbench.subtitles.hard_label": "Hard subtitle (\u1015\u102f\u1036\u1011\u1032\u1000 \u1011\u100a\u1037\u103a\u1011\u102c\u1038\u101e\u1031\u102c \u1005\u102c\u1010\u1014\u103a\u1038)", "tasks.workbench.subtitles.hard_note": "\u1019\u103e\u1010\u103a\u1001\u103b\u1000\u103a\u101e\u102c \u1016\u103c\u1005\u103a\u1015\u103c\u102e\u1038 v1.85 \u1010\u103d\u1004\u103a hard subtitle \u1019\u1016\u101a\u103a\u101b\u103e\u102c\u1038\u1014\u102d\u102f\u1004\u103a\u1015\u102b\u104b", "tasks.workbench.subtitles.none_detected_hint": "Soft subtitle track \u1019\u1010\u103d\u1031\u1037\u1015\u102b\u104b Hard subtitle \u1016\u103c\u1005\u103a\u1015\u102b\u1000 v1.85 \u1019\u1016\u101a\u103a\u101b\u103e\u102c\u1038\u1014\u102d\u102f\u1004\u103a\u1015\u102b\u104b v1.9 \u1010\u103d\u1004\u103a \u1010\u102d\u102f\u1038\u1010\u1000\u103a\u1015\u102b\u1019\u100a\u103a\u104b", "tasks.workbench.subtitles.soft_detected": "Soft subtitle track \u1010\u103d\u1031\u1037\u101b\u103e\u102d\u101e\u100a\u103a\u104b", "tasks.workbench.subtitles.unknown": "Subtitle track \u1005\u1005\u103a\u1006\u1031\u1038\u1019\u103e\u102f \u1019\u101e\u1031\u1001\u103b\u102c (\u1017\u102e\u1012\u102e\u101a\u102d\u102f \u1019\u101b\u103e\u102d/ffprobe \u1019\u1021\u1031\u102c\u1004\u103a\u1019\u103c\u1004\u103a)\u104b", "title": "Title", "tools.actions.details": "\u1021\u101e\u1031\u1038\u1005\u102d\u1010\u103a", "tools.actions.docs": "\u1005\u102c\u1010\u1019\u103a\u1038", "tools.actions.open": "\u1016\u103d\u1004\u1037\u103a", "tools.bucket.avatar.subtitle": "Talking head / assets", "tools.bucket.avatar.title": "Avatar", "tools.bucket.editors.subtitle": "Import pack, template edit, mobile export", "tools.bucket.editors.title": "Editors", "tools.bucket.face_swap.subtitle": "Single/multi face swap", "tools.bucket.face_swap.title": "Face swap", "tools.bucket.gemini.subtitle": "Understanding, generation, copy", "tools.bucket.gemini.title": "Gemini", "tools.bucket.keyframe.subtitle": "Shot selection, scene split, keyframes", "tools.bucket.keyframe.title": "Keyframe / Deterministic", "tools.bucket.other.subtitle": "Unclassified tools", "tools.bucket.other.title": "Other", "tools.bucket.post.subtitle": "Transcode, burn subtitles, packaging", "tools.bucket.post.title": "Post delivery", "tools.bucket.voice.subtitle": "TTS, mix, loudness/denoise", "tools.bucket.voice.title": "Voice / Audio", "tools.detail.capabilities": "\u1005\u103d\u1019\u103a\u1038\u101b\u100a\u103a", "tools.detail.description": "\u1016\u1031\u102c\u103a\u1015\u103c\u1001\u103b\u1000\u103a", "tools.detail.links": "\u101c\u1004\u1037\u103a\u1001\u103a\u1019\u103b\u102c\u1038", "tools.detail.load_failed": "\u1016\u103d\u1004\u1037\u103a\u1019\u101b\u1015\u102b: {error}", "tools.detail.not_found": "\u1000\u102d\u101b\u102d\u101a\u102c \u1019\u1010\u103d\u1031\u1037\u1015\u102b", "tools.detail.steps": "\u1021\u1006\u1004\u1037\u103a\u1019\u103b\u102c\u1038", "tools.detail.tags": "\u1010\u1000\u103a\u1002\u103a", "tools.empty": "\u1000\u102d\u101b\u102d\u101a\u102c \u1019\u1010\u103d\u1031\u1037\u1015\u102b", "tools.error": "\u1016\u103d\u1004\u1037\u103a\u1019\u101b\u1015\u102b", "tools.filters.all": "\u1021\u102c\u1038\u101c\u102f\u1036\u1038", "tools.filters.capabilities": "\u1005\u103d\u1019\u103a\u1038\u101b\u100a\u103a (comma)", "tools.filters.capabilities_placeholder": "\u1005\u103d\u1019\u103a\u1038\u101b\u100a\u103a (comma)", "tools.filters.category": "\u1021\u1019\u103b\u102d\u102f\u1038\u1021\u1005\u102c\u1038", "tools.filters.clear": "\u1005\u1005\u103a\u1011\u102f\u1010\u103a\u1019\u103e\u102f\u1016\u103b\u1000\u103a", "tools.filters.integration": "\u1001\u103b\u102d\u1010\u103a\u1006\u1000\u103a\u1019\u103e\u102f", "tools.filters.search": "\u101b\u103e\u102c\u1016\u103d\u1031\u101b\u1014\u103a", "tools.filters.search_placeholder": "\u1014\u102c\u1019\u100a\u103a\u104a tool id\u104a \u1016\u1031\u102c\u103a\u1015\u103c\u1001\u103b\u1000\u103a", "tools.filters.status": "\u1021\u1001\u103c\u1031\u1021\u1014\u1031", "tools.filters.tags": "\u1010\u1000\u103a\u1002\u103a (comma)", "tools.filters.tags_placeholder": "\u1010\u1000\u103a\u1002\u103a (comma)", "tools.loading": "\u1010\u1004\u103a\u1014\u1031\u101e\u100a\u103a\u2026", "ui.tasks.board": "\u1010\u102c\u101d\u1014\u103a\u1018\u102f\u1010\u103a", "ui.tools.title": "\u1000\u102d\u101b\u102d\u101a\u102c\u1019\u103b\u102c\u1038", "ui.workbench.title": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1001\u103d\u1004\u103a", "workbench.compare": "Compare subtitles", "workbench.compare.mm": "Burmese", "workbench.compare.origin": "Original", "workbench.deliverables": "Deliverables", "workbench.deliverables.subtitle": "Ops deliverables for download", "workbench.dub.skipped": "\u1021\u101e\u1036\u1016\u1019\u103a\u1038 \u1019\u101c\u102f\u1015\u103a\u1015\u102b (\u1000\u103b\u1031\u102c\u103a\u101e\u103d\u102c\u1038)", "workbench.dub.skipped_reason": "\u1021\u101e\u1036\u1016\u1019\u103a\u1038\u1000\u102d\u102f \u1000\u103b\u1031\u102c\u103a\u101e\u103d\u102c\u1038\u101e\u100a\u103a", "workbench.edit.mm": "Burmese edit (for dub)", "workbench.logs": "Logs \u0026 Debug", "workbench.logs.engineering": "Engineering details", "workbench.logs.title": "Logs", "workbench.meta.account": "Account", "workbench.meta.category": "Category", "workbench.meta.created": "Created", "workbench.meta.language": "Language", "workbench.meta.pipeline": "Pipeline", "workbench.meta.platform": "Platform", "workbench.meta.source_url": "Source URL", "workbench.meta.status": "Status", "workbench.meta.subtitle_track": "\u1005\u102c\u1010\u1014\u103a\u1038\u1011\u102d\u102f\u1038 Track", "workbench.meta.subtitle_track.burned": "\u1015\u103c\u1004\u103a\u1038\u1005\u102c\u1010\u1014\u103a\u1038 (Hard)", "workbench.meta.subtitle_track.embedded": "\u1015\u103b\u1031\u102c\u1037\u1005\u102c\u1010\u1014\u103a\u1038 (Soft)", "workbench.meta.subtitle_track.none": "\u1005\u102c\u1010\u1014\u103a\u1038\u1019\u101b\u103e\u102d", "workbench.meta.subtitle_track.unknown": "\u1019\u101e\u102d", "workbench.meta.task_id": "Task ID", "workbench.mm_audio": "Burmese audio", "workbench.mm_subtitles": "Burmese subtitles", "workbench.notice.dub_queued": "Dub queued; polling status...", "workbench.notice.subtitles_first": "Please generate subtitles first", "workbench.notice.subtitles_queued": "Subtitles queued; polling status...", "workbench.origin_subtitles": "Origin Subtitles", "workbench.pack": "Pack", "workbench.publish_hint": "Publishing moved to Publish Hub.", "workbench.publish_hub": "Publish Hub", "workbench.publish_open": "Open Publish Hub", "workbench.scenes": "Scenes", "workbench.scenes_action": "Actions", "workbench.scenes_desc": "Scene slices for reuse.", "workbench.scenes_download": "Download Scenes.zip", "workbench.scenes_generate": "Generate scenes", "workbench.scenes_help": "Scenes are sliced by subtitle timestamps and packed as Scenes.zip. Click generate, then download after ready. JSON is not required. Scenes.zip does not affect Pack.zip.", "workbench.scenes_section": "Scene slices", "workbench.source_url.empty": "\u101c\u1004\u1037\u103a\u1001\u103a \u1019\u1010\u103d\u1031\u1037\u1015\u102b\u104b", "workbench.source_url_raw": "Source URL (raw)", "workbench.status.error": "Failed: {error}", "workbench.status.not_parsed": "Not parsed", "workbench.status.not_ready": "Not ready", "workbench.status.parsed": "Parsed", "workbench.status.processing": "Processing...", "workbench.status.ready": "Ready", "workbench.step.dub.engine": "Engine", "workbench.step.dub.run": "Generate dub", "workbench.step.dub.title": "Step 3 - Dub", "workbench.step.dub.voice": "Voice", "workbench.step.pack.desc": "Generate pack for this task", "workbench.step.pack.run": "Generate pack", "workbench.step.pack.title": "Step 4 - Pack", "workbench.step.parse.desc": "Call /api/tasks/{id}/parse", "workbench.step.parse.local_skip": "\u1012\u1031\u101e\u1010\u103d\u1004\u103a\u1038 \u1017\u102e\u1012\u102e\u101a\u102d\u102f\u1016\u103c\u1005\u103a\u101e\u1031\u102c\u1000\u103c\u1031\u102c\u1004\u1037\u103a parse \u1019\u101c\u102d\u102f\u1015\u102b\u104b", "workbench.step.parse.run": "Run parse", "workbench.step.parse.title": "Step 1 - Parse \u0026 Download", "workbench.step.subtitles.desc": "Call /api/tasks/{id}/subtitles to generate", "workbench.step.subtitles.run": "Generate subtitles", "workbench.step.subtitles.title": "Step 2 - Subtitles", "workbench.steps": "Pipeline", "workbench.steps.subtitle": "Ops workflow view", "workbench.video": "Video"}, "zh": {"action.back_tasks": "\u4efb\u52a1\u770b\u677f", "action.back_tools": "\u5de5\u5177\u4e2d\u5fc3", "action.copy": "\u590d\u5236", "action.create": "\u521b\u5efa\u5e76\u8fd0\u884c", "action.delete": "\u5220\u9664", "action.download": "\u4e0b\u8f7d\u4ea7\u7269", "action.download_disabled": "\u4e0b\u8f7d\u4ea7\u7269", "action.force_download": "\u5f3a\u5236\u4e0b\u8f7d", "action.json": "JSON", "action.new_task": "\u65b0\u5efa\u4efb\u52a1", "action.open": "\u6253\u5f00", "action.open_detail": "\u8fdb\u5165\u8be6\u60c5", "action.refresh": "\u5237\u65b0", "action.reset": "\u91cd\u7f6e", "action.run": "\u8fd0\u884c", "action.save": "\u4fdd\u5b58", "action.submit": "\u63d0\u4ea4", "action.unlock": "\u89e3\u9501", "admin.tools.save": "\u4fdd\u5b58\u9ed8\u8ba4\u503c", "admin.tools.title": "\u5de5\u5177\u7ba1\u7406", "auth.login.button": "\u767b\u5f55", "auth.login.desc": "\u8bf7\u8f93\u5165 Operator \u540d\u4e0e\u8bbf\u95ee\u5bc6\u94a5\uff08OP_ACCESS_KEY\uff09\u3002\u652f\u6301 admin/operator\u3002", "auth.login.invalid": "\u5bc6\u94a5\u9519\u8bef", "auth.login.key_label": "\u5bc6\u94a5", "auth.login.key_placeholder": "OP_ACCESS_KEY", "auth.login.operator_label": "\u8d26\u53f7", "auth.login.operator_placeholder": "ops / admin", "auth.login.title": "\u8fd0\u8425\u767b\u5f55", "category": "\u5206\u7c7b", "category_beauty": "Beauty", "category_other": "\u5176\u4ed6", "category_suitcase": "Suitcase", "common.back_task_board": "\u2190 \u4efb\u52a1\u770b\u677f", "common.burmese": "\u7f05\u7538\u8bed", "common.chinese": "\u4e2d\u6587", "common.new_task": "\u65b0\u5efa\u4efb\u52a1", "common.tasks": "\u4efb\u52a1", "common.tools": "\u5de5\u5177", "created": "\u521b\u5efa\u65f6\u95f4", "delete": "\u5220\u9664", "detail": "\u8be6\u60c5", "download": "\u4e0b\u8f7d", "hot.follow.action.dub": "\u91cd\u65b0\u914d\u97f3", "hot.follow.action.pack": "\u91cd\u65b0\u6253\u5305", "hot.follow.action.parse": "\u91cd\u65b0\u89e3\u6790", "hot.follow.action.scenes": "\u751f\u6210\u5206\u955c", "hot.follow.action.subtitles": "\u91cd\u65b0\u5b57\u5e55", "hot.follow.delivery.cta": "\u4ea4\u4ed8\u4e2d\u5fc3", "hot.follow.delivery.deliverables": "\u4ea4\u4ed8\u7269", "hot.follow.delivery.empty": "\u6682\u65e0\u4ea4\u4ed8\u7269\u3002", "hot.follow.delivery.notes": "\u5907\u6ce8", "hot.follow.delivery.notes.placeholder": "\u53ef\u9009\uff0c\u8bb0\u5f55\u53d1\u5e03\u6e20\u9053\u6216\u8bf4\u660e", "hot.follow.delivery.publish": "\u53d1\u5e03\u56de\u586b", "hot.follow.delivery.publish_cta": "\u56de\u586b\u53d1\u5e03", "hot.follow.delivery.published_url": "\u53d1\u5e03\u94fe\u63a5", "hot.follow.delivery.subtitle": "\u4ea4\u4ed8\u7269\u4e0b\u8f7d\u4e0e\u53d1\u5e03\u56de\u586b", "hot.follow.delivery.title": "\u70ed\u70b9\u8ddf\u62cd - \u4ea4\u4ed8\u4e2d\u5fc3", "hot.follow.nav": "\u70ed\u70b9\u8ddf\u62cd", "hot.follow.new.bgm_keep": "\u4fdd\u7559\u539f\u97f3", "hot.follow.new.bgm_mix": "BGM \u6df7\u5408\u6bd4\u4f8b (0-1)", "hot.follow.new.bgm_mute": "\u9759\u97f3", "hot.follow.new.bgm_replace": "\u66ff\u6362\u539f\u97f3", "hot.follow.new.bgm_title": "BGM \u8bbe\u7f6e", "hot.follow.new.cta": "\u521b\u5efa\u5e76\u8fd0\u884c", "hot.follow.new.form_title": "\u521b\u5efa\u4efb\u52a1", "hot.follow.new.local_video": "\u672c\u5730\u89c6\u9891", "hot.follow.new.local_video_hint": "\u652f\u6301 mp4 / mov / mkv\uff0c\u672c\u5730\u5bfc\u5165\u540e\u7ee7\u7eed\u8fdb\u5165 Hot Follow \u5de5\u4f5c\u53f0", "hot.follow.new.probe_title": "\u94fe\u63a5\u9884\u89c8", "hot.follow.new.source_language": "\u6e90\u89c6\u9891\u8bed\u8a00", "hot.follow.new.source_language.en": "English", "hot.follow.new.source_language.zh": "\u4e2d\u6587", "hot.follow.new.source_mode": "\u6765\u6e90\u65b9\u5f0f", "hot.follow.new.source_mode.link": "\u94fe\u63a5", "hot.follow.new.source_mode.local": "\u672c\u5730\u89c6\u9891", "hot.follow.new.subtitle": "\u8f93\u5165\u94fe\u63a5\uff0c\u751f\u6210\u70ed\u70b9\u8ddf\u62cd\u4efb\u52a1", "hot.follow.new.title": "\u70ed\u70b9\u8ddf\u62cd - \u65b0\u5efa", "hot.follow.step.dub": "\u914d\u97f3", "hot.follow.step.pack": "\u6253\u5305", "hot.follow.step.parse": "\u89e3\u6790", "hot.follow.step.scenes": "\u5206\u955c", "hot.follow.step.subtitles": "\u5b57\u5e55", "hot.follow.subtitle": "\u53c2\u8003\u89c6\u9891\u62c6\u89e3\u4e0e\u590d\u523b", "hot.follow.title": "\u70ed\u70b9\u8ddf\u62cd", "hot.follow.workbench.cta": "\u8fd4\u56de\u5de5\u4f5c\u53f0", "hot.follow.workbench.events_title": "\u4e8b\u4ef6\u8bb0\u5f55", "hot.follow.workbench.pipeline_title": "\u6d41\u7a0b\u6b65\u9aa4", "hot.follow.workbench.subtitle": "\u4efb\u52a1\u8fdb\u5ea6\u4e0e\u6b65\u9aa4\u63a7\u5236", "hot.follow.workbench.title": "\u70ed\u70b9\u8ddf\u62cd - \u5de5\u4f5c\u53f0", "id": "ID", "json": "JSON", "label.account": "\u8d26\u53f7", "label.auto_category_hint": "Auto-category: Suitcase \u00b7 Language: Burmese \u00b7 UI: Chinese", "label.category": "\u5206\u7c7b", "label.category_other": "\u5176\u4ed6", "label.created": "\u521b\u5efa\u65f6\u95f4", "label.detail": "\u8be6\u60c5", "label.downloads": "\u4e0b\u8f7d", "label.dub_mode": "\u914d\u97f3", "label.dub_mode.auto": "\u81ea\u52a8\u515c\u5e95\uff08\u4f18\u5148\u53ef\u7528\uff09", "label.dub_mode.edge": "Edge TTS", "label.dub_mode.lovo": "LOVO", "label.id": "ID", "label.json": "JSON", "label.lang.mm": "\u7f05\u8bed (MM)", "label.language": "\u8bed\u79cd", "label.last_step": "\u6700\u540e\u6b65\u9aa4", "label.more_tools": "\u66f4\u591a\u5de5\u5177\u8bf7\u5728 Tools Hub \u914d\u7f6e\u3002", "label.note": "\u5907\u6ce8", "label.note.placeholder": "\u7ed9\u8fd0\u8425\u5907\u6ce8", "label.pack": "\u526a\u8f91\u5305", "label.pipeline_hint": "\u4ec5\u914d\u7f6e\u5b57\u5e55\u4e0e\u914d\u97f3\uff0c\u5176\u5b83\u5de5\u5177\u5728 Workbench \u8bbe\u7f6e\u3002", "label.pipeline_tools": "\u6d41\u6c34\u7ebf\u5de5\u5177", "label.platform": "\u5e73\u53f0", "label.platform_douyin": "\u6296\u97f3", "label.platform_fb": "Facebook", "label.platform_tiktok": "TikTok", "label.platform_xhs": "\u5c0f\u7ea2\u4e66", "label.publish": "\u53d1\u5e03", "label.source": "\u6765\u6e90", "label.source_url": "\u6765\u6e90\u94fe\u63a5", "label.source_url.placeholder": "\u7c98\u8d34\u6765\u6e90\u94fe\u63a5 (Douyin/XHS/TK/FB)", "label.status": "\u72b6\u6001", "label.style": "\u98ce\u683c", "label.style.fast": "\u77ed\u8bc4\u5feb\u8282\u594f", "label.style.story": "\u60c5\u666f\u53d9\u4e8b", "label.style_preset": "\u98ce\u683c\u9884\u8bbe", "label.style_preset.hint": "\u5b9a\u4e49\u8282\u594f\u4e0e\u526a\u8f91\u610f\u56fe", "label.submit.error.missing_link": "\u5fc5\u987b\u586b\u5199\u6765\u6e90\u94fe\u63a5", "label.submit.status.created": "\u5df2\u521b\u5efa\u4efb\u52a1 {task_id}, \u72b6\u6001: {status}", "label.submit.status.failed": "\u8bf7\u6c42\u5931\u8d25: {error}", "label.submit.status.submitting": "\u63d0\u4ea4\u4e2d...", "label.subtitles_mode": "\u5b57\u5e55/\u7ffb\u8bd1", "label.subtitles_mode.whisper_gemini": "Whisper + Gemini\uff08ASR + \u7ffb\u8bd1/\u6da6\u8272\uff09", "label.subtitles_mode.whisper_only": "Whisper only\uff08\u4ec5 ASR \u5b57\u5e55\uff09", "label.summary": "\u6458\u8981", "label.task_id": "\u4efb\u52a1ID", "label.title": "\u6807\u9898", "label.title.optional": "\u6807\u9898\uff08\u53ef\u9009\uff09", "label.title.placeholder": "\u53ef\u9009\u6807\u9898", "label.video_type": "\u89c6\u9891\u7c7b\u578b", "label.video_type.hint": "\u9009\u62e9\u4e1a\u52a1\u610f\u56fe", "label.video_type.review": "\u5bf9\u6bd4\u6d4b\u8bc4", "label.video_type.scenario": "\u573a\u666f\u4f7f\u7528", "lang": "\u8bed\u79cd", "lang.mm": "\u7f05\u6587", "lang.vi": "\u8d8a\u5357\u8bed", "lang.zh": "\u4e2d\u6587", "legend": "\u56fe\u4f8b", "nav.tasks": "\u4efb\u52a1", "nav.tools": "\u5de5\u5177", "new_suitcase_task": "\u65b0\u5efa\u4efb\u52a1", "no_tasks": "\u6682\u65e0\u4efb\u52a1", "open": "\u6253\u5f00", "pack": "\u526a\u8f91\u5305", "page.publish.subtitle": "\u4efb\u52a1ID: {task_id}", "page.publish.title": "\u53d1\u5e03\u4e2d\u5fc3", "page.tasks.board.subtitle": "\u5df2\u52a0\u8f7d {count} \u4e2a\u4efb\u52a1", "page.tasks.board.title": "\u4efb\u52a1\u770b\u677f", "page.tasks.new.subtitle": "\u7c98\u8d34\u94fe\u63a5 \u2192 \u4e00\u952e\u751f\u6210 Smart Pack + README", "page.tasks.new.title": "\u65b0\u5efa\u4efb\u52a1", "page.tools.detail.title": "\u5de5\u5177\u8be6\u60c5", "page.tools.hub.subtitle": "\u5de5\u5177\u914d\u7f6e\u4e0e\u5165\u53e3\uff08SSOT\uff09", "page.tools.hub.title": "\u5de5\u5177\u4e2d\u5fc3", "page.workbench.subtitle": "\u4efb\u52a1ID: {task_id}", "page.workbench.title": "\u5de5\u4f5c\u53f0", "platform": "\u5e73\u53f0", "publish": "\u53d1\u5e03", "publish.archive.desc": "\u5f52\u6863\u786e\u8ba4\u4ea4\u4ed8\uff0c\u4e0d\u4ee3\u8868\u5df2\u53d1\u5e03\u3002", "publish.archive.download_url": "\u4e0b\u8f7d\u94fe\u63a5", "publish.archive.key": "\u5f52\u6863 Key", "publish.archive.location": "\u5f52\u6863\u4f4d\u7f6e", "publish.archive.open": "\u6253\u5f00", "publish.archive.published": "\u5df2\u53d1\u5e03", "publish.archive.published_at": "\u53d1\u5e03\u65f6\u95f4", "publish.archive.published_hint": "\u52fe\u9009\u8868\u793a\u5df2\u53d1\u5e03", "publish.archive.save": "\u4fdd\u5b58\u5f52\u6863", "publish.archive.status": "\u72b6\u6001", "publish.archive.submit": "\u63d0\u4ea4\u5f52\u6863", "publish.archive.title": "\u5f52\u6863", "publish.copy.caption": "\u6807\u9898/\u6587\u6848", "publish.copy.comment": "\u8bc4\u8bba\u5f15\u5bfc", "publish.copy.desc": "\u8fd0\u8425\u53ef\u7f16\u8f91\u5b57\u6bb5\uff0c\u4fee\u6539\u4e0d\u4f1a\u4fdd\u5b58\u3002", "publish.copy.hashtags": "\u8bdd\u9898\u6807\u7b7e", "publish.copy.link_text": "\u6302\u94fe\u6587\u6848", "publish.copy.publish_time": "\u53d1\u5e03\u65f6\u95f4\u5efa\u8bae", "publish.copy.title": "\u6587\u6848\u5305", "publish.deliverables.bundle": "\u7f16\u8f91\u5305 (ZIP)", "publish.deliverables.copy_link": "\u590d\u5236\u94fe\u63a5", "publish.deliverables.copy_short": "\u590d\u5236\u77ed\u94fe", "publish.deliverables.desc": "\u4ec5\u663e\u793a\u5df2\u751f\u6210\u7684\u4ea7\u7269\u3002", "publish.deliverables.empty": "\u6682\u65e0\u4ea4\u4ed8\u7269\u3002", "publish.deliverables.open_link": "\u6253\u5f00\u94fe\u63a5", "publish.deliverables.qr": "\u626b\u7801\u4e0b\u8f7d\u7f16\u8f91\u5305", "publish.deliverables.short_link": "\u77ed\u94fe", "publish.deliverables.title": "\u4ea4\u4ed8\u7269", "publish.download_code": "\u4e0b\u8f7d\u7801", "publish.gate.desc": "\u8bf7\u8f93\u5165 OP Access Key \u4ee5\u52a0\u8f7d\u53d1\u5e03\u6570\u636e\u3002", "publish.gate.invalid_key": "OP Access Key \u4e0d\u6b63\u786e\u3002", "publish.gate.load_failed": "\u52a0\u8f7d\u5931\u8d25: HTTP {status}", "publish.gate.need_key": "\u8bf7\u8f93\u5165 OP Access Key \u7ee7\u7eed\u3002", "publish.gate.title": "\u8fd0\u8425\u95e8\u7981", "publish.sop.desc": "v1.85 \u4ea4\u4ed8\u64cd\u4f5c\u6b65\u9aa4\u3002", "publish.sop.step1": "1) \u5728\u4ea4\u4ed8\u7269\u4e2d\u4e0b\u8f7d pack.zip \u6216 scenes.zip\u3002", "publish.sop.step2": "2) \u5bfc\u5165\u624b\u673a\u526a\u8f91\u5de5\u5177\uff08\u5982 CapCut\uff09\uff0c\u6838\u5bf9\u5b57\u5e55\u4e0e\u65f6\u957f\u3002", "publish.sop.step3": "3) \u4f7f\u7528\u6587\u6848\u5305\u586b\u5199\u6807\u9898/\u8bdd\u9898/\u8bc4\u8bba\u5f15\u5bfc\u3002", "publish.sop.step4": "4) v1.85 \u4ec5\u63d0\u4f9b\u7f16\u8f91\u4ea4\u4ed8\uff0c\u53d1\u5e03\u5305\u5728 2.0 \u63d0\u4f9b\u3002", "publish.sop.title": "SOP \u64cd\u4f5c\u6307\u5f15", "publish.status.save_error": "\u4fdd\u5b58\u9519\u8bef: {error}", "publish.status.save_failed": "\u4fdd\u5b58\u5931\u8d25: {detail}", "publish.status.saved": "\u5df2\u4fdd\u5b58\u3002", "publish.status.saving": "\u4fdd\u5b58\u4e2d...", "publish.status.submit_error": "\u63d0\u4ea4\u9519\u8bef: {error}", "publish.status.submit_failed": "\u63d0\u4ea4\u5931\u8d25: {detail}", "publish.status.submitted": "\u5df2\u63d0\u4ea4\u3002", "publish.status.submitting": "\u63d0\u4ea4\u4e2d...", "publish.tab.archive": "\u5f52\u6863", "publish.tab.copy": "\u6587\u6848\u5305", "publish.tab.deliverables": "\u4ea4\u4ed8\u7269", "publish.tab.sop": "SOP \u6307\u5f15", "source": "\u6765\u6e90", "status": "\u72b6\u6001", "status.error": "\u5931\u8d25", "status.failed": "\u5931\u8d25", "status.not_ready": "\u672a\u5c31\u7eea", "status.pending": "\u6392\u961f\u4e2d", "status.processing": "\u5904\u7406\u4e2d", "status.queued": "\u6392\u961f\u4e2d", "status.ready": "\u5df2\u5c31\u7eea", "status.unknown": "\u672a\u77e5", "status_error": "\u5931\u8d25", "status_pending": "\u6392\u961f\u4e2d", "status_processing": "\u5904\u7406\u4e2d", "status_ready": "\u5df2\u5c31\u7eea", "status_unknown": "\u672a\u77e5", "task_count": "\u4efb\u52a1\u6570\u91cf", "task_not_found": "\u4efb\u52a1\u4e0d\u5b58\u5728", "tasks.badge.pack_exists": "Pack Exists", "tasks.badge.pack_ready": "Pack Ready", "tasks.badge.video": "Video", "tasks.board.subhead": "v1.9 Release | \u4ea7\u7269\u9a71\u52a8\u89c6\u56fe", "tasks.delete_confirm": "\u786e\u8ba4\u5220\u9664\u8be5\u4efb\u52a1\uff1f", "tasks.delete_failed": "\u5220\u9664\u5931\u8d25: {error}", "tasks.deleting": "\u5220\u9664\u4e2d\u2026", "tasks.dub": "\u914d\u97f3", "tasks.empty": "\u6682\u65e0\u4efb\u52a1\u3002", "tasks.filter.scene.all": "\u5168\u90e8\u573a\u666f", "tasks.filter.scene.avatar": "\u6570\u5b57\u4eba", "tasks.filter.scene.baseline": "\u57fa\u7840", "tasks.filter.scene.hot_follow": "\u70ed\u70b9\u8ddf\u968f", "tasks.filter.status.all": "\u5168\u90e8\u72b6\u6001", "tasks.filter.status.attention": "\u9700\u5173\u6ce8", "tasks.filter.status.done": "\u5df2\u5b8c\u6210", "tasks.filter.status.processing": "\u5904\u7406\u4e2d", "tasks.filtered_n": "\u7b5b\u9009\u540e {n} \u6761", "tasks.legend": "\u56fe\u4f8b", "tasks.legend.failed": "\u5931\u8d25", "tasks.legend.processing": "\u5904\u7406\u4e2d", "tasks.legend.queued": "\u6392\u961f\u4e2d", "tasks.legend.ready": "\u5df2\u5c31\u7eea", "tasks.load_failed": "\u52a0\u8f7d\u5931\u8d25: {error}", "tasks.loaded": "\u5df2\u52a0\u8f7d {n} \u4e2a\u4efb\u52a1", "tasks.loaded_n": "\u5df2\u52a0\u8f7d {n} \u4e2a\u4efb\u52a1", "tasks.loading": "\u52a0\u8f7d\u4efb\u52a1\u4e2d\u2026", "tasks.new.local_upload.choose_file": "\u9009\u62e9\u672c\u5730\u89c6\u9891", "tasks.new.local_upload.error": "\u4e0a\u4f20\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5", "tasks.new.local_upload.error_no_file": "\u8bf7\u5148\u9009\u62e9\u8981\u4e0a\u4f20\u7684\u89c6\u9891\u6587\u4ef6", "tasks.new.local_upload.error_upload_failed": "\u4e0a\u4f20\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5", "tasks.new.local_upload.hint": "\u652f\u6301 mp4/mov/mkv\uff0c\u4e0a\u4f20\u540e\u76f4\u63a5\u8fdb\u5165\u5904\u7406", "tasks.new.local_upload.submit": "\u4e0a\u4f20\u5e76\u521b\u5efa", "tasks.new.local_upload.uploading": "\u4e0a\u4f20\u4e2d...", "tasks.new.source_mode": "\u6765\u6e90\u65b9\u5f0f", "tasks.new.source_mode.local": "\u672c\u5730\u89c6\u9891", "tasks.new.source_mode.url": "\u94fe\u63a5", "tasks.no_tasks": "\u6682\u65e0\u4efb\u52a1", "tasks.pack_unavailable": "\u672a\u5c31\u7eea", "tasks.publish_hub": "\u53d1\u5e03\u4e2d\u5fc3", "tasks.scene.avatar.desc": "\u590d\u523b\u771f\u4eba\u5f62\u8c61\uff0c\u591a\u8bed\u79cd\u53e3\u64ad\u3002\u652f\u6301\u5507\u5f62\u540c\u6b65\u3002", "tasks.scene.avatar.title": "\u6570\u5b57\u4eba IP", "tasks.scene.baseline.desc": "\u901a\u7528\u526a\u8f91\u6d41\u6c34\u7ebf\u3002\u53bb\u91cd\u3001\u6df7\u526a\u3001\u57fa\u7840\u914d\u97f3\u3002", "tasks.scene.baseline.title": "\u57fa\u7840\u526a\u8f91", "tasks.scene.hot.desc": "\u62c6\u89e3\u5bf9\u6807\u89c6\u9891\uff0c\u50cf\u7d20\u7ea7\u590d\u523b\u3002\u81ea\u52a8\u63d0\u53d6\u811a\u672c\u4e0e\u5206\u955c\u3002", "tasks.scene.hot.title": "\u70ed\u70b9\u8ddf\u62cd", "tasks.status.failed": "\u5931\u8d25", "tasks.status.processing": "\u5904\u7406\u4e2d", "tasks.status.queued": "\u6392\u961f\u4e2d", "tasks.status.ready": "\u5df2\u5c31\u7eea", "tasks.subtitles": "\u5b57\u5e55", "tasks.table.category": "\u5206\u7c7b", "tasks.table.created": "\u521b\u5efa\u65f6\u95f4", "tasks.table.detail": "\u8be6\u60c5", "tasks.table.id": "ID", "tasks.table.language": "\u8bed\u79cd", "tasks.table.pack": "\u526a\u8f91\u5305", "tasks.table.platform": "\u5e73\u53f0", "tasks.table.publish": "\u53d1\u5e03", "tasks.table.source": "\u6765\u6e90", "tasks.table.status": "\u72b6\u6001", "tasks.table.title": "\u6807\u9898", "tasks.untitled": "\u672a\u547d\u540d\u4efb\u52a1", "tasks.wizard.header_subtitle": "\u8bf7\u9009\u62e9\u60a8\u8981\u521b\u5efa\u7684\u4efb\u52a1\u7c7b\u578b", "tasks.wizard.header_title": "\u9009\u62e9\u4efb\u52a1\u573a\u666f", "tasks.wizard.hint_avatar": "\u9002\u5408\u9700\u8981\u771f\u4eba\u51fa\u955c\u3001\u54c1\u724c\u4ee3\u8a00\u7684\u89c6\u9891\u5185\u5bb9", "tasks.wizard.hint_baseline": "\u9002\u5408\u5e38\u89c4\u7d20\u6750\u5904\u7406\u3001\u6279\u91cf\u6df7\u526a\u7b49\u901a\u7528\u9700\u6c42", "tasks.wizard.hint_hot": "\u9002\u5408\u5feb\u901f\u590d\u5236\u7206\u6b3e\u89c6\u9891\uff0c\u6279\u91cf\u4ea7\u51fa\u540c\u7c7b\u5185\u5bb9", "tasks.wizard.hint_title": "\u9009\u62e9\u63d0\u793a", "tasks.wizard.page_title": "\u9009\u62e9\u4efb\u52a1\u573a\u666f - ShortVideo", "tasks.wizard.start": "\u5f00\u59cb\u521b\u5efa", "tasks.wizard.subtitle": "\u8bf7\u9009\u62e9\u60a8\u8981\u521b\u5efa\u7684\u4efb\u52a1\u7c7b\u578b\uff0c\u6bcf\u79cd\u7c7b\u578b\u90fd\u6709\u4e13\u95e8\u4f18\u5316\u7684\u5de5\u4f5c\u6d41\u7a0b", "tasks.wizard.title": "\u9009\u62e9\u4efb\u52a1\u573a\u666f", "tasks.workbench.subtitles.clean_ready": "\u5df2\u751f\u6210\u65e0\u5b57\u5e55\u7248\u672c\uff08clean\uff09\u3002", "tasks.workbench.subtitles.hard_label": "\u8fd9\u662f\u786c\u5b57\u5e55\uff08\u753b\u9762\u70e7\u5f55\uff09", "tasks.workbench.subtitles.hard_note": "\u4ec5\u7528\u4e8e\u8bb0\u5f55\uff0cv1.85 \u4e0d\u4f1a\u81ea\u52a8\u53bb\u9664\u786c\u5b57\u5e55\u3002", "tasks.workbench.subtitles.none_detected_hint": "\u672a\u68c0\u6d4b\u5230\u8f6f\u5b57\u5e55\u8f68\u9053\u3002\u82e5\u753b\u9762\u5b58\u5728\u786c\u5b57\u5e55\uff0cv1.85 \u65e0\u6cd5\u81ea\u52a8\u53bb\u9664\uff0cv1.9 \u5c06\u589e\u5f3a\u3002", "tasks.workbench.subtitles.soft_detected": "\u68c0\u6d4b\u5230\u8f6f\u5b57\u5e55\u8f68\u9053\u3002", "tasks.workbench.subtitles.unknown": "\u5b57\u5e55\u8f68\u9053\u68c0\u6d4b\u672a\u77e5\uff08\u672a\u627e\u5230\u89c6\u9891\u6216 ffprobe \u5931\u8d25\uff09\u3002", "title": "\u6807\u9898", "tools.actions.details": "\u8be6\u60c5", "tools.actions.docs": "\u6587\u6863", "tools.actions.open": "\u6253\u5f00", "tools.bucket.avatar.subtitle": "\u53e3\u64ad/\u9a71\u52a8/\u7d20\u6750\u5e93", "tools.bucket.avatar.title": "\u6570\u5b57\u4eba", "tools.bucket.editors.subtitle": "\u5bfc\u5165\u5305\u3001\u6a21\u677f\u526a\u8f91\u3001\u79fb\u52a8\u7aef\u5bfc\u51fa", "tools.bucket.editors.title": "\u526a\u8f91\u5668", "tools.bucket.face_swap.subtitle": "\u4eba\u8138\u66ff\u6362\uff08\u5355/\u591a\uff09", "tools.bucket.face_swap.title": "\u6362\u8138", "tools.bucket.gemini.subtitle": "\u89c6\u9891\u7406\u89e3\u3001\u751f\u6210\u3001\u6587\u6848/\u811a\u672c", "tools.bucket.gemini.title": "\u7406\u89e3\u4e0e\u751f\u6210\uff08Gemini\uff09", "tools.bucket.keyframe.subtitle": "\u9009\u955c\u5934\u3001\u5207\u7247\u3001\u63d0\u5173\u952e\u5e27", "tools.bucket.keyframe.title": "\u5173\u952e\u5e27 / \u786e\u5b9a\u6027\u5de5\u7a0b", "tools.bucket.other.subtitle": "\u672a\u5f52\u7c7b\u5de5\u5177", "tools.bucket.other.title": "\u5176\u4ed6", "tools.bucket.post.subtitle": "\u8f6c\u7801\u3001\u70e7\u5f55\u5b57\u5e55\u3001\u4ea4\u4ed8\u5c01\u88c5", "tools.bucket.post.title": "\u540e\u671f\u4ea4\u4ed8\uff08\u786e\u5b9a\u6027\uff09", "tools.bucket.voice.subtitle": "TTS\u3001\u6df7\u97f3\u3001\u54cd\u5ea6/\u964d\u566a", "tools.bucket.voice.title": "\u914d\u97f3 / \u97f3\u9891", "tools.detail.capabilities": "\u80fd\u529b", "tools.detail.description": "\u7b80\u4ecb", "tools.detail.links": "\u94fe\u63a5", "tools.detail.load_failed": "\u52a0\u8f7d\u5931\u8d25: {error}", "tools.detail.not_found": "\u5de5\u5177\u672a\u627e\u5230", "tools.detail.steps": "\u6b65\u9aa4", "tools.detail.tags": "\u6807\u7b7e", "tools.empty": "\u6ca1\u6709\u5339\u914d\u7684\u5de5\u5177", "tools.error": "\u52a0\u8f7d\u5931\u8d25", "tools.filters.all": "\u5168\u90e8", "tools.filters.capabilities": "\u80fd\u529b (\u9017\u53f7)", "tools.filters.capabilities_placeholder": "\u80fd\u529b (\u9017\u53f7)", "tools.filters.category": "\u5206\u7c7b", "tools.filters.clear": "\u6e05\u9664\u7b5b\u9009", "tools.filters.integration": "\u96c6\u6210\u7ea7\u522b", "tools.filters.search": "\u641c\u7d22", "tools.filters.search_placeholder": "\u540d\u79f0\u3001tool id\u3001\u63cf\u8ff0", "tools.filters.status": "\u72b6\u6001", "tools.filters.tags": "\u6807\u7b7e (\u9017\u53f7)", "tools.filters.tags_placeholder": "\u6807\u7b7e (\u9017\u53f7)", "tools.loading": "\u52a0\u8f7d\u4e2d", "ui.tasks.board": "\u4efb\u52a1\u770b\u677f", "ui.tools.title": "\u5de5\u5177\u4e2d\u5fc3", "ui.workbench.title": "\u5de5\u4f5c\u53f0", "workbench.compare": "\u5bf9\u6bd4\u5b57\u5e55", "workbench.compare.mm": "\u7f05\u6587", "workbench.compare.origin": "\u539f\u59cb", "workbench.deliverables": "\u4ea4\u4ed8\u7269", "workbench.deliverables.subtitle": "\u8fd0\u8425\u53ef\u4e0b\u8f7d\u4ea4\u4ed8\u7269", "workbench.dub.skipped": "\u65e0\u914d\u97f3\uff0c\u5df2\u8df3\u8fc7", "workbench.dub.skipped_reason": "\u914d\u97f3\u5df2\u8df3\u8fc7", "workbench.edit.mm": "\u7f05\u6587\u7f16\u8f91 (\u7528\u4e8e\u914d\u97f3)", "workbench.logs": "\u65e5\u5fd7\u4e0e\u8c03\u8bd5", "workbench.logs.engineering": "\u5de5\u7a0b\u4fe1\u606f", "workbench.logs.title": "\u65e5\u5fd7", "workbench.meta.account": "\u8d26\u53f7", "workbench.meta.category": "\u5206\u7c7b", "workbench.meta.created": "\u521b\u5efa\u65f6\u95f4", "workbench.meta.language": "\u8bed\u79cd", "workbench.meta.pipeline": "\u5de5\u5177", "workbench.meta.platform": "\u5e73\u53f0", "workbench.meta.source_url": "\u6765\u6e90", "workbench.meta.status": "\u72b6\u6001", "workbench.meta.subtitle_track": "\u5b57\u5e55\u8f68\u9053", "workbench.meta.subtitle_track.burned": "\u786c\u5b57\u5e55(\u70e7\u5f55)", "workbench.meta.subtitle_track.embedded": "\u8f6f\u5b57\u5e55(\u5185\u5d4c)", "workbench.meta.subtitle_track.none": "\u65e0\u5b57\u5e55", "workbench.meta.subtitle_track.unknown": "\u672a\u77e5", "workbench.meta.task_id": "\u4efb\u52a1ID", "workbench.mm_audio": "\u7f05\u8bed\u914d\u97f3", "workbench.mm_subtitles": "\u7f05\u6587\u5b57\u5e55", "workbench.notice.dub_queued": "Dub queued; polling status...", "workbench.notice.subtitles_first": "Please generate subtitles first", "workbench.notice.subtitles_queued": "Subtitles queued; polling status...", "workbench.origin_subtitles": "Origin Subtitles", "workbench.pack": "\u526a\u8f91\u5305", "workbench.publish_hint": "\u53d1\u5e03\u5df2\u79fb\u52a8\u5230\u72ec\u7acb\u9875\u9762\u3002", "workbench.publish_hub": "\u53d1\u5e03\u4e2d\u5fc3", "workbench.publish_open": "\u6253\u5f00\u53d1\u5e03\u4e2d\u5fc3", "workbench.scenes": "\u573a\u666f\u5305", "workbench.scenes_action": "\u64cd\u4f5c", "workbench.scenes_desc": "\u7528\u4e8e\u8fd0\u8425\u590d\u7528\u7684\u573a\u666f\u5207\u7247\u3002", "workbench.scenes_download": "\u4e0b\u8f7d Scenes.zip", "workbench.scenes_generate": "\u751f\u6210\u573a\u666f\u5207\u7247", "workbench.scenes_help": "\u751f\u6210\u573a\u666f\u5207\u7247\u4f1a\u6309\u5b57\u5e55\u65f6\u95f4\u5207\u5206\u89c6\u9891\u5e76\u6253\u5305\u4e3a Scenes.zip\u3002\u70b9\u51fb\u201c\u751f\u6210\u573a\u666f\u5207\u7247\u201d\uff0c\u72b6\u6001\u5c31\u7eea\u540e\u4e0b\u8f7d Scenes.zip\u3002\u65e0\u9700\u6253\u5f00\u6216\u7f16\u8f91 JSON\u3002Scenes.zip \u4e0d\u5f71\u54cd Pack.zip\uff0c\u4e24\u4e2a\u5305\u7528\u9014\u4e0d\u540c\u3002", "workbench.scenes_section": "\u573a\u666f\u5207\u7247", "workbench.source_url.empty": "\u672a\u68c0\u6d4b\u5230\u53ef\u70b9\u51fb\u94fe\u63a5\u3002", "workbench.source_url_raw": "Source URL (raw)", "workbench.status.error": "\u5931\u8d25\uff1a{error}", "workbench.status.not_parsed": "\u672a\u89e3\u6790", "workbench.status.not_ready": "\u672a\u5c31\u7eea", "workbench.status.parsed": "\u5df2\u89e3\u6790", "workbench.status.processing": "\u5904\u7406\u4e2d\u2026", "workbench.status.ready": "\u5df2\u5c31\u7eea", "workbench.step.dub.engine": "\u5f15\u64ce", "workbench.step.dub.run": "\u751f\u6210\u914d\u97f3", "workbench.step.dub.title": "\u6b65\u9aa43 - \u7f05\u8bed\u914d\u97f3", "workbench.step.dub.voice": "\u97f3\u8272", "workbench.step.pack.desc": "\u751f\u6210\u672c\u4efb\u52a1\u526a\u8f91\u5305", "workbench.step.pack.run": "\u751f\u6210\u526a\u8f91\u5305", "workbench.step.pack.title": "\u6b65\u9aa44 - \u6253\u5305", "workbench.step.parse.desc": "\u8c03\u7528 /api/tasks/{id}/parse", "workbench.step.parse.local_skip": "\u672c\u5730\u4e0a\u4f20\u6a21\u5f0f\uff1a\u65e0\u9700\u89e3\u6790\uff08\u8df3\u8fc7\u4e0b\u8f7d\uff09", "workbench.step.parse.run": "\u8fd0\u884c\u89e3\u6790", "workbench.step.parse.title": "\u6b65\u9aa41 - \u89e3\u6790\u4e0e\u4e0b\u8f7d", "workbench.step.subtitles.desc": "\u8c03\u7528 /api/tasks/{id}/subtitles \u751f\u6210\u5b57\u5e55", "workbench.step.subtitles.run": "\u751f\u6210\u5b57\u5e55", "workbench.step.subtitles.title": "\u6b65\u9aa42 - \u5b57\u5e55", "workbench.steps": "\u6d41\u7a0b", "workbench.steps.subtitle": "\u8fd0\u8425\u6d41\u7a0b\u89c6\u56fe", "workbench.video": "\u89c6\u9891"}}, "fallbacks": {"mm": ["mm", "zh"], "zh": ["zh"]}, "labels": {"mm": "Burmese", "zh": "Chinese"}, "locale": "zh", "supported": ["zh", "mm"]};
+  window.__UI_LOCALE__ = "zh";
+</script>
+<div class="lang-tabs lang-switch">
+  
+    <a href="#" data-lang-tab="zh" class="lang-btn lang-pill ui-pill">
+      <span data-i18n="lang.zh">中文</span>
+    </a>
+  
+    <a href="#" data-lang-tab="mm" class="lang-btn lang-pill ui-pill">
+      <span data-i18n="lang.mm">缅文</span>
+    </a>
+  
+</div>
+    
+      <div class="topbar-actions">
+        
+          <a class="btn ui-pill btn-ghost" href="/tasks">
+            ← 任务看板
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+<div class="info-row" style="margin-top:10px;">
+        <div class="info-pill">
+          <span>下载码</span>
+          : <span id="download-code">2BE484</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="op-gate" style="display:none;">
+      <div class="section-title">
+        <h2>运营门禁</h2>
+        <div class="secondary">请输入 OP Access Key 以加载发布数据。</div>
+      </div>
+      <div class="copy-row" style="margin-top:10px;">
+        <input id="op-key-input" class="publish-textarea" placeholder="请输入 OP Access Key 继续。" />
+        <button type="button" class="btn-primary" id="op-key-save">
+          解锁
+        </button>
+        <span id="op-key-status" class="muted"></span>
+      </div>
+    </div>
+
+    <div id="hub-content" style="display:none;">
+      <div class="card">
+        <div class="tabs" role="tablist">
+          <button class="tab-btn active" data-tab="tab-sop" type="button">
+            SOP 指引
+          </button>
+          <button class="tab-btn" data-tab="tab-copy" type="button">
+            文案包
+          </button>
+          <button class="tab-btn" data-tab="tab-deliverables" type="button">
+            交付物
+          </button>
+          <button class="tab-btn" data-tab="tab-archive" type="button">
+            归档
+          </button>
+        </div>
+      </div>
+
+    <div class="tab-panel active" id="tab-sop">
+      <div class="card">
+        <div class="section-title">
+          <h2>SOP 操作指引</h2>
+          <div class="secondary">v1.85 交付操作步骤。</div>
+        </div>
+        <div class="block">1) 在交付物中下载 pack.zip 或 scenes.zip。</div>
+        <div class="block" style="margin-top:8px;">2) 导入手机剪辑工具（如 CapCut），核对字幕与时长。</div>
+        <div class="block" style="margin-top:8px;">3) 使用文案包填写标题/话题/评论引导。</div>
+        <div class="block" style="margin-top:8px;">4) v1.85 仅提供编辑交付，发布包在 2.0 提供。</div>
+      </div>
+    </div>
+    <div class="tab-panel" id="tab-copy">
+      <div class="card">
+        <div class="section-title">
+          <h2>文案包</h2>
+          <div class="secondary">运营可编辑字段，修改不会保存。</div>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>标题/文案</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-caption">复制</button>
+          </div>
+          <textarea id="copy-caption" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>话题标签</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-hashtags">复制</button>
+          </div>
+          <textarea id="copy-hashtags" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>评论引导</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-comment-cta">复制</button>
+          </div>
+          <textarea id="copy-comment-cta" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>挂链文案</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-link-text">复制</button>
+          </div>
+          <textarea id="copy-link-text" class="publish-textarea"></textarea>
+        </div>
+        <div class="field" style="margin-top:10px;">
+          <label>发布时间建议</label>
+          <div class="copy-row">
+            <button type="button" class="copy-btn" data-copy-target="copy-publish-time">复制</button>
+          </div>
+          <textarea id="copy-publish-time" class="publish-textarea"></textarea>
+        </div>
+      </div>
+    </div>
+<div class="tab-panel" id="tab-deliverables">
+      
+      
+      
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+          
+          <div class="op-card op-card--accent-emerald" data-role="matrix-script-delivery-center-header" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--emerald">① · 介绍</span>
+                <h2 class="op-section-title" data-role="ms-dc-title">交付结果介绍 · 视觉验证样本 V001（运营可读样本）</h2>
+                <span class="op-pill op-pill--matrix"><span class="op-pill__dot"></span>矩阵脚本</span>
+                <span class="info-pill ms-result-status__kind ms-result-status__kind--blocked"
+                      data-role="ms-dc-header-result-pill">阻塞</span>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-subtitle">本页是矩阵脚本任务的发布交付中心：成片预览、必交付物清单、文案包、发布反馈、迭代与归档。</p>
+
+            <div class="op-meta-grid">
+              <div class="op-meta-item" data-role="ms-dc-header-subject">
+                <span class="op-meta-item__label">主题</span>
+                <span class="op-meta-item__value">视觉验证样本 V001（运营可读样本）</span>
+              </div>
+              <div class="op-meta-item" data-role="ms-dc-header-stage"
+                   data-stage="created"
+                   data-stage-index="0">
+                <span class="op-meta-item__label">当前阶段</span>
+                <span class="op-meta-item__value" data-role="ms-dc-header-stage-label">已创建</span>
+              </div>
+              <div class="op-meta-item" data-role="ms-dc-header-result"
+                   data-status-kind="blocked">
+                <span class="op-meta-item__label">结果摘要</span>
+                <span class="op-meta-item__value" data-role="ms-dc-header-result-headline">已创建 · 待配置脚本与变体</span>
+              </div>
+            </div>
+
+            
+            <div data-role="ms-dc-readiness-banner"
+                 data-publishable="false"
+                 data-head-reason="publish_not_ready"
+                 class="op-banner op-banner--blocker"
+                 style="margin-top:14px;">
+              <div>
+                <div class="op-banner__title">
+                  
+                    <span data-role="ms-dc-readiness-banner-value">◐ 发布门禁未通过 · 待解除阻塞</span>
+                  
+                  
+                    <span style="margin-left:6px; font-weight:400;"
+                          data-role="ms-dc-readiness-banner-head-reason">· 发布前置项未就绪</span>
+                  
+                </div>
+                
+                  <div class="op-banner__body" data-role="ms-dc-readiness-banner-next-action">
+                    下一步：<span>先解除发布门禁的阻塞项再继续；阻塞原因显示在「主视频结果」面板中。</span>
+                  </div>
+                
+              </div>
+            </div>
+          </div>
+
+          
+          <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-a-final-video-primary" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--emerald">② · 主视频</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-a-title">最终成片 · final_video</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-a-subtitle">本任务的核心交付，单独突出展示；其余结构化交付物按必交付/可选分区。</p>
+            
+            
+              
+              <div data-role="ms-dc-block-a-empty"
+                   data-status-kind="blocked_pending_publish_readiness"
+                   style="margin-top:8px;padding:14px 12px;border:1px dashed #cbd5e1;border-radius:6px;">
+                <strong data-role="ms-dc-block-a-empty-headline">暂不推荐 · 发布门禁阻塞</strong>
+                <div class="muted t-secondary" data-role="ms-dc-block-a-empty-explanation" style="margin-top:6px;">
+                  先解除发布门禁的阻塞项再继续；阻塞原因显示在「主视频结果」面板中。
+                </div>
+              </div>
+            
+            
+            
+              <div data-role="ms-dc-block-a-variant-tabs" style="margin-top:10px;">
+                <strong>变体</strong>
+                <span style="margin-left:6px;">
+                  
+                    
+                    
+                    <span class="info-pill"
+                          data-role="ms-dc-block-a-variant-tab"
+                          data-variant-index="1"
+                          data-recommended-bucket="blocked_pending_publish_readiness"
+                          data-is-recommended="false"
+                          style="margin-right:4px;">
+                      候选 1
+                    </span>
+                  
+                    
+                    
+                    <span class="info-pill"
+                          data-role="ms-dc-block-a-variant-tab"
+                          data-variant-index="2"
+                          data-recommended-bucket="blocked_pending_publish_readiness"
+                          data-is-recommended="false"
+                          style="margin-right:4px;">
+                      候选 2
+                    </span>
+                  
+                    
+                    
+                    <span class="info-pill"
+                          data-role="ms-dc-block-a-variant-tab"
+                          data-variant-index="3"
+                          data-recommended-bucket="blocked_pending_publish_readiness"
+                          data-is-recommended="false"
+                          style="margin-right:4px;">
+                      候选 3
+                    </span>
+                  
+                    
+                    
+                    <span class="info-pill"
+                          data-role="ms-dc-block-a-variant-tab"
+                          data-variant-index="4"
+                          data-recommended-bucket="blocked_pending_publish_readiness"
+                          data-is-recommended="false"
+                          style="margin-right:4px;">
+                      候选 4
+                    </span>
+                  
+                </span>
+              </div>
+            
+          </div>
+
+          
+          <div class="op-card op-card--accent-amber" data-role="matrix-script-block-b-required-deliverables" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--amber">③ · 必需</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-b-title">必需交付物</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-b-subtitle">运营关注：哪些是阻塞发布的必交付，哪些是必交付但不阻塞发布的。状态来自 delivery_comprehension 投射。</p>
+            
+            
+            
+              <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse; margin-top:8px;"
+                     data-role="ms-dc-block-b-table"
+                     data-required-blocking-count="2"
+                     data-required-non-blocking-count="0">
+                <thead>
+                  <tr>
+                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">交付物</th>
+                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">必需 / 可选</th>
+                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">状态</th>
+                    <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  
+                    <tr data-role="ms-dc-block-b-row"
+                        data-deliverable-kind="variation_manifest"
+                        data-required-class="blocking"
+                        data-artifact-status="unresolved">
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-label">变体清单</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-zoning">必交付 · 阻塞发布</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-status">尚未解析</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-explanation">未在 L2 找到匹配工件；统一 publish_readiness 上线后会自动解析。</td>
+                    </tr>
+                  
+                    <tr data-role="ms-dc-block-b-row"
+                        data-deliverable-kind="script_slot_bundle"
+                        data-required-class="blocking"
+                        data-artifact-status="unresolved">
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-label">脚本 slot 包</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-zoning">必交付 · 阻塞发布</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-status">尚未解析</td>
+                      <td style="padding:6px; border-bottom:1px solid #f1f5f9;"
+                          data-role="ms-dc-block-b-row-explanation">未在 L2 找到匹配工件；统一 publish_readiness 上线后会自动解析。</td>
+                    </tr>
+                  
+                  
+                </tbody>
+              </table>
+            
+          </div>
+
+          
+          
+          <div class="op-card" data-role="matrix-script-block-c-scene-pack" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index">④ · 可选</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-c-title">可选交付物 · scene_pack（不阻塞发布）</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-c-subtitle">scene_pack 是下游精修出口（CapCut / 外部剪辑工具）。生成与否不影响发布门禁。</p>
+            <ul style="margin:8px 0 0 18px; padding:0;"
+                data-role="ms-dc-block-c-list"
+                data-optional-count="3">
+              
+                <li data-role="ms-dc-block-c-row"
+                    data-deliverable-kind="subtitle_bundle"
+                    data-artifact-status="unresolved">
+                  <span data-role="ms-dc-block-c-row-label">字幕包</span>
+                  · <span data-role="ms-dc-block-c-row-status">尚未解析</span>
+                  <span class="muted t-secondary">· 不阻塞发布 · 可在工作台请求生成</span>
+                </li>
+              
+                <li data-role="ms-dc-block-c-row"
+                    data-deliverable-kind="audio_preview"
+                    data-artifact-status="unresolved">
+                  <span data-role="ms-dc-block-c-row-label">音频预览</span>
+                  · <span data-role="ms-dc-block-c-row-status">尚未解析</span>
+                  <span class="muted t-secondary">· 不阻塞发布 · 可在工作台请求生成</span>
+                </li>
+              
+                <li data-role="ms-dc-block-c-row"
+                    data-deliverable-kind="scene_pack"
+                    data-artifact-status="unresolved">
+                  <span data-role="ms-dc-block-c-row-label">配套素材包（场景）</span>
+                  · <span data-role="ms-dc-block-c-row-status">尚未解析</span>
+                  <span class="muted t-secondary">· 不阻塞发布 · 可在工作台请求生成</span>
+                </li>
+              
+            </ul>
+          </div>
+
+          
+          <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-d-copy-bundle" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index">④ · 文案包</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-d-title">发布文案包</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-d-subtitle">按 product-flow §7.1 的标准交付物投射四项 operator 文案字段（标题 / hashtags / CTA / 评论关键词）；只读理解层，仅消费已有 publish-hub copy_bundle 投射，不作为第二条 copy 真值路径。</p>
+            
+              <div class="meta-grid" style="margin-top:8px;">
+                
+                  <div class="meta-item" data-role="ms-dc-block-d-subfield"
+                       data-subfield-id="title"
+                       data-status-code="resolved_from_existing_projection">
+                    <strong>标题</strong>
+                    
+                    
+                      <span data-role="ms-dc-block-d-subfield-value">视觉验证样本 V001（运营可读样本）</span>
+                    
+                  </div>
+                
+                  <div class="meta-item" data-role="ms-dc-block-d-subfield"
+                       data-subfield-id="hashtags"
+                       data-status-code="unresolved_pending_copy_projection_contract">
+                    <strong>Hashtags</strong>
+                    
+                    
+                      <span class="muted" data-role="ms-dc-block-d-subfield-empty">当前 publish-hub copy_bundle 不携带 hashtags；先以 — 占位。未来 copy 投射契约上线后将由 slot_pack / variation_manifest 衍生 hashtags。</span>
+                    
+                  </div>
+                
+                  <div class="meta-item" data-role="ms-dc-block-d-subfield"
+                       data-subfield-id="cta"
+                       data-status-code="unresolved_pending_copy_projection_contract">
+                    <strong>CTA</strong>
+                    
+                    
+                      <span class="muted" data-role="ms-dc-block-d-subfield-empty">当前 publish-hub copy_bundle 不携带 CTA 文案（comment_cta 字段为空）；先以 — 占位。CTA 不应从 entry.target_platform / audience_hint / tone_hint 等编辑期 hint 合成，那些不是 publish 文案真值。未来 copy 投射契约上线后由 variation_manifest 的 publish CTA 字段衍生。</span>
+                    
+                  </div>
+                
+                  <div class="meta-item" data-role="ms-dc-block-d-subfield"
+                       data-subfield-id="comment_keywords"
+                       data-status-code="unresolved_pending_copy_projection_contract">
+                    <strong>评论关键词</strong>
+                    
+                    
+                      <span class="muted" data-role="ms-dc-block-d-subfield-empty">当前 publish-hub copy_bundle 不存在评论关键词字段；先以 — 占位。评论关键词不应从 audience_hint / tone_hint 等编辑期 hint 合成，那些不是 评论关键词真值。未来 copy 投射契约上线后由 slot_pack 评论关键词聚合衍生。</span>
+                    
+                  </div>
+                
+              </div>
+              
+                <div class="muted t-secondary" data-role="ms-dc-block-d-tracked-gap" style="margin-top:6px;">
+                  当前共 3 项 copy_bundle 字段尚未投射，已按子字段单独标注 状态；不会以 panel-wide 占位替换已解析字段，亦不会从编辑期 hint 合成 copy 真值。
+                </div>
+              
+            
+          </div>
+
+          
+          <div class="op-card op-card--accent-indigo"
+               data-role="matrix-script-block-publish-settings"
+               data-redesign-wave="2026-05-28-pr3"
+               style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index">⑤ · 发布</span>
+                <h2 class="op-section-title" data-role="ms-dc-publish-settings-title">发布设置</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-publish-settings-subtitle">
+              填写发布平台与账号、文案与标签，确认后系统记录一次发布事件并出现在下方「发布回填」中。系统不直接对外发布，发布动作由运营在对应平台上完成。
+            </p>
+            <form data-role="ms-dc-publish-settings-form"
+                  method="post"
+                  action="/api/matrix-script/closures/2be4843363da/events"
+                  data-closure-endpoint="/api/matrix-script/closures/2be4843363da/events"
+                  style="display:grid; gap:12px; grid-template-columns:repeat(2, minmax(0, 1fr)); margin-top:8px;">
+              <input type="hidden" name="event_kind" value="operator_publish" data-role="ms-dc-publish-settings-event-kind" />
+              <input type="hidden" name="actor_kind" value="operator" />
+              <div style="display:grid; gap:6px;">
+                <label for="ms-publish-platform" style="font-weight:700; font-size:13px; color:#334155;">发布平台</label>
+                <input id="ms-publish-platform"
+                       name="publish_platform"
+                       list="ms-publish-platform-suggestions"
+                       data-role="ms-dc-publish-settings-platform"
+                       placeholder="选择或输入平台"
+                       autocomplete="off"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+                <datalist id="ms-publish-platform-suggestions" data-role="ms-dc-publish-settings-platform-suggestions">
+                  <option value="TikTok"></option>
+                  <option value="YouTube Shorts"></option>
+                  <option value="Instagram Reels"></option>
+                  <option value="抖音"></option>
+                  <option value="视频号"></option>
+                  <option value="小红书"></option>
+                  <option value="快手"></option>
+                </datalist>
+              </div>
+              <div style="display:grid; gap:6px;">
+                <label for="ms-publish-account" style="font-weight:700; font-size:13px; color:#334155;">账号</label>
+                <input id="ms-publish-account"
+                       name="publish_account"
+                       data-role="ms-dc-publish-settings-account"
+                       placeholder="例如：品牌官号 / 运营手号"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="display:grid; gap:6px; grid-column:1 / -1;">
+                <label for="ms-publish-title" style="font-weight:700; font-size:13px; color:#334155;">标题</label>
+                <input id="ms-publish-title"
+                       name="publish_title"
+                       data-role="ms-dc-publish-settings-title-input"
+                       placeholder="发布标题（≤50 字）"
+                       maxlength="120"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="display:grid; gap:6px; grid-column:1 / -1;">
+                <label for="ms-publish-caption" style="font-weight:700; font-size:13px; color:#334155;">文案</label>
+                <textarea id="ms-publish-caption"
+                          name="publish_caption"
+                          data-role="ms-dc-publish-settings-caption"
+                          rows="3"
+                          placeholder="发布文案"
+                          style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px; font-family:inherit;"></textarea>
+              </div>
+              <div style="display:grid; gap:6px;">
+                <label for="ms-publish-tags" style="font-weight:700; font-size:13px; color:#334155;">标签</label>
+                <input id="ms-publish-tags"
+                       name="publish_tags"
+                       data-role="ms-dc-publish-settings-tags"
+                       placeholder="#tag1 #tag2"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="display:grid; gap:6px;">
+                <label for="ms-publish-scheduled" style="font-weight:700; font-size:13px; color:#334155;">计划发布时间</label>
+                <input id="ms-publish-scheduled"
+                       name="publish_scheduled_at"
+                       type="datetime-local"
+                       data-role="ms-dc-publish-settings-scheduled"
+                       style="padding:8px 10px; border:1px solid #cbd5e1; border-radius:6px;" />
+              </div>
+              <div style="grid-column:1 / -1; display:flex; gap:8px; justify-content:flex-end; margin-top:4px;">
+                <button type="button"
+                        class="btn-secondary"
+                        data-role="ms-dc-publish-settings-skip"
+                        data-skip-event-kind="operator_retract">跳过发布</button>
+                <button type="submit"
+                        class="btn-primary"
+                        data-role="ms-dc-publish-settings-submit">标记为已发布</button>
+              </div>
+            </form>
+            <p class="op-tech-note" data-role="ms-dc-publish-settings-honesty-note" style="margin-top:10px;">
+              本表单不直接对外发布；提交只是在系统内记录一次发布事件（写入会话内的发布反馈）。外部发布请在对应平台手动完成。
+            </p>
+          </div>
+
+          
+          <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-publish-feedback" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--violet">⑥ · 回填</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-e-title">发布回填</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-e-subtitle">每个候选独立一行回填发布状态；事件日志 append-only，不可删除。</p>
+            
+            
+            
+              <div class="muted" data-role="ms-dc-block-e-empty" style="margin-top:8px;">
+                尚未生成 closure 记录；初始化 closure 后此处将按 variation 出现回填行。
+              </div>
+            
+            
+            <h3 style="margin:14px 0 6px;" data-role="ms-dc-block-e-event-log-label">发布事件日志（append-only）</h3>
+            
+              <div class="muted" data-role="ms-dc-block-e-event-log-empty" style="margin-top:6px;">尚无事件记录</div>
+            
+            
+            <h3 style="margin:14px 0 6px;" data-role="ms-dc-block-e-record-form-label">+ 记录发布事件</h3>
+            
+              <form data-role="ms-dc-block-e-record-form"
+                    method="POST"
+                    action="/api/matrix-script/closures/2be4843363da/events"
+                    data-publishable="false"
+                    style="margin-top:6px;">
+                <input type="hidden" name="event_kind" value="operator_publish"
+                       data-role="ms-dc-block-e-record-form-event-kind">
+                <input type="hidden" name="actor_kind" value="operator"
+                       data-role="ms-dc-block-e-record-form-actor-kind">
+                <label class="field" style="display:block;margin-bottom:6px;">
+                  <span>候选（variation_id）</span>
+                  <select name="variation_id" required
+                          data-role="ms-dc-block-e-record-form-variation-id">
+                    
+                  </select>
+                </label>
+                <label class="field" style="display:block;margin-bottom:6px;">
+                  <span>publish_url</span>
+                  <input type="url" name="publish_url"
+                         placeholder="https://… (留空则状态保持 pending)"
+                         data-role="ms-dc-block-e-record-form-publish-url" />
+                </label>
+                <label class="field" style="display:block;margin-bottom:6px;">
+                  <span>publish_status</span>
+                  <select name="publish_status"
+                          data-role="ms-dc-block-e-record-form-publish-status">
+                    <option value="pending">pending</option>
+                    <option value="retracted">retracted</option>
+                  </select>
+                </label>
+                <button type="submit" class="btn-primary"
+                        data-role="ms-dc-block-e-record-form-submit"
+                        disabled aria-disabled="true">
+                  提交发布事件
+                </button>
+                
+                  <span class="muted t-secondary" style="margin-left:6px;"
+                        data-role="ms-dc-block-e-record-form-disabled-reason">发布门禁未通过 · 解除阻塞后再记录发布事件</span>
+                
+              </form>
+            
+            <div class="muted t-secondary" data-role="ms-dc-block-e-no-fake-publish-url-note" style="margin-top:6px;">
+              本面板不展示伪造的 publish_url；publish_url 列仅在 closure 真实写入时渲染（RC-R8）。
+            </div>
+          </div>
+
+          
+          <div class="op-card op-card--accent-violet" data-role="matrix-script-block-f-iteration-archive" style="margin-top:10px;">
+            <div class="op-section-head">
+              <div class="op-section-head__main">
+                <span class="op-section-index op-section-index--violet">⑥ · 归档</span>
+                <h2 class="op-section-title" data-role="ms-dc-block-f-title">下一轮迭代建议 / 归档</h2>
+              </div>
+            </div>
+            <p class="op-section-helper" data-role="ms-dc-block-f-subtitle">对每个 variation 给出发布/回填的可发性分级（可发 / 阻塞 / 已发布 / 失败 / 跟踪缺口）；只读视图，单一 publish_readiness producer 决定可发性，不展示 final_video 媒体链接，已发布行的 publish_url 也不在此面板渲染。</p>
+            
+              <ul style="margin:8px 0 0 18px; padding:0;"
+                  data-role="ms-dc-block-f-iteration-list"
+                  data-row-count="4"
+                  data-publishable-now-count="0"
+                  data-gated-count="4"
+                  data-already-published-count="0">
+                
+                  
+                  <li data-role="ms-dc-block-f-iteration-row"
+                      data-variant-index="1"
+                      data-readiness-kind="gated_pending_publish_readiness">
+                    <span data-role="ms-dc-block-f-iteration-row-label">候选 1</span>
+                    · <span class="info-pill"
+                            data-role="ms-dc-block-f-iteration-row-readiness"
+                            data-readiness-kind="gated_pending_publish_readiness">暂不可发布 · 发布门禁阻塞</span>
+                    
+                      <div class="muted t-secondary" data-role="ms-dc-block-f-iteration-row-gap-summary">publish_readiness head_reason：发布前置项未就绪；必交付分区缺口：变体清单 / 脚本 slot 包。</div>
+                    
+                    
+                      <div class="muted t-secondary" data-role="ms-dc-block-f-iteration-row-next-input">下一步: 先解除发布门禁的阻塞项再继续；阻塞原因显示在「主视频结果」面板，未就绪的必交付分区缺口可在交付页面查看。</div>
+                    
+                  </li>
+                
+                  
+                  <li data-role="ms-dc-block-f-iteration-row"
+                      data-variant-index="2"
+                      data-readiness-kind="gated_pending_publish_readiness">
+                    <span data-role="ms-dc-block-f-iteration-row-label">候选 2</span>
+                    · <span class="info-pill"
+                            data-role="ms-dc-block-f-iteration-row-readiness"
+                            data-readiness-kind="gated_pending_publish_readiness">暂不可发布 · 发布门禁阻塞</span>
+                    
+                      <div class="muted t-secondary" data-role="ms-dc-block-f-iteration-row-gap-summary">publish_readiness head_reason：发布前置项未就绪；必交付分区缺口：变体清单 / 脚本 slot 包。</div>
+                    
+                    
+                      <div class="muted t-secondary" data-role="ms-dc-block-f-iteration-row-next-input">下一步: 先解除发布门禁的阻塞项再继续；阻塞原因显示在「主视频结果」面板，未就绪的必交付分区缺口可在交付页面查看。</div>
+                    
+                  </li>
+                
+                  
+                  <li data-role="ms-dc-block-f-iteration-row"
+                      data-variant-index="3"
+                      data-readiness-kind="gated_pending_publish_readiness">
+                    <span data-role="ms-dc-block-f-iteration-row-label">候选 3</span>
+                    · <span class="info-pill"
+                            data-role="ms-dc-block-f-iteration-row-readiness"
+                            data-readiness-kind="gated_pending_publish_readiness">暂不可发布 · 发布门禁阻塞</span>
+                    
+                      <div class="muted t-secondary" data-role="ms-dc-block-f-iteration-row-gap-summary">publish_readiness head_reason：发布前置项未就绪；必交付分区缺口：变体清单 / 脚本 slot 包。</div>
+                    
+                    
+                      <div class="muted t-secondary" data-role="ms-dc-block-f-iteration-row-next-input">下一步: 先解除发布门禁的阻塞项再继续；阻塞原因显示在「主视频结果」面板，未就绪的必交付分区缺口可在交付页面查看。</div>
+                    
+                  </li>
+                
+                  
+                  <li data-role="ms-dc-block-f-iteration-row"
+                      data-variant-index="4"
+                      data-readiness-kind="gated_pending_publish_readiness">
+                    <span data-role="ms-dc-block-f-iteration-row-label">候选 4</span>
+                    · <span class="info-pill"
+                            data-role="ms-dc-block-f-iteration-row-readiness"
+                            data-readiness-kind="gated_pending_publish_readiness">暂不可发布 · 发布门禁阻塞</span>
+                    
+                      <div class="muted t-secondary" data-role="ms-dc-block-f-iteration-row-gap-summary">publish_readiness head_reason：发布前置项未就绪；必交付分区缺口：变体清单 / 脚本 slot 包。</div>
+                    
+                    
+                      <div class="muted t-secondary" data-role="ms-dc-block-f-iteration-row-next-input">下一步: 先解除发布门禁的阻塞项再继续；阻塞原因显示在「主视频结果」面板，未就绪的必交付分区缺口可在交付页面查看。</div>
+                    
+                  </li>
+                
+              </ul>
+            
+            
+            
+              <div class="task-actions" data-role="ms-dc-block-f-archive-actions" style="margin-top:10px;">
+                <button type="button"
+                        class="btn-secondary"
+                        data-role="ms-dc-block-f-archive-button"
+                        title="尚未生成 closure 记录；记录任意发布事件后再尝试归档。"
+                        disabled aria-disabled="true">
+                  归档此任务
+                </button>
+              </div>
+            
+            <div class="muted t-secondary" data-role="ms-dc-block-f-no-invented-truth-note" style="margin-top:6px;">
+              本面板不发明任务级真值；建议来自既有 publish_backfill_readiness 投射，不基于尚未上线的指标分析（BG-5 待 Plan E 后续阶段）。
+            </div>
+          </div>
+        
+
+        
+        <details class="op-collapse" data-role="op-console-ms-delivery-comprehension-fold">
+          <summary>矩阵脚本 · 交付中心理解（旧版诊断层 · 可展开）</summary>
+          <div class="op-collapse__hint">仅当 publish_hub 返回 matrix_script_delivery_comprehension 时由 JS 填充；面向架构师 / 质检的只读重述。</div>
+          <div class="op-collapse__body">
+            <div class="card" id="matrix-script-delivery-comprehension-block"
+                 data-role="matrix-script-delivery-comprehension" style="display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-delivery-title">Matrix Script · 交付中心理解</h2>
+                <div class="secondary" data-role="ms-delivery-subtitle">只读理解层 · 不发明事实 · 不引入 vendor / model / provider / engine 控件。</div>
+              </div>
+
+              <div class="card" style="margin-top:10px; border:1px solid #2563eb; background:#eff6ff;"
+                   data-role="ms-delivery-final-video-primary">
+                <div class="section-title">
+                  <h2 data-role="ms-delivery-final-video-title">最终视频 · final_video（主交付）</h2>
+                  <div class="secondary" data-role="ms-delivery-final-video-subtitle"></div>
+                </div>
+                <div class="muted" data-role="ms-delivery-final-video-explanation"></div>
+              </div>
+
+              <h3 style="margin:14px 0 6px;" data-role="ms-delivery-lanes-label">交付分区</h3>
+              <div data-role="ms-delivery-lane" data-lane-id="required_blocking" style="margin-top:8px;">
+                <strong data-role="ms-delivery-lane-label"></strong>
+                <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+                <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+              </div>
+              <div data-role="ms-delivery-lane" data-lane-id="required_non_blocking" style="margin-top:8px;">
+                <strong data-role="ms-delivery-lane-label"></strong>
+                <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+                <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+              </div>
+              <div data-role="ms-delivery-lane" data-lane-id="optional_non_blocking" style="margin-top:8px;">
+                <strong data-role="ms-delivery-lane-label"></strong>
+                <div class="muted t-secondary" data-role="ms-delivery-lane-explanation"></div>
+                <ul data-role="ms-delivery-lane-rows" style="margin:6px 0 0 18px;"></ul>
+              </div>
+
+              <h3 style="margin:14px 0 6px;" data-role="ms-delivery-publish-blocking-label">发布阻塞解释</h3>
+              <div data-role="ms-delivery-publish-blocking-status"></div>
+              <ul data-role="ms-delivery-publish-blocking-rows" style="margin:6px 0 0 18px;"></ul>
+
+              <h3 style="margin:14px 0 6px;" data-role="ms-delivery-history-label">历史成功 vs 当前尝试</h3>
+              <div class="muted" data-role="ms-delivery-history-explanation"></div>
+            </div>
+          </div>
+        </details>
+
+        
+        <a id="publish-feedback" aria-hidden="true" tabindex="-1"
+           data-role="matrix-script-publish-feedback-anchor"></a>
+        
+        <div class="card" id="matrix-script-closure-block"
+             data-role="matrix-script-closure" style="margin-top:10px;">
+          <div class="section-title">
+            <h2>Matrix Script · 发布反馈闭环</h2>
+            <div class="secondary">
+              每个 variation（cell_id）对应一行可操作的发布反馈记录。事件按 contract 走
+              <code>POST /api/matrix-script/closures/{task_id}/events</code>。所有写回均严格遵循
+              <code>matrix_script_publish_feedback_closure_v1</code> 的封闭枚举。
+            </div>
+          </div>
+          <table class="meta-grid" style="display:table; width:100%; border-collapse:collapse; margin-top:8px;">
+            <thead>
+              <tr>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">variation_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">publish_status</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">publish_url</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">last_event_id</th>
+                <th style="text-align:left; padding:6px; border-bottom:1px solid #e5e7eb;">action</th>
+              </tr>
+            </thead>
+            <tbody data-role="ms-closure-rows"></tbody>
+          </table>
+          <div class="muted" data-role="ms-closure-empty" style="display:none; margin-top:8px;">
+            尚未生成 closure 记录；点击下方 “初始化 closure” 即可基于当前 packet 创建。
+          </div>
+          <div class="copy-row" style="margin-top:8px; gap:8px;">
+            <button id="btn-ms-closure-init" type="button" class="btn-secondary">初始化 closure</button>
+            <span id="ms-closure-status" class="muted"></span>
+          </div>
+
+          <h3 style="margin:14px 0 6px;">触发事件</h3>
+          <form id="ms-closure-event-form" class="meta-grid" style="display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:8px;">
+            <label class="field">
+              <span>variation_id</span>
+              <select name="variation_id" id="ms-closure-variation-select" required></select>
+            </label>
+            <label class="field">
+              <span>event_kind</span>
+              <select name="event_kind" id="ms-closure-event-kind" required>
+                <option value="operator_publish">operator_publish</option>
+                <option value="operator_retract">operator_retract</option>
+                <option value="operator_note">operator_note</option>
+              </select>
+            </label>
+            <label class="field" data-role="ms-closure-publish-url-field">
+              <span>publish_url（仅 operator_publish）</span>
+              <input type="url" name="publish_url" id="ms-closure-publish-url" />
+            </label>
+            <label class="field" data-role="ms-closure-publish-status-field">
+              <span>publish_status</span>
+              <select name="publish_status" id="ms-closure-publish-status">
+                <option value="pending">pending</option>
+                <option value="retracted">retracted</option>
+              </select>
+            </label>
+            <label class="field" data-role="ms-closure-note-field" style="grid-column: 1 / -1; display:none;">
+              <span>operator_publish_notes（仅 operator_note）</span>
+              <textarea name="operator_publish_notes" id="ms-closure-notes" rows="2"></textarea>
+            </label>
+            <div class="copy-row" style="grid-column: 1 / -1;">
+              <button type="submit" class="btn-primary">提交事件</button>
+              <span id="ms-closure-event-status" class="muted"></span>
+            </div>
+          </form>
+
+          <h3 style="margin:14px 0 6px;">最近事件（append-only）</h3>
+          <ul data-role="ms-closure-events-recent" class="muted" style="margin:6px 0 0 18px;"></ul>
+        </div>
+
+        
+        <details class="op-collapse" data-role="op-console-ms-secondary-shells-fold">
+          <summary>矩阵脚本 · 交付层 JS 诊断壳（copy_bundle / 多渠道回填 / 就绪解释 · 可展开）</summary>
+          <div class="op-collapse__hint">JS 在 publish_hub 加载后按需填充；展开仅用于核对 PR-3 / RC PR-4 的 lane 投射。</div>
+          <div class="op-collapse__body">
+            <div class="card" id="matrix-script-delivery-copy-bundle-block"
+                 data-role="matrix-script-delivery-copy-bundle" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-delivery-copy-bundle-title">Matrix Script · 交付中心 · copy_bundle</h2>
+                <div class="secondary" data-role="ms-delivery-copy-bundle-subtitle"></div>
+              </div>
+              <ul data-role="ms-delivery-copy-bundle-rows" style="margin:8px 0 0 18px;"></ul>
+              <div class="muted" data-role="ms-delivery-copy-bundle-tracked-gap" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="card" id="matrix-script-delivery-backfill-block"
+                 data-role="matrix-script-delivery-backfill" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-delivery-backfill-title">Matrix Script · 交付中心 · 多渠道回填</h2>
+                <div class="secondary" data-role="ms-delivery-backfill-subtitle"></div>
+              </div>
+              <div class="muted" data-role="ms-delivery-backfill-legend" style="margin-top:6px;"></div>
+              <div data-role="ms-delivery-backfill-lanes" style="margin-top:8px;"></div>
+              <div class="muted" data-role="ms-delivery-backfill-empty" style="display:none; margin-top:8px;">
+                尚未生成 closure 记录；初始化 closure 后此处将按 variation 出现回填行。
+              </div>
+              <div class="muted" data-role="ms-delivery-backfill-tracked-gap" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="card" id="matrix-script-publish-backfill-readiness-block"
+                 data-role="matrix-script-publish-backfill-readiness" style="margin-top:10px; display:none;">
+              <div class="section-title">
+                <h2 data-role="ms-publish-backfill-readiness-title">Matrix Script · 发布 / 回填就绪解释</h2>
+                <div class="secondary" data-role="ms-publish-backfill-readiness-subtitle"></div>
+              </div>
+              <div class="muted" data-role="ms-publish-backfill-readiness-legend" style="margin-top:6px;"></div>
+              <div data-role="ms-publish-backfill-readiness-rows" style="margin-top:8px;"></div>
+              <div class="muted" data-role="ms-publish-backfill-readiness-empty" style="display:none; margin-top:8px;">
+                尚无可解释的变体（Phase B 未派生 / packet 未到位）。
+              </div>
+              <div class="muted" data-role="ms-publish-backfill-readiness-no-fake-final-note" style="margin-top:8px;"></div>
+            </div>
+          </div>
+        </details>
+      
+
+      
+      
+      
+
+      <div class="card" data-role="operator-publish-gate-strip">
+        <div class="section-title">
+          <h2>Publish gate</h2>
+          <div class="secondary">Single derived gate. Optional items never block this.</div>
+        </div>
+        <div class="copy-row" style="gap:12px;">
+          <span data-role="operator-publish-gate" id="op-publish-gate">—</span>
+          <span data-role="operator-publish-gate-reason" id="op-publish-gate-reason" class="muted"></span>
+        </div>
+        <div class="copy-row" style="gap:12px; margin-top:8px;">
+          <strong>Last publish status:</strong>
+          <span data-role="operator-publish-status" id="op-publish-status">not_published</span>
+          <span data-role="operator-publish-channel" id="op-publish-channel" class="muted"></span>
+          <a data-role="operator-publish-url" id="op-publish-url" href="#" target="_blank" rel="noopener" style="display:none;">link</a>
+          <span data-role="operator-published-at" id="op-published-at" class="muted"></span>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-title">
+          <h2>交付物</h2>
+          <div class="secondary">仅显示已生成的产物。</div>
+        </div>
+        <div id="deliverables-list" class="copy-row" style="margin-top:12px;"></div>
+        <div class="muted" id="deliverables-empty" style="margin-top:8px; display:none;">
+          暂无交付物。
+        </div>
+        <div class="copy-row" style="margin-top:12px;">
+          <a id="edit-bundle-link" class="btn-primary" href="#" target="_blank" rel="noopener">编辑包 (ZIP)</a>
+        </div>
+        <div class="copy-row" style="margin-top:12px;">
+          <img id="qr-image" alt="QR" style="width:180px;height:180px;border:1px solid #e5e7eb;background:#fff;" />
+          <div class="muted">扫码下载编辑包</div>
+        </div>
+        <div class="copy-row" style="margin-top:6px;">
+          <a id="qr-link" href="#" target="_blank" rel="noopener">打开链接</a>
+          <button type="button" class="copy-btn" data-copy-target="qr-link">复制链接</button>
+        </div>
+        <div class="copy-row" style="margin-top:6px;">
+          <a id="short-link" href="#" target="_blank" rel="noopener">短链</a>
+          <button type="button" class="copy-btn" data-copy-target="short-link">复制短链</button>
+        </div>
+      </div>
+    </div>
+<div class="tab-panel" id="tab-archive">
+      <div class="card">
+        <div class="section-title">
+          <h2>归档</h2>
+          <div class="secondary">归档确认交付，不代表已发布。</div>
+        </div>
+        <div class="info-row">
+          <div class="info-pill">
+            发布时间: <span id="published-at">-</span>
+          </div>
+        </div>
+        <div class="section-grid" style="margin-top:12px;">
+          <div class="field">
+            <label>归档位置</label>
+            <input id="archive-location" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+          <div class="field">
+            <label>状态</label>
+            <input id="archive-status" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+          <div class="field">
+            <label>已发布</label>
+            <div class="copy-row">
+              <input type="checkbox" id="archive-published" />
+              <span class="muted">勾选表示已发布</span>
+            </div>
+          </div>
+          <div class="field">
+            <label>下载链接</label>
+            <div class="copy-row">
+              <input id="archive-download-url" class="publish-textarea" style="min-height:0;height:36px;" />
+              <a id="archive-download-link" class="btn-secondary" href="#" target="_blank" rel="noopener">打开</a>
+            </div>
+          </div>
+          <div class="field">
+            <label>归档 Key</label>
+            <input id="archive-key" class="publish-textarea" style="min-height:0;height:36px;" />
+          </div>
+        </div>
+        <div class="action-row" style="margin-top:12px;">
+          <button id="archive-save-btn" class="btn-primary">保存归档</button>
+          <button id="publish-btn" class="btn-success">提交归档</button>
+          <span id="archive-save-status" class="muted"></span>
+        </div>
+      </div>
+    </div>
+
+  <script src="/static/js/i18n_v185.js"></script>
+  <script>
+    const TASK_ID = "2be4843363da";
+    const TASK_KIND = "matrix_script";
+    const OP_KEY_STORAGE = "op_access_key";
+    const LANG_STORAGE = "ui_lang_publish_hub";
+
+        // UI language policy: show ZH + MM together in UI (English stays in code/logs only).
+function resolveLang(serverLang) {
+      const saved = localStorage.getItem(LANG_STORAGE);
+      return saved || serverLang || "zh";
+    }
+
+    function applyLang(lang) {
+      document.body.dataset.lang = lang;
+      localStorage.setItem(LANG_STORAGE, lang);
+      const toggle = document.getElementById("lang-toggle");
+      if (!toggle) return;
+      toggle.querySelectorAll(".lang-btn").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.lang === lang);
+      });
+    }
+
+    function getOpKey() {
+      return sessionStorage.getItem(OP_KEY_STORAGE) || "";
+    }
+
+    function setOpKey(value) {
+      sessionStorage.setItem(OP_KEY_STORAGE, value);
+    }
+
+    function showGate(message) {
+      const gate = document.getElementById("op-gate");
+      const hub = document.getElementById("hub-content");
+      if (gate) gate.style.display = "";
+      if (hub) hub.style.display = "none";
+      const statusEl = document.getElementById("op-key-status");
+      if (statusEl) statusEl.textContent = message || "";
+    }
+
+    function hideGate() {
+      const gate = document.getElementById("op-gate");
+      const hub = document.getElementById("hub-content");
+      if (gate) gate.style.display = "none";
+      if (hub) hub.style.display = "";
+    }
+
+    function setText(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value || "-";
+    }
+
+    function setLink(id, href) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (href) {
+        el.href = href;
+        el.classList.remove("disabled");
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+      }
+    }
+
+    function setInputValue(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.value = value || "";
+    }
+
+    function setArchiveLink(url) {
+      const el = document.getElementById("archive-download-link");
+      if (!el) return;
+      if (url) {
+        el.href = url;
+        el.classList.remove("disabled");
+      } else {
+        el.href = "#";
+        el.classList.add("disabled");
+      }
+    }
+
+    function renderDeliverables(deliverables) {
+      const list = document.getElementById("deliverables-list");
+      const empty = document.getElementById("deliverables-empty");
+      if (!list) return;
+      list.innerHTML = "";
+      const order = ["pack_zip", "scenes_zip", "origin_srt", "mm_srt", "mm_txt", "mm_audio", "edit_bundle_zip"];
+      let count = 0;
+      order.forEach((key) => {
+        const item = deliverables && deliverables[key];
+        if (!item || !item.url) return;
+        const row = document.createElement("div");
+        row.className = "link-row";
+        const link = document.createElement("a");
+        link.className = "download-link";
+        link.href = item.url;
+        link.target = "_blank";
+        link.rel = "noopener";
+        link.textContent = item.label || key;
+        row.appendChild(link);
+        list.appendChild(row);
+        count += 1;
+      });
+      if (empty) empty.style.display = count ? "none" : "";
+    }
+
+    // PR-U3: Matrix Script Delivery Center comprehension renderer.
+    // Renders only when the server-side container exists (gated by
+    // task.kind == "matrix_script") and the payload carries a
+    // matrix_script_delivery_comprehension bundle. Hot Follow / Digital
+    // Anchor / Baseline publish hubs short-circuit at the container check.
+    function renderMatrixScriptDeliveryComprehension(comp) {
+      const block = document.getElementById("matrix-script-delivery-comprehension-block");
+      if (!block) return;
+      if (!comp || !comp.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const setRoleText = (role, value) => {
+        const el = block.querySelector(`[data-role="${role}"]`);
+        if (el) el.textContent = value || "";
+      };
+
+      setRoleText("ms-delivery-title", comp.panel_title_zh);
+      setRoleText("ms-delivery-subtitle", comp.panel_subtitle_zh);
+
+      const fv = comp.final_video_primary || {};
+      setRoleText("ms-delivery-final-video-title", fv.title_zh);
+      setRoleText("ms-delivery-final-video-subtitle", fv.subtitle_zh);
+      setRoleText("ms-delivery-final-video-explanation", fv.primacy_explanation_zh);
+
+      setRoleText("ms-delivery-lanes-label", comp.lanes_label_zh);
+      const lanes = comp.lanes || {};
+      ["required_blocking", "required_non_blocking", "optional_non_blocking"].forEach((laneId) => {
+        const laneEl = block.querySelector(`[data-role="ms-delivery-lane"][data-lane-id="${laneId}"]`);
+        if (!laneEl) return;
+        const lane = lanes[laneId] || { rows: [] };
+        const labelEl = laneEl.querySelector('[data-role="ms-delivery-lane-label"]');
+        const explEl = laneEl.querySelector('[data-role="ms-delivery-lane-explanation"]');
+        const rowsEl = laneEl.querySelector('[data-role="ms-delivery-lane-rows"]');
+        if (labelEl) labelEl.textContent = (lane.lane_label_zh || "") + "（" + (lane.row_count || 0) + " 项）";
+        if (explEl) explEl.textContent = lane.lane_explanation_zh || "";
+        if (rowsEl) {
+          rowsEl.innerHTML = "";
+          (lane.rows || []).forEach((row) => {
+            const li = document.createElement("li");
+            li.dataset.deliverableId = row.deliverable_id || "";
+            li.dataset.artifactStatusCode = row.artifact_status_code || "";
+            li.textContent =
+              (row.kind_label_zh || row.kind || "—") +
+              " · " + (row.zoning_label_zh || "") +
+              " · " + (row.artifact_status_label_zh || "");
+            rowsEl.appendChild(li);
+          });
+        }
+      });
+
+      setRoleText("ms-delivery-publish-blocking-label", comp.publish_blocking_explanation_label_zh);
+      const blocking = comp.publish_blocking_explanation || {};
+      const statusEl = block.querySelector('[data-role="ms-delivery-publish-blocking-status"]');
+      if (statusEl) {
+        statusEl.textContent = blocking.reason_label_zh || "";
+        statusEl.dataset.isBlocked = blocking.is_blocked ? "true" : "false";
+      }
+      const blockingRowsEl = block.querySelector('[data-role="ms-delivery-publish-blocking-rows"]');
+      if (blockingRowsEl) {
+        blockingRowsEl.innerHTML = "";
+        (blocking.blocking_rows || []).forEach((br) => {
+          const li = document.createElement("li");
+          li.textContent =
+            (br.kind_label_zh || "") + " · " + (br.artifact_status_label_zh || "");
+          blockingRowsEl.appendChild(li);
+        });
+      }
+
+      setRoleText("ms-delivery-history-label", comp.history_vs_current_label_zh);
+      setRoleText("ms-delivery-history-explanation", comp.history_vs_current_explanation_zh);
+    }
+
+    // OWC-MS PR-3 / MS-W7: Matrix Script Delivery Center copy_bundle exposure
+    // renderer. Renders only when the server-side container exists (gated by
+    // task.kind == "matrix_script") and the payload carries a non-empty
+    // matrix_script_delivery_copy_bundle bundle. Hot Follow / Digital Anchor /
+    // Baseline publish hubs short-circuit at the container check.
+    function renderMatrixScriptDeliveryCopyBundle(bundle) {
+      const block = document.getElementById("matrix-script-delivery-copy-bundle-block");
+      if (!block) return;
+      if (!bundle || !bundle.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="ms-delivery-copy-bundle-title"]');
+      if (titleEl) titleEl.textContent = bundle.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="ms-delivery-copy-bundle-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = bundle.panel_subtitle_zh || "";
+
+      const rowsEl = block.querySelector('[data-role="ms-delivery-copy-bundle-rows"]');
+      if (rowsEl) {
+        rowsEl.innerHTML = "";
+        (bundle.subfields || []).forEach((sub) => {
+          const li = document.createElement("li");
+          li.dataset.subfieldId = sub.subfield_id || "";
+          li.dataset.statusCode = sub.status_code || "";
+          const labelEl = document.createElement("strong");
+          labelEl.textContent = (sub.label_zh || sub.subfield_id || "—") + "：";
+          li.appendChild(labelEl);
+          const valueSpan = document.createElement("span");
+          valueSpan.dataset.role = "ms-delivery-copy-bundle-value";
+          if (sub.value) {
+            valueSpan.textContent = sub.value;
+          } else {
+            valueSpan.textContent = "—";
+            valueSpan.classList.add("muted");
+          }
+          li.appendChild(valueSpan);
+          const statusSpan = document.createElement("span");
+          statusSpan.className = "muted";
+          statusSpan.style.marginLeft = "8px";
+          statusSpan.dataset.role = "ms-delivery-copy-bundle-status";
+          statusSpan.textContent = "[" + (sub.status_label_zh || sub.status_code || "") + "]";
+          li.appendChild(statusSpan);
+          if (sub.unresolved_explanation_zh) {
+            const expl = document.createElement("div");
+            expl.className = "muted t-secondary";
+            expl.dataset.role = "ms-delivery-copy-bundle-explanation";
+            expl.style.marginLeft = "12px";
+            expl.textContent = sub.unresolved_explanation_zh;
+            li.appendChild(expl);
+          }
+          rowsEl.appendChild(li);
+        });
+      }
+
+      const gapEl = block.querySelector('[data-role="ms-delivery-copy-bundle-tracked-gap"]');
+      if (gapEl) gapEl.textContent = bundle.tracked_gap_summary_zh || "";
+    }
+
+    // OWC-MS PR-3 / MS-W8: Matrix Script Delivery Center 多渠道回填 renderer.
+    // Reads only data.matrix_script_delivery_backfill; renders one lane per
+    // variation_id with six operator-language fields (channel / account /
+    // publish_time / publish_url / publish_status / metrics_snapshot). No
+    // second truth path; account_id surfaces as an explicit tracked gap.
+    function renderMatrixScriptDeliveryBackfill(backfill) {
+      const block = document.getElementById("matrix-script-delivery-backfill-block");
+      if (!block) return;
+      if (!backfill || !backfill.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="ms-delivery-backfill-title"]');
+      if (titleEl) titleEl.textContent = backfill.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="ms-delivery-backfill-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = backfill.panel_subtitle_zh || "";
+      const legendEl = block.querySelector('[data-role="ms-delivery-backfill-legend"]');
+      if (legendEl) {
+        const legend = backfill.field_legend_zh || [];
+        legendEl.textContent = legend.length ? "字段：" + legend.join(" / ") : "";
+      }
+
+      const lanesEl = block.querySelector('[data-role="ms-delivery-backfill-lanes"]');
+      const emptyEl = block.querySelector('[data-role="ms-delivery-backfill-empty"]');
+      if (lanesEl) {
+        lanesEl.innerHTML = "";
+        const lanes = backfill.lanes || [];
+        if (!lanes.length) {
+          if (emptyEl) emptyEl.style.display = "";
+        } else {
+          if (emptyEl) emptyEl.style.display = "none";
+          lanes.forEach((lane) => {
+            const laneCard = document.createElement("div");
+            laneCard.className = "card";
+            laneCard.style.marginTop = "8px";
+            laneCard.dataset.role = "ms-delivery-backfill-lane";
+            laneCard.dataset.variationId = lane.variation_id || "";
+
+            const laneTitle = document.createElement("strong");
+            laneTitle.dataset.role = "ms-delivery-backfill-lane-label";
+            laneTitle.textContent = lane.lane_label_zh || ("variation_id · " + (lane.variation_id || "—"));
+            laneCard.appendChild(laneTitle);
+
+            const fieldsList = document.createElement("ul");
+            fieldsList.style.margin = "6px 0 0 18px";
+            fieldsList.dataset.role = "ms-delivery-backfill-lane-fields";
+            (lane.fields || []).forEach((fld) => {
+              const li = document.createElement("li");
+              li.dataset.fieldId = fld.field_id || "";
+              li.dataset.statusCode = fld.status_code || "";
+              const labelEl = document.createElement("strong");
+              labelEl.textContent = (fld.label_zh || fld.field_id || "—") + "：";
+              li.appendChild(labelEl);
+
+              const valueSpan = document.createElement("span");
+              valueSpan.dataset.role = "ms-delivery-backfill-field-value";
+              if (fld.field_id === "metrics_snapshot") {
+                const pairs = fld.metrics_pairs || [];
+                if (pairs.length) {
+                  valueSpan.textContent = pairs
+                    .map((p) => (p.label_zh || p.metric_id || "—") + "=" + p.value)
+                    .join(" / ");
+                } else {
+                  valueSpan.textContent = "—";
+                  valueSpan.classList.add("muted");
+                }
+              } else if (fld.field_id === "publish_status") {
+                const labelTextRaw = fld.value_label_zh || "";
+                if (fld.value) {
+                  valueSpan.textContent = labelTextRaw
+                    ? labelTextRaw + "（" + fld.value + "）"
+                    : fld.value;
+                } else {
+                  valueSpan.textContent = labelTextRaw || "—";
+                  if (!labelTextRaw) valueSpan.classList.add("muted");
+                }
+              } else if (fld.value) {
+                valueSpan.textContent = fld.value;
+              } else {
+                valueSpan.textContent = "—";
+                valueSpan.classList.add("muted");
+              }
+              li.appendChild(valueSpan);
+
+              const statusSpan = document.createElement("span");
+              statusSpan.className = "muted";
+              statusSpan.style.marginLeft = "8px";
+              statusSpan.dataset.role = "ms-delivery-backfill-field-status";
+              statusSpan.textContent = "[" + (fld.status_label_zh || fld.status_code || "") + "]";
+              li.appendChild(statusSpan);
+
+              if (fld.tracked_gap_explanation_zh) {
+                const expl = document.createElement("div");
+                expl.className = "muted t-secondary";
+                expl.dataset.role = "ms-delivery-backfill-field-tracked-gap";
+                expl.style.marginLeft = "12px";
+                expl.textContent = fld.tracked_gap_explanation_zh;
+                li.appendChild(expl);
+              }
+              fieldsList.appendChild(li);
+            });
+            laneCard.appendChild(fieldsList);
+            lanesEl.appendChild(laneCard);
+          });
+        }
+      }
+
+      const gapEl = block.querySelector('[data-role="ms-delivery-backfill-tracked-gap"]');
+      if (gapEl) gapEl.textContent = backfill.tracked_gap_summary_zh || "";
+    }
+
+    // RC PR-4 / RC-R7 + RC-R8: Matrix Script publish/backfill readiness
+    // explanation renderer. Reads only data.matrix_script_publish_backfill_readiness;
+    // renders one row per variation_id with operator-language readiness label +
+    // next-input + gap summary. No second truth path; never renders publish_url
+    // or any media URL string. Authority:
+    // docs/reviews/matrix_script_result_capability_recovery_gate_spec_v1.md
+    // §3 RC-R7 + §3 RC-R8 + §5 RC PR-4.
+    function renderMatrixScriptPublishBackfillReadiness(readiness) {
+      const block = document.getElementById("matrix-script-publish-backfill-readiness-block");
+      if (!block) return;
+      if (!readiness || !readiness.is_matrix_script) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="ms-publish-backfill-readiness-title"]');
+      if (titleEl) titleEl.textContent = readiness.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="ms-publish-backfill-readiness-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = readiness.panel_subtitle_zh || "";
+
+      const legendEl = block.querySelector('[data-role="ms-publish-backfill-readiness-legend"]');
+      if (legendEl) {
+        const legend = readiness.readiness_legend_zh || [];
+        const counters = "（可发 " + (readiness.publishable_now_count || 0)
+          + " · 阻塞 " + (readiness.gated_count || 0)
+          + " · 已发布 " + (readiness.already_published_count || 0)
+          + " · 失败 " + (readiness.already_failed_count || 0)
+          + " · 跟踪缺口 " + (readiness.tracked_gap_count || 0) + "）";
+        legendEl.textContent = (legend.length ? "分级：" + legend.join(" / ") + " " : "") + counters;
+      }
+
+      const rowsEl = block.querySelector('[data-role="ms-publish-backfill-readiness-rows"]');
+      const emptyEl = block.querySelector('[data-role="ms-publish-backfill-readiness-empty"]');
+      if (rowsEl) {
+        rowsEl.innerHTML = "";
+        const rows = readiness.rows || [];
+        if (!rows.length) {
+          if (emptyEl) emptyEl.style.display = "";
+        } else {
+          if (emptyEl) emptyEl.style.display = "none";
+          rows.forEach((row) => {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.style.marginTop = "8px";
+            card.dataset.role = "ms-publish-backfill-readiness-row";
+            card.dataset.variationId = row.variation_id || "";
+            card.dataset.readinessKind = row.readiness_kind || "";
+
+            const head = document.createElement("div");
+            const idStrong = document.createElement("strong");
+            idStrong.textContent = "变体 " + (row.variation_id || "—");
+            head.appendChild(idStrong);
+            const kindPill = document.createElement("span");
+            kindPill.className = "info-pill";
+            kindPill.style.marginLeft = "6px";
+            kindPill.dataset.role = "ms-publish-backfill-readiness-kind";
+            kindPill.textContent = row.readiness_label_zh || "";
+            head.appendChild(kindPill);
+            const axisPill = document.createElement("span");
+            axisPill.className = "info-pill";
+            axisPill.style.marginLeft = "6px";
+            axisPill.textContent = row.axis_summary_zh || "—";
+            head.appendChild(axisPill);
+            card.appendChild(head);
+
+            const nextInput = document.createElement("div");
+            nextInput.className = "muted t-secondary";
+            nextInput.dataset.role = "ms-publish-backfill-readiness-next-input";
+            nextInput.style.marginTop = "4px";
+            nextInput.textContent = row.next_input_zh || "";
+            card.appendChild(nextInput);
+
+            if (row.gap_summary_zh) {
+              const gap = document.createElement("div");
+              gap.className = "muted t-secondary";
+              gap.dataset.role = "ms-publish-backfill-readiness-gap";
+              gap.style.marginTop = "4px";
+              gap.textContent = "缺口：" + row.gap_summary_zh;
+              card.appendChild(gap);
+            }
+            if (row.head_reason) {
+              const hr = document.createElement("div");
+              hr.className = "muted t-secondary";
+              hr.dataset.role = "ms-publish-backfill-readiness-head-reason";
+              hr.dataset.headReason = row.head_reason;
+              hr.style.marginTop = "4px";
+              hr.textContent = "head_reason = " + row.head_reason
+                + (row.head_reason_label_zh ? " · " + row.head_reason_label_zh : "");
+              card.appendChild(hr);
+            }
+            if (row.closure_publish_status_label_zh) {
+              const cs = document.createElement("div");
+              cs.className = "muted t-secondary";
+              cs.dataset.role = "ms-publish-backfill-readiness-closure-status";
+              cs.style.marginTop = "4px";
+              cs.textContent = "closure publish_status：" + row.closure_publish_status_label_zh;
+              card.appendChild(cs);
+            }
+            rowsEl.appendChild(card);
+          });
+        }
+      }
+
+      const noteEl = block.querySelector('[data-role="ms-publish-backfill-readiness-no-fake-final-note"]');
+      if (noteEl) noteEl.textContent = readiness.no_final_video_url_note_zh || "";
+    }
+
+    // OWC-DA PR-3 / DA-W8: Digital Anchor Delivery Center · Delivery Pack
+    // assembly renderer. Renders only when the server-side container exists
+    // (gated by task.kind == "digital_anchor") and the payload carries a
+    // digital_anchor_delivery_pack bundle. Hot Follow / Matrix Script /
+    // Baseline publish hubs short-circuit at the container check.
+    function renderDigitalAnchorDeliveryPack(pack) {
+      const block = document.getElementById("digital-anchor-delivery-pack-block");
+      if (!block) return;
+      if (!pack || !pack.is_digital_anchor) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const setRoleText = (role, value) => {
+        const el = block.querySelector(`[data-role="${role}"]`);
+        if (el) el.textContent = value || "";
+      };
+
+      setRoleText("da-delivery-pack-title", pack.panel_title_zh);
+      setRoleText("da-delivery-pack-subtitle", pack.panel_subtitle_zh);
+
+      const lanes = pack.lanes || {};
+      const order = pack.lane_order || [];
+
+      const fv = lanes.final_video || {};
+      setRoleText("da-delivery-pack-final-video-label", fv.label_zh);
+      setRoleText("da-delivery-pack-final-video-status", fv.status_label_zh ? "[" + fv.status_label_zh + "]" : "");
+      setRoleText("da-delivery-pack-final-video-explanation", fv.primacy_explanation_zh);
+      setRoleText("da-delivery-pack-final-video-tracked-gap", fv.tracked_gap_explanation_zh);
+
+      setRoleText("da-delivery-pack-lanes-label", "交付分区");
+      const legend = (pack.lane_legend_zh || []).join(" / ");
+      setRoleText("da-delivery-pack-legend", legend ? "字段：" + legend : "");
+
+      const lanesEl = block.querySelector('[data-role="da-delivery-pack-lanes"]');
+      if (lanesEl) {
+        lanesEl.innerHTML = "";
+        order.forEach((laneId) => {
+          if (laneId === "final_video") return; // primacy lane rendered above
+          const lane = lanes[laneId];
+          if (!lane) return;
+          const laneCard = document.createElement("div");
+          laneCard.className = "card";
+          laneCard.style.marginTop = "8px";
+          laneCard.dataset.role = "da-delivery-pack-lane";
+          laneCard.dataset.laneId = laneId;
+          laneCard.dataset.statusCode = lane.status_code || "";
+
+          const titleEl = document.createElement("strong");
+          titleEl.dataset.role = "da-delivery-pack-lane-label";
+          titleEl.textContent = lane.label_zh || laneId;
+          laneCard.appendChild(titleEl);
+
+          const statusSpan = document.createElement("span");
+          statusSpan.className = "muted";
+          statusSpan.style.marginLeft = "8px";
+          statusSpan.dataset.role = "da-delivery-pack-lane-status";
+          statusSpan.textContent = "[" + (lane.status_label_zh || lane.status_code || "") + "]";
+          laneCard.appendChild(statusSpan);
+
+          const detail = document.createElement("div");
+          detail.className = "muted t-secondary";
+          detail.style.marginTop = "4px";
+          detail.dataset.role = "da-delivery-pack-lane-detail";
+
+          if (laneId === "subtitle" || laneId === "dubbed_audio" || laneId === "pack") {
+            const parts = [];
+            if (lane.deliverable_id) parts.push("deliverable_id=" + lane.deliverable_id);
+            if (lane.deliverable_kind_label_zh) parts.push("kind=" + lane.deliverable_kind_label_zh);
+            parts.push("required=" + (lane.required ? "true" : "false"));
+            if (lane.artifact_lookup) parts.push("artifact_lookup=" + (typeof lane.artifact_lookup === "string" ? lane.artifact_lookup : "ArtifactHandle"));
+            detail.textContent = parts.join(" · ");
+          } else if (laneId === "metadata") {
+            const parts = [];
+            if (lane.line_id) parts.push("line_id=" + lane.line_id);
+            if (lane.packet_version) parts.push("packet_version=" + lane.packet_version);
+            if (lane.notes) parts.push("notes=" + lane.notes);
+            detail.textContent = parts.join(" · ") || "—";
+          } else if (laneId === "manifest") {
+            const parts = [];
+            if (lane.manifest_id) parts.push("manifest_id=" + lane.manifest_id);
+            if (lane.deliverable_profile_ref) parts.push("deliverable_profile_ref=" + lane.deliverable_profile_ref);
+            if (lane.asset_sink_profile_ref) parts.push("asset_sink_profile_ref=" + lane.asset_sink_profile_ref);
+            if (lane.packet_ready_state) parts.push("packet_ready_state=" + lane.packet_ready_state);
+            if (lane.write_policy) parts.push("write_policy=" + lane.write_policy);
+            detail.textContent = parts.join(" · ") || "—";
+          } else if (laneId === "role_usage") {
+            const roles = lane.roles || [];
+            if (roles.length === 0) {
+              detail.textContent = "—";
+            } else {
+              const ul = document.createElement("ul");
+              ul.style.margin = "4px 0 0 18px";
+              ul.dataset.role = "da-delivery-pack-role-rows";
+              roles.forEach((role) => {
+                const li = document.createElement("li");
+                li.dataset.roleId = role.role_id || "";
+                const segCount = (role.segment_ids || []).length;
+                li.textContent =
+                  (role.role_display_name || role.role_id || "—") +
+                  " · " + (role.role_framing_label_zh || role.role_framing_kind || "—") +
+                  " · 段落数=" + segCount;
+                ul.appendChild(li);
+              });
+              detail.appendChild(ul);
+            }
+          } else if (laneId === "scene_usage") {
+            if (lane.scene_binding_hint) {
+              detail.textContent = "scene_binding_hint=" + lane.scene_binding_hint;
+            } else {
+              detail.textContent = lane.tracked_gap_explanation_zh || "—";
+            }
+          } else if (laneId === "language_usage") {
+            const rows = lane.language_rows || [];
+            if (rows.length === 0) {
+              detail.textContent = "—";
+            } else {
+              const ul = document.createElement("ul");
+              ul.style.margin = "4px 0 0 18px";
+              ul.dataset.role = "da-delivery-pack-language-rows";
+              rows.forEach((row) => {
+                const li = document.createElement("li");
+                li.dataset.language = row.language || "";
+                const flags = [];
+                if (row.is_source_language) flags.push("源");
+                if (row.is_target_language) flags.push("目标");
+                li.textContent =
+                  row.language +
+                  (flags.length ? "（" + flags.join("/") + "）" : "") +
+                  " · 段落数=" + (row.segment_count || 0);
+                ul.appendChild(li);
+              });
+              detail.appendChild(ul);
+            }
+          } else {
+            detail.textContent = "—";
+          }
+          laneCard.appendChild(detail);
+          lanesEl.appendChild(laneCard);
+        });
+      }
+
+      const gapEl = block.querySelector('[data-role="da-delivery-pack-tracked-gap-summary"]');
+      if (gapEl) gapEl.textContent = pack.tracked_gap_summary_zh || "";
+    }
+
+    // OWC-DA PR-3 / DA-W9: Digital Anchor Delivery Center · 多渠道回填 renderer.
+    // Reads only data.digital_anchor_delivery_backfill; renders one lane per
+    // (role / segment) row with six operator-language fields (channel /
+    // account / publish_time / publish_url / publish_status / metrics_snapshot).
+    // No second truth path; channel + account surface as explicit tracked gaps.
+    function renderDigitalAnchorDeliveryBackfill(backfill) {
+      const block = document.getElementById("digital-anchor-delivery-backfill-block");
+      if (!block) return;
+      if (!backfill || !backfill.is_digital_anchor) {
+        block.style.display = "none";
+        return;
+      }
+      block.style.display = "";
+
+      const titleEl = block.querySelector('[data-role="da-delivery-backfill-title"]');
+      if (titleEl) titleEl.textContent = backfill.panel_title_zh || "";
+      const subtitleEl = block.querySelector('[data-role="da-delivery-backfill-subtitle"]');
+      if (subtitleEl) subtitleEl.textContent = backfill.panel_subtitle_zh || "";
+      const legendEl = block.querySelector('[data-role="da-delivery-backfill-legend"]');
+      if (legendEl) {
+        const legend = backfill.field_legend_zh || [];
+        legendEl.textContent = legend.length ? "字段：" + legend.join(" / ") : "";
+      }
+
+      const lanesEl = block.querySelector('[data-role="da-delivery-backfill-lanes"]');
+      const emptyEl = block.querySelector('[data-role="da-delivery-backfill-empty"]');
+      if (lanesEl) {
+        lanesEl.innerHTML = "";
+        const lanes = backfill.lanes || [];
+        if (!lanes.length) {
+          if (emptyEl) emptyEl.style.display = "";
+        } else {
+          if (emptyEl) emptyEl.style.display = "none";
+          lanes.forEach((lane) => {
+            const laneCard = document.createElement("div");
+            laneCard.className = "card";
+            laneCard.style.marginTop = "8px";
+            laneCard.dataset.role = "da-delivery-backfill-lane";
+            laneCard.dataset.rowScope = lane.row_scope || "";
+            laneCard.dataset.rowId = lane.row_id || "";
+
+            const laneTitle = document.createElement("strong");
+            laneTitle.dataset.role = "da-delivery-backfill-lane-label";
+            laneTitle.textContent = lane.lane_label_zh || ((lane.row_scope || "") + " · " + (lane.row_id || "—"));
+            laneCard.appendChild(laneTitle);
+
+            const fieldsList = document.createElement("ul");
+            fieldsList.style.margin = "6px 0 0 18px";
+            fieldsList.dataset.role = "da-delivery-backfill-lane-fields";
+            (lane.fields || []).forEach((fld) => {
+              const li = document.createElement("li");
+              li.dataset.fieldId = fld.field_id || "";
+              li.dataset.statusCode = fld.status_code || "";
+              const labelEl = document.createElement("strong");
+              labelEl.textContent = (fld.label_zh || fld.field_id || "—") + "：";
+              li.appendChild(labelEl);
+
+              const valueSpan = document.createElement("span");
+              valueSpan.dataset.role = "da-delivery-backfill-field-value";
+              if (fld.field_id === "metrics_snapshot") {
+                const pairs = fld.metrics_pairs || [];
+                if (pairs.length) {
+                  valueSpan.textContent = pairs
+                    .map((p) => (p.label_zh || p.metric_id || "—") + "=" + p.value)
+                    .join(" / ");
+                } else {
+                  valueSpan.textContent = "—";
+                  valueSpan.classList.add("muted");
+                }
+              } else if (fld.field_id === "publish_status") {
+                const labelTextRaw = fld.value_label_zh || "";
+                if (fld.value) {
+                  valueSpan.textContent = labelTextRaw
+                    ? labelTextRaw + "（" + fld.value + "）"
+                    : fld.value;
+                } else {
+                  valueSpan.textContent = labelTextRaw || "—";
+                  if (!labelTextRaw) valueSpan.classList.add("muted");
+                }
+              } else if (fld.value) {
+                valueSpan.textContent = fld.value;
+              } else {
+                valueSpan.textContent = "—";
+                valueSpan.classList.add("muted");
+              }
+              li.appendChild(valueSpan);
+
+              const statusSpan = document.createElement("span");
+              statusSpan.className = "muted";
+              statusSpan.style.marginLeft = "8px";
+              statusSpan.dataset.role = "da-delivery-backfill-field-status";
+              statusSpan.textContent = "[" + (fld.status_label_zh || fld.status_code || "") + "]";
+              li.appendChild(statusSpan);
+
+              if (fld.tracked_gap_explanation_zh) {
+                const expl = document.createElement("div");
+                expl.className = "muted t-secondary";
+                expl.dataset.role = "da-delivery-backfill-field-tracked-gap";
+                expl.style.marginLeft = "12px";
+                expl.textContent = fld.tracked_gap_explanation_zh;
+                li.appendChild(expl);
+              }
+              fieldsList.appendChild(li);
+            });
+            laneCard.appendChild(fieldsList);
+            lanesEl.appendChild(laneCard);
+          });
+        }
+      }
+
+      const gapEl = block.querySelector('[data-role="da-delivery-backfill-tracked-gap"]');
+      if (gapEl) gapEl.textContent = backfill.tracked_gap_summary_zh || "";
+    }
+
+    function renderCopyBundle(copy) {
+      const captionEl = document.getElementById("copy-caption");
+      if (captionEl && !captionEl.value) captionEl.value = copy.caption || "";
+      const hashtagsEl = document.getElementById("copy-hashtags");
+      if (hashtagsEl && !hashtagsEl.value) hashtagsEl.value = copy.hashtags || "";
+      const ctaEl = document.getElementById("copy-comment-cta");
+      if (ctaEl && !ctaEl.value) ctaEl.value = copy.comment_cta || "";
+      const linkEl = document.getElementById("copy-link-text");
+      if (linkEl && !linkEl.value) linkEl.value = copy.link_text || "";
+      const timeEl = document.getElementById("copy-publish-time");
+      if (timeEl && !timeEl.value) timeEl.value = copy.publish_time_suggestion || "";
+    }
+
+    async function fetchText(kind) {
+      const headers = {};
+      const opKey = getOpKey();
+      if (opKey) headers["X-OP-KEY"] = opKey;
+      const url = `/api/tasks/${encodeURIComponent(TASK_ID)}/text?kind=${encodeURIComponent(kind)}`;
+      const resp = await fetch(url, { headers });
+      if (!resp.ok) return "";
+      const text = await resp.text();
+      return (text || "").trim();
+    }
+
+    async function fillCaptionFallback(copy) {
+      const captionEl = document.getElementById("copy-caption");
+      if (!captionEl || captionEl.value) return;
+      const fromPayload = (copy && copy.caption) || "";
+      if (fromPayload) {
+        captionEl.value = fromPayload;
+        return;
+      }
+      const candidates = ["mm_edited", "mm_txt", "origin_srt"];
+      for (const kind of candidates) {
+        try {
+          const text = await fetchText(kind);
+          if (text) {
+            captionEl.value = text;
+            break;
+          }
+        } catch (err) {
+          continue;
+        }
+      }
+    }
+
+    function renderArchive(archive) {
+      setText("published-at", archive.published_at || "-");
+      setInputValue("archive-location", archive.archive_location || archive.publish_provider || "");
+      setInputValue("archive-status", archive.status || archive.publish_status || "");
+      setInputValue("archive-key", archive.archive_key || archive.publish_key || "");
+      const downloadUrl = archive.download_url || archive.publish_url || "";
+      setInputValue("archive-download-url", downloadUrl);
+      setArchiveLink(downloadUrl);
+      const published = Boolean(archive.published || archive.published_at) && archive.published_at !== "-";
+      const publishedEl = document.getElementById("archive-published");
+      if (publishedEl) publishedEl.checked = published;
+    }
+
+    // Recovery PR-3: Matrix Script publish-feedback closure renderer.
+    // Reads only data.matrix_script_publish_feedback_closure; emits no
+    // provider/model/vendor/engine identifiers; submits events through the
+    // contract-backed POST /api/matrix-script/closures/{task_id}/events.
+    function renderMatrixScriptClosure(closure) {
+      const block = document.getElementById("matrix-script-closure-block");
+      if (!block) return;
+      const tbody = block.querySelector('[data-role="ms-closure-rows"]');
+      const emptyEl = block.querySelector('[data-role="ms-closure-empty"]');
+      const variationSelect = document.getElementById("ms-closure-variation-select");
+      const eventsEl = block.querySelector('[data-role="ms-closure-events-recent"]');
+      if (!closure || !closure.variation_feedback) {
+        if (tbody) tbody.innerHTML = "";
+        if (emptyEl) emptyEl.style.display = "";
+        if (variationSelect) variationSelect.innerHTML = "";
+        if (eventsEl) eventsEl.innerHTML = "";
+        return;
+      }
+      if (emptyEl) emptyEl.style.display = "none";
+      if (tbody) {
+        tbody.innerHTML = "";
+        (closure.variation_feedback || []).forEach((row) => {
+          const tr = document.createElement("tr");
+          tr.dataset.variationId = row.variation_id || "";
+          const cells = [
+            row.variation_id || "—",
+            row.publish_status || "pending",
+            row.publish_url || "—",
+            row.last_event_id || "—",
+            "",
+          ];
+          cells.forEach((value, idx) => {
+            const td = document.createElement("td");
+            td.style.padding = "6px";
+            td.style.borderBottom = "1px solid #f1f5f9";
+            if (idx === 0 || idx === 3) {
+              const code = document.createElement("code");
+              code.textContent = value;
+              td.appendChild(code);
+            } else if (idx === 4) {
+              const btn = document.createElement("button");
+              btn.type = "button";
+              btn.className = "btn-secondary";
+              btn.textContent = "选择";
+              btn.addEventListener("click", () => {
+                if (variationSelect) variationSelect.value = row.variation_id || "";
+              });
+              td.appendChild(btn);
+            } else {
+              td.textContent = value;
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+      if (variationSelect) {
+        variationSelect.innerHTML = "";
+        (closure.variation_feedback || []).forEach((row) => {
+          const opt = document.createElement("option");
+          opt.value = row.variation_id || "";
+          opt.textContent = row.variation_id || "";
+          variationSelect.appendChild(opt);
+        });
+      }
+      if (eventsEl) {
+        eventsEl.innerHTML = "";
+        const records = (closure.feedback_closure_records || []).slice(-5).reverse();
+        records.forEach((record) => {
+          const li = document.createElement("li");
+          li.textContent =
+            (record.recorded_at || "—") +
+            " · " +
+            (record.event_kind || "—") +
+            " · variation=" +
+            (record.variation_id || "—") +
+            " · actor=" +
+            (record.actor_kind || "—");
+          eventsEl.appendChild(li);
+        });
+      }
+    }
+
+    function bindMatrixScriptClosureForm() {
+      const form = document.getElementById("ms-closure-event-form");
+      const initBtn = document.getElementById("btn-ms-closure-init");
+      const eventKindSelect = document.getElementById("ms-closure-event-kind");
+      const urlField = document.querySelector('[data-role="ms-closure-publish-url-field"]');
+      const statusField = document.querySelector('[data-role="ms-closure-publish-status-field"]');
+      const noteField = document.querySelector('[data-role="ms-closure-note-field"]');
+      const formStatusEl = document.getElementById("ms-closure-event-status");
+      const initStatusEl = document.getElementById("ms-closure-status");
+      if (!form) return;
+
+      function syncFieldVisibility() {
+        const kind = (eventKindSelect && eventKindSelect.value) || "";
+        if (urlField) urlField.style.display = kind === "operator_publish" ? "" : "none";
+        if (statusField) statusField.style.display = kind === "operator_publish" ? "" : "none";
+        if (noteField) noteField.style.display = kind === "operator_note" ? "" : "none";
+      }
+      if (eventKindSelect) eventKindSelect.addEventListener("change", syncFieldVisibility);
+      syncFieldVisibility();
+
+      async function refreshClosure() {
+        try {
+          const resp = await fetch(
+            `/api/matrix-script/closures/${encodeURIComponent(TASK_ID)}/peek`
+          );
+          if (!resp.ok) return;
+          const body = await resp.json();
+          renderMatrixScriptClosure(body && body.closure);
+        } catch (err) { /* presentation-only; never crash */ }
+      }
+
+      if (initBtn) {
+        initBtn.addEventListener("click", async () => {
+          if (initStatusEl) initStatusEl.textContent = "正在初始化…";
+          try {
+            const resp = await fetch(
+              `/api/matrix-script/closures/${encodeURIComponent(TASK_ID)}`
+            );
+            const body = await resp.json();
+            if (!resp.ok) {
+              if (initStatusEl) initStatusEl.textContent = "失败：" + (body.detail || resp.status);
+              return;
+            }
+            renderMatrixScriptClosure(body);
+            if (initStatusEl) initStatusEl.textContent = "已就绪";
+          } catch (err) {
+            if (initStatusEl) initStatusEl.textContent = "失败：" + (err && err.message);
+          }
+        });
+      }
+
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const kind = (eventKindSelect && eventKindSelect.value) || "";
+        const variationId = document.getElementById("ms-closure-variation-select").value;
+        if (!variationId) {
+          if (formStatusEl) formStatusEl.textContent = "请先选择 variation_id（点击表格中的 “选择”）";
+          return;
+        }
+        const event = {
+          event_kind: kind,
+          variation_id: variationId,
+          recorded_at: new Date().toISOString(),
+        };
+        if (kind === "operator_publish") {
+          const url = document.getElementById("ms-closure-publish-url").value || null;
+          const status = document.getElementById("ms-closure-publish-status").value || "pending";
+          event.payload = { publish_status: status };
+          if (url) event.payload.publish_url = url;
+        } else if (kind === "operator_note") {
+          const note = document.getElementById("ms-closure-notes").value || "";
+          event.payload = { operator_publish_notes: note };
+        } else if (kind === "operator_retract") {
+          event.payload = {};
+        }
+        if (formStatusEl) formStatusEl.textContent = "提交中…";
+        try {
+          const resp = await fetch(
+            `/api/matrix-script/closures/${encodeURIComponent(TASK_ID)}/events`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(event),
+            }
+          );
+          const body = await resp.json();
+          if (!resp.ok) {
+            if (formStatusEl) formStatusEl.textContent = "失败：" + (body.detail || resp.status);
+            return;
+          }
+          renderMatrixScriptClosure(body && body.closure);
+          if (formStatusEl) formStatusEl.textContent = "已写入 event_id=" + (body.event_id || "—");
+        } catch (err) {
+          if (formStatusEl) formStatusEl.textContent = "失败：" + (err && err.message);
+        }
+      });
+
+      // Initial fetch (no auto-create) so any pre-existing closure renders.
+      refreshClosure();
+    }
+
+    // Recovery PR-4: Digital Anchor publish-feedback closure renderer.
+    // Reads only data.digital_anchor_publish_feedback_closure; submits events
+    // through the contract-backed POST /api/digital-anchor/closures/{task_id}/...
+    function renderDigitalAnchorClosure(closure) {
+      const block = document.getElementById("digital-anchor-closure-block");
+      if (!block) return;
+      const roleTbody = block.querySelector('[data-role="da-role-rows"]');
+      const segmentTbody = block.querySelector('[data-role="da-segment-rows"]');
+      const eventsEl = block.querySelector('[data-role="da-closure-events-recent"]');
+      if (!closure) {
+        if (roleTbody) roleTbody.innerHTML = "";
+        if (segmentTbody) segmentTbody.innerHTML = "";
+        if (eventsEl) eventsEl.innerHTML = "";
+        return;
+      }
+      function renderRows(tbody, rows, columns) {
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        (rows || []).forEach((row) => {
+          const tr = document.createElement("tr");
+          columns.forEach((col) => {
+            const td = document.createElement("td");
+            td.style.padding = "6px";
+            td.style.borderBottom = "1px solid #f1f5f9";
+            const value = row[col];
+            if (Array.isArray(value)) {
+              td.textContent = value.join(", ");
+            } else {
+              td.textContent = (value === null || value === undefined) ? "—" : String(value);
+            }
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+      }
+      renderRows(roleTbody, closure.role_feedback, [
+        "role_id",
+        "role_display_name",
+        "role_feedback_kind",
+        "linked_segments",
+      ]);
+      renderRows(segmentTbody, closure.segment_feedback, [
+        "segment_id",
+        "binds_role_id",
+        "segment_feedback_kind",
+        "script_ref",
+      ]);
+      if (eventsEl) {
+        eventsEl.innerHTML = "";
+        const records = (closure.feedback_closure_records || []).slice(-5).reverse();
+        records.forEach((record) => {
+          const li = document.createElement("li");
+          li.textContent =
+            (record.recorded_at || "—") +
+            " · " +
+            (record.record_kind || "—") +
+            " · roles=[" + (record.role_ids || []).join(",") + "]" +
+            " · segments=[" + (record.segment_ids || []).join(",") + "]";
+          eventsEl.appendChild(li);
+        });
+      }
+    }
+
+    function bindDigitalAnchorClosureForms() {
+      const block = document.getElementById("digital-anchor-closure-block");
+      if (!block) return;
+      const initBtn = document.getElementById("btn-da-closure-init");
+      const initStatusEl = document.getElementById("da-closure-status");
+      const roleForm = document.getElementById("da-role-feedback-form");
+      const roleStatus = document.getElementById("da-role-feedback-status");
+      const segmentForm = document.getElementById("da-segment-feedback-form");
+      const segmentStatus = document.getElementById("da-segment-feedback-status");
+      const d1Form = document.getElementById("da-d1-event-form");
+      const d1Status = document.getElementById("da-d1-event-status");
+      const d1EventKind = document.getElementById("da-d1-event-kind");
+
+      async function refreshClosure() {
+        try {
+          const resp = await fetch(
+            `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}/peek`
+          );
+          if (!resp.ok) return;
+          const body = await resp.json();
+          renderDigitalAnchorClosure(body && body.closure);
+        } catch (err) { /* presentation-only */ }
+      }
+
+      if (initBtn) {
+        initBtn.addEventListener("click", async () => {
+          if (initStatusEl) initStatusEl.textContent = "正在初始化…";
+          try {
+            const resp = await fetch(
+              `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}`
+            );
+            const body = await resp.json();
+            if (!resp.ok) {
+              if (initStatusEl) initStatusEl.textContent = "失败：" + (body.detail || resp.status);
+              return;
+            }
+            renderDigitalAnchorClosure(body);
+            if (initStatusEl) initStatusEl.textContent = "已就绪";
+          } catch (err) {
+            if (initStatusEl) initStatusEl.textContent = "失败：" + (err && err.message);
+          }
+        });
+      }
+
+      async function postEvent(form, statusEl, path) {
+        const data = {};
+        new FormData(form).forEach((value, key) => {
+          if (typeof value === "string" && value.length > 0) data[key] = value;
+        });
+        if (statusEl) statusEl.textContent = "提交中…";
+        try {
+          const resp = await fetch(
+            `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}/${path}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(data),
+            }
+          );
+          const body = await resp.json();
+          if (!resp.ok) {
+            if (statusEl) statusEl.textContent = "失败：" + (body.detail || resp.status);
+            return;
+          }
+          renderDigitalAnchorClosure(body && body.closure);
+          if (statusEl) statusEl.textContent = "已写入 record_id=" + (body.record_id || "—");
+        } catch (err) {
+          if (statusEl) statusEl.textContent = "失败：" + (err && err.message);
+        }
+      }
+
+      if (roleForm) {
+        roleForm.addEventListener("submit", (ev) => {
+          ev.preventDefault();
+          postEvent(roleForm, roleStatus, "role-feedback");
+        });
+      }
+      if (segmentForm) {
+        segmentForm.addEventListener("submit", (ev) => {
+          ev.preventDefault();
+          postEvent(segmentForm, segmentStatus, "segment-feedback");
+        });
+      }
+      function syncD1FieldVisibility() {
+        const kind = (d1EventKind && d1EventKind.value) || "";
+        const urlField = block.querySelector('[data-role="da-d1-payload-publish-url"]');
+        const noteField = block.querySelector('[data-role="da-d1-payload-note"]');
+        if (urlField) urlField.style.display = kind === "publish_accepted" ? "" : "none";
+        if (noteField) noteField.style.display = kind === "operator_note" ? "" : "none";
+      }
+      if (d1EventKind) d1EventKind.addEventListener("change", syncD1FieldVisibility);
+      syncD1FieldVisibility();
+
+      if (d1Form) {
+        d1Form.addEventListener("submit", async (ev) => {
+          ev.preventDefault();
+          const formData = new FormData(d1Form);
+          const eventKind = formData.get("event_kind") || "";
+          const body = {
+            event_kind: eventKind,
+            row_scope: formData.get("row_scope") || "",
+            row_id: formData.get("row_id") || "",
+            recorded_at: new Date().toISOString(),
+            payload: {},
+          };
+          if (eventKind === "publish_accepted") {
+            const url = formData.get("publish_url");
+            if (url) body.payload.publish_url = url;
+          } else if (eventKind === "operator_note") {
+            const note = formData.get("note");
+            if (note) body.payload.note = note;
+          }
+          if (d1Status) d1Status.textContent = "提交中…";
+          try {
+            const resp = await fetch(
+              `/api/digital-anchor/closures/${encodeURIComponent(TASK_ID)}/events`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+              }
+            );
+            const respBody = await resp.json();
+            if (!resp.ok) {
+              if (d1Status) d1Status.textContent = "失败：" + (respBody.detail || resp.status);
+              return;
+            }
+            renderDigitalAnchorClosure(respBody && respBody.closure);
+            if (d1Status) d1Status.textContent = "已写入 record_id=" + (respBody.record_id || "—");
+          } catch (err) {
+            if (d1Status) d1Status.textContent = "失败：" + (err && err.message);
+          }
+        });
+      }
+      refreshClosure();
+    }
+
+    function renderOperatorSurfaces(ops) {
+      const delivery = (ops && ops.delivery) || {};
+      const mirror = delivery.publish_status_mirror || {};
+      const gateEl = document.getElementById("op-publish-gate");
+      const gateReasonEl = document.getElementById("op-publish-gate-reason");
+      if (gateEl) gateEl.textContent = delivery.publish_gate ? "open" : "blocked";
+      if (gateReasonEl) gateReasonEl.textContent = delivery.publish_gate_head_reason || "";
+      setText("op-publish-status", mirror.publish_status || "not_published");
+      setText("op-publish-channel", mirror.publish_channel ? `· ${mirror.publish_channel}` : "");
+      setText("op-published-at", mirror.last_published_at ? `· ${mirror.last_published_at}` : "");
+      const urlEl = document.getElementById("op-publish-url");
+      if (urlEl) {
+        if (mirror.publish_url) {
+          urlEl.href = mirror.publish_url;
+          urlEl.style.display = "";
+        } else {
+          urlEl.removeAttribute("href");
+          urlEl.style.display = "none";
+        }
+      }
+    }
+
+    function copyTextFromElement(el) {
+      if (!el) return;
+      let text = "";
+      if (el.tagName === "A") {
+        text = el.getAttribute("href") || "";
+      } else if (el.tagName === "TEXTAREA") {
+        text = el.value || "";
+      } else {
+        text = el.textContent || "";
+      }
+      if (!text || text === "#") return;
+      navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    document.querySelectorAll("[data-copy-target]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const targetId = btn.getAttribute("data-copy-target");
+        const target = document.getElementById(targetId);
+        copyTextFromElement(target);
+      });
+    });
+
+    async function fetchPublishHub() {
+      const opKey = getOpKey();
+      if (!opKey) {
+        showGate(window.__V185_I18N__.t("publish.gate.need_key"));
+        return;
+      }
+      const kind = (TASK_KIND || "").toLowerCase();
+      const publishHubUrl = kind === "apollo_avatar"
+        ? `/api/apollo/avatar/${encodeURIComponent(TASK_ID)}/publish_hub`
+        : `/api/tasks/${encodeURIComponent(TASK_ID)}/publish_hub`;
+      const resp = await fetch(publishHubUrl, {
+        headers: { "X-OP-KEY": opKey },
+      });
+      if (resp.status === 401 || resp.status === 403) {
+        showGate(window.__V185_I18N__.t("publish.gate.invalid_key"));
+        return;
+      }
+      if (!resp.ok) {
+        showGate(window.__V185_I18N__.t("publish.gate.load_failed", { status: resp.status }));
+        return;
+      }
+      hideGate();
+      const data = await resp.json();
+      setText("download-code", data.download_code || "-");
+      renderDeliverables(data.deliverables || {});
+      renderMatrixScriptDeliveryComprehension(data.matrix_script_delivery_comprehension || null);
+      renderMatrixScriptDeliveryCopyBundle(data.matrix_script_delivery_copy_bundle || null);
+      renderMatrixScriptDeliveryBackfill(data.matrix_script_delivery_backfill || null);
+      renderMatrixScriptPublishBackfillReadiness(data.matrix_script_publish_backfill_readiness || null);
+      renderMatrixScriptClosure(data.matrix_script_publish_feedback_closure || null);
+      renderDigitalAnchorDeliveryPack(data.digital_anchor_delivery_pack || null);
+      renderDigitalAnchorDeliveryBackfill(data.digital_anchor_delivery_backfill || null);
+      renderDigitalAnchorClosure(data.digital_anchor_publish_feedback_closure || null);
+      renderCopyBundle(data.copy_bundle || {});
+      await fillCaptionFallback(data.copy_bundle || {});
+      renderArchive(data.archive || {});
+      renderOperatorSurfaces(data.operator_surfaces || {});
+      const editLink = document.getElementById("edit-bundle-link");
+      if (editLink && data.deliverables && data.deliverables.edit_bundle_zip) {
+        editLink.href = data.deliverables.edit_bundle_zip.url;
+        editLink.classList.remove("disabled");
+      } else if (editLink) {
+        editLink.href = "#";
+        editLink.classList.add("disabled");
+      }
+      const sopEl = document.getElementById("sop-markdown");
+      if (sopEl) sopEl.textContent = data.sop_markdown || "";
+      const mobile = data.mobile || {};
+      const shortLink = mobile.short_url || mobile.short_link || mobile.qr_target || mobile.qr_url;
+      const qrTarget = shortLink || mobile.qr_target || mobile.qr_url;
+      if (qrTarget) {
+        const abs = new URL(qrTarget, window.location.origin).toString();
+        const qrImg = document.getElementById("qr-image");
+        if (qrImg) {
+          qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(abs)}`;
+        }
+        setLink("qr-link", abs);
+      }
+      if (shortLink) {
+        setLink("short-link", new URL(shortLink, window.location.origin).toString());
+      }
+      const serverLang = data.ui_lang;
+      const savedLang = localStorage.getItem("ui_lang_publish_hub");
+      if (!savedLang && serverLang) {
+        applyLang(serverLang);
+      }
+    }
+
+    const publishBtn = document.getElementById("publish-btn");
+    if (publishBtn) {
+      publishBtn.addEventListener("click", async () => {
+      const statusEl = document.getElementById("publish-status");
+      if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submitting");
+      try {
+        const opKey = getOpKey();
+        const headers = { "Content-Type": "application/json" };
+        if (opKey) headers["X-OP-KEY"] = opKey;
+        const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ task_id: TASK_ID, force: false }),
+        });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submit_failed", { detail: `${resp.status} ${detail}` });
+            return;
+          }
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submitted");
+          await fetchPublishHub();
+        } catch (err) {
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.submit_error", { error: err });
+        }
+      });
+    }
+
+    const archiveSaveBtn = document.getElementById("archive-save-btn");
+    if (archiveSaveBtn) {
+      archiveSaveBtn.addEventListener("click", async () => {
+        const statusEl = document.getElementById("archive-save-status");
+        if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.saving");
+        const payload = {
+          archive: {
+            archive_location: document.getElementById("archive-location")?.value?.trim() || "",
+            status: document.getElementById("archive-status")?.value?.trim() || "",
+            published: Boolean(document.getElementById("archive-published")?.checked),
+            download_url: document.getElementById("archive-download-url")?.value?.trim() || "",
+            archive_key: document.getElementById("archive-key")?.value?.trim() || "",
+          },
+        };
+        Object.assign(payload, payload.archive);
+        try {
+          const opKey = getOpKey();
+          const headers = { "Content-Type": "application/json" };
+          if (opKey) headers["X-OP-KEY"] = opKey;
+          const resp = await fetch(`/api/tasks/${encodeURIComponent(TASK_ID)}/publish`, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(payload),
+          });
+          if (!resp.ok) {
+            const detail = await resp.text();
+            if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.save_failed", { detail: `${resp.status} ${detail}` });
+            return;
+          }
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.saved");
+          await fetchPublishHub();
+        } catch (err) {
+          if (statusEl) statusEl.textContent = window.__V185_I18N__.t("publish.status.save_error", { error: err });
+        }
+      });
+    }
+
+    const archiveUrlInput = document.getElementById("archive-download-url");
+    if (archiveUrlInput) {
+      archiveUrlInput.addEventListener("input", () => {
+        setArchiveLink(archiveUrlInput.value.trim());
+      });
+    }
+
+    const saveBtn = document.getElementById("op-key-save");
+    if (saveBtn) {
+      saveBtn.addEventListener("click", () => {
+        const input = document.getElementById("op-key-input");
+        const value = input ? input.value.trim() : "";
+        if (!value) {
+          showGate(window.__V185_I18N__.t("publish.gate.need_key"));
+          return;
+        }
+        setOpKey(value);
+        fetchPublishHub().catch(() => {});
+      });
+    }
+
+    // OWC-MS-RO PR-4 conditional-pass correction (2026-05-08): Block F
+    // archive form JSON submit handler. Intercepts the form's default
+    // multipart/url-encoded submit and posts a JSON event to the existing
+    // POST /api/matrix-script/closures/{task_id}/events endpoint, which
+    // is JSON-only per the closure router
+    // (gateway/app/routers/matrix_script_closure.py:108-147 — calls
+    // `await request.json()` and 400-rejects non-JSON bodies). The
+    // payload shape mirrors the existing closure JSON pattern reused by
+    // bindMatrixScriptClosureForm above:
+    //   { event_kind, variation_id, actor_kind, recorded_at,
+    //     payload: { operator_publish_notes } }
+    // event_kind is the closed `operator_note` member of the existing
+    // EVENT_KINDS frozenset (no enum widening); operator_publish_notes
+    // carries the operator-language archive intent marker. The function
+    // is a no-op when the form is absent (Hot Follow / Digital Anchor /
+    // baseline publish hubs do not render it; matrix_script tasks
+    // without a closure render the disabled fallback button instead).
+    function bindMatrixScriptArchiveForm() {
+      const form = document.querySelector(
+        '[data-role="ms-dc-block-f-archive-form"]'
+      );
+      if (!form) return;
+      const variationSelect = form.querySelector(
+        '[data-role="ms-dc-block-f-archive-form-variation-id"]'
+      );
+      const eventKindEl = form.querySelector('input[name="event_kind"]');
+      const actorKindEl = form.querySelector('input[name="actor_kind"]');
+      const notesEl = form.querySelector('input[name="operator_publish_notes"]');
+      const statusEl = form.querySelector(
+        '[data-role="ms-dc-block-f-archive-form-status"]'
+      );
+      form.addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const variationId = (variationSelect && variationSelect.value) || "";
+        if (!variationId) {
+          if (statusEl) statusEl.textContent = "请先选择候选";
+          return;
+        }
+        const event = {
+          event_kind: (eventKindEl && eventKindEl.value) || "operator_note",
+          variation_id: variationId,
+          actor_kind: (actorKindEl && actorKindEl.value) || "operator",
+          recorded_at: new Date().toISOString(),
+          payload: {
+            operator_publish_notes:
+              (notesEl && notesEl.value) || "归档此任务",
+          },
+        };
+        const action = form.getAttribute("action");
+        if (statusEl) statusEl.textContent = "提交中…";
+        try {
+          const resp = await fetch(action, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(event),
+          });
+          let body = null;
+          try { body = await resp.json(); } catch (parseErr) { body = null; }
+          if (!resp.ok) {
+            const detail = (body && body.detail) || resp.status;
+            if (statusEl) statusEl.textContent = "失败：" + detail;
+            return;
+          }
+          const eventId = (body && body.event_id) || "—";
+          if (statusEl) {
+            statusEl.textContent = "已归档（事件 ID：" + eventId + "）";
+          }
+        } catch (err) {
+          if (statusEl) {
+            statusEl.textContent = "失败：" + (err && err.message);
+          }
+        }
+      });
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      // Recovery PR-3: bind the Matrix Script closure form once. The form
+      // surface only renders when the server emitted the gated container
+      // (task.kind == "matrix_script"); for other lines the call is a no-op.
+      try { bindMatrixScriptClosureForm(); } catch (err) { /* noop */ }
+      // OWC-MS-RO PR-4 conditional-pass correction: bind the Block F
+      // archive form to the JSON closure-event path. No-op when the
+      // form is absent.
+      try { bindMatrixScriptArchiveForm(); } catch (err) { /* noop */ }
+      try { bindDigitalAnchorClosureForms(); } catch (err) { /* noop */ }
+      const tabs = document.querySelectorAll(".tab-btn");
+      const panels = document.querySelectorAll(".tab-panel");
+      function activate(id) {
+        tabs.forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === id));
+        panels.forEach((panel) => panel.classList.toggle("active", panel.id === id));
+      }
+      tabs.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const id = btn.dataset.tab;
+          if (id) activate(id);
+        });
+      });
+      const hash = window.location.hash.replace("#", "");
+      if (hash) activate(`tab-${hash}`);
+      const initialLang = resolveLang(null);
+      applyLang(initialLang);
+      const langToggle = document.getElementById("lang-toggle");
+      if (langToggle) {
+        langToggle.addEventListener("click", (event) => {
+          const btn = event.target.closest(".lang-btn");
+          if (!btn) return;
+          const lang = btn.dataset.lang;
+          if (!lang) return;
+          applyLang(lang);
+        });
+      }
+
+      if (!getOpKey()) {
+        showGate(window.__V185_I18N__.t("publish.gate.need_key"));
+        return;
+      }
+      fetchPublishHub().catch(() => {});
+    });
+  </script>
+</body>
+</html>

@@ -158,6 +158,17 @@
   {"label": t("common.back_task_board"), "href": "/tasks", "primary": False},
 ] %}
 {% include "_topbar.html" %}
+      {# Phase 2B fidelity fix (2026-05-30) — the legacy task-meta header
+         (status pill + 9 task-meta rows: task_id / platform / account_id /
+         category_key / language / status / created / source_url + Hot Follow
+         pipeline rows) is a project-management surface, NOT a script-to-video
+         product surface. For matrix_script tasks the Phase 1 mock + the
+         Phase 2B Workbench IA put §A 主视频结果 as the first-screen anchor.
+         We gate the legacy task-meta header to non-matrix_script kinds only;
+         Hot Follow / Digital Anchor / baseline tasks keep their card
+         bytewise unchanged. Architects can still see task identifiers
+         inside §J 技术诊断 (collapsed, architect view). #}
+      {% if task.kind != "matrix_script" %}
       <div class="info-row" style="margin-top:8px;">
         <div id="status-badge" class="status-pill">{{ task.status }}</div>
       </div>
@@ -205,6 +216,7 @@
           {% endif %}
         </div>
       </div>
+      {% endif %} {# /matrix_script legacy task-meta header gate #}
     </div>
 
     {% set ops = (task_json.operator_surfaces or {}) %}
@@ -270,6 +282,148 @@
       {% set ms_recommended_action = ((ops.workbench or {}).matrix_script_recommended_action or {}) %}
       {% set ms_delivery_ready_package = ((ops.workbench or {}).matrix_script_delivery_ready_package or {}) %}
       {% set ms_delivery_comprehension = ((ops.workbench or {}).matrix_script_delivery_comprehension or {}) %}
+      {% set ms_main_video_result = ((ops.workbench or {}).matrix_script_main_video_result or {}) %}
+
+      {# Phase 2D (2026-05-30) · result-oriented IA: the capability banner
+         was relocated to BELOW §A 主视频结果 so the operator's first /
+         dominant surface is the result panel, not an orientation line.
+         The banner block now renders right after §A. #}
+
+      {# PR-2A (redesign 2026-05-28) · 主视频结果 anchor block.
+         Renders at the TOP of the matrix_script workbench branch, ABOVE the
+         existing Block A 任务摘要, so the operator's first-screen answer to
+         "is the main video ready, and what do I do next?" is dominant.
+         Sourced exclusively from
+         derive_matrix_script_main_video_result; no second producer, no
+         packet truth mutation, no engineering identifiers in operator copy.
+         Action enablement rules: 生成主视频 / 重新生成 are
+         disabled-with-operator-tooltip until the generation backend lands
+         (Capability Expansion Wave); 确认为主版本 enables when a
+         current_fresh media variation exists and no confirmation is yet
+         recorded; 前往交付页面 always enabled. Confirm-main writes the
+         closure operator_note with the structured
+         [main-version-confirmed] prefix per the approved product
+         decision #1 (2026-05-28) — no new endpoint, no closed-enum
+         widening. RC-R8 no-fake-output discipline preserved: empty state
+         when no current_fresh media is honest operator copy, never a fake
+         URL or placeholder media player. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card op-card--accent-emerald"
+             id="matrix-script-main-video-result"
+             data-role="matrix-script-main-video-result"
+             data-state-kind="{{ ms_main_video_result.state_kind }}"
+             data-redesign-wave="2026-05-28-pr2a">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">① · 主视频</span>
+              <h2 class="op-section-title" data-role="ms-main-video-result-title">{{ ms_main_video_result.panel_title_zh }}</h2>
+              <span class="op-pill op-pill--{% if ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% elif ms_main_video_result.state_kind == 'generating' %}info{% else %}blocked{% endif %}"
+                    data-role="ms-main-video-result-state-pill"
+                    data-state-kind="{{ ms_main_video_result.state_kind }}">
+                <span class="op-pill__dot"></span>{{ ms_main_video_result.state_label_zh }}
+              </span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-main-video-result-subtitle">{{ ms_main_video_result.panel_subtitle_zh }}</p>
+
+          {# Preview hero. Real artifact preview when current_fresh media
+             is bound; honest operator-language empty state otherwise.
+             NEVER a fake URL, NEVER a placeholder player widget. #}
+          <div class="op-main-video-preview" data-role="ms-main-video-result-preview"
+               data-preview-available="{{ 'true' if ms_main_video_result.preview.available else 'false' }}"
+               style="margin:14px 0; padding:48px 18px; min-height:220px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:12px; background:#fbfdff; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;">
+            {% if ms_main_video_result.preview.available %}
+              <div data-role="ms-main-video-result-preview-bound"
+                   data-bound-variation-id="{{ ms_main_video_result.preview.variation_id }}"
+                   style="font-size:14px; color:var(--op-fg-mid, #334155);">
+                <strong>主视频已生成</strong> · 候选编号 {{ ms_main_video_result.preview.variation_id }}
+                <div class="op-tech-note" style="margin-top:8px;">完整成片与下载在交付页面。本面板不内嵌外部链接。</div>
+              </div>
+            {% else %}
+              <div data-role="ms-main-video-result-preview-empty"
+                   style="font-size:14px; line-height:1.6; color:var(--op-fg-soft, #64748b); max-width:560px;">
+                {{ ms_main_video_result.preview.empty_state_message_zh }}
+              </div>
+            {% endif %}
+          </div>
+
+          {# Primary action bar — 4 buttons; state-dependent enablement.
+             生成主视频 / 重新生成 stay disabled-with-tooltip until the
+             generation worker lands (out of this wave's scope). #}
+          <div class="op-main-video-actions task-actions"
+               data-role="ms-main-video-result-actions"
+               style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+            {% for action in (ms_main_video_result.primary_actions or []) %}
+              {% if action.action_id == 'go_to_delivery' %}
+                <a class="btn-primary"
+                   data-role="ms-main-video-result-action"
+                   data-action-id="{{ action.action_id }}"
+                   data-enabled="true"
+                   href="{{ action.href }}">{{ action.label_zh }} →</a>
+              {% else %}
+                <button type="button"
+                        class="{% if action.action_id == 'confirm_main_version' and action.enabled %}btn-primary{% else %}btn-secondary{% endif %}"
+                        data-role="ms-main-video-result-action"
+                        data-action-id="{{ action.action_id }}"
+                        data-enabled="{{ 'true' if action.enabled else 'false' }}"
+                        {% if action.action_id == 'confirm_main_version' and action.enabled %}data-confirm-note-prefix="{{ ms_main_video_result.confirm_note_prefix }}" data-closure-endpoint="{{ ms_main_video_result.closure_event_endpoint_template | replace('{task_id}', task.task_id) }}" data-recommended-variation-id="{{ ms_main_video_result.recommended_variation_id or '' }}"{% endif %}
+                        {% if not action.enabled %}disabled aria-disabled="true" title="{{ action.disabled_reason_zh }}"{% endif %}>{{ action.label_zh }}</button>
+              {% endif %}
+            {% endfor %}
+          </div>
+
+          {# One-line blocker + next-action banner. Operator language only;
+             head_reason / publish_readiness raw enums NEVER appear here. #}
+          <div class="op-banner op-banner--{% if ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% else %}blocker{% endif %}"
+               data-role="ms-main-video-result-banner"
+               style="margin-top:12px;">
+            <div>
+              <div class="op-banner__title" data-role="ms-main-video-result-blocker">{{ ms_main_video_result.blocker_one_liner_zh }}</div>
+              <div class="op-banner__body" data-role="ms-main-video-result-next-action">{{ ms_main_video_result.next_action_one_liner_zh }}</div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      {# Phase 2C (2026-05-30) · operator-readability capability banner.
+         ONE orientation line; relocated by Phase 2D to render BELOW §A so
+         the result panel is the dominant first surface. Copy / layout only;
+         no new truth, no closed enum, no packet write. Operator language. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-banner op-banner--info"
+             data-role="matrix-script-capability-banner"
+             data-redesign-wave="2026-05-30-phase2c"
+             style="margin-bottom:12px;">
+          <div>
+            <div class="op-banner__title" data-role="matrix-script-capability-banner-title">脚本转视频工作台</div>
+            <div class="op-banner__body" data-role="matrix-script-capability-banner-body">这里把一条脚本拆解成可生成的视频方案。成片生成与素材匹配能力接入后，本工作台将开放生成与替换操作；当前阶段以方案确认与偏好选择兜底，已选偏好会作为后续生成的输入。</div>
+          </div>
+        </div>
+      {% endif %}
+
+      {# Phase 2D (2026-05-30) · result-oriented IA group header ② ·
+         生成方案确认. Merges the legacy §B 脚本理解 + §C 视频生成计划 into
+         one operator decision: confirm the generation plan. The storyboard
+         (§C) stays the primary visible content; 脚本理解 (§B) is demoted to
+         a collapsed supporting detail just below. Copy / layout only; the
+         §B / §C container anchors + sub-anchors are preserved unchanged. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card op-card--accent-emerald"
+             data-role="ms-section-plan-confirm"
+             data-redesign-wave="2026-05-30-phase2d"
+             style="margin-bottom:4px;">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">② · 方案</span>
+              <h2 class="op-section-title" data-role="ms-section-plan-confirm-title">生成方案确认</h2>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-plan-confirm-summary">系统已根据脚本整理出视频方向和分镜草案，请先确认是否符合你的成片预期。脚本理解（三段式 / 关键词 / 禁用词 / 受众 / 语气 / 时长）作为支撑细节收在下方，分镜草案为这一段的主视图。</p>
+        </div>
+      {% endif %}
+
+      {# Phase 2B fidelity fix (2026-05-30): PR-A standalone stepper relocated into §J (architect view); no longer rendered in operator primary scan. #}
+
       {% set ms_publish_readiness = ops_pr %}
       {% set ms_variation_plan = (ms_surface.variation_plan or {}) %}
       {% set ms_copy_bundle = (ms_surface.copy_bundle or {}) %}
@@ -281,6 +435,955 @@
       {% set ms_slots = (ms_copy_bundle.slots or []) %}
       {% set ms_slot_index = {} %}
       {% for slot in ms_slots %}{% if ms_slot_index.update({slot.slot_id: slot}) %}{% endif %}{% endfor %}
+
+      {# ============================================================
+         Phase 2B presenter mapping (2026-05-30) · script-to-video
+         operator sections B / C / D / E / F / H. Authority:
+         docs/design/matrix_script_script_to_video_presenter_alignment_v1.md
+         §4 + §7. All sections render real existing-helper data where
+         supported (script_understanding consumes script_structure_view;
+         delivery_entry consumes ops_pr.publishable); the rest emit
+         honest operator-language placeholders carrying closed status
+         codes from
+         docs/architecture/matrix_script_script_to_video_contract_alignment_v1.md §5.
+
+         Forbidden in primary view (Sections B–H): vendor / model /
+         provider / engine names; raw publish_readiness / head_reason /
+         artifact_lookup / final_video / RC-R8 / event_kind / closure /
+         source_script_ref / content:// / slot_pack / provenance /
+         variation_axis. Those tokens live only in Section J (technical
+         diagnostics, collapsed).
+
+         Reuses PR-A wires: Section A = matrix-script-main-video-result;
+         the PR-A production-flow-stepper anchor is preserved INSIDE
+         Section C as a compact navigation header for back-compat with
+         PR-A's structural tests.
+         ============================================================ #}
+
+      {# Section B · 脚本理解 — operator-language script understanding.
+         Source: script_structure_view (already wired by PR-A Section 2
+         step 1). Adds 卖点 row as presenter placeholder (no helper
+         field today). #}
+      {% if ms_script_structure.is_matrix_script %}
+        <div class="op-card op-card--accent-indigo"
+             data-role="matrix-script-section-script-understanding"
+             data-redesign-wave="2026-05-30-phase2b">
+          {# Phase 2D (2026-05-30) · demoted from a primary <h2> section to a
+             compact supporting detail INSIDE 生成方案确认 (②). The storyboard
+             plan (§C) is the dominant visible content; 脚本理解 reads as
+             collapsed supporting detail. All sub-anchors + data-status-code
+             values are preserved verbatim inside the <details>. #}
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">支撑</span>
+              <h3 class="op-section-subtitle" data-role="ms-section-script-understanding-title">脚本理解（支撑细节）</h3>
+              <span class="op-pill op-pill--ready"><span class="op-pill__dot"></span>已具备</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-script-understanding-subtitle">这是系统从脚本里读懂的内容：三段式结构、关键词、禁用词、卖点，以及目标受众、语气、时长、平台与语言。后续生成会以此为准。</p>
+          <details data-role="ms-section-script-understanding-fold">
+            <summary style="cursor:pointer; color:var(--op-muted,#6b7280); font-size:13px;">展开脚本理解细节（三段式 / 关键词 / 禁用词 / 受众 / 语气 / 时长 / 平台 / 语言）</summary>
+          <div class="op-meta-grid" style="margin-top:10px;">
+            {% for section in (ms_script_structure.sections or []) %}
+              <div class="op-meta-item" data-role="ms-section-script-understanding-segment"
+                   data-section-id="{{ section.section_id }}">
+                <span class="op-meta-item__label">{{ section.section_label_zh }}</span>
+                <span class="op-meta-item__value">
+                  {% if section.body_text %}{{ section.body_text }}{% else %}{{ section.body_status_label_zh }}{% endif %}
+                </span>
+              </div>
+            {% endfor %}
+            <div class="op-meta-item" data-role="ms-section-script-understanding-selling-points"
+                 data-status-code="selling_points_pending_upstream">
+              <span class="op-meta-item__label">卖点</span>
+              <span class="op-meta-item__value op-tech-note">卖点项接入后会在这里逐条展开；当前阶段以脚本主旨为准。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-script-understanding-target-audience">
+              <span class="op-meta-item__label">目标受众</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.target_audience_value or "以脚本主旨为准" }}</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-script-understanding-tone">
+              <span class="op-meta-item__label">语气</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.tone_value or "以脚本主旨为准" }}</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-script-understanding-duration">
+              <span class="op-meta-item__label">时长</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.duration_value or "以脚本与平台默认为准" }}</span>
+            </div>
+            {% for tax in (ms_script_structure.taxonomy or []) %}
+              <div class="op-meta-item" data-role="ms-section-script-understanding-taxonomy"
+                   data-taxonomy-id="{{ tax.taxonomy_id }}">
+                <span class="op-meta-item__label">{{ tax.taxonomy_label_zh }}</span>
+                <span class="op-meta-item__value">
+                  {% if tax["values"] %}{% for v in tax["values"] %}{{ v }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}{{ tax.values_status_label_zh }}{% endif %}
+                </span>
+              </div>
+            {% endfor %}
+            <div class="op-meta-item" data-role="ms-section-script-understanding-target-platform">
+              <span class="op-meta-item__label">目标平台</span>
+              <span class="op-meta-item__value">{{ ms_script_structure.target_platform_value or "—" }}</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-script-understanding-target-language">
+              <span class="op-meta-item__label">目标语言</span>
+              <span class="op-meta-item__value">
+                {% set _tl = (ms_script_structure.language_scope or {}).target_language %}
+                {% if _tl %}{{ _tl | join("、") }}{% else %}—{% endif %}
+              </span>
+            </div>
+          </div>
+          </details>
+        </div>
+      {% endif %}
+
+      {# Section C · 视频生成计划 — the CORE script-to-video product
+         object. Per design alignment §4.C: scene-plan helper does not
+         exist today; rows are presenter-deterministic placeholders
+         derived from the script_understanding segments (Hook / Body /
+         CTA → 3 scenes). Every row carries
+         data-status-code="plan_pending_upstream" so tests can assert
+         on the closed status code, not on copy. Embeds the PR-A
+         production-flow-stepper anchor as a compact navigation header
+         (back-compat with PR-A's structural tests). #}
+      {% if ms_script_structure.is_matrix_script %}
+        {% set _ms_phase2b_sections = (ms_script_structure.sections or []) %}
+        <div class="op-card op-card--accent-emerald"
+             data-role="matrix-script-section-generation-plan"
+             data-redesign-wave="2026-05-30-phase2b"
+             data-status-code="plan_pending_upstream">
+          {# Phase 2D (2026-05-30) · the storyboard is the DOMINANT visible
+             content of 生成方案确认 (②). Heading demoted from <h2> to <h3>
+             so 生成方案确认 is the single primary heading; the scene list
+             below stays fully visible. data-role + string preserved. #}
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">分镜草案</span>
+              <h3 class="op-section-subtitle" data-role="ms-section-generation-plan-title">视频生成计划 · 故事板</h3>
+              <span class="op-pill op-pill--review" data-role="ms-section-generation-plan-status-pill">占位草案</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-generation-plan-subtitle">这是基于脚本理解整理的分镜草案，帮助你预览成片节奏。方案生成能力接入后，会替换为可逐镜编辑的真实分镜，<b>当前未声明任何镜头已就绪</b>。</p>
+
+          {# Storyboard / scene list — 3 placeholder rows derived from
+             script_understanding sections (Hook / Body / CTA). Each row
+             carries data-status-code="plan_pending_upstream"; no row
+             claims resolved truth. #}
+          <ul style="margin:8px 0 0 0; padding:0; list-style:none; display:grid; gap:10px;"
+              data-role="ms-section-generation-plan-scene-list"
+              data-scene-count="{{ _ms_phase2b_sections | length or 3 }}">
+            {# Eleven storyboard fields per Phase 1 mock §C + presenter
+               alignment §6.2. Sample content is deterministic and
+               product-language; all unsupported items carry honest
+               chips (当前占位 / 后台待接入 / 未接入素材匹配) but the
+               section reads as a generation plan, not as a status row. #}
+            {% set _scene_meta = [
+              ('Hook · 前 3 秒', '人物近景 · 自然光 · 情绪密度高', '厨房 / 阳台 / 农场（自然采光）', '微笑女性 · 切到主体特写', '上扬 · 轻快', 'AI 主播 · 温和女声 zh-CN'),
+              ('Body · 中段', '食材特写 · 颗粒感 · 慢动作可选', '超市 / 农场（干净背景）', '主体特写 ×2 · 真实试用镜头', '上扬', '同 1 号主角'),
+              ('CTA · 结尾', '直视镜头 · 字幕强化 · 收尾 sting', '保持情绪一致性 · 同 1 号', '慢镜头举起主体 · 终镜定格', '上扬 · 收尾 sting', '同 1 号主角'),
+            ] %}
+            {% for label, intent, bg, broll, music, role in _scene_meta %}
+              {% set _idx = loop.index %}
+              {% set _seg = _ms_phase2b_sections[_idx - 1] if _ms_phase2b_sections | length >= _idx else {} %}
+              <li data-role="ms-section-generation-plan-scene-row"
+                  data-scene-index="{{ _idx }}"
+                  data-status-code="plan_pending_upstream"
+                  style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+                <div style="display:flex; gap:10px; align-items:baseline; margin-bottom:8px;">
+                  <span data-role="ms-section-generation-plan-scene-number"
+                        style="font-weight:700; color:var(--op-accent, #2563eb); font-size:16px; background:#eff6ff; border-radius:6px; padding:1px 10px;">场景 {{ _idx }}</span>
+                  <strong style="font-size:14px;">{{ label }}</strong>
+                  <span class="op-pill op-pill--neutral" data-role="ms-section-generation-plan-scene-status">当前占位</span>
+                </div>
+                <div class="op-meta-grid" style="font-size:12px; grid-template-columns:repeat(2, 1fr);">
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-script-segment">
+                    <span class="op-meta-item__label">脚本片段</span>
+                    <span class="op-meta-item__value">{% if _seg and _seg.body_text %}{{ _seg.body_text }}{% else %}—{% endif %}</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-visual-intent">
+                    <span class="op-meta-item__label">视觉意图</span>
+                    <span class="op-meta-item__value">{{ intent }}</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-background-suggestion">
+                    <span class="op-meta-item__label">背景建议 <span class="op-pill op-pill--neutral" style="font-size:10px;">未接入素材匹配</span></span>
+                    <span class="op-meta-item__value">{{ bg }}</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-broll-suggestion">
+                    <span class="op-meta-item__label">B-Roll 建议 <span class="op-pill op-pill--neutral" style="font-size:10px;">未接入素材匹配</span></span>
+                    <span class="op-meta-item__value">{{ broll }}</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-product-material-slot">
+                    <span class="op-meta-item__label">产品素材位 <span class="op-pill op-pill--neutral" style="font-size:10px;">运营可上传</span></span>
+                    <span class="op-meta-item__value">[空槽位]</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-role">
+                    <span class="op-meta-item__label">角色 / 出镜</span>
+                    <span class="op-meta-item__value">{{ role }}</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-voiceover">
+                    <span class="op-meta-item__label">旁白</span>
+                    <span class="op-meta-item__value">{% if _seg and _seg.body_text %}{{ _seg.body_text }}{% else %}—{% endif %}（默认 = 脚本片段，可编辑）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-subtitle">
+                    <span class="op-meta-item__label">字幕</span>
+                    <span class="op-meta-item__value">{% if _seg and _seg.body_text %}{{ _seg.body_text[:24] }}…{% else %}—{% endif %}（关键词高亮）</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-music-mood">
+                    <span class="op-meta-item__label">音乐情绪</span>
+                    <span class="op-meta-item__value">{{ music }}</span>
+                  </div>
+                  <div class="op-meta-item" data-role="ms-section-generation-plan-scene-aspect-ratio">
+                    <span class="op-meta-item__label">画幅</span>
+                    <span class="op-meta-item__value">9:16</span>
+                  </div>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+          <p class="op-tech-note" data-role="ms-section-generation-plan-honest-disclaimer" style="margin-top:10px;">
+            上述分镜为占位草案；方案生成能力接入后会替换为真实分镜，每个镜头可单独编辑。当前不声明任何镜头已就绪。
+          </p>
+        </div>
+      {% endif %}
+
+      {# Phase 2D (2026-05-30) · result-oriented IA group header ③ ·
+         成片要素调整. Merges §D 画面与素材 + §E 角色与声音 + §F 字幕与音乐
+         into one primary section read as operator-adjustable video intent.
+         The three legacy cards below are demoted from <h2> to compact
+         <h3> subcards; all container + sub-anchors preserved in order. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card op-card--accent-amber"
+             data-role="ms-section-final-elements"
+             data-redesign-wave="2026-05-30-phase2d"
+             style="margin-bottom:4px;">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--amber">③ · 要素</span>
+              <h2 class="op-section-title" data-role="ms-section-final-elements-title">成片要素调整</h2>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-final-elements-summary">系统已给出默认成片配置，你可以按账号风格微调。下面三张卡分别对应画面与素材、角色与声音、字幕与音乐。</p>
+          <ul data-role="ms-section-final-elements-examples" style="margin:6px 0 0 0; padding-left:18px; color:var(--op-muted,#6b7280); font-size:13px; line-height:1.7;">
+            <li>画面与素材：海边 / 圣女果特写 / 试吃动作 / 递向镜头</li>
+            <li>角色与声音：清爽女声 / 自然种草 / 甜美但不过度广告感</li>
+            <li>字幕与音乐：大字高亮 / 底部居中 / 轻快上扬 BGM</li>
+          </ul>
+        </div>
+      {% endif %}
+
+      {# Section D · 画面与素材 — placeholder for background / B-Roll /
+         product material slots. No helper today; Phase 5 Asset Supply
+         bridge will populate. Status code: broll_pending_upstream. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card op-card--accent-amber"
+             data-role="matrix-script-section-visual-materials"
+             data-redesign-wave="2026-05-30-phase2b"
+             data-status-code="broll_pending_upstream">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--amber">画面</span>
+              <h3 class="op-section-subtitle" data-role="ms-section-visual-materials-title">画面与素材</h3>
+              <span class="op-pill op-pill--neutral" data-role="ms-section-visual-materials-status-pill">当前占位</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-visual-materials-subtitle">素材匹配能力接入后，会在这里出现背景、B-Roll 与产品素材候选；当前可先记录素材意图，作为后续匹配的输入。</p>
+          {# Phase 2C (2026-05-30): three repeated pending slots consolidated
+             into ONE operator-facing intent panel as the primary read. The
+             original bg / broll / product slot anchors are preserved below
+             (back-compat with script-to-video phase2b structural tests) but
+             demoted into a collapsed detail so they no longer dominate the
+             scan. Copy / layout only; no upload endpoint, no packet write,
+             no fake media. #}
+          <div data-role="ms-section-visual-materials-intent-panel"
+               data-status-code="broll_pending_upstream"
+               style="margin-top:8px; padding:14px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:10px; background:#fffdf7;">
+            <div style="font-size:14px; color:var(--op-fg-mid, #334155);"><strong>素材意图</strong></div>
+            <p class="op-meta-item__value" style="margin-top:6px; line-height:1.6;">把这条视频需要的背景、B-Roll 与产品镜头先写清楚：拍什么场景、要不要真人出镜、有没有自带产品素材。匹配能力接入后，系统会按这里的意图给出候选，你再选用或替换。</p>
+          </div>
+          <details data-role="ms-section-visual-materials-slots-fold" style="margin-top:8px;">
+            <summary style="cursor:pointer; font-size:13px;">查看背景 / B-Roll / 产品素材候选位（接入后开放）</summary>
+            <div class="op-meta-grid" style="margin-top:8px;">
+              <div class="op-meta-item" data-role="ms-section-visual-materials-bg-slot"
+                   data-status-code="broll_pending_upstream">
+                <span class="op-meta-item__label">背景候选位</span>
+                <span class="op-meta-item__value op-tech-note">素材库与运营上传素材的匹配结果将在此处展开。</span>
+              </div>
+              <div class="op-meta-item" data-role="ms-section-visual-materials-broll-slot"
+                   data-status-code="broll_pending_upstream">
+                <span class="op-meta-item__label">B-Roll 候选位</span>
+                <span class="op-meta-item__value op-tech-note">每个镜头的 B-Roll 候选将在此处展开。</span>
+              </div>
+              <div class="op-meta-item" data-role="ms-section-visual-materials-product-slot"
+                   data-status-code="broll_pending_upstream">
+                <span class="op-meta-item__label">产品素材位</span>
+                <span class="op-meta-item__value op-tech-note">运营在「新建」上传的产品镜头将在此处出现。</span>
+              </div>
+            </div>
+          </details>
+          <div class="op-section-actions task-actions" data-role="ms-section-visual-materials-actions" style="margin-top:8px;">
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-visual-materials-replace-bg"
+                    title="背景候选接入后开放替换。"
+                    disabled aria-disabled="true">替换背景</button>
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-visual-materials-replace-broll"
+                    title="B-Roll 候选接入后开放替换。"
+                    disabled aria-disabled="true">替换 B-Roll</button>
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-visual-materials-regenerate"
+                    title="素材匹配能力接入后开放重新推荐。"
+                    disabled aria-disabled="true">重新生成视觉建议</button>
+          </div>
+          <p class="op-tech-note" data-role="ms-section-visual-materials-commercial-note" style="margin-top:6px;">
+            素材接入后，每个候选会标注商业可用 / 需审核 / 运营上传。
+          </p>
+        </div>
+      {% endif %}
+
+      {# Section E · 角色与声音 — operator-language preferences only.
+         No vendor / model / engine names. VoiceTrans is a future
+         runtime-layer provider via factory_audio_plan bridge; not
+         embedded as iframe / raw form here. Status code:
+         voice_preview_pending_voicetrans. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card op-card--accent-violet"
+             data-role="matrix-script-section-role-voice"
+             data-redesign-wave="2026-05-30-phase2b"
+             data-status-code="voice_preview_pending_voicetrans">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--violet">角色</span>
+              <h3 class="op-section-subtitle" data-role="ms-section-role-voice-title">角色与声音</h3>
+              <span class="op-pill op-pill--neutral" data-role="ms-section-role-voice-status-pill">当前占位</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-role-voice-subtitle">在这里选择这条视频要用的角色与声音偏好：是否真人出镜、声音气质、语气与目标语言。语音预览能力接入后会在这里实时试听；当前阶段以偏好选择为准，所选偏好会作为后续生成的输入。</p>
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="ms-section-role-voice-role-choice">
+              <span class="op-meta-item__label">角色</span>
+              <span class="op-meta-item__value">AI 主播 · 温和女声（默认占位）</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-role-voice-persona">
+              <span class="op-meta-item__label">气质</span>
+              <span class="op-meta-item__value">温和 / 真诚（占位）</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-role-voice-voice-style">
+              <span class="op-meta-item__label">语气</span>
+              <span class="op-meta-item__value">自然亲切（占位）</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-role-voice-target-language">
+              <span class="op-meta-item__label">目标语言</span>
+              <span class="op-meta-item__value">
+                {% set _tl2 = (ms_script_structure.language_scope or {}).target_language %}
+                {% if _tl2 %}{{ _tl2 | join("、") }}{% else %}zh-CN（占位）{% endif %}
+              </span>
+            </div>
+          </div>
+          <div data-role="ms-section-role-voice-preview-slot"
+               data-status-code="voice_preview_pending_voicetrans"
+               style="margin-top:10px;">
+            <span class="op-pill op-pill--neutral" data-role="ms-section-role-voice-preview-label">🔊 试听能力接入后开放</span>
+          </div>
+          <p class="op-tech-note" data-role="ms-section-role-voice-no-iframe-note" style="margin-top:8px;">
+            语音由系统统一接入，本节不嵌入任何外部页面；运营只需在这里选择声音偏好，不需要关心底层实现。
+          </p>
+        </div>
+      {% endif %}
+
+      {# Section F · 字幕与音乐 — subtitle style + BGM mood placeholders.
+         Status codes: subtitle_style_pending_compose,
+         bgm_pending_upstream. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card"
+             data-role="matrix-script-section-subtitle-music"
+             data-redesign-wave="2026-05-30-phase2b"
+             data-status-code="subtitle_style_pending_compose">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">字幕音乐</span>
+              <h3 class="op-section-subtitle" data-role="ms-section-subtitle-music-title">字幕与音乐</h3>
+              <span class="op-pill op-pill--neutral" data-role="ms-section-subtitle-music-status-pill">当前占位</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-subtitle-music-subtitle">已沿用新建页中的字幕与声音偏好；可在此处调整展示样式。预览生成后这些选择会应用到成片。</p>
+          {# Phase 2C (2026-05-30): subtitle / BGM controls become selectable
+             so the operator can express display intent. UI-only — these
+             <select> elements carry NO name= attribute, submit nothing, and
+             write no packet / route / storage truth. The data-role anchors
+             and data-status-code values are preserved bytewise for the
+             script-to-video phase2b structural tests. #}
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="ms-section-subtitle-music-font"
+                 data-status-code="subtitle_style_pending_compose">
+              <span class="op-meta-item__label">字体</span>
+              <select class="op-input" data-role="ms-section-subtitle-music-font-select" aria-label="字幕字体">
+                <option>思源黑 Bold · 大字 · 关键词高亮</option>
+                <option>思源黑 Regular · 常规</option>
+                <option>圆体 · 亲和</option>
+              </select>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-subtitle-music-position"
+                 data-status-code="subtitle_style_pending_compose">
+              <span class="op-meta-item__label">位置</span>
+              <select class="op-input" data-role="ms-section-subtitle-music-position-select" aria-label="字幕位置">
+                <option>底部居中</option>
+                <option>底部偏上</option>
+                <option>顶部</option>
+              </select>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-subtitle-music-bgm-mood"
+                 data-status-code="bgm_pending_upstream">
+              <span class="op-meta-item__label">BGM 情绪</span>
+              <select class="op-input" data-role="ms-section-subtitle-music-bgm-mood-select" aria-label="背景音乐情绪">
+                <option>上扬 / 轻快</option>
+                <option>舒缓 / 温暖</option>
+                <option>快节奏 / 动感</option>
+                <option>无背景音乐</option>
+              </select>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-subtitle-music-bgm-volume"
+                 data-status-code="bgm_pending_upstream">
+              <span class="op-meta-item__label">音量</span>
+              <select class="op-input" data-role="ms-section-subtitle-music-bgm-volume-select" aria-label="背景音乐音量">
+                <option>35%（自动避让旁白）</option>
+                <option>20%（更轻）</option>
+                <option>50%（更明显）</option>
+              </select>
+            </div>
+          </div>
+          <p class="op-tech-note" style="margin-top:6px;">
+            <span class="op-pill op-pill--neutral" data-role="ms-section-subtitle-music-preview-chip">预览生成后生效</span>
+          </p>
+          <div class="op-section-actions task-actions" data-role="ms-section-subtitle-music-actions" style="margin-top:8px;">
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-subtitle-music-replace-music"
+                    title="替换 / 上传背景音乐的能力尚未接入。"
+                    disabled aria-disabled="true">替换 / 上传背景音乐</button>
+          </div>
+        </div>
+      {% endif %}
+
+      {# Phase 2D (2026-05-30) · result-oriented IA group header ④ ·
+         视频版本（可选）. Demotes the variant section: variants are an
+         OPTIONAL step the operator can generate AFTER confirming the main
+         video. The §G card below keeps its locked <h2>视频变体</h2> heading
+         + all anchors; this header only reframes it as optional. No claim
+         that any version has already been generated. #}
+      {% if ms_preview_compare.is_matrix_script %}
+        <div class="op-card"
+             data-role="ms-section-video-versions-group"
+             data-redesign-wave="2026-05-30-phase2d"
+             style="margin-bottom:4px;">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">④ · 版本</span>
+              <h2 class="op-section-title" data-role="ms-section-video-versions-group-title">视频版本（可选）</h2>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-video-versions-group-summary">这一步是可选的：确认主视频后，你可以再生成多个视频版本来对比测试。下面列出的 V1 / V2 / V3 是建议方向，尚未生成；会标注「哪里不同 / 为什么测这一版 / 适合哪些账号或场景」。</p>
+        </div>
+      {% endif %}
+
+      {# PR-A reset (2026-05-29) · Section G · 视频变体 (renamed from 可选变体
+         by Phase 2B 2026-05-30). Compact: 当前主推版本 + N-1 其他变体 (folded)
+         + 追加生成 / 同时生成多个变体 (disabled-with-tooltip). Empty state is
+         ONE operator-language message (Mission §B.3 wording). No large
+         backend-style variant tables; no per-variant raw cell_id / slot_id /
+         axis tuples; no fake main video. Per-variant review-zone forms are
+         deferred to Section J for back-compat (PR-A preserves data-role
+         markers there). #}
+      {% if ms_preview_compare.is_matrix_script %}
+        {% set ms_s3_any_resolved = namespace(value=False) %}
+        {% for variation in (ms_preview_compare.variations or []) %}
+          {% if variation.preview_status_code in ("current_fresh", "historical") %}{% set ms_s3_any_resolved.value = True %}{% endif %}
+        {% endfor %}
+        {% set ms_s3_total = (ms_preview_compare.variations or []) | length %}
+        {% set ms_s3_recommended_id = (ms_recommended_action.recommended_variant or {}).variation_id %}
+        <div class="op-card" data-role="matrix-script-section-optional-variants"
+             data-redesign-wave="2026-05-30-phase2b"
+             data-any-preview-resolved="{{ 'true' if ms_s3_any_resolved.value else 'false' }}">
+          {# Phase 2B (2026-05-30) · Section G · 视频变体 — variants are
+             VIDEO VERSIONS now ("V1 / V2 / V3" with 哪里不同 / 为什么
+             测 / 推荐), not axis-tuple rows. The PR-A back-compat
+             anchor matrix-script-section-optional-variants is preserved
+             on the outer card; the new video-versions anchor is added
+             inside for Phase 2B tests. #}
+          <div data-role="matrix-script-section-video-versions"
+               data-redesign-wave="2026-05-30-phase2b"></div>
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">G · 变体</span>
+              <h2 class="op-section-title" data-role="ms-section-optional-variants-title">视频变体</h2>
+              {% if ms_s3_any_resolved.value %}
+                <span class="op-pill op-pill--review" data-role="ms-section-optional-variants-pill">1 主推 + {{ ms_s3_total - 1 }} 备选</span>
+              {% else %}
+                <span class="op-pill op-pill--neutral" data-role="ms-section-optional-variants-pill">暂未生成</span>
+              {% endif %}
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-section-optional-variants-subtitle">每一个变体都是一个完整的视频版本。系统会告诉你「哪里不同 / 为什么测这一版 / 适合哪些账号 · 场景 / 推荐哪个」，你照着选就行。</p>
+
+          {# Phase 2B fidelity fix (2026-05-30): V1 / V2 / V3 video-version
+             cards rendered as primary §G content (per Phase 1 mock §G +
+             alignment §6.6 video_versions_view shape). Deterministic
+             sample content; each card carries:
+               - version_id (V1 / V2 / V3)
+               - headline_zh ("V1 · 厨房 · 上扬")
+               - differentiator_zh ("哪里不同" one-liner)
+               - why_test_zh ("为什么测这一版" one-liner)
+               - is_recommended (⭐ marker on V1 only)
+               - current state (当前占位 — main-video worker pending)
+             Operator no longer reads axis-tuple raw labels. The legacy
+             empty-state copy + main+others-fold structure are preserved
+             BELOW for back-compat with the existing PR-A test suite. #}
+          <div data-role="ms-section-video-versions-list"
+               style="display:grid; gap:10px; margin-top:10px;">
+            {# V1 — ⭐ recommended baseline version #}
+            <div data-role="ms-section-video-versions-card"
+                 data-version-id="V1"
+                 data-is-recommended="true"
+                 data-status-code="variants_pending_capability"
+                 style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+              <div style="display:flex; gap:10px; align-items:baseline;">
+                <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V1 · 厨房 · 上扬</strong>
+                <span class="op-pill op-pill--ready"
+                      data-role="ms-section-video-versions-card-recommended-marker">⭐ 推荐</span>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">待生成</span>
+              </div>
+              <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
+                  <span class="op-meta-item__label">哪里不同</span>
+                  <span class="op-meta-item__value">背景：温馨厨房 · BGM：上扬 · 字幕：大字高亮</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
+                  <span class="op-meta-item__label">为什么测这一版</span>
+                  <span class="op-meta-item__value">主流情绪基线版，覆盖大多数账号 / 时段。</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-audience">
+                  <span class="op-meta-item__label">适合哪些账号 / 场景</span>
+                  <span class="op-meta-item__value">大众生活号 · 黄金时段首发 · 想要稳妥起量的账号。</span>
+                </div>
+              </div>
+            </div>
+
+            {# V2 — alternate version #}
+            <div data-role="ms-section-video-versions-card"
+                 data-version-id="V2"
+                 data-is-recommended="false"
+                 data-status-code="variants_pending_capability"
+                 style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+              <div style="display:flex; gap:10px; align-items:baseline;">
+                <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V2 · 农场 · 真情实感</strong>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-alt-marker">备选</span>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">待生成</span>
+              </div>
+              <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
+                  <span class="op-meta-item__label">哪里不同</span>
+                  <span class="op-meta-item__value">背景：农场摘菜 · BGM：舒缓 · 字幕：极简</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
+                  <span class="op-meta-item__label">为什么测这一版</span>
+                  <span class="op-meta-item__value">测试真情实感对完播率的影响。</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-audience">
+                  <span class="op-meta-item__label">适合哪些账号 / 场景</span>
+                  <span class="op-meta-item__value">原产地 / 溯源人设号 · 信任感优先的种草场景。</span>
+                </div>
+              </div>
+            </div>
+
+            {# V3 — alternate version #}
+            <div data-role="ms-section-video-versions-card"
+                 data-version-id="V3"
+                 data-is-recommended="false"
+                 data-status-code="variants_pending_capability"
+                 style="border:1px solid var(--op-card-bd, #e5e7eb); border-radius:8px; padding:12px 14px; background:#fbfdff;">
+              <div style="display:flex; gap:10px; align-items:baseline;">
+                <strong data-role="ms-section-video-versions-card-headline" style="font-size:14px;">V3 · 超市 · 快节奏</strong>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-alt-marker">备选</span>
+                <span class="op-pill op-pill--neutral"
+                      data-role="ms-section-video-versions-card-status">待生成</span>
+              </div>
+              <div class="op-meta-grid" style="font-size:12px; grid-template-columns:1fr 1fr; margin-top:8px;">
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-differentiator">
+                  <span class="op-meta-item__label">哪里不同</span>
+                  <span class="op-meta-item__value">背景：超市果蔬区 · BGM：上扬快 · 字幕：大字 + 切镜紧</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-why-test">
+                  <span class="op-meta-item__label">为什么测这一版</span>
+                  <span class="op-meta-item__value">测试 30 秒以内快剪对停留时长的影响。</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-section-video-versions-card-audience">
+                  <span class="op-meta-item__label">适合哪些账号 / 场景</span>
+                  <span class="op-meta-item__value">年轻快消号 · 信息流快节奏场景 · 主打停留时长。</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {# Legacy PR-A empty-state + main/others-fold preserved BELOW
+             for back-compat with the PR-A optional-variants test suite.
+             These markers are no longer the dominant Section G content
+             after the Phase 2B fidelity fix. #}
+          {% if not ms_s3_any_resolved.value %}
+            <div class="op-banner op-banner--review" data-role="ms-section-optional-variants-empty" style="margin-top:10px;">
+              <div>
+                <div class="op-banner__title">暂未生成变体视频</div>
+                <div class="op-banner__body">你可以先生成主视频，或选择同时生成多个变体。</div>
+              </div>
+            </div>
+          {% else %}
+            {# 主推版本 + 其他变体 (folded). #}
+            {% for variation in (ms_preview_compare.variations or []) %}
+              {% set _is_main = (ms_s3_recommended_id is not none) and (variation.variation_id == ms_s3_recommended_id) %}
+              {% if _is_main %}
+                <div class="op-meta-item" data-role="ms-section-optional-variants-main-version"
+                     data-variation-id-present="true" style="margin-top:8px;">
+                  <span class="op-meta-item__label">当前主推版本</span>
+                  <span class="op-meta-item__value">候选 {{ loop.index }} · {{ variation.recommended_label_zh }}</span>
+                </div>
+              {% endif %}
+            {% endfor %}
+            <details data-role="ms-section-optional-variants-others-fold" style="margin-top:8px;">
+              <summary style="cursor:pointer; font-size:13px;">
+                其他变体（{% set _other = ms_s3_total - 1 if ms_s3_total > 0 else 0 %}{{ _other if _other > 0 else 0 }} 个，点击展开）
+              </summary>
+              <ul style="margin:6px 0 0 16px; padding:0; font-size:13px;" data-role="ms-section-optional-variants-others-list">
+                {% for variation in (ms_preview_compare.variations or []) %}
+                  {% set _is_main = (ms_s3_recommended_id is not none) and (variation.variation_id == ms_s3_recommended_id) %}
+                  {% if not _is_main %}
+                    <li data-role="ms-section-optional-variants-other-row" data-variant-index="{{ loop.index }}">
+                      候选 {{ loop.index }} · {{ variation.recommended_label_zh }}
+                    </li>
+                  {% endif %}
+                {% endfor %}
+              </ul>
+            </details>
+          {% endif %}
+
+          <div class="op-section-actions task-actions" data-role="ms-section-optional-variants-actions" style="margin-top:10px;">
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-optional-variants-action-add"
+                    title="生成主视频能力接入后开放：追加单个变体。"
+                    disabled aria-disabled="true">追加生成变体</button>
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-optional-variants-action-batch"
+                    title="生成主视频能力接入后开放：同时生成多个变体。"
+                    disabled aria-disabled="true">同时生成多个变体</button>
+          </div>
+          <p class="op-tech-note" style="margin-top:8px;">本面板不展示完整成片或外部链接；完整成片在交付页面。</p>
+        </div>
+      {% endif %}
+
+      {# Phase 2B (2026-05-30) · Section H · 校对与微调 — four review
+         zones (画面 / 旁白 / 字幕 / 文案+CTA) all in pending state
+         until main video lands. Consumes existing review_zone closure
+         path at the runtime layer; the section J fold below carries
+         the actual closure forms for back-compat. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        {# Phase 2D (2026-05-30): 校对与微调 is NO LONGER a primary section.
+           Per result-oriented IA it only becomes relevant AFTER the main
+           video lands, so it is collapsed into a default-closed <details>
+           (the heading is demoted out of the primary <h2> set). The
+           container anchor matrix-script-section-review-tuning + all four
+           ms-section-review-tuning-zone sub-anchors + review_pending_main_video
+           status codes are preserved in place, between §G and §I, above the
+           §J technical-diagnostics fold. #}
+        <div class="op-card"
+             data-role="matrix-script-section-review-tuning"
+             data-redesign-wave="2026-05-30-phase2b">
+          <details data-role="ms-section-review-tuning-fold">
+            <summary style="cursor:pointer;">
+              <span class="op-section-index">校对</span>
+              <span class="op-section-subtitle" data-role="ms-section-review-tuning-title" style="font-weight:600;">校对与微调（主视频生成后开放）</span>
+              <span class="op-pill op-pill--neutral" data-role="ms-section-review-tuning-status-pill">待主视频</span>
+            </summary>
+          <p class="op-section-helper" data-role="ms-section-review-tuning-subtitle" style="margin-top:8px;">主视频生成后，按四个分区做人工校对：画面 / 旁白 / 字幕 / 文案+CTA。运营可在任一分区提交意见。</p>
+          <div class="op-meta-grid">
+            <div class="op-meta-item" data-role="ms-section-review-tuning-zone"
+                 data-zone-id="visual_match" data-status-code="review_pending_main_video">
+              <span class="op-meta-item__label">画面匹配检查</span>
+              <span class="op-meta-item__value">待主视频生成。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-review-tuning-zone"
+                 data-zone-id="voiceover" data-status-code="review_pending_main_video">
+              <span class="op-meta-item__label">旁白校对</span>
+              <span class="op-meta-item__value">待主视频生成。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-review-tuning-zone"
+                 data-zone-id="subtitle" data-status-code="review_pending_main_video">
+              <span class="op-meta-item__label">字幕校对</span>
+              <span class="op-meta-item__value">待主视频生成。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-section-review-tuning-zone"
+                 data-zone-id="copy_cta" data-status-code="review_pending_main_video">
+              <span class="op-meta-item__label">文案 / CTA 校对</span>
+              <span class="op-meta-item__value">待主视频生成。</span>
+            </div>
+          </div>
+          <div class="op-section-actions task-actions" data-role="ms-section-review-tuning-actions" style="margin-top:10px;">
+            <button type="button" class="btn-primary"
+                    data-role="ms-section-review-tuning-accept"
+                    title="主视频生成后开放。"
+                    disabled aria-disabled="true">接受当前主版本</button>
+            <button type="button" class="btn-secondary"
+                    data-role="ms-section-review-tuning-regenerate"
+                    title="主视频生成后开放。"
+                    disabled aria-disabled="true">重新生成</button>
+          </div>
+          </details>
+        </div>
+      {% endif %}
+
+      {# PR-A reset (2026-05-29) · Section 4 · 交付入口 (lightweight).
+         Two-line summary + single CTA. NO deliverable rows; NO publish
+         form; NO publish-feedback table; NO state pill restating Section
+         1's pill. Full delivery + publish lives in Delivery Center. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card" data-role="matrix-script-section-delivery-entry"
+             data-redesign-wave="2026-05-29-pra"
+             data-publishable="{{ 'true' if ops_pr.publishable else 'false' }}">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">⑤ · 交付</span>
+              <h2 class="op-section-title" data-role="ms-section-delivery-entry-title">交付入口</h2>
+            </div>
+          </div>
+          {% if ops_pr.publishable %}
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">可交付 · 已确认主版本。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">前往交付页面填写发布设置或回填发布状态。</p>
+          {% else %}
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">当前不能交付：尚未生成主视频。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">生成完成后，可前往交付页面查看成片、字幕、音频、文案包与发布设置。</p>
+          {% endif %}
+          <div class="op-section-actions task-actions" style="margin-top:8px;">
+            <a class="btn-primary"
+               data-role="ms-section-delivery-entry-cta"
+               href="/tasks/{{ task.task_id }}/publish">前往交付页面 →</a>
+          </div>
+        </div>
+      {% endif %}
+
+      {# ============================================================
+         PR-A reset (2026-05-29) · Section 5 · 技术诊断 (collapsed,
+         architect view). Everything below this point — including the
+         retired legacy Block A / B / C / D / E / F op-cards and the
+         pre-existing PR-U2 / MS-W3 / Variation Panel / RC PR-2..PR-4
+         diagnostics — lives inside a single collapsed <details>. The
+         data-role markers of the retired legacy blocks are preserved
+         for back-compat with existing structural tests; they are not
+         visible on the operator's primary scan.
+
+         Forbidden in primary view (Sections 1–4): source_script_ref,
+         content://, publish_readiness, head_reason, artifact_lookup,
+         final_video (raw field), RC-R8, closure (raw English),
+         slot_pack, provenance, variation_axis, audience=[b2b,b2c],
+         tone=[…], length=[…], provider, model, vendor, engine,
+         任务 ID as a heading. These tokens may appear ONLY inside this
+         fold.
+         ============================================================ #}
+      <details class="op-collapse" data-role="op-console-ms-technical-diagnostics-fold">
+        <summary>
+          <span class="op-section-index" style="margin-right:8px;">5 · 诊断</span>
+          矩阵脚本 · 技术诊断（架构师视图，默认收起）
+        </summary>
+        <div class="op-collapse__hint">展开查看历史 A–F 区块、PR-U2 / MS-W3 / 变体面板 / 单脚本可读视图等内部诊断；包括 head_reason / artifact_lookup / publish_readiness / final_provenance 等技术标识。日常运营操作不依赖本节。</div>
+        <div class="op-collapse__body">
+
+
+      {# Phase 2B fidelity fix (2026-05-30): PR-A standalone
+         production-flow-stepper relocated here from primary. Section J
+         is the architect view; operators do NOT see this on first
+         scan. The anchor `matrix-script-production-flow-stepper` and
+         the four `ms-production-flow-stepper-*` / three
+         `ms-production-flow-step-detail` / nine `ms-step{1,2,3}-detail-*`
+         markers are preserved bytewise for PR-A structural test
+         back-compat. #}
+      {# PR-A reset (2026-05-29) · Section 2 · 生产流程可观测.
+         Compact 3-step strip rendered BELOW Section 1. Each step is a
+         <details> collapsed by default; clicking expands inline detail.
+         The expanded detail is the ONLY surviving operator-visible home
+         for what Blocks B / C / D used to render. Engineering vocabulary
+         (axis tuples, cell_id, slot_id, provider/model/vendor/engine,
+         publish_readiness/head_reason raw enums) is forbidden here and
+         lives only inside Section 5 (技术诊断). #}
+      {% if ms_main_video_result.is_matrix_script %}
+        {% set ms_stepper_section_count = (ms_script_structure.sections or []) | length %}
+        {% set ms_stepper_variant_count = ms_readable_variants.variant_count or 0 %}
+        {% set ms_stepper_state = ms_main_video_result.state_kind %}
+        {% set ms_step1_state = 'done' if ms_stepper_section_count >= 3 else ('active' if ms_stepper_section_count > 0 else 'todo') %}
+        {% set ms_step2_state = 'done' if ms_stepper_variant_count > 0 else ('active' if ms_script_structure.is_matrix_script else 'todo') %}
+        {% set ms_step3_state = 'done' if ms_stepper_state == 'deliverable' else ('active' if ms_stepper_state in ('awaiting_review', 'generating') else 'todo') %}
+        <div class="op-card" data-role="matrix-script-production-flow-stepper"
+             data-redesign-wave="2026-05-29-pra"
+             style="padding:14px 18px;">
+          <div class="op-section-head" style="margin-bottom:6px;">
+            <div class="op-section-head__main">
+              <span class="op-section-index">流 · 流程</span>
+              <h3 class="op-section-title" style="font-size:15px;" data-role="ms-production-flow-stepper-title">生产流程可观测</h3>
+            </div>
+          </div>
+          <p class="op-section-helper" style="margin-bottom:8px;" data-role="ms-production-flow-stepper-subtitle">
+            脚本结构 → 变体选择 → 生成。点击每一步展开运营可读详情。
+          </p>
+          <div class="op-stage-strip" data-role="ms-production-flow-stepper-strip" style="border:none; padding:0; display:flex; gap:8px; align-items:center;">
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="script_structure"
+                  data-step-state="{{ ms_step1_state }}"
+                  data-state="{{ ms_step1_state }}">
+              <span class="op-stage-strip__num">{{ '✓' if ms_step1_state == 'done' else '1' }}</span>
+              <span><strong>脚本结构</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  {% if ms_stepper_section_count >= 3 %}3 段已具备{% elif ms_stepper_section_count > 0 %}{{ ms_stepper_section_count }} 段已具备{% else %}未具备{% endif %}
+                </span>
+              </span>
+            </span>
+            <span class="op-stage-strip__sep" aria-hidden="true">→</span>
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="variant_selection"
+                  data-step-state="{{ ms_step2_state }}"
+                  data-state="{{ ms_step2_state }}">
+              <span class="op-stage-strip__num">{{ '✓' if ms_step2_state == 'done' else '2' }}</span>
+              <span><strong>变体选择</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  {% if ms_stepper_variant_count > 0 %}{{ ms_stepper_variant_count }} 个候选{% else %}未派生{% endif %}
+                </span>
+              </span>
+            </span>
+            <span class="op-stage-strip__sep" aria-hidden="true">→</span>
+            <span class="op-stage-strip__step"
+                  data-role="ms-production-flow-stepper-step"
+                  data-step-id="generation"
+                  data-step-state="{{ ms_step3_state }}"
+                  data-state="{{ ms_step3_state }}">
+              <span class="op-stage-strip__num">{{ '✓' if ms_step3_state == 'done' else '3' }}</span>
+              <span><strong>生成</strong>
+                <span style="color:var(--op-fg-soft); font-weight:400; margin-left:4px;">
+                  {{ ms_main_video_result.state_label_zh }}
+                </span>
+              </span>
+            </span>
+          </div>
+
+          {# Inline expandable detail per step. Collapsed by default. The
+             detail content is operator-language only: NO axis tuples, NO
+             raw engineering identifiers, NO provider/model/vendor/engine
+             surface. Detail bodies are the post-reset homes for Block B /
+             Block C / Block D content. #}
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="script_structure"
+                   style="margin-top:10px; padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>脚本结构</strong> · 展开 Hook / Body / CTA / 关键词 / 禁用词
+            </summary>
+            <div style="padding:8px 4px 0;">
+              {% if ms_script_structure.is_matrix_script %}
+                <div class="op-script-grid" data-role="ms-step1-detail-sections">
+                  {% for section in (ms_script_structure.sections or []) %}
+                    {% set _section_tone = "hook" if section.section_id == "hook" else ("body" if section.section_id == "body" else ("cta" if section.section_id == "cta" else "body")) %}
+                    <div class="op-script-card" data-role="ms-step1-detail-section"
+                         data-section-id="{{ section.section_id }}"
+                         data-section-status="{{ section.body_status_code }}">
+                      <span class="op-script-card__tag op-script-card__tag--{{ _section_tone }}">{{ section.section_label_zh }}</span>
+                      {% if section.body_text %}
+                        <div class="op-script-card__body" data-role="ms-step1-detail-section-body">{{ section.body_text }}</div>
+                      {% else %}
+                        <div class="op-script-card__empty" data-role="ms-step1-detail-section-empty">{{ section.body_status_label_zh }}</div>
+                      {% endif %}
+                    </div>
+                  {% endfor %}
+                </div>
+                {% if ms_script_structure.taxonomy %}
+                  <div class="op-script-grid" style="margin-top:8px;">
+                    {% for tax in (ms_script_structure.taxonomy or []) %}
+                      {% set _tax_tone = "keyword" if tax.taxonomy_id == "keywords" else ("banword" if tax.taxonomy_id == "banwords" else "body") %}
+                      <div class="op-script-card" data-role="ms-step1-detail-taxonomy"
+                           data-taxonomy-id="{{ tax.taxonomy_id }}">
+                        <span class="op-script-card__tag op-script-card__tag--{{ _tax_tone }}">{{ tax.taxonomy_label_zh }}</span>
+                        {% if tax["values"] %}
+                          <div data-role="ms-step1-detail-taxonomy-values">
+                            {% for v in tax["values"] %}<span class="op-pill op-pill--neutral" style="margin:2px 4px 2px 0;">{{ v }}</span>{% endfor %}
+                          </div>
+                        {% else %}
+                          <div class="op-script-card__empty">{{ tax.values_status_label_zh }}</div>
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% else %}
+                <div class="op-script-card__empty" data-role="ms-step1-detail-empty">尚未具备脚本结构。</div>
+              {% endif %}
+            </div>
+          </details>
+
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="variant_selection"
+                   style="padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>变体选择</strong> · 主推版本 / 变体数量 / 差异维度
+            </summary>
+            <div style="padding:8px 4px 0;" data-role="ms-step2-detail">
+              <div class="op-meta-grid">
+                <div class="op-meta-item" data-role="ms-step2-detail-main-version">
+                  <span class="op-meta-item__label">主推版本</span>
+                  <span class="op-meta-item__value">
+                    {% if (ms_recommended_action.recommended_variant or {}).variation_id %}候选 {{ (ms_recommended_action.recommended_variant or {}).variation_id }}{% else %}—{% endif %}
+                  </span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step2-detail-variant-count">
+                  <span class="op-meta-item__label">变体数量</span>
+                  <span class="op-meta-item__value">{{ ms_readable_variants.variant_count or 0 }} 个</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step2-detail-differentiator-dimensions">
+                  <span class="op-meta-item__label">差异维度</span>
+                  <span class="op-meta-item__value">语气 / 时长 / 受众 / 开头方式 / 画面方向</span>
+                </div>
+              </div>
+              {% if (ms_readable_variants.variant_candidates or []) %}
+                <ul style="margin:8px 0 0 16px; padding:0; font-size:13px; color:#334155;" data-role="ms-step2-detail-variant-list">
+                  {% for variant in ms_readable_variants.variant_candidates %}
+                    <li data-role="ms-step2-detail-variant-row" data-variant-index="{{ loop.index }}">
+                      候选 {{ loop.index }} · {{ variant.differentiator_zh or "—" }}{% if variant.length_hint_zh %} · {{ variant.length_hint_zh }}{% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+            </div>
+          </details>
+
+          <details data-role="ms-production-flow-step-detail"
+                   data-step-id="generation"
+                   style="padding:8px 0; border-top:1px solid var(--op-card-bd, #e5e7eb);">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-mid, #334155);">
+              <strong>生成</strong> · 主视频状态 / 当前阻塞 / 下一步
+            </summary>
+            <div style="padding:8px 4px 0;" data-role="ms-step3-detail">
+              <div class="op-meta-grid">
+                <div class="op-meta-item" data-role="ms-step3-detail-state">
+                  <span class="op-meta-item__label">主视频状态</span>
+                  <span class="op-meta-item__value">{{ ms_main_video_result.state_label_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step3-detail-blocker">
+                  <span class="op-meta-item__label">当前阻塞</span>
+                  <span class="op-meta-item__value">{{ ms_main_video_result.blocker_one_liner_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-step3-detail-next-action">
+                  <span class="op-meta-item__label">下一步</span>
+                  <span class="op-meta-item__value">{{ ms_main_video_result.next_action_one_liner_zh }}</span>
+                </div>
+              </div>
+              <p class="op-tech-note" style="margin-top:6px;">生成动作集中在第一屏「主视频结果」操作区；本步骤仅做只读观测。</p>
+            </div>
+          </details>
+        </div>
+      {% endif %}
+
       {# OWC-MS-RO PR-2 — Matrix Script Workbench Blocks A / B / C (read-side
          comprehension). Per matrix_script_workbench_wireframe_v1.md §3 / §4 / §5.
          Three additive operator-result-first panels rendered ABOVE the existing
@@ -387,7 +1490,9 @@
          secondary diagnostics — Block B does not surface them per wireframe §4.5
          forbidden list ("operator-readable wording only"). #}
       {% if ms_script_structure.is_matrix_script %}
-        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-b-script-structure">
+        <div class="op-card op-card--accent-indigo"
+             id="matrix-script-block-b-script-structure"
+             data-role="matrix-script-block-b-script-structure">
           <div class="op-section-head">
             <div class="op-section-head__main">
               <span class="op-section-index">B · 脚本</span>
@@ -442,11 +1547,13 @@
          handles; NO vendor / model / provider / engine column.
          Source: derive_matrix_script_readable_variants. #}
       {% if ms_readable_variants.is_matrix_script %}
-        <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-c-variant-strategy">
+        <div class="op-card op-card--accent-indigo"
+             id="matrix-script-block-c-variant-strategy"
+             data-role="matrix-script-block-c-variant-strategy">
           <div class="op-section-head">
             <div class="op-section-head__main">
               <span class="op-section-index">C · 变体</span>
-              <h2 class="op-section-title" data-role="ms-block-c-title">变体策略</h2>
+              <h2 class="op-section-title" data-role="ms-block-c-title">变体方案</h2>
               <span class="op-pill op-pill--info" data-role="ms-block-c-variant-count">
                 共 <span data-role="ms-block-c-variant-count-value">{{ ms_readable_variants.variant_count }}</span> 个候选
               </span>
@@ -524,8 +1631,8 @@
         <div class="op-card op-card--accent-indigo" data-role="matrix-script-block-d-generate-regenerate">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">D · 行动</span>
-              <h2 class="op-section-title" data-role="ms-block-d-title">生成 / 重新生成</h2>
+              <span class="op-section-index">D · 生成</span>
+              <h2 class="op-section-title" data-role="ms-block-d-title">生成进度</h2>
               <span class="info-pill ms-result-status__kind ms-result-status__kind--{{ ms_recommended_action.status_kind }}"
                     data-role="ms-block-d-status-kind">{{ ms_recommended_action.status_label_zh }}</span>
             </div>
@@ -547,7 +1654,7 @@
               </button>
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-block-d-subtitle">面向运营的一键生成与定点重生；前置条件与阻塞原因来自统一 publish_readiness 上游，本面板不发明事实。</p>
+          <p class="op-section-helper" data-role="ms-block-d-subtitle">面向运营的一键生成与定点重生；前置条件与阻塞原因由发布门禁决定，本面板不发明事实。</p>
 
           <div class="op-banner op-banner--next">
             <div>
@@ -633,15 +1740,51 @@
            each card looks up by id from the source-of-truth dicts. #}
         {% set ms_block_e_pkg_rows = (ms_delivery_ready_package.rows or []) %}
         {% set ms_block_e_review_rows = (ms_review_zone.review_status_rows or []) %}
-        <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-candidate-review">
+        {# 2026-05-28 redesign — honesty audit: do ANY variations have a
+           resolved preview/final media (preview_status_code == "current_fresh"
+           or "historical")? If not, render a single operator-language
+           message in place of N empty candidate cards. The per-variation
+           cards' data-role markers stay reachable when any one variation
+           is resolved. #}
+        {% set ms_block_e_any_resolved = namespace(value=False) %}
+        {% for variation in ms_preview_compare.variations %}
+          {% if variation.preview_status_code in ("current_fresh", "historical") %}
+            {% set ms_block_e_any_resolved.value = True %}
+          {% endif %}
+        {% endfor %}
+        {# PR-2C (redesign 2026-05-28) · Block E renamed from 候选评审
+           to 可选变体. Restructured as "1 主推版本 + N 其他变体".
+           Empty state uses Mission §B.3 verbatim wording. Per-variant
+           review-zone forms preserved bytewise inside the expanded
+           variant details. #}
+        <div class="op-card op-card--accent-violet" data-role="matrix-script-block-e-candidate-review"
+             data-any-preview-resolved="{{ 'true' if ms_block_e_any_resolved.value else 'false' }}"
+             data-redesign-wave="2026-05-28-pr2c">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--violet">E · 评审</span>
-              <h2 class="op-section-title" data-role="ms-block-e-title">候选评审</h2>
-              <span class="op-pill op-pill--review">{{ ms_preview_compare.variations | length }} 候选并排</span>
+              <span class="op-section-index op-section-index--violet">E · 变体</span>
+              <h2 class="op-section-title" data-role="ms-block-e-title">可选变体</h2>
+              {% if ms_block_e_any_resolved.value %}
+                <span class="op-pill op-pill--review">1 主推 + {{ (ms_preview_compare.variations | length) - 1 }} 备选</span>
+              {% else %}
+                <span class="op-pill op-pill--neutral" data-role="ms-block-e-no-preview-pill">暂未生成</span>
+              {% endif %}
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-block-e-subtitle">每个候选独立预览 / 字幕 / 配音 / 质检；⭐ 推荐由统一 publish_readiness 决定，不发明事实、不展示 final_video 媒体链接。</p>
+          <p class="op-section-helper" data-role="ms-block-e-subtitle">主视频的备选脚本变体在这里展开；主推版本由 publish_readiness 与 closure 操作决定。</p>
+          {% if not ms_block_e_any_resolved.value %}
+            {# Mission §B.3 verbatim empty-state. PR-2C update — replaces
+               the PR-0 wording to match the approved product decision #2. #}
+            <div class="op-banner op-banner--review" data-role="ms-block-e-no-preview-available">
+              <div>
+                <div class="op-banner__title">暂未生成变体视频</div>
+                <div class="op-banner__body">你可以先生成主视频，或选择同时生成多个变体。</div>
+              </div>
+            </div>
+            <div class="op-tech-note" data-role="ms-block-e-no-fake-final-video-note" style="margin-top:10px;">
+              本面板不展示完整成片或外部链接；完整成片在交付页面。
+            </div>
+          {% else %}
           {% set ms_block_e_recommended_id = (ms_recommended_action.recommended_variant or {}).variation_id %}
           {% for variation in ms_preview_compare.variations %}
             {% set _idx = loop.index %}
@@ -849,6 +1992,7 @@
           <div class="muted t-secondary" data-role="ms-block-e-no-fake-final-video-note" style="margin-top:6px;">
             本面板不展示 final_video / 媒体链接 / 发布 URL — 上述项由统一 publish_readiness 与 Delivery Center 收敛（RC-R8）。
           </div>
+          {% endif %}
         </div>
       {% endif %}
 
@@ -866,15 +2010,40 @@
          button (publishing happens in the Delivery Center / Publish Feedback
          only); no second-source publishable derivation; no fabricated URLs. #}
       {% if ms_delivery_comprehension.is_matrix_script %}
-        <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-f-delivery-teaser">
+        {# 2026-05-28 redesign — Mission §4 says workbench shows a SHORT
+           delivery status card; full per-deliverable detail belongs in
+           Delivery Center. We compute a "have / need" split honestly from
+           the same delivery_comprehension lane data, render mission-
+           mandated default copy when nothing is resolved, and link out to
+           the Delivery Center. The detailed per-row markers
+           (ms-block-f-required-row / ms-block-f-optional-row) are no
+           longer rendered in the workbench per Mission §4; coordinators
+           inspect them in the Delivery Center surface. #}
+        <div class="op-card op-card--accent-emerald" data-role="matrix-script-block-f-delivery-teaser"
+             data-redesign-wave="2026-05-28-ms-ui">
+        {% set ms_block_f_required_rows = (ms_delivery_comprehension.lanes.required_blocking.rows or []) + (ms_delivery_comprehension.lanes.required_non_blocking.rows or []) %}
+        {% set ms_block_f_resolved = namespace(items=[]) %}
+        {% set ms_block_f_missing = namespace(items=[]) %}
+        {% for row in ms_block_f_required_rows %}
+          {% if row.artifact_status_code == "current_fresh" %}
+            {% set _ = ms_block_f_resolved.items.append(row.kind_label_zh or row.kind) %}
+          {% else %}
+            {% set _ = ms_block_f_missing.items.append(row.kind_label_zh or row.kind) %}
+          {% endif %}
+        {% endfor %}
+        {# Phase B authored truth (script structure + variant plan) is
+           always present on a contract-clean Matrix Script task today —
+           it is the "已具备" baseline before any media generation. #}
+        {% set ms_block_f_have_baseline = ["脚本结构", "变体方案"] %}
+        {% set ms_block_f_need_baseline = ["成片", "字幕", "音频", "manifest", "交付包"] %}
           <div class="op-section-head">
             <div class="op-section-head__main">
               <span class="op-section-index op-section-index--emerald">F · 交付</span>
-              <h2 class="op-section-title" data-role="ms-block-f-title">交付概览</h2>
+              <h2 class="op-section-title" data-role="ms-block-f-title">交付摘要</h2>
               {% if ms_publish_readiness.publishable %}
                 <span class="op-pill op-pill--ready"><span class="op-pill__dot"></span>可发布</span>
               {% else %}
-                <span class="op-pill op-pill--blocked"><span class="op-pill__dot"></span>待解除阻塞</span>
+                <span class="op-pill op-pill--blocked"><span class="op-pill__dot"></span>当前不能交付</span>
               {% endif %}
             </div>
             <div class="op-section-actions task-actions" data-role="ms-block-f-actions">
@@ -883,89 +2052,62 @@
                  data-role="ms-block-f-action-delivery-center">前往交付中心查看完整成片 →</a>
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-block-f-subtitle">工作台一眼看懂"现在能不能发"；详细成片与发布表单在交付中心。</p>
-          {# Publish gate banner — single-source publishability. #}
-          <div data-role="ms-block-f-publish-gate"
-               data-publishable="{{ 'true' if ms_publish_readiness.publishable else 'false' }}"
-               data-head-reason="{{ ms_publish_readiness.head_reason or '' }}"
-               style="margin-top:8px;padding:10px 12px;border-radius:6px;background:#f6f7f9;">
-            <strong>发布门禁</strong>
-            <span data-role="ms-block-f-publish-gate-value" style="margin-left:6px;">
-              {% if ms_publish_readiness.publishable %}
-                <span class="info-pill ms-result-status__kind ms-result-status__kind--publishable_candidate">✓ 可发布</span>
-              {% else %}
-                <span class="info-pill ms-result-status__kind ms-result-status__kind--blocked_pending_publish_readiness">◐ 待解除阻塞</span>
-              {% endif %}
-              {% if ms_recommended_action.head_reason_label_zh %}
-                <span class="muted t-secondary" style="margin-left:6px;"
-                      data-role="ms-block-f-publish-gate-head-reason">{{ ms_recommended_action.head_reason_label_zh }}</span>
-              {% endif %}
-            </span>
+          <p class="op-section-helper" data-role="ms-block-f-subtitle">工作台仅显示交付状态摘要；逐项交付物详情、零碎产物与发布表单在交付中心。</p>
+          {% if not ms_publish_readiness.publishable %}
+            <div class="op-banner op-banner--blocker" data-role="ms-block-f-headline-blocker">
+              <div>
+                <div class="op-banner__title">当前不能交付：尚未生成成片。</div>
+                <div class="op-banner__body">下方为运营可读的「已具备」与「待补齐」摘要；详细产物状态在交付中心。</div>
+              </div>
+            </div>
+          {% else %}
+            <div class="op-banner op-banner--ready" data-role="ms-block-f-headline-ready">
+              <div>
+                <div class="op-banner__title">可发布 · 所有必要素材已就位。</div>
+                <div class="op-banner__body">前往交付中心查看成片与发布表单。</div>
+              </div>
+            </div>
+          {% endif %}
+          <div class="op-meta-grid" style="margin-top:10px;">
+            <div class="op-meta-item" data-role="ms-block-f-have">
+              <span class="op-meta-item__label">已具备</span>
+              <span class="op-meta-item__value">
+                {{ ms_block_f_have_baseline | join("、") }}{% if ms_block_f_resolved.items %}、{{ ms_block_f_resolved.items | join("、") }}{% endif %}。
+              </span>
+            </div>
+            <div class="op-meta-item" data-role="ms-block-f-need">
+              <span class="op-meta-item__label">待补齐</span>
+              <span class="op-meta-item__value">
+                {# PR-2D fix (2026-05-28) — always render the mission
+                   §B.4 operator-language baseline list when not yet
+                   publishable. Per visual-validation issue #3: do
+                   NOT surface raw contract kind_label_zh ("变体清单 /
+                   脚本 slot 包") on the operator surface; that
+                   technical detail belongs in F · 诊断. #}
+                {% if ms_publish_readiness.publishable %}—{% else %}{{ ms_block_f_need_baseline | join("、") }}。{% endif %}
+              </span>
+            </div>
           </div>
-          {# Required-deliverable lane — required_blocking + required_non_blocking
-             rows. Each row shows operator-language status; Delivery Center
-             carries the full table. #}
-          <div data-role="ms-block-f-required" style="margin-top:8px;">
-            <strong>必需交付</strong>
-            <ul style="margin:6px 0 0 16px; padding:0;"
-                data-role="ms-block-f-required-list"
-                data-required-blocking-count="{{ ms_delivery_comprehension.lanes.required_blocking.row_count or 0 }}"
-                data-required-non-blocking-count="{{ ms_delivery_comprehension.lanes.required_non_blocking.row_count or 0 }}">
-              {% for row in (ms_delivery_comprehension.lanes.required_blocking.rows or []) %}
-                <li data-role="ms-block-f-required-row"
-                    data-deliverable-kind="{{ row.kind }}"
-                    data-required-class="blocking"
-                    data-artifact-status="{{ row.artifact_status_code }}">
-                  <span data-role="ms-block-f-required-row-label">{{ row.kind_label_zh or row.kind }}</span>
-                  · <span data-role="ms-block-f-required-row-status">{{ row.artifact_status_label_zh }}</span>
-                  <span class="muted t-secondary">（必交付 · 阻塞发布）</span>
-                </li>
-              {% endfor %}
-              {% for row in (ms_delivery_comprehension.lanes.required_non_blocking.rows or []) %}
-                <li data-role="ms-block-f-required-row"
-                    data-deliverable-kind="{{ row.kind }}"
-                    data-required-class="non_blocking"
-                    data-artifact-status="{{ row.artifact_status_code }}">
-                  <span data-role="ms-block-f-required-row-label">{{ row.kind_label_zh or row.kind }}</span>
-                  · <span data-role="ms-block-f-required-row-status">{{ row.artifact_status_label_zh }}</span>
-                  <span class="muted t-secondary">（必交付 · 不阻塞）</span>
-                </li>
-              {% endfor %}
-            </ul>
-          </div>
-          {# Optional scene_pack — always non-blocking per
-             SCENE_PACK_BLOCKING_ALLOWED = False. Renders the row-set even
-             when empty so the operator sees the policy explicitly. #}
-          <div data-role="ms-block-f-optional" style="margin-top:8px;">
-            <strong>可选 · 不阻塞</strong>
-            <span class="muted t-secondary" style="margin-left:6px;">scene_pack 始终非阻塞</span>
-            <ul style="margin:6px 0 0 16px; padding:0;"
-                data-role="ms-block-f-optional-list"
-                data-optional-count="{{ ms_delivery_comprehension.lanes.optional_non_blocking.row_count or 0 }}">
-              {% for row in (ms_delivery_comprehension.lanes.optional_non_blocking.rows or []) %}
-                <li data-role="ms-block-f-optional-row"
-                    data-deliverable-kind="{{ row.kind }}"
-                    data-artifact-status="{{ row.artifact_status_code }}">
-                  <span data-role="ms-block-f-optional-row-label">{{ row.kind_label_zh or row.kind }}</span>
-                  · <span data-role="ms-block-f-optional-row-status">{{ row.artifact_status_label_zh }}</span>
-                </li>
-              {% else %}
-                <li class="muted" data-role="ms-block-f-optional-empty">尚未生成可选交付物 · 非阻塞</li>
-              {% endfor %}
-            </ul>
-          </div>
+          <p class="op-tech-note" data-role="ms-block-f-scene-pack-note" style="margin-top:8px;">
+            场景包（scene_pack）始终为可选 · 不阻塞发布。
+          </p>
           <div class="op-tech-note" data-role="ms-block-f-no-fake-final-video-note">
             本面板不展示 final_video / 发布 URL · final_video 主体在交付中心渲染（RC-R8）。
           </div>
         </div>
       {% endif %}
 
-      {# Matrix Script · 技术诊断（折叠）— 历史遗留的 PR-U2 / MS-W3 / Variation
-         / RC PR-2 / RC PR-3 / RC PR-4 二级诊断面板，统一收纳到一个折叠
-         <details>，默认收起。所有 data-role 锚点完整保留，结构测试不受影响。 #}
+      {# 2026-05-28 redesign — Mission §2 calls Block F · 技术诊断 (collapsed
+         by default). The existing PR-164 二级诊断面板 fold is repurposed as
+         that block. All historic data-role markers inside the fold are
+         preserved bytewise so existing OWC-MS / OWC-DA / RC tests still
+         resolve their selectors. #}
       <details class="op-collapse" data-role="op-console-ms-secondary-fold">
-        <summary>矩阵脚本 · 二级诊断面板（架构师视图）</summary>
-        <div class="op-collapse__hint">展开查看 PR-U2 / MS-W3 / 变体面板 / 单脚本可读视图等内部诊断；不影响日常运营。</div>
+        <summary>
+          <span class="op-section-index" style="margin-right:8px;">F · 诊断</span>
+          矩阵脚本 · 技术诊断（架构师视图，默认收起）
+        </summary>
+        <div class="op-collapse__hint">展开查看 PR-U2 / MS-W3 / 变体面板 / 单脚本可读视图等内部诊断；包括 head_reason / artifact_lookup / publish_readiness / final_provenance 等技术标识。日常运营操作不依赖本节。</div>
         <div class="op-collapse__body">
 
       {# PR-U2 Matrix Script Workbench operator-comprehension block. Additive — sits ABOVE the existing axes/cells/slots/attribution rows which are preserved verbatim below. Reads only ms_comp (presentation-layer projection over ms_surface + panel resolver). No new packet truth. No provider/model/vendor controls. #}
@@ -1851,6 +2993,9 @@
 
         </div> {# /op-collapse__body for matrix_script secondary diagnostics #}
       </details>
+
+        </div> {# /op-collapse__body for PR-A Section 5 technical diagnostics #}
+      </details> {# /op-console-ms-technical-diagnostics-fold (PR-A Section 5) #}
     {% endif %}
 
     {# OWC-DA PR-2 — Digital Anchor Workbench Five-Panel Convergence (DA-W3 + DA-W4 + DA-W5 + DA-W6 + DA-W7).

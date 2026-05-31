@@ -6,55 +6,37 @@
   <title>矩阵脚本新建任务 - ApolloVeo</title>
   <link rel="stylesheet" href="/static/i18n.css" />
   <link rel="stylesheet" href="/static/css/ui_v185.css" />
+  <link rel="stylesheet" href="/static/css/operator_console.css" />
   <style>
+    /* Page-local additive styling. The op-card / op-section-head /
+       op-collapse / op-pill / op-banner classes are already defined in
+       operator_console.css; this <style> block only adds tab-switcher
+       affordances + page-local form spacing. */
     :root { color-scheme: light; }
     body {
       margin: 0;
-      background: #f8fafc;
-      color: #111827;
+      background: var(--op-bg, #f8fafc);
+      color: var(--op-fg, #0f172a);
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     }
-    .page {
-      max-width: 1040px;
+    .ms-new-page {
+      max-width: 1080px;
       margin: 0 auto;
-      padding: 16px;
-    }
-    .entry-shell {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 280px;
-      gap: 16px;
-      align-items: start;
-    }
-    .panel {
-      background: #fff;
-      border: 1px solid #e5e7eb;
-      border-radius: 8px;
       padding: 18px;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
     }
-    .section-title {
-      margin: 0 0 14px;
-      font-size: 18px;
-      font-weight: 800;
-    }
-    .field-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 14px;
-    }
-    .field {
+    .ms-new-field {
       display: grid;
       gap: 6px;
+      margin-top: 14px;
     }
-    .field.full { grid-column: 1 / -1; }
-    label {
-      font-size: 14px;
+    .ms-new-field label {
+      font-size: 13px;
       font-weight: 700;
-      color: #334155;
+      color: var(--op-fg-mid, #334155);
     }
-    input,
-    select,
-    textarea {
+    .ms-new-field input,
+    .ms-new-field select,
+    .ms-new-field textarea {
       width: 100%;
       box-sizing: border-box;
       border: 1px solid #cbd5e1;
@@ -62,53 +44,112 @@
       padding: 10px 11px;
       font: inherit;
       background: #fff;
-      color: #111827;
+      color: var(--op-fg, #0f172a);
     }
-    textarea { min-height: 108px; resize: vertical; }
-    .hint {
-      margin: 0;
-      color: #64748b;
+    .ms-new-field textarea {
+      min-height: 220px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
       font-size: 13px;
       line-height: 1.5;
     }
-    .required {
+    .ms-new-field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .ms-new-field-grid .ms-new-field.full { grid-column: 1 / -1; }
+    .ms-new-required {
       color: #b91c1c;
       font-weight: 800;
     }
-    .actions {
+    /* Tab switcher for paste / upload / select script source modes. */
+    .ms-new-tabs {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--op-card-bd, #e5e7eb);
+    }
+    .ms-new-tab {
+      background: transparent;
+      border: 1px solid transparent;
+      border-bottom: 2px solid transparent;
+      padding: 8px 14px;
+      font: inherit;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--op-fg-soft, #64748b);
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+    }
+    .ms-new-tab:hover { color: var(--op-fg, #0f172a); }
+    .ms-new-tab.is-active {
+      color: var(--op-emerald, #047857);
+      border-bottom-color: var(--op-emerald, #047857);
+      background: var(--op-emerald-bg, #ecfdf5);
+    }
+    .ms-new-tab-panel { padding-top: 12px; }
+    .ms-new-tab-panel[hidden] { display: none; }
+    .ms-new-feedback {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+      display: none;
+    }
+    .ms-new-feedback.is-success {
+      display: block;
+      background: var(--op-emerald-bg, #ecfdf5);
+      border: 1px solid var(--op-emerald-bd, #a7f3d0);
+      color: #064e3b;
+    }
+    .ms-new-feedback.is-error {
+      display: block;
+      background: var(--op-amber-bg, #fffbeb);
+      border: 1px solid var(--op-amber-bd, #fde68a);
+      color: #7c2d12;
+    }
+    .ms-new-actions {
       display: flex;
       justify-content: flex-end;
       gap: 10px;
       margin-top: 18px;
       flex-wrap: wrap;
     }
-    .btn-primary,
-    .btn-secondary {
+    .ms-new-btn-primary,
+    .ms-new-btn-secondary {
       border-radius: 8px;
-      padding: 10px 14px;
+      padding: 10px 18px;
       font-weight: 800;
       text-decoration: none;
       border: 1px solid transparent;
       cursor: pointer;
+      font-size: 14px;
     }
-    .btn-primary {
-      background: #047857;
-      border-color: #047857;
+    .ms-new-btn-primary {
+      background: var(--op-emerald, #047857);
+      border-color: var(--op-emerald, #047857);
       color: #fff;
     }
-    .btn-secondary {
+    .ms-new-btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .ms-new-btn-secondary {
       background: #fff;
       border-color: #cbd5e1;
-      color: #111827;
+      color: var(--op-fg, #0f172a);
     }
-    .route-list {
+    .ms-new-route-list {
       display: grid;
       gap: 10px;
       margin: 0;
       padding: 0;
       list-style: none;
     }
-    .route-list li {
+    .ms-new-route-list li {
       border: 1px solid #e2e8f0;
       border-radius: 8px;
       padding: 10px;
@@ -122,18 +163,35 @@
       border: 1px solid #e2e8f0;
       border-radius: 6px;
       padding: 1px 5px;
+      font-size: 12px;
     }
-    @media (max-width: 840px) {
-      .entry-shell { grid-template-columns: 1fr; }
-      .field-grid { grid-template-columns: 1fr; }
+    .ms-new-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 880px) {
+      .ms-new-shell { grid-template-columns: 1fr; }
+      .ms-new-field-grid { grid-template-columns: 1fr; }
+      /* PR-1 (2026-05-28) — responsive degradation polish. The
+         op-page-head row currently uses justify-content: space-between
+         which floats the matrix-script pill above the title at narrow
+         viewport. Stack the pill below the title and shrink the title
+         font for cleaner mobile/tablet degradation. */
+      .op-page-head__row { flex-direction: column; align-items: flex-start; }
+      .op-page-head__row .op-pill { align-self: flex-start; margin-top: 4px; }
+      .op-page-head__title { font-size: 20px; }
+      /* Tabs wrap to two rows below 880px instead of overflowing. */
+      .ms-new-tabs { flex-wrap: wrap; }
     }
   </style>
 </head>
 <body>
-  <div class="page" data-role="matrix-script-create-entry" data-line-id="matrix_script">
+  <div class="ms-new-page" data-role="matrix-script-create-entry" data-line-id="matrix_script">
     {% set ui_q = "?ui_locale=" ~ ui_locale if ui_locale else "" %}
     {% set topbar_title = "矩阵脚本" %}
-    {% set topbar_subtitle = "正式产线新建入口" %}
+    {% set topbar_subtitle = "脚本转视频 · 生成方案入口" %}
     {% set topbar_nav = [
       {"label": "任务", "href": "/tasks" ~ ui_q, "active": false},
       {"label": "工具", "href": "/tools/hub" ~ ui_q, "active": false}
@@ -144,164 +202,664 @@
     ] %}
     {% include "_topbar.html" %}
 
-    <main class="entry-shell">
-      <form class="panel" method="post" action="/tasks/matrix-script/new{{ ui_q }}">
-        <h1 class="section-title">创建矩阵脚本任务</h1>
-        <p class="hint" style="margin-bottom:16px;">
-          这里只填写创建任务所需的产线输入。脚本变体、槽位细化和交付发布在任务创建后的工作台与交付页完成。
-        </p>
-
-        <div class="field-grid">
-          <div class="field full">
-            <label for="topic">主题 <span class="required">*</span></label>
-            <input id="topic" name="topic" required maxlength="160" placeholder="例如：新品短视频首发脚本" />
+    <div class="op-page-head" style="margin:10px 0 18px;">
+      <div class="op-page-head__row">
+        <div>
+          <h1 class="op-page-head__title" data-role="ms-new-page-title">生成脚本视频方案</h1>
+          <div class="op-page-head__sub" data-role="ms-new-page-subtitle">
+            输入脚本、素材和目标平台，系统先生成可确认的视频方案：脚本理解、分镜、背景 / B-Roll、角色、旁白、字幕、音乐与视频变体。
           </div>
+        </div>
+        <span class="op-pill op-pill--matrix" data-role="ms-new-line-pill">
+          <span class="op-pill__dot"></span>矩阵脚本
+        </span>
+      </div>
+    </div>
 
-          <div class="field full">
-            <label for="source_script_ref">源脚本引用 <span class="required">*</span></label>
-            <div style="display:flex; gap:8px; align-items:stretch;">
-              <input
-                id="source_script_ref"
-                name="source_script_ref"
-                type="text"
-                required
-                maxlength="512"
-                pattern="^(?:(?:content|task|asset|ref)://\S+|[A-Za-z0-9][A-Za-z0-9._\-:\/]{3,})$"
-                placeholder="content://matrix-script/source/<your-token>"
-                autocomplete="off"
-                spellcheck="false"
-                style="flex:1 1 auto;"
-              />
-              <button
-                type="button"
-                id="mint-source-script-ref"
-                class="btn-secondary"
-                data-mint-route="/tasks/matrix-script/source-script-refs/mint"
-                data-target-input="source_script_ref"
-                title="向产品请求一个新的不透明 content:// 句柄"
-                style="padding:8px 12px; white-space:nowrap;"
-              >铸造句柄</button>
+    <main class="ms-new-shell">
+      <form
+        class="ms-new-form"
+        method="post"
+        action="/tasks/matrix-script/new{{ ui_q }}"
+        data-role="matrix-script-create-form"
+        data-ingest-route="/tasks/matrix-script/source-script-refs/ingest"
+        data-mint-route="/tasks/matrix-script/source-script-refs/mint"
+      >
+
+        {# ===================== Card 1 · 脚本来源 ===================== #}
+        <div class="op-card op-card--accent-emerald" data-role="ms-new-card-source">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">1 · 脚本</span>
+              <h2 class="op-section-title">脚本来源</h2>
+              <span class="op-pill op-pill--info" data-role="ms-new-source-mode-pill">粘贴脚本</span>
             </div>
-            <p class="hint">仅填写不透明引用：<code>content://</code>、<code>task://</code>、<code>asset://</code>、<code>ref://</code> 之一，或令牌 ID。<strong>不接受</strong>外部网页 URL（<code>https://</code> / <code>http://</code>）和对象存储桶（<code>s3://</code> / <code>gs://</code>）；这些不是产品内部可解析的不透明引用。<strong>不要</strong>把脚本正文粘贴进来——脚本正文由后续工作台阶段处理。</p>
-            <p class="hint"><strong>推荐方式（Plan E Option F2 已上线）</strong>：点击「铸造句柄」按钮，由产品分配一个全新的不透明 <code>content://matrix-script/source/&lt;product-minted-token&gt;</code> 句柄。产品拥有 <code>&lt;token&gt;</code> 的分配与唯一性。</p>
-            <p class="hint"><strong>过渡兼容</strong>：原 §8.F / §8.H 操作员自定 <code>&lt;token&gt;</code> 形式仍然接受（例如 <code>content://matrix-script/source/op-token-001</code>）；既有句柄无需迁移，因为它们与铸造句柄同属 <code>content://</code> 不透明方案集。<code>task://</code> / <code>asset://</code> / <code>ref://</code> 形式同样接受。</p>
+          </div>
+          <p class="op-section-helper" data-role="ms-new-source-helper">
+            选择一种方式提供脚本：粘贴正文 / 上传脚本文档 / 选择已有脚本。系统会自动生成产品句柄并存入会话内的脚本素材库；运营无需自己拼写句柄。
+          </p>
+
+          {# Tab switcher #}
+          <div class="ms-new-tabs" role="tablist" data-role="ms-new-source-tabs">
+            <button type="button" class="ms-new-tab is-active"
+                    role="tab" aria-selected="true"
+                    data-tab="paste"
+                    data-role="ms-new-source-tab-paste">粘贴脚本</button>
+            <button type="button" class="ms-new-tab"
+                    role="tab" aria-selected="false"
+                    data-tab="upload"
+                    data-role="ms-new-source-tab-upload">上传脚本文档</button>
+            <button type="button" class="ms-new-tab"
+                    role="tab" aria-selected="false"
+                    data-tab="select"
+                    data-role="ms-new-source-tab-select">选择已有脚本</button>
           </div>
 
-          <div class="field">
-            <label for="source_language">源语言 <span class="required">*</span></label>
-            <select id="source_language" name="source_language" required>
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
+          {# Tab · paste #}
+          <div class="ms-new-tab-panel" role="tabpanel"
+               data-tab-panel="paste"
+               data-role="ms-new-source-panel-paste">
+            <div class="ms-new-field full">
+              <label for="script_body">脚本正文 <span class="ms-new-required">*</span></label>
+              <textarea id="script_body"
+                        name="script_body"
+                        maxlength="20000"
+                        data-role="ms-new-script-body"
+                        placeholder="将脚本正文粘贴到这里..."></textarea>
+              <p class="op-section-helper">
+                提交后会被存入会话内的脚本素材库（在线临时存储；网关重启会清空）。<strong>脚本正文不会发送给任何外部模型、厂商或引擎。</strong>
+              </p>
+            </div>
           </div>
 
-          <div class="field">
-            <label for="target_language">目标语言 <span class="required">*</span></label>
-            <select id="target_language" name="target_language" required>
-              <option value="mm">မြန်မာ</option>
-              <option value="vi">Tiếng Việt</option>
-            </select>
+          {# Tab · upload #}
+          <div class="ms-new-tab-panel" role="tabpanel" hidden
+               data-tab-panel="upload"
+               data-role="ms-new-source-panel-upload">
+            <div class="ms-new-field full">
+              <label for="script_file">脚本文档 <span class="ms-new-required">*</span></label>
+              <input type="file"
+                     id="script_file"
+                     accept=".txt,.md,text/plain,text/markdown"
+                     data-role="ms-new-script-file" />
+              <p class="op-section-helper">
+                支持 <code>.txt</code> / <code>.md</code> 纯文本；最大 64 KB。系统会在本地读取正文，再走与「粘贴脚本」相同的入库流程。
+              </p>
+            </div>
           </div>
 
-          <div class="field">
-            <label for="target_platform">目标平台 <span class="required">*</span></label>
-            <input id="target_platform" name="target_platform" required maxlength="80" placeholder="例如：TikTok / Reels / Shorts" />
+          {# Tab · select existing #}
+          <div class="ms-new-tab-panel" role="tabpanel" hidden
+               data-tab-panel="select"
+               data-role="ms-new-source-panel-select">
+            <div class="ms-new-field full">
+              <label for="existing_source_script_ref">已有脚本引用</label>
+              <input id="existing_source_script_ref"
+                     name="existing_source_script_ref"
+                     type="text"
+                     maxlength="512"
+                     data-role="ms-new-existing-source-script-ref"
+                     placeholder="选择或输入既有的产品脚本句柄"
+                     autocomplete="off" />
+              <p class="op-section-helper">
+                仅在你已经在 Asset Supply / 内部脚本库中预先发布了脚本时使用。<strong>当前阶段没有可视化的脚本选择器</strong>；如果你没有现成句柄，请用「粘贴脚本」或「上传脚本文档」。
+              </p>
+            </div>
           </div>
 
-          <div class="field">
-            <label for="variation_target_count">变体数量 <span class="required">*</span></label>
-            <input id="variation_target_count" name="variation_target_count" type="number" min="1" max="12" step="1" required value="4" />
-          </div>
+          {# Live feedback for ingest / mint operations #}
+          <div class="ms-new-feedback" data-role="ms-new-source-feedback" aria-live="polite"></div>
 
-          <div class="field">
-            <label for="audience_hint">受众提示</label>
-            <input id="audience_hint" name="audience_hint" maxlength="120" placeholder="例如：新手用户 / 老客复购" />
-          </div>
+          {# PR-1 (2026-05-28) — Operator surface: the opaque
+             ``source_script_ref`` field is HIDDEN by default. The form
+             still POSTs ``source_script_ref`` because the JS submit
+             pipeline ingests paste / upload bodies through
+             ``/tasks/matrix-script/source-script-refs/ingest`` and
+             populates ``#source_script_ref`` with the minted handle
+             before form.submit() runs. Architects / engineers can
+             reveal the technical reference block with ``?technical=1``
+             query param. Mission §A.4 confirms compatibility for
+             existing ``content://`` / ``task://`` / ``asset://`` /
+             ``ref://`` handles is preserved through the technical-mode
+             path. #}
+          {% if technical_mode %}
+            <details class="op-collapse" data-role="ms-new-technical-ref" open>
+              <summary>架构师 / 工程师：手动指定不透明脚本句柄（技术引用）</summary>
+              <div class="op-collapse__hint">
+                <strong>本节仅在 <code>?technical=1</code> 下可见</strong>。普通运营不会看到此节。
+                外部网页 URL（<code>https://</code> / <code>http://</code>）与对象存储桶 URI（<code>s3://</code> / <code>gs://</code>）不是产品内不透明句柄，会被入口拒绝。
+              </div>
+              <div class="op-collapse__body">
+                <div class="ms-new-field">
+                  <label for="source_script_ref">source_script_ref</label>
+                  <div style="display:flex; gap:8px; align-items:stretch;">
+                    <input
+                      id="source_script_ref"
+                      name="source_script_ref"
+                      type="text"
+                      required
+                      maxlength="512"
+                      pattern="^(?:(?:content|task|asset|ref)://\S+|[A-Za-z0-9][A-Za-z0-9._\-:\/]{3,})$"
+                      placeholder="content://matrix-script/source/<token>"
+                      autocomplete="off"
+                      spellcheck="false"
+                      data-role="ms-new-source-script-ref"
+                      style="flex:1 1 auto;"
+                    />
+                    <button
+                      type="button"
+                      class="ms-new-btn-secondary"
+                      data-role="ms-new-mint-button"
+                      data-mint-route="/tasks/matrix-script/source-script-refs/mint"
+                      data-target-input="source_script_ref"
+                      title="向产品请求一个新的不透明 content:// 句柄"
+                      style="padding:8px 12px; white-space:nowrap;"
+                    >铸造空句柄</button>
+                  </div>
+                  <p class="op-tech-note">
+                    接受方案：<code>content://</code> / <code>task://</code> / <code>asset://</code> / <code>ref://</code>，或纯令牌 ID。
+                    「铸造空句柄」只分配一个产品句柄，不存任何正文；如果你只是要把脚本传进来，请改用上面三个标签页。
+                  </p>
+                </div>
+              </div>
+            </details>
+          {% else %}
+            {# Operator surface — single hidden input keeps the server
+               POST contract intact. The JS submit pipeline populates
+               this field from the ingest / select paths before
+               form.submit() runs. No mint button, no opaque-handle
+               vocabulary visible on the operator surface. #}
+            <input
+              id="source_script_ref"
+              name="source_script_ref"
+              type="hidden"
+              data-role="ms-new-source-script-ref"
+            />
+          {% endif %}
 
-          <div class="field">
-            <label for="tone_hint">语气提示</label>
-            <input id="tone_hint" name="tone_hint" maxlength="120" placeholder="例如：专业可信 / 轻松直接" />
-          </div>
+        </div>
 
-          <div class="field">
-            <label for="length_hint">长度提示</label>
-            <input id="length_hint" name="length_hint" maxlength="80" placeholder="例如：15 秒 / 30 秒" />
-          </div>
+        {# ============================================================
+           Fidelity fix (2026-05-30b) — Phase 2B New Task entry cards
+           per Phase 1 mock § ① and presenter alignment §5.1. The
+           legacy single 任务基本信息 card is restructured into FOUR
+           product-language cards (Card 2 素材 / Card 3 目标 · 画幅
+           · 语言 / Card 4 角色 · 声音 · 字幕 / Card 5 变体策略).
+           Every POST-required name= attribute (topic / source_language
+           / target_language / target_platform / variation_target_count
+           / audience_hint / tone_hint / length_hint / product_ref /
+           operator_notes) is preserved bytewise so the existing safe
+           POST + build_matrix_script_task_payload contract continues
+           to work. New presenter-only fields (aspect ratio radio,
+           role / voice / subtitle / B-Roll preference selectors,
+           variant-axis checkboxes) are operator-intent capture only
+           and do NOT introduce new payload fields.
+           ============================================================ #}
 
-          <div class="field">
-            <label for="product_ref">产品引用</label>
-            <input id="product_ref" name="product_ref" maxlength="160" placeholder="产品名、SKU 或资料链接" />
+        {# ===================== Card 2 · 素材 ===================== #}
+        <div class="op-card" data-role="ms-new-card-product-material"
+             data-redesign-wave="2026-05-30-phase2b-fidelity-b">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">2 · 素材</span>
+              <h2 class="op-section-title">产品 / 素材</h2>
+            </div>
           </div>
+          <p class="op-section-helper">上传或填写产品资料；运营在工作台「画面与素材」(D) 一节可继续替换 B-Roll。</p>
+          <div class="ms-new-field-grid">
+            <div class="ms-new-field full">
+              <label for="product_ref">产品名称 / SKU / 资料链接</label>
+              <input id="product_ref" name="product_ref" maxlength="160" placeholder="例如：温室小番茄 SKU-T01 · https://example.invalid/product" />
+            </div>
+            <div class="ms-new-field full">
+              <label>上传商品图 / 商品视频片段 <span class="op-pill op-pill--neutral" style="font-size:11px; margin-left:4px;">当前占位 · 后台待接入</span></label>
+              <div data-role="ms-new-product-material-upload-slot"
+                   data-status-code="materials_pending_upstream"
+                   style="padding:14px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:8px; background:#fbfdff; color:var(--op-fg-soft, #64748b); font-size:13px;">
+                上传槽占位。素材上传 / 匹配能力接入后，可在此处提交商品图与视频片段；当前阶段无需提交。
+              </div>
+            </div>
+            <div class="ms-new-field full">
+              <label for="ms-new-material-description">素材说明</label>
+              <textarea id="ms-new-material-description"
+                        data-role="ms-new-product-material-description"
+                        rows="2" maxlength="320"
+                        style="min-height:60px; font-family: system-ui, sans-serif; font-size:14px;"
+                        placeholder="例如：成熟番茄特写、农场环境、品牌 Logo 等可识别要点"></textarea>
+            </div>
+            <div class="ms-new-field full">
+              <label for="ms-new-broll-preference">背景 / B-Roll 偏好</label>
+              <select id="ms-new-broll-preference"
+                      data-role="ms-new-broll-preference">
+                <option value="prefer_upload">优先使用上传素材</option>
+                <option value="prefer_library">优先使用素材库</option>
+                <option value="mixed">混合（默认）</option>
+                <option value="no_preference">无偏好</option>
+              </select>
+            </div>
+          </div>
+          <p class="op-tech-note" style="margin-top:8px;">本卡为运营意图采集；素材匹配 / 上传 worker 尚未接入。</p>
+        </div>
 
-          <div class="field full">
-            <label for="operator_notes">补充备注</label>
-            <textarea id="operator_notes" name="operator_notes" placeholder="只填写创建阶段必要备注，不填写工作台执行细节"></textarea>
+        {# ===================== Card 3 · 目标 · 画幅 · 语言 ===================== #}
+        <div class="op-card" data-role="ms-new-card-target-aspect-language"
+             data-redesign-wave="2026-05-30-phase2b-fidelity-b">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">3 · 目标</span>
+              <h2 class="op-section-title">目标 · 画幅 · 语言</h2>
+            </div>
+          </div>
+          <p class="op-section-helper">视频主题、目标平台、画幅、语言、时长、受众。这些会进入工作台的「脚本理解」(B)。</p>
+          <div class="ms-new-field-grid">
+            <div class="ms-new-field full">
+              <label for="topic">视频主题 <span class="ms-new-required">*</span></label>
+              <input id="topic" name="topic" required maxlength="160" placeholder="例如：温室小番茄上市首发短视频" />
+            </div>
+            <div class="ms-new-field">
+              <label for="target_platform">目标平台 <span class="ms-new-required">*</span></label>
+              <input id="target_platform" name="target_platform" required maxlength="80"
+                     list="ms-new-platform-suggestions"
+                     placeholder="选择或输入平台" />
+              <datalist id="ms-new-platform-suggestions" data-role="ms-new-platform-suggestions">
+                <option value="TikTok"></option>
+                <option value="YouTube Shorts"></option>
+                <option value="Instagram Reels"></option>
+                <option value="抖音"></option>
+                <option value="视频号"></option>
+                <option value="小红书"></option>
+                <option value="快手"></option>
+              </datalist>
+            </div>
+            <div class="ms-new-field">
+              <label>画幅 / 比例 <span class="op-pill op-pill--neutral" style="font-size:11px; margin-left:4px;">运营意图</span></label>
+              <div data-role="ms-new-aspect-ratio-group" style="display:flex; gap:10px; align-items:center;">
+                <label style="font-weight:400; display:flex; align-items:center; gap:4px;">
+                  <input type="radio" data-role="ms-new-aspect-ratio-option" value="9:16" checked /> 9:16
+                </label>
+                <label style="font-weight:400; display:flex; align-items:center; gap:4px;">
+                  <input type="radio" data-role="ms-new-aspect-ratio-option" value="16:9" /> 16:9
+                </label>
+                <label style="font-weight:400; display:flex; align-items:center; gap:4px;">
+                  <input type="radio" data-role="ms-new-aspect-ratio-option" value="1:1" /> 1:1
+                </label>
+              </div>
+            </div>
+            <div class="ms-new-field">
+              <label for="source_language">源语言 <span class="ms-new-required">*</span></label>
+              <select id="source_language" name="source_language" required>
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+            <div class="ms-new-field">
+              <label for="target_language">目标语言 <span class="ms-new-required">*</span></label>
+              <select id="target_language" name="target_language" required>
+                <option value="mm">မြန်မာ（缅甸语）</option>
+                <option value="vi">Tiếng Việt（越南语）</option>
+              </select>
+            </div>
+            <div class="ms-new-field">
+              <label for="length_hint">视频时长</label>
+              <input id="length_hint" name="length_hint" maxlength="80" placeholder="例如：15 秒 / 30 秒 / 60 秒" />
+            </div>
+            <div class="ms-new-field">
+              <label for="audience_hint">目标受众</label>
+              <input id="audience_hint" name="audience_hint" maxlength="120" placeholder="例如：20–35 城市女性 · 关注健康饮食" />
+            </div>
           </div>
         </div>
 
-        <div class="actions">
-          <a class="btn-secondary" href="/tasks/newtasks{{ ui_q }}">取消</a>
-          <button class="btn-primary" type="submit">创建并进入工作台</button>
+        {# ===================== Card 4 · 角色 · 声音 · 字幕 ===================== #}
+        <div class="op-card" data-role="ms-new-card-role-voice-subtitle"
+             data-redesign-wave="2026-05-30-phase2b-fidelity-b">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">4 · 角色</span>
+              <h2 class="op-section-title">角色 · 声音 · 字幕</h2>
+              <span class="op-pill op-pill--neutral" style="font-size:11px;">运营意图</span>
+            </div>
+          </div>
+          <p class="op-section-helper">在工作台「角色与声音」(E) 与「字幕与音乐」(F) 中可继续微调。本卡只采集偏好，不调用任何外部模型。</p>
+          <div class="ms-new-field-grid">
+            <div class="ms-new-field">
+              <label for="ms-new-role-preference">角色偏好</label>
+              <select id="ms-new-role-preference" data-role="ms-new-role-preference">
+                <option value="none">无角色 · 仅画面（推荐：纯 B-Roll + 字幕）</option>
+                <option value="ai_host">AI 主播（推荐：讲解型短视频）</option>
+                <option value="local_host">本地主播 · 已注册（推荐：本地化投放）</option>
+                <option value="custom_character">自定义角色</option>
+              </select>
+            </div>
+            <div class="ms-new-field">
+              <label for="ms-new-voice-preference">声音偏好</label>
+              <select id="ms-new-voice-preference" data-role="ms-new-voice-preference">
+                <option value="natural_female">女声自然（推荐：生活种草）</option>
+                <option value="professional_male">男声专业（推荐：测评说明）</option>
+                <option value="casual_direct">轻松直接</option>
+                <option value="no_voiceover">无旁白</option>
+              </select>
+              <small style="color:var(--op-fg-soft, #64748b); font-size:11px; margin-top:2px; display:block;">语音由系统统一接入 · 当前阶段只采集偏好，不调用任何外部能力。</small>
+            </div>
+            <div class="ms-new-field">
+              <label for="ms-new-subtitle-style">字幕风格</label>
+              <select id="ms-new-subtitle-style" data-role="ms-new-subtitle-style">
+                <option value="large_highlight">大字高亮（推荐：短视频首屏）</option>
+                <option value="brand_color">品牌色</option>
+                <option value="standard">常规字幕</option>
+                <option value="minimal">极简</option>
+              </select>
+            </div>
+            <div class="ms-new-field">
+              <label for="tone_hint">目标语言旁白说明</label>
+              <input id="tone_hint" name="tone_hint" maxlength="120" placeholder="例如：自然亲切 / 专业可信 / 轻松直接" />
+            </div>
+          </div>
+          <p class="op-tech-note" data-role="ms-new-voicetrans-future-provider-note" style="margin-top:8px;">
+            语音能力接入后由系统统一选择，本卡不嵌入任何外部页面，也不需要运营关心底层实现。
+          </p>
         </div>
+
+        {# ===================== Card 5 · 变体策略 ===================== #}
+        <div class="op-card" data-role="ms-new-card-variant-strategy"
+             data-redesign-wave="2026-05-30-phase2b-fidelity-b">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">5 · 变体</span>
+              <h2 class="op-section-title">变体策略</h2>
+            </div>
+          </div>
+          <p class="op-section-helper">每个变体都是一个视频版本。运营在工作台「视频变体」(G) 可继续调整。</p>
+          <div class="ms-new-field-grid">
+            <div class="ms-new-field">
+              <label for="variation_target_count">测试版本数量 <span class="ms-new-required">*</span></label>
+              <input id="variation_target_count" name="variation_target_count" type="number" min="1" max="12" step="1" required value="3" />
+              <small style="color:var(--op-fg-soft, #64748b); font-size:11px; margin-top:2px; display:block;">默认 3 个测试版本（V1 主推 + V2 / V3 备选）。</small>
+            </div>
+            <div class="ms-new-field full">
+              <label>差异维度（运营意图勾选；不影响 POST 字段）</label>
+              <div data-role="ms-new-variant-axes-group" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:6px; font-size:13px;">
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="background" checked /> 背景 / B-Roll 变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="product_material" /> 商品素材变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="voiceover" /> 旁白变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="subtitle_style" checked /> 字幕样式变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="bgm" /> BGM 变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="pacing_aspect" checked /> 节奏 / 画幅变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="role" /> 角色变体</label>
+                <label style="font-weight:400; display:flex; gap:4px;"><input type="checkbox" data-role="ms-new-variant-axis" value="main_only" /> 仅生成主视频（不生成测试版本）</label>
+              </div>
+            </div>
+            <div class="ms-new-field full">
+              <label for="operator_notes">运营备注</label>
+              <textarea id="operator_notes" name="operator_notes" rows="2"
+                        style="min-height:60px; font-family: system-ui, sans-serif; font-size:14px;"
+                        placeholder="只填写创建阶段必要备注，不填写工作台执行细节"></textarea>
+            </div>
+          </div>
+        </div>
+
+        {# ===================== Actions ===================== #}
+        <div class="ms-new-actions">
+          <a class="ms-new-btn-secondary" href="/tasks/newtasks{{ ui_q }}">取消</a>
+          <button class="ms-new-btn-primary" type="submit" data-role="ms-new-submit"
+                  data-redesign-wave="2026-05-30-phase2b">
+            生成视频方案 →
+          </button>
+        </div>
+
       </form>
 
-      <aside class="panel" aria-label="route mapping">
-        <h2 class="section-title">链路</h2>
-        <ul class="route-list">
-          <li><strong>入口</strong><br /><code>/tasks/matrix-script/new</code></li>
-          <li><strong>任务类型</strong><br /><code>matrix_script</code></li>
-          <li><strong>创建后</strong><br />进入任务工作台 <code>/tasks/{task_id}</code></li>
-          <li><strong>交付</strong><br />任务存在后进入 <code>/tasks/{task_id}/publish</code></li>
-        </ul>
+      {# ===================== Sidebar · 链路 ===================== #}
+      <aside class="op-card" aria-label="route mapping" data-role="ms-new-route-map">
+        <div class="op-section-head">
+          <div class="op-section-head__main">
+            <span class="op-section-index op-section-index--violet">链路</span>
+            <h2 class="op-section-title">提交后会发生什么</h2>
+          </div>
+        </div>
+        <ol style="margin:0; padding-left:18px; color:var(--op-fg-mid, #334155); font-size:13px; line-height:1.7;"
+            data-role="ms-new-route-map-script-to-video-steps">
+          <li>生成<strong>脚本理解</strong>：Hook / Body / CTA / 卖点。</li>
+          <li>生成<strong>视频方案</strong>：分镜、背景、B-Roll、商品素材位。</li>
+          <li>生成<strong>角色与音频计划</strong>：角色、旁白、字幕、音乐。</li>
+          <li>进入<strong>工作台确认方案</strong>，再生成主视频。</li>
+        </ol>
+        <details class="op-collapse" style="margin-top:14px;" data-role="ms-new-route-map-technical">
+          <summary>技术链路（架构师视图）</summary>
+          <div class="op-collapse__body">
+            <ul class="ms-new-route-list">
+              <li><strong>入口</strong><br /><code>POST /tasks/matrix-script/new</code></li>
+              <li><strong>正文入库</strong><br /><code>POST /tasks/matrix-script/source-script-refs/ingest</code><br /><span class="op-tech-note">会话内 in-process 存储；不持久化</span></li>
+              <li><strong>空句柄</strong><br /><code>POST /tasks/matrix-script/source-script-refs/mint</code></li>
+              <li><strong>任务工作台</strong><br /><code>GET /tasks/{task_id}</code></li>
+              <li><strong>交付中心</strong><br /><code>GET /tasks/{task_id}/publish</code></li>
+            </ul>
+          </div>
+        </details>
       </aside>
     </main>
   </div>
+
   <script src="/static/js/i18n_v185.js"></script>
   <script>
-    // Plan E PR-2 / Item E.MS.2 — operator-facing minting affordance.
-    // Calls the matrix-script-scoped POST mint endpoint and populates the
-    // source_script_ref input with a freshly product-minted opaque handle.
-    // The minted handle is contract-equivalent to operator-discipline handles
-    // (both are content:// opaque-by-construction URIs) — no migration of
-    // existing samples is required.
+    // 2026-05-28 Matrix Script Operator UI Redesign — entry page tab + ingest wiring.
+    //
+    // Behaviour:
+    //   - Tab switcher: paste / upload / select. The active tab determines
+    //     which input path runs at submit time.
+    //   - On submit: if paste tab is active, POST body to /ingest; if upload
+    //     tab is active, read file -> POST body to /ingest; if select tab,
+    //     copy the selected ref into the hidden source_script_ref input.
+    //     If the operator opened the "技术引用" details and supplied a
+    //     handle there directly, that value is used and no ingest call is made.
+    //   - The form's hidden source_script_ref input is what the backend
+    //     /tasks/matrix-script/new route validates; it MUST be populated
+    //     with an opaque content:// / task:// / asset:// / ref:// handle.
     (function () {
-      var btn = document.getElementById('mint-source-script-ref');
-      if (!btn) { return; }
-      btn.addEventListener('click', function () {
-        var route = btn.getAttribute('data-mint-route');
-        var targetId = btn.getAttribute('data-target-input');
-        var input = document.getElementById(targetId);
-        if (!route || !input) { return; }
-        var originalLabel = btn.textContent;
-        btn.disabled = true;
-        btn.textContent = '铸造中…';
-        fetch(route, {
+      var form = document.querySelector('[data-role="matrix-script-create-form"]');
+      if (!form) { return; }
+
+      var tabBar = form.querySelector('[data-role="ms-new-source-tabs"]');
+      var tabs = Array.prototype.slice.call(form.querySelectorAll('.ms-new-tab'));
+      var panels = Array.prototype.slice.call(form.querySelectorAll('[data-tab-panel]'));
+      var modePill = form.querySelector('[data-role="ms-new-source-mode-pill"]');
+      var feedback = form.querySelector('[data-role="ms-new-source-feedback"]');
+      var bodyArea = form.querySelector('[data-role="ms-new-script-body"]');
+      var fileInput = form.querySelector('[data-role="ms-new-script-file"]');
+      var existingRefInput = form.querySelector('[data-role="ms-new-existing-source-script-ref"]');
+      var refInput = form.querySelector('[data-role="ms-new-source-script-ref"]');
+      var mintBtn = form.querySelector('[data-role="ms-new-mint-button"]');
+      var submitBtn = form.querySelector('[data-role="ms-new-submit"]');
+      var ingestRoute = form.getAttribute('data-ingest-route');
+      var mintRoute = form.getAttribute('data-mint-route');
+
+      var modeLabels = { paste: '粘贴脚本', upload: '上传脚本文档', select: '选择已有脚本' };
+      var activeMode = 'paste';
+
+      function setFeedback(level, text) {
+        if (!feedback) { return; }
+        feedback.classList.remove('is-success');
+        feedback.classList.remove('is-error');
+        if (level === 'success') { feedback.classList.add('is-success'); }
+        if (level === 'error')   { feedback.classList.add('is-error'); }
+        feedback.textContent = text || '';
+      }
+
+      function activateTab(mode) {
+        activeMode = mode;
+        tabs.forEach(function (tab) {
+          var on = tab.getAttribute('data-tab') === mode;
+          tab.classList.toggle('is-active', on);
+          tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        panels.forEach(function (panel) {
+          panel.hidden = panel.getAttribute('data-tab-panel') !== mode;
+        });
+        if (modePill) { modePill.textContent = modeLabels[mode] || mode; }
+        setFeedback(null, '');
+      }
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          activateTab(tab.getAttribute('data-tab'));
+        });
+      });
+
+      function readFileAsText(file) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve(String(reader.result || '')); };
+          reader.onerror = function () { reject(new Error('文件读取失败')); };
+          reader.readAsText(file);
+        });
+      }
+
+      var AUTH_EXPIRED_MESSAGE = '登录已失效，请重新登录后再提交脚本。';
+      var SAFE_LOGIN_NEXT = '/tasks/matrix-script/new?ui_locale=zh';
+
+      function ingestBody(body, sourceKind) {
+        return fetch(ingestRoute, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-          body: JSON.stringify({})
-        })
-          .then(function (resp) {
-            if (!resp.ok) { throw new Error('mint http ' + resp.status); }
-            return resp.json();
-          })
-          .then(function (payload) {
-            if (payload && typeof payload.source_script_ref === 'string') {
-              input.value = payload.source_script_ref;
-              input.focus();
-            } else {
-              throw new Error('mint response missing source_script_ref');
+          body: JSON.stringify({ body: body, source_kind: sourceKind })
+        }).then(function (resp) {
+          var ctype = (resp.headers.get('content-type') || '').toLowerCase();
+          var looksHtml = ctype.indexOf('text/html') !== -1;
+          // Auth gate / session expiry. The API now returns 401/403 JSON,
+          // but a legacy gate could 302-redirect the fetch to the HTML
+          // login page. In NONE of these cases is the body valid JSON, so
+          // we must NOT call resp.json() blindly (that is what produced the
+          // "Unexpected token '<'" error on the operator's screen).
+          if (resp.status === 401 || resp.status === 403 || resp.redirected || looksHtml) {
+            var authErr = new Error(AUTH_EXPIRED_MESSAGE);
+            authErr.authRequired = true;
+            throw authErr;
+          }
+          if (ctype.indexOf('application/json') === -1) {
+            throw new Error('入库失败：服务返回了非预期的响应格式 (HTTP ' + resp.status + ')。');
+          }
+          return resp.json().then(function (data) {
+            if (!resp.ok) {
+              var msg = (data && (data.message || data.detail)) || ('入库失败 HTTP ' + resp.status);
+              throw new Error(msg);
             }
-          })
-          .catch(function () {
-            // Quiet fallback — operator may type an operator-discipline handle
-            // instead. The transitional convention remains accepted.
-            input.placeholder = 'content://matrix-script/source/<your-token>';
-          })
-          .finally(function () {
-            btn.disabled = false;
-            btn.textContent = originalLabel;
+            return data;
           });
+        });
+      }
+
+      // Shared ingest-error handler. Restores the submit affordance, shows
+      // an operator-readable message, and — only when the failure is an
+      // expired/absent session — routes to the login page with a SAFE next
+      // that returns to this operator page (never the POST-only ingest
+      // endpoint).
+      function onIngestError(err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '生成视频方案 →';
+        setFeedback('error', String((err && err.message) || err || '入库失败'));
+        if (err && err.authRequired) {
+          setTimeout(function () {
+            window.location.href = '/auth/login?next=' + encodeURIComponent(SAFE_LOGIN_NEXT);
+          }, 1600);
+        }
+      }
+
+      // Mint-empty button inside the technical-ref details — same UX as the
+      // Plan E PR-2 mint affordance: allocates an empty opaque handle.
+      if (mintBtn && refInput && mintRoute) {
+        mintBtn.addEventListener('click', function () {
+          var originalLabel = mintBtn.textContent;
+          mintBtn.disabled = true;
+          mintBtn.textContent = '铸造中…';
+          fetch(mintRoute, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({})
+          })
+            .then(function (resp) { if (!resp.ok) { throw new Error('mint http ' + resp.status); } return resp.json(); })
+            .then(function (payload) {
+              if (payload && typeof payload.source_script_ref === 'string') {
+                refInput.value = payload.source_script_ref;
+                refInput.focus();
+              } else {
+                throw new Error('mint response missing source_script_ref');
+              }
+            })
+            .catch(function () {
+              refInput.placeholder = 'content://matrix-script/source/<your-token>';
+            })
+            .finally(function () {
+              mintBtn.disabled = false;
+              mintBtn.textContent = originalLabel;
+            });
+        });
+      }
+
+      // Submit pipeline. We intercept submit, run ingest if needed, populate
+      // the hidden source_script_ref, then let the normal form POST proceed.
+      form.addEventListener('submit', function (evt) {
+        // If technical-ref input already has a valid-looking value AND the
+        // operator opened the details, honour their direct entry without
+        // running ingest. The browser pattern attribute validates shape.
+        var techRefHasValue = refInput && refInput.value && refInput.value.trim().length > 0;
+        var techDetails = form.querySelector('[data-role="ms-new-technical-ref"]');
+        var techExpanded = techDetails && techDetails.open;
+        if (techRefHasValue && techExpanded && activeMode !== 'paste' && activeMode !== 'upload') {
+          // direct path — no JS work
+          return;
+        }
+        if (activeMode === 'select') {
+          var existing = existingRefInput && existingRefInput.value ? existingRefInput.value.trim() : '';
+          if (!existing) {
+            evt.preventDefault();
+            setFeedback('error', '请填写已有脚本句柄，或切换到「粘贴脚本」/「上传脚本文档」。');
+            return;
+          }
+          refInput.value = existing;
+          return;
+        }
+        if (activeMode === 'paste') {
+          var body = bodyArea && bodyArea.value ? bodyArea.value : '';
+          if (!body.trim()) {
+            evt.preventDefault();
+            setFeedback('error', '请先粘贴脚本正文，或切换标签页选择其他来源。');
+            return;
+          }
+          evt.preventDefault();
+          submitBtn.disabled = true;
+          submitBtn.textContent = '入库中…';
+          ingestBody(body, 'operator_paste')
+            .then(function (payload) {
+              refInput.value = payload.source_script_ref;
+              setFeedback('success', '已入库 ' + (payload.body_char_count || 0) + ' 字符；正在提交任务...');
+              form.submit();
+            })
+            .catch(onIngestError);
+          return;
+        }
+        if (activeMode === 'upload') {
+          if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            evt.preventDefault();
+            setFeedback('error', '请选择脚本文档（.txt / .md），或切换到「粘贴脚本」标签页。');
+            return;
+          }
+          evt.preventDefault();
+          submitBtn.disabled = true;
+          submitBtn.textContent = '读取并入库中…';
+          readFileAsText(fileInput.files[0])
+            .then(function (text) { return ingestBody(text, 'operator_upload'); })
+            .then(function (payload) {
+              refInput.value = payload.source_script_ref;
+              setFeedback('success', '已入库 ' + (payload.body_char_count || 0) + ' 字符；正在提交任务...');
+              form.submit();
+            })
+            .catch(onIngestError);
+          return;
+        }
       });
+
+      // Set initial state
+      activateTab('paste');
     })();
   </script>
 </body>
