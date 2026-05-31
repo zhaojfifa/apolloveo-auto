@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>矩阵脚本新建任务 - ApolloVeo</title>
+  <link rel="stylesheet" href="/static/i18n.css" />
+  <link rel="stylesheet" href="/static/css/ui_v185.css" />
+  <link rel="stylesheet" href="/static/css/operator_console.css" />
+  <style>
+    /* Page-local additive styling. The op-card / op-section-head /
+       op-collapse / op-pill / op-banner classes are already defined in
+       operator_console.css; this <style> block only adds tab-switcher
+       affordances + page-local form spacing. */
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      background: var(--op-bg, #f8fafc);
+      color: var(--op-fg, #0f172a);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .ms-new-page {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+    .ms-new-field {
+      display: grid;
+      gap: 6px;
+      margin-top: 14px;
+    }
+    .ms-new-field label {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--op-fg-mid, #334155);
+    }
+    .ms-new-field input,
+    .ms-new-field select,
+    .ms-new-field textarea {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      padding: 10px 11px;
+      font: inherit;
+      background: #fff;
+      color: var(--op-fg, #0f172a);
+    }
+    .ms-new-field textarea {
+      min-height: 220px;
+      resize: vertical;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .ms-new-field-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .ms-new-field-grid .ms-new-field.full { grid-column: 1 / -1; }
+    .ms-new-required {
+      color: #b91c1c;
+      font-weight: 800;
+    }
+    /* Tab switcher for paste / upload / select script source modes. */
+    .ms-new-tabs {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--op-card-bd, #e5e7eb);
+    }
+    .ms-new-tab {
+      background: transparent;
+      border: 1px solid transparent;
+      border-bottom: 2px solid transparent;
+      padding: 8px 14px;
+      font: inherit;
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--op-fg-soft, #64748b);
+      cursor: pointer;
+      border-radius: 6px 6px 0 0;
+    }
+    .ms-new-tab:hover { color: var(--op-fg, #0f172a); }
+    .ms-new-tab.is-active {
+      color: var(--op-emerald, #047857);
+      border-bottom-color: var(--op-emerald, #047857);
+      background: var(--op-emerald-bg, #ecfdf5);
+    }
+    .ms-new-tab-panel { padding-top: 12px; }
+    .ms-new-tab-panel[hidden] { display: none; }
+    .ms-new-feedback {
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+      display: none;
+    }
+    .ms-new-feedback.is-success {
+      display: block;
+      background: var(--op-emerald-bg, #ecfdf5);
+      border: 1px solid var(--op-emerald-bd, #a7f3d0);
+      color: #064e3b;
+    }
+    .ms-new-feedback.is-error {
+      display: block;
+      background: var(--op-amber-bg, #fffbeb);
+      border: 1px solid var(--op-amber-bd, #fde68a);
+      color: #7c2d12;
+    }
+    .ms-new-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+    .ms-new-btn-primary,
+    .ms-new-btn-secondary {
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-weight: 800;
+      text-decoration: none;
+      border: 1px solid transparent;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .ms-new-btn-primary {
+      background: var(--op-emerald, #047857);
+      border-color: var(--op-emerald, #047857);
+      color: #fff;
+    }
+    .ms-new-btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .ms-new-btn-secondary {
+      background: #fff;
+      border-color: #cbd5e1;
+      color: var(--op-fg, #0f172a);
+    }
+    .ms-new-route-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .ms-new-route-list li {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px;
+      background: #f8fafc;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 1px 5px;
+      font-size: 12px;
+    }
+    .ms-new-shell {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 280px;
+      gap: 16px;
+      align-items: start;
+    }
+    @media (max-width: 880px) {
+      .ms-new-shell { grid-template-columns: 1fr; }
+      .ms-new-field-grid { grid-template-columns: 1fr; }
+      /* PR-1 (2026-05-28) — responsive degradation polish. The
+         op-page-head row currently uses justify-content: space-between
+         which floats the matrix-script pill above the title at narrow
+         viewport. Stack the pill below the title and shrink the title
+         font for cleaner mobile/tablet degradation. */
+      .op-page-head__row { flex-direction: column; align-items: flex-start; }
+      .op-page-head__row .op-pill { align-self: flex-start; margin-top: 4px; }
+      .op-page-head__title { font-size: 20px; }
+      /* Tabs wrap to two rows below 880px instead of overflowing. */
+      .ms-new-tabs { flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+  <div class="ms-new-page" data-role="matrix-script-create-entry" data-line-id="matrix_script">
+    
+    
+    
+    
+    
+    
+<div class="topbar">
+  <div class="topbar-left">
+    
+      <div class="topbar-title">矩阵脚本</div>
+    
+    
+      <div class="topbar-subtitle">正式产线新建入口</div>
+    
+  </div>
+
+  <div class="topbar-center">
+    
+      <div class="segmented">
+        
+          <a class="segmented-item nav-pill ui-pill " href="/tasks?ui_locale=zh">
+            任务
+          </a>
+        
+          <a class="segmented-item nav-pill ui-pill " href="/tools/hub?ui_locale=zh">
+            工具
+          </a>
+        
+      </div>
+    
+  </div>
+
+  <div class="topbar-right">
+    <script>
+  window.__I18N__ = {"dict": {"mm": {"action.back_tasks": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1005\u102c\u101b\u1004\u103a\u1038", "action.back_tools": "\u1000\u102d\u101b\u102d\u101a\u102c\u1019\u103b\u102c\u1038", "action.copy": "\u1000\u1030\u1038\u101a\u1030", "action.create": "\u1016\u1014\u103a\u1010\u102e\u1038\u1015\u103c\u102e\u1038 \u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a", "action.delete": "\u1016\u103b\u1000\u103a", "action.download": "\u1012\u1031\u102b\u1004\u103a\u1038\u101c\u102f\u1012\u103a", "action.download_disabled": "\u1012\u1031\u102b\u1004\u103a\u1038\u101c\u102f\u1012\u103a", "action.force_download": "\u1021\u1010\u1004\u103a\u1038\u1012\u1031\u102b\u1004\u103a\u1038\u101c\u102f\u1012\u103a", "action.json": "JSON", "action.new_task": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1021\u101e\u1005\u103a", "action.open": "\u1016\u103d\u1004\u1037\u103a", "action.open_detail": "\u1021\u101e\u1031\u1038\u1005\u102d\u1010\u103a\u101d\u1004\u103a\u101b\u1014\u103a", "action.refresh": "\u1015\u103c\u1014\u103a\u1005\u1005\u103a", "action.reset": "\u1015\u103c\u1014\u103a\u1005\u101b\u1014\u103a", "action.run": "\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a", "action.save": "\u101e\u102d\u1019\u103a\u1038\u1006\u100a\u103a\u1038", "action.submit": "\u1010\u1004\u103a\u101e\u103d\u1004\u103a\u1038", "action.unlock": "\u1016\u103d\u1004\u1037\u103a", "admin.tools.save": "Save defaults", "admin.tools.title": "Tools admin", "auth.login.button": "Login", "auth.login.desc": "Enter operator name and OP_ACCESS_KEY. Supports admin/operator.", "auth.login.invalid": "\u1000\u102e\u1038 \u1019\u1019\u103e\u1014\u103a\u1015\u102b", "auth.login.key_label": "\u1000\u102e\u1038", "auth.login.key_placeholder": "OP_ACCESS_KEY", "auth.login.operator_label": "\u1021\u1000\u1031\u102c\u1004\u1037\u103a", "auth.login.operator_placeholder": "ops / admin", "auth.login.title": "Operator Login", "category": "Category", "category_beauty": "Beauty", "category_other": "Other", "category_suitcase": "Suitcase", "common.back_task_board": "\u2190 \u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1005\u102c\u101b\u1004\u103a\u1038", "common.burmese": "\u1019\u103c\u1014\u103a\u1019\u102c", "common.chinese": "\u4e2d\u6587", "common.clear_filters": "\u1005\u1005\u103a\u1011\u102f\u1010\u103a\u1019\u103e\u102f\u1016\u103b\u1000\u103a", "common.delete": "\u1016\u103b\u1000\u103a", "common.details": "\u1021\u101e\u1031\u1038\u1005\u102d\u1010\u103a", "common.docs": "\u1005\u102c\u1010\u1019\u103a\u1038", "common.download": "\u1012\u1031\u102b\u1004\u103a\u1038\u101c\u102f\u1015\u103a", "common.new_task": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1021\u101e\u1005\u103a", "common.open": "\u1016\u103d\u1004\u1037\u103a", "common.search": "\u101b\u103e\u102c\u1016\u103d\u1031", "common.tasks": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038", "common.tools": "\u1000\u102d\u101b\u102d\u101a\u102c", "created": "Created", "delete": "Delete", "detail": "Detail", "download": "Download", "hot.follow.action.dub": "Re-Dub", "hot.follow.action.pack": "Re-Pack", "hot.follow.action.parse": "Re-Parse", "hot.follow.action.scenes": "Generate Scenes", "hot.follow.action.subtitles": "Re-Subtitles", "hot.follow.delivery.cta": "Delivery Center", "hot.follow.delivery.deliverables": "Deliverables", "hot.follow.delivery.empty": "No deliverables yet.", "hot.follow.delivery.notes": "Notes", "hot.follow.delivery.notes.placeholder": "Optional notes", "hot.follow.delivery.publish": "Publish Backfill", "hot.follow.delivery.publish_cta": "Backfill Publish", "hot.follow.delivery.published_url": "Published URL", "hot.follow.delivery.subtitle": "Deliverables download and publish backfill", "hot.follow.delivery.title": "Hot Follow - Delivery Center", "hot.follow.nav": "Hot Follow", "hot.follow.new.bgm_keep": "Keep original", "hot.follow.new.bgm_mix": "BGM mix ratio (0-1)", "hot.follow.new.bgm_mute": "Mute", "hot.follow.new.bgm_replace": "Replace audio", "hot.follow.new.bgm_title": "BGM Settings", "hot.follow.new.cta": "Create \u0026 Run", "hot.follow.new.form_title": "Create Task", "hot.follow.new.local_video": "\u1012\u1031\u101e\u1010\u103d\u1004\u103a\u1038 \u1017\u102e\u1012\u102e\u101a\u102d\u102f", "hot.follow.new.local_video_hint": "mp4 / mov / mkv \u1000\u102d\u102f \u1015\u1036\u1037\u1015\u102d\u102f\u1038\u1015\u103c\u102e\u1038 Hot Follow workbench \u101e\u102d\u102f\u1037 \u1006\u1000\u103a\u101e\u103d\u102c\u1038\u1019\u100a\u103a", "hot.follow.new.probe_title": "Link Preview", "hot.follow.new.source_language": "\u1019\u1030\u101b\u1004\u103a\u1038\u1017\u102e\u1012\u102e\u101a\u102d\u102f \u1018\u102c\u101e\u102c\u1005\u1000\u102c\u1038", "hot.follow.new.source_language.en": "English", "hot.follow.new.source_language.zh": "\u4e2d\u6587", "hot.follow.new.source_mode": "\u101b\u1004\u103a\u1038\u1019\u103c\u1005\u103a \u101b\u103d\u1031\u1038\u1001\u103b\u101a\u103a\u1019\u103e\u102f", "hot.follow.new.source_mode.link": "\u101c\u1004\u1037\u103a\u1001\u103a", "hot.follow.new.source_mode.local": "\u1012\u1031\u101e\u1010\u103d\u1004\u103a\u1038 \u1017\u102e\u1012\u102e\u101a\u102d\u102f", "hot.follow.new.subtitle": "Paste a link to create a hot follow task", "hot.follow.new.title": "Hot Follow - New", "hot.follow.step.dub": "Dubbing", "hot.follow.step.pack": "Pack", "hot.follow.step.parse": "Parse", "hot.follow.step.scenes": "Scenes", "hot.follow.step.subtitles": "Subtitles", "hot.follow.subtitle": "Deconstruct and replicate trending videos", "hot.follow.title": "Hot Follow", "hot.follow.workbench.cta": "Back to Workbench", "hot.follow.workbench.events_title": "Events", "hot.follow.workbench.pipeline_title": "Pipeline Steps", "hot.follow.workbench.subtitle": "Track progress and control steps", "hot.follow.workbench.title": "Hot Follow - Workbench", "id": "ID", "json": "JSON", "label.account": "\u1021\u1000\u1031\u102c\u1004\u1037\u103a", "label.auto_category_hint": "\u1021\u1031\u102c\u103a\u1010\u102d\u102f \u1021\u1019\u103b\u102d\u102f\u1038\u1021\u1005\u102c\u1038: Suitcase \u00b7 \u1018\u102c\u101e\u102c: Burmese \u00b7 UI: Chinese", "label.category": "\u1021\u1019\u103b\u102d\u102f\u1038\u1021\u1005\u102c\u1038", "label.category_other": "\u1021\u1001\u103c\u102c\u1038", "label.created": "\u1016\u1014\u103a\u1010\u102e\u1038\u1001\u103b\u102d\u1014\u103a", "label.detail": "\u1021\u101e\u1031\u1038\u1005\u102d\u1010\u103a", "label.downloads": "\u1012\u1031\u102b\u1004\u103a\u1038\u101c\u102f\u1015\u103a\u1019\u103b\u102c\u1038", "label.dub_mode": "\u1021\u101e\u1036\u1016\u1019\u103a\u1038", "label.dub_mode.auto": "Auto fallback", "label.dub_mode.edge": "Edge TTS", "label.dub_mode.lovo": "LOVO", "label.id": "ID", "label.json": "JSON", "label.lang.mm": "\u1019\u103c\u1014\u103a\u1019\u102c (MM)", "label.language": "\u1018\u102c\u101e\u102c", "label.last_step": "\u1014\u1031\u102c\u1000\u103a\u1006\u102f\u1036\u1038 \u1021\u1006\u1004\u1037\u103a", "label.more_tools": "\u1014\u1031\u102c\u1000\u103a\u1011\u1015\u103a \u1000\u102d\u101b\u102d\u101a\u102c\u1019\u103b\u102c\u1038\u1000\u102d\u102f Tools Hub \u1019\u103e\u102c\u104b", "label.note": "\u1019\u103e\u1010\u103a\u1001\u103b\u1000\u103a", "label.note.placeholder": "\u1021\u1031\u102c\u103a\u1015\u101b\u1031\u1010\u102c \u1019\u103e\u1010\u103a\u1001\u103b\u1000\u103a", "label.pack": "\u1015\u1000\u103a\u1000\u1031\u1037\u1001\u103a", "label.pipeline_hint": "\u1005\u102c\u1010\u1014\u103a\u1038\u1011\u102d\u102f\u1038/\u1021\u101e\u1036\u1016\u1019\u103a\u1038\u101e\u102c \u101e\u1010\u103a\u1019\u103e\u1010\u103a\u1015\u102b\u104b \u1021\u1001\u103c\u102c\u1038\u1000\u102d\u101b\u102d\u101a\u102c\u1019\u103b\u102c\u1038\u1000\u102d\u102f Workbench \u1019\u103e\u102c\u104b", "label.pipeline_tools": "\u101c\u1019\u103a\u1038\u1000\u103c\u1031\u102c\u1004\u103a\u1038\u1000\u102d\u101b\u102d\u101a\u102c\u1019\u103b\u102c\u1038", "label.platform": "\u1015\u101c\u1000\u103a\u1016\u1031\u102c\u1004\u103a\u1038", "label.platform_douyin": "Douyin", "label.platform_fb": "Facebook", "label.platform_tiktok": "TikTok", "label.platform_xhs": "XHS", "label.publish": "\u1011\u102f\u1010\u103a\u101d\u1031", "label.source": "\u1021\u101b\u1004\u103a\u1038\u1021\u1019\u103c\u1005\u103a", "label.source_url": "\u1021\u101b\u1004\u103a\u1038\u1021\u1019\u103c\u1005\u103a \u101c\u1004\u1037\u103a\u1001\u103a", "label.source_url.placeholder": "\u1021\u101b\u1004\u103a\u1038\u1021\u1019\u103c\u1005\u103a \u101c\u1004\u1037\u103a\u1001\u103a\u1000\u1030\u1038\u1011\u100a\u1037\u103a\u1015\u102b (Douyin/XHS/TK/FB)", "label.status": "\u1021\u1001\u103c\u1031\u1021\u1014\u1031", "label.style": "\u1005\u1010\u102d\u102f\u1004\u103a", "label.style.fast": "\u1019\u103c\u1014\u103a\u1019\u103c\u1014\u103a \u101e\u102f\u1036\u1038\u101e\u1015\u103a", "label.style.story": "\u1007\u102c\u1010\u103a\u101c\u1019\u103a\u1038", "label.style_preset": "\u1005\u1010\u102d\u102f\u1004\u103a \u1015\u101b\u102e\u1006\u1000\u103a", "label.style_preset.hint": "\u1005\u1010\u102d\u102f\u1004\u103a\u1014\u103e\u1004\u1037\u103a \u1005\u102f\u1005\u100a\u103a\u1038\u1015\u102f\u1036 \u101e\u1010\u103a\u1019\u103e\u1010\u103a\u1015\u102b", "label.submit.error.missing_link": "\u1021\u101b\u1004\u103a\u1038\u1021\u1019\u103c\u1005\u103a \u101c\u1004\u1037\u103a\u1001\u103a \u1019\u1016\u103c\u1005\u103a\u1019\u1014\u1031\u101c\u102d\u102f\u1021\u1015\u103a\u1015\u102b\u101e\u100a\u103a", "label.submit.status.created": "\u1010\u102c\u101d\u1014\u103a {task_id} \u1016\u1014\u103a\u1010\u102e\u1038\u1015\u103c\u102e\u1038\u104a \u1021\u1001\u103c\u1031\u1021\u1014\u1031: {status}", "label.submit.status.failed": "\u1010\u1004\u103a\u1019\u101b\u1015\u102b: {error}", "label.submit.status.submitting": "\u1010\u1004\u103a\u1014\u1031\u101e\u100a\u103a\u2026", "label.subtitles_mode": "\u1005\u102c\u1010\u1014\u103a\u1038\u1011\u102d\u102f\u1038/\u1018\u102c\u101e\u102c\u1015\u103c\u1014\u103a", "label.subtitles_mode.whisper_gemini": "Whisper + Gemini (ASR + translate)", "label.subtitles_mode.whisper_only": "Whisper only (ASR only)", "label.summary": "\u1021\u1014\u103e\u1005\u103a\u1001\u103b\u102f\u1015\u103a", "label.task_id": "\u1010\u102c\u101d\u1014\u103a ID", "label.title": "\u1001\u1031\u102b\u1004\u103a\u1038\u1005\u1009\u103a", "label.title.optional": "\u1001\u1031\u102b\u1004\u103a\u1038\u1005\u1009\u103a (\u101b\u103d\u1031\u1038\u1001\u103b\u101a\u103a\u101b\u1014\u103a)", "label.title.placeholder": "\u101b\u103d\u1031\u1038\u1001\u103b\u101a\u103a\u101b\u1014\u103a \u1001\u1031\u102b\u1004\u103a\u1038\u1005\u1009\u103a", "label.video_type": "\u1017\u102e\u1012\u102e\u101a\u102d\u102f\u1021\u1019\u103b\u102d\u102f\u1038\u1021\u1005\u102c\u1038", "label.video_type.hint": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038 \u101b\u100a\u103a\u101b\u103d\u101a\u103a\u1001\u103b\u1000\u103a\u101b\u103d\u1031\u1038\u1015\u102b", "label.video_type.review": "\u101e\u102f\u1036\u1038\u101e\u1015\u103a\u1001\u103b\u1000\u103a", "label.video_type.scenario": "\u1007\u102c\u1010\u103a\u101c\u1019\u103a\u1038\u1006\u1014\u103a", "lang": "Language", "lang.mm": "Burmese", "lang.vi": "Vietnamese", "lang.zh": "Chinese", "legend": "Legend", "nav.tasks": "Tasks", "nav.tools": "Tools", "new_suitcase_task": "New Task", "no_tasks": "No tasks yet", "open": "Open", "pack": "Pack", "page.publish.subtitle": "Task ID: {task_id}", "page.publish.title": "Publish Hub", "page.tasks.board.subtitle": "Loaded {count} tasks", "page.tasks.board.title": "Task Board", "page.tasks.new.subtitle": "Paste link \u2192 generate Smart Pack + README", "page.tasks.new.title": "New Task", "page.tools.detail.title": "Tool Detail", "page.tools.hub.subtitle": "Tool registry \u0026 entry points (SSOT)", "page.tools.hub.title": "Tools Hub", "page.workbench.subtitle": "Task ID: {task_id}", "page.workbench.title": "Workbench", "platform": "Platform", "publish": "Publish", "publish.archive.desc": "Archive confirms delivery, not published.", "publish.archive.download_url": "Download URL", "publish.archive.key": "Archive key", "publish.archive.location": "Archive location", "publish.archive.open": "Open", "publish.archive.published": "Published", "publish.archive.published_at": "Published at", "publish.archive.published_hint": "Check to mark published", "publish.archive.save": "Save archive", "publish.archive.status": "Status", "publish.archive.submit": "Submit archive", "publish.archive.title": "Archive", "publish.copy.caption": "Caption", "publish.copy.comment": "Comment CTA", "publish.copy.desc": "Editable fields; edits are not saved.", "publish.copy.hashtags": "Hashtags", "publish.copy.link_text": "Link text", "publish.copy.publish_time": "Publish time suggestion", "publish.copy.title": "Copy Bundle", "publish.deliverables.bundle": "Edit Bundle (ZIP)", "publish.deliverables.copy_link": "Copy link", "publish.deliverables.copy_short": "Copy short link", "publish.deliverables.desc": "Show only generated artifacts.", "publish.deliverables.empty": "No deliverables available.", "publish.deliverables.open_link": "Open link", "publish.deliverables.qr": "Scan to download bundle", "publish.deliverables.short_link": "Short link", "publish.deliverables.title": "Deliverables", "publish.download_code": "Download code", "publish.gate.desc": "Enter OP Access Key to load publish data.", "publish.gate.invalid_key": "OP Access Key is invalid.", "publish.gate.load_failed": "Load failed: HTTP {status}", "publish.gate.need_key": "OP Access Key is required.", "publish.gate.title": "Operator gate", "publish.sop.desc": "v1.85 delivery steps.", "publish.sop.step1": "1) Download pack.zip or scenes.zip in Deliverables.", "publish.sop.step2": "2) Import into mobile editor (e.g., CapCut) and verify.", "publish.sop.step3": "3) Use Copy Bundle for title/hashtags/comment CTA.", "publish.sop.step4": "4) v1.85 is edit delivery only; publish bundle comes in 2.0.", "publish.sop.title": "SOP", "publish.status.save_error": "Save error: {error}", "publish.status.save_failed": "Save failed: {detail}", "publish.status.saved": "Saved.", "publish.status.saving": "Saving...", "publish.status.submit_error": "Submit error: {error}", "publish.status.submit_failed": "Submit failed: {detail}", "publish.status.submitted": "Submitted.", "publish.status.submitting": "Submitting...", "publish.tab.archive": "Archive", "publish.tab.copy": "Copy Bundle", "publish.tab.deliverables": "Deliverables", "publish.tab.sop": "SOP", "source": "Source", "status": "Status", "status.error": "\u1019\u1021\u1031\u102c\u1004\u103a\u1019\u103c\u1004\u103a", "status.failed": "\u1019\u1021\u1031\u102c\u1004\u103a\u1019\u103c\u1004\u103a", "status.not_ready": "Not ready", "status.pending": "\u1005\u1031\u102c\u1004\u1037\u103a\u1006\u102d\u102f\u1004\u103a\u1038", "status.processing": "\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a\u1014\u1031", "status.queued": "\u1005\u1031\u102c\u1004\u1037\u103a\u1006\u102d\u102f\u1004\u103a\u1038", "status.ready": "\u1021\u1006\u1004\u103a\u101e\u1004\u1037\u103a", "status.unknown": "Unknown", "status_error": "Failed", "status_pending": "Queued", "status_processing": "Processing", "status_ready": "Ready", "status_unknown": "Unknown", "task_count": "Task count", "task_not_found": "Task not found", "tasks.badge.pack_exists": "Pack Exists", "tasks.badge.pack_ready": "Pack Ready", "tasks.badge.video": "Video", "tasks.board.subhead": "v1.9 Release | \u1015\u1005\u1039\u1005\u100a\u103a\u1038\u1021\u1001\u103c\u1031\u1015\u103c\u102f \u1019\u103c\u1004\u103a\u1000\u103d\u1004\u103a\u1038", "tasks.delete_confirm": "\u1012\u102e\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1000\u102d\u102f \u1016\u103b\u1000\u103a\u1019\u101c\u102c\u1038?", "tasks.delete_failed": "\u1016\u103b\u1000\u103a\u1019\u101b\u1015\u102b: {error}", "tasks.deleting": "\u1016\u103b\u1000\u103a\u1014\u1031\u101e\u100a\u103a\u2026", "tasks.dub": "\u1021\u101e\u1036\u1016\u1019\u103a\u1038", "tasks.empty": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1019\u101b\u103e\u102d\u101e\u1031\u1038\u1015\u102b\u104b", "tasks.filter.scene.all": "\u1021\u1001\u1014\u103a\u1038\u1021\u102c\u1038\u101c\u102f\u1036\u1038", "tasks.filter.scene.avatar": "\u1012\u1005\u103a\u1002\u103b\u1005\u103a\u1010\u101a\u103a\u101c\u1030", "tasks.filter.scene.baseline": "\u1021\u1001\u103c\u1031\u1001\u1036", "tasks.filter.scene.hot_follow": "\u101f\u1031\u102c\u1037\u101c\u102d\u102f\u1000\u103a", "tasks.filter.status.all": "\u1021\u1001\u103c\u1031\u1021\u1014\u1031\u1021\u102c\u1038\u101c\u102f\u1036\u1038", "tasks.filter.status.attention": "\u1021\u102c\u101b\u102f\u1036\u1005\u102d\u102f\u1000\u103a\u101b\u1014\u103a", "tasks.filter.status.done": "\u1015\u103c\u102e\u1038\u1006\u102f\u1036\u1038", "tasks.filter.status.processing": "\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a\u1014\u1031", "tasks.filtered_n": "\u1005\u1005\u103a\u1011\u102f\u1010\u103a\u1015\u103c\u102e\u1038 {n} \u1001\u102f", "tasks.legend": "Legend", "tasks.legend.failed": "\u1019\u1021\u1031\u102c\u1004\u103a\u1019\u103c\u1004\u103a", "tasks.legend.processing": "\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a\u1014\u1031", "tasks.legend.queued": "\u1005\u1031\u102c\u1004\u1037\u103a\u1006\u102d\u102f\u1004\u103a\u1038", "tasks.legend.ready": "\u1021\u1006\u1004\u103a\u101e\u1004\u1037\u103a", "tasks.load_failed": "\u1016\u103d\u1004\u1037\u103a\u1019\u101b\u1015\u102b: {error}", "tasks.loaded": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038 {n} \u1001\u102f \u1016\u103d\u1004\u1037\u103a\u1011\u102c\u1038\u101e\u100a\u103a", "tasks.loaded_n": "\u1010\u102c\u101d\u1014\u103a {n} \u1001\u102f \u1010\u1004\u103a\u1015\u103c\u102e\u1038", "tasks.loading": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1019\u103b\u102c\u1038 \u1005\u1005\u103a\u1006\u1031\u1038\u1014\u1031\u101e\u100a\u103a\u2026", "tasks.new.local_upload.choose_file": "\u1012\u1031\u101e\u1010\u103d\u1004\u103a\u1038 \u1017\u102e\u1012\u102e\u101a\u102d\u102f \u101b\u103d\u1031\u1038\u101b\u1014\u103a", "tasks.new.local_upload.error": "\u1010\u1004\u103a\u1019\u101b\u1015\u102b\u104a \u1014\u1031\u102c\u1000\u103a\u1019\u103e \u1011\u1015\u103a\u1005\u1019\u103a\u1038\u1015\u102b", "tasks.new.local_upload.error_no_file": "\u1017\u102e\u1012\u102e\u101a\u102d\u102f \u1016\u102d\u102f\u1004\u103a\u1000\u102d\u102f \u101b\u103d\u1031\u1038\u1001\u103b\u101a\u103a\u1015\u102b", "tasks.new.local_upload.error_upload_failed": "\u1010\u1004\u103a\u1019\u101b\u1015\u102b\u104a \u1014\u1031\u102c\u1000\u103a\u1019\u103e \u1011\u1015\u103a\u1005\u1019\u103a\u1038\u1015\u102b", "tasks.new.local_upload.hint": "mp4/mov/mkv \u1000\u102d\u102f \u1015\u1036\u1037\u1015\u102d\u102f\u1038\u101e\u100a\u103a\u104a \u1010\u1004\u103a\u1015\u103c\u102e\u1038\u101e\u103d\u102c\u1038\u101c\u103b\u103e\u1004\u103a \u1006\u1000\u103a\u101c\u1000\u103a\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a\u1019\u100a\u103a", "tasks.new.local_upload.submit": "\u1010\u1004\u103a\u1015\u103c\u102e\u1038 \u1016\u1014\u103a\u1010\u102e\u1038", "tasks.new.local_upload.uploading": "\u1010\u1004\u103a\u1014\u1031\u101e\u100a\u103a...", "tasks.new.source_mode": "\u101b\u1004\u103a\u1038\u1019\u103c\u1005\u103a \u101b\u103d\u1031\u1038\u1001\u103b\u101a\u103a\u1019\u103e\u102f", "tasks.new.source_mode.local": "\u1012\u1031\u101e\u1010\u103d\u1004\u103a\u1038 \u1017\u102e\u1012\u102e\u101a\u102d\u102f", "tasks.new.source_mode.url": "\u101c\u1004\u1037\u103a\u1001\u103a", "tasks.no_tasks": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038 \u1019\u101b\u103e\u102d\u101e\u1031\u1038\u1015\u102b", "tasks.pack_unavailable": "\u1019\u101b\u103e\u102d\u101e\u1031\u1038\u1015\u102b", "tasks.publish_hub": "\u1011\u102f\u1010\u103a\u101d\u1031\u1005\u1004\u103a\u1010\u102c", "tasks.scene.avatar.desc": "Recreate a real persona and follow a driving video. Supports lip-sync.", "tasks.scene.avatar.title": "Avatar IP", "tasks.scene.baseline.desc": "General editing pipeline: dedupe, remix, basic dubbing.", "tasks.scene.baseline.title": "Baseline Editing", "tasks.scene.hot.desc": "Deconstruct target videos for pixel-level replication. Auto-extract script \u0026 storyboard.", "tasks.scene.hot.title": "Hot Follow", "tasks.status.failed": "\u1019\u1021\u1031\u102c\u1004\u103a\u1019\u103c\u1004\u103a", "tasks.status.processing": "\u101c\u102f\u1015\u103a\u1006\u1031\u102c\u1004\u103a\u1014\u1031", "tasks.status.queued": "\u1005\u1031\u102c\u1004\u1037\u103a\u1006\u102d\u102f\u1004\u103a\u1038", "tasks.status.ready": "\u1021\u1006\u1004\u103a\u101e\u1004\u1037\u103a", "tasks.subtitles": "\u1005\u102c\u1010\u1014\u103a\u1038\u1011\u102d\u102f\u1038", "tasks.table.category": "\u1021\u1019\u103b\u102d\u102f\u1038\u1021\u1005\u102c\u1038", "tasks.table.created": "\u1016\u1014\u103a\u1010\u102e\u1038\u1001\u103b\u102d\u1014\u103a", "tasks.table.detail": "\u1021\u101e\u1031\u1038\u1005\u102d\u1010\u103a", "tasks.table.id": "ID", "tasks.table.language": "\u1018\u102c\u101e\u102c", "tasks.table.pack": "\u1015\u1000\u103a\u1000\u1031\u1037\u1001\u103a", "tasks.table.platform": "\u1015\u101c\u1000\u103a\u1016\u1031\u102c\u1004\u103a\u1038", "tasks.table.publish": "\u1011\u102f\u1010\u103a\u101d\u1031", "tasks.table.source": "\u1021\u101b\u1004\u103a\u1038\u1021\u1019\u103c\u1005\u103a", "tasks.table.status": "\u1021\u1001\u103c\u1031\u1021\u1014\u1031", "tasks.table.title": "\u1001\u1031\u102b\u1004\u103a\u1038\u1005\u1009\u103a", "tasks.untitled": "\u1021\u1019\u100a\u103a\u1019\u1015\u102b\u101e\u1031\u102c \u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038", "tasks.wizard.header_subtitle": "Select the type of task to create", "tasks.wizard.header_title": "Choose a Task Scenario", "tasks.wizard.hint_avatar": "Best for on-camera persona \u0026 brand spokesperson content", "tasks.wizard.hint_baseline": "Best for general processing and batch remixing", "tasks.wizard.hint_hot": "Best for quickly replicating viral formats at scale", "tasks.wizard.hint_title": "Tips", "tasks.wizard.page_title": "Choose a Task Scenario - ShortVideo", "tasks.wizard.start": "Start", "tasks.wizard.subtitle": "Select the type of task to create. Each type has an optimized workflow.", "tasks.wizard.title": "Choose a Task Scenario", "tasks.workbench.subtitles.clean_ready": "Subtitle stream \u1019\u1015\u102b\u1010\u1032\u1037 clean video \u1000\u102d\u102f \u1015\u103c\u102f\u101c\u102f\u1015\u103a\u1015\u103c\u102e\u1038\u1015\u102b\u1015\u103c\u102e\u104b", "tasks.workbench.subtitles.hard_label": "Hard subtitle (\u1015\u102f\u1036\u1011\u1032\u1000 \u1011\u100a\u1037\u103a\u1011\u102c\u1038\u101e\u1031\u102c \u1005\u102c\u1010\u1014\u103a\u1038)", "tasks.workbench.subtitles.hard_note": "\u1019\u103e\u1010\u103a\u1001\u103b\u1000\u103a\u101e\u102c \u1016\u103c\u1005\u103a\u1015\u103c\u102e\u1038 v1.85 \u1010\u103d\u1004\u103a hard subtitle \u1019\u1016\u101a\u103a\u101b\u103e\u102c\u1038\u1014\u102d\u102f\u1004\u103a\u1015\u102b\u104b", "tasks.workbench.subtitles.none_detected_hint": "Soft subtitle track \u1019\u1010\u103d\u1031\u1037\u1015\u102b\u104b Hard subtitle \u1016\u103c\u1005\u103a\u1015\u102b\u1000 v1.85 \u1019\u1016\u101a\u103a\u101b\u103e\u102c\u1038\u1014\u102d\u102f\u1004\u103a\u1015\u102b\u104b v1.9 \u1010\u103d\u1004\u103a \u1010\u102d\u102f\u1038\u1010\u1000\u103a\u1015\u102b\u1019\u100a\u103a\u104b", "tasks.workbench.subtitles.soft_detected": "Soft subtitle track \u1010\u103d\u1031\u1037\u101b\u103e\u102d\u101e\u100a\u103a\u104b", "tasks.workbench.subtitles.unknown": "Subtitle track \u1005\u1005\u103a\u1006\u1031\u1038\u1019\u103e\u102f \u1019\u101e\u1031\u1001\u103b\u102c (\u1017\u102e\u1012\u102e\u101a\u102d\u102f \u1019\u101b\u103e\u102d/ffprobe \u1019\u1021\u1031\u102c\u1004\u103a\u1019\u103c\u1004\u103a)\u104b", "title": "Title", "tools.actions.details": "\u1021\u101e\u1031\u1038\u1005\u102d\u1010\u103a", "tools.actions.docs": "\u1005\u102c\u1010\u1019\u103a\u1038", "tools.actions.open": "\u1016\u103d\u1004\u1037\u103a", "tools.bucket.avatar.subtitle": "Talking head / assets", "tools.bucket.avatar.title": "Avatar", "tools.bucket.editors.subtitle": "Import pack, template edit, mobile export", "tools.bucket.editors.title": "Editors", "tools.bucket.face_swap.subtitle": "Single/multi face swap", "tools.bucket.face_swap.title": "Face swap", "tools.bucket.gemini.subtitle": "Understanding, generation, copy", "tools.bucket.gemini.title": "Gemini", "tools.bucket.keyframe.subtitle": "Shot selection, scene split, keyframes", "tools.bucket.keyframe.title": "Keyframe / Deterministic", "tools.bucket.other.subtitle": "Unclassified tools", "tools.bucket.other.title": "Other", "tools.bucket.post.subtitle": "Transcode, burn subtitles, packaging", "tools.bucket.post.title": "Post delivery", "tools.bucket.voice.subtitle": "TTS, mix, loudness/denoise", "tools.bucket.voice.title": "Voice / Audio", "tools.detail.capabilities": "\u1005\u103d\u1019\u103a\u1038\u101b\u100a\u103a", "tools.detail.description": "\u1016\u1031\u102c\u103a\u1015\u103c\u1001\u103b\u1000\u103a", "tools.detail.links": "\u101c\u1004\u1037\u103a\u1001\u103a\u1019\u103b\u102c\u1038", "tools.detail.load_failed": "\u1016\u103d\u1004\u1037\u103a\u1019\u101b\u1015\u102b: {error}", "tools.detail.not_found": "\u1000\u102d\u101b\u102d\u101a\u102c \u1019\u1010\u103d\u1031\u1037\u1015\u102b", "tools.detail.steps": "\u1021\u1006\u1004\u1037\u103a\u1019\u103b\u102c\u1038", "tools.detail.tags": "\u1010\u1000\u103a\u1002\u103a", "tools.empty": "\u1000\u102d\u101b\u102d\u101a\u102c \u1019\u1010\u103d\u1031\u1037\u1015\u102b", "tools.error": "\u1016\u103d\u1004\u1037\u103a\u1019\u101b\u1015\u102b", "tools.filters.all": "\u1021\u102c\u1038\u101c\u102f\u1036\u1038", "tools.filters.capabilities": "\u1005\u103d\u1019\u103a\u1038\u101b\u100a\u103a (comma)", "tools.filters.capabilities_placeholder": "\u1005\u103d\u1019\u103a\u1038\u101b\u100a\u103a (comma)", "tools.filters.category": "\u1021\u1019\u103b\u102d\u102f\u1038\u1021\u1005\u102c\u1038", "tools.filters.clear": "\u1005\u1005\u103a\u1011\u102f\u1010\u103a\u1019\u103e\u102f\u1016\u103b\u1000\u103a", "tools.filters.integration": "\u1001\u103b\u102d\u1010\u103a\u1006\u1000\u103a\u1019\u103e\u102f", "tools.filters.search": "\u101b\u103e\u102c\u1016\u103d\u1031\u101b\u1014\u103a", "tools.filters.search_placeholder": "\u1014\u102c\u1019\u100a\u103a\u104a tool id\u104a \u1016\u1031\u102c\u103a\u1015\u103c\u1001\u103b\u1000\u103a", "tools.filters.status": "\u1021\u1001\u103c\u1031\u1021\u1014\u1031", "tools.filters.tags": "\u1010\u1000\u103a\u1002\u103a (comma)", "tools.filters.tags_placeholder": "\u1010\u1000\u103a\u1002\u103a (comma)", "tools.loading": "\u1010\u1004\u103a\u1014\u1031\u101e\u100a\u103a\u2026", "ui.tasks.board": "\u1010\u102c\u101d\u1014\u103a\u1018\u102f\u1010\u103a", "ui.tools.title": "\u1000\u102d\u101b\u102d\u101a\u102c\u1019\u103b\u102c\u1038", "ui.workbench.title": "\u101c\u102f\u1015\u103a\u1004\u1014\u103a\u1038\u1001\u103d\u1004\u103a", "workbench.compare": "Compare subtitles", "workbench.compare.mm": "Burmese", "workbench.compare.origin": "Original", "workbench.deliverables": "Deliverables", "workbench.deliverables.subtitle": "Ops deliverables for download", "workbench.dub.skipped": "\u1021\u101e\u1036\u1016\u1019\u103a\u1038 \u1019\u101c\u102f\u1015\u103a\u1015\u102b (\u1000\u103b\u1031\u102c\u103a\u101e\u103d\u102c\u1038)", "workbench.dub.skipped_reason": "\u1021\u101e\u1036\u1016\u1019\u103a\u1038\u1000\u102d\u102f \u1000\u103b\u1031\u102c\u103a\u101e\u103d\u102c\u1038\u101e\u100a\u103a", "workbench.edit.mm": "Burmese edit (for dub)", "workbench.logs": "Logs \u0026 Debug", "workbench.logs.engineering": "Engineering details", "workbench.logs.title": "Logs", "workbench.meta.account": "Account", "workbench.meta.category": "Category", "workbench.meta.created": "Created", "workbench.meta.language": "Language", "workbench.meta.pipeline": "Pipeline", "workbench.meta.platform": "Platform", "workbench.meta.source_url": "Source URL", "workbench.meta.status": "Status", "workbench.meta.subtitle_track": "\u1005\u102c\u1010\u1014\u103a\u1038\u1011\u102d\u102f\u1038 Track", "workbench.meta.subtitle_track.burned": "\u1015\u103c\u1004\u103a\u1038\u1005\u102c\u1010\u1014\u103a\u1038 (Hard)", "workbench.meta.subtitle_track.embedded": "\u1015\u103b\u1031\u102c\u1037\u1005\u102c\u1010\u1014\u103a\u1038 (Soft)", "workbench.meta.subtitle_track.none": "\u1005\u102c\u1010\u1014\u103a\u1038\u1019\u101b\u103e\u102d", "workbench.meta.subtitle_track.unknown": "\u1019\u101e\u102d", "workbench.meta.task_id": "Task ID", "workbench.mm_audio": "Burmese audio", "workbench.mm_subtitles": "Burmese subtitles", "workbench.notice.dub_queued": "Dub queued; polling status...", "workbench.notice.subtitles_first": "Please generate subtitles first", "workbench.notice.subtitles_queued": "Subtitles queued; polling status...", "workbench.origin_subtitles": "Origin Subtitles", "workbench.pack": "Pack", "workbench.publish_hint": "Publishing moved to Publish Hub.", "workbench.publish_hub": "Publish Hub", "workbench.publish_open": "Open Publish Hub", "workbench.scenes": "Scenes", "workbench.scenes_action": "Actions", "workbench.scenes_desc": "Scene slices for reuse.", "workbench.scenes_download": "Download Scenes.zip", "workbench.scenes_generate": "Generate scenes", "workbench.scenes_help": "Scenes are sliced by subtitle timestamps and packed as Scenes.zip. Click generate, then download after ready. JSON is not required. Scenes.zip does not affect Pack.zip.", "workbench.scenes_section": "Scene slices", "workbench.source_url.empty": "\u101c\u1004\u1037\u103a\u1001\u103a \u1019\u1010\u103d\u1031\u1037\u1015\u102b\u104b", "workbench.source_url_raw": "Source URL (raw)", "workbench.status.error": "Failed: {error}", "workbench.status.not_parsed": "Not parsed", "workbench.status.not_ready": "Not ready", "workbench.status.parsed": "Parsed", "workbench.status.processing": "Processing...", "workbench.status.ready": "Ready", "workbench.step.dub.engine": "Engine", "workbench.step.dub.run": "Generate dub", "workbench.step.dub.title": "Step 3 - Dub", "workbench.step.dub.voice": "Voice", "workbench.step.pack.desc": "Generate pack for this task", "workbench.step.pack.run": "Generate pack", "workbench.step.pack.title": "Step 4 - Pack", "workbench.step.parse.desc": "Call /api/tasks/{id}/parse", "workbench.step.parse.local_skip": "\u1012\u1031\u101e\u1010\u103d\u1004\u103a\u1038 \u1017\u102e\u1012\u102e\u101a\u102d\u102f\u1016\u103c\u1005\u103a\u101e\u1031\u102c\u1000\u103c\u1031\u102c\u1004\u1037\u103a parse \u1019\u101c\u102d\u102f\u1015\u102b\u104b", "workbench.step.parse.run": "Run parse", "workbench.step.parse.title": "Step 1 - Parse \u0026 Download", "workbench.step.subtitles.desc": "Call /api/tasks/{id}/subtitles to generate", "workbench.step.subtitles.run": "Generate subtitles", "workbench.step.subtitles.title": "Step 2 - Subtitles", "workbench.steps": "Pipeline", "workbench.steps.subtitle": "Ops workflow view", "workbench.video": "Video"}, "zh": {"action.back_tasks": "\u4efb\u52a1\u770b\u677f", "action.back_tools": "\u5de5\u5177\u4e2d\u5fc3", "action.copy": "\u590d\u5236", "action.create": "\u521b\u5efa\u5e76\u8fd0\u884c", "action.delete": "\u5220\u9664", "action.download": "\u4e0b\u8f7d\u4ea7\u7269", "action.download_disabled": "\u4e0b\u8f7d\u4ea7\u7269", "action.force_download": "\u5f3a\u5236\u4e0b\u8f7d", "action.json": "JSON", "action.new_task": "\u65b0\u5efa\u4efb\u52a1", "action.open": "\u6253\u5f00", "action.open_detail": "\u8fdb\u5165\u8be6\u60c5", "action.refresh": "\u5237\u65b0", "action.reset": "\u91cd\u7f6e", "action.run": "\u8fd0\u884c", "action.save": "\u4fdd\u5b58", "action.submit": "\u63d0\u4ea4", "action.unlock": "\u89e3\u9501", "admin.tools.save": "\u4fdd\u5b58\u9ed8\u8ba4\u503c", "admin.tools.title": "\u5de5\u5177\u7ba1\u7406", "auth.login.button": "\u767b\u5f55", "auth.login.desc": "\u8bf7\u8f93\u5165 Operator \u540d\u4e0e\u8bbf\u95ee\u5bc6\u94a5\uff08OP_ACCESS_KEY\uff09\u3002\u652f\u6301 admin/operator\u3002", "auth.login.invalid": "\u5bc6\u94a5\u9519\u8bef", "auth.login.key_label": "\u5bc6\u94a5", "auth.login.key_placeholder": "OP_ACCESS_KEY", "auth.login.operator_label": "\u8d26\u53f7", "auth.login.operator_placeholder": "ops / admin", "auth.login.title": "\u8fd0\u8425\u767b\u5f55", "category": "\u5206\u7c7b", "category_beauty": "Beauty", "category_other": "\u5176\u4ed6", "category_suitcase": "Suitcase", "common.back_task_board": "\u2190 \u4efb\u52a1\u770b\u677f", "common.burmese": "\u7f05\u7538\u8bed", "common.chinese": "\u4e2d\u6587", "common.new_task": "\u65b0\u5efa\u4efb\u52a1", "common.tasks": "\u4efb\u52a1", "common.tools": "\u5de5\u5177", "created": "\u521b\u5efa\u65f6\u95f4", "delete": "\u5220\u9664", "detail": "\u8be6\u60c5", "download": "\u4e0b\u8f7d", "hot.follow.action.dub": "\u91cd\u65b0\u914d\u97f3", "hot.follow.action.pack": "\u91cd\u65b0\u6253\u5305", "hot.follow.action.parse": "\u91cd\u65b0\u89e3\u6790", "hot.follow.action.scenes": "\u751f\u6210\u5206\u955c", "hot.follow.action.subtitles": "\u91cd\u65b0\u5b57\u5e55", "hot.follow.delivery.cta": "\u4ea4\u4ed8\u4e2d\u5fc3", "hot.follow.delivery.deliverables": "\u4ea4\u4ed8\u7269", "hot.follow.delivery.empty": "\u6682\u65e0\u4ea4\u4ed8\u7269\u3002", "hot.follow.delivery.notes": "\u5907\u6ce8", "hot.follow.delivery.notes.placeholder": "\u53ef\u9009\uff0c\u8bb0\u5f55\u53d1\u5e03\u6e20\u9053\u6216\u8bf4\u660e", "hot.follow.delivery.publish": "\u53d1\u5e03\u56de\u586b", "hot.follow.delivery.publish_cta": "\u56de\u586b\u53d1\u5e03", "hot.follow.delivery.published_url": "\u53d1\u5e03\u94fe\u63a5", "hot.follow.delivery.subtitle": "\u4ea4\u4ed8\u7269\u4e0b\u8f7d\u4e0e\u53d1\u5e03\u56de\u586b", "hot.follow.delivery.title": "\u70ed\u70b9\u8ddf\u62cd - \u4ea4\u4ed8\u4e2d\u5fc3", "hot.follow.nav": "\u70ed\u70b9\u8ddf\u62cd", "hot.follow.new.bgm_keep": "\u4fdd\u7559\u539f\u97f3", "hot.follow.new.bgm_mix": "BGM \u6df7\u5408\u6bd4\u4f8b (0-1)", "hot.follow.new.bgm_mute": "\u9759\u97f3", "hot.follow.new.bgm_replace": "\u66ff\u6362\u539f\u97f3", "hot.follow.new.bgm_title": "BGM \u8bbe\u7f6e", "hot.follow.new.cta": "\u521b\u5efa\u5e76\u8fd0\u884c", "hot.follow.new.form_title": "\u521b\u5efa\u4efb\u52a1", "hot.follow.new.local_video": "\u672c\u5730\u89c6\u9891", "hot.follow.new.local_video_hint": "\u652f\u6301 mp4 / mov / mkv\uff0c\u672c\u5730\u5bfc\u5165\u540e\u7ee7\u7eed\u8fdb\u5165 Hot Follow \u5de5\u4f5c\u53f0", "hot.follow.new.probe_title": "\u94fe\u63a5\u9884\u89c8", "hot.follow.new.source_language": "\u6e90\u89c6\u9891\u8bed\u8a00", "hot.follow.new.source_language.en": "English", "hot.follow.new.source_language.zh": "\u4e2d\u6587", "hot.follow.new.source_mode": "\u6765\u6e90\u65b9\u5f0f", "hot.follow.new.source_mode.link": "\u94fe\u63a5", "hot.follow.new.source_mode.local": "\u672c\u5730\u89c6\u9891", "hot.follow.new.subtitle": "\u8f93\u5165\u94fe\u63a5\uff0c\u751f\u6210\u70ed\u70b9\u8ddf\u62cd\u4efb\u52a1", "hot.follow.new.title": "\u70ed\u70b9\u8ddf\u62cd - \u65b0\u5efa", "hot.follow.step.dub": "\u914d\u97f3", "hot.follow.step.pack": "\u6253\u5305", "hot.follow.step.parse": "\u89e3\u6790", "hot.follow.step.scenes": "\u5206\u955c", "hot.follow.step.subtitles": "\u5b57\u5e55", "hot.follow.subtitle": "\u53c2\u8003\u89c6\u9891\u62c6\u89e3\u4e0e\u590d\u523b", "hot.follow.title": "\u70ed\u70b9\u8ddf\u62cd", "hot.follow.workbench.cta": "\u8fd4\u56de\u5de5\u4f5c\u53f0", "hot.follow.workbench.events_title": "\u4e8b\u4ef6\u8bb0\u5f55", "hot.follow.workbench.pipeline_title": "\u6d41\u7a0b\u6b65\u9aa4", "hot.follow.workbench.subtitle": "\u4efb\u52a1\u8fdb\u5ea6\u4e0e\u6b65\u9aa4\u63a7\u5236", "hot.follow.workbench.title": "\u70ed\u70b9\u8ddf\u62cd - \u5de5\u4f5c\u53f0", "id": "ID", "json": "JSON", "label.account": "\u8d26\u53f7", "label.auto_category_hint": "Auto-category: Suitcase \u00b7 Language: Burmese \u00b7 UI: Chinese", "label.category": "\u5206\u7c7b", "label.category_other": "\u5176\u4ed6", "label.created": "\u521b\u5efa\u65f6\u95f4", "label.detail": "\u8be6\u60c5", "label.downloads": "\u4e0b\u8f7d", "label.dub_mode": "\u914d\u97f3", "label.dub_mode.auto": "\u81ea\u52a8\u515c\u5e95\uff08\u4f18\u5148\u53ef\u7528\uff09", "label.dub_mode.edge": "Edge TTS", "label.dub_mode.lovo": "LOVO", "label.id": "ID", "label.json": "JSON", "label.lang.mm": "\u7f05\u8bed (MM)", "label.language": "\u8bed\u79cd", "label.last_step": "\u6700\u540e\u6b65\u9aa4", "label.more_tools": "\u66f4\u591a\u5de5\u5177\u8bf7\u5728 Tools Hub \u914d\u7f6e\u3002", "label.note": "\u5907\u6ce8", "label.note.placeholder": "\u7ed9\u8fd0\u8425\u5907\u6ce8", "label.pack": "\u526a\u8f91\u5305", "label.pipeline_hint": "\u4ec5\u914d\u7f6e\u5b57\u5e55\u4e0e\u914d\u97f3\uff0c\u5176\u5b83\u5de5\u5177\u5728 Workbench \u8bbe\u7f6e\u3002", "label.pipeline_tools": "\u6d41\u6c34\u7ebf\u5de5\u5177", "label.platform": "\u5e73\u53f0", "label.platform_douyin": "\u6296\u97f3", "label.platform_fb": "Facebook", "label.platform_tiktok": "TikTok", "label.platform_xhs": "\u5c0f\u7ea2\u4e66", "label.publish": "\u53d1\u5e03", "label.source": "\u6765\u6e90", "label.source_url": "\u6765\u6e90\u94fe\u63a5", "label.source_url.placeholder": "\u7c98\u8d34\u6765\u6e90\u94fe\u63a5 (Douyin/XHS/TK/FB)", "label.status": "\u72b6\u6001", "label.style": "\u98ce\u683c", "label.style.fast": "\u77ed\u8bc4\u5feb\u8282\u594f", "label.style.story": "\u60c5\u666f\u53d9\u4e8b", "label.style_preset": "\u98ce\u683c\u9884\u8bbe", "label.style_preset.hint": "\u5b9a\u4e49\u8282\u594f\u4e0e\u526a\u8f91\u610f\u56fe", "label.submit.error.missing_link": "\u5fc5\u987b\u586b\u5199\u6765\u6e90\u94fe\u63a5", "label.submit.status.created": "\u5df2\u521b\u5efa\u4efb\u52a1 {task_id}, \u72b6\u6001: {status}", "label.submit.status.failed": "\u8bf7\u6c42\u5931\u8d25: {error}", "label.submit.status.submitting": "\u63d0\u4ea4\u4e2d...", "label.subtitles_mode": "\u5b57\u5e55/\u7ffb\u8bd1", "label.subtitles_mode.whisper_gemini": "Whisper + Gemini\uff08ASR + \u7ffb\u8bd1/\u6da6\u8272\uff09", "label.subtitles_mode.whisper_only": "Whisper only\uff08\u4ec5 ASR \u5b57\u5e55\uff09", "label.summary": "\u6458\u8981", "label.task_id": "\u4efb\u52a1ID", "label.title": "\u6807\u9898", "label.title.optional": "\u6807\u9898\uff08\u53ef\u9009\uff09", "label.title.placeholder": "\u53ef\u9009\u6807\u9898", "label.video_type": "\u89c6\u9891\u7c7b\u578b", "label.video_type.hint": "\u9009\u62e9\u4e1a\u52a1\u610f\u56fe", "label.video_type.review": "\u5bf9\u6bd4\u6d4b\u8bc4", "label.video_type.scenario": "\u573a\u666f\u4f7f\u7528", "lang": "\u8bed\u79cd", "lang.mm": "\u7f05\u6587", "lang.vi": "\u8d8a\u5357\u8bed", "lang.zh": "\u4e2d\u6587", "legend": "\u56fe\u4f8b", "nav.tasks": "\u4efb\u52a1", "nav.tools": "\u5de5\u5177", "new_suitcase_task": "\u65b0\u5efa\u4efb\u52a1", "no_tasks": "\u6682\u65e0\u4efb\u52a1", "open": "\u6253\u5f00", "pack": "\u526a\u8f91\u5305", "page.publish.subtitle": "\u4efb\u52a1ID: {task_id}", "page.publish.title": "\u53d1\u5e03\u4e2d\u5fc3", "page.tasks.board.subtitle": "\u5df2\u52a0\u8f7d {count} \u4e2a\u4efb\u52a1", "page.tasks.board.title": "\u4efb\u52a1\u770b\u677f", "page.tasks.new.subtitle": "\u7c98\u8d34\u94fe\u63a5 \u2192 \u4e00\u952e\u751f\u6210 Smart Pack + README", "page.tasks.new.title": "\u65b0\u5efa\u4efb\u52a1", "page.tools.detail.title": "\u5de5\u5177\u8be6\u60c5", "page.tools.hub.subtitle": "\u5de5\u5177\u914d\u7f6e\u4e0e\u5165\u53e3\uff08SSOT\uff09", "page.tools.hub.title": "\u5de5\u5177\u4e2d\u5fc3", "page.workbench.subtitle": "\u4efb\u52a1ID: {task_id}", "page.workbench.title": "\u5de5\u4f5c\u53f0", "platform": "\u5e73\u53f0", "publish": "\u53d1\u5e03", "publish.archive.desc": "\u5f52\u6863\u786e\u8ba4\u4ea4\u4ed8\uff0c\u4e0d\u4ee3\u8868\u5df2\u53d1\u5e03\u3002", "publish.archive.download_url": "\u4e0b\u8f7d\u94fe\u63a5", "publish.archive.key": "\u5f52\u6863 Key", "publish.archive.location": "\u5f52\u6863\u4f4d\u7f6e", "publish.archive.open": "\u6253\u5f00", "publish.archive.published": "\u5df2\u53d1\u5e03", "publish.archive.published_at": "\u53d1\u5e03\u65f6\u95f4", "publish.archive.published_hint": "\u52fe\u9009\u8868\u793a\u5df2\u53d1\u5e03", "publish.archive.save": "\u4fdd\u5b58\u5f52\u6863", "publish.archive.status": "\u72b6\u6001", "publish.archive.submit": "\u63d0\u4ea4\u5f52\u6863", "publish.archive.title": "\u5f52\u6863", "publish.copy.caption": "\u6807\u9898/\u6587\u6848", "publish.copy.comment": "\u8bc4\u8bba\u5f15\u5bfc", "publish.copy.desc": "\u8fd0\u8425\u53ef\u7f16\u8f91\u5b57\u6bb5\uff0c\u4fee\u6539\u4e0d\u4f1a\u4fdd\u5b58\u3002", "publish.copy.hashtags": "\u8bdd\u9898\u6807\u7b7e", "publish.copy.link_text": "\u6302\u94fe\u6587\u6848", "publish.copy.publish_time": "\u53d1\u5e03\u65f6\u95f4\u5efa\u8bae", "publish.copy.title": "\u6587\u6848\u5305", "publish.deliverables.bundle": "\u7f16\u8f91\u5305 (ZIP)", "publish.deliverables.copy_link": "\u590d\u5236\u94fe\u63a5", "publish.deliverables.copy_short": "\u590d\u5236\u77ed\u94fe", "publish.deliverables.desc": "\u4ec5\u663e\u793a\u5df2\u751f\u6210\u7684\u4ea7\u7269\u3002", "publish.deliverables.empty": "\u6682\u65e0\u4ea4\u4ed8\u7269\u3002", "publish.deliverables.open_link": "\u6253\u5f00\u94fe\u63a5", "publish.deliverables.qr": "\u626b\u7801\u4e0b\u8f7d\u7f16\u8f91\u5305", "publish.deliverables.short_link": "\u77ed\u94fe", "publish.deliverables.title": "\u4ea4\u4ed8\u7269", "publish.download_code": "\u4e0b\u8f7d\u7801", "publish.gate.desc": "\u8bf7\u8f93\u5165 OP Access Key \u4ee5\u52a0\u8f7d\u53d1\u5e03\u6570\u636e\u3002", "publish.gate.invalid_key": "OP Access Key \u4e0d\u6b63\u786e\u3002", "publish.gate.load_failed": "\u52a0\u8f7d\u5931\u8d25: HTTP {status}", "publish.gate.need_key": "\u8bf7\u8f93\u5165 OP Access Key \u7ee7\u7eed\u3002", "publish.gate.title": "\u8fd0\u8425\u95e8\u7981", "publish.sop.desc": "v1.85 \u4ea4\u4ed8\u64cd\u4f5c\u6b65\u9aa4\u3002", "publish.sop.step1": "1) \u5728\u4ea4\u4ed8\u7269\u4e2d\u4e0b\u8f7d pack.zip \u6216 scenes.zip\u3002", "publish.sop.step2": "2) \u5bfc\u5165\u624b\u673a\u526a\u8f91\u5de5\u5177\uff08\u5982 CapCut\uff09\uff0c\u6838\u5bf9\u5b57\u5e55\u4e0e\u65f6\u957f\u3002", "publish.sop.step3": "3) \u4f7f\u7528\u6587\u6848\u5305\u586b\u5199\u6807\u9898/\u8bdd\u9898/\u8bc4\u8bba\u5f15\u5bfc\u3002", "publish.sop.step4": "4) v1.85 \u4ec5\u63d0\u4f9b\u7f16\u8f91\u4ea4\u4ed8\uff0c\u53d1\u5e03\u5305\u5728 2.0 \u63d0\u4f9b\u3002", "publish.sop.title": "SOP \u64cd\u4f5c\u6307\u5f15", "publish.status.save_error": "\u4fdd\u5b58\u9519\u8bef: {error}", "publish.status.save_failed": "\u4fdd\u5b58\u5931\u8d25: {detail}", "publish.status.saved": "\u5df2\u4fdd\u5b58\u3002", "publish.status.saving": "\u4fdd\u5b58\u4e2d...", "publish.status.submit_error": "\u63d0\u4ea4\u9519\u8bef: {error}", "publish.status.submit_failed": "\u63d0\u4ea4\u5931\u8d25: {detail}", "publish.status.submitted": "\u5df2\u63d0\u4ea4\u3002", "publish.status.submitting": "\u63d0\u4ea4\u4e2d...", "publish.tab.archive": "\u5f52\u6863", "publish.tab.copy": "\u6587\u6848\u5305", "publish.tab.deliverables": "\u4ea4\u4ed8\u7269", "publish.tab.sop": "SOP \u6307\u5f15", "source": "\u6765\u6e90", "status": "\u72b6\u6001", "status.error": "\u5931\u8d25", "status.failed": "\u5931\u8d25", "status.not_ready": "\u672a\u5c31\u7eea", "status.pending": "\u6392\u961f\u4e2d", "status.processing": "\u5904\u7406\u4e2d", "status.queued": "\u6392\u961f\u4e2d", "status.ready": "\u5df2\u5c31\u7eea", "status.unknown": "\u672a\u77e5", "status_error": "\u5931\u8d25", "status_pending": "\u6392\u961f\u4e2d", "status_processing": "\u5904\u7406\u4e2d", "status_ready": "\u5df2\u5c31\u7eea", "status_unknown": "\u672a\u77e5", "task_count": "\u4efb\u52a1\u6570\u91cf", "task_not_found": "\u4efb\u52a1\u4e0d\u5b58\u5728", "tasks.badge.pack_exists": "Pack Exists", "tasks.badge.pack_ready": "Pack Ready", "tasks.badge.video": "Video", "tasks.board.subhead": "v1.9 Release | \u4ea7\u7269\u9a71\u52a8\u89c6\u56fe", "tasks.delete_confirm": "\u786e\u8ba4\u5220\u9664\u8be5\u4efb\u52a1\uff1f", "tasks.delete_failed": "\u5220\u9664\u5931\u8d25: {error}", "tasks.deleting": "\u5220\u9664\u4e2d\u2026", "tasks.dub": "\u914d\u97f3", "tasks.empty": "\u6682\u65e0\u4efb\u52a1\u3002", "tasks.filter.scene.all": "\u5168\u90e8\u573a\u666f", "tasks.filter.scene.avatar": "\u6570\u5b57\u4eba", "tasks.filter.scene.baseline": "\u57fa\u7840", "tasks.filter.scene.hot_follow": "\u70ed\u70b9\u8ddf\u968f", "tasks.filter.status.all": "\u5168\u90e8\u72b6\u6001", "tasks.filter.status.attention": "\u9700\u5173\u6ce8", "tasks.filter.status.done": "\u5df2\u5b8c\u6210", "tasks.filter.status.processing": "\u5904\u7406\u4e2d", "tasks.filtered_n": "\u7b5b\u9009\u540e {n} \u6761", "tasks.legend": "\u56fe\u4f8b", "tasks.legend.failed": "\u5931\u8d25", "tasks.legend.processing": "\u5904\u7406\u4e2d", "tasks.legend.queued": "\u6392\u961f\u4e2d", "tasks.legend.ready": "\u5df2\u5c31\u7eea", "tasks.load_failed": "\u52a0\u8f7d\u5931\u8d25: {error}", "tasks.loaded": "\u5df2\u52a0\u8f7d {n} \u4e2a\u4efb\u52a1", "tasks.loaded_n": "\u5df2\u52a0\u8f7d {n} \u4e2a\u4efb\u52a1", "tasks.loading": "\u52a0\u8f7d\u4efb\u52a1\u4e2d\u2026", "tasks.new.local_upload.choose_file": "\u9009\u62e9\u672c\u5730\u89c6\u9891", "tasks.new.local_upload.error": "\u4e0a\u4f20\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5", "tasks.new.local_upload.error_no_file": "\u8bf7\u5148\u9009\u62e9\u8981\u4e0a\u4f20\u7684\u89c6\u9891\u6587\u4ef6", "tasks.new.local_upload.error_upload_failed": "\u4e0a\u4f20\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5", "tasks.new.local_upload.hint": "\u652f\u6301 mp4/mov/mkv\uff0c\u4e0a\u4f20\u540e\u76f4\u63a5\u8fdb\u5165\u5904\u7406", "tasks.new.local_upload.submit": "\u4e0a\u4f20\u5e76\u521b\u5efa", "tasks.new.local_upload.uploading": "\u4e0a\u4f20\u4e2d...", "tasks.new.source_mode": "\u6765\u6e90\u65b9\u5f0f", "tasks.new.source_mode.local": "\u672c\u5730\u89c6\u9891", "tasks.new.source_mode.url": "\u94fe\u63a5", "tasks.no_tasks": "\u6682\u65e0\u4efb\u52a1", "tasks.pack_unavailable": "\u672a\u5c31\u7eea", "tasks.publish_hub": "\u53d1\u5e03\u4e2d\u5fc3", "tasks.scene.avatar.desc": "\u590d\u523b\u771f\u4eba\u5f62\u8c61\uff0c\u591a\u8bed\u79cd\u53e3\u64ad\u3002\u652f\u6301\u5507\u5f62\u540c\u6b65\u3002", "tasks.scene.avatar.title": "\u6570\u5b57\u4eba IP", "tasks.scene.baseline.desc": "\u901a\u7528\u526a\u8f91\u6d41\u6c34\u7ebf\u3002\u53bb\u91cd\u3001\u6df7\u526a\u3001\u57fa\u7840\u914d\u97f3\u3002", "tasks.scene.baseline.title": "\u57fa\u7840\u526a\u8f91", "tasks.scene.hot.desc": "\u62c6\u89e3\u5bf9\u6807\u89c6\u9891\uff0c\u50cf\u7d20\u7ea7\u590d\u523b\u3002\u81ea\u52a8\u63d0\u53d6\u811a\u672c\u4e0e\u5206\u955c\u3002", "tasks.scene.hot.title": "\u70ed\u70b9\u8ddf\u62cd", "tasks.status.failed": "\u5931\u8d25", "tasks.status.processing": "\u5904\u7406\u4e2d", "tasks.status.queued": "\u6392\u961f\u4e2d", "tasks.status.ready": "\u5df2\u5c31\u7eea", "tasks.subtitles": "\u5b57\u5e55", "tasks.table.category": "\u5206\u7c7b", "tasks.table.created": "\u521b\u5efa\u65f6\u95f4", "tasks.table.detail": "\u8be6\u60c5", "tasks.table.id": "ID", "tasks.table.language": "\u8bed\u79cd", "tasks.table.pack": "\u526a\u8f91\u5305", "tasks.table.platform": "\u5e73\u53f0", "tasks.table.publish": "\u53d1\u5e03", "tasks.table.source": "\u6765\u6e90", "tasks.table.status": "\u72b6\u6001", "tasks.table.title": "\u6807\u9898", "tasks.untitled": "\u672a\u547d\u540d\u4efb\u52a1", "tasks.wizard.header_subtitle": "\u8bf7\u9009\u62e9\u60a8\u8981\u521b\u5efa\u7684\u4efb\u52a1\u7c7b\u578b", "tasks.wizard.header_title": "\u9009\u62e9\u4efb\u52a1\u573a\u666f", "tasks.wizard.hint_avatar": "\u9002\u5408\u9700\u8981\u771f\u4eba\u51fa\u955c\u3001\u54c1\u724c\u4ee3\u8a00\u7684\u89c6\u9891\u5185\u5bb9", "tasks.wizard.hint_baseline": "\u9002\u5408\u5e38\u89c4\u7d20\u6750\u5904\u7406\u3001\u6279\u91cf\u6df7\u526a\u7b49\u901a\u7528\u9700\u6c42", "tasks.wizard.hint_hot": "\u9002\u5408\u5feb\u901f\u590d\u5236\u7206\u6b3e\u89c6\u9891\uff0c\u6279\u91cf\u4ea7\u51fa\u540c\u7c7b\u5185\u5bb9", "tasks.wizard.hint_title": "\u9009\u62e9\u63d0\u793a", "tasks.wizard.page_title": "\u9009\u62e9\u4efb\u52a1\u573a\u666f - ShortVideo", "tasks.wizard.start": "\u5f00\u59cb\u521b\u5efa", "tasks.wizard.subtitle": "\u8bf7\u9009\u62e9\u60a8\u8981\u521b\u5efa\u7684\u4efb\u52a1\u7c7b\u578b\uff0c\u6bcf\u79cd\u7c7b\u578b\u90fd\u6709\u4e13\u95e8\u4f18\u5316\u7684\u5de5\u4f5c\u6d41\u7a0b", "tasks.wizard.title": "\u9009\u62e9\u4efb\u52a1\u573a\u666f", "tasks.workbench.subtitles.clean_ready": "\u5df2\u751f\u6210\u65e0\u5b57\u5e55\u7248\u672c\uff08clean\uff09\u3002", "tasks.workbench.subtitles.hard_label": "\u8fd9\u662f\u786c\u5b57\u5e55\uff08\u753b\u9762\u70e7\u5f55\uff09", "tasks.workbench.subtitles.hard_note": "\u4ec5\u7528\u4e8e\u8bb0\u5f55\uff0cv1.85 \u4e0d\u4f1a\u81ea\u52a8\u53bb\u9664\u786c\u5b57\u5e55\u3002", "tasks.workbench.subtitles.none_detected_hint": "\u672a\u68c0\u6d4b\u5230\u8f6f\u5b57\u5e55\u8f68\u9053\u3002\u82e5\u753b\u9762\u5b58\u5728\u786c\u5b57\u5e55\uff0cv1.85 \u65e0\u6cd5\u81ea\u52a8\u53bb\u9664\uff0cv1.9 \u5c06\u589e\u5f3a\u3002", "tasks.workbench.subtitles.soft_detected": "\u68c0\u6d4b\u5230\u8f6f\u5b57\u5e55\u8f68\u9053\u3002", "tasks.workbench.subtitles.unknown": "\u5b57\u5e55\u8f68\u9053\u68c0\u6d4b\u672a\u77e5\uff08\u672a\u627e\u5230\u89c6\u9891\u6216 ffprobe \u5931\u8d25\uff09\u3002", "title": "\u6807\u9898", "tools.actions.details": "\u8be6\u60c5", "tools.actions.docs": "\u6587\u6863", "tools.actions.open": "\u6253\u5f00", "tools.bucket.avatar.subtitle": "\u53e3\u64ad/\u9a71\u52a8/\u7d20\u6750\u5e93", "tools.bucket.avatar.title": "\u6570\u5b57\u4eba", "tools.bucket.editors.subtitle": "\u5bfc\u5165\u5305\u3001\u6a21\u677f\u526a\u8f91\u3001\u79fb\u52a8\u7aef\u5bfc\u51fa", "tools.bucket.editors.title": "\u526a\u8f91\u5668", "tools.bucket.face_swap.subtitle": "\u4eba\u8138\u66ff\u6362\uff08\u5355/\u591a\uff09", "tools.bucket.face_swap.title": "\u6362\u8138", "tools.bucket.gemini.subtitle": "\u89c6\u9891\u7406\u89e3\u3001\u751f\u6210\u3001\u6587\u6848/\u811a\u672c", "tools.bucket.gemini.title": "\u7406\u89e3\u4e0e\u751f\u6210\uff08Gemini\uff09", "tools.bucket.keyframe.subtitle": "\u9009\u955c\u5934\u3001\u5207\u7247\u3001\u63d0\u5173\u952e\u5e27", "tools.bucket.keyframe.title": "\u5173\u952e\u5e27 / \u786e\u5b9a\u6027\u5de5\u7a0b", "tools.bucket.other.subtitle": "\u672a\u5f52\u7c7b\u5de5\u5177", "tools.bucket.other.title": "\u5176\u4ed6", "tools.bucket.post.subtitle": "\u8f6c\u7801\u3001\u70e7\u5f55\u5b57\u5e55\u3001\u4ea4\u4ed8\u5c01\u88c5", "tools.bucket.post.title": "\u540e\u671f\u4ea4\u4ed8\uff08\u786e\u5b9a\u6027\uff09", "tools.bucket.voice.subtitle": "TTS\u3001\u6df7\u97f3\u3001\u54cd\u5ea6/\u964d\u566a", "tools.bucket.voice.title": "\u914d\u97f3 / \u97f3\u9891", "tools.detail.capabilities": "\u80fd\u529b", "tools.detail.description": "\u7b80\u4ecb", "tools.detail.links": "\u94fe\u63a5", "tools.detail.load_failed": "\u52a0\u8f7d\u5931\u8d25: {error}", "tools.detail.not_found": "\u5de5\u5177\u672a\u627e\u5230", "tools.detail.steps": "\u6b65\u9aa4", "tools.detail.tags": "\u6807\u7b7e", "tools.empty": "\u6ca1\u6709\u5339\u914d\u7684\u5de5\u5177", "tools.error": "\u52a0\u8f7d\u5931\u8d25", "tools.filters.all": "\u5168\u90e8", "tools.filters.capabilities": "\u80fd\u529b (\u9017\u53f7)", "tools.filters.capabilities_placeholder": "\u80fd\u529b (\u9017\u53f7)", "tools.filters.category": "\u5206\u7c7b", "tools.filters.clear": "\u6e05\u9664\u7b5b\u9009", "tools.filters.integration": "\u96c6\u6210\u7ea7\u522b", "tools.filters.search": "\u641c\u7d22", "tools.filters.search_placeholder": "\u540d\u79f0\u3001tool id\u3001\u63cf\u8ff0", "tools.filters.status": "\u72b6\u6001", "tools.filters.tags": "\u6807\u7b7e (\u9017\u53f7)", "tools.filters.tags_placeholder": "\u6807\u7b7e (\u9017\u53f7)", "tools.loading": "\u52a0\u8f7d\u4e2d", "ui.tasks.board": "\u4efb\u52a1\u770b\u677f", "ui.tools.title": "\u5de5\u5177\u4e2d\u5fc3", "ui.workbench.title": "\u5de5\u4f5c\u53f0", "workbench.compare": "\u5bf9\u6bd4\u5b57\u5e55", "workbench.compare.mm": "\u7f05\u6587", "workbench.compare.origin": "\u539f\u59cb", "workbench.deliverables": "\u4ea4\u4ed8\u7269", "workbench.deliverables.subtitle": "\u8fd0\u8425\u53ef\u4e0b\u8f7d\u4ea4\u4ed8\u7269", "workbench.dub.skipped": "\u65e0\u914d\u97f3\uff0c\u5df2\u8df3\u8fc7", "workbench.dub.skipped_reason": "\u914d\u97f3\u5df2\u8df3\u8fc7", "workbench.edit.mm": "\u7f05\u6587\u7f16\u8f91 (\u7528\u4e8e\u914d\u97f3)", "workbench.logs": "\u65e5\u5fd7\u4e0e\u8c03\u8bd5", "workbench.logs.engineering": "\u5de5\u7a0b\u4fe1\u606f", "workbench.logs.title": "\u65e5\u5fd7", "workbench.meta.account": "\u8d26\u53f7", "workbench.meta.category": "\u5206\u7c7b", "workbench.meta.created": "\u521b\u5efa\u65f6\u95f4", "workbench.meta.language": "\u8bed\u79cd", "workbench.meta.pipeline": "\u5de5\u5177", "workbench.meta.platform": "\u5e73\u53f0", "workbench.meta.source_url": "\u6765\u6e90", "workbench.meta.status": "\u72b6\u6001", "workbench.meta.subtitle_track": "\u5b57\u5e55\u8f68\u9053", "workbench.meta.subtitle_track.burned": "\u786c\u5b57\u5e55(\u70e7\u5f55)", "workbench.meta.subtitle_track.embedded": "\u8f6f\u5b57\u5e55(\u5185\u5d4c)", "workbench.meta.subtitle_track.none": "\u65e0\u5b57\u5e55", "workbench.meta.subtitle_track.unknown": "\u672a\u77e5", "workbench.meta.task_id": "\u4efb\u52a1ID", "workbench.mm_audio": "\u7f05\u8bed\u914d\u97f3", "workbench.mm_subtitles": "\u7f05\u6587\u5b57\u5e55", "workbench.notice.dub_queued": "Dub queued; polling status...", "workbench.notice.subtitles_first": "Please generate subtitles first", "workbench.notice.subtitles_queued": "Subtitles queued; polling status...", "workbench.origin_subtitles": "Origin Subtitles", "workbench.pack": "\u526a\u8f91\u5305", "workbench.publish_hint": "\u53d1\u5e03\u5df2\u79fb\u52a8\u5230\u72ec\u7acb\u9875\u9762\u3002", "workbench.publish_hub": "\u53d1\u5e03\u4e2d\u5fc3", "workbench.publish_open": "\u6253\u5f00\u53d1\u5e03\u4e2d\u5fc3", "workbench.scenes": "\u573a\u666f\u5305", "workbench.scenes_action": "\u64cd\u4f5c", "workbench.scenes_desc": "\u7528\u4e8e\u8fd0\u8425\u590d\u7528\u7684\u573a\u666f\u5207\u7247\u3002", "workbench.scenes_download": "\u4e0b\u8f7d Scenes.zip", "workbench.scenes_generate": "\u751f\u6210\u573a\u666f\u5207\u7247", "workbench.scenes_help": "\u751f\u6210\u573a\u666f\u5207\u7247\u4f1a\u6309\u5b57\u5e55\u65f6\u95f4\u5207\u5206\u89c6\u9891\u5e76\u6253\u5305\u4e3a Scenes.zip\u3002\u70b9\u51fb\u201c\u751f\u6210\u573a\u666f\u5207\u7247\u201d\uff0c\u72b6\u6001\u5c31\u7eea\u540e\u4e0b\u8f7d Scenes.zip\u3002\u65e0\u9700\u6253\u5f00\u6216\u7f16\u8f91 JSON\u3002Scenes.zip \u4e0d\u5f71\u54cd Pack.zip\uff0c\u4e24\u4e2a\u5305\u7528\u9014\u4e0d\u540c\u3002", "workbench.scenes_section": "\u573a\u666f\u5207\u7247", "workbench.source_url.empty": "\u672a\u68c0\u6d4b\u5230\u53ef\u70b9\u51fb\u94fe\u63a5\u3002", "workbench.source_url_raw": "Source URL (raw)", "workbench.status.error": "\u5931\u8d25\uff1a{error}", "workbench.status.not_parsed": "\u672a\u89e3\u6790", "workbench.status.not_ready": "\u672a\u5c31\u7eea", "workbench.status.parsed": "\u5df2\u89e3\u6790", "workbench.status.processing": "\u5904\u7406\u4e2d\u2026", "workbench.status.ready": "\u5df2\u5c31\u7eea", "workbench.step.dub.engine": "\u5f15\u64ce", "workbench.step.dub.run": "\u751f\u6210\u914d\u97f3", "workbench.step.dub.title": "\u6b65\u9aa43 - \u7f05\u8bed\u914d\u97f3", "workbench.step.dub.voice": "\u97f3\u8272", "workbench.step.pack.desc": "\u751f\u6210\u672c\u4efb\u52a1\u526a\u8f91\u5305", "workbench.step.pack.run": "\u751f\u6210\u526a\u8f91\u5305", "workbench.step.pack.title": "\u6b65\u9aa44 - \u6253\u5305", "workbench.step.parse.desc": "\u8c03\u7528 /api/tasks/{id}/parse", "workbench.step.parse.local_skip": "\u672c\u5730\u4e0a\u4f20\u6a21\u5f0f\uff1a\u65e0\u9700\u89e3\u6790\uff08\u8df3\u8fc7\u4e0b\u8f7d\uff09", "workbench.step.parse.run": "\u8fd0\u884c\u89e3\u6790", "workbench.step.parse.title": "\u6b65\u9aa41 - \u89e3\u6790\u4e0e\u4e0b\u8f7d", "workbench.step.subtitles.desc": "\u8c03\u7528 /api/tasks/{id}/subtitles \u751f\u6210\u5b57\u5e55", "workbench.step.subtitles.run": "\u751f\u6210\u5b57\u5e55", "workbench.step.subtitles.title": "\u6b65\u9aa42 - \u5b57\u5e55", "workbench.steps": "\u6d41\u7a0b", "workbench.steps.subtitle": "\u8fd0\u8425\u6d41\u7a0b\u89c6\u56fe", "workbench.video": "\u89c6\u9891"}}, "fallbacks": {"mm": ["mm", "zh"], "zh": ["zh"]}, "labels": {"mm": "Burmese", "zh": "Chinese"}, "locale": "zh", "supported": ["zh", "mm"]};
+  window.__UI_LOCALE__ = "zh";
+</script>
+<div class="lang-tabs lang-switch">
+  
+    <a href="#" data-lang-tab="zh" class="lang-btn lang-pill ui-pill">
+      <span data-i18n="lang.zh">中文</span>
+    </a>
+  
+    <a href="#" data-lang-tab="mm" class="lang-btn lang-pill ui-pill">
+      <span data-i18n="lang.mm">缅文</span>
+    </a>
+  
+</div>
+    
+      <div class="topbar-actions">
+        
+          <a class="btn ui-pill btn-ghost" href="/tasks/newtasks?ui_locale=zh">
+            返回新建任务
+          </a>
+        
+          <a class="btn ui-pill btn-ghost" href="/tasks?kind=matrix_script&amp;ui_locale=zh">
+            返回任务看板
+          </a>
+        
+      </div>
+    
+  </div>
+</div>
+
+    <div class="op-page-head" style="margin:10px 0 18px;">
+      <div class="op-page-head__row">
+        <div>
+          <h1 class="op-page-head__title" data-role="ms-new-page-title">创建矩阵脚本任务</h1>
+          <div class="op-page-head__sub" data-role="ms-new-page-subtitle">
+            创建后，系统会解析脚本结构、生成变体方案，并进入工作台评审。
+          </div>
+        </div>
+        <span class="op-pill op-pill--matrix" data-role="ms-new-line-pill">
+          <span class="op-pill__dot"></span>矩阵脚本
+        </span>
+      </div>
+    </div>
+
+    <main class="ms-new-shell">
+      <form
+        class="ms-new-form"
+        method="post"
+        action="/tasks/matrix-script/new?ui_locale=zh"
+        data-role="matrix-script-create-form"
+        data-ingest-route="/tasks/matrix-script/source-script-refs/ingest"
+        data-mint-route="/tasks/matrix-script/source-script-refs/mint"
+      >
+
+        
+        <div class="op-card op-card--accent-emerald" data-role="ms-new-card-source">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--emerald">1 · 脚本</span>
+              <h2 class="op-section-title">脚本来源</h2>
+              <span class="op-pill op-pill--info" data-role="ms-new-source-mode-pill">粘贴脚本</span>
+            </div>
+          </div>
+          <p class="op-section-helper" data-role="ms-new-source-helper">
+            选择一种方式提供脚本：粘贴正文 / 上传脚本文档 / 选择已有脚本。系统会自动生成产品句柄并存入会话内的脚本素材库；运营无需自己拼写句柄。
+          </p>
+
+          
+          <div class="ms-new-tabs" role="tablist" data-role="ms-new-source-tabs">
+            <button type="button" class="ms-new-tab is-active"
+                    role="tab" aria-selected="true"
+                    data-tab="paste"
+                    data-role="ms-new-source-tab-paste">粘贴脚本</button>
+            <button type="button" class="ms-new-tab"
+                    role="tab" aria-selected="false"
+                    data-tab="upload"
+                    data-role="ms-new-source-tab-upload">上传脚本文档</button>
+            <button type="button" class="ms-new-tab"
+                    role="tab" aria-selected="false"
+                    data-tab="select"
+                    data-role="ms-new-source-tab-select">选择已有脚本</button>
+          </div>
+
+          
+          <div class="ms-new-tab-panel" role="tabpanel"
+               data-tab-panel="paste"
+               data-role="ms-new-source-panel-paste">
+            <div class="ms-new-field full">
+              <label for="script_body">脚本正文 <span class="ms-new-required">*</span></label>
+              <textarea id="script_body"
+                        name="script_body"
+                        maxlength="20000"
+                        data-role="ms-new-script-body"
+                        placeholder="将脚本正文粘贴到这里..."></textarea>
+              <p class="op-section-helper">
+                提交后会被存入会话内的脚本素材库（在线临时存储；网关重启会清空）。<strong>脚本正文不会发送给任何外部模型、厂商或引擎。</strong>
+              </p>
+            </div>
+          </div>
+
+          
+          <div class="ms-new-tab-panel" role="tabpanel" hidden
+               data-tab-panel="upload"
+               data-role="ms-new-source-panel-upload">
+            <div class="ms-new-field full">
+              <label for="script_file">脚本文档 <span class="ms-new-required">*</span></label>
+              <input type="file"
+                     id="script_file"
+                     accept=".txt,.md,text/plain,text/markdown"
+                     data-role="ms-new-script-file" />
+              <p class="op-section-helper">
+                支持 <code>.txt</code> / <code>.md</code> 纯文本；最大 64 KB。系统会在本地读取正文，再走与「粘贴脚本」相同的入库流程。
+              </p>
+            </div>
+          </div>
+
+          
+          <div class="ms-new-tab-panel" role="tabpanel" hidden
+               data-tab-panel="select"
+               data-role="ms-new-source-panel-select">
+            <div class="ms-new-field full">
+              <label for="existing_source_script_ref">已有脚本引用</label>
+              <input id="existing_source_script_ref"
+                     name="existing_source_script_ref"
+                     type="text"
+                     maxlength="512"
+                     data-role="ms-new-existing-source-script-ref"
+                     placeholder="选择或输入既有的产品脚本句柄"
+                     autocomplete="off" />
+              <p class="op-section-helper">
+                仅在你已经在 Asset Supply / 内部脚本库中预先发布了脚本时使用。<strong>当前阶段没有可视化的脚本选择器</strong>；如果你没有现成句柄，请用「粘贴脚本」或「上传脚本文档」。
+              </p>
+            </div>
+          </div>
+
+          
+          <div class="ms-new-feedback" data-role="ms-new-source-feedback" aria-live="polite"></div>
+
+          
+          
+            
+            <input
+              id="source_script_ref"
+              name="source_script_ref"
+              type="hidden"
+              data-role="ms-new-source-script-ref"
+            />
+          
+
+        </div>
+
+        
+        <div class="op-card" data-role="ms-new-card-task-meta">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">2 · 任务</span>
+              <h2 class="op-section-title">任务基本信息</h2>
+            </div>
+          </div>
+          <p class="op-section-helper">
+            这一段决定任务的主题、目标语言与平台、需要的变体数量。变体生成的细节（轴 / 配音 / 字幕）在工作台进一步评审。
+          </p>
+
+          <div class="ms-new-field-grid">
+            <div class="ms-new-field full">
+              <label for="topic">主题 <span class="ms-new-required">*</span></label>
+              <input id="topic" name="topic" required maxlength="160" placeholder="例如：新品短视频首发脚本" />
+            </div>
+
+            <div class="ms-new-field">
+              <label for="source_language">源语言 <span class="ms-new-required">*</span></label>
+              <select id="source_language" name="source_language" required>
+                <option value="zh">中文</option>
+                <option value="en">English</option>
+              </select>
+            </div>
+
+            <div class="ms-new-field">
+              <label for="target_language">目标语言 <span class="ms-new-required">*</span></label>
+              <select id="target_language" name="target_language" required>
+                <option value="mm">မြန်မာ（缅甸语）</option>
+                <option value="vi">Tiếng Việt（越南语）</option>
+              </select>
+            </div>
+
+            <div class="ms-new-field">
+              <label for="target_platform">目标平台 <span class="ms-new-required">*</span></label>
+              <input id="target_platform" name="target_platform" required maxlength="80" placeholder="例如：TikTok / Reels / Shorts" />
+            </div>
+
+            <div class="ms-new-field">
+              <label for="variation_target_count">变体数量 <span class="ms-new-required">*</span></label>
+              <input id="variation_target_count" name="variation_target_count" type="number" min="1" max="12" step="1" required value="4" />
+            </div>
+
+            <div class="ms-new-field">
+              <label for="audience_hint">受众提示</label>
+              <input id="audience_hint" name="audience_hint" maxlength="120" placeholder="例如：新手用户 / 老客复购" />
+            </div>
+
+            <div class="ms-new-field">
+              <label for="tone_hint">语气提示</label>
+              <input id="tone_hint" name="tone_hint" maxlength="120" placeholder="例如：专业可信 / 轻松直接" />
+            </div>
+
+            <div class="ms-new-field">
+              <label for="length_hint">长度提示</label>
+              <input id="length_hint" name="length_hint" maxlength="80" placeholder="例如：15 秒 / 30 秒" />
+            </div>
+
+            <div class="ms-new-field">
+              <label for="product_ref">产品引用</label>
+              <input id="product_ref" name="product_ref" maxlength="160" placeholder="产品名、SKU 或资料链接" />
+            </div>
+
+            <div class="ms-new-field full">
+              <label for="operator_notes">补充备注</label>
+              <textarea id="operator_notes" name="operator_notes" rows="3"
+                        style="min-height:80px; font-family: system-ui, sans-serif; font-size:14px;"
+                        placeholder="只填写创建阶段必要备注，不填写工作台执行细节"></textarea>
+            </div>
+          </div>
+        </div>
+
+        
+        <div class="ms-new-actions">
+          <a class="ms-new-btn-secondary" href="/tasks/newtasks?ui_locale=zh">取消</a>
+          <button class="ms-new-btn-primary" type="submit" data-role="ms-new-submit">
+            创建并进入工作台
+          </button>
+        </div>
+
+      </form>
+
+      
+      <aside class="op-card" aria-label="route mapping" data-role="ms-new-route-map">
+        <div class="op-section-head">
+          <div class="op-section-head__main">
+            <span class="op-section-index op-section-index--violet">链路</span>
+            <h2 class="op-section-title">提交后会发生什么</h2>
+          </div>
+        </div>
+        <ol style="margin:0; padding-left:18px; color:var(--op-fg-mid, #334155); font-size:13px; line-height:1.7;">
+          <li>系统把脚本正文存入会话内的脚本素材库，并生成一个不透明的产品句柄。</li>
+          <li>句柄进入产线，触发解析与变体方案生成（当前为确定性骨架，<strong>不</strong>调用任何外部模型）。</li>
+          <li>跳转到任务工作台，可查看任务摘要 / 脚本结构 / 变体方案 / 生成进度 / 候选评审 / 交付摘要。</li>
+          <li>成片生成能力上线后，候选评审区会出现可预览的成片；当前阶段会显示「暂无可预览成片」。</li>
+        </ol>
+        <details class="op-collapse" style="margin-top:14px;" data-role="ms-new-route-map-technical">
+          <summary>技术链路（架构师视图）</summary>
+          <div class="op-collapse__body">
+            <ul class="ms-new-route-list">
+              <li><strong>入口</strong><br /><code>POST /tasks/matrix-script/new</code></li>
+              <li><strong>正文入库</strong><br /><code>POST /tasks/matrix-script/source-script-refs/ingest</code><br /><span class="op-tech-note">会话内 in-process 存储；不持久化</span></li>
+              <li><strong>空句柄</strong><br /><code>POST /tasks/matrix-script/source-script-refs/mint</code></li>
+              <li><strong>任务工作台</strong><br /><code>GET /tasks/{task_id}</code></li>
+              <li><strong>交付中心</strong><br /><code>GET /tasks/{task_id}/publish</code></li>
+            </ul>
+          </div>
+        </details>
+      </aside>
+    </main>
+  </div>
+
+  <script src="/static/js/i18n_v185.js"></script>
+  <script>
+    // 2026-05-28 Matrix Script Operator UI Redesign — entry page tab + ingest wiring.
+    //
+    // Behaviour:
+    //   - Tab switcher: paste / upload / select. The active tab determines
+    //     which input path runs at submit time.
+    //   - On submit: if paste tab is active, POST body to /ingest; if upload
+    //     tab is active, read file -> POST body to /ingest; if select tab,
+    //     copy the selected ref into the hidden source_script_ref input.
+    //     If the operator opened the "技术引用" details and supplied a
+    //     handle there directly, that value is used and no ingest call is made.
+    //   - The form's hidden source_script_ref input is what the backend
+    //     /tasks/matrix-script/new route validates; it MUST be populated
+    //     with an opaque content:// / task:// / asset:// / ref:// handle.
+    (function () {
+      var form = document.querySelector('[data-role="matrix-script-create-form"]');
+      if (!form) { return; }
+
+      var tabBar = form.querySelector('[data-role="ms-new-source-tabs"]');
+      var tabs = Array.prototype.slice.call(form.querySelectorAll('.ms-new-tab'));
+      var panels = Array.prototype.slice.call(form.querySelectorAll('[data-tab-panel]'));
+      var modePill = form.querySelector('[data-role="ms-new-source-mode-pill"]');
+      var feedback = form.querySelector('[data-role="ms-new-source-feedback"]');
+      var bodyArea = form.querySelector('[data-role="ms-new-script-body"]');
+      var fileInput = form.querySelector('[data-role="ms-new-script-file"]');
+      var existingRefInput = form.querySelector('[data-role="ms-new-existing-source-script-ref"]');
+      var refInput = form.querySelector('[data-role="ms-new-source-script-ref"]');
+      var mintBtn = form.querySelector('[data-role="ms-new-mint-button"]');
+      var submitBtn = form.querySelector('[data-role="ms-new-submit"]');
+      var ingestRoute = form.getAttribute('data-ingest-route');
+      var mintRoute = form.getAttribute('data-mint-route');
+
+      var modeLabels = { paste: '粘贴脚本', upload: '上传脚本文档', select: '选择已有脚本' };
+      var activeMode = 'paste';
+
+      function setFeedback(level, text) {
+        if (!feedback) { return; }
+        feedback.classList.remove('is-success');
+        feedback.classList.remove('is-error');
+        if (level === 'success') { feedback.classList.add('is-success'); }
+        if (level === 'error')   { feedback.classList.add('is-error'); }
+        feedback.textContent = text || '';
+      }
+
+      function activateTab(mode) {
+        activeMode = mode;
+        tabs.forEach(function (tab) {
+          var on = tab.getAttribute('data-tab') === mode;
+          tab.classList.toggle('is-active', on);
+          tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        panels.forEach(function (panel) {
+          panel.hidden = panel.getAttribute('data-tab-panel') !== mode;
+        });
+        if (modePill) { modePill.textContent = modeLabels[mode] || mode; }
+        setFeedback(null, '');
+      }
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () {
+          activateTab(tab.getAttribute('data-tab'));
+        });
+      });
+
+      function readFileAsText(file) {
+        return new Promise(function (resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function () { resolve(String(reader.result || '')); };
+          reader.onerror = function () { reject(new Error('文件读取失败')); };
+          reader.readAsText(file);
+        });
+      }
+
+      function ingestBody(body, sourceKind) {
+        return fetch(ingestRoute, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+          body: JSON.stringify({ body: body, source_kind: sourceKind })
+        }).then(function (resp) {
+          return resp.json().then(function (data) {
+            if (!resp.ok) {
+              var msg = (data && data.detail) || ('入库失败 HTTP ' + resp.status);
+              throw new Error(msg);
+            }
+            return data;
+          });
+        });
+      }
+
+      // Mint-empty button inside the technical-ref details — same UX as the
+      // Plan E PR-2 mint affordance: allocates an empty opaque handle.
+      if (mintBtn && refInput && mintRoute) {
+        mintBtn.addEventListener('click', function () {
+          var originalLabel = mintBtn.textContent;
+          mintBtn.disabled = true;
+          mintBtn.textContent = '铸造中…';
+          fetch(mintRoute, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({})
+          })
+            .then(function (resp) { if (!resp.ok) { throw new Error('mint http ' + resp.status); } return resp.json(); })
+            .then(function (payload) {
+              if (payload && typeof payload.source_script_ref === 'string') {
+                refInput.value = payload.source_script_ref;
+                refInput.focus();
+              } else {
+                throw new Error('mint response missing source_script_ref');
+              }
+            })
+            .catch(function () {
+              refInput.placeholder = 'content://matrix-script/source/<your-token>';
+            })
+            .finally(function () {
+              mintBtn.disabled = false;
+              mintBtn.textContent = originalLabel;
+            });
+        });
+      }
+
+      // Submit pipeline. We intercept submit, run ingest if needed, populate
+      // the hidden source_script_ref, then let the normal form POST proceed.
+      form.addEventListener('submit', function (evt) {
+        // If technical-ref input already has a valid-looking value AND the
+        // operator opened the details, honour their direct entry without
+        // running ingest. The browser pattern attribute validates shape.
+        var techRefHasValue = refInput && refInput.value && refInput.value.trim().length > 0;
+        var techDetails = form.querySelector('[data-role="ms-new-technical-ref"]');
+        var techExpanded = techDetails && techDetails.open;
+        if (techRefHasValue && techExpanded && activeMode !== 'paste' && activeMode !== 'upload') {
+          // direct path — no JS work
+          return;
+        }
+        if (activeMode === 'select') {
+          var existing = existingRefInput && existingRefInput.value ? existingRefInput.value.trim() : '';
+          if (!existing) {
+            evt.preventDefault();
+            setFeedback('error', '请填写已有脚本句柄，或切换到「粘贴脚本」/「上传脚本文档」。');
+            return;
+          }
+          refInput.value = existing;
+          return;
+        }
+        if (activeMode === 'paste') {
+          var body = bodyArea && bodyArea.value ? bodyArea.value : '';
+          if (!body.trim()) {
+            evt.preventDefault();
+            setFeedback('error', '请先粘贴脚本正文，或切换标签页选择其他来源。');
+            return;
+          }
+          evt.preventDefault();
+          submitBtn.disabled = true;
+          submitBtn.textContent = '入库中…';
+          ingestBody(body, 'operator_paste')
+            .then(function (payload) {
+              refInput.value = payload.source_script_ref;
+              setFeedback('success', '已入库 ' + (payload.body_char_count || 0) + ' 字符；正在提交任务...');
+              form.submit();
+            })
+            .catch(function (err) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = '创建并进入工作台';
+              setFeedback('error', String((err && err.message) || err || '入库失败'));
+            });
+          return;
+        }
+        if (activeMode === 'upload') {
+          if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            evt.preventDefault();
+            setFeedback('error', '请选择脚本文档（.txt / .md），或切换到「粘贴脚本」标签页。');
+            return;
+          }
+          evt.preventDefault();
+          submitBtn.disabled = true;
+          submitBtn.textContent = '读取并入库中…';
+          readFileAsText(fileInput.files[0])
+            .then(function (text) { return ingestBody(text, 'operator_upload'); })
+            .then(function (payload) {
+              refInput.value = payload.source_script_ref;
+              setFeedback('success', '已入库 ' + (payload.body_char_count || 0) + ' 字符；正在提交任务...');
+              form.submit();
+            })
+            .catch(function (err) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = '创建并进入工作台';
+              setFeedback('error', String((err && err.message) || err || '入库失败'));
+            });
+          return;
+        }
+      });
+
+      // Set initial state
+      activateTab('paste');
+    })();
+  </script>
+</body>
+</html>

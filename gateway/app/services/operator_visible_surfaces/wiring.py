@@ -425,6 +425,46 @@ def build_operator_surfaces_for_workbench(
                 workbench_panel,
             )
         )
+        # PR-2A (redesign 2026-05-28) · Workbench 主视频结果 anchor.
+        # Single result-first block at the TOP of the operator surface
+        # (Mission §B.1). Pure presentation-layer projection over the
+        # already-attached publish_readiness + preview_compare +
+        # recommended_action + closure. No new producer; no contract
+        # change; no closed-enum widening; no new endpoint. The
+        # operator-confirm-main-version intent is recorded via the
+        # existing closure operator_note event_kind with the structured
+        # ``[main-version-confirmed]`` note prefix per the approved
+        # product decision #1 (2026-05-28).
+        from gateway.app.services.matrix_script.closure_binding import (
+            get_closure_view_for_task,
+        )
+        from gateway.app.services.matrix_script.main_video_result_view import (
+            derive_matrix_script_main_video_result,
+        )
+
+        # Read-only closure peek; never lazy-creates the in-process
+        # closure store on the workbench path. Defensive try/except so a
+        # transient closure failure cannot brick the workbench render.
+        try:
+            _ms_closure_view = get_closure_view_for_task(
+                str(task.get("task_id") or task.get("id") or "")
+            )
+        except Exception:
+            _ms_closure_view = None
+        bundle["workbench"]["matrix_script_main_video_result"] = (
+            derive_matrix_script_main_video_result(
+                task,
+                workbench_panel,
+                publish_readiness,
+                preview_compare=bundle["workbench"].get(
+                    "matrix_script_preview_compare"
+                ),
+                recommended_action=bundle["workbench"].get(
+                    "matrix_script_recommended_action"
+                ),
+                closure=_ms_closure_view,
+            )
+        )
     # Recovery PR-4: when the Workbench mounts the Digital Anchor
     # line-specific panel, attach the formal
     # `digital_anchor_workbench_role_speaker_surface_v1` projection so

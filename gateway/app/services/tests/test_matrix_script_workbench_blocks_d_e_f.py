@@ -876,7 +876,16 @@ def test_block_f_delivery_comprehension_returns_lanes_object() -> None:
 
 def test_block_f_publish_gate_consumes_publish_readiness_directly() -> None:
     """RC-A7 single-source publishability — Block F MUST consume
-    compute_publish_readiness output directly, not re-derive it."""
+    compute_publish_readiness output directly, not re-derive it.
+
+    Updated 2026-05-28: Block F was reframed per Mission §4 to a short
+    delivery STATUS card (head_reason no longer rendered on the workbench
+    surface; full per-row detail moved to Delivery Center). The single-
+    source publishability gate is still read directly from
+    ``ms_publish_readiness.publishable``; ``head_reason`` is consumed
+    instead by the (separate) result-summary helper that drives Block A.
+    """
+
     template = _read_workbench_template()
     inside = _ms_panel_gate_body(template)
     block_f_open = inside.find('data-role="matrix-script-block-f-delivery-teaser"')
@@ -885,37 +894,49 @@ def test_block_f_publish_gate_consumes_publish_readiness_directly() -> None:
     # Block F reads ms_publish_readiness which is the bundle.publish_readiness
     # alias; never invents a parallel publishable boolean.
     assert "ms_publish_readiness.publishable" in block_f_subtree
-    assert "ms_publish_readiness.head_reason" in block_f_subtree
+    # head_reason now reaches the operator through Block A's result-summary
+    # path, NOT through Block F. Block F shows only "可发布" vs "当前不能
+    # 交付" using the publishable boolean — operator-language only.
+    assert "可发布" in block_f_subtree
+    assert "当前不能交付" in block_f_subtree
 
 
-def test_block_f_required_lane_renders_blocking_and_non_blocking_rows() -> None:
+def test_block_f_have_section_lists_phase_b_baseline_items() -> None:
+    """Mission §4 — Block F shows what is "已具备" (have) at the workbench
+    summary level. The Phase B baseline ("脚本结构、变体方案") is the
+    minimum honest claim on a contract-clean task today. Per-row resolved
+    deliverables append to this list when delivery_comprehension lanes
+    show resolved artifacts; full per-row detail belongs in Delivery Center.
+    """
+
     template = _read_workbench_template()
     inside = _ms_panel_gate_body(template)
     block_f_open = inside.find('data-role="matrix-script-block-f-delivery-teaser"')
     block_f_subtree = inside[block_f_open:]
-    assert (
-        "ms_delivery_comprehension.lanes.required_blocking.rows" in block_f_subtree
-    )
-    assert (
-        "ms_delivery_comprehension.lanes.required_non_blocking.rows"
-        in block_f_subtree
-    )
+    assert 'data-role="ms-block-f-have"' in block_f_subtree
+    assert "脚本结构" in block_f_subtree
+    assert "变体方案" in block_f_subtree
+    # The resolved-row append uses the same delivery_comprehension lane
+    # data, just collapsed to a list of kind labels instead of a per-row
+    # status table (which lives in Delivery Center per Mission §4).
+    assert "ms_delivery_comprehension.lanes.required_blocking.rows" in block_f_subtree
+    assert "ms_delivery_comprehension.lanes.required_non_blocking.rows" in block_f_subtree
 
 
-def test_block_f_optional_scene_pack_lane_always_non_blocking() -> None:
+def test_block_f_scene_pack_non_blocking_note_present() -> None:
     """SCENE_PACK_BLOCKING_ALLOWED = False is enforced upstream; Block F
-    renders the optional lane as always non-blocking by labelling it
-    explicitly."""
+    notes the operator-language rule once, near the bottom of the short
+    status card. Updated 2026-05-28 to the redesigned wording — the
+    per-row optional lane was removed per Mission §4 (full detail in
+    Delivery Center).
+    """
+
     template = _read_workbench_template()
     inside = _ms_panel_gate_body(template)
     block_f_open = inside.find('data-role="matrix-script-block-f-delivery-teaser"')
     block_f_subtree = inside[block_f_open:]
-    assert "可选 · 不阻塞" in block_f_subtree
-    assert "scene_pack 始终非阻塞" in block_f_subtree
-    assert (
-        "ms_delivery_comprehension.lanes.optional_non_blocking.rows"
-        in block_f_subtree
-    )
+    assert 'data-role="ms-block-f-scene-pack-note"' in block_f_subtree
+    assert "场景包（scene_pack）始终为可选 · 不阻塞发布。" in block_f_subtree
 
 
 def test_block_f_jump_button_targets_publish_hub_route() -> None:

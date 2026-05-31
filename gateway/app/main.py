@@ -23,7 +23,17 @@ from gateway.app.core.logging_config import configure_logging
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
 from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
-from gateway.app.routers import admin_publish, admin_tools as admin_tools_router, assets as assets_router, digital_anchor_closure as digital_anchor_closure_router, matrix_script_closure as matrix_script_closure_router, matrix_script_panel_debug, publish as publish_router, tasks as tasks_router
+from gateway.app.routers import (
+    admin_publish,
+    admin_tools as admin_tools_router,
+    assets as assets_router,
+    digital_anchor_closure as digital_anchor_closure_router,
+    matrix_script_closure as matrix_script_closure_router,
+    matrix_script_panel_debug,
+    publish as publish_router,
+    tasks as tasks_router,
+    voice_tool as voice_tool_router,
+)
 from gateway.app.routers import hot_follow_ui as hot_follow_ui_router
 from gateway.app.routers.hot_follow_api import hot_follow_api_router
 from gateway.app.routers.api_tools import router as tools_api_router
@@ -105,6 +115,67 @@ def _is_admin_area(path: str) -> bool:
     return any(path == p or path.startswith(p) for p in ADMIN_PREFIXES)
 
 
+def _wants_json(request: Request) -> bool:
+    """True when the caller is an XHR/fetch/API client that expects a JSON
+    body rather than an HTML page.
+
+    Matrix Script ingest (POST /tasks/matrix-script/source-script-refs/ingest)
+    is a JSON endpoint that lives under /tasks/ — it is NOT matched by
+    `_is_api_path`. When the operator's session has expired, redirecting such
+    a fetch to the HTML login page makes the frontend `response.json()` choke
+    on "<!doctype html>" ("Unexpected token '<'"). For these callers we must
+    answer with a JSON 401 instead of a 302 to HTML.
+    """
+    accept = (request.headers.get("accept") or "").lower()
+    if "application/json" in accept:
+        return True
+    if (request.headers.get("x-requested-with") or "").lower() == "xmlhttprequest":
+        return True
+    ctype = (request.headers.get("content-type") or "").lower()
+    if "application/json" in ctype:
+        return True
+    return False
+
+
+# Endpoints that must never be used as a post-login redirect target: they are
+# POST-only JSON-body APIs (ingest / mint) or token peek routes. Redirecting a
+# successful login to any of these produces a broken navigation (GET on a
+# POST-only endpoint) — which is exactly the secondary bug behind the operator
+# "Unexpected token '<'" report.
+_UNSAFE_NEXT_SUBSTRINGS = (
+    "/tasks/matrix-script/source-script-refs/ingest",
+    "/tasks/matrix-script/source-script-refs/mint",
+    "/tasks/matrix-script/source-script-refs/",
+    "/api/",
+    "/v1/",
+)
+
+
+def _safe_next(next_value: str) -> str:
+    """Sanitize the post-login `next` target.
+
+    Only same-origin path-absolute navigations are honoured. External URLs,
+    protocol-relative URLs, and POST-only/JSON-body API endpoints fall back to
+    a safe default of `/tasks`.
+    """
+    candidate = (next_value or "").strip()
+    if not candidate:
+        return "/tasks"
+    # Must be a path-absolute, same-origin reference.
+    if not candidate.startswith("/"):
+        return "/tasks"
+    # Reject protocol-relative ("//host") and any scheme ("://").
+    if candidate.startswith("//") or "://" in candidate:
+        return "/tasks"
+    if "\\" in candidate:
+        return "/tasks"
+    lowered = candidate.lower()
+    for bad in _UNSAFE_NEXT_SUBSTRINGS:
+        if bad in lowered:
+            return "/tasks"
+    return candidate
+
+
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
@@ -162,6 +233,20 @@ async def auth_middleware(request: Request, call_next):
     if _is_api_path(path):
         return JSONResponse(status_code=401, content={"detail": "Unauthorized"})
 
+    # JSON/XHR callers under non-/api paths (e.g. the Matrix Script ingest
+    # endpoint POST /tasks/matrix-script/source-script-refs/ingest) must get a
+    # JSON 401 — never a 302 to the HTML login page — so the frontend fetch
+    # can show "登录已失效…" instead of failing on "Unexpected token '<'".
+    if _wants_json(request):
+        return JSONResponse(
+            status_code=401,
+            content={
+                "ok": False,
+                "error": "auth_required",
+                "message": "登录已失效，请重新登录后再提交脚本。",
+            },
+        )
+
     next_url = str(request.url.path)
     if request.url.query:
         next_url += "?" + request.url.query
@@ -182,6 +267,8 @@ app.include_router(hot_follow_ui_router.router)
 app.include_router(matrix_script_panel_debug.router)
 app.include_router(matrix_script_closure_router.api_router)
 app.include_router(digital_anchor_closure_router.api_router)
+app.include_router(voice_tool_router.page_router)
+app.include_router(voice_tool_router.api_router)
 # Operator Capability Recovery PR-2: B-roll / Asset Supply minimum
 # operator surface. Distinct from `/tasks*` (Task Area) and
 # `/admin/*` (Tool Backstage) per
@@ -200,7 +287,7 @@ def auth_login_page(request: Request, next: str = "/tasks"):
         request=request,
         name="auth_login.html",
         ctx={
-            "next": next,
+            "next": _safe_next(next),
             "topbar_title": None,
             "topbar_nav": None,
             "topbar_actions": None,
