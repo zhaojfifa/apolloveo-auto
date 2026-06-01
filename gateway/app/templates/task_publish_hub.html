@@ -365,6 +365,36 @@
             </div>
           {% endif %}
 
+          {# PR-17R · Delivery staged-candidate (real operator trial). Display
+             only — NO publish button, NO publish gate. Renders when a staged
+             candidate dict is present on task config (read-only). Shows opaque
+             artifact refs (no download/provider URL). storage_scope=artifact_staged,
+             delivery_candidate=true, official_publish_ready=false. generation_provider
+             is a provider-agnostic label (none / real_oneshot_attempted). #}
+          {% set ms_staged = (task.config or {}).matrix_script_staged_candidate or {} %}
+          {% if ms_staged.has_result %}
+            <div class="op-card" data-role="matrix-script-dc-staged-candidate"
+                 data-storage-scope="{{ ms_staged.storage_scope }}"
+                 data-delivery-candidate="{{ ms_staged.delivery_candidate }}"
+                 data-official-publish-ready="{{ ms_staged.official_publish_ready }}"
+                 style="margin-top:10px;">
+              <div class="op-section-head">
+                <div class="op-section-head__main">
+                  <h2 class="op-section-title" data-role="ms-dc-staged-title">暂存成片候选</h2>
+                  <span class="info-pill" data-role="ms-dc-staged-scope">{{ ms_staged.storage_scope or "artifact_staged" }}</span>
+                </div>
+              </div>
+              <div class="muted" data-role="ms-dc-staged-final-ref">主视频工件：{{ ms_staged.final_video_artifact_ref }}</div>
+              <div class="muted" data-role="ms-dc-staged-manifest-ref">清单工件：{{ ms_staged.manifest_artifact_ref }}</div>
+              <div class="muted" data-role="ms-dc-staged-subtitles-ref">字幕工件：{{ ms_staged.subtitles_artifact_ref }}</div>
+              <div class="muted" data-role="ms-dc-staged-audio-ref">音频工件：{{ ms_staged.audio_artifact_ref }}</div>
+              <div class="muted" data-role="ms-dc-staged-scene-count">场景片段数：{{ ms_staged.scene_clip_count }}</div>
+              <div class="muted" data-role="ms-dc-staged-generation">生成方式：{{ ms_staged.generation_provider or "none" }}</div>
+              <div class="muted" data-role="ms-dc-staged-publish-ready">正式交付就绪：{{ ms_staged.official_publish_ready }}</div>
+              <div class="op-tech-note" data-role="ms-dc-staged-note">该结果已暂存为交付候选（artifact staged），但尚未正式发布。</div>
+            </div>
+          {% endif %}
+
           {# Section 2 · 主视频 — preview (or honest empty state) + download
              entry. NO raw `final_video` heading; NO fabricated URL. The
              preview hero either binds a real artifact when present or
