@@ -311,6 +311,17 @@ def build_operator_surfaces_for_workbench(
         bundle["workbench"]["matrix_script_script_structure"] = (
             derive_matrix_script_script_structure_view(task)
         )
+        # PR-9R · architecture-to-operator-result bridge: read-only minimal
+        # local result block. Read-only (no generation, no ffmpeg, no storage);
+        # returns {"has_result": False} unless a pre-computed surface dict is
+        # present on the task config. official_publish_ready is always False.
+        from gateway.app.services.matrix_script.minimal_result_workbench_block import (
+            derive_matrix_script_minimal_result_workbench_block,
+        )
+
+        bundle["workbench"]["matrix_script_minimal_result"] = (
+            derive_matrix_script_minimal_result_workbench_block(task)
+        )
         bundle["workbench"]["matrix_script_preview_compare"] = (
             derive_matrix_script_preview_compare_view(
                 variation_surface,
