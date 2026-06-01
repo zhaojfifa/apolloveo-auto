@@ -99,3 +99,32 @@ def test_real_trial_returns_staged_candidate_payload(tmp_path, monkeypatch) -> N
     for token in ("akool", "provider_url", "temporary_url", "download_url", "publish_url", "publish_status", "model_id", "credit", "http://", "https://"):
         assert token not in blob
     assert repo.mutations == []  # route does not mutate task/publish state
+
+
+@_skip_no_ffmpeg
+def test_real_trial_payload_has_browser_preview_url(tmp_path, monkeypatch) -> None:
+    repo = _StubRepo({"ms-rt-1": _matrix_task()})
+    client = _build(repo, tmp_path, monkeypatch)
+    if client is None:
+        pytest.skip("no TestClient")
+    body = client.post("/api/matrix-script/ms-rt-1/real-trial").json()
+    # operator-accessible preview link present; dedicated gateway endpoint
+    assert body.get("preview_url"), "preview_url missing from real-trial payload"
+    assert str(body["preview_url"]) == "/api/matrix-script/ms-rt-1/real-trial/preview/final.mp4"
+    for token in ("provider_url", "temporary_url", "publish_url", "publish_status", "download_url"):
+        assert token not in str(body)
+    # the preview endpoint streams the staged final.mp4 (browser-openable)
+    pv = client.get(body["preview_url"])
+    assert pv.status_code == 200
+    assert pv.headers.get("content-type", "").startswith("video/mp4")
+    assert len(pv.content) > 0
+
+
+def test_real_trial_preview_404_when_not_generated(tmp_path, monkeypatch) -> None:
+    repo = _StubRepo({"ms-rt-1": _matrix_task()})
+    client = _build(repo, tmp_path, monkeypatch)
+    if client is None:
+        pytest.skip("no TestClient")
+    # no POST run → no staged final.mp4 → preview 404 (never a fake)
+    pv = client.get("/api/matrix-script/ms-rt-1/real-trial/preview/final.mp4")
+    assert pv.status_code in (404, 302)

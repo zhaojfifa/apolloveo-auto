@@ -176,3 +176,27 @@ def test_staging_record_type_defaults() -> None:
     assert rec.storage_scope == "artifact_staged"
     assert rec.official_publish_ready is False
     assert rec.delivery_candidate is True
+
+
+# ---------------------------------------------------------------------------
+# P0 R2 preview staging — preview_url
+# ---------------------------------------------------------------------------
+
+
+def test_staging_record_carries_final_video_preview_url(tmp_path) -> None:
+    _, rec = _stage(tmp_path)
+    assert rec.final_video_preview_url is not None
+    assert rec.final_video_preview_url.startswith("/files/")
+    assert "final.mp4" in rec.final_video_preview_url
+    d = staging_record_to_dict(rec)
+    assert d["final_video_preview_url"] == rec.final_video_preview_url
+    # not a provider/publish/temporary url
+    for token in ("provider_url", "temporary_url", "publish_url", "publish_status"):
+        assert token not in rec.final_video_preview_url
+
+
+def test_staged_delivery_block_includes_preview_url(tmp_path) -> None:
+    from gateway.app.services.matrix_script.minimal_result_delivery_view import staged_record_to_delivery_block
+    _, rec = _stage(tmp_path)
+    block = staged_record_to_delivery_block(rec)
+    assert block["preview_url"] == rec.final_video_preview_url

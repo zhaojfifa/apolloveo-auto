@@ -390,6 +390,9 @@
               <div class="muted" data-role="ms-dc-staged-audio-ref">音频工件：{{ ms_staged.audio_artifact_ref }}</div>
               <div class="muted" data-role="ms-dc-staged-scene-count">场景片段数：{{ ms_staged.scene_clip_count }}</div>
               <div class="muted" data-role="ms-dc-staged-generation">生成方式：{{ ms_staged.generation_provider or "none" }}</div>
+              {% if ms_staged.preview_url %}
+                <a data-role="ms-dc-staged-preview" href="{{ ms_staged.preview_url }}" target="_blank" rel="noopener" class="btn-secondary" style="margin-top:8px;">打开视频（暂存预览）</a>
+              {% endif %}
               <div class="muted" data-role="ms-dc-staged-publish-ready">正式交付就绪：{{ ms_staged.official_publish_ready }}</div>
               <div class="op-tech-note" data-role="ms-dc-staged-note">该结果已暂存为交付候选（artifact staged），但尚未正式发布。</div>
             </div>

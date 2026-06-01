@@ -532,6 +532,88 @@
         </div>
       {% endif %}
 
+      {# P0 R2 preview staging · 暂存并预览. Calls the real-trial route, stages
+         the result pack into artifact storage, and renders an operator-openable
+         preview link from the response (preview_url). NOT publish: staged only,
+         official_publish_ready stays false. Renders no media URL literal; the
+         preview link href is set from the JSON response at runtime. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card"
+             id="matrix-script-staged-preview-action"
+             data-role="matrix-script-staged-preview-action">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <h2 class="op-section-title">暂存并预览</h2>
+            </div>
+          </div>
+          <p class="op-section-helper">生成成片并暂存到工件存储，生成可在浏览器打开的预览链接。该结果为交付候选，尚未进入正式发布。</p>
+          <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button type="button"
+                    class="btn-secondary"
+                    data-role="ms-staged-preview-trigger"
+                    data-task-id="{{ task.task_id }}"
+                    data-endpoint="/api/matrix-script/{{ task.task_id }}/real-trial">生成并暂存（可预览）</button>
+          </div>
+          <div class="muted" data-role="ms-staged-preview-status" data-state="idle"></div>
+          <div data-role="ms-staged-preview-output"></div>
+          <script>
+          (function () {
+            var trigger = document.querySelector('[data-role="ms-staged-preview-trigger"]');
+            if (!trigger) { return; }
+            var statusEl = document.querySelector('[data-role="ms-staged-preview-status"]');
+            var outEl = document.querySelector('[data-role="ms-staged-preview-output"]');
+            function row(label, value) {
+              var el = document.createElement('div');
+              el.className = 'muted';
+              el.textContent = label + '：' + (value === undefined || value === null ? '' : value);
+              return el;
+            }
+            trigger.addEventListener('click', async function () {
+              trigger.disabled = true;
+              statusEl.setAttribute('data-state', 'running');
+              statusEl.textContent = '生成并暂存中…';
+              outEl.textContent = '';
+              try {
+                var resp = await fetch(trigger.getAttribute('data-endpoint'), {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' }
+                });
+                if (!resp.ok) {
+                  statusEl.setAttribute('data-state', 'error');
+                  statusEl.textContent = '暂存失败（' + resp.status + '）';
+                  trigger.disabled = false;
+                  return;
+                }
+                var d = await resp.json();
+                statusEl.setAttribute('data-state', 'done');
+                statusEl.textContent = '已暂存为交付候选';
+                outEl.appendChild(row('存储范围', d.storage_scope));
+                outEl.appendChild(row('交付候选', d.delivery_candidate));
+                outEl.appendChild(row('正式交付就绪', d.official_publish_ready));
+                outEl.appendChild(row('生成方式', d.generation_provider));
+                if (d.blocked_reason_zh) { outEl.appendChild(row('说明', d.blocked_reason_zh)); }
+                if (d.preview_url) {
+                  var a = document.createElement('a');
+                  a.setAttribute('data-role', 'ms-staged-preview-link');
+                  a.setAttribute('href', d.preview_url);
+                  a.setAttribute('target', '_blank');
+                  a.setAttribute('rel', 'noopener');
+                  a.className = 'btn-secondary';
+                  a.style.marginTop = '8px';
+                  a.textContent = '打开视频';
+                  outEl.appendChild(a);
+                }
+                trigger.disabled = false;
+              } catch (e) {
+                statusEl.setAttribute('data-state', 'error');
+                statusEl.textContent = '暂存失败';
+                trigger.disabled = false;
+              }
+            });
+          })();
+          </script>
+        </div>
+      {% endif %}
+
       {# Phase 2C (2026-05-30) · operator-readability capability banner.
          ONE orientation line; relocated by Phase 2D to render BELOW §A so
          the result panel is the dominant first surface. Copy / layout only;

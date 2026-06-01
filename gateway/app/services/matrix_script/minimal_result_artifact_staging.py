@@ -62,6 +62,10 @@ class MatrixScriptMinimalResultStagingRecord:
     official_publish_ready: bool = False
     generation_provider: str = GENERATION_PROVIDER_NONE
     scene_clips_staged: bool = True
+    # Operator-accessible browser preview URL for the staged final video, when
+    # the sink can produce one (e.g. /files/<key> for local, presigned for R2).
+    # NOT a provider/temporary/publish URL — an internal staged preview.
+    final_video_preview_url: Optional[str] = None
 
 
 class InMemoryArtifactSink:
@@ -81,6 +85,10 @@ class InMemoryArtifactSink:
             raise StagingError("artifact_name must be a non-empty string")
         self.puts.append((local_path, artifact_name))
         return f"{ARTIFACT_REF_PREFIX}{artifact_name}"
+
+    def preview_url_for(self, artifact_name: str) -> str:
+        """Browser-openable preview URL (fake local-style path for tests)."""
+        return f"/files/{artifact_name}"
 
 
 def _artifact_name(task_id: Optional[str], kind: str, local_path: str) -> str:
@@ -116,10 +124,22 @@ def stage_minimal_result(
     if sink is None or not hasattr(sink, "put"):
         raise StagingError("sink must provide a put(local_path, artifact_name) method")
 
+    final_name = _artifact_name(task_id, "final", final_video_path)
     final_ref = _stage_one(sink, task_id, "final", final_video_path)
     manifest_ref = _stage_one(sink, task_id, "manifest", manifest_path)
     subtitles_ref = _stage_one(sink, task_id, "subtitles", subtitles_path)
     audio_ref = _stage_one(sink, task_id, "audio", audio_path)
+
+    # Operator-accessible preview URL for the final video, when the sink can
+    # produce one (browser-openable; never a provider/temporary/publish URL).
+    final_preview_url: Optional[str] = None
+    if hasattr(sink, "preview_url_for"):
+        try:
+            candidate = sink.preview_url_for(final_name)
+            if isinstance(candidate, str) and candidate:
+                final_preview_url = candidate
+        except Exception:
+            final_preview_url = None
 
     clip_refs: List[str] = []
     if stage_scene_clips:
@@ -134,6 +154,7 @@ def stage_minimal_result(
         audio_artifact_ref=audio_ref,
         scene_clip_artifact_refs=tuple(clip_refs),
         scene_clips_staged=bool(stage_scene_clips),
+        final_video_preview_url=final_preview_url,
     )
     assert_no_staging_forbidden_tokens(staging_record_to_dict(record))
     return record
@@ -153,6 +174,7 @@ def staging_record_to_dict(record: MatrixScriptMinimalResultStagingRecord) -> Di
         "delivery_candidate": record.delivery_candidate,
         "official_publish_ready": record.official_publish_ready,
         "generation_provider": record.generation_provider,
+        "final_video_preview_url": record.final_video_preview_url,
     }
 
 
