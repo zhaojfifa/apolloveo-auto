@@ -207,3 +207,24 @@ def test_trace_serialization_is_leak_free() -> None:
     blob = json.dumps(build_minimal_result_trace(_surface_dict()), ensure_ascii=False).lower()
     for token in ("akool", "provider", "vendor", "model_id", "credit", "publish_url", "publish_status", "http://", "https://"):
         assert token not in blob
+
+
+# ---------------------------------------------------------------------------
+# P0 R2 preview staging — Workbench "暂存并预览" action (static)
+# ---------------------------------------------------------------------------
+
+
+def test_workbench_has_staged_preview_action() -> None:
+    src = _WORKBENCH.read_text(encoding="utf-8")
+    assert 'data-role="matrix-script-staged-preview-action"' in src
+    assert 'data-role="ms-staged-preview-trigger"' in src
+    assert "/real-trial" in src
+    assert "ms-staged-preview-link" in src
+    assert "d.preview_url" in src
+    assert "打开视频" in src
+
+
+def test_publish_hub_staged_block_has_preview_link() -> None:
+    src = _PUBLISH_HUB.read_text(encoding="utf-8")
+    assert 'data-role="ms-dc-staged-preview"' in src
+    assert "ms_staged.preview_url" in src

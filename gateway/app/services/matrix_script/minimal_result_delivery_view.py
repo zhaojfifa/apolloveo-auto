@@ -131,8 +131,14 @@ def staged_record_to_delivery_block(
         "subtitles_artifact_ref": record.subtitles_artifact_ref,
         "audio_artifact_ref": record.audio_artifact_ref,
         "scene_clip_count": len(record.scene_clip_artifact_refs),
+        # Operator-accessible browser preview URL (staged, not publish). May be
+        # None when the sink cannot produce one.
+        "preview_url": getattr(record, "final_video_preview_url", None),
         "delivery_note": STAGED_DELIVERY_NOTE,
     }
+    # NOTE: preview_url is the intended browser link (may be an https presigned
+    # URL for R2); the delivery guard forbids provider/publish/download tokens
+    # but NOT a generic https preview, so this stays compliant.
     assert_no_delivery_view_forbidden_tokens(block)
     return block
 
