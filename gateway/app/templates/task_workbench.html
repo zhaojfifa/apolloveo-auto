@@ -415,6 +415,87 @@
         </div>
       {% endif %}
 
+      {# PR-13R · Workbench minimal-result trigger action (Matrix Script
+         Production Action MVP). A controlled operator action that POSTs to the
+         PR-12R internal route and renders the returned read-only surface
+         payload client-side. NO generation control beyond this trigger, NO
+         provider/vendor, NO media player, NO external link, NO download URL,
+         NO publish gate. The result is a LOCAL workspace minimal final video
+         (storage_scope=local_workspace, official_publish_ready=false) — not
+         official delivery. Result fields are built via textContent only (no
+         innerHTML), and the endpoint is read from a data- attribute (no literal
+         media URL in script). Rendered for matrix_script tasks only. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card"
+             id="matrix-script-minimal-result-action"
+             data-role="matrix-script-minimal-result-action">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <h2 class="op-section-title">本地最小成片</h2>
+            </div>
+          </div>
+          <p class="op-section-helper">生成一段本地最小成片用于预览。结果保存在本地工作区，尚未进入正式交付存储。</p>
+          <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button type="button"
+                    class="btn-secondary"
+                    data-role="ms-minimal-result-trigger"
+                    data-task-id="{{ task.task_id }}"
+                    data-endpoint="/api/matrix-script/{{ task.task_id }}/minimal-result">生成本地最小成片</button>
+          </div>
+          <div class="muted" data-role="ms-minimal-result-action-status" data-state="idle"></div>
+          <div data-role="ms-minimal-result-action-output"></div>
+          <script>
+          (function () {
+            var trigger = document.querySelector('[data-role="ms-minimal-result-trigger"]');
+            if (!trigger) { return; }
+            var statusEl = document.querySelector('[data-role="ms-minimal-result-action-status"]');
+            var outEl = document.querySelector('[data-role="ms-minimal-result-action-output"]');
+            function row(label, value) {
+              var el = document.createElement('div');
+              el.className = 'muted';
+              el.textContent = label + '：' + (value === undefined || value === null ? '' : value);
+              return el;
+            }
+            trigger.addEventListener('click', async function () {
+              trigger.disabled = true;
+              statusEl.setAttribute('data-state', 'running');
+              statusEl.textContent = '生成中…';
+              outEl.textContent = '';
+              try {
+                var resp = await fetch(trigger.getAttribute('data-endpoint'), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' }
+                });
+                if (!resp.ok) {
+                  statusEl.setAttribute('data-state', 'error');
+                  statusEl.textContent = '生成失败（' + resp.status + '）';
+                  trigger.disabled = false;
+                  return;
+                }
+                var d = await resp.json();
+                statusEl.setAttribute('data-state', 'done');
+                statusEl.textContent = '已生成';
+                outEl.setAttribute('data-has-result', d.has_result ? 'true' : 'false');
+                outEl.appendChild(row('结果', d.final_video_label || '本地最小成片'));
+                outEl.appendChild(row('状态', d.result_status));
+                outEl.appendChild(row('本地路径', d.final_video_path));
+                outEl.appendChild(row('时长（秒）', d.duration_seconds));
+                outEl.appendChild(row('镜头数', d.shot_count));
+                outEl.appendChild(row('存储范围', d.storage_scope));
+                outEl.appendChild(row('正式交付就绪', d.official_publish_ready));
+                outEl.appendChild(row('提示', d.operator_note));
+                trigger.disabled = false;
+              } catch (e) {
+                statusEl.setAttribute('data-state', 'error');
+                statusEl.textContent = '生成失败';
+                trigger.disabled = false;
+              }
+            });
+          })();
+          </script>
+        </div>
+      {% endif %}
+
       {# Phase 2C (2026-05-30) · operator-readability capability banner.
          ONE orientation line; relocated by Phase 2D to render BELOW §A so
          the result panel is the dominant first surface. Copy / layout only;
