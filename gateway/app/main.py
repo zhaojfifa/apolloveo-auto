@@ -29,6 +29,7 @@ from gateway.app.routers import (
     assets as assets_router,
     digital_anchor_closure as digital_anchor_closure_router,
     matrix_script_closure as matrix_script_closure_router,
+    matrix_script_minimal_result as matrix_script_minimal_result_router,
     matrix_script_panel_debug,
     publish as publish_router,
     tasks as tasks_router,
@@ -266,6 +267,7 @@ app.include_router(v17_pack_router)
 app.include_router(hot_follow_ui_router.router)
 app.include_router(matrix_script_panel_debug.router)
 app.include_router(matrix_script_closure_router.api_router)
+app.include_router(matrix_script_minimal_result_router.api_router)
 app.include_router(digital_anchor_closure_router.api_router)
 app.include_router(voice_tool_router.page_router)
 app.include_router(voice_tool_router.api_router)
