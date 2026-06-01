@@ -87,12 +87,25 @@ STORAGE_SCOPE_STAGED = "artifact_staged"
 STAGED_DELIVERY_NOTE = "该结果已暂存为交付候选（artifact staged），但尚未正式发布。"
 
 
-def staged_record_to_delivery_block(record: Any) -> Dict[str, object]:
+# Provider-agnostic generation labels for the operator-facing staged block.
+# Deliberately NOT a vendor name (four-layer rule: no provider name in the
+# operator surface). "real_oneshot_attempted" records that a real one-shot was
+# attempted without revealing which provider.
+GENERATION_PROVIDER_NONE = "none"
+GENERATION_PROVIDER_REAL_ONESHOT = "real_oneshot_attempted"
+_ALLOWED_GENERATION_PROVIDERS = frozenset({GENERATION_PROVIDER_NONE, GENERATION_PROVIDER_REAL_ONESHOT})
+
+
+def staged_record_to_delivery_block(
+    record: Any, *, generation_provider: str = GENERATION_PROVIDER_NONE
+) -> Dict[str, object]:
     """Project a PR-16R staging record into a Delivery staged-candidate block.
 
     Additive ``artifact_staged`` view: a delivery candidate that is explicitly
     NOT publish-ready. Carries opaque ``artifact://`` refs only — no provider
-    URL, no download URL, no publish field.
+    URL, no download URL, no publish field. ``generation_provider`` is a
+    provider-AGNOSTIC label (``none`` / ``real_oneshot_attempted``) — never a
+    vendor name.
     """
     from gateway.app.services.matrix_script.minimal_result_artifact_staging import (
         MatrixScriptMinimalResultStagingRecord,
@@ -100,6 +113,10 @@ def staged_record_to_delivery_block(record: Any) -> Dict[str, object]:
 
     if not isinstance(record, MatrixScriptMinimalResultStagingRecord):
         raise DeliveryViewError("record must be a MatrixScriptMinimalResultStagingRecord")
+    if generation_provider not in _ALLOWED_GENERATION_PROVIDERS:
+        raise DeliveryViewError(
+            f"generation_provider must be one of {sorted(_ALLOWED_GENERATION_PROVIDERS)}"
+        )
     block: Dict[str, object] = {
         "has_result": True,
         "line_id": LINE_ID,
@@ -108,6 +125,7 @@ def staged_record_to_delivery_block(record: Any) -> Dict[str, object]:
         "storage_scope": STORAGE_SCOPE_STAGED,
         "delivery_candidate": True,
         "official_publish_ready": OFFICIAL_PUBLISH_READY_FALSE,
+        "generation_provider": generation_provider,
         "final_video_artifact_ref": record.final_video_artifact_ref,
         "manifest_artifact_ref": record.manifest_artifact_ref,
         "subtitles_artifact_ref": record.subtitles_artifact_ref,
