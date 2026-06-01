@@ -83,6 +83,42 @@ def minimal_result_surface_view_to_delivery_block(
     return _block_from_surface(minimal_result_surface_view_to_dict(view))
 
 
+STORAGE_SCOPE_STAGED = "artifact_staged"
+STAGED_DELIVERY_NOTE = "该结果已暂存为交付候选（artifact staged），但尚未正式发布。"
+
+
+def staged_record_to_delivery_block(record: Any) -> Dict[str, object]:
+    """Project a PR-16R staging record into a Delivery staged-candidate block.
+
+    Additive ``artifact_staged`` view: a delivery candidate that is explicitly
+    NOT publish-ready. Carries opaque ``artifact://`` refs only — no provider
+    URL, no download URL, no publish field.
+    """
+    from gateway.app.services.matrix_script.minimal_result_artifact_staging import (
+        MatrixScriptMinimalResultStagingRecord,
+    )
+
+    if not isinstance(record, MatrixScriptMinimalResultStagingRecord):
+        raise DeliveryViewError("record must be a MatrixScriptMinimalResultStagingRecord")
+    block: Dict[str, object] = {
+        "has_result": True,
+        "line_id": LINE_ID,
+        "final_video_label": FINAL_VIDEO_LABEL,
+        "result_status": "generated",
+        "storage_scope": STORAGE_SCOPE_STAGED,
+        "delivery_candidate": True,
+        "official_publish_ready": OFFICIAL_PUBLISH_READY_FALSE,
+        "final_video_artifact_ref": record.final_video_artifact_ref,
+        "manifest_artifact_ref": record.manifest_artifact_ref,
+        "subtitles_artifact_ref": record.subtitles_artifact_ref,
+        "audio_artifact_ref": record.audio_artifact_ref,
+        "scene_clip_count": len(record.scene_clip_artifact_refs),
+        "delivery_note": STAGED_DELIVERY_NOTE,
+    }
+    assert_no_delivery_view_forbidden_tokens(block)
+    return block
+
+
 def derive_matrix_script_minimal_result_delivery_block(task: Any) -> Dict[str, object]:
     """Read-only wiring adapter: surface dict on task config → delivery block.
 
