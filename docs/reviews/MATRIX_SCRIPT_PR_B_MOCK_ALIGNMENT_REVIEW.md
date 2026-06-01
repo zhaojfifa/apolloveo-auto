@@ -101,3 +101,17 @@ The boundary is clean; the failure is **structural alignment**, not a guardrail 
 ## 8. Final recommendation
 
 **C — FAIL.** Do not merge PR #190 as-is. Revise to overlay the PR-A real result onto the already-implemented ①/② sections and remove the duplicate fixture-driven flow, then re-review.
+
+---
+
+## 9. Resolution addendum (2026-06-01)
+
+The FAIL items were addressed by the revised overlay commit on the same branch:
+
+- ❌→✅ **Parallel flow removed.** The entire `matrix-script-operator-flow` (`ms-flow-*`) section is deleted; grep confirms 0 `ms-flow-*` anchors.
+- ❌→✅ **Single anchors.** Exactly one each of `matrix-script-main-video-result`, `matrix-script-section-script-understanding`, `matrix-script-section-generation-plan`, `matrix-script-section-delivery-entry`.
+- ❌→✅ **Fixtures removed.** `TOMATO_SCRIPT_UNDERSTANDING` / `TOMATO_VARIANTS` deleted from the plan module; script-understanding + variants stay presenter-bound (`ms_script_structure` / `ms_readable_variants`).
+- ❌→✅ **Overlay into existing sections.** PR-A acceptance overlaid into ① (`ms-main-video-result-acceptance`, with empty-state/blocker suppressed when operator_usable), ② (`ms-section-generation-plan-shot-acceptance-overlay`, per-shot source/semantic/included), and ⑤ (`ms-section-delivery-entry-acceptance`, CTA kept at `/tasks/{task_id}/publish`).
+- Tests 15 passed (single-flow + overlay + presenter-bound + boundary); adjacent regression 81 passed. Evidence: `docs/execution/screenshots/pr_a_tomato/pr_b_overlay_main_result.png`.
+
+Revised verdict on the overlay commit: **PASS** (pending the standing reviewer's confirmation). Execution log: `docs/execution/MATRIX_SCRIPT_PR_B_OPERATOR_WORKBENCH_FLOW_ALIGNMENT.md`. PR remains unmerged pending review.

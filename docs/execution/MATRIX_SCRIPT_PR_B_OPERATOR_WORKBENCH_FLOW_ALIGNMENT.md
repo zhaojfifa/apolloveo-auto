@@ -1,62 +1,54 @@
-# PR-B · Matrix Script Operator Workbench Flow Alignment
+# PR-B · Matrix Script Operator Workbench Flow Alignment (revised → overlay)
 
 Date: 2026-06-01
 Branch: `phase3/pr-b-matrix-script-operator-workbench-flow`
-Scope: UI / presenter alignment only. No new generation engine, no schema/contract, no Hot Follow / Digital Anchor, no `artifact_storage.py`, no Akool live, no `official_publish_ready=true`, no `provider_url`/`publish_url`/`temporary_url`.
+Scope: UI / presenter overlay only. No new generation engine, no schema/contract, no Hot Follow / Digital Anchor, no `artifact_storage.py`, no Akool live, no `official_publish_ready=true`, no `provider_url`/`publish_url`/`temporary_url`.
 
-## Goal
+## Revision context
 
-Make the Matrix Script Workbench an operator-driven, script→video production surface. The **Main Video Result** is the dominant top surface and is **linked** to the decisions that produced it:
+The first PR-B revision added a **parallel** `matrix-script-operator-flow` (`ms-flow-*`) section. The mock-alignment review (`docs/reviews/MATRIX_SCRIPT_PR_B_MOCK_ALIGNMENT_REVIEW.md`) classified that **FAIL** — the binding Workbench mock is already implemented on `main` (presenter-bound ① / ② / script-understanding / variants / ⑤), so a second flow created duplicate + contradictory sections.
 
-```
-主视频结果 ↕ 脚本理解 ↕ 分镜/镜头计划 ↕ 素材与视觉资产 ↕ 角色/配音 ↕ 字幕/音乐 ↕ 视频变体 ↕ 交付
-```
+**This revision is the corrected, narrow overlay.** It removes the parallel flow and overlays only the useful PR-A acceptance values into the EXISTING sections.
 
-The main result is the current projection of those lower decisions — not an isolated card above technical blocks.
+## What was removed
 
-## What changed
+- The entire `matrix-script-operator-flow` parallel `<section>` (all `ms-flow-*` primary sections).
+- `TOMATO_SCRIPT_UNDERSTANDING` and `TOMATO_VARIANTS` fixtures (deleted from `tomato_real_result_plan.py`) — no longer rendered as task truth.
+- The duplicate parallel delivery block.
+- The redundant standalone PR-A "运营可用预览" action card (folded into ① below).
 
-- **New presenter** `gateway/app/services/matrix_script/operator_workbench_view.py` → `build_matrix_script_operator_workbench_view(task, *, result=None, env=None)` returns one `MatrixScriptOperatorWorkbenchView` dict: `main_result` / `script_understanding` / `storyboard` / `materials` / `voice` / `subtitles_music` / `variants` / `delivery`. Pure projection over the fixed tomato plan + the PR-A staged result (read-only). Self-guards against provider/publish token leakage.
-- **Fixture additions** in `tomato_real_result_plan.py`: `TOMATO_SCRIPT_UNDERSTANDING` + `TOMATO_VARIANTS` (V1 generated; V2/V3 planned/pending — same script plan). No contract.
-- **Wiring** (`operator_visible_surfaces/wiring.py`, +14 lines): inside the existing `panel_kind == "matrix_script"` branch, attach `bundle["workbench"]["matrix_script_operator_flow"]`. Kind-gated; never enters for Hot Follow / Digital Anchor.
-- **Template** (`task_workbench.html`, matrix_script branch only): added the linked A–H operator-flow `<section>` as the dominant top surface; **removed the now-redundant PR-A "运营可用预览" action block** (Section A owns the generate action and updates its own fields live from the route response). Legacy blocks below are untouched (their retirement is the separate Workbench-reset wave).
+## What was overlaid into the existing mock
 
-## Four-layer mapping (UI invents no truth)
+- **① `matrix-script-main-video-result`** — acceptance overlay (`ms-main-video-result-acceptance`): 运营状态 (operator_usable→可交付 / technical_preview→待审核 / none→未生成), 画面语义匹配, 匹配镜头数 (shot_match_count/shot_count), 真实视觉镜头数, 交付候选, 正式交付就绪=false, 阻塞原因, a 生成运营可用预览 action, and a 打开视频 link. When the PR-A result is operator-usable, the legacy empty-state (`ms-main-video-result-preview-empty`) and blocker banner are **suppressed** (server-side `{% elif ms_overlay_mr.operator_usable %}` + `{% if not ms_overlay_mr.operator_usable %}`; JS hides them after a live generate) so ① never shows 未生成 / 主成片缺失 in that state.
+- **② `matrix-script-section-generation-plan`** — per-shot acceptance overlay (`ms-section-generation-plan-shot-acceptance-overlay`, loop over `ms_overlay.shots`): each shot's 素材来源 / 语义匹配 / 是否进入当前主视频. No second storyboard.
+- **⑤ `matrix-script-section-delivery-entry`** — delivery overlay (`ms-section-delivery-entry-acceptance`): 交付候选 / 正式交付就绪=false / 打开视频（暂存预览）. CTA stays `/tasks/{task_id}/publish`.
 
-- **L1**: generation steps / shot assembly status (storyboard `generation_status`).
-- **L2**: artifacts — final.mp4 / subtitles / audio / manifest / preview_url / shot clips (drive `main_result.preview_url`, `subtitles_music`).
-- **L3**: operator acceptance — `operator_usable` / `visual_semantic_match` / `shot_match_count` / `real_visual_count` / `delivery_candidate` (drive `main_result` + per-shot `semantic_status`).
-- **L4**: the Workbench sections display only these derived facts. Main result derives from L2+L3; storyboard from the fixed shot plan + acceptance; variants carry planned V2/V3 but only V1 may be marked generated.
+The existing **脚本理解** (`ms_script_structure`) and **变体** (`ms_readable_variants`) sections are untouched and remain presenter-bound per task.
 
-## Result linkage (tomato case, operator-usable result)
+## Helper
 
-| field | value |
+`gateway/app/services/matrix_script/operator_workbench_view.py::build_matrix_script_operator_workbench_view(task, *, result=None, env=None)` now returns an **overlay-only** payload: `{is_matrix_script, has_pr_a_result, main_result, shots, delivery, generate_endpoint}`. Result source: the staged PR-A candidate on `task.config` (read-only) or an explicit `result`. Wired into the existing matrix_script branch of `operator_visible_surfaces/wiring.py` as `matrix_script_operator_flow` (kind-gated). Self-guards against provider/publish token leakage.
+
+## Four-layer mapping
+
+L1 generation/shot status · L2 artifacts (final.mp4/subtitles/audio/manifest/preview_url) · L3 acceptance (operator_usable / visual_semantic_match / shot_match_count / real_visual_count / delivery_candidate) → overlaid into ①/②/⑤ · L4 displays derived facts only. No invented truth; fixtures no longer rendered as task content.
+
+## Single-flow proof
+
+| Section | anchors |
 |---|---|
-| current variant | V1 清新种草版 |
-| status | operator_usable (运营可用) |
-| visual_semantic_match | partial_pass |
-| shot_match_count | 3 / 5 |
-| real_visual_count | 3 |
-| delivery_candidate | true |
-| official_publish_ready | false |
-| preview_url | `/api/matrix-script/{id}/tomato-real-result/preview/final.mp4` |
-
-### Storyboard linkage
-
-| Shot | Script role | Asset | Source | Semantic | In current video |
-|---|---|---|---|---|---|
-| 01 海边 Hook | Hook | 01_beach_hook.png | local_real_asset | pass | true |
-| 02 小番茄产品特写 | Body | 02_tomato_bowl.png | local_real_asset | pass | true |
-| 03 拿起小番茄 | Body | 03_pick_tomato.png | local_real_asset | pass | true |
-| 04 品尝爆汁 | Body | 03_pick_tomato.png | fallback_semantic_reuse | partial | true |
-| 05 递向镜头 CTA | CTA | 02_tomato_bowl.png | fallback_semantic_reuse | partial | true |
-
-Rendered evidence: `docs/execution/screenshots/pr_a_tomato/pr_b_operator_flow.png` (Section A shows 运营可用, not 未生成; B–E linked below).
+| main result | exactly 1 (`matrix-script-main-video-result`); `ms-flow-main-result` = 0 |
+| script understanding | exactly 1 (`matrix-script-section-script-understanding`); `ms-flow-*` = 0 |
+| generation-plan / storyboard | exactly 1 (`matrix-script-section-generation-plan`) |
+| variants | existing `matrix-script-section-optional-variants` retained; `ms-flow-variants` = 0 |
+| delivery entry | exactly 1 (`matrix-script-section-delivery-entry`), CTA `/tasks/{task_id}/publish` |
 
 ## Tests
 
-`gateway/app/services/tests/test_matrix_script_operator_workbench_flow_alignment.py` — **15 passed**. Covers: main result uses operator_usable result; not_generated when no result; technical_preview on fallback; rendered Section A has no 未生成/主成片缺失 when usable; storyboard 5 shots with source+semantic; materials→shots mapping; voice azure vs fallback; subtitles state; variants V1 generated / V2/V3 pending; delivery V1 candidate + official_publish_ready false; no provider/publish leakage; staged-candidate-on-config path; module import boundary. Adjacent regression (PR-A tomato + phase2b fidelity + main_video_result_view): **81 passed**.
+`gateway/app/services/tests/test_matrix_script_operator_workbench_flow_alignment.py` — **15 passed**. Proves: exactly one of each section; overlay feeds PR-A acceptance (operator_usable / partial_pass / 3 of 5 / real 3 / preview_url / official_publish_ready=false); ① suppresses empty-state/blocker when operator_usable (source-structure + block-render); ② carries the per-shot acceptance overlay; script-understanding + variants stay presenter-bound and the tomato fixtures are gone (`not hasattr` checks); delivery keeps `/tasks/{task_id}/publish`; no provider/publish leakage. Adjacent regression (PR-A tomato + phase2b fidelity + main_video_result_view): **81 passed**.
+
+Rendered evidence: `docs/execution/screenshots/pr_a_tomato/pr_b_overlay_main_result.png` — existing ① block with PR-A acceptance overlaid (可交付 / 主视频已生成·运营可用 / partial_pass), no 未生成.
 
 ## Boundary
 
-No schema/contract; no Hot Follow / Digital Anchor; `artifact_storage.py` untouched; no Akool live; no `official_publish_ready=true`; no `provider_url`/`publish_url`/`temporary_url`. Only: new presenter + fixture + 14-line kind-gated wiring + matrix_script template branch + test + screenshot.
+No schema/contract; no Hot Follow / Digital Anchor; `artifact_storage.py` untouched; no Akool live; no `official_publish_ready=true`; no `provider_url`/`publish_url`/`temporary_url`. Files: `operator_workbench_view.py` (overlay-only), `tomato_real_result_plan.py` (fixtures removed), kind-gated `wiring.py`, matrix_script branch of `task_workbench.html` (parallel flow removed; overlays added to ①/②/⑤), test, docs, screenshot.
