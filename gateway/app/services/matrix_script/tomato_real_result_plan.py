@@ -1,0 +1,140 @@
+"""Matrix Script Tomato Real Result — fixed 5-shot plan (PR-A).
+
+The single, fixed operator case 《海边与圣女果的盛夏约定》. This module is a
+deterministic CODE FIXTURE for the controlled PR-A real-result path — NOT a
+contract, NOT a schema, NOT a packet. It encodes the baseline §5/§6 shot table
+verbatim plus the asset→shot mapping the user fixed for MS-TOMATO-BEACH-001.
+
+No free drift: the five shots, their voiceover/subtitle text, and the asset
+mapping are fixed here. Shots 04 / 05 are explicit semantic reuses of real
+assets with a different crop/zoom focus, labelled ``fallback_semantic_reuse``.
+
+Hard boundary: no provider name, no contract/schema/packet change, no I/O here.
+"""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from typing import Tuple
+
+LINE_ID = "matrix_script"
+CASE_ID = "MS-TOMATO-BEACH-001"
+SCRIPT_TITLE = "海边与圣女果的盛夏约定"
+
+# Asset source kinds (operator-facing, provider-agnostic).
+SOURCE_LOCAL_REAL_ASSET = "local_real_asset"
+SOURCE_FALLBACK_SEMANTIC_REUSE = "fallback_semantic_reuse"
+
+
+@dataclass(frozen=True)
+class TomatoShot:
+    """One fixed shot in the tomato case."""
+
+    shot_id: str
+    order: int
+    title_zh: str
+    visual_intent_zh: str
+    voiceover_zh: str
+    subtitle_zh: str
+    asset_filename: str
+    source: str
+    # Ken-Burns focus point (fractions of frame) + zoom range for image→motion.
+    focus: Tuple[float, float]
+    zoom: Tuple[float, float]
+    # A real-visual shot binds a distinct local photo; a semantic reuse re-frames
+    # an already-used photo and does NOT count toward ``real_visual_count``.
+    real_visual: bool
+    # Whether this shot is treated as a semantic match against the script.
+    semantic_match: bool
+
+
+# Baseline §6 fixed 5-shot target + the user's fixed asset mapping (§6 of the
+# launch instruction). Shot 04 reuses 03 (品尝爆汁); Shot 05 reuses 02 (CTA).
+TOMATO_SHOTS: Tuple[TomatoShot, ...] = (
+    TomatoShot(
+        shot_id="shot01",
+        order=1,
+        title_zh="海边 Hook",
+        visual_intent_zh="阳光海滩、蓝天白云，白裙美女迎着海风对镜头微笑",
+        voiceover_zh="这个夏天，总要去趟海边吧？去吹吹海风，去尝尝属于夏天的味道。",
+        subtitle_zh="这个夏天，总要去趟海边吧？",
+        asset_filename="01_beach_hook.png",
+        source=SOURCE_LOCAL_REAL_ASSET,
+        focus=(0.5, 0.42),
+        zoom=(1.0, 1.10),
+        real_visual=True,
+        semantic_match=True,
+    ),
+    TomatoShot(
+        shot_id="shot02",
+        order=2,
+        title_zh="小番茄产品特写",
+        visual_intent_zh="玻璃碗里红润剔透、挂着水珠的小番茄特写，阳光照射",
+        voiceover_zh="看！这是刚刚从温室采摘来的小番茄，每一颗都吸饱了阳光，圆润饱满。",
+        subtitle_zh="刚采摘的小番茄，圆润饱满、吸饱阳光。",
+        asset_filename="02_tomato_bowl.png",
+        source=SOURCE_LOCAL_REAL_ASSET,
+        focus=(0.5, 0.5),
+        zoom=(1.0, 1.10),
+        real_visual=True,
+        semantic_match=True,
+    ),
+    TomatoShot(
+        shot_id="shot03",
+        order=3,
+        title_zh="拿起小番茄",
+        visual_intent_zh="纤手从碗中轻轻捏起一颗饱满的红色小番茄，海边背景",
+        voiceover_zh="轻轻捏起一颗，薄薄的外皮包着满满汁水。",
+        subtitle_zh="轻轻捏起一颗，薄皮包着满满汁水。",
+        asset_filename="03_pick_tomato.png",
+        source=SOURCE_LOCAL_REAL_ASSET,
+        focus=(0.5, 0.5),
+        zoom=(1.0, 1.12),
+        real_visual=True,
+        semantic_match=True,
+    ),
+    TomatoShot(
+        shot_id="shot04",
+        order=4,
+        title_zh="品尝爆汁",
+        visual_intent_zh="近景特写：咬下小番茄、汁水迸发的满足表情（复用 03 收紧特写）",
+        voiceover_zh="一口咬下去，清甜的汁水瞬间在舌尖炸开，酸甜适中，满满夏日感。",
+        subtitle_zh="一口咬下去，清甜汁水在舌尖炸开！",
+        asset_filename="03_pick_tomato.png",
+        source=SOURCE_FALLBACK_SEMANTIC_REUSE,
+        focus=(0.55, 0.62),
+        zoom=(1.10, 1.28),
+        real_visual=False,
+        semantic_match=False,
+    ),
+    TomatoShot(
+        shot_id="shot05",
+        order=5,
+        title_zh="递向镜头 CTA",
+        visual_intent_zh="将整碗番茄递向镜头、邀请观众一起品尝（复用 02 收紧特写）",
+        voiceover_zh="这个夏天，和我一起炫一碗爆汁小番茄吧！",
+        subtitle_zh="这个夏天，一起炫一碗爆汁小番茄吧！",
+        asset_filename="02_tomato_bowl.png",
+        source=SOURCE_FALLBACK_SEMANTIC_REUSE,
+        focus=(0.5, 0.5),
+        zoom=(1.08, 1.20),
+        real_visual=False,
+        semantic_match=False,
+    ),
+)
+
+
+def repo_root() -> str:
+    """Repository root, derived from this file's location."""
+    # gateway/app/services/matrix_script/<this file> → up 4 → repo root.
+    here = os.path.abspath(__file__)
+    return os.path.abspath(os.path.join(here, os.pardir, os.pardir, os.pardir, os.pardir, os.pardir))
+
+
+def default_asset_dir() -> str:
+    """The fixed local asset pack directory for MS-TOMATO-BEACH-001."""
+    return os.path.join(repo_root(), "assets", "matrix_script_assets", CASE_ID)
+
+
+def shot_count() -> int:
+    return len(TOMATO_SHOTS)

@@ -31,6 +31,7 @@ from gateway.app.routers import (
     matrix_script_closure as matrix_script_closure_router,
     matrix_script_minimal_result as matrix_script_minimal_result_router,
     matrix_script_real_trial as matrix_script_real_trial_router,
+    matrix_script_tomato_real_result as matrix_script_tomato_real_result_router,
     matrix_script_panel_debug,
     publish as publish_router,
     tasks as tasks_router,
@@ -270,6 +271,7 @@ app.include_router(matrix_script_panel_debug.router)
 app.include_router(matrix_script_closure_router.api_router)
 app.include_router(matrix_script_minimal_result_router.api_router)
 app.include_router(matrix_script_real_trial_router.api_router)
+app.include_router(matrix_script_tomato_real_result_router.api_router)
 app.include_router(digital_anchor_closure_router.api_router)
 app.include_router(voice_tool_router.page_router)
 app.include_router(voice_tool_router.api_router)

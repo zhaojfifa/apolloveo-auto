@@ -614,6 +614,94 @@
         </div>
       {% endif %}
 
+      {# PR-A · 运营可用预览 (Tomato Real Result). Runs the controlled real-asset
+         tomato path (《海边与圣女果的盛夏约定》) and renders the operator
+         acceptance gate (L3) from the JSON response: operator_usable /
+         technical_preview / visual_semantic_match / shot_match_count /
+         real_visual_count / delivery_candidate / blocked_reason + 打开视频.
+         NOT publish: official_publish_ready stays false; fallback never becomes
+         a delivery candidate. The preview link href is set at runtime. #}
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card"
+             id="matrix-script-tomato-real-result-action"
+             data-role="matrix-script-tomato-real-result-action">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <h2 class="op-section-title">运营可用预览</h2>
+            </div>
+          </div>
+          <p class="op-section-helper">用固定脚本与本地素材生成可在浏览器打开的成片，并给出运营可用判断。该结果为交付候选，尚未进入正式发布。</p>
+          <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
+            <button type="button"
+                    class="btn-secondary"
+                    data-role="ms-tomato-trigger"
+                    data-task-id="{{ task.task_id }}"
+                    data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">生成运营可用预览</button>
+          </div>
+          <div class="muted" data-role="ms-tomato-status" data-state="idle"></div>
+          <div data-role="ms-tomato-output"></div>
+          <script>
+          (function () {
+            var trigger = document.querySelector('[data-role="ms-tomato-trigger"]');
+            if (!trigger) { return; }
+            var statusEl = document.querySelector('[data-role="ms-tomato-status"]');
+            var outEl = document.querySelector('[data-role="ms-tomato-output"]');
+            function row(label, value, role) {
+              var el = document.createElement('div');
+              el.className = 'muted';
+              if (role) { el.setAttribute('data-role', role); }
+              el.textContent = label + '：' + (value === undefined || value === null ? '' : value);
+              return el;
+            }
+            trigger.addEventListener('click', async function () {
+              trigger.disabled = true;
+              statusEl.setAttribute('data-state', 'running');
+              statusEl.textContent = '生成运营可用预览中…';
+              outEl.textContent = '';
+              try {
+                var resp = await fetch(trigger.getAttribute('data-endpoint'), {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' }
+                });
+                if (!resp.ok) {
+                  statusEl.setAttribute('data-state', 'error');
+                  statusEl.textContent = '生成失败（' + resp.status + '）';
+                  trigger.disabled = false;
+                  return;
+                }
+                var d = await resp.json();
+                statusEl.setAttribute('data-state', 'done');
+                statusEl.textContent = d.operator_usable ? '运营可用：是' : '运营可用：否（技术预览）';
+                outEl.appendChild(row('运营可用', d.operator_usable, 'ms-tomato-operator-usable'));
+                outEl.appendChild(row('技术预览', d.technical_preview, 'ms-tomato-technical-preview'));
+                outEl.appendChild(row('画面语义匹配', d.visual_semantic_match, 'ms-tomato-semantic-match'));
+                outEl.appendChild(row('匹配镜头数', d.shot_match_count + ' / ' + d.shot_count, 'ms-tomato-shot-match'));
+                outEl.appendChild(row('真实视觉镜头数', d.real_visual_count, 'ms-tomato-real-visual'));
+                outEl.appendChild(row('交付候选', d.delivery_candidate, 'ms-tomato-delivery-candidate'));
+                outEl.appendChild(row('正式交付就绪', d.official_publish_ready, 'ms-tomato-publish-ready'));
+                if (d.blocked_reason) { outEl.appendChild(row('阻塞原因', d.blocked_reason, 'ms-tomato-blocked-reason')); }
+                if (d.preview_url) {
+                  var a = document.createElement('a');
+                  a.setAttribute('data-role', 'ms-tomato-preview-link');
+                  a.setAttribute('href', d.preview_url);
+                  a.setAttribute('target', '_blank');
+                  a.setAttribute('rel', 'noopener');
+                  a.className = 'btn-secondary';
+                  a.style.marginTop = '8px';
+                  a.textContent = '打开视频';
+                  outEl.appendChild(a);
+                }
+                trigger.disabled = false;
+              } catch (e) {
+                statusEl.setAttribute('data-state', 'error');
+                statusEl.textContent = '生成失败';
+                trigger.disabled = false;
+              }
+            });
+          })();
+          </script>
+        </div>
+      {% endif %}
+
       {# Phase 2C (2026-05-30) · operator-readability capability banner.
          ONE orientation line; relocated by Phase 2D to render BELOW §A so
          the result panel is the dominant first surface. Copy / layout only;

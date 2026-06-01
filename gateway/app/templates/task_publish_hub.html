@@ -390,6 +390,18 @@
               <div class="muted" data-role="ms-dc-staged-audio-ref">音频工件：{{ ms_staged.audio_artifact_ref }}</div>
               <div class="muted" data-role="ms-dc-staged-scene-count">场景片段数：{{ ms_staged.scene_clip_count }}</div>
               <div class="muted" data-role="ms-dc-staged-generation">生成方式：{{ ms_staged.generation_provider or "none" }}</div>
+              {# PR-A · operator acceptance gate (L3), shown when present on the
+                 staged candidate. Derived facts only — UI invents no truth. #}
+              {% if 'operator_usable' in ms_staged %}
+                <div class="muted" data-role="ms-dc-staged-operator-usable">运营可用：{{ ms_staged.operator_usable }}</div>
+                <div class="muted" data-role="ms-dc-staged-technical-preview">技术预览：{{ ms_staged.technical_preview }}</div>
+                <div class="muted" data-role="ms-dc-staged-semantic-match">画面语义匹配：{{ ms_staged.visual_semantic_match }}</div>
+                <div class="muted" data-role="ms-dc-staged-shot-match">匹配镜头数：{{ ms_staged.shot_match_count }} / {{ ms_staged.shot_count }}</div>
+                <div class="muted" data-role="ms-dc-staged-real-visual">真实视觉镜头数：{{ ms_staged.real_visual_count }}</div>
+                {% if ms_staged.blocked_reason %}
+                  <div class="muted" data-role="ms-dc-staged-blocked-reason">阻塞原因：{{ ms_staged.blocked_reason }}</div>
+                {% endif %}
+              {% endif %}
               {% if ms_staged.preview_url %}
                 <a data-role="ms-dc-staged-preview" href="{{ ms_staged.preview_url }}" target="_blank" rel="noopener" class="btn-secondary" style="margin-top:8px;">打开视频（暂存预览）</a>
               {% endif %}
