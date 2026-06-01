@@ -338,6 +338,33 @@
             {% endif %}
           </div>
 
+          {# PR-14R · Delivery local read-only result. Renders ONLY when a
+             pre-computed local minimal result is present on the task config
+             (read-only; no generation, no task mutation). This is a LOCAL
+             workspace result — NOT official delivery, NOT publishable: no
+             download URL, no publish gate. All values are Jinja interpolation
+             (no literal media URL). #}
+          {% set ms_local_result = (task.config or {}).matrix_script_minimal_result or {} %}
+          {% if ms_local_result.has_result %}
+            <div class="op-card" data-role="matrix-script-dc-local-result"
+                 data-storage-scope="{{ ms_local_result.storage_scope }}"
+                 data-official-publish-ready="{{ ms_local_result.official_publish_ready }}"
+                 style="margin-top:10px;">
+              <div class="op-section-head">
+                <div class="op-section-head__main">
+                  <h2 class="op-section-title" data-role="ms-dc-local-result-title">{{ ms_local_result.final_video_label or "本地最小成片" }}</h2>
+                  <span class="info-pill" data-role="ms-dc-local-result-status">{{ ms_local_result.result_status or "generated" }}</span>
+                </div>
+              </div>
+              <div class="muted" data-role="ms-dc-local-result-path">本地路径：{{ ms_local_result.final_video_path }}</div>
+              <div class="muted" data-role="ms-dc-local-result-duration">时长（秒）：{{ ms_local_result.duration_seconds }}</div>
+              <div class="muted" data-role="ms-dc-local-result-shots">镜头数：{{ ms_local_result.shot_count }}</div>
+              <div class="muted" data-role="ms-dc-local-result-scope">存储范围：{{ ms_local_result.storage_scope or "local_workspace" }}</div>
+              <div class="muted" data-role="ms-dc-local-result-publish-ready">正式交付就绪：{{ ms_local_result.official_publish_ready }}</div>
+              <div class="op-tech-note" data-role="ms-dc-local-result-note">该结果尚未进入正式交付存储，不能作为正式发布文件。</div>
+            </div>
+          {% endif %}
+
           {# Section 2 · 主视频 — preview (or honest empty state) + download
              entry. NO raw `final_video` heading; NO fabricated URL. The
              preview hero either binds a real artifact when present or
