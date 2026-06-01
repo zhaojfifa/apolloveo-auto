@@ -344,7 +344,7 @@
              workspace result — NOT official delivery, NOT publishable: no
              download URL, no publish gate. All values are Jinja interpolation
              (no literal media URL). #}
-          {% set ms_local_result = (task.config or {}).matrix_script_minimal_result or {} %}
+          {% set ms_local_result = ms_pub.local_result or {} %}
           {% if ms_local_result.has_result %}
             <div class="op-card" data-role="matrix-script-dc-local-result"
                  data-storage-scope="{{ ms_local_result.storage_scope }}"
@@ -371,7 +371,7 @@
              artifact refs (no download/provider URL). storage_scope=artifact_staged,
              delivery_candidate=true, official_publish_ready=false. generation_provider
              is a provider-agnostic label (none / real_oneshot_attempted). #}
-          {% set ms_staged = (task.config or {}).matrix_script_staged_candidate or {} %}
+          {% set ms_staged = ms_pub.staged_candidate or {} %}
           {% if ms_staged.has_result %}
             <div class="op-card" data-role="matrix-script-dc-staged-candidate"
                  data-storage-scope="{{ ms_staged.storage_scope }}"

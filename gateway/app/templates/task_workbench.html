@@ -589,7 +589,6 @@
                 outEl.appendChild(row('存储范围', d.storage_scope));
                 outEl.appendChild(row('交付候选', d.delivery_candidate));
                 outEl.appendChild(row('正式交付就绪', d.official_publish_ready));
-                outEl.appendChild(row('生成方式', d.generation_provider));
                 if (d.blocked_reason_zh) { outEl.appendChild(row('说明', d.blocked_reason_zh)); }
                 if (d.preview_url) {
                   var a = document.createElement('a');

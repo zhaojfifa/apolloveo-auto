@@ -143,6 +143,31 @@ def staged_record_to_delivery_block(
     return block
 
 
+def derive_matrix_script_staged_candidate_block(task: Any) -> Dict[str, object]:
+    """Read-only: surface a persisted staged-candidate dict off the task config.
+
+    The real-trial route returns a staged-candidate block; when it is persisted
+    at ``task['config']['matrix_script_staged_candidate']`` this exposes it for
+    the Delivery server-render (via the publish render-data path). Absent /
+    malformed → ``{"has_result": False}``. Sanitised; ``preview_url`` allowed.
+    """
+    if not isinstance(task, Mapping):
+        return _empty()
+    config = task.get("config")
+    staged = config.get("matrix_script_staged_candidate") if isinstance(config, Mapping) else None
+    if not isinstance(staged, Mapping) or not staged.get("has_result"):
+        return _empty()
+    block = dict(staged)
+    block["has_result"] = True
+    # Hard-pin: a staged candidate is never publish-ready here.
+    block["official_publish_ready"] = OFFICIAL_PUBLISH_READY_FALSE
+    try:
+        assert_no_delivery_view_forbidden_tokens(block)
+    except DeliveryViewError:
+        return _empty()
+    return block
+
+
 def derive_matrix_script_minimal_result_delivery_block(task: Any) -> Dict[str, object]:
     """Read-only wiring adapter: surface dict on task config → delivery block.
 

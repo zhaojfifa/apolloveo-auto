@@ -145,9 +145,19 @@ def derive_matrix_script_publish_hub_render_data(
         f"/api/matrix-script/closures/{task_id}/events" if task_id else None
     )
 
+    # PR-185 Delivery render-path fix: surface the local-result + staged
+    # candidate from the RAW task config here. This function receives the raw
+    # task, whereas the template's `task` is a projected detail that cannot
+    # reach `config.matrix_script_*`. Read-only; official_publish_ready stays
+    # false; preview_url is an internal staged preview link.
+    local_result = _safe_local_result(task_dict)
+    staged_candidate = _safe_staged_candidate(task_dict)
+
     return {
         "is_matrix_script": True,
         "task_id": task_id,
+        "local_result": local_result,
+        "staged_candidate": staged_candidate,
         "eight_stage_state": eight_stage_state,
         "task_area_result_status": task_area_result_status,
         "publish_readiness": publish_readiness,
@@ -166,6 +176,28 @@ def derive_matrix_script_publish_hub_render_data(
 # Defensive wrappers — every helper invocation guarded so a projection
 # error returns {} instead of breaking the page render.
 # --------------------------------------------------------------------------
+
+
+def _safe_local_result(task: Mapping[str, Any]) -> Mapping[str, Any]:
+    try:
+        from gateway.app.services.matrix_script.minimal_result_delivery_view import (
+            derive_matrix_script_minimal_result_delivery_block,
+        )
+
+        return derive_matrix_script_minimal_result_delivery_block(task) or {}
+    except Exception:
+        return {}
+
+
+def _safe_staged_candidate(task: Mapping[str, Any]) -> Mapping[str, Any]:
+    try:
+        from gateway.app.services.matrix_script.minimal_result_delivery_view import (
+            derive_matrix_script_staged_candidate_block,
+        )
+
+        return derive_matrix_script_staged_candidate_block(task) or {}
+    except Exception:
+        return {}
 
 
 def _safe_closure_view(task_id: str) -> Optional[Mapping[str, Any]]:
