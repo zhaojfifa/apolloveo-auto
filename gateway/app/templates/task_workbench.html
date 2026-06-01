@@ -284,6 +284,175 @@
       {% set ms_delivery_comprehension = ((ops.workbench or {}).matrix_script_delivery_comprehension or {}) %}
       {% set ms_main_video_result = ((ops.workbench or {}).matrix_script_main_video_result or {}) %}
       {% set ms_minimal_result = ((ops.workbench or {}).matrix_script_minimal_result or {}) %}
+      {% set ms_flow = ((ops.workbench or {}).matrix_script_operator_flow or {}) %}
+
+      {# PR-B (2026-06-01) · Operator Workbench Flow Alignment. The Main Video
+         Result is the dominant top surface and is LINKED to the decisions that
+         produced it: 脚本理解 → 分镜 → 素材 → 角色/配音 → 字幕/音乐 → 变体 →
+         交付. Pure presentation-layer projection over the fixed tomato plan +
+         the staged PR-A result (read-only). official_publish_ready stays false;
+         a fallback-only result is shown as 技术预览, never a delivery candidate.
+         data-role anchors are stable for the flow-alignment tests. #}
+      {% if ms_flow.is_matrix_script %}
+      {% set _fmr = ms_flow.main_result or {} %}
+      <section class="op-flow" data-role="matrix-script-operator-flow" data-script-title="{{ ms_flow.script_title }}">
+
+        {# ---- A · 主视频结果 (primary) ---- #}
+        <div class="op-card op-card--accent-emerald" data-role="ms-flow-main-result"
+             data-status="{{ _fmr.status }}"
+             data-operator-usable="{{ _fmr.operator_usable }}">
+          <div class="op-section-head"><div class="op-section-head__main">
+            <h2 class="op-section-title">主视频结果</h2>
+            <span class="info-pill" data-role="ms-flow-status">{{ _fmr.status_label_zh }}</span>
+          </div></div>
+          {% if _fmr.current_variant %}<div class="muted" data-role="ms-flow-current-variant">当前版本：{{ _fmr.current_variant }}</div>{% endif %}
+          {% if _fmr.status == "not_generated" %}
+            <div class="muted" data-role="ms-flow-next-step">下一步：{{ _fmr.next_step_zh }}</div>
+          {% elif _fmr.status == "technical_preview" %}
+            <div class="muted" data-role="ms-flow-blocked-reason">原因：{{ _fmr.blocked_reason }}</div>
+          {% endif %}
+          <div class="muted" data-role="ms-flow-semantic-match">画面语义匹配：<span data-bind="visual_semantic_match">{{ _fmr.visual_semantic_match or "—" }}</span></div>
+          <div class="muted" data-role="ms-flow-shot-match">匹配镜头数：<span data-bind="shot_match_count">{{ _fmr.shot_match_count }}</span> / <span data-bind="shot_count">{{ _fmr.shot_count }}</span></div>
+          <div class="muted" data-role="ms-flow-real-visual">真实视觉镜头数：<span data-bind="real_visual_count">{{ _fmr.real_visual_count }}</span></div>
+          <div class="muted" data-role="ms-flow-delivery-candidate">交付候选：<span data-bind="delivery_candidate">{{ _fmr.delivery_candidate }}</span></div>
+          <div class="muted" data-role="ms-flow-publish-ready">正式交付就绪：{{ _fmr.official_publish_ready }}</div>
+          <div class="task-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">
+            <button type="button" class="btn-secondary" data-role="ms-flow-generate"
+                    data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">生成运营可用预览</button>
+            <a data-role="ms-flow-open-video" href="{{ _fmr.preview_url or '#' }}" target="_blank" rel="noopener"
+               class="btn-secondary" {% if not _fmr.preview_url %}style="display:none;"{% endif %}>打开视频</a>
+          </div>
+          <div class="muted" data-role="ms-flow-generate-status" data-state="idle"></div>
+        </div>
+
+        {# ---- B · 脚本理解 ---- #}
+        {% set _su = ms_flow.script_understanding or {} %}
+        <div class="op-card" data-role="ms-flow-script-understanding">
+          <div class="op-section-head"><div class="op-section-head__main"><h2 class="op-section-title">脚本理解</h2></div></div>
+          <div class="muted">主题：{{ _su.topic }}</div>
+          <div class="muted">产品：{{ _su.product }}</div>
+          <div class="muted">平台：{{ _su.platform }}</div>
+          <div class="muted">受众：{{ _su.audience }}</div>
+          <div class="muted">语气：{{ _su.tone }}</div>
+          <div class="muted">合规提示：{{ _su.forbidden_or_compliance }}</div>
+          <div class="muted">结构：{{ _su.structure }}</div>
+        </div>
+
+        {# ---- C · 分镜 / 镜头计划 (core driver) ---- #}
+        <div class="op-card" data-role="ms-flow-storyboard" data-shot-count="{{ ms_flow.storyboard | length }}">
+          <div class="op-section-head"><div class="op-section-head__main"><h2 class="op-section-title">分镜 / 镜头计划</h2></div></div>
+          {% for s in ms_flow.storyboard %}
+          <div class="op-card" data-role="ms-flow-shot" data-shot-id="{{ s.shot_id }}"
+               data-source="{{ s.source }}" data-semantic="{{ s.semantic_status }}"
+               data-included="{{ s.included_in_current_video }}" style="margin-top:8px;">
+            <div class="muted"><strong>Shot {{ "%02d"|format(s.order) }} · {{ s.title }}</strong></div>
+            <div class="muted">画面：{{ s.visual_intent }}</div>
+            <div class="muted">旁白：{{ s.voiceover }}</div>
+            <div class="muted">字幕：{{ s.subtitle }}</div>
+            <div class="muted">素材来源：{{ s.asset_name }}（{{ s.source }}）</div>
+            <div class="muted">生成状态：{{ s.generation_status }} · 语义匹配：{{ s.semantic_status }} · 进入当前主视频：{{ s.included_in_current_video }}</div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {# ---- D · 素材与视觉资产 ---- #}
+        <div class="op-card" data-role="ms-flow-materials">
+          <div class="op-section-head"><div class="op-section-head__main"><h2 class="op-section-title">素材与视觉资产</h2></div></div>
+          {% for m in ms_flow.materials %}
+          <div class="muted" data-role="ms-flow-material" data-asset="{{ m.asset_name }}">{{ m.asset_name }} → {{ m.used_by | join(" / ") }}（{{ m.source }}）</div>
+          {% endfor %}
+        </div>
+
+        {# ---- E · 角色 / 配音 ---- #}
+        {% set _v = ms_flow.voice or {} %}
+        <div class="op-card" data-role="ms-flow-voice" data-provider="{{ _v.provider }}" data-status="{{ _v.status }}">
+          <div class="op-section-head"><div class="op-section-head__main"><h2 class="op-section-title">角色 / 配音</h2></div></div>
+          <div class="muted">配音来源：{{ _v.provider }}</div>
+          <div class="muted">配音风格：{{ _v.voice_style }}</div>
+          <div class="muted">状态：{{ _v.status }}</div>
+          {% if _v.blocked_reason %}<div class="muted" data-role="ms-flow-voice-blocked">说明：{{ _v.note_zh }}</div>{% endif %}
+        </div>
+
+        {# ---- F · 字幕 / 音乐 ---- #}
+        {% set _sm = ms_flow.subtitles_music or {} %}
+        <div class="op-card" data-role="ms-flow-subtitles-music">
+          <div class="op-section-head"><div class="op-section-head__main"><h2 class="op-section-title">字幕 / 音乐</h2></div></div>
+          <div class="muted">字幕：{{ _sm.subtitles }}（烧录：{{ _sm.burned_captions }}）</div>
+          <div class="muted">背景音乐：{{ _sm.bgm }} · 状态：{{ _sm.music_status }}</div>
+        </div>
+
+        {# ---- G · 视频变体 ---- #}
+        <div class="op-card" data-role="ms-flow-variants">
+          <div class="op-section-head"><div class="op-section-head__main"><h2 class="op-section-title">视频变体</h2></div></div>
+          {% for vv in ms_flow.variants %}
+          <div class="muted" data-role="ms-flow-variant" data-variant-id="{{ vv.id }}" data-status="{{ vv.status }}">
+            {{ vv.id | upper }} {{ vv.name }} — 状态：{{ vv.status }} · 时长：{{ vv.target_duration }} · 策略：{{ vv.shot_strategy }} · 风格：{{ vv.voice_subtitle_style }}
+          </div>
+          {% endfor %}
+        </div>
+
+        {# ---- H · 交付入口 ---- #}
+        {% set _d = ms_flow.delivery or {} %}
+        <div class="op-card" data-role="ms-flow-delivery">
+          <div class="op-section-head"><div class="op-section-head__main"><h2 class="op-section-title">交付入口</h2></div></div>
+          <div class="muted">当前可交付候选：V1 {{ (ms_flow.variants[0].name) if ms_flow.variants else "清新种草版" }}</div>
+          <div class="muted" data-role="ms-flow-delivery-candidate">交付候选：{{ _d.delivery_candidate }}</div>
+          <div class="muted" data-role="ms-flow-delivery-publish-ready">正式交付就绪：{{ _d.official_publish_ready }}</div>
+          <a class="btn-secondary" href="/tasks/connect/matrix_script/publish" data-role="ms-flow-delivery-cta" style="margin-top:8px;">进入交付页</a>
+        </div>
+
+        <script>
+        (function () {
+          var btn = document.querySelector('[data-role="ms-flow-generate"]');
+          if (!btn) { return; }
+          var statusEl = document.querySelector('[data-role="ms-flow-generate-status"]');
+          var mainCard = document.querySelector('[data-role="ms-flow-main-result"]');
+          var statusPill = document.querySelector('[data-role="ms-flow-status"]');
+          var openLink = document.querySelector('[data-role="ms-flow-open-video"]');
+          function setBind(name, val) {
+            document.querySelectorAll('[data-bind="' + name + '"]').forEach(function (el) {
+              el.textContent = (val === undefined || val === null) ? '—' : val;
+            });
+          }
+          btn.addEventListener('click', async function () {
+            btn.disabled = true;
+            statusEl.setAttribute('data-state', 'running');
+            statusEl.textContent = '生成运营可用预览中…';
+            try {
+              var resp = await fetch(btn.getAttribute('data-endpoint'), {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }
+              });
+              if (!resp.ok) {
+                statusEl.setAttribute('data-state', 'error');
+                statusEl.textContent = '生成失败（' + resp.status + '）';
+                btn.disabled = false; return;
+              }
+              var d = await resp.json();
+              statusPill.textContent = d.operator_usable ? '运营可用' : '技术预览，不可运营';
+              mainCard.setAttribute('data-operator-usable', d.operator_usable);
+              mainCard.setAttribute('data-status', d.operator_usable ? 'operator_usable' : 'technical_preview');
+              setBind('visual_semantic_match', d.visual_semantic_match);
+              setBind('shot_match_count', d.shot_match_count);
+              setBind('shot_count', d.shot_count);
+              setBind('real_visual_count', d.real_visual_count);
+              setBind('delivery_candidate', d.delivery_candidate);
+              if (d.preview_url && openLink) {
+                openLink.setAttribute('href', d.preview_url);
+                openLink.style.display = '';
+              }
+              statusEl.setAttribute('data-state', 'done');
+              statusEl.textContent = d.operator_usable ? '已生成运营可用预览' : '已生成（技术预览）';
+              btn.disabled = false;
+            } catch (e) {
+              statusEl.setAttribute('data-state', 'error');
+              statusEl.textContent = '生成失败';
+              btn.disabled = false;
+            }
+          });
+        })();
+        </script>
+      </section>
+      {% endif %}
 
       {# Phase 2D (2026-05-30) · result-oriented IA: the capability banner
          was relocated to BELOW §A 主视频结果 so the operator's first /
@@ -614,93 +783,6 @@
         </div>
       {% endif %}
 
-      {# PR-A · 运营可用预览 (Tomato Real Result). Runs the controlled real-asset
-         tomato path (《海边与圣女果的盛夏约定》) and renders the operator
-         acceptance gate (L3) from the JSON response: operator_usable /
-         technical_preview / visual_semantic_match / shot_match_count /
-         real_visual_count / delivery_candidate / blocked_reason + 打开视频.
-         NOT publish: official_publish_ready stays false; fallback never becomes
-         a delivery candidate. The preview link href is set at runtime. #}
-      {% if ms_main_video_result.is_matrix_script %}
-        <div class="op-card"
-             id="matrix-script-tomato-real-result-action"
-             data-role="matrix-script-tomato-real-result-action">
-          <div class="op-section-head">
-            <div class="op-section-head__main">
-              <h2 class="op-section-title">运营可用预览</h2>
-            </div>
-          </div>
-          <p class="op-section-helper">用固定脚本与本地素材生成可在浏览器打开的成片，并给出运营可用判断。该结果为交付候选，尚未进入正式发布。</p>
-          <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
-            <button type="button"
-                    class="btn-secondary"
-                    data-role="ms-tomato-trigger"
-                    data-task-id="{{ task.task_id }}"
-                    data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">生成运营可用预览</button>
-          </div>
-          <div class="muted" data-role="ms-tomato-status" data-state="idle"></div>
-          <div data-role="ms-tomato-output"></div>
-          <script>
-          (function () {
-            var trigger = document.querySelector('[data-role="ms-tomato-trigger"]');
-            if (!trigger) { return; }
-            var statusEl = document.querySelector('[data-role="ms-tomato-status"]');
-            var outEl = document.querySelector('[data-role="ms-tomato-output"]');
-            function row(label, value, role) {
-              var el = document.createElement('div');
-              el.className = 'muted';
-              if (role) { el.setAttribute('data-role', role); }
-              el.textContent = label + '：' + (value === undefined || value === null ? '' : value);
-              return el;
-            }
-            trigger.addEventListener('click', async function () {
-              trigger.disabled = true;
-              statusEl.setAttribute('data-state', 'running');
-              statusEl.textContent = '生成运营可用预览中…';
-              outEl.textContent = '';
-              try {
-                var resp = await fetch(trigger.getAttribute('data-endpoint'), {
-                  method: 'POST', headers: { 'Content-Type': 'application/json' }
-                });
-                if (!resp.ok) {
-                  statusEl.setAttribute('data-state', 'error');
-                  statusEl.textContent = '生成失败（' + resp.status + '）';
-                  trigger.disabled = false;
-                  return;
-                }
-                var d = await resp.json();
-                statusEl.setAttribute('data-state', 'done');
-                statusEl.textContent = d.operator_usable ? '运营可用：是' : '运营可用：否（技术预览）';
-                outEl.appendChild(row('运营可用', d.operator_usable, 'ms-tomato-operator-usable'));
-                outEl.appendChild(row('技术预览', d.technical_preview, 'ms-tomato-technical-preview'));
-                outEl.appendChild(row('画面语义匹配', d.visual_semantic_match, 'ms-tomato-semantic-match'));
-                outEl.appendChild(row('匹配镜头数', d.shot_match_count + ' / ' + d.shot_count, 'ms-tomato-shot-match'));
-                outEl.appendChild(row('真实视觉镜头数', d.real_visual_count, 'ms-tomato-real-visual'));
-                outEl.appendChild(row('交付候选', d.delivery_candidate, 'ms-tomato-delivery-candidate'));
-                outEl.appendChild(row('正式交付就绪', d.official_publish_ready, 'ms-tomato-publish-ready'));
-                if (d.blocked_reason) { outEl.appendChild(row('阻塞原因', d.blocked_reason, 'ms-tomato-blocked-reason')); }
-                if (d.preview_url) {
-                  var a = document.createElement('a');
-                  a.setAttribute('data-role', 'ms-tomato-preview-link');
-                  a.setAttribute('href', d.preview_url);
-                  a.setAttribute('target', '_blank');
-                  a.setAttribute('rel', 'noopener');
-                  a.className = 'btn-secondary';
-                  a.style.marginTop = '8px';
-                  a.textContent = '打开视频';
-                  outEl.appendChild(a);
-                }
-                trigger.disabled = false;
-              } catch (e) {
-                statusEl.setAttribute('data-state', 'error');
-                statusEl.textContent = '生成失败';
-                trigger.disabled = false;
-              }
-            });
-          })();
-          </script>
-        </div>
-      {% endif %}
 
       {# Phase 2C (2026-05-30) · operator-readability capability banner.
          ONE orientation line; relocated by Phase 2D to render BELOW §A so
