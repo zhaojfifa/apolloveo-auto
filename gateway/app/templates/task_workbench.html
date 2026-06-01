@@ -283,6 +283,7 @@
       {% set ms_delivery_ready_package = ((ops.workbench or {}).matrix_script_delivery_ready_package or {}) %}
       {% set ms_delivery_comprehension = ((ops.workbench or {}).matrix_script_delivery_comprehension or {}) %}
       {% set ms_main_video_result = ((ops.workbench or {}).matrix_script_main_video_result or {}) %}
+      {% set ms_minimal_result = ((ops.workbench or {}).matrix_script_minimal_result or {}) %}
 
       {# Phase 2D (2026-05-30) · result-oriented IA: the capability banner
          was relocated to BELOW §A 主视频结果 so the operator's first /
@@ -382,6 +383,35 @@
               <div class="op-banner__body" data-role="ms-main-video-result-next-action">{{ ms_main_video_result.next_action_one_liner_zh }}</div>
             </div>
           </div>
+        </div>
+      {% endif %}
+
+      {# PR-9R (architecture-to-operator-result bridge) · read-only minimal
+         local result block. Renders ONLY when a pre-computed local result is
+         present (ms_minimal_result.has_result); otherwise nothing renders and
+         existing behavior is unchanged. Read-only: NO generation control, NO
+         provider/vendor, NO media player, NO external link, NO download URL.
+         official_publish_ready is always false; this is a pre-delivery local
+         result, not official delivery and not a publish gate. All dynamic
+         values are Jinja interpolation only (no literal media URLs). #}
+      {% if ms_minimal_result.has_result %}
+        <div class="op-card"
+             id="matrix-script-minimal-result"
+             data-role="matrix-script-minimal-result"
+             data-storage-scope="{{ ms_minimal_result.storage_scope }}"
+             data-official-publish-ready="{{ ms_minimal_result.official_publish_ready }}">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <h2 class="op-section-title" data-role="ms-minimal-result-title">{{ ms_minimal_result.final_video_label }}</h2>
+              <span class="op-pill op-pill--info" data-role="ms-minimal-result-status">{{ ms_minimal_result.result_status }}</span>
+            </div>
+          </div>
+          <div class="muted" data-role="ms-minimal-result-path">本地路径：{{ ms_minimal_result.final_video_path }}</div>
+          <div class="muted" data-role="ms-minimal-result-duration">时长（秒）：{{ ms_minimal_result.duration_seconds }}</div>
+          <div class="muted" data-role="ms-minimal-result-shots">镜头数：{{ ms_minimal_result.shot_count }}</div>
+          <div class="muted" data-role="ms-minimal-result-scope">存储范围：{{ ms_minimal_result.storage_scope }}</div>
+          <div class="muted" data-role="ms-minimal-result-publish-ready">正式交付就绪：{{ ms_minimal_result.official_publish_ready }}</div>
+          <div class="op-tech-note" data-role="ms-minimal-result-note">{{ ms_minimal_result.operator_note }}</div>
         </div>
       {% endif %}
 
