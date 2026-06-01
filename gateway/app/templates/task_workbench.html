@@ -284,6 +284,13 @@
       {% set ms_delivery_comprehension = ((ops.workbench or {}).matrix_script_delivery_comprehension or {}) %}
       {% set ms_main_video_result = ((ops.workbench or {}).matrix_script_main_video_result or {}) %}
       {% set ms_minimal_result = ((ops.workbench or {}).matrix_script_minimal_result or {}) %}
+      {# PR-B (revised overlay) · PR-A real-result acceptance overlay. NOT a
+         second flow — these values are overlaid into the EXISTING ① main
+         result, ② 故事板, and ⑤ 交付入口 sections below. Sourced from the
+         staged PR-A result on task config (read-only). #}
+      {% set ms_overlay = ((ops.workbench or {}).matrix_script_operator_flow or {}) %}
+      {% set ms_overlay_mr = (ms_overlay.main_result or {}) %}
+      {% set ms_overlay_has = (ms_overlay_mr.operator_usable or ms_overlay_mr.technical_preview) %}
 
       {# Phase 2D (2026-05-30) · result-oriented IA: the capability banner
          was relocated to BELOW §A 主视频结果 so the operator's first /
@@ -340,12 +347,47 @@
                 <strong>主视频已生成</strong> · 候选编号 {{ ms_main_video_result.preview.variation_id }}
                 <div class="op-tech-note" style="margin-top:8px;">完整成片与下载在交付页面。本面板不内嵌外部链接。</div>
               </div>
+            {% elif ms_overlay_mr.operator_usable %}
+              {# PR-B overlay: a real PR-A result exists and is operator-usable —
+                 do NOT render the 未生成/主成片缺失 empty state. #}
+              <div data-role="ms-main-video-result-preview-overlay-ready"
+                   style="font-size:14px; color:var(--op-fg-mid, #334155);">
+                <strong>主视频已生成 · 运营可用</strong>
+                <div class="op-tech-note" style="margin-top:8px;">完整成片与下载在交付页面。本面板不内嵌外部链接。</div>
+              </div>
             {% else %}
               <div data-role="ms-main-video-result-preview-empty"
                    style="font-size:14px; line-height:1.6; color:var(--op-fg-soft, #64748b); max-width:560px;">
                 {{ ms_main_video_result.preview.empty_state_message_zh }}
               </div>
             {% endif %}
+          </div>
+
+          {# ============================================================
+             PR-B (revised overlay) · PR-A real-result acceptance, overlaid
+             INTO this existing ① 主视频结果 block (no second section). When a
+             real result exists it shows operator_usable / 画面语义匹配 /
+             匹配镜头数 / 真实视觉镜头数 / 交付候选 / 打开视频; the generate
+             action fills these live and hides the empty state. Sourced from
+             the PR-A staged result; official_publish_ready stays false.
+             ============================================================ #}
+          <div class="op-main-video-acceptance" data-role="ms-main-video-result-acceptance"
+               data-operator-usable="{{ ms_overlay_mr.operator_usable }}"
+               data-status="{{ ms_overlay_mr.status }}" style="margin-top:10px;">
+            <div class="muted" data-role="ms-acc-status">运营状态：<span data-bind="status_label">{{ ms_overlay_mr.status_label_zh }}</span></div>
+            <div class="muted" data-role="ms-acc-semantic"{% if not ms_overlay_has %} style="display:none;"{% endif %}>画面语义匹配：<span data-bind="visual_semantic_match">{{ ms_overlay_mr.visual_semantic_match or "—" }}</span></div>
+            <div class="muted" data-role="ms-acc-shot-match"{% if not ms_overlay_has %} style="display:none;"{% endif %}>匹配镜头数：<span data-bind="shot_match_count">{{ ms_overlay_mr.shot_match_count }}</span> / <span data-bind="shot_count">{{ ms_overlay_mr.shot_count }}</span></div>
+            <div class="muted" data-role="ms-acc-real-visual"{% if not ms_overlay_has %} style="display:none;"{% endif %}>真实视觉镜头数：<span data-bind="real_visual_count">{{ ms_overlay_mr.real_visual_count }}</span></div>
+            <div class="muted" data-role="ms-acc-delivery-candidate"{% if not ms_overlay_has %} style="display:none;"{% endif %}>交付候选：<span data-bind="delivery_candidate">{{ ms_overlay_mr.delivery_candidate }}</span></div>
+            <div class="muted" data-role="ms-acc-publish-ready">正式交付就绪：false</div>
+            <div class="muted" data-role="ms-acc-blocked"{% if not ms_overlay_mr.blocked_reason %} style="display:none;"{% endif %}>原因：<span data-bind="blocked_reason">{{ ms_overlay_mr.blocked_reason or "" }}</span></div>
+            <div class="task-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
+              <button type="button" class="btn-secondary" data-role="ms-acc-generate"
+                      data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">生成运营可用预览</button>
+              <a data-role="ms-acc-open-video" href="{{ ms_overlay_mr.preview_url or '#' }}" target="_blank" rel="noopener"
+                 class="btn-secondary" {% if not ms_overlay_mr.preview_url %}style="display:none;"{% endif %}>打开视频</a>
+            </div>
+            <div class="muted" data-role="ms-acc-generate-status" data-state="idle"></div>
           </div>
 
           {# Primary action bar — 4 buttons; state-dependent enablement.
@@ -374,7 +416,10 @@
           </div>
 
           {# One-line blocker + next-action banner. Operator language only;
-             head_reason / publish_readiness raw enums NEVER appear here. #}
+             head_reason / publish_readiness raw enums NEVER appear here.
+             PR-B overlay: suppressed when a real PR-A result is operator-usable
+             so ① never shows a 未生成/缺失 blocker in that state. #}
+          {% if not ms_overlay_mr.operator_usable %}
           <div class="op-banner op-banner--{% if ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% else %}blocker{% endif %}"
                data-role="ms-main-video-result-banner"
                style="margin-top:12px;">
@@ -383,6 +428,63 @@
               <div class="op-banner__body" data-role="ms-main-video-result-next-action">{{ ms_main_video_result.next_action_one_liner_zh }}</div>
             </div>
           </div>
+          {% endif %}
+          <script>
+          (function () {
+            var btn = document.querySelector('[data-role="ms-acc-generate"]');
+            if (!btn) { return; }
+            var card = document.getElementById('matrix-script-main-video-result');
+            var statusEl = document.querySelector('[data-role="ms-acc-generate-status"]');
+            var openLink = document.querySelector('[data-role="ms-acc-open-video"]');
+            var banner = document.querySelector('[data-role="ms-main-video-result-banner"]');
+            var emptyEl = document.querySelector('[data-role="ms-main-video-result-preview-empty"]');
+            function setBind(name, val) {
+              document.querySelectorAll('[data-bind="' + name + '"]').forEach(function (el) {
+                el.textContent = (val === undefined || val === null) ? '—' : val;
+              });
+            }
+            function show(role) { var e = document.querySelector('[data-role="' + role + '"]'); if (e) { e.style.display = ''; } }
+            btn.addEventListener('click', async function () {
+              btn.disabled = true;
+              statusEl.setAttribute('data-state', 'running');
+              statusEl.textContent = '生成运营可用预览中…';
+              try {
+                var resp = await fetch(btn.getAttribute('data-endpoint'), {
+                  method: 'POST', headers: { 'Content-Type': 'application/json' }
+                });
+                if (!resp.ok) {
+                  statusEl.setAttribute('data-state', 'error');
+                  statusEl.textContent = '生成失败（' + resp.status + '）';
+                  btn.disabled = false; return;
+                }
+                var d = await resp.json();
+                var usable = !!d.operator_usable;
+                setBind('status_label', usable ? '运营可用 · 可交付' : '技术预览 · 待审核');
+                setBind('visual_semantic_match', d.visual_semantic_match);
+                setBind('shot_match_count', d.shot_match_count);
+                setBind('shot_count', d.shot_count);
+                setBind('real_visual_count', d.real_visual_count);
+                setBind('delivery_candidate', d.delivery_candidate);
+                ['ms-acc-semantic','ms-acc-shot-match','ms-acc-real-visual','ms-acc-delivery-candidate'].forEach(show);
+                if (d.blocked_reason) { setBind('blocked_reason', d.blocked_reason); show('ms-acc-blocked'); }
+                if (card) { card.setAttribute('data-operator-usable', usable); }
+                // When usable, suppress the legacy not-generated surfaces in section A.
+                if (usable) {
+                  if (banner) { banner.style.display = 'none'; }
+                  if (emptyEl) { emptyEl.style.display = 'none'; }
+                }
+                if (d.preview_url && openLink) { openLink.setAttribute('href', d.preview_url); openLink.style.display = ''; }
+                statusEl.setAttribute('data-state', 'done');
+                statusEl.textContent = usable ? '已生成 · 运营可用' : '已生成 · 技术预览';
+                btn.disabled = false;
+              } catch (e) {
+                statusEl.setAttribute('data-state', 'error');
+                statusEl.textContent = '生成失败';
+                btn.disabled = false;
+              }
+            });
+          })();
+          </script>
         </div>
       {% endif %}
 
@@ -614,93 +716,6 @@
         </div>
       {% endif %}
 
-      {# PR-A · 运营可用预览 (Tomato Real Result). Runs the controlled real-asset
-         tomato path (《海边与圣女果的盛夏约定》) and renders the operator
-         acceptance gate (L3) from the JSON response: operator_usable /
-         technical_preview / visual_semantic_match / shot_match_count /
-         real_visual_count / delivery_candidate / blocked_reason + 打开视频.
-         NOT publish: official_publish_ready stays false; fallback never becomes
-         a delivery candidate. The preview link href is set at runtime. #}
-      {% if ms_main_video_result.is_matrix_script %}
-        <div class="op-card"
-             id="matrix-script-tomato-real-result-action"
-             data-role="matrix-script-tomato-real-result-action">
-          <div class="op-section-head">
-            <div class="op-section-head__main">
-              <h2 class="op-section-title">运营可用预览</h2>
-            </div>
-          </div>
-          <p class="op-section-helper">用固定脚本与本地素材生成可在浏览器打开的成片，并给出运营可用判断。该结果为交付候选，尚未进入正式发布。</p>
-          <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
-            <button type="button"
-                    class="btn-secondary"
-                    data-role="ms-tomato-trigger"
-                    data-task-id="{{ task.task_id }}"
-                    data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">生成运营可用预览</button>
-          </div>
-          <div class="muted" data-role="ms-tomato-status" data-state="idle"></div>
-          <div data-role="ms-tomato-output"></div>
-          <script>
-          (function () {
-            var trigger = document.querySelector('[data-role="ms-tomato-trigger"]');
-            if (!trigger) { return; }
-            var statusEl = document.querySelector('[data-role="ms-tomato-status"]');
-            var outEl = document.querySelector('[data-role="ms-tomato-output"]');
-            function row(label, value, role) {
-              var el = document.createElement('div');
-              el.className = 'muted';
-              if (role) { el.setAttribute('data-role', role); }
-              el.textContent = label + '：' + (value === undefined || value === null ? '' : value);
-              return el;
-            }
-            trigger.addEventListener('click', async function () {
-              trigger.disabled = true;
-              statusEl.setAttribute('data-state', 'running');
-              statusEl.textContent = '生成运营可用预览中…';
-              outEl.textContent = '';
-              try {
-                var resp = await fetch(trigger.getAttribute('data-endpoint'), {
-                  method: 'POST', headers: { 'Content-Type': 'application/json' }
-                });
-                if (!resp.ok) {
-                  statusEl.setAttribute('data-state', 'error');
-                  statusEl.textContent = '生成失败（' + resp.status + '）';
-                  trigger.disabled = false;
-                  return;
-                }
-                var d = await resp.json();
-                statusEl.setAttribute('data-state', 'done');
-                statusEl.textContent = d.operator_usable ? '运营可用：是' : '运营可用：否（技术预览）';
-                outEl.appendChild(row('运营可用', d.operator_usable, 'ms-tomato-operator-usable'));
-                outEl.appendChild(row('技术预览', d.technical_preview, 'ms-tomato-technical-preview'));
-                outEl.appendChild(row('画面语义匹配', d.visual_semantic_match, 'ms-tomato-semantic-match'));
-                outEl.appendChild(row('匹配镜头数', d.shot_match_count + ' / ' + d.shot_count, 'ms-tomato-shot-match'));
-                outEl.appendChild(row('真实视觉镜头数', d.real_visual_count, 'ms-tomato-real-visual'));
-                outEl.appendChild(row('交付候选', d.delivery_candidate, 'ms-tomato-delivery-candidate'));
-                outEl.appendChild(row('正式交付就绪', d.official_publish_ready, 'ms-tomato-publish-ready'));
-                if (d.blocked_reason) { outEl.appendChild(row('阻塞原因', d.blocked_reason, 'ms-tomato-blocked-reason')); }
-                if (d.preview_url) {
-                  var a = document.createElement('a');
-                  a.setAttribute('data-role', 'ms-tomato-preview-link');
-                  a.setAttribute('href', d.preview_url);
-                  a.setAttribute('target', '_blank');
-                  a.setAttribute('rel', 'noopener');
-                  a.className = 'btn-secondary';
-                  a.style.marginTop = '8px';
-                  a.textContent = '打开视频';
-                  outEl.appendChild(a);
-                }
-                trigger.disabled = false;
-              } catch (e) {
-                statusEl.setAttribute('data-state', 'error');
-                statusEl.textContent = '生成失败';
-                trigger.disabled = false;
-              }
-            });
-          })();
-          </script>
-        </div>
-      {% endif %}
 
       {# Phase 2C (2026-05-30) · operator-readability capability banner.
          ONE orientation line; relocated by Phase 2D to render BELOW §A so
@@ -958,6 +973,26 @@
           <p class="op-tech-note" data-role="ms-section-generation-plan-honest-disclaimer" style="margin-top:10px;">
             上述分镜为占位草案；方案生成能力接入后会替换为真实分镜，每个镜头可单独编辑。当前不声明任何镜头已就绪。
           </p>
+          {# PR-B (revised overlay) · per-shot PR-A real-result acceptance,
+             overlaid INTO this existing 故事板 section (no second storyboard).
+             Shows the controlled tomato shots' 素材来源 / 语义匹配 / 是否进入
+             当前主视频 from the PR-A result. #}
+          {% if ms_overlay.shots %}
+          <div data-role="ms-section-generation-plan-shot-acceptance-overlay"
+               data-shot-count="{{ ms_overlay.shots | length }}"
+               data-has-result="{{ ms_overlay.has_pr_a_result }}" style="margin-top:10px;">
+            <div class="op-section-head"><div class="op-section-head__main">
+              <h3 class="op-section-subtitle">本次生成 · 镜头语义匹配</h3>
+            </div></div>
+            {% for s in ms_overlay.shots %}
+            <div class="muted" data-role="ms-shot-acceptance" data-shot-id="{{ s.shot_id }}"
+                 data-source="{{ s.source }}" data-semantic="{{ s.semantic_status }}"
+                 data-included="{{ s.included_in_current_video }}">
+              Shot {{ "%02d"|format(s.order) }} · {{ s.title }} — 素材：{{ s.asset_name }}（{{ s.source }}）· 语义匹配：{{ s.semantic_status }} · 进入当前主视频：{{ s.included_in_current_video }}
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
         </div>
       {% endif %}
 
@@ -1475,6 +1510,18 @@
           {% else %}
             <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">当前不能交付：尚未生成主视频。</p>
             <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">生成完成后，可前往交付页面查看成片、字幕、音频、文案包与发布设置。</p>
+          {% endif %}
+          {# PR-B (revised overlay) · PR-A staged delivery candidate, overlaid
+             INTO this existing ⑤ 交付入口 (no second delivery block). #}
+          {% if ms_overlay.has_pr_a_result %}
+          <div data-role="ms-section-delivery-entry-acceptance" style="margin-top:6px;">
+            <div class="muted" data-role="ms-delivery-acc-candidate">交付候选：{{ ms_overlay.delivery.delivery_candidate }}</div>
+            <div class="muted" data-role="ms-delivery-acc-publish-ready">正式交付就绪：false</div>
+            {% if ms_overlay.delivery.preview_url %}
+            <a class="btn-secondary" data-role="ms-delivery-acc-preview" target="_blank" rel="noopener"
+               href="{{ ms_overlay.delivery.preview_url }}" style="margin-top:6px;">打开视频（暂存预览）</a>
+            {% endif %}
+          </div>
           {% endif %}
           <div class="op-section-actions task-actions" style="margin-top:8px;">
             <a class="btn-primary"

@@ -476,6 +476,20 @@ def build_operator_surfaces_for_workbench(
                 closure=_ms_closure_view,
             )
         )
+        # PR-B (2026-06-01) · Operator Workbench Flow Alignment. One linked view
+        # model that ties the Main Video Result to the decisions that produced
+        # it (script understanding → storyboard → materials → voice →
+        # subtitles/music → variants → delivery). Pure presentation-layer
+        # projection over the fixed tomato plan + the staged PR-A result on the
+        # task config (read-only). No new producer / endpoint / contract /
+        # closed-enum change; never enters for Hot Follow / Digital Anchor.
+        from gateway.app.services.matrix_script.operator_workbench_view import (
+            build_matrix_script_operator_workbench_view,
+        )
+
+        bundle["workbench"]["matrix_script_operator_flow"] = (
+            build_matrix_script_operator_workbench_view(task)
+        )
     # Recovery PR-4: when the Workbench mounts the Digital Anchor
     # line-specific panel, attach the formal
     # `digital_anchor_workbench_role_speaker_surface_v1` projection so
