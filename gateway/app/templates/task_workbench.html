@@ -444,23 +444,58 @@
           </div>
           <div class="muted" data-role="ms-minimal-result-action-status" data-state="idle"></div>
           <div data-role="ms-minimal-result-action-output"></div>
+          {# PR-14R · execution_trace (process observable). Rendered client-side
+             after a successful generate; closed 6-step list mirroring
+             gateway/app/services/matrix_script/minimal_result_trace.py
+             (shot_plan / scene_clips / audio / subtitles / assembly / surface).
+             All steps show done on success. Local-only; no third-party
+             identifiers and no delivery-truth fields. #}
+          <div data-role="ms-minimal-result-trace" data-trace-step-count="6"></div>
           <script>
           (function () {
             var trigger = document.querySelector('[data-role="ms-minimal-result-trigger"]');
             if (!trigger) { return; }
             var statusEl = document.querySelector('[data-role="ms-minimal-result-action-status"]');
             var outEl = document.querySelector('[data-role="ms-minimal-result-action-output"]');
+            var traceEl = document.querySelector('[data-role="ms-minimal-result-trace"]');
+            // Closed execution-trace steps (mirrors minimal_result_trace.py).
+            var TRACE_STEPS = [
+              ['shot_plan', '生成镜头计划'],
+              ['scene_clips', '生成场景片段'],
+              ['audio', '生成音频'],
+              ['subtitles', '生成字幕'],
+              ['assembly', '合成成片'],
+              ['surface', '生成结果视图']
+            ];
             function row(label, value) {
               var el = document.createElement('div');
               el.className = 'muted';
               el.textContent = label + '：' + (value === undefined || value === null ? '' : value);
               return el;
             }
+            function renderTrace(done) {
+              if (!traceEl) { return; }
+              traceEl.textContent = '';
+              var head = document.createElement('div');
+              head.className = 'op-tech-note';
+              head.textContent = '生成过程：';
+              traceEl.appendChild(head);
+              for (var i = 0; i < TRACE_STEPS.length; i++) {
+                var s = document.createElement('div');
+                s.className = 'muted';
+                s.setAttribute('data-role', 'ms-minimal-result-trace-step');
+                s.setAttribute('data-step', TRACE_STEPS[i][0]);
+                s.setAttribute('data-status', done ? 'done' : 'pending');
+                s.textContent = TRACE_STEPS[i][1] + '：' + (done ? 'done' : 'pending');
+                traceEl.appendChild(s);
+              }
+            }
             trigger.addEventListener('click', async function () {
               trigger.disabled = true;
               statusEl.setAttribute('data-state', 'running');
               statusEl.textContent = '生成中…';
               outEl.textContent = '';
+              if (traceEl) { traceEl.textContent = ''; }
               try {
                 var resp = await fetch(trigger.getAttribute('data-endpoint'), {
                   method: 'POST',
@@ -484,6 +519,7 @@
                 outEl.appendChild(row('存储范围', d.storage_scope));
                 outEl.appendChild(row('正式交付就绪', d.official_publish_ready));
                 outEl.appendChild(row('提示', d.operator_note));
+                renderTrace(!!d.has_result);
                 trigger.disabled = false;
               } catch (e) {
                 statusEl.setAttribute('data-state', 'error');
