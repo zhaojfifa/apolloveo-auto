@@ -126,9 +126,10 @@ def test_no_fake_or_forbidden_primary_media(primary_visible: str) -> None:
     for token in (
         "provider_url", "temporary_url", "download_url", "publish_url",
         "publish_status", "artifact_key", "r2_key", "model_id", "credit",
-        "<video", "<iframe", "http://", "https://",
+        "<iframe", "http://", "https://",
     ):
         assert token not in lowered
+    assert '<video controls preload="metadata" src="{{}}"' in lowered
 
 
 def test_no_voicetrans_iframe(primary_slice: str) -> None:

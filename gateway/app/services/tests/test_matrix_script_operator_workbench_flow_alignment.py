@@ -100,9 +100,11 @@ def _block(src: str, start_marker: str, end_marker: str) -> str:
 def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     src = _template_src()
     block = _block(src, 'id="matrix-script-main-video-result"', '{# Phase 2C')
-    # empty-state is gated behind the operator-usable elif
-    assert "{% elif ms_overlay_mr.operator_usable %}" in block
-    assert block.index("{% elif ms_overlay_mr.operator_usable %}") < block.index('data-role="ms-main-video-result-preview-empty"')
+    # empty-state is gated behind the operator-usable preview branch
+    assert "{% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}" in block
+    assert block.index("{% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}") < block.index('data-role="ms-main-video-result-preview-empty"')
+    assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in block
+    assert 'data-role="ms-main-video-result-video"' in block
     # blocker banner only renders when NOT operator-usable
     banner_idx = block.index('data-role="ms-main-video-result-banner"')
     guard = block.rindex("{% if not ms_overlay_mr.operator_usable %}", 0, banner_idx)
@@ -112,6 +114,10 @@ def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     assert 'data-bind="visual_semantic_match"' in block
     assert 'data-role="ms-acc-open-video"' in block
     assert 'data-role="ms-acc-preview-url"' in block
+    assert 'data-role="ms-acc-generate"' in block
+    assert 'data-role="ms-acc-confirm-main"' in block
+    assert 'data-role="ms-acc-go-delivery"' in block
+    assert 'hidden aria-hidden="true"' in block
 
 
 # 8. existing ② storyboard carries the per-shot acceptance overlay (loop over
@@ -124,6 +130,10 @@ def test_existing_storyboard_has_shot_acceptance_overlay() -> None:
     assert "{% for s in ms_overlay.shots %}" in block
     assert 'data-role="ms-shot-acceptance"' in block
     assert "{{ s.semantic_status }}" in block and "{{ s.source }}" in block
+    assert "素材来源：" in block
+    assert "语义状态：" in block
+    assert "已进入当前主视频：" in block
+    assert "当前为复用素材，建议补充真实品尝 / 递镜素材。" in block
 
 
 # overlay render proof (block-extraction render with a usable result)
@@ -141,6 +151,8 @@ def test_overlay_main_result_renders_operator_usable() -> None:
     assert "当前尚未生成主视频" not in html  # empty-state suppressed
     assert "主成片缺失" not in html
     assert "运营可用" in html and "partial_pass" in html
+    assert '<video controls preload="metadata" src="/api/matrix-script/ms-flow-1/tomato-real-result/preview/final.mp4"' in html
+    assert 'data-role="ms-main-video-result-actions"\n               hidden aria-hidden="true"' in html
     assert "/tomato-real-result/preview/final.mp4" in html
 
 
@@ -173,6 +185,27 @@ def test_delivery_entry_keeps_publish_cta() -> None:
     dse = dse[:dse.index('技术诊断')]
     assert "/tasks/{{ task.task_id }}/publish" in dse
     assert "/tasks/connect/matrix_script/publish" not in dse
+    assert "当前交付候选：主视频 V1" in dse
+    assert "正式交付就绪：false" in dse
+    assert dse.index("ms_overlay.has_pr_a_result") < dse.index("当前不能交付：尚未生成主视频")
+
+
+def test_primary_ui_uses_operator_shot_labels_not_raw_engineering_labels() -> None:
+    src = _template_src()
+    primary = src[:src.index('data-role="op-console-ms-technical-diagnostics-fold"')]
+    for raw in ("SOURCE", "SEMANTIC_STATUS", "INCLUDED_IN_CURRENT_VIDEO"):
+        assert raw not in primary
+    assert "素材来源：" in primary
+    assert "语义状态：" in primary
+    assert "已进入当前主视频：" in primary
+
+
+def test_variants_are_folded_in_primary_workbench() -> None:
+    src = _template_src()
+    variants = src[src.index('data-role="matrix-script-section-optional-variants"'):]
+    variants = variants[:variants.index('data-role="matrix-script-section-review-tuning"')]
+    assert 'data-role="ms-section-video-variants-fold"' in variants
+    assert "主视频确认后，可生成 V2/V3 变体。" in variants
 
 
 def test_temporary_result_cards_removed_from_primary_workbench() -> None:
