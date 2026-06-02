@@ -348,13 +348,18 @@
                 <strong>主视频已生成</strong> · 候选编号 {{ ms_main_video_result.preview.variation_id }}
                 <div class="op-tech-note" style="margin-top:8px;">完整成片与下载在交付页面。本面板不内嵌外部链接。</div>
               </div>
-            {% elif ms_overlay_mr.operator_usable %}
-              {# PR-B overlay: a real PR-A result exists and is operator-usable —
-                 do NOT render the 未生成/主成片缺失 empty state. #}
+            {% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}
               <div data-role="ms-main-video-result-preview-overlay-ready"
+                   style="width:100%; max-width:720px; display:grid; gap:10px; text-align:left;">
+                <strong style="font-size:14px; color:var(--op-fg-mid, #334155);">主视频已生成 · 运营可用 · 可交付</strong>
+                <video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"
+                       data-role="ms-main-video-result-video"
+                       style="width:100%; aspect-ratio:9/16; max-height:560px; border-radius:10px; background:#0f172a;"></video>
+              </div>
+            {% elif ms_overlay_mr.technical_preview %}
+              <div data-role="ms-main-video-result-preview-technical"
                    style="font-size:14px; color:var(--op-fg-mid, #334155);">
-                <strong>主视频已生成 · 运营可用</strong>
-                <div class="op-tech-note" style="margin-top:8px;">完整成片与下载在交付页面。本面板不内嵌外部链接。</div>
+                <strong>技术预览，不可交付</strong>
               </div>
             {% else %}
               <div data-role="ms-main-video-result-preview-empty"
@@ -385,7 +390,9 @@
             <div class="muted" data-role="ms-acc-blocked"{% if not ms_overlay_mr.blocked_reason %} style="display:none;"{% endif %}>原因：<span data-bind="blocked_reason">{{ ms_overlay_mr.blocked_reason or "" }}</span></div>
             <div class="task-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
               <button type="button" class="btn-secondary" data-role="ms-acc-generate"
-                      data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">生成运营可用预览</button>
+                      data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">重新生成</button>
+              <button type="button" class="btn-primary" data-role="ms-acc-confirm-main" disabled aria-disabled="true" title="确认主版本写入仍走既有确认链路，本按钮仅保留运营主操作位。">确认为主版本</button>
+              <a data-role="ms-acc-go-delivery" href="/tasks/{{ task.task_id }}/publish" class="btn-primary">前往交付</a>
               <a data-role="ms-acc-open-video" href="{{ ms_overlay_mr.preview_url or '#' }}" target="_blank" rel="noopener"
                  class="btn-secondary" {% if not ms_overlay_mr.preview_url %}style="display:none;"{% endif %}>打开视频</a>
             </div>
@@ -397,6 +404,7 @@
              generation worker lands (out of this wave's scope). #}
           <div class="op-main-video-actions task-actions"
                data-role="ms-main-video-result-actions"
+               {% if ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}hidden aria-hidden="true"{% endif %}
                style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
             {% for action in (ms_main_video_result.primary_actions or []) %}
               {% if action.action_id == 'go_to_delivery' %}
@@ -438,6 +446,7 @@
             var card = document.getElementById('matrix-script-main-video-result');
             var statusEl = document.querySelector('[data-role="ms-acc-generate-status"]');
             var openLink = document.querySelector('[data-role="ms-acc-open-video"]');
+            var videoEl = document.querySelector('[data-role="ms-main-video-result-video"]');
             var banner = document.querySelector('[data-role="ms-main-video-result-banner"]');
             var emptyEl = document.querySelector('[data-role="ms-main-video-result-preview-empty"]');
             function setBind(name, val) {
@@ -477,6 +486,7 @@
                   if (emptyEl) { emptyEl.style.display = 'none'; }
                 }
                 if (d.preview_url && openLink) { openLink.setAttribute('href', d.preview_url); openLink.style.display = ''; }
+                if (d.preview_url && videoEl) { videoEl.setAttribute('src', d.preview_url); }
                 statusEl.setAttribute('data-state', 'done');
                 statusEl.textContent = usable ? '已生成 · 运营可用' : '已生成 · 技术预览';
                 btn.disabled = false;
@@ -731,13 +741,20 @@
                data-shot-count="{{ ms_overlay.shots | length }}"
                data-has-result="{{ ms_overlay.has_pr_a_result }}" style="margin-top:10px;">
             <div class="op-section-head"><div class="op-section-head__main">
-              <h3 class="op-section-subtitle">本次生成 · 镜头语义匹配</h3>
+              <h3 class="op-section-subtitle">本次生成 · 镜头与素材调整</h3>
             </div></div>
             {% for s in ms_overlay.shots %}
             <div class="muted" data-role="ms-shot-acceptance" data-shot-id="{{ s.shot_id }}"
                  data-source="{{ s.source }}" data-semantic="{{ s.semantic_status }}"
                  data-included="{{ s.included_in_current_video }}">
-              Shot {{ "%02d"|format(s.order) }} · {{ s.title }} — 素材：{{ s.asset_name }}（{{ s.source }}）· 语义匹配：{{ s.semantic_status }} · 进入当前主视频：{{ s.included_in_current_video }}
+              Shot {{ "%02d"|format(s.order) }} · {{ s.title }} —
+              当前素材：{{ s.asset_name }} ·
+              素材来源：{% if s.source == 'local_real_asset' %}真实素材{% elif s.source == 'fallback_semantic_reuse' %}复用素材{% else %}待确认{% endif %} ·
+              语义状态：{% if s.semantic_status == 'pass' %}通过{% elif s.semantic_status == 'partial' %}部分通过{% else %}待确认{% endif %} ·
+              已进入当前主视频：{% if s.included_in_current_video %}是{% else %}否{% endif %}
+              {% if s.source == 'fallback_semantic_reuse' %}
+                <span data-role="ms-shot-fallback-suggestion">当前为复用素材，建议补充真实品尝 / 递镜素材。</span>
+              {% endif %}
             </div>
             {% endfor %}
           </div>
@@ -975,6 +992,8 @@
             </div>
           </div>
           <p class="op-section-helper" data-role="ms-section-optional-variants-subtitle">每一个变体都是一个完整的视频版本。系统会告诉你「哪里不同 / 为什么测这一版 / 适合哪些账号 · 场景 / 推荐哪个」，你照着选就行。</p>
+          <details data-role="ms-section-video-variants-fold" style="margin-top:8px;">
+            <summary style="cursor:pointer; font-size:13px; color:var(--op-muted,#6b7280);">主视频确认后，可生成 V2/V3 变体。</summary>
 
           {# Phase 2B fidelity fix (2026-05-30): V1 / V2 / V3 video-version
              cards rendered as primary §G content (per Phase 1 mock §G +
@@ -1130,6 +1149,7 @@
                     disabled aria-disabled="true">同时生成多个变体</button>
           </div>
           <p class="op-tech-note" style="margin-top:8px;">本面板不展示完整成片或外部链接；完整成片在交付页面。</p>
+          </details>
         </div>
       {% endif %}
 
@@ -1208,8 +1228,8 @@
             </div>
           </div>
           {% if ms_overlay.has_pr_a_result %}
-            <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">交付候选：{{ ms_overlay.delivery.delivery_candidate }} · 可打开暂存预览。</p>
-            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">正式发布仍未开启，official_publish_ready=false；进入交付页面继续检查成片、字幕、音频和文案包。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">当前交付候选：主视频 V1 · delivery_candidate={{ ms_overlay.delivery.delivery_candidate }}。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">official_publish_ready=false；正式交付就绪：false；进入交付页面继续检查成片、字幕、音频和文案包。</p>
           {% elif ops_pr.publishable %}
             <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">可交付 · 已确认主版本。</p>
             <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">前往交付页面填写发布设置或回填发布状态。</p>

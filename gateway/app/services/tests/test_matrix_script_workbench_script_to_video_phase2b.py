@@ -368,8 +368,9 @@ def test_no_fake_media_or_publish_url(primary_visible: str) -> None:
         assert fake not in visible, f"Fake media / URL leaked: {fake}"
 
 
-def test_no_video_or_iframe_or_source_tag_in_primary(primary_slice: str) -> None:
-    for tag in ("<video", "<iframe", "<source "):
+def test_only_real_preview_video_no_iframe_or_source_tag_in_primary(primary_slice: str) -> None:
+    assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in primary_slice
+    for tag in ("<iframe", "<source "):
         assert tag not in primary_slice
 
 
