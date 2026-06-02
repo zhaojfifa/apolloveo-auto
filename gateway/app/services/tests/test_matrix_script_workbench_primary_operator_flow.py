@@ -152,6 +152,50 @@ def _render_primary_with_preview_url_only(source: str) -> str:
     )
 
 
+def _render_primary_with_delivery_preview_url_only(source: str) -> str:
+    pytest.importorskip("jinja2")
+    from jinja2 import ChainableUndefined, Environment
+
+    branch = _primary_flow(source)
+    start = branch.index("{% if ms_main_video_result.is_matrix_script %}")
+    end = branch.index("{# Phase 2C", start)
+    template = branch[start:end]
+    preview_url = "/api/matrix-script/ms-1/tomato-real-result/preview/final.mp4"
+    result = {
+        "operator_usable": False,
+        "technical_preview": False,
+        "preview_url": "",
+        "status": "generated_pending_review",
+        "status_label_zh": "待运营确认",
+        "visual_semantic_match": "",
+        "shot_match_count": 0,
+        "shot_count": 5,
+        "real_visual_count": 0,
+        "delivery_candidate": False,
+        "blocked_reason": None,
+    }
+    return Environment(undefined=ChainableUndefined, autoescape=True).from_string(template).render(
+        ms_main_video_result={
+            "is_matrix_script": True,
+            "state_kind": "blocked",
+            "state_label_zh": "未生成",
+            "preview": {"available": False},
+            "primary_actions": [],
+        },
+        ms_overlay_mr=result,
+        ms_overlay_has=False,
+        ms_overlay={
+            "main_result": result,
+            "has_pr_a_result": False,
+            "delivery": {"delivery_candidate": True, "preview_url": preview_url},
+            "shots": [],
+        },
+        ms_preview_compare={"is_matrix_script": True},
+        ms_script_structure={"is_matrix_script": True, "sections": []},
+        task={"task_id": "ms-1", "title": "海边与圣女果"},
+    )
+
+
 def _a_section(rendered: str) -> str:
     start = rendered.index('id="matrix-script-main-video-result"')
     end = rendered.index('data-role="matrix-script-primary-material-music"', start)
@@ -238,6 +282,25 @@ def test_preview_url_always_renders_inline_video_before_bound_placeholder(source
     assert '<video controls preload="metadata" src="/api/matrix-script/ms-1/tomato-real-result/preview/final.mp4"' in section
     assert "主视频预览已生成 · 待运营确认" in section
     assert 'data-role="ms-main-video-result-preview-bound"' not in section
+    assert 'data-preview-present="true"' in section
+    assert 'data-preview-source="main_result"' in section
+
+
+def test_delivery_preview_url_renders_inline_video_when_main_result_url_missing(source: str) -> None:
+    section = _a_section(_render_primary_with_delivery_preview_url_only(source))
+    assert '<video controls preload="metadata" src="/api/matrix-script/ms-1/tomato-real-result/preview/final.mp4"' in section
+    assert 'href="/api/matrix-script/ms-1/tomato-real-result/preview/final.mp4"' in section
+    assert "主视频预览已生成 · 待运营确认" in section
+    assert "状态：<span data-bind=\"status_label\">已生成预览</span>" in section
+    assert "再次生成预览" in section
+    assert "生成视频预览" not in section
+    assert '<div data-role="ms-main-video-result-preview-empty"' not in section
+    assert 'data-role="ms-main-video-result-preview-bound"' not in section
+    assert 'data-preview-present="true"' in section
+    assert 'data-preview-source="delivery"' in section
+    assert "预览链接" not in section
+    for forbidden in ("provider_url", "publish_url", "Akool", "model", "credit"):
+        assert forbidden not in section
 
 
 def test_raw_rendered_primary_has_no_old_hidden_action_text(source: str) -> None:
