@@ -319,11 +319,12 @@
         <div class="op-card op-card--accent-emerald"
              id="matrix-script-main-video-result"
              data-role="matrix-script-main-video-result"
+             data-panel-kind="matrix_script"
              data-state-kind="{{ ms_main_video_result.state_kind }}"
              data-redesign-wave="2026-05-28-pr2a">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--emerald">① · 主视频</span>
+              <span class="op-section-index op-section-index--emerald">A · 主视频结果</span>
               <h2 class="op-section-title" data-role="ms-main-video-result-title">{{ ms_main_video_result.panel_title_zh }}</h2>
               <span class="op-pill op-pill--{% if ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% elif ms_main_video_result.state_kind == 'generating' %}info{% else %}blocked{% endif %}"
                     data-role="ms-main-video-result-state-pill"
@@ -380,6 +381,7 @@
             <div class="muted" data-role="ms-acc-real-visual"{% if not ms_overlay_has %} style="display:none;"{% endif %}>真实视觉镜头数：<span data-bind="real_visual_count">{{ ms_overlay_mr.real_visual_count }}</span></div>
             <div class="muted" data-role="ms-acc-delivery-candidate"{% if not ms_overlay_has %} style="display:none;"{% endif %}>交付候选：<span data-bind="delivery_candidate">{{ ms_overlay_mr.delivery_candidate }}</span></div>
             <div class="muted" data-role="ms-acc-publish-ready">正式交付就绪：false</div>
+            <div class="muted" data-role="ms-acc-preview-url"{% if not ms_overlay_mr.preview_url %} style="display:none;"{% endif %}>预览链接：<span data-bind="preview_url">{{ ms_overlay_mr.preview_url or "" }}</span></div>
             <div class="muted" data-role="ms-acc-blocked"{% if not ms_overlay_mr.blocked_reason %} style="display:none;"{% endif %}>原因：<span data-bind="blocked_reason">{{ ms_overlay_mr.blocked_reason or "" }}</span></div>
             <div class="task-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
               <button type="button" class="btn-secondary" data-role="ms-acc-generate"
@@ -465,7 +467,8 @@
                 setBind('shot_count', d.shot_count);
                 setBind('real_visual_count', d.real_visual_count);
                 setBind('delivery_candidate', d.delivery_candidate);
-                ['ms-acc-semantic','ms-acc-shot-match','ms-acc-real-visual','ms-acc-delivery-candidate'].forEach(show);
+                setBind('preview_url', d.preview_url);
+                ['ms-acc-semantic','ms-acc-shot-match','ms-acc-real-visual','ms-acc-delivery-candidate','ms-acc-preview-url'].forEach(show);
                 if (d.blocked_reason) { setBind('blocked_reason', d.blocked_reason); show('ms-acc-blocked'); }
                 if (card) { card.setAttribute('data-operator-usable', usable); }
                 // When usable, suppress the legacy not-generated surfaces in section A.
@@ -488,235 +491,6 @@
         </div>
       {% endif %}
 
-      {# PR-9R (architecture-to-operator-result bridge) · read-only minimal
-         local result block. Renders ONLY when a pre-computed local result is
-         present (ms_minimal_result.has_result); otherwise nothing renders and
-         existing behavior is unchanged. Read-only: NO generation control, NO
-         provider/vendor, NO media player, NO external link, NO download URL.
-         official_publish_ready is always false; this is a pre-delivery local
-         result, not official delivery and not a publish gate. All dynamic
-         values are Jinja interpolation only (no literal media URLs). #}
-      {% if ms_minimal_result.has_result %}
-        <div class="op-card"
-             id="matrix-script-minimal-result"
-             data-role="matrix-script-minimal-result"
-             data-storage-scope="{{ ms_minimal_result.storage_scope }}"
-             data-official-publish-ready="{{ ms_minimal_result.official_publish_ready }}">
-          <div class="op-section-head">
-            <div class="op-section-head__main">
-              <h2 class="op-section-title" data-role="ms-minimal-result-title">{{ ms_minimal_result.final_video_label }}</h2>
-              <span class="op-pill op-pill--info" data-role="ms-minimal-result-status">{{ ms_minimal_result.result_status }}</span>
-            </div>
-          </div>
-          <div class="muted" data-role="ms-minimal-result-path">本地路径：{{ ms_minimal_result.final_video_path }}</div>
-          <div class="muted" data-role="ms-minimal-result-duration">时长（秒）：{{ ms_minimal_result.duration_seconds }}</div>
-          <div class="muted" data-role="ms-minimal-result-shots">镜头数：{{ ms_minimal_result.shot_count }}</div>
-          <div class="muted" data-role="ms-minimal-result-scope">存储范围：{{ ms_minimal_result.storage_scope }}</div>
-          <div class="muted" data-role="ms-minimal-result-publish-ready">正式交付就绪：{{ ms_minimal_result.official_publish_ready }}</div>
-          <div class="op-tech-note" data-role="ms-minimal-result-note">{{ ms_minimal_result.operator_note }}</div>
-        </div>
-      {% endif %}
-
-      {# PR-13R · Workbench minimal-result trigger action (Matrix Script
-         Production Action MVP). A controlled operator action that POSTs to the
-         PR-12R internal route and renders the returned read-only surface
-         payload client-side. NO generation control beyond this trigger, NO
-         provider/vendor, NO media player, NO external link, NO download URL,
-         NO publish gate. The result is a LOCAL workspace minimal final video
-         (storage_scope=local_workspace, official_publish_ready=false) — not
-         official delivery. Result fields are built via textContent only (no
-         innerHTML), and the endpoint is read from a data- attribute (no literal
-         media URL in script). Rendered for matrix_script tasks only. #}
-      {% if ms_main_video_result.is_matrix_script %}
-        <div class="op-card"
-             id="matrix-script-minimal-result-action"
-             data-role="matrix-script-minimal-result-action">
-          <div class="op-section-head">
-            <div class="op-section-head__main">
-              <h2 class="op-section-title">本地最小成片</h2>
-            </div>
-          </div>
-          <p class="op-section-helper">生成一段本地最小成片用于预览。结果保存在本地工作区，尚未进入正式交付存储。</p>
-          <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
-            <button type="button"
-                    class="btn-secondary"
-                    data-role="ms-minimal-result-trigger"
-                    data-task-id="{{ task.task_id }}"
-                    data-endpoint="/api/matrix-script/{{ task.task_id }}/minimal-result">生成本地最小成片</button>
-          </div>
-          <div class="muted" data-role="ms-minimal-result-action-status" data-state="idle"></div>
-          <div data-role="ms-minimal-result-action-output"></div>
-          {# PR-14R · execution_trace (process observable). Rendered client-side
-             after a successful generate; closed 6-step list mirroring
-             gateway/app/services/matrix_script/minimal_result_trace.py
-             (shot_plan / scene_clips / audio / subtitles / assembly / surface).
-             All steps show done on success. Local-only; no third-party
-             identifiers and no delivery-truth fields. #}
-          <div data-role="ms-minimal-result-trace" data-trace-step-count="6"></div>
-          <script>
-          (function () {
-            var trigger = document.querySelector('[data-role="ms-minimal-result-trigger"]');
-            if (!trigger) { return; }
-            var statusEl = document.querySelector('[data-role="ms-minimal-result-action-status"]');
-            var outEl = document.querySelector('[data-role="ms-minimal-result-action-output"]');
-            var traceEl = document.querySelector('[data-role="ms-minimal-result-trace"]');
-            // Closed execution-trace steps (mirrors minimal_result_trace.py).
-            var TRACE_STEPS = [
-              ['shot_plan', '生成镜头计划'],
-              ['scene_clips', '生成场景片段'],
-              ['audio', '生成音频'],
-              ['subtitles', '生成字幕'],
-              ['assembly', '合成成片'],
-              ['surface', '生成结果视图']
-            ];
-            function row(label, value) {
-              var el = document.createElement('div');
-              el.className = 'muted';
-              el.textContent = label + '：' + (value === undefined || value === null ? '' : value);
-              return el;
-            }
-            function renderTrace(done) {
-              if (!traceEl) { return; }
-              traceEl.textContent = '';
-              var head = document.createElement('div');
-              head.className = 'op-tech-note';
-              head.textContent = '生成过程：';
-              traceEl.appendChild(head);
-              for (var i = 0; i < TRACE_STEPS.length; i++) {
-                var s = document.createElement('div');
-                s.className = 'muted';
-                s.setAttribute('data-role', 'ms-minimal-result-trace-step');
-                s.setAttribute('data-step', TRACE_STEPS[i][0]);
-                s.setAttribute('data-status', done ? 'done' : 'pending');
-                s.textContent = TRACE_STEPS[i][1] + '：' + (done ? 'done' : 'pending');
-                traceEl.appendChild(s);
-              }
-            }
-            trigger.addEventListener('click', async function () {
-              trigger.disabled = true;
-              statusEl.setAttribute('data-state', 'running');
-              statusEl.textContent = '生成中…';
-              outEl.textContent = '';
-              if (traceEl) { traceEl.textContent = ''; }
-              try {
-                var resp = await fetch(trigger.getAttribute('data-endpoint'), {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' }
-                });
-                if (!resp.ok) {
-                  statusEl.setAttribute('data-state', 'error');
-                  statusEl.textContent = '生成失败（' + resp.status + '）';
-                  trigger.disabled = false;
-                  return;
-                }
-                var d = await resp.json();
-                statusEl.setAttribute('data-state', 'done');
-                statusEl.textContent = '已生成';
-                outEl.setAttribute('data-has-result', d.has_result ? 'true' : 'false');
-                outEl.appendChild(row('结果', d.final_video_label || '本地最小成片'));
-                outEl.appendChild(row('状态', d.result_status));
-                outEl.appendChild(row('本地路径', d.final_video_path));
-                outEl.appendChild(row('时长（秒）', d.duration_seconds));
-                outEl.appendChild(row('镜头数', d.shot_count));
-                outEl.appendChild(row('存储范围', d.storage_scope));
-                outEl.appendChild(row('正式交付就绪', d.official_publish_ready));
-                outEl.appendChild(row('提示', d.operator_note));
-                renderTrace(!!d.has_result);
-                trigger.disabled = false;
-              } catch (e) {
-                statusEl.setAttribute('data-state', 'error');
-                statusEl.textContent = '生成失败';
-                trigger.disabled = false;
-              }
-            });
-          })();
-          </script>
-        </div>
-      {% endif %}
-
-      {# P0 R2 preview staging · 暂存并预览. Calls the real-trial route, stages
-         the result pack into artifact storage, and renders an operator-openable
-         preview link from the response (preview_url). NOT publish: staged only,
-         official_publish_ready stays false. Renders no media URL literal; the
-         preview link href is set from the JSON response at runtime. #}
-      {% if ms_main_video_result.is_matrix_script %}
-        <div class="op-card"
-             id="matrix-script-staged-preview-action"
-             data-role="matrix-script-staged-preview-action">
-          <div class="op-section-head">
-            <div class="op-section-head__main">
-              <h2 class="op-section-title">暂存并预览</h2>
-            </div>
-          </div>
-          <p class="op-section-helper">生成成片并暂存到工件存储，生成可在浏览器打开的预览链接。该结果为交付候选，尚未进入正式发布。</p>
-          <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
-            <button type="button"
-                    class="btn-secondary"
-                    data-role="ms-staged-preview-trigger"
-                    data-task-id="{{ task.task_id }}"
-                    data-endpoint="/api/matrix-script/{{ task.task_id }}/real-trial">生成并暂存（可预览）</button>
-          </div>
-          <div class="muted" data-role="ms-staged-preview-status" data-state="idle"></div>
-          <div data-role="ms-staged-preview-output"></div>
-          <script>
-          (function () {
-            var trigger = document.querySelector('[data-role="ms-staged-preview-trigger"]');
-            if (!trigger) { return; }
-            var statusEl = document.querySelector('[data-role="ms-staged-preview-status"]');
-            var outEl = document.querySelector('[data-role="ms-staged-preview-output"]');
-            function row(label, value) {
-              var el = document.createElement('div');
-              el.className = 'muted';
-              el.textContent = label + '：' + (value === undefined || value === null ? '' : value);
-              return el;
-            }
-            trigger.addEventListener('click', async function () {
-              trigger.disabled = true;
-              statusEl.setAttribute('data-state', 'running');
-              statusEl.textContent = '生成并暂存中…';
-              outEl.textContent = '';
-              try {
-                var resp = await fetch(trigger.getAttribute('data-endpoint'), {
-                  method: 'POST', headers: { 'Content-Type': 'application/json' }
-                });
-                if (!resp.ok) {
-                  statusEl.setAttribute('data-state', 'error');
-                  statusEl.textContent = '暂存失败（' + resp.status + '）';
-                  trigger.disabled = false;
-                  return;
-                }
-                var d = await resp.json();
-                statusEl.setAttribute('data-state', 'done');
-                statusEl.textContent = '已暂存为交付候选';
-                outEl.appendChild(row('存储范围', d.storage_scope));
-                outEl.appendChild(row('交付候选', d.delivery_candidate));
-                outEl.appendChild(row('正式交付就绪', d.official_publish_ready));
-                outEl.appendChild(row('生成方式', d.generation_provider));
-                if (d.blocked_reason_zh) { outEl.appendChild(row('说明', d.blocked_reason_zh)); }
-                if (d.preview_url) {
-                  var a = document.createElement('a');
-                  a.setAttribute('data-role', 'ms-staged-preview-link');
-                  a.setAttribute('href', d.preview_url);
-                  a.setAttribute('target', '_blank');
-                  a.setAttribute('rel', 'noopener');
-                  a.className = 'btn-secondary';
-                  a.style.marginTop = '8px';
-                  a.textContent = '打开视频';
-                  outEl.appendChild(a);
-                }
-                trigger.disabled = false;
-              } catch (e) {
-                statusEl.setAttribute('data-state', 'error');
-                statusEl.textContent = '暂存失败';
-                trigger.disabled = false;
-              }
-            });
-          })();
-          </script>
-        </div>
-      {% endif %}
-
-
       {# Phase 2C (2026-05-30) · operator-readability capability banner.
          ONE orientation line; relocated by Phase 2D to render BELOW §A so
          the result panel is the dominant first surface. Copy / layout only;
@@ -730,27 +504,6 @@
             <div class="op-banner__title" data-role="matrix-script-capability-banner-title">脚本转视频工作台</div>
             <div class="op-banner__body" data-role="matrix-script-capability-banner-body">这里把一条脚本拆解成可生成的视频方案。成片生成与素材匹配能力接入后，本工作台将开放生成与替换操作；当前阶段以方案确认与偏好选择兜底，已选偏好会作为后续生成的输入。</div>
           </div>
-        </div>
-      {% endif %}
-
-      {# Phase 2D (2026-05-30) · result-oriented IA group header ② ·
-         生成方案确认. Merges the legacy §B 脚本理解 + §C 视频生成计划 into
-         one operator decision: confirm the generation plan. The storyboard
-         (§C) stays the primary visible content; 脚本理解 (§B) is demoted to
-         a collapsed supporting detail just below. Copy / layout only; the
-         §B / §C container anchors + sub-anchors are preserved unchanged. #}
-      {% if ms_main_video_result.is_matrix_script %}
-        <div class="op-card op-card--accent-emerald"
-             data-role="ms-section-plan-confirm"
-             data-redesign-wave="2026-05-30-phase2d"
-             style="margin-bottom:4px;">
-          <div class="op-section-head">
-            <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--emerald">② · 方案</span>
-              <h2 class="op-section-title" data-role="ms-section-plan-confirm-title">生成方案确认</h2>
-            </div>
-          </div>
-          <p class="op-section-helper" data-role="ms-section-plan-confirm-summary">系统已根据脚本整理出视频方向和分镜草案，请先确认是否符合你的成片预期。脚本理解（三段式 / 关键词 / 禁用词 / 受众 / 语气 / 时长）作为支撑细节收在下方，分镜草案为这一段的主视图。</p>
         </div>
       {% endif %}
 
@@ -807,8 +560,8 @@
              values are preserved verbatim inside the <details>. #}
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">支撑</span>
-              <h3 class="op-section-subtitle" data-role="ms-section-script-understanding-title">脚本理解（支撑细节）</h3>
+              <span class="op-section-index">B · 脚本理解</span>
+              <h2 class="op-section-title" data-role="ms-section-script-understanding-title">脚本理解</h2>
               <span class="op-pill op-pill--ready"><span class="op-pill__dot"></span>已具备</span>
             </div>
           </div>
@@ -882,14 +635,10 @@
              data-role="matrix-script-section-generation-plan"
              data-redesign-wave="2026-05-30-phase2b"
              data-status-code="plan_pending_upstream">
-          {# Phase 2D (2026-05-30) · the storyboard is the DOMINANT visible
-             content of 生成方案确认 (②). Heading demoted from <h2> to <h3>
-             so 生成方案确认 is the single primary heading; the scene list
-             below stays fully visible. data-role + string preserved. #}
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--emerald">分镜草案</span>
-              <h3 class="op-section-subtitle" data-role="ms-section-generation-plan-title">视频生成计划 · 故事板</h3>
+              <span class="op-section-index op-section-index--emerald">C · 视频生成计划</span>
+              <h2 class="op-section-title" data-role="ms-section-generation-plan-title">视频生成计划 · 分镜故事板</h2>
               <span class="op-pill op-pill--review" data-role="ms-section-generation-plan-status-pill">占位草案</span>
             </div>
           </div>
@@ -996,31 +745,6 @@
         </div>
       {% endif %}
 
-      {# Phase 2D (2026-05-30) · result-oriented IA group header ③ ·
-         成片要素调整. Merges §D 画面与素材 + §E 角色与声音 + §F 字幕与音乐
-         into one primary section read as operator-adjustable video intent.
-         The three legacy cards below are demoted from <h2> to compact
-         <h3> subcards; all container + sub-anchors preserved in order. #}
-      {% if ms_main_video_result.is_matrix_script %}
-        <div class="op-card op-card--accent-amber"
-             data-role="ms-section-final-elements"
-             data-redesign-wave="2026-05-30-phase2d"
-             style="margin-bottom:4px;">
-          <div class="op-section-head">
-            <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--amber">③ · 要素</span>
-              <h2 class="op-section-title" data-role="ms-section-final-elements-title">成片要素调整</h2>
-            </div>
-          </div>
-          <p class="op-section-helper" data-role="ms-section-final-elements-summary">系统已给出默认成片配置，你可以按账号风格微调。下面三张卡分别对应画面与素材、角色与声音、字幕与音乐。</p>
-          <ul data-role="ms-section-final-elements-examples" style="margin:6px 0 0 0; padding-left:18px; color:var(--op-muted,#6b7280); font-size:13px; line-height:1.7;">
-            <li>画面与素材：海边 / 圣女果特写 / 试吃动作 / 递向镜头</li>
-            <li>角色与声音：清爽女声 / 自然种草 / 甜美但不过度广告感</li>
-            <li>字幕与音乐：大字高亮 / 底部居中 / 轻快上扬 BGM</li>
-          </ul>
-        </div>
-      {% endif %}
-
       {# Section D · 画面与素材 — placeholder for background / B-Roll /
          product material slots. No helper today; Phase 5 Asset Supply
          bridge will populate. Status code: broll_pending_upstream. #}
@@ -1031,8 +755,8 @@
              data-status-code="broll_pending_upstream">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--amber">画面</span>
-              <h3 class="op-section-subtitle" data-role="ms-section-visual-materials-title">画面与素材</h3>
+              <span class="op-section-index op-section-index--amber">D · 画面与素材</span>
+              <h2 class="op-section-title" data-role="ms-section-visual-materials-title">画面与素材</h2>
               <span class="op-pill op-pill--neutral" data-role="ms-section-visual-materials-status-pill">当前占位</span>
             </div>
           </div>
@@ -1102,8 +826,8 @@
              data-status-code="voice_preview_pending_voicetrans">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--violet">角色</span>
-              <h3 class="op-section-subtitle" data-role="ms-section-role-voice-title">角色与声音</h3>
+              <span class="op-section-index op-section-index--violet">E · 角色与声音</span>
+              <h2 class="op-section-title" data-role="ms-section-role-voice-title">角色与声音</h2>
               <span class="op-pill op-pill--neutral" data-role="ms-section-role-voice-status-pill">当前占位</span>
             </div>
           </div>
@@ -1150,8 +874,8 @@
              data-status-code="subtitle_style_pending_compose">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">字幕音乐</span>
-              <h3 class="op-section-subtitle" data-role="ms-section-subtitle-music-title">字幕与音乐</h3>
+              <span class="op-section-index">F · 字幕与音乐</span>
+              <h2 class="op-section-title" data-role="ms-section-subtitle-music-title">字幕与音乐</h2>
               <span class="op-pill op-pill--neutral" data-role="ms-section-subtitle-music-status-pill">当前占位</span>
             </div>
           </div>
@@ -1213,27 +937,6 @@
         </div>
       {% endif %}
 
-      {# Phase 2D (2026-05-30) · result-oriented IA group header ④ ·
-         视频版本（可选）. Demotes the variant section: variants are an
-         OPTIONAL step the operator can generate AFTER confirming the main
-         video. The §G card below keeps its locked <h2>视频变体</h2> heading
-         + all anchors; this header only reframes it as optional. No claim
-         that any version has already been generated. #}
-      {% if ms_preview_compare.is_matrix_script %}
-        <div class="op-card"
-             data-role="ms-section-video-versions-group"
-             data-redesign-wave="2026-05-30-phase2d"
-             style="margin-bottom:4px;">
-          <div class="op-section-head">
-            <div class="op-section-head__main">
-              <span class="op-section-index">④ · 版本</span>
-              <h2 class="op-section-title" data-role="ms-section-video-versions-group-title">视频版本（可选）</h2>
-            </div>
-          </div>
-          <p class="op-section-helper" data-role="ms-section-video-versions-group-summary">这一步是可选的：确认主视频后，你可以再生成多个视频版本来对比测试。下面列出的 V1 / V2 / V3 是建议方向，尚未生成；会标注「哪里不同 / 为什么测这一版 / 适合哪些账号或场景」。</p>
-        </div>
-      {% endif %}
-
       {# PR-A reset (2026-05-29) · Section G · 视频变体 (renamed from 可选变体
          by Phase 2B 2026-05-30). Compact: 当前主推版本 + N-1 其他变体 (folded)
          + 追加生成 / 同时生成多个变体 (disabled-with-tooltip). Empty state is
@@ -1262,7 +965,7 @@
                data-redesign-wave="2026-05-30-phase2b"></div>
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">G · 变体</span>
+              <span class="op-section-index">G · 视频变体</span>
               <h2 class="op-section-title" data-role="ms-section-optional-variants-title">视频变体</h2>
               {% if ms_s3_any_resolved.value %}
                 <span class="op-pill op-pill--review" data-role="ms-section-optional-variants-pill">1 主推 + {{ ms_s3_total - 1 }} 备选</span>
@@ -1449,7 +1152,7 @@
              data-redesign-wave="2026-05-30-phase2b">
           <details data-role="ms-section-review-tuning-fold">
             <summary style="cursor:pointer;">
-              <span class="op-section-index">校对</span>
+              <span class="op-section-index">H · 校对与微调</span>
               <span class="op-section-subtitle" data-role="ms-section-review-tuning-title" style="font-weight:600;">校对与微调（主视频生成后开放）</span>
               <span class="op-pill op-pill--neutral" data-role="ms-section-review-tuning-status-pill">待主视频</span>
             </summary>
@@ -1500,11 +1203,14 @@
              data-publishable="{{ 'true' if ops_pr.publishable else 'false' }}">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">⑤ · 交付</span>
+              <span class="op-section-index">I · 交付入口</span>
               <h2 class="op-section-title" data-role="ms-section-delivery-entry-title">交付入口</h2>
             </div>
           </div>
-          {% if ops_pr.publishable %}
+          {% if ms_overlay.has_pr_a_result %}
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">交付候选：{{ ms_overlay.delivery.delivery_candidate }} · 可打开暂存预览。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">正式发布仍未开启，official_publish_ready=false；进入交付页面继续检查成片、字幕、音频和文案包。</p>
+          {% elif ops_pr.publishable %}
             <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">可交付 · 已确认主版本。</p>
             <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">前往交付页面填写发布设置或回填发布状态。</p>
           {% else %}
@@ -1516,6 +1222,7 @@
           {% if ms_overlay.has_pr_a_result %}
           <div data-role="ms-section-delivery-entry-acceptance" style="margin-top:6px;">
             <div class="muted" data-role="ms-delivery-acc-candidate">交付候选：{{ ms_overlay.delivery.delivery_candidate }}</div>
+            <div class="muted" data-role="ms-delivery-acc-preview-url">预览链接：{{ ms_overlay.delivery.preview_url }}</div>
             <div class="muted" data-role="ms-delivery-acc-publish-ready">正式交付就绪：false</div>
             {% if ms_overlay.delivery.preview_url %}
             <a class="btn-secondary" data-role="ms-delivery-acc-preview" target="_blank" rel="noopener"
@@ -1551,7 +1258,7 @@
          ============================================================ #}
       <details class="op-collapse" data-role="op-console-ms-technical-diagnostics-fold">
         <summary>
-          <span class="op-section-index" style="margin-right:8px;">5 · 诊断</span>
+          <span class="op-section-index" style="margin-right:8px;">J · 技术诊断</span>
           矩阵脚本 · 技术诊断（架构师视图，默认收起）
         </summary>
         <div class="op-collapse__hint">展开查看历史 A–F 区块、PR-U2 / MS-W3 / 变体面板 / 单脚本可读视图等内部诊断；包括 head_reason / artifact_lookup / publish_readiness / final_provenance 等技术标识。日常运营操作不依赖本节。</div>

@@ -59,6 +59,7 @@ or active architecture decisions.
 | Runtime execution log | `docs/execution/VEOBASE01_EXECUTION_LOG.md` |
 | VeoBase01 ADR | `docs/adr/ADR-VEOBASE01-LINE-STATE-CONTRACT.md` |
 | Docs shared logic review | `docs/reviews/VEOBASE01_DOCS_STRUCTURE_AND_SHARED_LOGIC_REVIEW.md` |
+| Matrix Script design authority | `docs/design/MATRIX_SCRIPT_DESIGN_AUTHORITY_INDEX.md` |
 
 ## Task-Oriented Reading Map
 
@@ -69,6 +70,14 @@ Read root governance, `docs/baseline/PROJECT_BASELINE_INDEX.md`,
 and the latest active Hot Follow execution note. Business-line changes must
 include regression validation for normal translation, helper translation, dub,
 compose, and final availability.
+
+### Matrix Script Changes
+
+Read `docs/design/MATRIX_SCRIPT_DESIGN_AUTHORITY_INDEX.md` before any Matrix
+Script UI, presenter, result-line, delivery-entry, or production-action work.
+That index selects the accepted script-to-video mock and result baseline.
+Execution logs are evidence only and must not be used as implementation
+authority unless they are explicitly named by that index.
 
 ### Four-Layer State Changes
 

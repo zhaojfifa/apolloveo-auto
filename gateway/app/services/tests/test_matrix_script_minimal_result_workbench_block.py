@@ -170,29 +170,21 @@ def test_conversion_is_deterministic() -> None:
 
 
 # ---------------------------------------------------------------------------
-# template integration (static text) — block present, gated, leak-free
+# template integration (static text) — standalone block removed from primary UI
 # ---------------------------------------------------------------------------
 
 
-def test_workbench_template_has_minimal_result_block() -> None:
+def test_workbench_template_no_longer_has_standalone_minimal_result_block() -> None:
     src = _WORKBENCH.read_text(encoding="utf-8")
     assert "{% set ms_minimal_result = ((ops.workbench or {}).matrix_script_minimal_result or {}) %}" in src
-    assert 'data-role="matrix-script-minimal-result"' in src
-    assert "{% if ms_minimal_result.has_result %}" in src
+    assert 'data-role="matrix-script-minimal-result"' not in src
+    assert "{% if ms_minimal_result.has_result %}" not in src
+    assert "本地最小成片" not in src
 
 
-def test_workbench_minimal_result_block_is_read_only_and_leak_free() -> None:
+def test_workbench_primary_flow_uses_main_result_and_delivery_entry() -> None:
     src = _WORKBENCH.read_text(encoding="utf-8")
-    anchor = src.find('data-role="matrix-script-minimal-result"')
-    assert anchor != -1
-    # slice the exact {% if ms_minimal_result.has_result %} ... {% endif %} block
-    gate = src.rfind("{% if ms_minimal_result.has_result %}", 0, anchor)
-    assert gate != -1
-    end = src.find("{% endif %}", anchor)
-    assert end != -1
-    block = src[gate : end + len("{% endif %}")]
-    # read-only: no media player tag, no external link, no generation control
-    for tag in ("<video", "<iframe", "<source ", "<a ", "<button", "<select", "<input"):
-        assert tag not in block, f"minimal-result block contains forbidden tag {tag}"
-    for token in ("akool", "provider", "vendor", "publish_url", "publish_status", ".mp4", "http://", "https://"):
-        assert token not in block.lower(), f"minimal-result block leaks '{token}'"
+    assert 'data-role="matrix-script-main-video-result"' in src
+    assert 'data-role="ms-main-video-result-acceptance"' in src
+    assert 'data-role="matrix-script-section-delivery-entry"' in src
+    assert 'data-role="ms-section-delivery-entry-acceptance"' in src

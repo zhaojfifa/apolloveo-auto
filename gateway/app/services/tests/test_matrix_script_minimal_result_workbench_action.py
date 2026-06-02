@@ -1,8 +1,8 @@
-"""Matrix Script Workbench minimal-result action MVP tests (Phase 3 PR-13R).
+"""Matrix Script cleanup tests for the retired minimal-result Workbench action.
 
-Static template assertions over the new Workbench trigger block + an
-ffmpeg-gated end-to-end through the PR-12R route proving the rendered payload
-is local-workspace, not-publish-ready, and leak-free.
+The minimal-result service/route remains available as a retained result-chain
+capability, but the standalone Workbench card and button are no longer part of
+the operator-primary UI. Operators use the A 主视频结果 PR-A action and I 交付入口.
 """
 from __future__ import annotations
 
@@ -23,125 +23,32 @@ _skip_no_ffmpeg = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(scope="module")
-def workbench_source() -> str:
-    return _WORKBENCH.read_text(encoding="utf-8")
+def test_standalone_minimal_result_action_removed_from_workbench() -> None:
+    src = _WORKBENCH.read_text(encoding="utf-8")
+    assert 'data-role="matrix-script-minimal-result-action"' not in src
+    assert 'data-role="ms-minimal-result-trigger"' not in src
+    assert "生成本地最小成片" not in src
+    assert "/minimal-result" not in src[src.find('ops_workbench_panel.panel_kind == "matrix_script"'):]
 
 
-@pytest.fixture(scope="module")
-def matrix_branch(workbench_source: str) -> str:
-    start = workbench_source.find('ops_workbench_panel.panel_kind == "matrix_script"')
-    end = workbench_source.find(
-        "</details> {# /op-console-ms-technical-diagnostics-fold (PR-A Section 5) #}",
-        start,
-    )
-    assert start != -1 and end != -1
-    return workbench_source[start:end]
+def test_primary_workbench_action_is_pr_a_operator_preview() -> None:
+    src = _WORKBENCH.read_text(encoding="utf-8")
+    assert 'data-role="ms-acc-generate"' in src
+    assert "/tomato-real-result" in src
+    assert 'data-role="ms-main-video-result-acceptance"' in src
+    assert 'data-role="ms-section-delivery-entry-acceptance"' in src
 
 
-@pytest.fixture(scope="module")
-def action_block(matrix_branch: str) -> str:
-    anchor = matrix_branch.find('data-role="matrix-script-minimal-result-action"')
-    assert anchor != -1, "minimal-result action block missing from matrix_script branch"
-    gate = matrix_branch.rfind("{% if ms_main_video_result.is_matrix_script %}", 0, anchor)
-    end = matrix_branch.find("{% endif %}", anchor)
-    # extend to the endif that closes this block (after the <script>)
-    end = matrix_branch.find("{% endif %}", matrix_branch.find("</script>", anchor))
-    assert gate != -1 and end != -1
-    return matrix_branch[gate : end + len("{% endif %}")]
-
-
-# ---------------------------------------------------------------------------
-# (1)(2)(3) action present, posts to the route, renders the result label
-# ---------------------------------------------------------------------------
-
-
-def test_workbench_has_generate_button(action_block: str) -> None:
-    assert "生成本地最小成片" in action_block
-    assert 'data-role="ms-minimal-result-trigger"' in action_block
-
-
-def test_action_posts_to_minimal_result_route(action_block: str) -> None:
-    assert 'data-endpoint="/api/matrix-script/' in action_block
-    assert "/minimal-result" in action_block
-    assert "fetch(" in action_block
-    assert "method: 'POST'" in action_block
-
-
-def test_action_renders_local_result_label(action_block: str) -> None:
-    assert "本地最小成片" in action_block
-    assert 'data-role="ms-minimal-result-action-output"' in action_block
-    assert 'data-role="ms-minimal-result-action-status"' in action_block
-
-
-# ---------------------------------------------------------------------------
-# (4)(5) result surfaces storage_scope + official_publish_ready
-# ---------------------------------------------------------------------------
-
-
-def test_action_surfaces_storage_scope_and_publish_ready(action_block: str) -> None:
-    assert "d.storage_scope" in action_block
-    assert "存储范围" in action_block
-    assert "d.official_publish_ready" in action_block
-    assert "正式交付就绪" in action_block
-
-
-# ---------------------------------------------------------------------------
-# (6)(7)(8) no leakage in the action block
-# ---------------------------------------------------------------------------
-
-
-def test_action_block_is_leak_free(action_block: str) -> None:
-    lowered = action_block.lower()
+def test_cleanup_keeps_no_provider_or_publish_leakage_in_primary_branch() -> None:
+    src = _WORKBENCH.read_text(encoding="utf-8")
+    start = src.index('ops_workbench_panel.panel_kind == "matrix_script"')
+    end = src.index('data-role="op-console-ms-technical-diagnostics-fold"', start)
+    primary = src[start:end].lower()
     for token in (
-        "akool", "provider", "vendor", "model_id", "credit",
-        "publish_url", "publish_status", "artifact_key", "r2_key", "download_url",
-        ".mp4", "http://", "https://",
+        "provider_url", "temporary_url", "download_url", "publish_url",
+        "publish_status", "artifact_key", "r2_key", "model_id", "credit",
     ):
-        assert token not in lowered, f"action block leaks '{token}'"
-    for tag in ("<video", "<iframe", "<source "):
-        assert tag not in action_block, f"action block contains forbidden tag {tag}"
-
-
-# ---------------------------------------------------------------------------
-# (10) gated to matrix_script (Hot Follow / Digital Anchor unaffected)
-# ---------------------------------------------------------------------------
-
-
-def test_action_block_is_gated_to_matrix_script(workbench_source: str) -> None:
-    ms_start = workbench_source.find('ops_workbench_panel.panel_kind == "matrix_script"')
-    da_start = workbench_source.find('ops_workbench_panel.panel_kind == "digital_anchor"')
-    action = workbench_source.find('data-role="matrix-script-minimal-result-action"')
-    assert ms_start != -1 and action != -1
-    # action lives inside the matrix_script branch, before the digital_anchor branch
-    assert ms_start < action < da_start
-
-
-def test_action_block_gated_by_is_matrix_script(action_block: str) -> None:
-    assert action_block.startswith("{% if ms_main_video_result.is_matrix_script %}")
-
-
-# ---------------------------------------------------------------------------
-# (9) section order A–J preserved
-# ---------------------------------------------------------------------------
-
-
-def test_primary_section_order_preserved(matrix_branch: str) -> None:
-    anchors = [
-        "matrix-script-main-video-result",
-        "matrix-script-section-script-understanding",
-        "matrix-script-section-generation-plan",
-        "matrix-script-section-video-versions",
-        "op-console-ms-technical-diagnostics-fold",
-    ]
-    positions = [matrix_branch.find(f'data-role="{a}"') for a in anchors]
-    assert all(p != -1 for p in positions)
-    assert positions == sorted(positions)
-
-
-# ---------------------------------------------------------------------------
-# end-to-end via the route (skipped without ffmpeg)
-# ---------------------------------------------------------------------------
+        assert token not in primary
 
 
 class _StubRepo:
@@ -165,7 +72,7 @@ class _StubRepo:
 
 
 @_skip_no_ffmpeg
-def test_action_endpoint_returns_local_workspace_payload(tmp_path, monkeypatch) -> None:
+def test_retained_minimal_result_route_still_returns_local_workspace_payload(tmp_path, monkeypatch) -> None:
     try:
         from fastapi import FastAPI
         from fastapi.testclient import TestClient
@@ -191,5 +98,5 @@ def test_action_endpoint_returns_local_workspace_payload(tmp_path, monkeypatch) 
     blob = str(body).lower()
     for token in ("akool", "provider_url", "publish_url", "publish_status", "artifact_key", "r2_key", "download_url", "http://", "https://"):
         assert token not in blob
-    assert repo.mutations == []  # route does not mutate task/publish state
+    assert repo.mutations == []
     assert os.path.exists(body["final_video_path"])
