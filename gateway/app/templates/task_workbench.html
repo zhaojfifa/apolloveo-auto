@@ -330,7 +330,7 @@
             </div>
           </div>
           <p class="op-section-helper" data-role="ms-main-video-result-subtitle">
-            {% if ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}
+            {% if ms_overlay_mr.preview_url %}
               已生成 V1 主视频预览。确认主版本后进入交付检查。
             {% else %}
               请先确认素材与配乐，然后生成视频预览。
@@ -343,20 +343,26 @@
           <div class="op-main-video-preview" data-role="ms-main-video-result-preview"
                data-preview-available="{{ 'true' if ms_main_video_result.preview.available else 'false' }}"
                style="margin:14px 0; padding:18px; border:1px solid var(--op-card-bd, #e5e7eb); border-radius:12px; background:#fbfdff; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;">
-            {% if ms_main_video_result.preview.available %}
+            {% if ms_overlay_mr.preview_url %}
+              <div data-role="ms-main-video-result-preview-overlay-ready"
+                   style="width:100%; max-width:720px; display:grid; gap:10px; text-align:left;">
+                <strong style="font-size:14px; color:var(--op-fg-mid, #334155);">
+                  {% if ms_overlay_mr.operator_usable %}
+                    主视频已生成 · 运营可用 · 可交付候选
+                  {% else %}
+                    主视频预览已生成 · 待运营确认
+                  {% endif %}
+                </strong>
+                <video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"
+                       data-role="ms-main-video-result-video"
+                       style="width:100%; aspect-ratio:9/16; max-height:560px; border-radius:10px; background:#0f172a;"></video>
+              </div>
+            {% elif ms_main_video_result.preview.available %}
               <div data-role="ms-main-video-result-preview-bound"
                    data-bound-variation-id="{{ ms_main_video_result.preview.variation_id }}"
                    style="font-size:14px; color:var(--op-fg-mid, #334155);">
                 <strong>主视频已生成</strong> · 候选编号 {{ ms_main_video_result.preview.variation_id }}
                 <div class="op-tech-note" style="margin-top:8px;">完整成片与下载在交付页面。本面板不内嵌外部链接。</div>
-              </div>
-            {% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}
-              <div data-role="ms-main-video-result-preview-overlay-ready"
-                   style="width:100%; max-width:720px; display:grid; gap:10px; text-align:left;">
-                <strong style="font-size:14px; color:var(--op-fg-mid, #334155);">主视频已生成 · 运营可用 · 可交付</strong>
-                <video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"
-                       data-role="ms-main-video-result-video"
-                       style="width:100%; aspect-ratio:9/16; max-height:560px; border-radius:10px; background:#0f172a;"></video>
               </div>
             {% elif ms_overlay_mr.technical_preview %}
               <div data-role="ms-main-video-result-preview-technical"
