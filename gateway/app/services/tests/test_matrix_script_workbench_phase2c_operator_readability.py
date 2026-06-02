@@ -209,7 +209,7 @@ def test_section_d_preserves_slot_anchors(primary_slice: str) -> None:
 def test_section_d_differentiated_tooltips(primary_slice: str) -> None:
     assert 'title="背景候选接入后开放替换。"' in primary_slice
     assert 'title="B-Roll 候选接入后开放替换。"' in primary_slice
-    assert 'title="素材匹配能力接入后开放重新推荐。"' in primary_slice
+    assert 'title="素材匹配能力接入后开放。"' in primary_slice
 
 
 # --------------------------------------------------------------------------

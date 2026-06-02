@@ -95,8 +95,8 @@ def _block(src: str, start_marker: str, end_marker: str) -> str:
 
 # 7. existing ① main result suppresses 未生成 / 主成片缺失 when operator_usable.
 #    The empty-state sits in an {% else %} AFTER an {% elif ms_overlay_mr.operator_usable %}
-#    branch, and the blocker banner is wrapped in {% if not ms_overlay_mr.operator_usable %},
-#    so neither renders in the operator-usable state.
+#    branch. The old blocker banner and hidden helper action group are removed
+#    from the primary operator flow so they cannot leak back into the page.
 def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     src = _template_src()
     block = _block(src, 'id="matrix-script-main-video-result"', '{# Phase 2C')
@@ -105,10 +105,9 @@ def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     assert block.index("{% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}") < block.index('data-role="ms-main-video-result-preview-empty"')
     assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in block
     assert 'data-role="ms-main-video-result-video"' in block
-    # blocker banner only renders when NOT operator-usable
-    banner_idx = block.index('data-role="ms-main-video-result-banner"')
-    guard = block.rindex("{% if not ms_overlay_mr.operator_usable %}", 0, banner_idx)
-    assert guard < banner_idx
+    assert 'data-role="ms-main-video-result-banner"' not in block
+    assert 'data-role="ms-main-video-result-actions"' not in block
+    assert 'data-role="legacy-main-video-compat-anchor"' in block
     # acceptance overlay is inside this same ① block (no separate section)
     assert 'data-role="ms-main-video-result-acceptance"' in block
     assert 'data-bind="visual_semantic_match"' in block
@@ -152,7 +151,8 @@ def test_overlay_main_result_renders_operator_usable() -> None:
     assert "主成片缺失" not in html
     assert "运营可用" in html and "partial_pass" in html
     assert '<video controls preload="metadata" src="/api/matrix-script/ms-flow-1/tomato-real-result/preview/final.mp4"' in html
-    assert 'data-role="ms-main-video-result-actions"\n               hidden aria-hidden="true"' in html
+    assert 'data-role="ms-main-video-result-actions"' not in html
+    assert 'data-role="legacy-main-video-compat-anchor"' in html
     assert "/tomato-real-result/preview/final.mp4" in html
 
 
@@ -187,7 +187,7 @@ def test_delivery_entry_keeps_publish_cta() -> None:
     assert "/tasks/connect/matrix_script/publish" not in dse
     assert "当前交付候选：主视频 V1" in dse
     assert "正式交付就绪：false" in dse
-    assert dse.index("ms_overlay.has_pr_a_result") < dse.index("当前不能交付：尚未生成主视频")
+    assert dse.index("ms_overlay.has_pr_a_result") < dse.index("当前不能交付：尚未完成主预览")
 
 
 def test_primary_ui_uses_operator_shot_labels_not_raw_engineering_labels() -> None:

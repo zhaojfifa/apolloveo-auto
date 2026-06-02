@@ -166,22 +166,21 @@ def test_section1_carries_state_pill(primary_slice: str) -> None:
     assert 'data-role="ms-main-video-result-state-pill"' in primary_slice
 
 
-def test_section1_carries_four_actions(primary_slice: str) -> None:
-    assert 'data-role="ms-main-video-result-actions"' in primary_slice
-    # Action ids are rendered through {{ action.action_id }} so the
-    # source contains the literal id strings inside the Jinja branches.
-    assert "'go_to_delivery'" in primary_slice
-    assert "'confirm_main_version'" in primary_slice
+def test_section1_uses_preview_action_model(primary_slice: str) -> None:
+    assert 'data-role="ms-main-video-result-actions"' not in primary_slice
+    assert 'data-role="ms-acc-generate"' in primary_slice
+    assert 'data-role="legacy-main-video-compat-anchor"' in primary_slice
+    assert 'inert' in primary_slice
 
 
 def test_section1_empty_state_copy_present_in_helper_contract(
     primary_slice: str,
 ) -> None:
-    """The honest empty-state copy is sourced from the helper at render
-    time (`ms_main_video_result.preview.empty_state_message_zh`); the
-    template binding must be present so the helper string flows through."""
+    """The operator-first empty state is a direct single-action instruction,
+    not the old helper's task-status blocker copy."""
 
-    assert "ms_main_video_result.preview.empty_state_message_zh" in primary_slice
+    assert "请先确认素材与配乐，然后生成视频预览" in primary_slice
+    assert "ms_main_video_result.preview.empty_state_message_zh" not in primary_slice
 
 
 # --------------------------------------------------------------------------
@@ -240,7 +239,7 @@ def test_section3_empty_state_uses_design_verbatim_copy(primary_slice: str) -> N
     """Design §4 Section 3 verbatim empty-state copy."""
 
     assert "暂未生成变体视频" in primary_slice
-    assert "你可以先生成主视频，或选择同时生成多个变体。" in primary_slice
+    assert "你可以先完成主预览，或选择同时准备多个变体。" in primary_slice
 
 
 def test_section3_has_add_and_batch_actions(primary_slice: str) -> None:
@@ -304,9 +303,9 @@ def test_section4_has_two_lines_and_cta(primary_slice: str) -> None:
 def test_section4_default_copy_when_not_publishable(primary_slice: str) -> None:
     """Design §4 Section 4 default (not publishable) copy verbatim."""
 
-    assert "当前不能交付：尚未生成主视频。" in primary_slice
+    assert "当前不能交付：尚未完成主预览。" in primary_slice
     assert (
-        "生成完成后，可前往交付页面查看成片、字幕、音频、文案包与发布设置。"
+        "预览完成后，可进入交付检查查看成片、字幕、音频、文案包与发布设置。"
         in primary_slice
     )
 
@@ -315,7 +314,7 @@ def test_section4_publishable_branch_copy_present(primary_slice: str) -> None:
     """Design §4 Section 4 publishable copy verbatim."""
 
     assert "可交付 · 已确认主版本。" in primary_slice
-    assert "前往交付页面填写发布设置或回填发布状态。" in primary_slice
+    assert "进入交付检查填写发布设置或回填发布状态。" in primary_slice
 
 
 def test_section4_contains_no_deliverable_rows(primary_slice: str) -> None:
@@ -539,16 +538,16 @@ def test_anchor_questions_answered_in_section1_and_section2(
 ) -> None:
     """Q1 main video identity → Section 1 title + subtitle.
     Q2 generated? → Section 1 state pill (mirrored in step 3 detail).
-    Q3 blocked? → Section 1 banner blocker line (mirrored in step 3).
-    Q4 next action? → Section 1 banner next-action line.
+    Q3 generated? → Section 1 acceptance status + generate preview action.
+    Q4 next action? → Section 1 preview action.
     Q5 delivery? → Section 4 CTA."""
 
     for marker in (
         'data-role="ms-main-video-result-title"',
         'data-role="ms-main-video-result-subtitle"',
         'data-role="ms-main-video-result-state-pill"',
-        'data-role="ms-main-video-result-blocker"',
-        'data-role="ms-main-video-result-next-action"',
+        'data-role="ms-main-video-result-acceptance"',
+        'data-role="ms-acc-generate"',
         'data-role="ms-section-delivery-entry-cta"',
     ):
         assert marker in primary_slice

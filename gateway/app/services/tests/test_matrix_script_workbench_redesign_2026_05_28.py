@@ -73,7 +73,7 @@ def test_block_e_empty_state_mission_copy_present() -> None:
 
     source = _read()
     assert "暂未生成变体视频" in source
-    assert "你可以先生成主视频，或选择同时生成多个变体。" in source
+    assert "你可以先完成主预览，或选择同时准备多个变体。" in source
 
 
 def test_block_e_card_data_role_marker_root_preserved_for_back_compat() -> None:

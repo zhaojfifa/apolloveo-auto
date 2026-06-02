@@ -83,20 +83,15 @@ def test_removed_group_headers_and_temp_cards_are_absent(workbench_source: str) 
         assert label not in workbench_source
 
 
-def test_a_to_j_operator_titles_are_direct(primary_visible: str) -> None:
+def test_primary_operator_titles_are_direct(primary_visible: str) -> None:
     for title in (
-        "A · 主视频结果",
-        "B · 脚本理解",
-        "C · 视频生成计划",
-        "D · 画面与素材",
-        "E · 角色与声音",
-        "F · 字幕与音乐",
-        "G · 视频变体",
-        "H · 校对与微调",
-        "I · 交付入口",
-        "J · 技术诊断",
+        "A · 主视频预览 / 生成视频",
+        "B · 背景、素材、配乐调整",
+        "C · 交付入口",
+        "D · 视频变体",
+        "E · 脚本理解 / 故事理解",
     ):
-        assert title in primary_visible or title == "J · 技术诊断"
+        assert title in primary_visible
 
 
 def test_review_tuning_is_collapsed(primary_slice: str) -> None:
