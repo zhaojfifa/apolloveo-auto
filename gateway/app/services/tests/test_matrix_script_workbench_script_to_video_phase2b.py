@@ -129,18 +129,21 @@ def test_new_task_cta_is_generate_video_plan(new_task_source: str) -> None:
 
 
 # --------------------------------------------------------------------------
-# (2) Operator-first Workbench sections present
+# (2) Ten Workbench sections (A–J) present
 # --------------------------------------------------------------------------
 
 
 PHASE2B_SECTION_ANCHORS = [
     ("A", "matrix-script-main-video-result"),
-    ("B", "matrix-script-section-generation-plan"),
-    ("C", "matrix-script-section-role-voice"),
-    ("D", "matrix-script-section-delivery-entry"),
-    ("E", "matrix-script-section-optional-variants"),
-    ("F", "matrix-script-section-script-understanding"),
-    ("G", "op-console-ms-technical-diagnostics-fold"),
+    ("B", "matrix-script-section-script-understanding"),
+    ("C", "matrix-script-section-generation-plan"),
+    ("D", "matrix-script-section-visual-materials"),
+    ("E", "matrix-script-section-role-voice"),
+    ("F", "matrix-script-section-subtitle-music"),
+    ("G", "matrix-script-section-video-versions"),
+    ("H", "matrix-script-section-review-tuning"),
+    ("I", "matrix-script-section-delivery-entry"),
+    ("J", "op-console-ms-technical-diagnostics-fold"),
 ]
 
 
@@ -331,8 +334,8 @@ def test_no_axis_tuple_row_markers_in_primary(primary_visible: str) -> None:
 
 def test_no_provider_model_vendor_engine_controls(primary_slice: str) -> None:
     """No <select> / <input> with name=provider|model|vendor|engine in
-    primary. No operator-visible provider names except the approved Azure
-    TTS readiness note."""
+    primary. No operator-visible provider name (Azure / Gemini / Akool /
+    Seedance / OpenAI / etc.)."""
 
     # Form controls.
     for noun in ("provider", "model", "vendor", "engine"):
@@ -342,7 +345,7 @@ def test_no_provider_model_vendor_engine_controls(primary_slice: str) -> None:
         )
     # Visible vendor / model names (any case).
     visible = re.sub(r'="[^"]*"', '=""', _strip_non_rendered(primary_slice))
-    for vendor in ("gemini", "akool", "seedance", "openai", "anthropic"):
+    for vendor in ("azure", "gemini", "akool", "seedance", "openai", "anthropic"):
         assert not re.search(rf"\b{vendor}\b", visible, flags=re.IGNORECASE), (
             f"Vendor name leaked into primary visible text: {vendor}"
         )
@@ -365,9 +368,8 @@ def test_no_fake_media_or_publish_url(primary_visible: str) -> None:
         assert fake not in visible, f"Fake media / URL leaked: {fake}"
 
 
-def test_only_real_preview_video_no_iframe_or_source_tag_in_primary(primary_slice: str) -> None:
-    assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in primary_slice
-    for tag in ("<iframe", "<source "):
+def test_no_video_or_iframe_or_source_tag_in_primary(primary_slice: str) -> None:
+    for tag in ("<video", "<iframe", "<source "):
         assert tag not in primary_slice
 
 
