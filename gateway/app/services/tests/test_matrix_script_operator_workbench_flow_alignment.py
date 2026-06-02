@@ -94,15 +94,17 @@ def _block(src: str, start_marker: str, end_marker: str) -> str:
 
 
 # 7. existing ① main result suppresses 未生成 / 主成片缺失 when operator_usable.
-#    The empty-state sits in an {% else %} AFTER an {% elif ms_overlay_mr.operator_usable %}
+#    The empty-state sits in an {% else %} AFTER an operator_usable + preview_url
 #    branch, and the blocker banner is wrapped in {% if not ms_overlay_mr.operator_usable %},
 #    so neither renders in the operator-usable state.
 def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     src = _template_src()
     block = _block(src, 'id="matrix-script-main-video-result"', '{# Phase 2C')
-    # empty-state is gated behind the operator-usable elif
-    assert "{% elif ms_overlay_mr.operator_usable %}" in block
-    assert block.index("{% elif ms_overlay_mr.operator_usable %}") < block.index('data-role="ms-main-video-result-preview-empty"')
+    # empty-state is gated behind the operator-usable video branch
+    assert "{% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}" in block
+    assert block.index("{% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}") < block.index('data-role="ms-main-video-result-preview-empty"')
+    assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in block
+    assert 'data-role="ms-main-video-result-video"' in block
     # blocker banner only renders when NOT operator-usable
     banner_idx = block.index('data-role="ms-main-video-result-banner"')
     guard = block.rindex("{% if not ms_overlay_mr.operator_usable %}", 0, banner_idx)
@@ -114,8 +116,8 @@ def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     assert 'data-role="ms-acc-preview-url"' in block
 
 
-# 8. existing ② storyboard carries the per-shot acceptance overlay (loop over
-#    ms_overlay.shots) INSIDE the existing generation-plan section.
+# 8. existing ② storyboard carries the per-shot/material acceptance overlay
+#    (loop over ms_overlay.shots) INSIDE the existing generation-plan section.
 def test_existing_storyboard_has_shot_acceptance_overlay() -> None:
     src = _template_src()
     block = _block(src, 'data-role="matrix-script-section-generation-plan"',
@@ -124,6 +126,9 @@ def test_existing_storyboard_has_shot_acceptance_overlay() -> None:
     assert "{% for s in ms_overlay.shots %}" in block
     assert 'data-role="ms-shot-acceptance"' in block
     assert "{{ s.semantic_status }}" in block and "{{ s.source }}" in block
+    assert 'data-role="ms-shot-replace-material"' in block
+    assert 'data-role="ms-shot-regenerate"' in block
+    assert "当前为复用素材，建议补充真实品尝/递镜素材。" in block
 
 
 # overlay render proof (block-extraction render with a usable result)
@@ -141,6 +146,7 @@ def test_overlay_main_result_renders_operator_usable() -> None:
     assert "当前尚未生成主视频" not in html  # empty-state suppressed
     assert "主成片缺失" not in html
     assert "运营可用" in html and "partial_pass" in html
+    assert '<video controls preload="metadata" src="/api/matrix-script/ms-flow-1/tomato-real-result/preview/final.mp4"' in html
     assert "/tomato-real-result/preview/final.mp4" in html
 
 
@@ -148,7 +154,7 @@ def test_overlay_main_result_renders_operator_usable() -> None:
 def test_script_understanding_presenter_bound_not_fixture() -> None:
     src = _template_src()
     su = src[src.index('data-role="matrix-script-section-script-understanding"'):]
-    su = su[:su.index('data-role="matrix-script-section-generation-plan"')]
+    su = su[:su.index('data-role="matrix-script-section-review-tuning"')]
     assert "ms_script_structure" in su  # bound to the per-task presenter
     # the removed hardcoded fixture is not rendered anywhere
     assert "TOMATO_SCRIPT_UNDERSTANDING" not in src
