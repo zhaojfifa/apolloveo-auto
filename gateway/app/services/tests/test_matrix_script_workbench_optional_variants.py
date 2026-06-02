@@ -46,7 +46,7 @@ def test_block_e_empty_state_uses_mission_b3_verbatim_wording() -> None:
 
     source = _read()
     assert ">暂未生成变体视频<" in source
-    assert "你可以先生成主视频，或选择同时生成多个变体。" in source
+    assert "你可以先完成主预览，或选择同时准备多个变体。" in source
     # The PR-0 wording is retired from primary operator copy.
     # (The substring "当前暂无可预览成片" may survive elsewhere in
     # operator-facing copy as a generic phrase; the specific PR-0

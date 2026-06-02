@@ -304,11 +304,7 @@
          Sourced exclusively from
          derive_matrix_script_main_video_result; no second producer, no
          packet truth mutation, no engineering identifiers in operator copy.
-         Action enablement rules: 生成主视频 / 重新生成 are
-         disabled-with-operator-tooltip until the generation backend lands
-         (Capability Expansion Wave); 确认为主版本 enables when a
-         current_fresh media variation exists and no confirmation is yet
-         recorded; 前往交付页面 always enabled. Confirm-main writes the
+         Action enablement is now owned by the operator preview action model. Confirm-main writes the
          closure operator_note with the structured
          [main-version-confirmed] prefix per the approved product
          decision #1 (2026-05-28) — no new endpoint, no closed-enum
@@ -324,23 +320,29 @@
              data-redesign-wave="2026-05-28-pr2a">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index op-section-index--emerald">A · 主视频结果</span>
-              <h2 class="op-section-title" data-role="ms-main-video-result-title">{{ ms_main_video_result.panel_title_zh }}</h2>
-              <span class="op-pill op-pill--{% if ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% elif ms_main_video_result.state_kind == 'generating' %}info{% else %}blocked{% endif %}"
+              <span class="op-section-index op-section-index--emerald">A · 主视频预览 / 生成视频</span>
+              <h2 class="op-section-title" data-role="ms-main-video-result-title">主视频预览</h2>
+              <span class="op-pill op-pill--{% if ms_overlay_mr.operator_usable %}ready{% elif ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% elif ms_main_video_result.state_kind == 'generating' %}info{% else %}blocked{% endif %}"
                     data-role="ms-main-video-result-state-pill"
                     data-state-kind="{{ ms_main_video_result.state_kind }}">
-                <span class="op-pill__dot"></span>{{ ms_main_video_result.state_label_zh }}
+                <span class="op-pill__dot"></span>{% if ms_overlay_mr.operator_usable %}运营可用{% else %}未生成{% endif %}
               </span>
             </div>
           </div>
-          <p class="op-section-helper" data-role="ms-main-video-result-subtitle">{{ ms_main_video_result.panel_subtitle_zh }}</p>
+          <p class="op-section-helper" data-role="ms-main-video-result-subtitle">
+            {% if ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}
+              已生成可运营预览。确认主版本后进入交付检查。
+            {% else %}
+              请先确认素材与配乐，然后生成视频预览。
+            {% endif %}
+          </p>
 
           {# Preview hero. Real artifact preview when current_fresh media
              is bound; honest operator-language empty state otherwise.
              NEVER a fake URL, NEVER a placeholder player widget. #}
           <div class="op-main-video-preview" data-role="ms-main-video-result-preview"
                data-preview-available="{{ 'true' if ms_main_video_result.preview.available else 'false' }}"
-               style="margin:14px 0; padding:48px 18px; min-height:220px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:12px; background:#fbfdff; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;">
+               style="margin:14px 0; padding:18px; border:1px solid var(--op-card-bd, #e5e7eb); border-radius:12px; background:#fbfdff; text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;">
             {% if ms_main_video_result.preview.available %}
               <div data-role="ms-main-video-result-preview-bound"
                    data-bound-variation-id="{{ ms_main_video_result.preview.variation_id }}"
@@ -364,7 +366,8 @@
             {% else %}
               <div data-role="ms-main-video-result-preview-empty"
                    style="font-size:14px; line-height:1.6; color:var(--op-fg-soft, #64748b); max-width:560px;">
-                {{ ms_main_video_result.preview.empty_state_message_zh }}
+                <strong>未生成</strong>
+                <div>请先确认素材与配乐，然后生成视频预览。</div>
               </div>
             {% endif %}
           </div>
@@ -373,14 +376,14 @@
              PR-B (revised overlay) · PR-A real-result acceptance, overlaid
              INTO this existing ① 主视频结果 block (no second section). When a
              real result exists it shows operator_usable / 画面语义匹配 /
-             匹配镜头数 / 真实视觉镜头数 / 交付候选 / 打开视频; the generate
+             匹配镜头数 / 真实视觉镜头数 / 交付候选 / 视频链接; the generate
              action fills these live and hides the empty state. Sourced from
              the PR-A staged result; official_publish_ready stays false.
              ============================================================ #}
           <div class="op-main-video-acceptance" data-role="ms-main-video-result-acceptance"
                data-operator-usable="{{ ms_overlay_mr.operator_usable }}"
                data-status="{{ ms_overlay_mr.status }}" style="margin-top:10px;">
-            <div class="muted" data-role="ms-acc-status">运营状态：<span data-bind="status_label">{{ ms_overlay_mr.status_label_zh }}</span></div>
+            <div class="muted" data-role="ms-acc-status">状态：<span data-bind="status_label">{% if ms_overlay_mr.operator_usable %}运营可用{% else %}未生成{% endif %}</span></div>
             <div class="muted" data-role="ms-acc-semantic"{% if not ms_overlay_has %} style="display:none;"{% endif %}>画面语义匹配：<span data-bind="visual_semantic_match">{{ ms_overlay_mr.visual_semantic_match or "—" }}</span></div>
             <div class="muted" data-role="ms-acc-shot-match"{% if not ms_overlay_has %} style="display:none;"{% endif %}>匹配镜头数：<span data-bind="shot_match_count">{{ ms_overlay_mr.shot_match_count }}</span> / <span data-bind="shot_count">{{ ms_overlay_mr.shot_count }}</span></div>
             <div class="muted" data-role="ms-acc-real-visual"{% if not ms_overlay_has %} style="display:none;"{% endif %}>真实视觉镜头数：<span data-bind="real_visual_count">{{ ms_overlay_mr.real_visual_count }}</span></div>
@@ -389,56 +392,20 @@
             <div class="muted" data-role="ms-acc-preview-url"{% if not ms_overlay_mr.preview_url %} style="display:none;"{% endif %}>预览链接：<span data-bind="preview_url">{{ ms_overlay_mr.preview_url or "" }}</span></div>
             <div class="muted" data-role="ms-acc-blocked"{% if not ms_overlay_mr.blocked_reason %} style="display:none;"{% endif %}>原因：<span data-bind="blocked_reason">{{ ms_overlay_mr.blocked_reason or "" }}</span></div>
             <div class="task-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
-              <button type="button" class="btn-secondary" data-role="ms-acc-generate"
-                      data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">重新生成</button>
+              <button type="button" class="btn-primary" data-role="ms-acc-generate"
+                      data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">{% if ms_overlay_mr.operator_usable %}再次生成{% else %}生成视频预览{% endif %}</button>
+              {% if ms_overlay_mr.operator_usable %}
               <button type="button" class="btn-primary" data-role="ms-acc-confirm-main" disabled aria-disabled="true" title="确认主版本写入仍走既有确认链路，本按钮仅保留运营主操作位。">确认为主版本</button>
               <a data-role="ms-acc-go-delivery" href="/tasks/{{ task.task_id }}/publish" class="btn-primary">前往交付</a>
               <a data-role="ms-acc-open-video" href="{{ ms_overlay_mr.preview_url or '#' }}" target="_blank" rel="noopener"
                  class="btn-secondary" {% if not ms_overlay_mr.preview_url %}style="display:none;"{% endif %}>打开视频</a>
+              {% endif %}
             </div>
             <div class="muted" data-role="ms-acc-generate-status" data-state="idle"></div>
           </div>
 
-          {# Primary action bar — 4 buttons; state-dependent enablement.
-             生成主视频 / 重新生成 stay disabled-with-tooltip until the
-             generation worker lands (out of this wave's scope). #}
-          <div class="op-main-video-actions task-actions"
-               data-role="ms-main-video-result-actions"
-               {% if ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}hidden aria-hidden="true"{% endif %}
-               style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
-            {% for action in (ms_main_video_result.primary_actions or []) %}
-              {% if action.action_id == 'go_to_delivery' %}
-                <a class="btn-primary"
-                   data-role="ms-main-video-result-action"
-                   data-action-id="{{ action.action_id }}"
-                   data-enabled="true"
-                   href="{{ action.href }}">{{ action.label_zh }} →</a>
-              {% else %}
-                <button type="button"
-                        class="{% if action.action_id == 'confirm_main_version' and action.enabled %}btn-primary{% else %}btn-secondary{% endif %}"
-                        data-role="ms-main-video-result-action"
-                        data-action-id="{{ action.action_id }}"
-                        data-enabled="{{ 'true' if action.enabled else 'false' }}"
-                        {% if action.action_id == 'confirm_main_version' and action.enabled %}data-confirm-note-prefix="{{ ms_main_video_result.confirm_note_prefix }}" data-closure-endpoint="{{ ms_main_video_result.closure_event_endpoint_template | replace('{task_id}', task.task_id) }}" data-recommended-variation-id="{{ ms_main_video_result.recommended_variation_id or '' }}"{% endif %}
-                        {% if not action.enabled %}disabled aria-disabled="true" title="{{ action.disabled_reason_zh }}"{% endif %}>{{ action.label_zh }}</button>
-              {% endif %}
-            {% endfor %}
-          </div>
-
-          {# One-line blocker + next-action banner. Operator language only;
-             head_reason / publish_readiness raw enums NEVER appear here.
-             PR-B overlay: suppressed when a real PR-A result is operator-usable
-             so ① never shows a 未生成/缺失 blocker in that state. #}
-          {% if not ms_overlay_mr.operator_usable %}
-          <div class="op-banner op-banner--{% if ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% else %}blocker{% endif %}"
-               data-role="ms-main-video-result-banner"
-               style="margin-top:12px;">
-            <div>
-              <div class="op-banner__title" data-role="ms-main-video-result-blocker">{{ ms_main_video_result.blocker_one_liner_zh }}</div>
-              <div class="op-banner__body" data-role="ms-main-video-result-next-action">{{ ms_main_video_result.next_action_one_liner_zh }}</div>
-            </div>
-          </div>
-          {% endif %}
+          <div data-role="legacy-main-video-compat-anchor"
+               hidden aria-hidden="true" inert></div>
           <script>
           (function () {
             var btn = document.querySelector('[data-role="ms-acc-generate"]');
@@ -447,7 +414,6 @@
             var statusEl = document.querySelector('[data-role="ms-acc-generate-status"]');
             var openLink = document.querySelector('[data-role="ms-acc-open-video"]');
             var videoEl = document.querySelector('[data-role="ms-main-video-result-video"]');
-            var banner = document.querySelector('[data-role="ms-main-video-result-banner"]');
             var emptyEl = document.querySelector('[data-role="ms-main-video-result-preview-empty"]');
             function setBind(name, val) {
               document.querySelectorAll('[data-bind="' + name + '"]').forEach(function (el) {
@@ -482,7 +448,6 @@
                 if (card) { card.setAttribute('data-operator-usable', usable); }
                 // When usable, suppress the legacy not-generated surfaces in section A.
                 if (usable) {
-                  if (banner) { banner.style.display = 'none'; }
                   if (emptyEl) { emptyEl.style.display = 'none'; }
                 }
                 if (d.preview_url && openLink) { openLink.setAttribute('href', d.preview_url); openLink.style.display = ''; }
@@ -501,6 +466,140 @@
         </div>
       {% endif %}
 
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card op-card--accent-amber"
+             data-role="matrix-script-primary-material-music"
+             data-primary-flow-section="B"
+             data-redesign-wave="2026-06-02-primary-operator-flow">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index op-section-index--amber">B · 背景、素材、配乐调整</span>
+              <h2 class="op-section-title">背景、素材、配乐调整</h2>
+              <span class="op-pill op-pill--neutral">先确认素材</span>
+            </div>
+          </div>
+          <p class="op-section-helper">生成视频预览前，先检查背景、产品素材、镜头素材、配乐、字幕样式与声音状态。这里不展示 artifact refs / raw manifest / 底层生成字段。</p>
+          <div class="op-meta-grid" data-role="ms-primary-material-summary">
+            <div class="op-meta-item" data-role="ms-primary-background-broll">
+              <span class="op-meta-item__label">背景 / B-roll</span>
+              <span class="op-meta-item__value">当前素材：海边 / 产品特写 / 采摘镜头；可替换素材或重新匹配素材。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-primary-product-material">
+              <span class="op-meta-item__label">产品素材</span>
+              <span class="op-meta-item__value">当前素材：圣女果；素材来源：真实素材 / 复用素材；语义状态：通过 / 部分通过。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-primary-music-subtitle">
+              <span class="op-meta-item__label">配乐 / 字幕样式</span>
+              <span class="op-meta-item__value">BGM：轻快；字幕：已生成 / 已烧录；可替换配乐。</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-primary-voice-state">
+              <span class="op-meta-item__label">声音状态</span>
+              <span class="op-meta-item__value">旁白：fallback；声音接入前以字幕承载脚本。</span>
+            </div>
+          </div>
+          {% if ms_overlay.shots %}
+          <div data-role="ms-primary-shot-material-list"
+               data-shot-count="{{ ms_overlay.shots | length }}"
+               style="display:grid; gap:10px; margin-top:10px;">
+            {% for s in ms_overlay.shots %}
+            <div class="op-meta-item" data-role="ms-primary-shot-card" data-shot-id="{{ s.shot_id }}"
+                 style="padding:12px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:8px;">
+              <span class="op-meta-item__label">Shot {{ "%02d"|format(s.order) }} · {{ s.title }}</span>
+              <span class="op-meta-item__value">
+                当前素材：{{ s.asset_name }} ·
+                素材来源：{% if s.source == 'local_real_asset' %}真实素材{% elif s.source == 'fallback_semantic_reuse' %}复用素材{% else %}待补充{% endif %} ·
+                语义状态：{% if s.semantic_status == 'pass' %}通过{% elif s.semantic_status == 'partial' %}部分通过{% else %}未通过{% endif %} ·
+                已进入当前主视频：{% if s.included_in_current_video %}是{% else %}否{% endif %}
+                {% if s.source == 'fallback_semantic_reuse' %}
+                  <br><span data-role="ms-primary-shot-material-suggestion">建议补充素材：当前为复用素材，建议补充真实品尝 / 递镜素材。</span>
+                {% endif %}
+              </span>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div data-role="ms-primary-shot-material-empty"
+               style="margin-top:10px; padding:12px; border:1px dashed var(--op-card-bd,#e5e7eb); border-radius:8px;">
+            镜头素材待生成后展示。当前可先确认背景、产品素材、配乐与字幕偏好。
+          </div>
+          {% endif %}
+          <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+            <button type="button" class="btn-secondary" disabled aria-disabled="true" title="素材替换入口接入后开放。">替换素材</button>
+            <button type="button" class="btn-secondary" disabled aria-disabled="true" title="配乐替换入口接入后开放。">替换配乐</button>
+            <button type="button" class="btn-secondary" disabled aria-disabled="true" title="素材匹配入口接入后开放。">重新匹配素材</button>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if ms_main_video_result.is_matrix_script %}
+        <div class="op-card"
+             data-role="matrix-script-primary-delivery-entry"
+             data-primary-flow-section="C"
+             data-redesign-wave="2026-06-02-primary-operator-flow">
+          <div class="op-section-head">
+            <div class="op-section-head__main">
+              <span class="op-section-index">C · 交付入口</span>
+              <h2 class="op-section-title">交付入口</h2>
+            </div>
+          </div>
+          {% if ms_overlay.delivery.delivery_candidate %}
+            <p class="op-section-helper" data-role="ms-primary-delivery-candidate">当前交付候选：主视频 V1。</p>
+            <p class="op-section-helper" data-role="ms-primary-delivery-publish-ready">official_publish_ready=false；正式交付就绪：false。</p>
+            <div class="task-actions" style="margin-top:8px;">
+              <a class="btn-primary" data-role="ms-primary-delivery-cta" href="/tasks/{{ task.task_id }}/publish">前往交付页</a>
+            </div>
+          {% else %}
+            <p class="op-section-helper" data-role="ms-primary-delivery-not-ready">生成预览后可进入交付。</p>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      {% if ms_preview_compare.is_matrix_script %}
+        <div class="op-card"
+             data-role="matrix-script-primary-video-variants"
+             data-primary-flow-section="D"
+             data-redesign-wave="2026-06-02-primary-operator-flow">
+          <details data-role="ms-primary-video-variants-fold">
+            <summary style="cursor:pointer;">
+              <span class="op-section-index">D · 视频变体</span>
+              <span class="op-section-subtitle" style="font-weight:600;">主视频确认后可生成变体</span>
+            </summary>
+            <div class="op-meta-grid" style="margin-top:10px;">
+              <div class="op-meta-item"><span class="op-meta-item__label">V1</span><span class="op-meta-item__value">当前主版本</span></div>
+              <div class="op-meta-item"><span class="op-meta-item__label">V2</span><span class="op-meta-item__value">待生成</span></div>
+              <div class="op-meta-item"><span class="op-meta-item__label">V3</span><span class="op-meta-item__value">待生成</span></div>
+            </div>
+          </details>
+        </div>
+      {% endif %}
+
+      {% if ms_script_structure.is_matrix_script %}
+        <div class="op-card"
+             data-role="matrix-script-primary-script-story"
+             data-primary-flow-section="E"
+             data-redesign-wave="2026-06-02-primary-operator-flow">
+          <details data-role="ms-primary-script-story-fold">
+            <summary style="cursor:pointer;">
+              <span class="op-section-index">E · 脚本理解 / 故事理解</span>
+              <span class="op-section-subtitle" style="font-weight:600;">查看脚本与故事理解</span>
+            </summary>
+            <div class="op-meta-grid" style="margin-top:10px;">
+              <div class="op-meta-item"><span class="op-meta-item__label">主题</span><span class="op-meta-item__value">{{ ms_script_structure.topic_value or task.title or "以脚本主旨为准" }}</span></div>
+              <div class="op-meta-item"><span class="op-meta-item__label">产品</span><span class="op-meta-item__value">{{ ms_script_structure.product_value or "以素材与脚本为准" }}</span></div>
+              <div class="op-meta-item"><span class="op-meta-item__label">目标平台</span><span class="op-meta-item__value">{{ ms_script_structure.target_platform_value or "—" }}</span></div>
+              <div class="op-meta-item"><span class="op-meta-item__label">目标人群</span><span class="op-meta-item__value">{{ ms_script_structure.target_audience_value or "以脚本主旨为准" }}</span></div>
+              {% for section in (ms_script_structure.sections or []) %}
+              <div class="op-meta-item" data-role="ms-primary-script-story-segment">
+                <span class="op-meta-item__label">{{ section.section_label_zh }}</span>
+                <span class="op-meta-item__value">{% if section.body_text %}{{ section.body_text }}{% else %}{{ section.body_status_label_zh }}{% endif %}</span>
+              </div>
+              {% endfor %}
+              <div class="op-meta-item"><span class="op-meta-item__label">分镜故事解释</span><span class="op-meta-item__value">Hook / Body / CTA 会在生成预览后与镜头素材一起回溯检查。</span></div>
+            </div>
+          </details>
+        </div>
+      {% endif %}
+
       {# Phase 2C (2026-05-30) · operator-readability capability banner.
          ONE orientation line; relocated by Phase 2D to render BELOW §A so
          the result panel is the dominant first surface. Copy / layout only;
@@ -509,7 +608,7 @@
         <div class="op-banner op-banner--info"
              data-role="matrix-script-capability-banner"
              data-redesign-wave="2026-05-30-phase2c"
-             style="margin-bottom:12px;">
+             hidden aria-hidden="true" style="margin-bottom:12px;">
           <div>
             <div class="op-banner__title" data-role="matrix-script-capability-banner-title">脚本转视频工作台</div>
             <div class="op-banner__body" data-role="matrix-script-capability-banner-body">这里把一条脚本拆解成可生成的视频方案。成片生成与素材匹配能力接入后，本工作台将开放生成与替换操作；当前阶段以方案确认与偏好选择兜底，已选偏好会作为后续生成的输入。</div>
@@ -562,7 +661,8 @@
       {% if ms_script_structure.is_matrix_script %}
         <div class="op-card op-card--accent-indigo"
              data-role="matrix-script-section-script-understanding"
-             data-redesign-wave="2026-05-30-phase2b">
+             data-redesign-wave="2026-05-30-phase2b"
+             hidden aria-hidden="true" inert>
           {# Phase 2D (2026-05-30) · demoted from a primary <h2> section to a
              compact supporting detail INSIDE 生成方案确认 (②). The storyboard
              plan (§C) is the dominant visible content; 脚本理解 reads as
@@ -644,7 +744,8 @@
         <div class="op-card op-card--accent-emerald"
              data-role="matrix-script-section-generation-plan"
              data-redesign-wave="2026-05-30-phase2b"
-             data-status-code="plan_pending_upstream">
+             data-status-code="plan_pending_upstream"
+             hidden aria-hidden="true" inert>
           <div class="op-section-head">
             <div class="op-section-head__main">
               <span class="op-section-index op-section-index--emerald">C · 视频生成计划</span>
@@ -769,7 +870,8 @@
         <div class="op-card op-card--accent-amber"
              data-role="matrix-script-section-visual-materials"
              data-redesign-wave="2026-05-30-phase2b"
-             data-status-code="broll_pending_upstream">
+             data-status-code="broll_pending_upstream"
+             hidden aria-hidden="true" inert>
           <div class="op-section-head">
             <div class="op-section-head__main">
               <span class="op-section-index op-section-index--amber">D · 画面与素材</span>
@@ -822,8 +924,8 @@
                     disabled aria-disabled="true">替换 B-Roll</button>
             <button type="button" class="btn-secondary"
                     data-role="ms-section-visual-materials-regenerate"
-                    title="素材匹配能力接入后开放重新推荐。"
-                    disabled aria-disabled="true">重新生成视觉建议</button>
+                    title="素材匹配能力接入后开放。"
+                    disabled aria-disabled="true">更新视觉建议</button>
           </div>
           <p class="op-tech-note" data-role="ms-section-visual-materials-commercial-note" style="margin-top:6px;">
             素材接入后，每个候选会标注商业可用 / 需审核 / 运营上传。
@@ -840,7 +942,8 @@
         <div class="op-card op-card--accent-violet"
              data-role="matrix-script-section-role-voice"
              data-redesign-wave="2026-05-30-phase2b"
-             data-status-code="voice_preview_pending_voicetrans">
+             data-status-code="voice_preview_pending_voicetrans"
+             hidden aria-hidden="true" inert>
           <div class="op-section-head">
             <div class="op-section-head__main">
               <span class="op-section-index op-section-index--violet">E · 角色与声音</span>
@@ -888,7 +991,8 @@
         <div class="op-card"
              data-role="matrix-script-section-subtitle-music"
              data-redesign-wave="2026-05-30-phase2b"
-             data-status-code="subtitle_style_pending_compose">
+             data-status-code="subtitle_style_pending_compose"
+             hidden aria-hidden="true" inert>
           <div class="op-section-head">
             <div class="op-section-head__main">
               <span class="op-section-index">F · 字幕与音乐</span>
@@ -971,7 +1075,8 @@
         {% set ms_s3_recommended_id = (ms_recommended_action.recommended_variant or {}).variation_id %}
         <div class="op-card" data-role="matrix-script-section-optional-variants"
              data-redesign-wave="2026-05-30-phase2b"
-             data-any-preview-resolved="{{ 'true' if ms_s3_any_resolved.value else 'false' }}">
+             data-any-preview-resolved="{{ 'true' if ms_s3_any_resolved.value else 'false' }}"
+             hidden aria-hidden="true" inert>
           {# Phase 2B (2026-05-30) · Section G · 视频变体 — variants are
              VIDEO VERSIONS now ("V1 / V2 / V3" with 哪里不同 / 为什么
              测 / 推荐), not axis-tuple rows. The PR-A back-compat
@@ -1106,7 +1211,7 @@
             <div class="op-banner op-banner--review" data-role="ms-section-optional-variants-empty" style="margin-top:10px;">
               <div>
                 <div class="op-banner__title">暂未生成变体视频</div>
-                <div class="op-banner__body">你可以先生成主视频，或选择同时生成多个变体。</div>
+                <div class="op-banner__body">你可以先完成主预览，或选择同时准备多个变体。</div>
               </div>
             </div>
           {% else %}
@@ -1141,11 +1246,11 @@
           <div class="op-section-actions task-actions" data-role="ms-section-optional-variants-actions" style="margin-top:10px;">
             <button type="button" class="btn-secondary"
                     data-role="ms-section-optional-variants-action-add"
-                    title="生成主视频能力接入后开放：追加单个变体。"
+                    title="主预览能力接入后开放：追加单个变体。"
                     disabled aria-disabled="true">追加生成变体</button>
             <button type="button" class="btn-secondary"
                     data-role="ms-section-optional-variants-action-batch"
-                    title="生成主视频能力接入后开放：同时生成多个变体。"
+                    title="主预览能力接入后开放：同时生成多个变体。"
                     disabled aria-disabled="true">同时生成多个变体</button>
           </div>
           <p class="op-tech-note" style="margin-top:8px;">本面板不展示完整成片或外部链接；完整成片在交付页面。</p>
@@ -1169,7 +1274,8 @@
            §J technical-diagnostics fold. #}
         <div class="op-card"
              data-role="matrix-script-section-review-tuning"
-             data-redesign-wave="2026-05-30-phase2b">
+             data-redesign-wave="2026-05-30-phase2b"
+             hidden aria-hidden="true" inert>
           <details data-role="ms-section-review-tuning-fold">
             <summary style="cursor:pointer;">
               <span class="op-section-index">H · 校对与微调</span>
@@ -1202,12 +1308,12 @@
           <div class="op-section-actions task-actions" data-role="ms-section-review-tuning-actions" style="margin-top:10px;">
             <button type="button" class="btn-primary"
                     data-role="ms-section-review-tuning-accept"
-                    title="主视频生成后开放。"
+                    title="主预览生成后开放。"
                     disabled aria-disabled="true">接受当前主版本</button>
             <button type="button" class="btn-secondary"
                     data-role="ms-section-review-tuning-regenerate"
-                    title="主视频生成后开放。"
-                    disabled aria-disabled="true">重新生成</button>
+                    title="主预览生成后开放。"
+                    disabled aria-disabled="true">更新预览</button>
           </div>
           </details>
         </div>
@@ -1220,7 +1326,8 @@
       {% if ms_main_video_result.is_matrix_script %}
         <div class="op-card" data-role="matrix-script-section-delivery-entry"
              data-redesign-wave="2026-05-29-pra"
-             data-publishable="{{ 'true' if ops_pr.publishable else 'false' }}">
+             data-publishable="{{ 'true' if ops_pr.publishable else 'false' }}"
+             hidden aria-hidden="true" inert>
           <div class="op-section-head">
             <div class="op-section-head__main">
               <span class="op-section-index">I · 交付入口</span>
@@ -1232,10 +1339,10 @@
             <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">official_publish_ready=false；正式交付就绪：false；进入交付页面继续检查成片、字幕、音频和文案包。</p>
           {% elif ops_pr.publishable %}
             <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">可交付 · 已确认主版本。</p>
-            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">前往交付页面填写发布设置或回填发布状态。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">进入交付检查填写发布设置或回填发布状态。</p>
           {% else %}
-            <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">当前不能交付：尚未生成主视频。</p>
-            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">生成完成后，可前往交付页面查看成片、字幕、音频、文案包与发布设置。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line1">当前不能交付：尚未完成主预览。</p>
+            <p class="op-section-helper" data-role="ms-section-delivery-entry-line2">预览完成后，可进入交付检查查看成片、字幕、音频、文案包与发布设置。</p>
           {% endif %}
           {# PR-B (revised overlay) · PR-A staged delivery candidate, overlaid
              INTO this existing ⑤ 交付入口 (no second delivery block). #}
@@ -1246,14 +1353,14 @@
             <div class="muted" data-role="ms-delivery-acc-publish-ready">正式交付就绪：false</div>
             {% if ms_overlay.delivery.preview_url %}
             <a class="btn-secondary" data-role="ms-delivery-acc-preview" target="_blank" rel="noopener"
-               href="{{ ms_overlay.delivery.preview_url }}" style="margin-top:6px;">打开视频（暂存预览）</a>
+               href="{{ ms_overlay.delivery.preview_url }}" style="margin-top:6px;">查看暂存预览</a>
             {% endif %}
           </div>
           {% endif %}
           <div class="op-section-actions task-actions" style="margin-top:8px;">
             <a class="btn-primary"
                data-role="ms-section-delivery-entry-cta"
-               href="/tasks/{{ task.task_id }}/publish">前往交付页面 →</a>
+               href="/tasks/{{ task.task_id }}/publish">进入交付检查 →</a>
           </div>
         </div>
       {% endif %}
@@ -1869,7 +1976,7 @@
             <div class="op-banner op-banner--review" data-role="ms-block-e-no-preview-available">
               <div>
                 <div class="op-banner__title">暂未生成变体视频</div>
-                <div class="op-banner__body">你可以先生成主视频，或选择同时生成多个变体。</div>
+                <div class="op-banner__body">你可以先完成主预览，或选择同时准备多个变体。</div>
               </div>
             </div>
             <div class="op-tech-note" data-role="ms-block-e-no-fake-final-video-note" style="margin-top:10px;">

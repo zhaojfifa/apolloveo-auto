@@ -45,17 +45,14 @@ def test_preview_hero_renders_empty_state_marker_branch() -> None:
     assert 'data-role="ms-main-video-result-preview-bound"' in source
 
 
-def test_four_action_buttons_carry_data_action_id() -> None:
-    """The template renders ``data-action-id="{{ action.action_id }}"`` via
-    Jinja interpolation; assert the loop + the data-action-id attribute
-    are wired so all four actions get individual markers at render time.
-    The action_id values themselves are pinned in the helper module
-    constants tested in test_matrix_script_main_video_result_view."""
+def test_old_helper_action_loop_removed_from_primary_ui() -> None:
+    """The old helper action loop must not remain as hidden primary markup.
+    Section A now uses the operator preview action model only."""
 
     source = _read()
-    # The loop iterates over primary_actions and renders the marker:
-    assert 'for action in (ms_main_video_result.primary_actions or [])' in source
-    assert 'data-action-id="{{ action.action_id }}"' in source
+    assert 'for action in (ms_main_video_result.primary_actions or [])' not in source
+    assert 'data-action-id="{{ action.action_id }}"' not in source
+    assert 'data-role="ms-acc-generate"' in source
 
 
 def _main_video_card_slice(source: str) -> str:
@@ -72,10 +69,11 @@ def _main_video_card_slice(source: str) -> str:
     return source[open_idx:endif_idx]
 
 
-def test_blocker_and_next_action_markers_present() -> None:
+def test_old_blocker_and_next_action_markers_removed() -> None:
     source = _read()
-    assert 'data-role="ms-main-video-result-blocker"' in source
-    assert 'data-role="ms-main-video-result-next-action"' in source
+    assert 'data-role="ms-main-video-result-blocker"' not in source
+    assert 'data-role="ms-main-video-result-next-action"' not in source
+    assert 'data-role="legacy-main-video-compat-anchor"' in source
 
 
 def test_no_engineering_identifier_in_main_video_block_source() -> None:
@@ -102,12 +100,10 @@ def test_main_video_block_carries_redesign_wave_attribute() -> None:
     assert 'data-redesign-wave="2026-05-28-pr2a"' in source
 
 
-def test_confirm_main_button_carries_closure_endpoint_attribute_when_enabled() -> None:
-    """The closure endpoint + note prefix attributes only render when
-    the confirm-main action is enabled (so JS can do the write-back)."""
+def test_confirm_main_closure_attributes_removed_from_primary_template() -> None:
+    """The old confirm-main helper action loop is no longer retained as
+    hidden primary markup."""
 
     source = _read()
-    # The data-closure-endpoint attribute IS in the template (rendered
-    # conditionally inside the action loop).
-    assert "data-closure-endpoint" in source
-    assert "data-confirm-note-prefix" in source
+    assert "data-closure-endpoint" not in source
+    assert "data-confirm-note-prefix" not in source
