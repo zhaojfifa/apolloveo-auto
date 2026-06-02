@@ -99,7 +99,7 @@ def _block(src: str, start_marker: str, end_marker: str) -> str:
 #    so neither renders in the operator-usable state.
 def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     src = _template_src()
-    block = _block(src, 'id="matrix-script-main-video-result"', '{# PR-9R')
+    block = _block(src, 'id="matrix-script-main-video-result"', '{# Phase 2C')
     # empty-state is gated behind the operator-usable elif
     assert "{% elif ms_overlay_mr.operator_usable %}" in block
     assert block.index("{% elif ms_overlay_mr.operator_usable %}") < block.index('data-role="ms-main-video-result-preview-empty"')
@@ -111,6 +111,7 @@ def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     assert 'data-role="ms-main-video-result-acceptance"' in block
     assert 'data-bind="visual_semantic_match"' in block
     assert 'data-role="ms-acc-open-video"' in block
+    assert 'data-role="ms-acc-preview-url"' in block
 
 
 # 8. existing ② storyboard carries the per-shot acceptance overlay (loop over
@@ -118,7 +119,7 @@ def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
 def test_existing_storyboard_has_shot_acceptance_overlay() -> None:
     src = _template_src()
     block = _block(src, 'data-role="matrix-script-section-generation-plan"',
-                   "result-oriented IA group header ③")
+                   'data-role="matrix-script-section-visual-materials"')
     assert 'data-role="ms-section-generation-plan-shot-acceptance-overlay"' in block
     assert "{% for s in ms_overlay.shots %}" in block
     assert 'data-role="ms-shot-acceptance"' in block
@@ -127,9 +128,10 @@ def test_existing_storyboard_has_shot_acceptance_overlay() -> None:
 
 # overlay render proof (block-extraction render with a usable result)
 def test_overlay_main_result_renders_operator_usable() -> None:
+    pytest.importorskip("jinja2")
     from jinja2 import Environment, ChainableUndefined
     src = _template_src()
-    block = _block(src, "{% if ms_main_video_result.is_matrix_script %}", "{# PR-9R")
+    block = _block(src, "{% if ms_main_video_result.is_matrix_script %}", "{# Phase 2C")
     overlay = build_matrix_script_operator_workbench_view(TASK, result=USABLE_RESULT, env={})
     env = Environment(undefined=ChainableUndefined, autoescape=True)
     html = env.from_string(block).render(
@@ -171,6 +173,22 @@ def test_delivery_entry_keeps_publish_cta() -> None:
     dse = dse[:dse.index('技术诊断')]
     assert "/tasks/{{ task.task_id }}/publish" in dse
     assert "/tasks/connect/matrix_script/publish" not in dse
+
+
+def test_temporary_result_cards_removed_from_primary_workbench() -> None:
+    src = _template_src()
+    for role in (
+        "matrix-script-minimal-result",
+        "matrix-script-minimal-result-action",
+        "matrix-script-staged-preview-action",
+        "matrix-script-archived-temp-preview-fold",
+        "ms-section-plan-confirm",
+        "ms-section-final-elements",
+        "ms-section-video-versions-group",
+    ):
+        assert f'data-role="{role}"' not in src
+    for label in ("本地最小成片", "暂存并预览", "生成本地最小成片", "生成并暂存"):
+        assert label not in src
 
 
 # 12. no provider/publish/vendor leakage in the overlay view

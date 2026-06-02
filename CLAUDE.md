@@ -25,6 +25,9 @@ Every AI agent entering this repo MUST read the following files in this order, b
 
 After those four, proceed to task-specific authority through the index-first reading discipline already declared in `README.md`, `ENGINEERING_CONSTRAINTS_INDEX.md`, `docs/README.md`, `docs/ENGINEERING_INDEX.md`, and `docs/contracts/engineering_reading_contract_v1.md`. Read only the minimum task-specific authority files selected through those indexes.
 
+For Matrix Script work, the first task-specific authority is
+`docs/design/MATRIX_SCRIPT_DESIGN_AUTHORITY_INDEX.md`.
+
 Do not skip the boot sequence. Do not reorder it. Do not start from a long flat raw authority list.
 
 ## 3. No Private Memory Rule

@@ -358,7 +358,9 @@
                   </div>
                   <p class="op-tech-note">
                     接受方案：<code>content://</code> / <code>task://</code> / <code>asset://</code> / <code>ref://</code>，或纯令牌 ID。
-                    「铸造空句柄」只分配一个产品句柄，不存任何正文；如果你只是要把脚本传进来，请改用上面三个标签页。
+                    过渡约定示例：<code>content://matrix-script/source/&lt;token&gt;</code>。
+                    不接受 <code>https://</code> / <code>http://</code> 外部网页 URL，也不接受 <code>s3://</code> / <code>gs://</code> 桶 URI。
+                    不要把脚本正文粘贴到这个技术引用输入框；「铸造空句柄」只分配一个产品句柄，不存任何正文；如果你只是要把脚本传进来，请改用上面三个标签页。
                   </p>
                 </div>
               </div>
@@ -510,12 +512,16 @@
           </div>
         </div>
 
-        {# ===================== Card 4 · 角色 · 声音 · 字幕 ===================== #}
+        <details class="op-collapse" data-role="ms-new-advanced-options" style="margin-top:0;">
+          <summary style="cursor:pointer; font-weight:700;">高级选项：角色 / 声音 / 字幕、变体策略、素材偏好与运营备注</summary>
+          <div class="op-collapse__body">
+
+        {# ===================== Advanced · 角色 · 声音 · 字幕 ===================== #}
         <div class="op-card" data-role="ms-new-card-role-voice-subtitle"
              data-redesign-wave="2026-05-30-phase2b-fidelity-b">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">4 · 角色</span>
+              <span class="op-section-index">高级 · 角色</span>
               <h2 class="op-section-title">角色 · 声音 · 字幕</h2>
               <span class="op-pill op-pill--neutral" style="font-size:11px;">运营意图</span>
             </div>
@@ -560,12 +566,12 @@
           </p>
         </div>
 
-        {# ===================== Card 5 · 变体策略 ===================== #}
+        {# ===================== Advanced · 变体策略 ===================== #}
         <div class="op-card" data-role="ms-new-card-variant-strategy"
              data-redesign-wave="2026-05-30-phase2b-fidelity-b">
           <div class="op-section-head">
             <div class="op-section-head__main">
-              <span class="op-section-index">5 · 变体</span>
+              <span class="op-section-index">高级 · 变体</span>
               <h2 class="op-section-title">变体策略</h2>
             </div>
           </div>
@@ -597,6 +603,9 @@
             </div>
           </div>
         </div>
+
+          </div>
+        </details>
 
         {# ===================== Actions ===================== #}
         <div class="ms-new-actions">

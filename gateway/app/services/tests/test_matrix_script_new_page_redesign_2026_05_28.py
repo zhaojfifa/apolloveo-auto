@@ -1,10 +1,8 @@
 """Matrix Script New Task page redesign tests (2026-05-28 wave).
 
-Authority: 2026-05-28 Matrix Script Operator UI Redesign mission §1
-(paste / upload / select primary input; opaque source_script_ref moved
-behind a collapsed technical-ref details element; operator copy says
-"创建后，系统会解析脚本结构、生成变体方案，并进入工作台评审。"; existing
-opaque-ref validation preserved behind the scenes).
+Authority: Matrix Script cleanup baseline. The entry point is now
+script-to-video planning: script text, material, target platform/aspect/language,
+then CTA "生成视频方案"; role/voice/subtitle and variants are advanced options.
 
 Pattern: source-only template inspection, mirroring the OWC-MS-RO
 template-source tests. No Jinja render, no FastAPI instantiation.
@@ -30,12 +28,13 @@ def _read() -> str:
 
 def test_mission_mandated_operator_copy_present() -> None:
     source = _read()
-    assert "创建后，系统会解析脚本结构、生成变体方案，并进入工作台评审。" in source
+    assert "输入脚本、素材和目标平台，系统先生成可确认的视频方案" in source
+    assert "脚本理解、分镜、背景 / B-Roll、角色、旁白、字幕、音乐与视频变体" in source
 
 
 def test_page_title_is_chinese_operator_language() -> None:
     source = _read()
-    assert ">创建矩阵脚本任务<" in source
+    assert ">生成脚本视频方案<" in source
 
 
 def test_line_pill_marks_matrix_script_line() -> None:
@@ -72,6 +71,14 @@ def test_upload_tab_has_file_input_accepting_text_formats() -> None:
 def test_select_tab_has_existing_source_script_ref_field() -> None:
     source = _read()
     assert 'data-role="ms-new-existing-source-script-ref"' in source
+
+
+def test_advanced_options_are_collapsed() -> None:
+    source = _read()
+    assert 'data-role="ms-new-advanced-options"' in source
+    assert "高级选项：角色 / 声音 / 字幕、变体策略、素材偏好与运营备注" in source
+    assert 'data-role="ms-new-card-role-voice-subtitle"' in source
+    assert 'data-role="ms-new-card-variant-strategy"' in source
 
 
 def test_paste_tab_active_by_default() -> None:

@@ -177,25 +177,17 @@ def test_publish_hub_local_block_gated_to_matrix_script_and_leak_free() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_workbench_has_trace_container_and_steps() -> None:
+def test_workbench_trace_container_removed_from_primary_ui() -> None:
     src = _WORKBENCH.read_text(encoding="utf-8")
-    assert 'data-role="ms-minimal-result-trace"' in src
-    assert "renderTrace(" in src
-    assert "var TRACE_STEPS" in src
-    for label in ("生成镜头计划", "生成场景片段", "生成音频", "生成字幕", "合成成片", "生成结果视图"):
-        assert label in src
-    for step in _REQUIRED_STEPS:
-        assert f"'{step}'" in src
+    assert 'data-role="ms-minimal-result-trace"' not in src
+    assert "renderTrace(" not in src
+    assert "var TRACE_STEPS" not in src
 
 
-def test_workbench_trace_is_inside_matrix_script_action_block_and_leak_free() -> None:
+def test_workbench_minimal_result_action_removed() -> None:
     src = _WORKBENCH.read_text(encoding="utf-8")
-    action = src.find('data-role="matrix-script-minimal-result-action"')
-    trace = src.find('data-role="ms-minimal-result-trace"')
-    da = src.find('ops_workbench_panel.panel_kind == "digital_anchor"')
-    ms = src.find('ops_workbench_panel.panel_kind == "matrix_script"')
-    assert ms != -1 and action != -1 and trace != -1
-    assert ms < action < trace < da  # inside the matrix_script branch, before digital_anchor
+    assert 'data-role="matrix-script-minimal-result-action"' not in src
+    assert 'data-role="ms-minimal-result-trigger"' not in src
 
 
 # ---------------------------------------------------------------------------
@@ -214,14 +206,11 @@ def test_trace_serialization_is_leak_free() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_workbench_has_staged_preview_action() -> None:
+def test_workbench_staged_preview_action_removed() -> None:
     src = _WORKBENCH.read_text(encoding="utf-8")
-    assert 'data-role="matrix-script-staged-preview-action"' in src
-    assert 'data-role="ms-staged-preview-trigger"' in src
-    assert "/real-trial" in src
-    assert "ms-staged-preview-link" in src
-    assert "d.preview_url" in src
-    assert "打开视频" in src
+    assert 'data-role="matrix-script-staged-preview-action"' not in src
+    assert 'data-role="ms-staged-preview-trigger"' not in src
+    assert "ms-staged-preview-link" not in src
 
 
 def test_publish_hub_staged_block_has_preview_link() -> None:
