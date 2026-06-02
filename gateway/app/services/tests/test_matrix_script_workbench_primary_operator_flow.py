@@ -37,7 +37,7 @@ def _primary_flow(source: str) -> str:
     return branch[:end]
 
 
-def _render_primary(source: str, *, generated: bool) -> str:
+def _render_primary(source: str, *, generated: bool, material_changed: bool = False) -> str:
     pytest.importorskip("jinja2")
     from jinja2 import ChainableUndefined, Environment
 
@@ -65,6 +65,7 @@ def _render_primary(source: str, *, generated: bool) -> str:
             "delivery_candidate": generated,
             "preview_url": result["preview_url"],
         },
+        "material_changed": material_changed,
         "shots": [
             {
                 "shot_id": f"shot-{idx}",
@@ -158,6 +159,12 @@ def test_ungenerated_state_has_single_generate_preview_action(source: str) -> No
     assert "主视频预览" in section
     assert "未生成" in section
     assert "请先确认素材与配乐，然后生成视频预览" in section
+    assert 'data-role="ms-main-video-material-readiness"' in section
+    assert "真实素材镜头" in section
+    assert "待补素材镜头" in section
+    assert "配乐" in section
+    assert "旁白" in section
+    assert "字幕承载 / 语音合成待接入" in section
     assert section.count("生成视频预览") >= 1
     for forbidden in ("重新生成", "再次生成", "确认为主版本", "前往交付", "前往交付页面", "打开视频", "主成片缺失"):
         assert forbidden not in section
@@ -167,11 +174,14 @@ def test_generated_state_has_inline_video_and_no_duplicate_actions(source: str) 
     section = _a_section(_render_primary(source, generated=True))
     assert '<video controls preload="metadata" src="/api/matrix-script/ms-1/tomato-real-result/preview/final.mp4"' in section
     assert "运营可用" in section
+    assert "当前版本" in section
+    assert "V1 主视频预览" in section
     assert "partial_pass" in section
     assert "匹配镜头数" in section
     assert "真实视觉镜头数" in section
+    assert "待补素材镜头" in section
     assert "正式交付就绪：false" in section
-    assert section.count("再次生成") == 1
+    assert section.count("再次生成预览") == 1
     assert section.count("确认为主版本") == 1
     assert section.count("前往交付") == 1
     assert section.count("打开视频") == 1
@@ -200,7 +210,6 @@ def test_raw_rendered_primary_has_no_old_hidden_action_text(source: str) -> None
         assert "inert" in compat_tag
         assert "</div>" in primary[compat_idx : compat_idx + 120]
         for forbidden in (
-            "重新生成",
             "前往交付页面",
             "主成片缺失",
         ):
@@ -217,7 +226,10 @@ def test_raw_rendered_primary_has_no_old_hidden_action_text(source: str) -> None
         ):
             assert forbidden not in compat_block
         if not generated:
+            a_section = _a_section(primary)
             for forbidden in ("确认为主版本", "前往交付", "打开视频", "再次生成"):
+                assert forbidden not in a_section
+            for forbidden in ("确认为主版本", "前往交付", "打开视频"):
                 assert forbidden not in primary
 
 
@@ -225,14 +237,21 @@ def test_material_delivery_and_folded_sections_render(source: str) -> None:
     html = _render_primary(source, generated=True)
     assert 'data-role="matrix-script-primary-material-music"' in html
     assert html.count('data-role="ms-primary-shot-card"') == 5
+    assert html.count('data-role="ms-primary-shot-replace-action"') == 5
     assert "素材来源：真实素材" in html
     assert "素材来源：复用素材" in html
     assert "语义状态：通过" in html
     assert "语义状态：部分通过" in html
-    assert "建议补充素材：当前为复用素材" in html
-    assert "替换素材" in html
+    assert "当前为复用素材，建议补充真实品尝素材。" in html
+    assert "当前为复用素材，建议补充递向镜头素材。" in html
+    assert "上传/替换 Shot 04 素材" in html
+    assert "上传/替换 Shot 05 素材" in html
     assert "替换配乐" in html
     assert "重新匹配素材" in html
+    assert "替换素材或配乐后，请返回主视频区点击“再次生成预览”。新预览不会自动成为正式发布版本。" in html
+    assert "当前配乐" in html
+    assert "字幕" in html
+    assert "旁白" in html
     assert "当前交付候选：主视频 V1" in html
     assert "official_publish_ready=false" in html
     assert 'data-role="ms-primary-delivery-cta"' in html
@@ -244,7 +263,7 @@ def test_delivery_button_hidden_until_candidate(source: str) -> None:
     html = _render_primary(source, generated=False)
     delivery = html[html.index('data-role="matrix-script-primary-delivery-entry"') :]
     delivery = delivery[: delivery.index('data-role="matrix-script-primary-video-variants"')]
-    assert "生成预览后可进入交付" in delivery
+    assert "生成视频预览后可进入交付" in delivery
     assert 'data-role="ms-primary-delivery-cta"' not in delivery
     assert "前往交付页" not in delivery
 
@@ -265,3 +284,9 @@ def test_primary_flow_has_no_backend_or_provider_leakage(source: str) -> None:
         "credit",
     ):
         assert token not in primary
+
+
+def test_material_changed_state_prompts_regenerate_preview(source: str) -> None:
+    rendered = _render_primary(source, generated=True, material_changed=True)
+    assert "素材已更新，需要再次生成预览" in rendered
+    assert "重新生成预览" in rendered

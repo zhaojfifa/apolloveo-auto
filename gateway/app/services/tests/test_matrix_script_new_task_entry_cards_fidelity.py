@@ -257,6 +257,11 @@ def test_card2_product_material_has_required_subfields(source: str) -> None:
     assert 'data-role="ms-new-product-material-description"' in body
     # 背景 / B-Roll 偏好 selector.
     assert 'data-role="ms-new-broll-preference"' in body
+    assert "这里先填写产品与素材说明，作为系统生成视频方案和匹配素材的依据" in body
+    assert "进入 Workbench 后，可按镜头补充或替换素材" in body
+    assert "素材上传入口将逐步接入；当前可以先使用说明和示例素材完成预览" in body
+    assert "后台待接入" not in body
+    assert "worker 尚未接入" not in body
 
 
 def test_card3_target_aspect_language_has_required_subfields(source: str) -> None:

@@ -407,18 +407,22 @@
               <h2 class="op-section-title">产品 / 素材</h2>
             </div>
           </div>
-          <p class="op-section-helper">上传或填写产品资料；运营在工作台「画面与素材」(D) 一节可继续替换 B-Roll。</p>
+          <p class="op-section-helper">
+            这里先填写产品与素材说明，作为系统生成视频方案和匹配素材的依据。
+            进入 Workbench 后，可按镜头补充或替换素材。
+            素材上传入口将逐步接入；当前可以先使用说明和示例素材完成预览。
+          </p>
           <div class="ms-new-field-grid">
             <div class="ms-new-field full">
               <label for="product_ref">产品名称 / SKU / 资料链接</label>
               <input id="product_ref" name="product_ref" maxlength="160" placeholder="例如：温室小番茄 SKU-T01 · https://example.invalid/product" />
             </div>
             <div class="ms-new-field full">
-              <label>上传商品图 / 商品视频片段 <span class="op-pill op-pill--neutral" style="font-size:11px; margin-left:4px;">当前占位 · 后台待接入</span></label>
+              <label>商品图 / 商品视频片段说明 <span class="op-pill op-pill--neutral" style="font-size:11px; margin-left:4px;">逐步接入</span></label>
               <div data-role="ms-new-product-material-upload-slot"
                    data-status-code="materials_pending_upstream"
                    style="padding:14px; border:1px dashed var(--op-card-bd, #e5e7eb); border-radius:8px; background:#fbfdff; color:var(--op-fg-soft, #64748b); font-size:13px;">
-                上传槽占位。素材上传 / 匹配能力接入后，可在此处提交商品图与视频片段；当前阶段无需提交。
+                当前先记录素材说明和示例素材方向；进入 Workbench 后，可按 Shot 补充或替换素材。
               </div>
             </div>
             <div class="ms-new-field full">
@@ -440,7 +444,7 @@
               </select>
             </div>
           </div>
-          <p class="op-tech-note" style="margin-top:8px;">本卡为运营意图采集；素材匹配 / 上传 worker 尚未接入。</p>
+          <p class="op-tech-note" style="margin-top:8px;">本卡为运营意图采集；不会在新建页直接触发素材生成。</p>
         </div>
 
         {# ===================== Card 3 · 目标 · 画幅 · 语言 ===================== #}
