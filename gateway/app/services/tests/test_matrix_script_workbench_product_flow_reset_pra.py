@@ -131,15 +131,15 @@ def test_section5_diagnostics_fold_present(matrix_branch: str) -> None:
 
 
 def test_primary_sections_in_design_order(primary_slice: str) -> None:
-    """Phase 2B fidelity fix (2026-05-30) ordering: §A 主视频结果 → §G
-    视频变体 (= legacy matrix-script-section-optional-variants anchor) →
-    §I 交付入口. The PR-A standalone production-flow-stepper has been
-    relocated into §J (architect view); ordering is now A → G → I."""
+    """Operator-first ordering: §A 主视频结果 → §B 镜头与素材调整 →
+    §C 声音字幕音乐 → §D 交付入口 → §E 视频变体."""
 
     pos1 = primary_slice.find('data-role="matrix-script-main-video-result"')
-    pos3 = primary_slice.find('data-role="matrix-script-section-optional-variants"')
+    pos2 = primary_slice.find('data-role="matrix-script-section-generation-plan"')
+    pos_voice = primary_slice.find('data-role="matrix-script-section-role-voice"')
     pos4 = primary_slice.find('data-role="matrix-script-section-delivery-entry"')
-    assert -1 < pos1 < pos3 < pos4
+    pos3 = primary_slice.find('data-role="matrix-script-section-optional-variants"')
+    assert -1 < pos1 < pos2 < pos_voice < pos4 < pos3
 
 
 def test_section5_fold_after_all_primary_sections(matrix_branch: str) -> None:
@@ -177,11 +177,9 @@ def test_section1_carries_four_actions(primary_slice: str) -> None:
 def test_section1_empty_state_copy_present_in_helper_contract(
     primary_slice: str,
 ) -> None:
-    """The honest empty-state copy is sourced from the helper at render
-    time (`ms_main_video_result.preview.empty_state_message_zh`); the
-    template binding must be present so the helper string flows through."""
+    """The honest empty-state copy remains visible when no PR-A preview exists."""
 
-    assert "ms_main_video_result.preview.empty_state_message_zh" in primary_slice
+    assert "尚未生成主视频" in primary_slice
 
 
 # --------------------------------------------------------------------------
@@ -423,9 +421,10 @@ def test_no_fake_video_url_in_primary(primary_slice: str) -> None:
 
 
 def test_no_placeholder_video_player_in_primary(primary_slice: str) -> None:
-    """No <video>/<source>/iframe player placeholder in the primary slice."""
+    """The only primary player binds the real PR-A preview URL; no source/iframe placeholders."""
 
-    for tag in ("<video", "<source ", "<iframe"):
+    assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in primary_slice
+    for tag in ("<source ", "<iframe"):
         assert tag not in primary_slice
 
 
