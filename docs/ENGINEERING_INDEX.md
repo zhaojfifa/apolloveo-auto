@@ -79,6 +79,20 @@ That index selects the accepted script-to-video mock and result baseline.
 Execution logs are evidence only and must not be used as implementation
 authority unless they are explicitly named by that index.
 
+Current Matrix Script work must then read the Bucket A authority set selected
+by `docs/design/MATRIX_SCRIPT_DESIGN_AUTHORITY_INDEX.md`, starting with:
+
+1. `docs/product/matrix_script_product_flow_v2_delta.md`
+2. `docs/design/matrix_script_workbench_product_flow_reset_v1.md`
+3. `docs/design/matrix_script_script_to_video_presenter_alignment_v1.md`
+4. `docs/architecture/matrix_script_script_to_video_contract_alignment_v1.md`
+
+For Workbench, New Task, Delivery, result-line, or state/projection changes,
+also read the four-layer state authorities named in this index. Matrix Script
+UI may show L4 operator summary and necessary L3 acceptance facts; it must not
+promote L2 raw artifacts, raw manifests, provider fields, or execution-log
+temporary reports into the primary operator flow.
+
 ### Four-Layer State Changes
 
 Read `docs/contracts/four_layer_state_contract.md`,
