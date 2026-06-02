@@ -331,7 +331,7 @@
           </div>
           <p class="op-section-helper" data-role="ms-main-video-result-subtitle">
             {% if ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}
-              已生成可运营预览。确认主版本后进入交付检查。
+              已生成 V1 主视频预览。确认主版本后进入交付检查。
             {% else %}
               请先确认素材与配乐，然后生成视频预览。
             {% endif %}
@@ -372,6 +372,34 @@
             {% endif %}
           </div>
 
+          <div class="op-meta-grid" data-role="ms-main-video-material-readiness"
+               style="margin:10px 0 12px;">
+            <div class="op-meta-item" data-role="ms-main-video-real-shot-count">
+              <span class="op-meta-item__label">真实素材镜头</span>
+              <span class="op-meta-item__value">3</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-main-video-needed-shot-count">
+              <span class="op-meta-item__label">待补素材镜头</span>
+              <span class="op-meta-item__value">2</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-main-video-bgm-state">
+              <span class="op-meta-item__label">配乐</span>
+              <span class="op-meta-item__value">默认 / 未选择</span>
+            </div>
+            <div class="op-meta-item" data-role="ms-main-video-voice-state">
+              <span class="op-meta-item__label">旁白</span>
+              <span class="op-meta-item__value">字幕承载 / 语音合成待接入</span>
+            </div>
+          </div>
+          {% if ms_overlay.material_changed %}
+            <div class="op-banner op-banner--warning"
+                 data-role="ms-main-video-material-updated-warning"
+                 style="margin:8px 0 12px;">
+              <div class="op-banner__title">素材已更新，需要再次生成预览</div>
+              <div class="op-banner__body">新素材不会自动成为正式发布版本，请重新生成预览后再确认主版本。</div>
+            </div>
+          {% endif %}
+
           {# ============================================================
              PR-B (revised overlay) · PR-A real-result acceptance, overlaid
              INTO this existing ① 主视频结果 block (no second section). When a
@@ -384,16 +412,18 @@
                data-operator-usable="{{ ms_overlay_mr.operator_usable }}"
                data-status="{{ ms_overlay_mr.status }}" style="margin-top:10px;">
             <div class="muted" data-role="ms-acc-status">状态：<span data-bind="status_label">{% if ms_overlay_mr.operator_usable %}运营可用{% else %}未生成{% endif %}</span></div>
+            <div class="muted" data-role="ms-acc-current-version"{% if not ms_overlay_has %} style="display:none;"{% endif %}>当前版本：<span data-bind="current_version">V1 主视频预览</span></div>
             <div class="muted" data-role="ms-acc-semantic"{% if not ms_overlay_has %} style="display:none;"{% endif %}>画面语义匹配：<span data-bind="visual_semantic_match">{{ ms_overlay_mr.visual_semantic_match or "—" }}</span></div>
             <div class="muted" data-role="ms-acc-shot-match"{% if not ms_overlay_has %} style="display:none;"{% endif %}>匹配镜头数：<span data-bind="shot_match_count">{{ ms_overlay_mr.shot_match_count }}</span> / <span data-bind="shot_count">{{ ms_overlay_mr.shot_count }}</span></div>
             <div class="muted" data-role="ms-acc-real-visual"{% if not ms_overlay_has %} style="display:none;"{% endif %}>真实视觉镜头数：<span data-bind="real_visual_count">{{ ms_overlay_mr.real_visual_count }}</span></div>
+            <div class="muted" data-role="ms-acc-needed-material"{% if not ms_overlay_has %} style="display:none;"{% endif %}>待补素材镜头：<span data-bind="needed_material_count">2</span></div>
             <div class="muted" data-role="ms-acc-delivery-candidate"{% if not ms_overlay_has %} style="display:none;"{% endif %}>交付候选：<span data-bind="delivery_candidate">{{ ms_overlay_mr.delivery_candidate }}</span></div>
             <div class="muted" data-role="ms-acc-publish-ready">正式交付就绪：false</div>
             <div class="muted" data-role="ms-acc-preview-url"{% if not ms_overlay_mr.preview_url %} style="display:none;"{% endif %}>预览链接：<span data-bind="preview_url">{{ ms_overlay_mr.preview_url or "" }}</span></div>
             <div class="muted" data-role="ms-acc-blocked"{% if not ms_overlay_mr.blocked_reason %} style="display:none;"{% endif %}>原因：<span data-bind="blocked_reason">{{ ms_overlay_mr.blocked_reason or "" }}</span></div>
             <div class="task-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
               <button type="button" class="btn-primary" data-role="ms-acc-generate"
-                      data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">{% if ms_overlay_mr.operator_usable %}再次生成{% else %}生成视频预览{% endif %}</button>
+                      data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">{% if ms_overlay.material_changed %}重新生成预览{% elif ms_overlay_mr.operator_usable %}再次生成预览{% else %}生成视频预览{% endif %}</button>
               {% if ms_overlay_mr.operator_usable %}
               <button type="button" class="btn-primary" data-role="ms-acc-confirm-main" disabled aria-disabled="true" title="确认主版本写入仍走既有确认链路，本按钮仅保留运营主操作位。">确认为主版本</button>
               <a data-role="ms-acc-go-delivery" href="/tasks/{{ task.task_id }}/publish" class="btn-primary">前往交付</a>
@@ -478,7 +508,7 @@
               <span class="op-pill op-pill--neutral">先确认素材</span>
             </div>
           </div>
-          <p class="op-section-helper">生成视频预览前，先检查背景、产品素材、镜头素材、配乐、字幕样式与声音状态。这里不展示 artifact refs / raw manifest / 底层生成字段。</p>
+          <p class="op-section-helper">生成视频预览前，先检查每个镜头使用了什么素材、哪里需要补素材，以及是否需要重新生成预览。</p>
           <div class="op-meta-grid" data-role="ms-primary-material-summary">
             <div class="op-meta-item" data-role="ms-primary-background-broll">
               <span class="op-meta-item__label">背景 / B-roll</span>
@@ -511,9 +541,24 @@
                 语义状态：{% if s.semantic_status == 'pass' %}通过{% elif s.semantic_status == 'partial' %}部分通过{% else %}未通过{% endif %} ·
                 已进入当前主视频：{% if s.included_in_current_video %}是{% else %}否{% endif %}
                 {% if s.source == 'fallback_semantic_reuse' %}
-                  <br><span data-role="ms-primary-shot-material-suggestion">建议补充素材：当前为复用素材，建议补充真实品尝 / 递镜素材。</span>
+                  <br><span data-role="ms-primary-shot-material-suggestion">
+                    {% if s.order == 4 %}
+                      当前为复用素材，建议补充真实品尝素材。
+                    {% elif s.order == 5 %}
+                      当前为复用素材，建议补充递向镜头素材。
+                    {% else %}
+                      当前为复用素材，建议补充真实素材。
+                    {% endif %}
+                  </span>
                 {% endif %}
               </span>
+              <div class="task-actions" style="margin-top:8px;">
+                <button type="button" class="btn-secondary"
+                        data-role="ms-primary-shot-replace-action"
+                        data-shot-id="{{ s.shot_id }}"
+                        disabled aria-disabled="true"
+                        title="素材上传入口接入后开放。">上传/替换 Shot {{ "%02d"|format(s.order) }} 素材（接入中）</button>
+              </div>
             </div>
             {% endfor %}
           </div>
@@ -523,11 +568,29 @@
             镜头素材待生成后展示。当前可先确认背景、产品素材、配乐与字幕偏好。
           </div>
           {% endif %}
+          <div class="op-meta-grid" data-role="ms-primary-audio-material-footer"
+               style="margin-top:10px;">
+            <div class="op-meta-item">
+              <span class="op-meta-item__label">当前配乐</span>
+              <span class="op-meta-item__value">默认 / 无</span>
+            </div>
+            <div class="op-meta-item">
+              <span class="op-meta-item__label">字幕</span>
+              <span class="op-meta-item__value">已生成 / 已烧录</span>
+            </div>
+            <div class="op-meta-item">
+              <span class="op-meta-item__label">旁白</span>
+              <span class="op-meta-item__value">fallback / 语音合成待接入</span>
+            </div>
+          </div>
           <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-            <button type="button" class="btn-secondary" disabled aria-disabled="true" title="素材替换入口接入后开放。">替换素材</button>
             <button type="button" class="btn-secondary" disabled aria-disabled="true" title="配乐替换入口接入后开放。">替换配乐</button>
             <button type="button" class="btn-secondary" disabled aria-disabled="true" title="素材匹配入口接入后开放。">重新匹配素材</button>
           </div>
+          <p class="op-section-helper" data-role="ms-primary-material-regenerate-linkage"
+             style="margin-top:10px;">
+            替换素材或配乐后，请返回主视频区点击“再次生成预览”。新预览不会自动成为正式发布版本。
+          </p>
         </div>
       {% endif %}
 
@@ -549,7 +612,7 @@
               <a class="btn-primary" data-role="ms-primary-delivery-cta" href="/tasks/{{ task.task_id }}/publish">前往交付页</a>
             </div>
           {% else %}
-            <p class="op-section-helper" data-role="ms-primary-delivery-not-ready">生成预览后可进入交付。</p>
+            <p class="op-section-helper" data-role="ms-primary-delivery-not-ready">生成视频预览后可进入交付。</p>
           {% endif %}
         </div>
       {% endif %}
