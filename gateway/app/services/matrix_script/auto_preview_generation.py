@@ -8,16 +8,24 @@ operator click.
 from __future__ import annotations
 
 import os
+import subprocess
 from datetime import datetime, timezone
 from typing import Any, Dict, Mapping
 
 from gateway.app.config import get_settings
 from gateway.app.routers.matrix_script_real_trial import ArtifactStorageStagingSink
+from gateway.app.services.matrix_script.minimal_result_artifact_staging import StagingError
 from gateway.app.services.matrix_script.minimal_result_delivery_view import (
     assert_no_delivery_view_forbidden_tokens,
 )
-from gateway.app.services.matrix_script.simple_scene_renderer import FFmpegUnavailableError
+from gateway.app.services.matrix_script.simple_scene_renderer import (
+    FFmpegUnavailableError,
+    SceneRenderError,
+    ffprobe_path,
+    probe_duration_seconds,
+)
 from gateway.app.services.matrix_script.tomato_real_result_orchestrator import (
+    TomatoRealResult,
     TomatoRealResultError,
     run_tomato_real_result,
     tomato_result_to_payload,
@@ -28,6 +36,12 @@ STAGED_CANDIDATE_KEY = "matrix_script_staged_candidate"
 STATUS_RUNNING = "preview_generation_running"
 STATUS_SUCCEEDED = "preview_generation_succeeded"
 STATUS_FAILED = "preview_generation_failed"
+MIN_FINAL_VIDEO_BYTES = 1024
+OPERATOR_SAFE_GENERATION_FAILURE = "首版预览生成失败：视频文件未完整生成，请重新生成。"
+
+
+class AutoPreviewValidationError(RuntimeError):
+    """Raised when generated preview artifacts are incomplete or unreadable."""
 
 
 def _utc_now() -> str:
@@ -79,11 +93,65 @@ def _status_payload(status: str, **extra: Any) -> Dict[str, Any]:
     return payload
 
 
+def _failure_payload(*, stage: str, error_summary: str = OPERATOR_SAFE_GENERATION_FAILURE, error: str | None = None) -> Dict[str, Any]:
+    payload = _status_payload(
+        STATUS_FAILED,
+        error_summary=error_summary,
+        failed_at=_utc_now(),
+        stage=stage,
+    )
+    if error:
+        payload["error"] = error
+    return payload
+
+
 def _task_mapping(task: Any) -> Dict[str, Any]:
     if isinstance(task, Mapping):
         return dict(task)
     attrs = getattr(task, "__dict__", None)
     return dict(attrs) if isinstance(attrs, Mapping) else {}
+
+
+def _manifest_path_for_result(result: TomatoRealResult) -> str:
+    return os.path.join(os.path.dirname(os.path.dirname(result.final_video_path)), "manifest.json")
+
+
+def _probe_has_video_stream(path: str) -> bool:
+    if not ffprobe_path():
+        raise FFmpegUnavailableError("ffprobe not found on PATH")
+    cmd = [
+        ffprobe_path(),
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=codec_type",
+        "-of",
+        "default=nw=1:nokey=1",
+        path,
+    ]
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=30, check=False)
+    if proc.returncode != 0:
+        raise SceneRenderError("ffprobe failed to read video stream")
+    return "video" in (proc.stdout or b"").decode("utf-8", "replace").splitlines()
+
+
+def validate_tomato_result_artifacts(result: TomatoRealResult) -> None:
+    """Validate final artifacts before exposing them as a staged candidate."""
+    final_path = result.final_video_path
+    if not final_path or not os.path.exists(final_path):
+        raise AutoPreviewValidationError("final_video_missing")
+    if os.path.getsize(final_path) <= MIN_FINAL_VIDEO_BYTES:
+        raise AutoPreviewValidationError("final_video_too_small")
+    duration = probe_duration_seconds(final_path)
+    if duration <= 0:
+        raise AutoPreviewValidationError("final_video_duration_non_positive")
+    if not _probe_has_video_stream(final_path):
+        raise AutoPreviewValidationError("final_video_stream_missing")
+    manifest_path = _manifest_path_for_result(result)
+    if not os.path.exists(manifest_path):
+        raise AutoPreviewValidationError("manifest_missing")
 
 
 def build_matrix_script_tomato_preview_payload(task: Mapping[str, Any]) -> Dict[str, Any]:
@@ -95,6 +163,7 @@ def build_matrix_script_tomato_preview_payload(task: Mapping[str, Any]) -> Dict[
         _resolve_tomato_output_dir(task_id),
         sink=_build_tomato_sink(task_id),
     )
+    validate_tomato_result_artifacts(result)
     payload = tomato_result_to_payload(result)
     payload["preview_url"] = f"/api/matrix-script/{task_id}/tomato-real-result/preview/final.mp4"
     assert_no_delivery_view_forbidden_tokens(payload)
@@ -112,28 +181,31 @@ def trigger_matrix_script_initial_preview_generation(
     so the Workbench can show a retry/error state instead of a dead empty state.
     """
     task_id = _task_id(task)
-    _update_config(
-        repo,
-        task_id,
-        task,
-        {AUTO_PREVIEW_STATUS_KEY: _status_payload(STATUS_RUNNING, started_at=_utc_now())},
-    )
     latest = repo.get(task_id) or task
     try:
         payload = build_matrix_script_tomato_preview_payload(latest)
     except FFmpegUnavailableError:
-        failure = _status_payload(
-            STATUS_FAILED,
+        failure = _failure_payload(
+            stage="generation",
+            error_summary="首版预览生成失败：当前环境无法使用 ffmpeg，请重新生成或联系管理员。",
             error="tomato_real_result_generation_unavailable",
         )
         _update_config(repo, task_id, repo.get(task_id) or latest, {AUTO_PREVIEW_STATUS_KEY: failure})
         return failure
+    except AutoPreviewValidationError as exc:
+        failure = _failure_payload(stage="validation", error=str(exc))
+        _update_config(repo, task_id, repo.get(task_id) or latest, {AUTO_PREVIEW_STATUS_KEY: failure})
+        return failure
+    except StagingError as exc:
+        failure = _failure_payload(stage="staging", error=str(exc))
+        _update_config(repo, task_id, repo.get(task_id) or latest, {AUTO_PREVIEW_STATUS_KEY: failure})
+        return failure
     except TomatoRealResultError as exc:
-        failure = _status_payload(STATUS_FAILED, error=str(exc))
+        failure = _failure_payload(stage="generation", error=str(exc))
         _update_config(repo, task_id, repo.get(task_id) or latest, {AUTO_PREVIEW_STATUS_KEY: failure})
         return failure
     except Exception as exc:
-        failure = _status_payload(STATUS_FAILED, error=f"{exc.__class__.__name__}: {exc}")
+        failure = _failure_payload(stage="generation", error=f"{exc.__class__.__name__}: {exc}")
         _update_config(repo, task_id, repo.get(task_id) or latest, {AUTO_PREVIEW_STATUS_KEY: failure})
         return failure
 
@@ -142,13 +214,18 @@ def trigger_matrix_script_initial_preview_generation(
         preview_url=payload.get("preview_url"),
         delivery_candidate=payload.get("delivery_candidate"),
     )
-    _update_config(
-        repo,
-        task_id,
-        repo.get(task_id) or latest,
-        {
-            STAGED_CANDIDATE_KEY: payload,
-            AUTO_PREVIEW_STATUS_KEY: success,
-        },
-    )
+    try:
+        _update_config(
+            repo,
+            task_id,
+            repo.get(task_id) or latest,
+            {
+                STAGED_CANDIDATE_KEY: payload,
+                AUTO_PREVIEW_STATUS_KEY: success,
+            },
+        )
+    except Exception as exc:
+        failure = _failure_payload(stage="persistence", error=f"{exc.__class__.__name__}: {exc}")
+        _update_config(repo, task_id, repo.get(task_id) or latest, {AUTO_PREVIEW_STATUS_KEY: failure})
+        return failure
     return success
