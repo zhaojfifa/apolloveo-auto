@@ -93,17 +93,20 @@ def _block(src: str, start_marker: str, end_marker: str) -> str:
     return src[a:b]
 
 
-# 7. existing ① main result suppresses 未生成 / 主成片缺失 when operator_usable.
-#    The empty-state sits in an {% else %} AFTER an {% elif ms_overlay_mr.operator_usable %}
+# 7. existing ① main result suppresses 未生成 / 主成片缺失 when preview_url exists.
+#    The preview_url branch is first, before any bound placeholder or empty state,
+#    so the operator sees the actual video player whenever a preview URL is present.
 #    branch. The old blocker banner and hidden helper action group are removed
 #    from the primary operator flow so they cannot leak back into the page.
 def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     src = _template_src()
     block = _block(src, 'id="matrix-script-main-video-result"', '{# Phase 2C')
-    # empty-state is gated behind the operator-usable preview branch
-    assert "{% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}" in block
-    assert block.index("{% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}") < block.index('data-role="ms-main-video-result-preview-empty"')
+    # empty-state and bound-placeholder are gated behind the preview_url branch
+    assert "{% if ms_overlay_mr.preview_url %}" in block
     assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in block
+    assert block.index("{% if ms_overlay_mr.preview_url %}") < block.index('data-role="ms-main-video-result-preview-bound"')
+    assert block.index("{% if ms_overlay_mr.preview_url %}") < block.index('data-role="ms-main-video-result-preview-empty"')
+    assert "{% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}" not in block
     assert 'data-role="ms-main-video-result-video"' in block
     assert 'data-role="ms-main-video-result-banner"' not in block
     assert 'data-role="ms-main-video-result-actions"' not in block
