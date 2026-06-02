@@ -234,6 +234,11 @@ def test_post_handler_rejects_prose_body_with_400(monkeypatch):
             raise AssertionError("repo.get must not run on rejection")
 
     app.dependency_overrides[get_task_repository] = lambda: _Repo()
+    monkeypatch.setattr(
+        tasks_router,
+        "trigger_matrix_script_initial_preview_generation",
+        lambda task, repo: {"status": "stubbed"},
+    )
     client = TestClient(app, raise_server_exceptions=False)
 
     try:
@@ -272,6 +277,11 @@ def test_post_handler_accepts_contract_shaped_ref_and_redirects(monkeypatch):
             return None
 
     app.dependency_overrides[get_task_repository] = lambda: _Repo()
+    monkeypatch.setattr(
+        tasks_router,
+        "trigger_matrix_script_initial_preview_generation",
+        lambda task, repo: {"status": "stubbed"},
+    )
     client = TestClient(app, raise_server_exceptions=False)
 
     try:

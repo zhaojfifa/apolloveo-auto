@@ -233,6 +233,7 @@ def test_matrix_script_form_post_creates_task_and_redirects_to_workbench(monkeyp
     monkeypatch.setenv("AUTH_MODE", "off")
 
     created = {}
+    calls = []
 
     class _Repo:
         def create(self, payload):
@@ -244,7 +245,37 @@ def test_matrix_script_form_post_creates_task_and_redirects_to_workbench(monkeyp
                 return dict(created)
             return None
 
+        def update(self, task_id, patch):
+            assert task_id == created["task_id"]
+            created.update(patch)
+            return dict(created)
+
+    def _fake_auto_preview(task, repo):
+        calls.append(task["task_id"])
+        repo.update(
+            task["task_id"],
+            {
+                "config": {
+                    **task.get("config", {}),
+                    "matrix_script_staged_candidate": {
+                        "has_result": True,
+                        "operator_usable": True,
+                        "technical_preview": False,
+                        "delivery_candidate": True,
+                        "official_publish_ready": False,
+                        "preview_url": f"/api/matrix-script/{task['task_id']}/tomato-real-result/preview/final.mp4",
+                    },
+                    "matrix_script_initial_preview_generation": {
+                        "status": "preview_generation_succeeded",
+                        "official_publish_ready": False,
+                    },
+                }
+            },
+        )
+        return {"status": "preview_generation_succeeded"}
+
     app.dependency_overrides[get_task_repository] = lambda: _Repo()
+    monkeypatch.setattr(tasks_router, "trigger_matrix_script_initial_preview_generation", _fake_auto_preview)
     client = TestClient(app, raise_server_exceptions=False)
 
     try:
@@ -275,12 +306,201 @@ def test_matrix_script_form_post_creates_task_and_redirects_to_workbench(monkeyp
     assert created["platform"] == "matrix_script"
     assert created["source_url"] == "content://matrix-script/source/001"
     assert created["config"]["entry"]["topic"] == "新品矩阵脚本"
+    assert calls == [created["task_id"]]
+    assert created["config"]["matrix_script_staged_candidate"]["has_result"] is True
+    assert created["config"]["matrix_script_staged_candidate"]["preview_url"].endswith(
+        "/tomato-real-result/preview/final.mp4"
+    )
+    assert created["config"]["matrix_script_initial_preview_generation"]["status"] == "preview_generation_succeeded"
     assert created["config"]["next_surfaces"]["workbench"] == f"/tasks/{created['task_id']}"
     assert created["config"]["next_surfaces"]["delivery"] == f"/tasks/{created['task_id']}/publish"
     assert {ref["ref_id"] for ref in created["line_specific_refs"]} == {
         "matrix_script_variation_matrix",
         "matrix_script_slot_pack",
     }
+
+
+def _matrix_script_create_payload() -> dict[str, str]:
+    return {
+        "topic": "新品矩阵脚本",
+        "source_script_ref": "content://matrix-script/source/001",
+        "source_language": "zh",
+        "target_language": "mm",
+        "target_platform": "TikTok",
+        "variation_target_count": "4",
+        "audience_hint": "新用户",
+        "tone_hint": "直接",
+        "length_hint": "15秒",
+        "product_ref": "SKU-001",
+        "operator_notes": "入口备注",
+    }
+
+
+def _main_video_block(html: str) -> str:
+    start = html.index('data-role="matrix-script-main-video-result"')
+    end_marker = "B · 背景、素材、配乐调整"
+    end = html.index(end_marker, start)
+    return html[start:end]
+
+
+def test_matrix_script_new_task_success_renders_auto_preview_inline(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "off")
+
+    created: dict[str, object] = {}
+    calls: list[str] = []
+
+    class _Repo:
+        def create(self, payload):
+            created.clear()
+            created.update(payload)
+            return payload
+
+        def get(self, task_id):
+            if created.get("task_id") == task_id:
+                return dict(created)
+            return None
+
+        def update(self, task_id, patch):
+            assert task_id == created["task_id"]
+            if "config" in patch:
+                cfg = dict(created.get("config", {}) or {})
+                cfg.update(patch["config"] or {})
+                created["config"] = cfg
+            for key, value in patch.items():
+                if key != "config":
+                    created[key] = value
+            return dict(created)
+
+    def _fake_success(task, repo):
+        calls.append(task["task_id"])
+        preview_url = f"/api/matrix-script/{task['task_id']}/tomato-real-result/preview/final.mp4"
+        repo.update(
+            task["task_id"],
+            {
+                "config": {
+                    "matrix_script_staged_candidate": {
+                        "has_result": True,
+                        "operator_usable": True,
+                        "technical_preview": False,
+                        "delivery_candidate": True,
+                        "official_publish_ready": False,
+                        "visual_semantic_match": "partial_pass",
+                        "shot_count": 5,
+                        "shot_match_count": 3,
+                        "real_visual_count": 3,
+                        "preview_url": preview_url,
+                    },
+                    "matrix_script_initial_preview_generation": {
+                        "status": "preview_generation_succeeded",
+                        "preview_url": preview_url,
+                        "official_publish_ready": False,
+                    },
+                }
+            },
+        )
+        return {"status": "preview_generation_succeeded", "preview_url": preview_url}
+
+    app.dependency_overrides[get_task_repository] = lambda: _Repo()
+    monkeypatch.setattr(tasks_router, "trigger_matrix_script_initial_preview_generation", _fake_success)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    try:
+        response = client.post(
+            "/tasks/matrix-script/new",
+            data=_matrix_script_create_payload(),
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        workbench = client.get(response.headers["location"])
+    finally:
+        app.dependency_overrides.clear()
+
+    assert calls == [created["task_id"]]
+    assert workbench.status_code == 200
+    block = _main_video_block(workbench.text)
+    assert 'data-role="ms-main-video-result-video"' in block
+    assert "<video controls preload=\"metadata\"" in block
+    assert "/tomato-real-result/preview/final.mp4" in block
+    assert "当前版本：<span data-bind=\"current_version\">V1 主视频预览</span>" in block
+    assert "再次生成预览" in block
+    assert "生成视频预览" not in block
+    assert "当前尚未生成主视频" not in block
+    assert "未生成" not in block
+    assert "official_publish_ready=true" not in workbench.text
+
+
+def test_matrix_script_new_task_failure_survives_and_renders_retry(monkeypatch):
+    monkeypatch.setenv("AUTH_MODE", "off")
+
+    created: dict[str, object] = {}
+    calls: list[str] = []
+
+    class _Repo:
+        def create(self, payload):
+            created.clear()
+            created.update(payload)
+            return payload
+
+        def get(self, task_id):
+            if created.get("task_id") == task_id:
+                return dict(created)
+            return None
+
+        def update(self, task_id, patch):
+            assert task_id == created["task_id"]
+            if "config" in patch:
+                cfg = dict(created.get("config", {}) or {})
+                cfg.update(patch["config"] or {})
+                created["config"] = cfg
+            for key, value in patch.items():
+                if key != "config":
+                    created[key] = value
+            return dict(created)
+
+    def _fake_failure(task, repo):
+        calls.append(task["task_id"])
+        repo.update(
+            task["task_id"],
+            {
+                "config": {
+                    "matrix_script_initial_preview_generation": {
+                        "status": "preview_generation_failed",
+                        "error": "sample generation failure",
+                        "official_publish_ready": False,
+                    },
+                }
+            },
+        )
+        return {"status": "preview_generation_failed", "error": "sample generation failure"}
+
+    app.dependency_overrides[get_task_repository] = lambda: _Repo()
+    monkeypatch.setattr(tasks_router, "trigger_matrix_script_initial_preview_generation", _fake_failure)
+    client = TestClient(app, raise_server_exceptions=False)
+
+    try:
+        response = client.post(
+            "/tasks/matrix-script/new",
+            data=_matrix_script_create_payload(),
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        workbench = client.get(response.headers["location"])
+    finally:
+        app.dependency_overrides.clear()
+
+    assert calls == [created["task_id"]]
+    assert created["config"]["matrix_script_initial_preview_generation"]["status"] == (
+        "preview_generation_failed"
+    )
+    assert workbench.status_code == 200
+    block = _main_video_block(workbench.text)
+    assert "首版预览生成失败" in block
+    assert "sample generation failure" in block
+    assert "重新生成预览" in block
+    assert "生成视频预览" not in block
+    assert "当前尚未生成主视频" not in block
+    assert "未生成" not in block
+    assert "official_publish_ready=true" not in workbench.text
 
 
 def test_hot_follow_task_chain_uses_formal_workbench_and_delivery(monkeypatch):

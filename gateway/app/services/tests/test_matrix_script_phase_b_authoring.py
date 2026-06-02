@@ -53,6 +53,15 @@ CONTRACT_CLEAN_REF = "content://matrix-script/source/8c-fresh-001"
 TOPIC = "§8.C fresh contract-clean Matrix Script sample"
 
 
+@pytest.fixture(autouse=True)
+def _stub_auto_preview(monkeypatch):
+    monkeypatch.setattr(
+        tasks_router,
+        "trigger_matrix_script_initial_preview_generation",
+        lambda task, repo: {"status": "stubbed"},
+    )
+
+
 class _InMemoryRepo:
     def __init__(self) -> None:
         self._rows: dict[str, dict[str, Any]] = {}

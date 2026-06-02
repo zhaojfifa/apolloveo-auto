@@ -87,6 +87,27 @@ def test_overlay_inert_without_result() -> None:
     assert v["main_result"]["status"] == "not_generated"
 
 
+def test_initial_preview_failure_projects_retry_state() -> None:
+    task = {
+        "task_id": "ms-flow-1",
+        "kind": "matrix_script",
+        "config": {
+            "matrix_script_initial_preview_generation": {
+                "status": "preview_generation_failed",
+                "error": "sample failure",
+                "official_publish_ready": False,
+            }
+        },
+    }
+    v = build_matrix_script_operator_workbench_view(task, result=None, env={})
+    mr = v["main_result"]
+    assert v["has_pr_a_result"] is False
+    assert mr["status"] == "preview_generation_failed"
+    assert mr["status_label_zh"] == "首版预览生成失败"
+    assert mr["blocked_reason"] == "sample failure"
+    assert mr["official_publish_ready"] is False
+
+
 def _block(src: str, start_marker: str, end_marker: str) -> str:
     a = src.index(start_marker)
     b = src.index(end_marker, a)
@@ -158,6 +179,40 @@ def test_overlay_main_result_renders_operator_usable() -> None:
     assert 'data-role="ms-main-video-result-actions"' not in html
     assert 'data-role="legacy-main-video-compat-anchor"' in html
     assert "/tomato-real-result/preview/final.mp4" in html
+
+
+def test_template_renders_initial_preview_failure_retry_state() -> None:
+    pytest.importorskip("jinja2")
+    from jinja2 import ChainableUndefined, Environment
+
+    src = _template_src()
+    block = _block(src, "{% if ms_main_video_result.is_matrix_script %}", "{# Phase 2C")
+    overlay = build_matrix_script_operator_workbench_view(
+        {
+            "task_id": "ms-flow-1",
+            "kind": "matrix_script",
+            "config": {
+                "matrix_script_initial_preview_generation": {
+                    "status": "preview_generation_failed",
+                    "error": "sample failure",
+                }
+            },
+        },
+        result=None,
+        env={},
+    )
+    html = Environment(undefined=ChainableUndefined, autoescape=True).from_string(block).render(
+        ms_main_video_result={"is_matrix_script": True, "preview": {"available": False}, "primary_actions": [], "state_kind": "blocked"},
+        ms_overlay_mr=overlay["main_result"],
+        ms_overlay_has=False,
+        ms_overlay=overlay,
+        task=TASK,
+    )
+    assert "首版预览生成失败" in html
+    assert "sample failure" in html
+    assert "重新生成预览" in html
+    assert "当前尚未生成主视频" not in html
+    assert "主成片缺失" not in html
 
 
 # 9. existing script-understanding stays presenter-bound, no tomato fixture

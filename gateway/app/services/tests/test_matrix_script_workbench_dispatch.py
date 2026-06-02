@@ -51,6 +51,14 @@ CONTRACT_CLEAN_REF = "content://matrix-script/source/8b-fresh-001"
 TOPIC = "§8.B fresh contract-clean Matrix Script sample"
 
 
+def _stub_auto_preview(monkeypatch) -> None:
+    monkeypatch.setattr(
+        tasks_router,
+        "trigger_matrix_script_initial_preview_generation",
+        lambda task, repo: {"status": "stubbed"},
+    )
+
+
 class _InMemoryRepo:
     """Minimal repo that round-trips the formal create payload.
 
@@ -102,6 +110,7 @@ def test_post_redirect_target_is_workbench_route(monkeypatch):
     """
 
     monkeypatch.setenv("AUTH_MODE", "off")
+    _stub_auto_preview(monkeypatch)
     repo = _InMemoryRepo()
     app.dependency_overrides[get_task_repository] = lambda: repo
     client = TestClient(app, raise_server_exceptions=False)
@@ -129,6 +138,7 @@ def test_fresh_sample_packet_seeds_dispatch_inputs(monkeypatch):
     """
 
     monkeypatch.setenv("AUTH_MODE", "off")
+    _stub_auto_preview(monkeypatch)
     repo = _InMemoryRepo()
     app.dependency_overrides[get_task_repository] = lambda: repo
     client = TestClient(app, raise_server_exceptions=False)
@@ -166,6 +176,7 @@ def test_resolver_dispatches_fresh_sample_to_matrix_script_panel_kind(monkeypatc
     assert PANEL_REF_DISPATCH["matrix_script_slot_pack"] == "matrix_script"
 
     monkeypatch.setenv("AUTH_MODE", "off")
+    _stub_auto_preview(monkeypatch)
     repo = _InMemoryRepo()
     app.dependency_overrides[get_task_repository] = lambda: repo
     client = TestClient(app, raise_server_exceptions=False)
@@ -195,6 +206,7 @@ def test_get_workbench_renders_matrix_script_phase_b_variation_panel(monkeypatch
     """
 
     monkeypatch.setenv("AUTH_MODE", "off")
+    _stub_auto_preview(monkeypatch)
     repo = _InMemoryRepo()
     app.dependency_overrides[get_task_repository] = lambda: repo
     captured: dict[str, Any] = {}
