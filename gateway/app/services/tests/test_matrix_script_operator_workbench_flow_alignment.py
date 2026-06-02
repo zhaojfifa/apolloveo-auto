@@ -102,12 +102,14 @@ def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     src = _template_src()
     block = _block(src, 'id="matrix-script-main-video-result"', '{# Phase 2C')
     # empty-state and bound-placeholder are gated behind the preview_url branch
-    assert "{% if ms_overlay_mr.preview_url %}" in block
-    assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in block
-    assert block.index("{% if ms_overlay_mr.preview_url %}") < block.index('data-role="ms-main-video-result-preview-bound"')
-    assert block.index("{% if ms_overlay_mr.preview_url %}") < block.index('data-role="ms-main-video-result-preview-empty"')
+    assert "{% if ms_effective_preview_url %}" in block
+    assert '<video controls preload="metadata" src="{{ ms_effective_preview_url }}"' in block
+    assert block.index("{% if ms_effective_preview_url %}") < block.index('data-role="ms-main-video-result-preview-bound"')
+    assert block.index("{% if ms_effective_preview_url %}") < block.index('data-role="ms-main-video-result-preview-empty"')
     assert "{% elif ms_overlay_mr.operator_usable and ms_overlay_mr.preview_url %}" not in block
     assert 'data-role="ms-main-video-result-video"' in block
+    assert 'data-preview-present="{{ \'true\' if ms_effective_preview_url else \'false\' }}"' in block
+    assert 'data-preview-source="{{ ms_effective_preview_source }}"' in block
     assert 'data-role="ms-main-video-result-banner"' not in block
     assert 'data-role="ms-main-video-result-actions"' not in block
     assert 'data-role="legacy-main-video-compat-anchor"' in block
@@ -115,7 +117,6 @@ def test_existing_main_result_suppresses_empty_state_when_usable() -> None:
     assert 'data-role="ms-main-video-result-acceptance"' in block
     assert 'data-bind="visual_semantic_match"' in block
     assert 'data-role="ms-acc-open-video"' in block
-    assert 'data-role="ms-acc-preview-url"' in block
     assert 'data-role="ms-acc-generate"' in block
     assert 'data-role="ms-acc-confirm-main"' in block
     assert 'data-role="ms-acc-go-delivery"' in block

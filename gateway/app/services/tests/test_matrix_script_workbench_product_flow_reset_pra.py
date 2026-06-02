@@ -424,7 +424,7 @@ def test_no_fake_video_url_in_primary(primary_slice: str) -> None:
 def test_no_placeholder_video_player_in_primary(primary_slice: str) -> None:
     """The primary slice may only contain the real PR-A preview player."""
 
-    assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in primary_slice
+    assert '<video controls preload="metadata" src="{{ ms_effective_preview_url }}"' in primary_slice
     for tag in ("<source ", "<iframe"):
         assert tag not in primary_slice
 
