@@ -257,6 +257,9 @@ from gateway.app.services.matrix_script.create_entry import (  # noqa: E402
     build_matrix_script_entry,
     build_matrix_script_task_payload,
 )
+from gateway.app.services.matrix_script.auto_preview_generation import (  # noqa: E402
+    trigger_matrix_script_initial_preview_generation,
+)
 from gateway.app.services.matrix_script.source_script_body_store import (  # noqa: E402
     BodyStoreError,
     SOURCE_KIND_PASTE,
@@ -684,6 +687,7 @@ async def create_matrix_script_task(
             status_code=500,
             detail=f"Task persistence failed for task_id={task_id}",
         )
+    trigger_matrix_script_initial_preview_generation(stored_task, repo)
     return RedirectResponse(url=f"/tasks/{task_id}?created={MATRIX_SCRIPT_LINE_ID}", status_code=303)
 
 

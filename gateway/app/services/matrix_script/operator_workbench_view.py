@@ -36,12 +36,16 @@ LINE_ID = "matrix_script"
 STATUS_OPERATOR_USABLE = "operator_usable"
 STATUS_TECHNICAL_PREVIEW = "technical_preview"
 STATUS_NOT_GENERATED = "not_generated"
+STATUS_PREVIEW_GENERATION_RUNNING = "preview_generation_running"
+STATUS_PREVIEW_GENERATION_FAILED = "preview_generation_failed"
 
 # Status mapping onto the existing 主视频结果 vocabulary.
 _STATUS_LABEL = {
     STATUS_OPERATOR_USABLE: "运营可用 · 可交付",
     STATUS_TECHNICAL_PREVIEW: "技术预览 · 待审核",
     STATUS_NOT_GENERATED: "未生成",
+    STATUS_PREVIEW_GENERATION_RUNNING: "主视频预览生成中",
+    STATUS_PREVIEW_GENERATION_FAILED: "首版预览生成失败",
 }
 
 _FORBIDDEN_TOKENS = (
@@ -63,6 +67,12 @@ def _resolve_result(task: Mapping[str, Any], result: Optional[Mapping[str, Any]]
     staged = config.get("matrix_script_staged_candidate") if isinstance(config, Mapping) else None
     if isinstance(staged, Mapping) and staged.get("has_result"):
         return staged
+    initial = config.get("matrix_script_initial_preview_generation") if isinstance(config, Mapping) else None
+    if isinstance(initial, Mapping) and initial.get("status") in {
+        STATUS_PREVIEW_GENERATION_RUNNING,
+        STATUS_PREVIEW_GENERATION_FAILED,
+    }:
+        return initial
     return None
 
 
@@ -80,6 +90,25 @@ def _build_main_result(result: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
             "delivery_candidate": False,
             "official_publish_ready": False,
             "blocked_reason": None,
+            "preview_url": None,
+        }
+    if result.get("status") in {
+        STATUS_PREVIEW_GENERATION_RUNNING,
+        STATUS_PREVIEW_GENERATION_FAILED,
+    }:
+        status = str(result.get("status"))
+        return {
+            "status": status,
+            "status_label_zh": _STATUS_LABEL[status],
+            "operator_usable": False,
+            "technical_preview": False,
+            "visual_semantic_match": None,
+            "shot_match_count": 0,
+            "shot_count": plan_mod.shot_count(),
+            "real_visual_count": 0,
+            "delivery_candidate": False,
+            "official_publish_ready": False,
+            "blocked_reason": result.get("error") if status == STATUS_PREVIEW_GENERATION_FAILED else None,
             "preview_url": None,
         }
     operator_usable = _truthy(result.get("operator_usable"))
@@ -133,7 +162,10 @@ def build_matrix_script_operator_workbench_view(
     if not isinstance(task, Mapping):
         task = {}
     resolved = _resolve_result(task, result)
-    has_result = resolved is not None
+    has_result = (
+        resolved is not None
+        and resolved.get("status") not in {STATUS_PREVIEW_GENERATION_RUNNING, STATUS_PREVIEW_GENERATION_FAILED}
+    )
     main_result = _build_main_result(resolved)
     view: Dict[str, Any] = {
         "is_matrix_script": True,
