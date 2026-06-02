@@ -57,6 +57,7 @@ _FORBIDDEN_VOCAB = (
     "provider",
     "vendor",
     "engine",
+    "azure",
     "akool",
     "seedance",
     "openai",

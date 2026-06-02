@@ -205,22 +205,25 @@ def test_pra_stepper_lives_inside_diagnostics_fold(
 
 
 # --------------------------------------------------------------------------
-# (5) Workbench primary section order is operator-first
+# (5) Workbench primary section order is A–J
 # --------------------------------------------------------------------------
 
 
 PRIMARY_SECTION_ORDER = [
     ("A", "matrix-script-main-video-result"),
-    ("B", "matrix-script-section-generation-plan"),
-    ("C", "matrix-script-section-role-voice"),
-    ("D", "matrix-script-section-delivery-entry"),
-    ("E", "matrix-script-section-optional-variants"),
-    ("F", "matrix-script-section-script-understanding"),
-    ("G", "op-console-ms-technical-diagnostics-fold"),
+    ("B", "matrix-script-section-script-understanding"),
+    ("C", "matrix-script-section-generation-plan"),
+    ("D", "matrix-script-section-visual-materials"),
+    ("E", "matrix-script-section-role-voice"),
+    ("F", "matrix-script-section-subtitle-music"),
+    ("G", "matrix-script-section-video-versions"),
+    ("H", "matrix-script-section-review-tuning"),
+    ("I", "matrix-script-section-delivery-entry"),
+    ("J", "op-console-ms-technical-diagnostics-fold"),
 ]
 
 
-def test_primary_section_order_is_operator_first(matrix_branch: str) -> None:
+def test_primary_section_order_is_exactly_a_to_j(matrix_branch: str) -> None:
     positions = [
         matrix_branch.find(f'data-role="{anchor}"')
         for _, anchor in PRIMARY_SECTION_ORDER
@@ -419,7 +422,7 @@ def test_legacy_af_marker_only_in_diagnostics(
 
 
 # --------------------------------------------------------------------------
-# (12) No fake media / publish URLs
+# (12) No fake video / media / publish URLs
 # --------------------------------------------------------------------------
 
 
@@ -435,9 +438,8 @@ def test_no_fake_media_or_publish_url(primary_visible: str) -> None:
         assert fake not in visible, f"Fake media URL leaked: {fake}"
 
 
-def test_only_real_preview_video_no_iframe_or_source_tag_in_primary(primary_slice: str) -> None:
-    assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in primary_slice
-    for tag in ("<iframe", "<source "):
+def test_no_video_or_iframe_or_source_tag_in_primary(primary_slice: str) -> None:
+    for tag in ("<video", "<iframe", "<source "):
         assert tag not in primary_slice
 
 
@@ -457,7 +459,7 @@ def test_no_vendor_name_in_primary_visible_text(
 ) -> None:
     visible = re.sub(r'="[^"]*"', '=""', primary_visible)
     for vendor in (
-        "gemini", "akool", "seedance",
+        "azure", "gemini", "akool", "seedance",
         "openai", "anthropic", "google", "elevenlabs",
     ):
         assert not re.search(rf"\b{vendor}\b", visible, flags=re.IGNORECASE), (

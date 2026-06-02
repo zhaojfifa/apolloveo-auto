@@ -49,14 +49,17 @@ def primary_visible(primary_slice: str) -> str:
     return _strip_non_rendered(primary_slice)
 
 
-def test_primary_section_order_is_operator_first_a_to_g(matrix_branch: str) -> None:
+def test_primary_section_order_is_accepted_a_to_j(matrix_branch: str) -> None:
     anchors = [
         'data-role="matrix-script-main-video-result"',
-        'data-role="matrix-script-section-generation-plan"',
-        'data-role="matrix-script-section-role-voice"',
-        'data-role="matrix-script-section-delivery-entry"',
-        'data-role="matrix-script-section-optional-variants"',
         'data-role="matrix-script-section-script-understanding"',
+        'data-role="matrix-script-section-generation-plan"',
+        'data-role="matrix-script-section-visual-materials"',
+        'data-role="matrix-script-section-role-voice"',
+        'data-role="matrix-script-section-subtitle-music"',
+        'data-role="matrix-script-section-video-versions"',
+        'data-role="matrix-script-section-review-tuning"',
+        'data-role="matrix-script-section-delivery-entry"',
         'data-role="op-console-ms-technical-diagnostics-fold"',
     ]
     positions = [matrix_branch.find(a) for a in anchors]
@@ -80,35 +83,32 @@ def test_removed_group_headers_and_temp_cards_are_absent(workbench_source: str) 
         assert label not in workbench_source
 
 
-def test_operator_first_titles_are_direct(primary_visible: str) -> None:
+def test_a_to_j_operator_titles_are_direct(primary_visible: str) -> None:
     for title in (
         "A · 主视频结果",
-        "B · 镜头与素材调整",
-        "C · 声音、字幕与音乐",
-        "D · 交付入口",
-        "E · 视频变体",
-        "F · 脚本理解",
-        "G · 技术诊断",
+        "B · 脚本理解",
+        "C · 视频生成计划",
+        "D · 画面与素材",
+        "E · 角色与声音",
+        "F · 字幕与音乐",
+        "G · 视频变体",
+        "H · 校对与微调",
+        "I · 交付入口",
+        "J · 技术诊断",
     ):
-        assert title in primary_visible or title == "G · 技术诊断"
+        assert title in primary_visible or title == "J · 技术诊断"
 
 
 def test_review_tuning_is_collapsed(primary_slice: str) -> None:
     assert 'data-role="matrix-script-section-review-tuning"' in primary_slice
-    assert 'data-role="matrix-script-section-review-tuning"' in primary_slice
-    assert 'hidden aria-hidden="true"' in primary_slice
     assert 'data-role="ms-section-review-tuning-fold"' in primary_slice
     assert primary_slice.count('data-role="ms-section-review-tuning-zone"') == 4
 
 
-def test_shot_material_adjustment_has_shot_acceptance_cards(primary_slice: str) -> None:
+def test_storyboard_has_shot_acceptance_overlay(primary_slice: str) -> None:
     assert 'data-role="ms-section-generation-plan-scene-list"' in primary_slice
     assert 'data-role="ms-section-generation-plan-shot-acceptance-overlay"' in primary_slice
     assert 'data-role="ms-shot-acceptance"' in primary_slice
-    assert 'data-role="ms-shot-adjustment-grid"' in primary_slice
-    assert 'data-role="ms-shot-replace-material"' in primary_slice
-    assert 'data-role="ms-shot-regenerate"' in primary_slice
-    assert "当前为复用素材，建议补充真实品尝/递镜素材。" in primary_slice
     assert "{{ s.source }}" in primary_slice
     assert "{{ s.semantic_status }}" in primary_slice
 
@@ -121,37 +121,12 @@ def test_delivery_entry_projects_preview_candidate(primary_slice: str) -> None:
     assert 'href="/tasks/{{ task.task_id }}/publish"' in primary_slice
 
 
-def test_operator_usable_preview_embeds_video(primary_slice: str) -> None:
-    assert '<video controls preload="metadata" src="{{ ms_overlay_mr.preview_url }}"' in primary_slice
-    assert 'data-role="ms-main-video-result-video"' in primary_slice
-    assert "尚未生成主视频" in primary_slice
-
-
-def test_voice_subtitle_music_is_combined(primary_slice: str) -> None:
-    assert 'data-role="ms-section-voice-subtitle-music-summary"' in primary_slice
-    assert 'data-role="ms-section-voiceover-status"' in primary_slice
-    assert "旁白待接入 Azure TTS，当前以字幕承载脚本。" in primary_slice
-    assert 'data-role="ms-section-subtitle-status"' in primary_slice
-    assert 'data-role="ms-section-bgm-status"' in primary_slice
-
-
-def test_variants_and_script_understanding_are_collapsed_or_late(primary_slice: str) -> None:
-    delivery_pos = primary_slice.index('data-role="matrix-script-section-delivery-entry"')
-    variants_pos = primary_slice.index('data-role="matrix-script-section-optional-variants"')
-    script_pos = primary_slice.index('data-role="matrix-script-section-script-understanding"')
-    assert delivery_pos < variants_pos < script_pos
-    assert 'data-role="ms-section-video-variants-fold"' in primary_slice
-    assert "主视频确认后，可生成 V2/V3 变体。" in primary_slice
-    assert 'data-role="ms-section-script-understanding-fold"' in primary_slice
-    assert "查看系统如何理解脚本" in primary_slice
-
-
 def test_no_fake_or_forbidden_primary_media(primary_visible: str) -> None:
     lowered = primary_visible.lower()
     for token in (
         "provider_url", "temporary_url", "download_url", "publish_url",
         "publish_status", "artifact_key", "r2_key", "model_id", "credit",
-        "<iframe", "http://", "https://",
+        "<video", "<iframe", "http://", "https://",
     ):
         assert token not in lowered
 
