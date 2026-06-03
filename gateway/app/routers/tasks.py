@@ -258,7 +258,11 @@ from gateway.app.services.matrix_script.create_entry import (  # noqa: E402
     build_matrix_script_task_payload,
 )
 from gateway.app.services.matrix_script.auto_preview_generation import (  # noqa: E402
+    enqueue_matrix_script_initial_preview_generation,
     trigger_matrix_script_initial_preview_generation,
+)
+from gateway.app.services.matrix_script.operator_workbench_view import (  # noqa: E402
+    build_matrix_script_operator_workbench_view,
 )
 from gateway.app.services.matrix_script.source_script_body_store import (  # noqa: E402
     BodyStoreError,
@@ -650,6 +654,7 @@ async def tasks_matrix_script_new(request: Request) -> HTMLResponse:
 
 @pages_router.post(MATRIX_SCRIPT_CREATE_ROUTE)
 async def create_matrix_script_task(
+    background_tasks: BackgroundTasks,
     topic: str = Form(...),
     source_script_ref: str = Form(...),
     source_language: str = Form(...),
@@ -663,7 +668,16 @@ async def create_matrix_script_task(
     operator_notes: str | None = Form(default=None),
     repo=Depends(get_task_repository),
 ) -> RedirectResponse:
-    """Create a Matrix Script task from the formal line-specific entry."""
+    """Create a Matrix Script task from the formal line-specific entry.
+
+    The first-preview generation is NOT run inline: blocking the POST on the full
+    ffmpeg path is what produced 502s and left tasks stuck in ``running``.
+    Instead the task is created, a durable ``queued`` lifecycle state is
+    persisted, the heavy generation is dispatched to the background, and the
+    Workbench is redirected to immediately. The Workbench polls the
+    initial-preview status until a terminal state (succeeded / failed /
+    retry_required).
+    """
 
     entry = build_matrix_script_entry(
         topic=topic,
@@ -687,8 +701,67 @@ async def create_matrix_script_task(
             status_code=500,
             detail=f"Task persistence failed for task_id={task_id}",
         )
-    trigger_matrix_script_initial_preview_generation(stored_task, repo)
+    # Persisting the queued marker and dispatching generation must never break
+    # the New Task redirect — resilience here is the entire point of the async
+    # lifecycle. A failure to mark queued degrades to the safe not_generated
+    # projection; the background job still finalizes the real state.
+    try:
+        enqueue_matrix_script_initial_preview_generation(stored_task, repo)
+    except Exception:  # noqa: BLE001 — never block task creation on the marker write
+        logger.warning(
+            "matrix_script initial-preview enqueue failed for task_id=%s", task_id,
+            exc_info=True,
+        )
+    background_tasks.add_task(
+        trigger_matrix_script_initial_preview_generation, stored_task, repo
+    )
     return RedirectResponse(url=f"/tasks/{task_id}?created={MATRIX_SCRIPT_LINE_ID}", status_code=303)
+
+
+def _is_matrix_script_task(task: Any) -> bool:
+    if not isinstance(task, dict):
+        return False
+    for key in ("kind", "category_key", "category", "platform"):
+        value = task.get(key)
+        if isinstance(value, str) and value.strip().lower() == MATRIX_SCRIPT_LINE_ID:
+            return True
+    return False
+
+
+@api_router.get("/matrix-script/{task_id}/initial-preview-status")
+async def matrix_script_initial_preview_status(
+    task_id: str,
+    repo=Depends(get_task_repository),
+) -> JSONResponse:
+    """Operator-safe poll target for the Matrix Script first-preview lifecycle.
+
+    Reuses the read-only Workbench overlay projection (which owns the stale
+    guard), so a queued/running attempt that outlived the stale window is
+    reported as a retry state instead of endless ``poll: true``. Carries no
+    provider / model / publish identifiers — the overlay builder asserts the
+    surface is clean before it is returned.
+    """
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="task_not_found")
+    if not _is_matrix_script_task(task):
+        raise HTTPException(
+            status_code=400,
+            detail="initial_preview_status_only_available_for_matrix_script_tasks",
+        )
+    view = build_matrix_script_operator_workbench_view(task)
+    main_result = view.get("main_result", {})
+    delivery = view.get("delivery", {})
+    return JSONResponse(
+        {
+            "status": main_result.get("status"),
+            "poll": bool(main_result.get("poll")),
+            "operator_usable": bool(main_result.get("operator_usable")),
+            "preview_url": main_result.get("preview_url") or delivery.get("preview_url"),
+            "blocked_reason": main_result.get("blocked_reason"),
+            "official_publish_ready": False,
+        }
+    )
 
 
 @pages_router.post(MATRIX_SCRIPT_MINT_ROUTE)

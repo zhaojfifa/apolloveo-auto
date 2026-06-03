@@ -321,6 +321,8 @@
              data-state-kind="{{ ms_main_video_result.state_kind }}"
              data-preview-present="{{ 'true' if ms_effective_preview_url else 'false' }}"
              data-preview-source="{{ ms_effective_preview_source }}"
+             data-preview-status="{{ ms_overlay_mr.status }}"
+             data-preview-poll="{{ 'true' if ms_overlay_mr.poll else 'false' }}"
              data-redesign-wave="2026-05-28-pr2a">
           <div class="op-section-head">
             <div class="op-section-head__main">
@@ -329,16 +331,16 @@
               <span class="op-pill op-pill--{% if ms_overlay_mr.operator_usable %}ready{% elif ms_main_video_result.state_kind == 'deliverable' %}ready{% elif ms_main_video_result.state_kind == 'awaiting_review' %}review{% elif ms_main_video_result.state_kind == 'generating' %}info{% else %}blocked{% endif %}"
                     data-role="ms-main-video-result-state-pill"
                     data-state-kind="{{ ms_main_video_result.state_kind }}">
-                <span class="op-pill__dot"></span>{% if ms_overlay_mr.operator_usable %}运营可用{% elif ms_effective_preview_url %}已生成预览{% elif ms_overlay_mr.status == 'preview_generation_running' %}生成中{% elif ms_overlay_mr.status == 'preview_generation_failed' %}生成失败{% else %}未生成{% endif %}
+                <span class="op-pill__dot"></span>{% if ms_overlay_mr.operator_usable %}运营可用{% elif ms_effective_preview_url %}已生成预览{% elif ms_overlay_mr.status in ['preview_generation_running', 'preview_generation_queued'] %}生成中{% elif ms_overlay_mr.status in ['preview_generation_failed', 'preview_generation_retry_required'] %}生成失败{% else %}未生成{% endif %}
               </span>
             </div>
           </div>
           <p class="op-section-helper" data-role="ms-main-video-result-subtitle">
             {% if ms_effective_preview_url %}
               已生成 V1 主视频预览。确认主版本后进入交付检查。
-            {% elif ms_overlay_mr.status == 'preview_generation_running' %}
-              系统正在根据脚本和素材生成首版预览。
-            {% elif ms_overlay_mr.status == 'preview_generation_failed' %}
+            {% elif ms_overlay_mr.status in ['preview_generation_running', 'preview_generation_queued'] %}
+              系统正在根据脚本和素材生成首版预览，完成后本页会自动更新。
+            {% elif ms_overlay_mr.status in ['preview_generation_failed', 'preview_generation_retry_required'] %}
               首版预览生成失败，请检查原因后重新生成预览。
             {% else %}
               请先确认素材与配乐，然后生成视频预览。
@@ -372,13 +374,14 @@
                 <strong>主视频已生成</strong> · 候选编号 {{ ms_main_video_result.preview.variation_id }}
                 <div class="op-tech-note" style="margin-top:8px;">完整成片与下载在交付页面。本面板不内嵌外部链接。</div>
               </div>
-            {% elif ms_overlay_mr.status == 'preview_generation_running' %}
+            {% elif ms_overlay_mr.status in ['preview_generation_running', 'preview_generation_queued'] %}
               <div data-role="ms-main-video-result-preview-generating"
+                   data-preview-poll="true"
                    style="font-size:14px; color:var(--op-fg-mid, #334155);">
                 <strong>主视频预览生成中</strong>
-                <div>系统正在根据脚本和素材生成首版预览。</div>
+                <div>系统正在根据脚本和素材生成首版预览，完成后本页会自动更新。</div>
               </div>
-            {% elif ms_overlay_mr.status == 'preview_generation_failed' %}
+            {% elif ms_overlay_mr.status in ['preview_generation_failed', 'preview_generation_retry_required'] %}
               <div data-role="ms-main-video-result-preview-failed"
                    style="font-size:14px; color:var(--op-fg-mid, #334155);">
                 <strong>首版预览生成失败</strong>
@@ -437,7 +440,7 @@
           <div class="op-main-video-acceptance" data-role="ms-main-video-result-acceptance"
                data-operator-usable="{{ ms_overlay_mr.operator_usable }}"
                data-status="{{ ms_overlay_mr.status }}" style="margin-top:10px;">
-            <div class="muted" data-role="ms-acc-status">状态：<span data-bind="status_label">{% if ms_overlay_mr.operator_usable %}运营可用{% elif ms_effective_preview_url %}已生成预览{% elif ms_overlay_mr.status == 'preview_generation_running' %}主视频预览生成中{% elif ms_overlay_mr.status == 'preview_generation_failed' %}首版预览生成失败{% else %}未生成{% endif %}</span></div>
+            <div class="muted" data-role="ms-acc-status">状态：<span data-bind="status_label">{% if ms_overlay_mr.operator_usable %}运营可用{% elif ms_effective_preview_url %}已生成预览{% elif ms_overlay_mr.status in ['preview_generation_running', 'preview_generation_queued'] %}主视频预览生成中{% elif ms_overlay_mr.status in ['preview_generation_failed', 'preview_generation_retry_required'] %}首版预览生成失败{% else %}未生成{% endif %}</span></div>
             <div class="muted" data-role="ms-acc-current-version"{% if not ms_overlay_has %} style="display:none;"{% endif %}>当前版本：<span data-bind="current_version">V1 主视频预览</span></div>
             <div class="muted" data-role="ms-acc-semantic"{% if not ms_overlay_has %} style="display:none;"{% endif %}>画面语义匹配：<span data-bind="visual_semantic_match">{{ ms_overlay_mr.visual_semantic_match or "—" }}</span></div>
             <div class="muted" data-role="ms-acc-shot-match"{% if not ms_overlay_has %} style="display:none;"{% endif %}>匹配镜头数：<span data-bind="shot_match_count">{{ ms_overlay_mr.shot_match_count }}</span> / <span data-bind="shot_count">{{ ms_overlay_mr.shot_count }}</span></div>
@@ -448,7 +451,7 @@
             <div class="muted" data-role="ms-acc-blocked"{% if not ms_overlay_mr.blocked_reason %} style="display:none;"{% endif %}>原因：<span data-bind="blocked_reason">{{ ms_overlay_mr.blocked_reason or "" }}</span></div>
             <div class="task-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">
               <button type="button" class="btn-primary" data-role="ms-acc-generate"
-                      data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">{% if ms_overlay.material_changed %}重新生成预览{% elif ms_effective_preview_url %}再次生成预览{% elif ms_overlay_mr.status == 'preview_generation_failed' %}重新生成预览{% elif ms_overlay_mr.status == 'preview_generation_running' %}生成中{% else %}生成视频预览{% endif %}</button>
+                      data-endpoint="/api/matrix-script/{{ task.task_id }}/tomato-real-result">{% if ms_overlay.material_changed %}重新生成预览{% elif ms_effective_preview_url %}再次生成预览{% elif ms_overlay_mr.status in ['preview_generation_failed', 'preview_generation_retry_required'] %}重新生成预览{% elif ms_overlay_mr.status in ['preview_generation_running', 'preview_generation_queued'] %}生成中{% else %}生成视频预览{% endif %}</button>
               {% if ms_overlay_mr.operator_usable %}
               <button type="button" class="btn-primary" data-role="ms-acc-confirm-main" disabled aria-disabled="true" title="确认主版本写入仍走既有确认链路，本按钮仅保留运营主操作位。">确认为主版本</button>
               <a data-role="ms-acc-go-delivery" href="/tasks/{{ task.task_id }}/publish" class="btn-primary">前往交付</a>
@@ -463,6 +466,40 @@
 
           <div data-role="legacy-main-video-compat-anchor"
                hidden aria-hidden="true" inert></div>
+          {% if ms_overlay_mr.poll %}
+          {# Async first-preview lifecycle poller. The New Task POST dispatches
+             generation to the background and redirects here immediately; this
+             polls the initial-preview status until a terminal state, then
+             reloads so the success (inline video) or failure (retry) state
+             renders from the server projection. The server-side stale guard
+             guarantees the projected status becomes retry_required if a worker
+             dies, so this can never poll forever. #}
+          <script>
+          (function () {
+            var card = document.getElementById('matrix-script-main-video-result');
+            if (!card || card.getAttribute('data-preview-poll') !== 'true') { return; }
+            var statusUrl = '/api/matrix-script/{{ task.task_id }}/initial-preview-status';
+            var INTERVAL_MS = 4000;
+            var inFlight = false;
+            var timer = setInterval(function () {
+              if (inFlight || document.hidden) { return; }
+              inFlight = true;
+              fetch(statusUrl, { headers: { 'Accept': 'application/json' } })
+                .then(function (resp) { return resp.ok ? resp.json() : null; })
+                .then(function (d) {
+                  if (!d) { return; }
+                  if (d.poll) { return; }
+                  // Terminal state reached (succeeded / failed / retry_required):
+                  // reload so the server renders the inline video or retry state.
+                  clearInterval(timer);
+                  window.location.reload();
+                })
+                .catch(function () { /* transient error: keep polling */ })
+                .then(function () { inFlight = false; });
+            }, INTERVAL_MS);
+          })();
+          </script>
+          {% endif %}
           <script>
           (function () {
             var btn = document.querySelector('[data-role="ms-acc-generate"]');
