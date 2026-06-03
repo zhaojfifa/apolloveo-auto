@@ -108,7 +108,11 @@ def _build_main_result(result: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
             "real_visual_count": 0,
             "delivery_candidate": False,
             "official_publish_ready": False,
-            "blocked_reason": result.get("error") if status == STATUS_PREVIEW_GENERATION_FAILED else None,
+            "blocked_reason": (
+                result.get("error_summary") or result.get("error")
+                if status == STATUS_PREVIEW_GENERATION_FAILED
+                else None
+            ),
             "preview_url": None,
         }
     operator_usable = _truthy(result.get("operator_usable"))
