@@ -87,6 +87,13 @@ by `docs/design/MATRIX_SCRIPT_DESIGN_AUTHORITY_INDEX.md`, starting with:
 3. `docs/design/matrix_script_script_to_video_presenter_alignment_v1.md`
 4. `docs/architecture/matrix_script_script_to_video_contract_alignment_v1.md`
 
+Matrix Script P0 is **closed** (async state machine, 2026-06-04). The current
+baseline is `docs/execution/MATRIX_SCRIPT_ASYNC_STATE_MACHINE_CLOSURE_20260604.md`
+(#202 artifact-truth + #203 async lifecycle/polling/stale guard). Any future
+Matrix Script PR must preserve the result-first layout (A main video, B
+material/music, C delivery, D/E folded, diagnostics collapsed) and the
+operator-only primary UI.
+
 For Workbench, New Task, Delivery, result-line, or state/projection changes,
 also read the four-layer state authorities named in this index. Matrix Script
 UI may show L4 operator summary and necessary L3 acceptance facts; it must not

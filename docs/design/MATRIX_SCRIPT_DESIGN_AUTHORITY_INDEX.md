@@ -22,6 +22,11 @@ must not use execution logs as design authority:
 5. `docs/design/matrix_script_phase2c_operator_readability_plan_v1.md`
 6. `docs/architecture/matrix_script_script_to_video_contract_alignment_v1.md`
 7. `docs/execution/MATRIX_SCRIPT_REAL_RESULT_BASELINE_20260601.md`
+8. `docs/execution/MATRIX_SCRIPT_ASYNC_STATE_MACHINE_CLOSURE_20260604.md`
+   (P0 closure baseline — #202 artifact-truth + #203 async lifecycle / polling /
+   stale guard; records the New Task → Workbench inline-video terminal flow,
+   the operator-only primary-UI rule, and the four-layer boundary. Binding for
+   the P0 lifecycle baseline; not a new UI/IA design.)
 
 ## Binding Reading
 
