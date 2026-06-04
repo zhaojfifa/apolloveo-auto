@@ -101,6 +101,7 @@ Authority surfaces that bind the module-presence check (consume the line-specifi
 - operator-visible surfaces: `docs/design/ApolloVeo_Operator_Visible_Surfaces_v1.md`
 - design handoff: `docs/handoffs/apolloveo_2_0_design_handoff_v1.md`
 - Matrix Script line-specific execution authority: `docs/product/matrix_script_product_flow_v1.md`
+  - Matrix Script P0 baseline is now **result-first and closed** (async state machine, 2026-06-04): `docs/execution/MATRIX_SCRIPT_ASYNC_STATE_MACHINE_CLOSURE_20260604.md`. Do not reintroduce parallel flows or engineering-detail primary UI. Any future Matrix Script PR must preserve: A main video first, B material/music adjustment, C delivery, D/E folded, diagnostics collapsed; and keep `official_publish_ready=false`.
 - Digital Anchor line-specific execution authority: `docs/product/digital_anchor_product_flow_v1.md`
 
 Reviewer obligation: for every PR claiming convergence on one of those lines, the reviewer MUST open the relevant template branches and verify each module enumerated in the PR's scope is operator-visible. A PR that lands a service module + a wiring seam + a contract addendum but does not also extend the line's `tasks.html` / `task_workbench.html` / `task_publish_hub.html` operator block to expose the module is by definition incomplete and must be returned. This rule complements §6 (Contract-First) and §8 (Truth-Source); it does not relax either.
