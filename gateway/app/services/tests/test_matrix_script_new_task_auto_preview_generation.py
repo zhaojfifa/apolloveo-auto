@@ -69,7 +69,13 @@ def test_trigger_initial_preview_persists_staged_candidate(monkeypatch) -> None:
     status = auto.trigger_matrix_script_initial_preview_generation(task, repo)
 
     assert status["status"] == auto.STATUS_SUCCEEDED
-    assert len(repo.updates) == 1
+    assert status.get("completed_at")
+    # Async lifecycle: the background job writes running (started_at) first, then
+    # the terminal succeeded + staged candidate — two durable config updates.
+    assert len(repo.updates) == 2
+    first_status = repo.updates[0][1]["config"][auto.AUTO_PREVIEW_STATUS_KEY]
+    assert first_status["status"] == auto.STATUS_RUNNING
+    assert first_status.get("started_at")
     stored = repo.get("ms-auto-1") or {}
     cfg = stored["config"]
     assert cfg[auto.STAGED_CANDIDATE_KEY]["has_result"] is True

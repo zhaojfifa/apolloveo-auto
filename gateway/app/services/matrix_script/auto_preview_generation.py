@@ -33,9 +33,15 @@ from gateway.app.services.matrix_script.tomato_real_result_orchestrator import (
 
 AUTO_PREVIEW_STATUS_KEY = "matrix_script_initial_preview_generation"
 STAGED_CANDIDATE_KEY = "matrix_script_staged_candidate"
+# Async lifecycle: queued (New Task POST) -> running (background job start) ->
+# succeeded / failed (background job terminal). retry_required is a *projection*
+# state derived from a stale running/queued attempt; the generator never writes
+# it (the projection layer owns the stale guard — see operator_workbench_view).
+STATUS_QUEUED = "preview_generation_queued"
 STATUS_RUNNING = "preview_generation_running"
 STATUS_SUCCEEDED = "preview_generation_succeeded"
 STATUS_FAILED = "preview_generation_failed"
+STATUS_RETRY_REQUIRED = "preview_generation_retry_required"
 MIN_FINAL_VIDEO_BYTES = 1024
 OPERATOR_SAFE_GENERATION_FAILURE = "首版预览生成失败：视频文件未完整生成，请重新生成。"
 
@@ -170,17 +176,45 @@ def build_matrix_script_tomato_preview_payload(task: Mapping[str, Any]) -> Dict[
     return payload
 
 
+def enqueue_matrix_script_initial_preview_generation(
+    task: Mapping[str, Any],
+    repo: Any,
+) -> Dict[str, Any]:
+    """Persist the ``queued`` lifecycle state for the first Matrix Script preview.
+
+    Called synchronously inside the New Task POST so the Workbench has a durable
+    in-progress state to poll against, BEFORE the heavy generation runs. The
+    actual generation is dispatched to the background and finalized by
+    :func:`trigger_matrix_script_initial_preview_generation`.
+    """
+    task_id = _task_id(task)
+    queued = _status_payload(STATUS_QUEUED, queued_at=_utc_now())
+    _update_config(repo, task_id, repo.get(task_id) or task, {AUTO_PREVIEW_STATUS_KEY: queued})
+    return queued
+
+
 def trigger_matrix_script_initial_preview_generation(
     task: Mapping[str, Any],
     repo: Any,
 ) -> Dict[str, Any]:
-    """Synchronously generate and persist the first Matrix Script preview.
+    """Generate and persist the first Matrix Script preview (background job body).
 
-    The result is persisted under ``config.matrix_script_staged_candidate``.
-    Failures are persisted under ``config.matrix_script_initial_preview_generation``
-    so the Workbench can show a retry/error state instead of a dead empty state.
+    Writes ``running`` (with ``started_at``) before the heavy work so the
+    Workbench poller observes progress, then finalizes as
+    ``preview_generation_succeeded`` (with ``completed_at`` +
+    ``config.matrix_script_staged_candidate``) or ``preview_generation_failed``
+    (with ``failed_at`` + an operator-safe ``error_summary``). Because the
+    request thread no longer blocks on this, a gateway timeout can never leave a
+    half-written state; if the worker dies mid-run the projection layer's stale
+    guard promotes a lingering ``running`` to ``retry_required``.
     """
     task_id = _task_id(task)
+    _update_config(
+        repo,
+        task_id,
+        repo.get(task_id) or task,
+        {AUTO_PREVIEW_STATUS_KEY: _status_payload(STATUS_RUNNING, started_at=_utc_now())},
+    )
     latest = repo.get(task_id) or task
     try:
         payload = build_matrix_script_tomato_preview_payload(latest)
@@ -211,6 +245,7 @@ def trigger_matrix_script_initial_preview_generation(
 
     success = _status_payload(
         STATUS_SUCCEEDED,
+        completed_at=_utc_now(),
         preview_url=payload.get("preview_url"),
         delivery_candidate=payload.get("delivery_candidate"),
     )

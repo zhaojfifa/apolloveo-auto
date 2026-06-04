@@ -27,6 +27,7 @@ rendered as task truth (removed per the mock-alignment review).
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional
 
 from gateway.app.services.matrix_script import tomato_real_result_plan as plan_mod
@@ -36,16 +37,38 @@ LINE_ID = "matrix_script"
 STATUS_OPERATOR_USABLE = "operator_usable"
 STATUS_TECHNICAL_PREVIEW = "technical_preview"
 STATUS_NOT_GENERATED = "not_generated"
+STATUS_PREVIEW_GENERATION_QUEUED = "preview_generation_queued"
 STATUS_PREVIEW_GENERATION_RUNNING = "preview_generation_running"
 STATUS_PREVIEW_GENERATION_FAILED = "preview_generation_failed"
+STATUS_PREVIEW_GENERATION_RETRY_REQUIRED = "preview_generation_retry_required"
+
+# In-progress (operator should keep polling) vs failure (operator should retry).
+_IN_PROGRESS_STATUSES = {
+    STATUS_PREVIEW_GENERATION_QUEUED,
+    STATUS_PREVIEW_GENERATION_RUNNING,
+}
+_FAILURE_STATUSES = {
+    STATUS_PREVIEW_GENERATION_FAILED,
+    STATUS_PREVIEW_GENERATION_RETRY_REQUIRED,
+}
+_NON_SUCCESS_STATUSES = _IN_PROGRESS_STATUSES | _FAILURE_STATUSES
+
+# Projection owns the stale guard: a queued/running attempt that has not
+# finalized within this window is shown as retry_required, never as endless
+# "generating". This protects against a background worker that died (process
+# restart / OOM) without writing a terminal state.
+RUNNING_STALE_SECONDS = 300
+_STALE_RETRY_REASON = "首版预览生成超时，请重新生成预览。"
 
 # Status mapping onto the existing 主视频结果 vocabulary.
 _STATUS_LABEL = {
     STATUS_OPERATOR_USABLE: "运营可用 · 可交付",
     STATUS_TECHNICAL_PREVIEW: "技术预览 · 待审核",
     STATUS_NOT_GENERATED: "未生成",
+    STATUS_PREVIEW_GENERATION_QUEUED: "主视频预览生成中",
     STATUS_PREVIEW_GENERATION_RUNNING: "主视频预览生成中",
     STATUS_PREVIEW_GENERATION_FAILED: "首版预览生成失败",
+    STATUS_PREVIEW_GENERATION_RETRY_REQUIRED: "首版预览生成失败",
 }
 
 _FORBIDDEN_TOKENS = (
@@ -58,6 +81,42 @@ def _truthy(v: Any) -> bool:
     return bool(v) and v not in ("", "false", "False", 0)
 
 
+def _now(now: Optional[datetime]) -> datetime:
+    return now or datetime.now(timezone.utc)
+
+
+def _parse_iso(value: Any) -> Optional[datetime]:
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed
+
+
+def _is_stale_attempt(initial: Mapping[str, Any], now: datetime) -> bool:
+    """True when a queued/running attempt has outlived the stale window."""
+    started = (
+        _parse_iso(initial.get("started_at"))
+        or _parse_iso(initial.get("queued_at"))
+        or _parse_iso(initial.get("updated_at"))
+    )
+    if started is None:
+        return False
+    return (now - started).total_seconds() > RUNNING_STALE_SECONDS
+
+
+def _project_initial_status(initial: Mapping[str, Any], now: datetime) -> str:
+    """Apply the stale guard: a stale in-progress attempt projects to retry_required."""
+    status = str(initial.get("status") or "")
+    if status in _IN_PROGRESS_STATUSES and _is_stale_attempt(initial, now):
+        return STATUS_PREVIEW_GENERATION_RETRY_REQUIRED
+    return status
+
+
 def _resolve_result(task: Mapping[str, Any], result: Optional[Mapping[str, Any]]) -> Optional[Mapping[str, Any]]:
     if isinstance(result, Mapping) and any(
         k in result for k in ("operator_usable", "delivery_candidate", "visual_semantic_match")
@@ -68,19 +127,17 @@ def _resolve_result(task: Mapping[str, Any], result: Optional[Mapping[str, Any]]
     if isinstance(staged, Mapping) and staged.get("has_result"):
         return staged
     initial = config.get("matrix_script_initial_preview_generation") if isinstance(config, Mapping) else None
-    if isinstance(initial, Mapping) and initial.get("status") in {
-        STATUS_PREVIEW_GENERATION_RUNNING,
-        STATUS_PREVIEW_GENERATION_FAILED,
-    }:
+    if isinstance(initial, Mapping) and str(initial.get("status") or "") in _NON_SUCCESS_STATUSES:
         return initial
     return None
 
 
-def _build_main_result(result: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
+def _build_main_result(result: Optional[Mapping[str, Any]], now: datetime) -> Dict[str, Any]:
     if not result:
         return {
             "status": STATUS_NOT_GENERATED,
             "status_label_zh": _STATUS_LABEL[STATUS_NOT_GENERATED],
+            "poll": False,
             "operator_usable": False,
             "technical_preview": False,
             "visual_semantic_match": None,
@@ -92,14 +149,19 @@ def _build_main_result(result: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
             "blocked_reason": None,
             "preview_url": None,
         }
-    if result.get("status") in {
-        STATUS_PREVIEW_GENERATION_RUNNING,
-        STATUS_PREVIEW_GENERATION_FAILED,
-    }:
-        status = str(result.get("status"))
+    if str(result.get("status") or "") in _NON_SUCCESS_STATUSES:
+        status = _project_initial_status(result, now)
+        in_progress = status in _IN_PROGRESS_STATUSES
+        if status == STATUS_PREVIEW_GENERATION_RETRY_REQUIRED and _is_stale_attempt(result, now):
+            blocked_reason = _STALE_RETRY_REASON
+        elif status in _FAILURE_STATUSES:
+            blocked_reason = result.get("error_summary") or result.get("error") or _STALE_RETRY_REASON
+        else:
+            blocked_reason = None
         return {
             "status": status,
             "status_label_zh": _STATUS_LABEL[status],
+            "poll": in_progress,
             "operator_usable": False,
             "technical_preview": False,
             "visual_semantic_match": None,
@@ -108,11 +170,7 @@ def _build_main_result(result: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
             "real_visual_count": 0,
             "delivery_candidate": False,
             "official_publish_ready": False,
-            "blocked_reason": (
-                result.get("error_summary") or result.get("error")
-                if status == STATUS_PREVIEW_GENERATION_FAILED
-                else None
-            ),
+            "blocked_reason": blocked_reason,
             "preview_url": None,
         }
     operator_usable = _truthy(result.get("operator_usable"))
@@ -121,6 +179,7 @@ def _build_main_result(result: Optional[Mapping[str, Any]]) -> Dict[str, Any]:
     return {
         "status": status,
         "status_label_zh": _STATUS_LABEL[status],
+        "poll": False,
         "operator_usable": operator_usable,
         "technical_preview": technical_preview,
         "visual_semantic_match": result.get("visual_semantic_match"),
@@ -161,16 +220,22 @@ def build_matrix_script_operator_workbench_view(
     *,
     result: Optional[Mapping[str, Any]] = None,
     env: Optional[Mapping[str, str]] = None,
+    now: Optional[datetime] = None,
 ) -> Dict[str, Any]:
-    """Build the PR-A acceptance OVERLAY for the existing Workbench sections."""
+    """Build the PR-A acceptance OVERLAY for the existing Workbench sections.
+
+    ``now`` is injectable so the stale-guard projection is deterministically
+    testable; it defaults to the current UTC time.
+    """
     if not isinstance(task, Mapping):
         task = {}
+    clock = _now(now)
     resolved = _resolve_result(task, result)
     has_result = (
         resolved is not None
-        and resolved.get("status") not in {STATUS_PREVIEW_GENERATION_RUNNING, STATUS_PREVIEW_GENERATION_FAILED}
+        and str(resolved.get("status") or "") not in _NON_SUCCESS_STATUSES
     )
-    main_result = _build_main_result(resolved)
+    main_result = _build_main_result(resolved, clock)
     view: Dict[str, Any] = {
         "is_matrix_script": True,
         "has_pr_a_result": has_result,
