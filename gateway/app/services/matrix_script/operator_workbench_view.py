@@ -76,6 +76,29 @@ _FORBIDDEN_TOKENS = (
     "model_id", "credit", "provider_task_id", "publish_url", "publish_status",
 )
 
+# P1 PR-1 — shot-level material replacement INTENT (no upload/storage here).
+MATERIAL_INTENT_KEY = "matrix_script_material_replacement_intents"
+MATERIAL_INTENT_REPLACE = "replace"
+MATERIAL_INTENT_SUPPLEMENT = "supplement"
+MATERIAL_INTENT_KEEP = "keep"
+MATERIAL_INTENTS = (
+    MATERIAL_INTENT_REPLACE,
+    MATERIAL_INTENT_SUPPLEMENT,
+    MATERIAL_INTENT_KEEP,
+)
+# A recorded replace/supplement intent makes the current material "dirty" — the
+# operator must regenerate the preview. ``keep`` (or no record) is not dirty.
+MATERIAL_DIRTY_INTENTS = (MATERIAL_INTENT_REPLACE, MATERIAL_INTENT_SUPPLEMENT)
+MATERIAL_INTENT_NOTE_MAX = 280
+_MATERIAL_INTENT_LABEL = {
+    MATERIAL_INTENT_REPLACE: "已标记替换素材",
+    MATERIAL_INTENT_SUPPLEMENT: "已标记补素材",
+    MATERIAL_INTENT_KEEP: "使用当前素材",
+}
+# Operator-authored free text — excluded from the engineering leakage scan
+# (the guard polices the projection's own identifiers, not operator prose).
+_OPERATOR_NOTE_KEYS = ("intent_note", "operator_note")
+
 
 def _truthy(v: Any) -> bool:
     return bool(v) and v not in ("", "false", "False", 0)
@@ -193,9 +216,26 @@ def _build_main_result(result: Optional[Mapping[str, Any]], now: datetime) -> Di
     }
 
 
-def _build_shots(has_result: bool) -> List[Dict[str, Any]]:
+def _material_intents(task: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
+    config = task.get("config") if isinstance(task, Mapping) else None
+    raw = config.get(MATERIAL_INTENT_KEY) if isinstance(config, Mapping) else None
+    if not isinstance(raw, Mapping):
+        return {}
+    out: Dict[str, Mapping[str, Any]] = {}
+    for shot_id, entry in raw.items():
+        if isinstance(entry, Mapping) and entry.get("intent") in MATERIAL_INTENTS:
+            out[str(shot_id)] = entry
+    return out
+
+
+def _build_shots(has_result: bool, intents: Mapping[str, Mapping[str, Any]]) -> List[Dict[str, Any]]:
     cards: List[Dict[str, Any]] = []
     for shot in plan_mod.TOMATO_SHOTS:
+        entry = intents.get(shot.shot_id) or {}
+        intent = str(entry.get("intent") or MATERIAL_INTENT_KEEP)
+        if intent not in MATERIAL_INTENTS:
+            intent = MATERIAL_INTENT_KEEP
+        note = entry.get("operator_note")
         cards.append({
             "shot_id": shot.shot_id,
             "order": shot.order,
@@ -204,12 +244,31 @@ def _build_shots(has_result: bool) -> List[Dict[str, Any]]:
             "source": shot.source,
             "semantic_status": "pass" if shot.real_visual else "partial",
             "included_in_current_video": bool(has_result),
+            "intent": intent,
+            "intent_label_zh": _MATERIAL_INTENT_LABEL[intent],
+            "intent_dirty": intent in MATERIAL_DIRTY_INTENTS,
+            "intent_note": str(note)[:MATERIAL_INTENT_NOTE_MAX] if note else None,
+            "intent_updated_at": entry.get("updated_at"),
         })
     return cards
 
 
+def _scrub_operator_notes(value: Any) -> Any:
+    """Deep copy with operator-authored note fields blanked, for the leakage scan."""
+    if isinstance(value, Mapping):
+        return {
+            k: ("" if k in _OPERATOR_NOTE_KEYS else _scrub_operator_notes(v))
+            for k, v in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [_scrub_operator_notes(v) for v in value]
+    return value
+
+
 def _assert_clean(view: Mapping[str, Any]) -> None:
-    blob = str(view).lower()
+    # Scan the projection's own fields; operator free-text notes are excluded so
+    # operator prose can never crash the Workbench render.
+    blob = str(_scrub_operator_notes(view)).lower()
     hits = [t for t in _FORBIDDEN_TOKENS if t in blob]
     if hits:
         raise ValueError(f"operator overlay leaks forbidden tokens: {hits}")
@@ -236,11 +295,21 @@ def build_matrix_script_operator_workbench_view(
         and str(resolved.get("status") or "") not in _NON_SUCCESS_STATUSES
     )
     main_result = _build_main_result(resolved, clock)
+    intents = _material_intents(task)
+    shots = _build_shots(has_result, intents)
+    dirty_shots = [s["shot_id"] for s in shots if s["intent_dirty"]]
+    material_changed = bool(dirty_shots)
     view: Dict[str, Any] = {
         "is_matrix_script": True,
         "has_pr_a_result": has_result,
         "main_result": main_result,
-        "shots": _build_shots(has_result),
+        "shots": shots,
+        # P1 PR-1: material replacement intent is dirty-state only. It must NOT
+        # touch the current main video, delivery candidate, or publish readiness.
+        "material_changed": material_changed,
+        "dirty_shots": dirty_shots,
+        "dirty_shot_count": len(dirty_shots),
+        "material_intent_endpoint": "/api/matrix-script/{task_id}/material-replacement-intent",
         "delivery": {
             "delivery_candidate": main_result["delivery_candidate"],
             "preview_url": main_result["preview_url"],
