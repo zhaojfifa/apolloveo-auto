@@ -263,7 +263,12 @@ from gateway.app.services.matrix_script.auto_preview_generation import (  # noqa
 )
 from gateway.app.services.matrix_script.operator_workbench_view import (  # noqa: E402
     build_matrix_script_operator_workbench_view,
+    MATERIAL_INTENT_KEY,
+    MATERIAL_INTENT_KEEP,
+    MATERIAL_INTENTS,
+    MATERIAL_INTENT_NOTE_MAX,
 )
+from gateway.app.services.matrix_script import tomato_real_result_plan as _ms_plan  # noqa: E402
 from gateway.app.services.matrix_script.source_script_body_store import (  # noqa: E402
     BodyStoreError,
     SOURCE_KIND_PASTE,
@@ -759,6 +764,71 @@ async def matrix_script_initial_preview_status(
             "operator_usable": bool(main_result.get("operator_usable")),
             "preview_url": main_result.get("preview_url") or delivery.get("preview_url"),
             "blocked_reason": main_result.get("blocked_reason"),
+            "official_publish_ready": False,
+        }
+    )
+
+
+_MS_SHOT_IDS = frozenset(shot.shot_id for shot in _ms_plan.TOMATO_SHOTS)
+
+
+@api_router.post("/matrix-script/{task_id}/material-replacement-intent")
+async def matrix_script_material_replacement_intent(
+    task_id: str,
+    request: Request,
+    repo=Depends(get_task_repository),
+) -> JSONResponse:
+    """Record a shot-level material replacement INTENT (P1 PR-1).
+
+    Intent only — no upload, no storage, no regeneration, no versioning. Marking
+    an intent makes the material dirty (operator must regenerate) but must NOT
+    overwrite the current main video, change the delivery candidate, or flip
+    ``official_publish_ready``. ``keep`` clears any prior intent for the shot.
+    """
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="task_not_found")
+    if not _is_matrix_script_task(task):
+        raise HTTPException(
+            status_code=400,
+            detail="material_replacement_intent_only_available_for_matrix_script_tasks",
+        )
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="invalid_request_body")
+
+    shot_id = body.get("shot_id")
+    if not isinstance(shot_id, str) or shot_id not in _MS_SHOT_IDS:
+        raise HTTPException(status_code=400, detail="unknown_shot_id")
+    intent = body.get("intent")
+    if not isinstance(intent, str) or intent not in MATERIAL_INTENTS:
+        raise HTTPException(status_code=400, detail="invalid_intent")
+    note_raw = body.get("operator_note")
+    operator_note = str(note_raw)[:MATERIAL_INTENT_NOTE_MAX].strip() if note_raw else None
+
+    config = dict(task.get("config") or {})
+    intents = dict(config.get(MATERIAL_INTENT_KEY) or {})
+    if intent == MATERIAL_INTENT_KEEP:
+        intents.pop(shot_id, None)
+    else:
+        entry = {"intent": intent, "updated_at": datetime.now(timezone.utc).isoformat()}
+        if operator_note:
+            entry["operator_note"] = operator_note
+        intents[shot_id] = entry
+    config[MATERIAL_INTENT_KEY] = intents
+    repo.update(task_id, {"config": config})
+
+    view = build_matrix_script_operator_workbench_view(repo.get(task_id) or task)
+    return JSONResponse(
+        {
+            "ok": True,
+            "shot_id": shot_id,
+            "intent": intent,
+            "material_changed": bool(view.get("material_changed")),
+            "dirty_shot_count": int(view.get("dirty_shot_count", 0)),
             "official_publish_ready": False,
         }
     )

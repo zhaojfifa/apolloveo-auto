@@ -306,7 +306,10 @@ def test_workbench_view_has_no_provider_or_publish_leakage() -> None:
 
 def test_status_endpoint_reports_queued_poll_true(monkeypatch) -> None:
     repo = _Repo()
-    repo.create(_task({auto.AUTO_PREVIEW_STATUS_KEY: {"status": auto.STATUS_QUEUED, "queued_at": _now().isoformat()}}))
+    # The endpoint uses real wall-clock for the stale guard, so the queued_at
+    # must be recent (a fixed past timestamp would project to retry_required).
+    fresh_queued_at = datetime.now(timezone.utc).isoformat()
+    repo.create(_task({auto.AUTO_PREVIEW_STATUS_KEY: {"status": auto.STATUS_QUEUED, "queued_at": fresh_queued_at}}))
     client = _client(monkeypatch, repo)
     try:
         resp = client.get("/api/matrix-script/ms-async-1/initial-preview-status")

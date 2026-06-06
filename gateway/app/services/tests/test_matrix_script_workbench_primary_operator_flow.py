@@ -346,15 +346,19 @@ def test_material_delivery_and_folded_sections_render(source: str) -> None:
     html = _render_primary(source, generated=True)
     assert 'data-role="matrix-script-primary-material-music"' in html
     assert html.count('data-role="ms-primary-shot-card"') == 5
-    assert html.count('data-role="ms-primary-shot-replace-action"') == 5
+    # P1 PR-1: each shot exposes the three material-intent actions.
+    assert html.count('data-role="ms-primary-shot-intent-replace"') == 5
+    assert html.count('data-role="ms-primary-shot-intent-supplement"') == 5
+    assert html.count('data-role="ms-primary-shot-intent-keep"') == 5
+    assert "标记替换素材" in html
+    assert "标记补素材" in html
+    assert "保持当前素材" in html
     assert "素材来源：真实素材" in html
     assert "素材来源：复用素材" in html
     assert "语义状态：通过" in html
     assert "语义状态：部分通过" in html
     assert "当前为复用素材，建议补充真实品尝素材。" in html
     assert "当前为复用素材，建议补充递向镜头素材。" in html
-    assert "上传/替换 Shot 04 素材" in html
-    assert "上传/替换 Shot 05 素材" in html
     assert "替换配乐" in html
     assert "重新匹配素材" in html
     assert "替换素材或配乐后，请返回主视频区点击“再次生成预览”。新预览不会自动成为正式发布版本。" in html

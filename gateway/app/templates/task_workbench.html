@@ -597,6 +597,8 @@
                style="display:grid; gap:10px; margin-top:10px;">
             {% for s in ms_overlay.shots %}
             <div class="op-meta-item" data-role="ms-primary-shot-card" data-shot-id="{{ s.shot_id }}"
+                 data-shot-intent="{{ s.intent }}"
+                 data-shot-intent-dirty="{{ 'true' if s.intent_dirty else 'false' }}"
                  style="padding:12px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:8px;">
               <span class="op-meta-item__label">Shot {{ "%02d"|format(s.order) }} · {{ s.title }}</span>
               <span class="op-meta-item__value">
@@ -615,13 +617,27 @@
                     {% endif %}
                   </span>
                 {% endif %}
+                <br><span data-role="ms-primary-shot-intent-state"
+                          style="{% if s.intent_dirty %}color:var(--op-fg-mid,#b45309);font-weight:600;{% else %}color:var(--op-fg-soft,#64748b);{% endif %}">
+                  素材意图：{{ s.intent_label_zh }}{% if s.intent_dirty %} · 需要再次生成预览{% endif %}
+                </span>
+                {% if s.intent_note %}
+                  <br><span data-role="ms-primary-shot-intent-note" style="color:var(--op-fg-soft,#64748b);">备注：{{ s.intent_note }}</span>
+                {% endif %}
               </span>
-              <div class="task-actions" style="margin-top:8px;">
+              <div class="task-actions" data-role="ms-primary-shot-intent-actions" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
                 <button type="button" class="btn-secondary"
-                        data-role="ms-primary-shot-replace-action"
-                        data-shot-id="{{ s.shot_id }}"
-                        disabled aria-disabled="true"
-                        title="素材上传入口接入后开放。">上传/替换 Shot {{ "%02d"|format(s.order) }} 素材（接入中）</button>
+                        data-role="ms-primary-shot-intent-replace"
+                        data-shot-id="{{ s.shot_id }}" data-intent="replace"
+                        {% if s.intent == 'replace' %}aria-pressed="true"{% endif %}>标记替换素材</button>
+                <button type="button" class="btn-secondary"
+                        data-role="ms-primary-shot-intent-supplement"
+                        data-shot-id="{{ s.shot_id }}" data-intent="supplement"
+                        {% if s.intent == 'supplement' %}aria-pressed="true"{% endif %}>标记补素材</button>
+                <button type="button" class="btn-secondary"
+                        data-role="ms-primary-shot-intent-keep"
+                        data-shot-id="{{ s.shot_id }}" data-intent="keep"
+                        {% if s.intent == 'keep' %}aria-pressed="true"{% endif %}>保持当前素材</button>
               </div>
             </div>
             {% endfor %}
@@ -651,10 +667,45 @@
             <button type="button" class="btn-secondary" disabled aria-disabled="true" title="配乐替换入口接入后开放。">替换配乐</button>
             <button type="button" class="btn-secondary" disabled aria-disabled="true" title="素材匹配入口接入后开放。">重新匹配素材</button>
           </div>
+          {% if ms_overlay.material_changed %}
+          <div class="op-banner op-banner--warning" data-role="ms-primary-material-dirty-summary"
+               data-dirty-shot-count="{{ ms_overlay.dirty_shot_count }}" style="margin-top:10px;">
+            <div class="op-banner__title">素材已更新，需要再次生成预览</div>
+            <div class="op-banner__body">已标记 {{ ms_overlay.dirty_shot_count }} 个镜头需要替换 / 补素材。新素材不会自动成为当前主视频或正式发布版本，请返回主视频区点击“再次生成预览”。</div>
+          </div>
+          {% endif %}
           <p class="op-section-helper" data-role="ms-primary-material-regenerate-linkage"
              style="margin-top:10px;">
             替换素材或配乐后，请返回主视频区点击“再次生成预览”。新预览不会自动成为正式发布版本。
           </p>
+          {% if ms_overlay.shots %}
+          <script>
+          (function () {
+            var endpoint = "/api/matrix-script/{{ task.task_id }}/material-replacement-intent";
+            document.querySelectorAll('[data-role="ms-primary-shot-intent-actions"] button[data-intent]').forEach(function (btn) {
+              btn.addEventListener('click', async function () {
+                var shotId = btn.getAttribute('data-shot-id');
+                var intent = btn.getAttribute('data-intent');
+                btn.disabled = true;
+                try {
+                  var resp = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ shot_id: shotId, intent: intent })
+                  });
+                  if (resp.ok) {
+                    // Reload so B区 dirty state + A区 "素材已更新" banner render from
+                    // the server projection. Marking intent never regenerates.
+                    window.location.reload();
+                    return;
+                  }
+                } catch (e) { /* fall through to re-enable */ }
+                btn.disabled = false;
+              });
+            });
+          })();
+          </script>
+          {% endif %}
         </div>
       {% endif %}
 
