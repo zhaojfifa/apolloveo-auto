@@ -22,6 +22,7 @@ from typing import Any
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, Request, Security, UploadFile
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.responses import (
+    FileResponse,
     HTMLResponse,
     JSONResponse,
     PlainTextResponse,
@@ -260,6 +261,11 @@ from gateway.app.services.matrix_script.create_entry import (  # noqa: E402
 from gateway.app.services.matrix_script.auto_preview_generation import (  # noqa: E402
     enqueue_matrix_script_initial_preview_generation,
     trigger_matrix_script_initial_preview_generation,
+    enqueue_matrix_script_preview_regeneration,
+    trigger_matrix_script_preview_regeneration,
+    confirm_matrix_script_preview_version,
+    discard_matrix_script_preview_candidate,
+    resolve_version_final_path,
 )
 from gateway.app.services.matrix_script.operator_workbench_view import (  # noqa: E402
     build_matrix_script_operator_workbench_view,
@@ -832,6 +838,115 @@ async def matrix_script_material_replacement_intent(
             "official_publish_ready": False,
         }
     )
+
+
+def _require_matrix_script_task(repo: Any, task_id: str) -> dict:
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="task_not_found")
+    if not _is_matrix_script_task(task):
+        raise HTTPException(status_code=400, detail="only_available_for_matrix_script_tasks")
+    return task
+
+
+@api_router.post("/matrix-script/{task_id}/regenerate-preview")
+async def matrix_script_regenerate_preview(
+    task_id: str,
+    background_tasks: BackgroundTasks,
+    repo=Depends(get_task_repository),
+) -> JSONResponse:
+    """Regenerate a V2 candidate preview (P1 PR-2), async, off the request thread.
+
+    Reuses the #203 lifecycle. The V2 candidate is written to its own version
+    slot and NEVER overwrites the current main video (V1); the operator confirms
+    or discards it afterwards. official_publish_ready stays false.
+    """
+    task = _require_matrix_script_task(repo, task_id)
+    try:
+        enqueue_matrix_script_preview_regeneration(task, repo)
+    except Exception:  # noqa: BLE001 — never block on the marker write
+        logger.warning("matrix_script regenerate enqueue failed for task_id=%s", task_id, exc_info=True)
+    background_tasks.add_task(trigger_matrix_script_preview_regeneration, task, repo)
+    return JSONResponse({"ok": True, "status": "preview_generation_queued", "official_publish_ready": False})
+
+
+@api_router.get("/matrix-script/{task_id}/regeneration-status")
+async def matrix_script_regeneration_status(
+    task_id: str,
+    repo=Depends(get_task_repository),
+) -> JSONResponse:
+    """Operator-safe poll target for the V2 regeneration lifecycle."""
+    task = _require_matrix_script_task(repo, task_id)
+    view = build_matrix_script_operator_workbench_view(task)
+    regen = view.get("regeneration", {})
+    new_preview = view.get("new_preview") or {}
+    return JSONResponse(
+        {
+            "status": regen.get("status"),
+            "poll": bool(regen.get("poll")),
+            "blocked_reason": regen.get("blocked_reason"),
+            "has_candidate_preview": bool(view.get("has_candidate_preview")),
+            "candidate_preview_url": new_preview.get("preview_url"),
+            "current_main_version": view.get("current_main_version"),
+            "official_publish_ready": False,
+        }
+    )
+
+
+@api_router.post("/matrix-script/{task_id}/preview-version/confirm")
+async def matrix_script_confirm_preview_version(
+    task_id: str,
+    repo=Depends(get_task_repository),
+) -> JSONResponse:
+    """Confirm the V2 candidate as the current main; delivery follows it."""
+    task = _require_matrix_script_task(repo, task_id)
+    result = confirm_matrix_script_preview_version(task, repo)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error", "no_candidate_preview"))
+    view = build_matrix_script_operator_workbench_view(repo.get(task_id) or task)
+    return JSONResponse(
+        {
+            "ok": True,
+            "current_main_version": view.get("current_main_version"),
+            "delivery_candidate": bool(view.get("delivery", {}).get("delivery_candidate")),
+            "official_publish_ready": False,
+        }
+    )
+
+
+@api_router.post("/matrix-script/{task_id}/preview-version/discard")
+async def matrix_script_discard_preview_version(
+    task_id: str,
+    repo=Depends(get_task_repository),
+) -> JSONResponse:
+    """Discard the V2 candidate; V1 stays the current main."""
+    task = _require_matrix_script_task(repo, task_id)
+    discard_matrix_script_preview_candidate(task, repo)
+    view = build_matrix_script_operator_workbench_view(repo.get(task_id) or task)
+    return JSONResponse(
+        {
+            "ok": True,
+            "current_main_version": view.get("current_main_version"),
+            "has_candidate_preview": bool(view.get("has_candidate_preview")),
+            "official_publish_ready": False,
+        }
+    )
+
+
+@api_router.get("/matrix-script/{task_id}/preview-version/{version}/final.mp4")
+async def matrix_script_preview_version_file(
+    task_id: str,
+    version: str,
+    repo=Depends(get_task_repository),
+):
+    """Stream a version-scoped candidate ``final.mp4`` (preview, not publish)."""
+    _require_matrix_script_task(repo, task_id)
+    if version not in ("V1", "V2"):
+        raise HTTPException(status_code=400, detail="unknown_version")
+    local_final = resolve_version_final_path(task_id, version)
+    if os.path.exists(local_final) and os.path.getsize(local_final) > 0:
+        return FileResponse(path=local_final, media_type="video/mp4", filename="final.mp4")
+    raise HTTPException(status_code=404, detail="preview_version_not_available")
 
 
 @pages_router.post(MATRIX_SCRIPT_MINT_ROUTE)

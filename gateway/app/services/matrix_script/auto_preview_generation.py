@@ -14,7 +14,10 @@ from typing import Any, Dict, Mapping
 
 from gateway.app.config import get_settings
 from gateway.app.routers.matrix_script_real_trial import ArtifactStorageStagingSink
-from gateway.app.services.matrix_script.minimal_result_artifact_staging import StagingError
+from gateway.app.services.matrix_script.minimal_result_artifact_staging import (
+    InMemoryArtifactSink,
+    StagingError,
+)
 from gateway.app.services.matrix_script.minimal_result_delivery_view import (
     assert_no_delivery_view_forbidden_tokens,
 )
@@ -44,6 +47,22 @@ STATUS_FAILED = "preview_generation_failed"
 STATUS_RETRY_REQUIRED = "preview_generation_retry_required"
 MIN_FINAL_VIDEO_BYTES = 1024
 OPERATOR_SAFE_GENERATION_FAILURE = "首版预览生成失败：视频文件未完整生成，请重新生成。"
+
+# P1 PR-2 — regenerate preview versioning (V1 current main vs V2 candidate).
+# Intent-driven regeneration produces a NEW version without overwriting the
+# current main video (V1). No upload / R2 / Akool / multi-variant beyond V1/V2.
+PREVIEW_VERSIONS_KEY = "matrix_script_preview_versions"
+CURRENT_MAIN_VERSION_KEY = "matrix_script_current_main_version"
+REGEN_STATUS_KEY = "matrix_script_preview_regeneration"
+MATERIAL_INTENT_CONFIG_KEY = "matrix_script_material_replacement_intents"
+VERSION_MAIN = "V1"
+VERSION_CANDIDATE = "V2"
+ROLE_CURRENT_MAIN = "current_main"
+ROLE_CANDIDATE = "candidate_preview"
+SOURCE_INITIAL = "initial_preview"
+SOURCE_REGENERATION = "material_regeneration"
+_MATERIAL_DIRTY_INTENTS = ("replace", "supplement")
+OPERATOR_SAFE_REGENERATION_FAILURE = "再次生成预览失败：视频文件未完整生成，当前主视频已保留，请重试。"
 
 
 class AutoPreviewValidationError(RuntimeError):
@@ -264,3 +283,165 @@ def trigger_matrix_script_initial_preview_generation(
         _update_config(repo, task_id, repo.get(task_id) or latest, {AUTO_PREVIEW_STATUS_KEY: failure})
         return failure
     return success
+
+
+# --------------------------------------------------------------------------- #
+# P1 PR-2 — Regenerate Preview Versioning
+# A regeneration produces a V2 *candidate* preview in its own output dir/url and
+# NEVER overwrites the current main video (V1 = matrix_script_staged_candidate)
+# until the operator explicitly confirms V2 as main.
+# --------------------------------------------------------------------------- #
+
+
+def _resolve_version_output_dir(task_id: str, version: str) -> str:
+    return os.path.join(_resolve_tomato_output_dir(task_id), "versions", str(version))
+
+
+def resolve_version_final_path(task_id: str, version: str) -> str:
+    """Local path of a version-scoped candidate ``final.mp4`` (preview serving)."""
+    return os.path.join(_resolve_version_output_dir(task_id, version), "final", "final.mp4")
+
+
+def version_preview_url(task_id: str, version: str) -> str:
+    return f"/api/matrix-script/{task_id}/preview-version/{version}/final.mp4"
+
+
+def _build_regen_sink(task_id: str) -> Any:
+    # Candidate preview stays local-only (not promoted to the canonical storage
+    # slot) so a V2 regeneration never clobbers V1's staged artifact. Promotion
+    # to the canonical publish slot is out of scope for P1 (publish stays closed).
+    return InMemoryArtifactSink()
+
+
+def _material_intent_shot_ids(task: Any) -> list:
+    cfg = _config(task)
+    raw = cfg.get(MATERIAL_INTENT_CONFIG_KEY)
+    if not isinstance(raw, Mapping):
+        return []
+    return sorted(
+        str(shot_id)
+        for shot_id, entry in raw.items()
+        if isinstance(entry, Mapping) and entry.get("intent") in _MATERIAL_DIRTY_INTENTS
+    )
+
+
+def build_matrix_script_regeneration_payload(task: Mapping[str, Any]) -> Dict[str, Any]:
+    """Generate a V2 candidate preview into a version-scoped output dir."""
+    task_id = _task_id(task)
+    task_payload = _task_mapping(task)
+    result = run_tomato_real_result(
+        task_payload,
+        _resolve_version_output_dir(task_id, VERSION_CANDIDATE),
+        sink=_build_regen_sink(task_id),
+    )
+    validate_tomato_result_artifacts(result)
+    payload = tomato_result_to_payload(result)
+    payload["preview_url"] = version_preview_url(task_id, VERSION_CANDIDATE)
+    assert_no_delivery_view_forbidden_tokens(payload)
+    return payload
+
+
+def enqueue_matrix_script_preview_regeneration(task: Mapping[str, Any], repo: Any) -> Dict[str, Any]:
+    """Persist the ``queued`` regeneration state (synchronous, fast)."""
+    task_id = _task_id(task)
+    queued = _status_payload(STATUS_QUEUED, queued_at=_utc_now())
+    _update_config(repo, task_id, repo.get(task_id) or task, {REGEN_STATUS_KEY: queued})
+    return queued
+
+
+def trigger_matrix_script_preview_regeneration(task: Mapping[str, Any], repo: Any) -> Dict[str, Any]:
+    """Background job: generate the V2 candidate; never touch V1 on any path."""
+    task_id = _task_id(task)
+    _update_config(
+        repo, task_id, repo.get(task_id) or task,
+        {REGEN_STATUS_KEY: _status_payload(STATUS_RUNNING, started_at=_utc_now())},
+    )
+    latest = repo.get(task_id) or task
+    based_on = _material_intent_shot_ids(latest)
+
+    def _fail(stage: str, error: str) -> Dict[str, Any]:
+        failure = _failure_payload(
+            stage=stage, error_summary=OPERATOR_SAFE_REGENERATION_FAILURE, error=error
+        )
+        _update_config(repo, task_id, repo.get(task_id) or latest, {REGEN_STATUS_KEY: failure})
+        return failure
+
+    try:
+        payload = build_matrix_script_regeneration_payload(latest)
+    except FFmpegUnavailableError:
+        return _fail("generation", "tomato_real_result_generation_unavailable")
+    except AutoPreviewValidationError as exc:
+        return _fail("validation", str(exc))
+    except StagingError as exc:
+        return _fail("staging", str(exc))
+    except TomatoRealResultError as exc:
+        return _fail("generation", str(exc))
+    except Exception as exc:  # noqa: BLE001
+        return _fail("generation", f"{exc.__class__.__name__}: {exc}")
+
+    cfg = _config(repo.get(task_id) or latest)
+    versions = dict(cfg.get(PREVIEW_VERSIONS_KEY) or {})
+    versions[VERSION_CANDIDATE] = {
+        "role": ROLE_CANDIDATE,
+        "preview_url": payload.get("preview_url"),
+        "created_at": _utc_now(),
+        "source": SOURCE_REGENERATION,
+        "based_on_intents": based_on,
+        "payload": payload,
+    }
+    success = _status_payload(
+        STATUS_SUCCEEDED, completed_at=_utc_now(), preview_url=payload.get("preview_url")
+    )
+    try:
+        _update_config(
+            repo, task_id, repo.get(task_id) or latest,
+            {PREVIEW_VERSIONS_KEY: versions, REGEN_STATUS_KEY: success},
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _fail("persistence", f"{exc.__class__.__name__}: {exc}")
+    return success
+
+
+def confirm_matrix_script_preview_version(
+    task: Mapping[str, Any], repo: Any, version: str = VERSION_CANDIDATE
+) -> Dict[str, Any]:
+    """Promote the V2 candidate to current main; delivery candidate follows it."""
+    task_id = _task_id(task)
+    cfg = _config(repo.get(task_id) or task)
+    versions = dict(cfg.get(PREVIEW_VERSIONS_KEY) or {})
+    entry = versions.get(version)
+    if not isinstance(entry, Mapping) or entry.get("role") != ROLE_CANDIDATE:
+        return {"ok": False, "error": "no_candidate_preview"}
+    payload = dict(entry.get("payload") or {})
+    success = _status_payload(
+        STATUS_SUCCEEDED,
+        completed_at=_utc_now(),
+        preview_url=payload.get("preview_url"),
+        delivery_candidate=payload.get("delivery_candidate"),
+    )
+    _update_config(
+        repo, task_id, repo.get(task_id) or task,
+        {
+            STAGED_CANDIDATE_KEY: payload,            # V2 becomes the current main
+            CURRENT_MAIN_VERSION_KEY: version,
+            AUTO_PREVIEW_STATUS_KEY: success,
+            PREVIEW_VERSIONS_KEY: {},                  # candidate consumed
+            REGEN_STATUS_KEY: None,
+            MATERIAL_INTENT_CONFIG_KEY: {},            # intents incorporated → cleared
+        },
+    )
+    return {"ok": True, "current_main_version": version}
+
+
+def discard_matrix_script_preview_candidate(task: Mapping[str, Any], repo: Any) -> Dict[str, Any]:
+    """Drop the V2 candidate; V1 stays the current main, intents cleared."""
+    task_id = _task_id(task)
+    _update_config(
+        repo, task_id, repo.get(task_id) or task,
+        {
+            PREVIEW_VERSIONS_KEY: {},
+            REGEN_STATUS_KEY: None,
+            MATERIAL_INTENT_CONFIG_KEY: {},
+        },
+    )
+    return {"ok": True, "current_main_version": VERSION_MAIN}
