@@ -94,27 +94,30 @@ Matrix Script PR must preserve the result-first layout (A main video, B
 material/music, C delivery, D/E folded, diagnostics collapsed) and the
 operator-only primary UI.
 
-**Matrix Script P1 / P1-2 established** (operator edit loop):
+**Matrix Script P1 / P1-2 / P1-3 established** (operator edit loop + uploaded
+material bytes):
 
 - P1 PR-1 (#206) material replacement intent · P1 PR-2 (#207) regenerate V1/V2
   versioning · P1 closure docs (#208).
 - P1-2 PR-A (#209) Shot Material Attachment Handle · P1-2 PR-B (#210) regenerate
   records the attached material as `based_on_assets`. `material_bytes_consumed`
-  remains **false** because `asset://` bytes are not yet resolvable.
+  remained **false** because `asset://` bytes were not yet resolvable.
 - Matrix Script P1-3 PR-C (#211) Shot Material Upload / Storage Handle —
   uploaded material is resolvable (`msmaterial://`,
-  `storage_scope=local_workspace`, `bytes_resolvable=true`), still NOT consumed
-  by regeneration.
-- State note: `docs/execution/MATRIX_SCRIPT_P1_2_STATE_AND_P1_3_FOCUS_20260606.md`.
+  `storage_scope=local_workspace`, `bytes_resolvable=true`).
+- P1-3 PR-D (#212) Regenerate Consumes Uploaded Material Bytes — V2 consumes the
+  uploaded bytes (image used directly; video first frame when extraction
+  succeeds). `material_bytes_consumed=true` only when the renderer actually
+  consumed an uploaded file; honest copy otherwise.
+- P1-3 closure: `docs/execution/MATRIX_SCRIPT_P1_3_MATERIAL_BYTES_CLOSURE_20260606.md`
+  (state note: `docs/execution/MATRIX_SCRIPT_P1_2_STATE_AND_P1_3_FOCUS_20260606.md`).
 
-**Next active focus — Matrix Script P1-3 PR-D — Regenerate Consumes Uploaded
-Material Bytes.** Goal: a V2 regeneration resolves a stored `msmaterial://`
-handle and CONSUMES its bytes (uploaded image used directly; uploaded video
-first frame extracted). `material_bytes_consumed=true` only when at least one
-uploaded file was actually used; the V2 entry records `consumed_materials`;
-the workbench copy is honest ("已使用运营上传素材生成新预览" vs the reference
-label). V1 stays current until confirm; delivery follows confirmed main only;
-`official_publish_ready` stays false.
+**Next recommended phase — production browser validation, then P2.** Prove the
+end-to-end operator flow in a real browser (upload Shot material → regenerate V2
+from uploaded bytes → confirm V2 → delivery follows V2, with honest usage copy
+and V1 protection observed live). Provider / quality integration (and any Akool
+surface) stays out of scope until the uploaded-material operator loop is
+validated in production. `official_publish_ready` stays false.
 
 For Workbench, New Task, Delivery, result-line, or state/projection changes,
 also read the four-layer state authorities named in this index. Matrix Script
