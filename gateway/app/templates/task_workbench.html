@@ -464,6 +464,118 @@
             <div class="muted" data-role="ms-acc-generate-status" data-state="idle"></div>
           </div>
 
+          {# P1 PR-2 · Regenerate preview versioning. Only meaningful once a
+             current main video (V1) exists. V1 stays visible above; this block
+             owns the V2 candidate lifecycle. Confirming V2 promotes it to main;
+             discarding keeps V1. official_publish_ready stays false throughout. #}
+          {% if ms_overlay_mr.operator_usable and ms_overlay.regeneration is defined %}
+          <div class="op-main-video-versioning" data-role="ms-regen-versioning"
+               data-current-main-version="{{ ms_overlay.current_main_version or 'V1' }}"
+               data-regen-status="{{ ms_overlay.regeneration.status or '' }}"
+               data-regen-poll="{{ 'true' if ms_overlay.regeneration.poll else 'false' }}"
+               data-has-candidate="{{ 'true' if ms_overlay.has_candidate_preview else 'false' }}"
+               style="margin-top:12px; padding:12px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:10px;">
+            {% if ms_overlay.regeneration.poll %}
+              <div data-role="ms-regen-running" style="font-size:14px; color:var(--op-fg-mid,#334155);">
+                <strong>新预览生成中…</strong>
+                <div>当前主视频（{{ ms_overlay.current_main_version or 'V1' }}）保持可用，完成后会显示新预览。</div>
+              </div>
+            {% elif ms_overlay.new_preview %}
+              <div data-role="ms-regen-candidate" style="display:grid; gap:10px;">
+                <strong style="font-size:14px; color:var(--op-fg-mid,#334155);">{{ ms_overlay.new_preview.label_zh }}（{{ ms_overlay.new_preview.version }}） · 待运营确认</strong>
+                <video controls preload="metadata" src="{{ ms_overlay.new_preview.preview_url }}"
+                       data-role="ms-regen-candidate-video"
+                       style="width:100%; aspect-ratio:9/16; max-height:480px; border-radius:10px; background:#0f172a;"></video>
+                {% if ms_overlay.new_preview.based_on_intents %}
+                <div class="muted" data-role="ms-regen-based-on">基于素材意图：{{ ms_overlay.new_preview.based_on_intents | join('、') }}</div>
+                {% endif %}
+                <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
+                  <button type="button" class="btn-primary" data-role="ms-regen-confirm">设为主版本</button>
+                  <button type="button" class="btn-secondary" data-role="ms-regen-discard">丢弃新预览</button>
+                  <button type="button" class="btn-secondary" data-role="ms-regen-keep-tuning">继续调整</button>
+                </div>
+                <div class="muted">新预览不会自动成为正式发布版本，确认前当前主视频保持不变。</div>
+              </div>
+            {% elif ms_overlay.regeneration.status in ['preview_generation_failed', 'preview_generation_retry_required'] %}
+              <div data-role="ms-regen-failed" style="font-size:14px; color:var(--op-fg-mid,#334155);">
+                <strong>再次生成预览失败</strong>
+                <div>{{ ms_overlay.regeneration.blocked_reason or "当前主视频已保留，请重试。" }}</div>
+                <div class="task-actions" style="margin-top:8px;">
+                  <button type="button" class="btn-primary" data-role="ms-regen-trigger">再次生成预览</button>
+                </div>
+              </div>
+            {% elif ms_overlay.material_changed %}
+              <div data-role="ms-regen-prompt" style="font-size:14px; color:var(--op-fg-mid,#334155);">
+                <strong>素材已更新，需要再次生成预览</strong>
+                <div>生成的新预览为候选版本，确认后才会成为当前主视频。</div>
+                <div class="task-actions" style="margin-top:8px;">
+                  <button type="button" class="btn-primary" data-role="ms-regen-trigger">再次生成预览</button>
+                </div>
+              </div>
+            {% else %}
+              <div data-role="ms-regen-idle" style="font-size:13px; color:var(--op-fg-soft,#64748b);">
+                调整素材后，返回主视频区将出现“再次生成预览”，生成的新预览为候选版本。
+              </div>
+            {% endif %}
+          </div>
+          <script>
+          (function () {
+            var box = document.querySelector('[data-role="ms-regen-versioning"]');
+            if (!box) { return; }
+            var taskId = "{{ task.task_id }}";
+            var regen = "/api/matrix-script/" + taskId + "/regenerate-preview";
+            var statusUrl = "/api/matrix-script/" + taskId + "/regeneration-status";
+            var confirmUrl = "/api/matrix-script/" + taskId + "/preview-version/confirm";
+            var discardUrl = "/api/matrix-script/" + taskId + "/preview-version/discard";
+            function post(url) {
+              return fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+            }
+            function bind(role, handler) {
+              var el = box.querySelector('[data-role="' + role + '"]');
+              if (el) { el.addEventListener('click', handler); }
+            }
+            bind('ms-regen-trigger', async function (e) {
+              e.target.disabled = true;
+              try { await post(regen); } catch (err) {}
+              window.location.reload();
+            });
+            bind('ms-regen-confirm', async function (e) {
+              e.target.disabled = true;
+              try { await post(confirmUrl); } catch (err) {}
+              window.location.reload();
+            });
+            bind('ms-regen-discard', async function (e) {
+              e.target.disabled = true;
+              try { await post(discardUrl); } catch (err) {}
+              window.location.reload();
+            });
+            bind('ms-regen-keep-tuning', function () {
+              // Keep V1 + candidate as-is; return focus to material adjustment (B区).
+              var b = document.querySelector('[data-role="matrix-script-primary-material-music"]');
+              if (b) { b.scrollIntoView({ behavior: 'smooth' }); }
+            });
+            // Poll the regeneration lifecycle until terminal, then reload.
+            if (box.getAttribute('data-regen-poll') === 'true') {
+              var inFlight = false;
+              var timer = setInterval(function () {
+                if (inFlight || document.hidden) { return; }
+                inFlight = true;
+                fetch(statusUrl, { headers: { 'Accept': 'application/json' } })
+                  .then(function (r) { return r.ok ? r.json() : null; })
+                  .then(function (d) {
+                    if (!d) { return; }
+                    if (d.poll) { return; }
+                    clearInterval(timer);
+                    window.location.reload();
+                  })
+                  .catch(function () {})
+                  .then(function () { inFlight = false; });
+              }, 4000);
+            }
+          })();
+          </script>
+          {% endif %}
+
           <div data-role="legacy-main-video-compat-anchor"
                hidden aria-hidden="true" inert></div>
           {% if ms_overlay_mr.poll %}

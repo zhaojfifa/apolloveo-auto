@@ -99,6 +99,16 @@ _MATERIAL_INTENT_LABEL = {
 # (the guard polices the projection's own identifiers, not operator prose).
 _OPERATOR_NOTE_KEYS = ("intent_note", "operator_note")
 
+# P1 PR-2 — regenerate preview versioning (V1 current main vs V2 candidate).
+PREVIEW_VERSIONS_KEY = "matrix_script_preview_versions"
+CURRENT_MAIN_VERSION_KEY = "matrix_script_current_main_version"
+REGEN_STATUS_KEY = "matrix_script_preview_regeneration"
+VERSION_MAIN = "V1"
+VERSION_CANDIDATE = "V2"
+ROLE_CANDIDATE = "candidate_preview"
+ROLE_CURRENT_MAIN = "current_main"
+_VERSION_LABEL = {VERSION_MAIN: "当前主视频", VERSION_CANDIDATE: "新预览"}
+
 
 def _truthy(v: Any) -> bool:
     return bool(v) and v not in ("", "false", "False", 0)
@@ -265,6 +275,67 @@ def _scrub_operator_notes(value: Any) -> Any:
     return value
 
 
+def _project_regeneration(task: Mapping[str, Any], now: datetime) -> Dict[str, Any]:
+    config = task.get("config") if isinstance(task, Mapping) else None
+    raw = config.get(REGEN_STATUS_KEY) if isinstance(config, Mapping) else None
+    if not isinstance(raw, Mapping) or not raw.get("status"):
+        return {"status": None, "poll": False, "blocked_reason": None}
+    status = _project_initial_status(raw, now)
+    in_progress = status in _IN_PROGRESS_STATUSES
+    if status in _FAILURE_STATUSES:
+        blocked = raw.get("error_summary") or raw.get("error") or _STALE_RETRY_REASON
+    else:
+        blocked = None
+    return {"status": status, "poll": in_progress, "blocked_reason": blocked}
+
+
+def _build_preview_versions(
+    task: Mapping[str, Any], main_result: Mapping[str, Any]
+) -> Dict[str, Any]:
+    """Operator-safe V1/V2 version projection (no payload internals exposed)."""
+    config = task.get("config") if isinstance(task, Mapping) else None
+    raw_versions = config.get(PREVIEW_VERSIONS_KEY) if isinstance(config, Mapping) else None
+    raw_versions = raw_versions if isinstance(raw_versions, Mapping) else {}
+    current_main_version = (
+        config.get(CURRENT_MAIN_VERSION_KEY) if isinstance(config, Mapping) else None
+    )
+
+    versions: List[Dict[str, Any]] = []
+    main_preview_url = main_result.get("preview_url")
+    if main_preview_url:
+        cmv = str(current_main_version or VERSION_MAIN)
+        versions.append({
+            "version": cmv,
+            "role": ROLE_CURRENT_MAIN,
+            "label_zh": _VERSION_LABEL.get(cmv, _VERSION_LABEL[VERSION_MAIN]),
+            "preview_url": main_preview_url,
+        })
+
+    new_preview: Optional[Dict[str, Any]] = None
+    candidate = raw_versions.get(VERSION_CANDIDATE)
+    if isinstance(candidate, Mapping) and candidate.get("role") == ROLE_CANDIDATE:
+        based_on = candidate.get("based_on_intents")
+        new_preview = {
+            "version": VERSION_CANDIDATE,
+            "role": ROLE_CANDIDATE,
+            "label_zh": _VERSION_LABEL[VERSION_CANDIDATE],
+            "preview_url": candidate.get("preview_url"),
+            "based_on_intents": list(based_on) if isinstance(based_on, (list, tuple)) else [],
+            "source": candidate.get("source"),
+        }
+        versions.append(new_preview)
+
+    return {
+        "preview_versions": versions,
+        "new_preview": new_preview,
+        "has_candidate_preview": new_preview is not None,
+        "current_main_version": (
+            str(current_main_version) if current_main_version
+            else (VERSION_MAIN if main_preview_url else None)
+        ),
+    }
+
+
 def _assert_clean(view: Mapping[str, Any]) -> None:
     # Scan the projection's own fields; operator free-text notes are excluded so
     # operator prose can never crash the Workbench render.
@@ -299,6 +370,7 @@ def build_matrix_script_operator_workbench_view(
     shots = _build_shots(has_result, intents)
     dirty_shots = [s["shot_id"] for s in shots if s["intent_dirty"]]
     material_changed = bool(dirty_shots)
+    version_view = _build_preview_versions(task, main_result)
     view: Dict[str, Any] = {
         "is_matrix_script": True,
         "has_pr_a_result": has_result,
@@ -310,6 +382,17 @@ def build_matrix_script_operator_workbench_view(
         "dirty_shots": dirty_shots,
         "dirty_shot_count": len(dirty_shots),
         "material_intent_endpoint": "/api/matrix-script/{task_id}/material-replacement-intent",
+        # P1 PR-2: regenerate preview versioning. The current main (V1) is the
+        # staged candidate; a V2 candidate (if any) is shown alongside without
+        # replacing V1 until confirmed.
+        "regeneration": _project_regeneration(task, clock),
+        "regenerate_endpoint": "/api/matrix-script/{task_id}/regenerate-preview",
+        "preview_version_confirm_endpoint": "/api/matrix-script/{task_id}/preview-version/confirm",
+        "preview_version_discard_endpoint": "/api/matrix-script/{task_id}/preview-version/discard",
+        "preview_versions": version_view["preview_versions"],
+        "new_preview": version_view["new_preview"],
+        "has_candidate_preview": version_view["has_candidate_preview"],
+        "current_main_version": version_view["current_main_version"],
         "delivery": {
             "delivery_candidate": main_result["delivery_candidate"],
             "preview_url": main_result["preview_url"],
