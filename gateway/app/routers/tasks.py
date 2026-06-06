@@ -281,6 +281,7 @@ from gateway.app.services.matrix_script.operator_workbench_view import (  # noqa
     MATERIAL_REF_MAX,
 )
 from gateway.app.services.matrix_script import tomato_real_result_plan as _ms_plan  # noqa: E402
+from gateway.app.services.matrix_script import shot_material_storage as _ms_material  # noqa: E402
 from gateway.app.services.matrix_script.source_script_body_store import (  # noqa: E402
     BodyStoreError,
     SOURCE_KIND_PASTE,
@@ -945,6 +946,133 @@ async def matrix_script_shot_material_attachment(
             "official_publish_ready": False,
         }
     )
+
+
+@api_router.post("/matrix-script/{task_id}/shot-material-upload")
+async def matrix_script_shot_material_upload(
+    task_id: str,
+    shot_id: str = Form(...),
+    file: UploadFile = File(...),
+    material_kind: Optional[str] = Form(default=None),
+    intent: Optional[str] = Form(default=None),
+    repo=Depends(get_task_repository),
+) -> JSONResponse:
+    """Upload + store a shot material file → resolvable bytes (P1-3 PR-C).
+
+    Upgrades a shot's attached material from a bare operator reference (PR-A) to
+    a stored handle whose BYTES are resolvable (``bytes_resolvable=true``,
+    ``storage_scope=local_workspace``, ``material_source=operator_upload``). The
+    file is stored under a Matrix-Script-scoped local workspace path — never an
+    ``artifact_storage.py`` / provider / publish surface. Regeneration still does
+    NOT consume the bytes (that is PR-D; ``material_bytes_consumed`` stays false).
+    The upload keeps the shot dirty and never overwrites V1, V2, or delivery.
+    """
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="task_not_found")
+    if not _is_matrix_script_task(task):
+        raise HTTPException(
+            status_code=400,
+            detail="material_upload_only_available_for_matrix_script_tasks",
+        )
+    if not isinstance(shot_id, str) or shot_id not in _MS_SHOT_IDS:
+        raise HTTPException(status_code=400, detail="unknown_shot_id")
+    if not file or not file.filename:
+        raise HTTPException(status_code=400, detail="file_required")
+    declared_kind = material_kind if material_kind in MATERIAL_KINDS else None
+
+    data = await file.read()
+    max_mb = int(os.getenv("MATRIX_SCRIPT_MATERIAL_MAX_MB", str(_ms_material.DEFAULT_MAX_MB)))
+    try:
+        stored = _ms_material.store_shot_material_bytes(
+            task_id=task_id,
+            shot_id=shot_id,
+            filename=file.filename,
+            data=data,
+            declared_kind=declared_kind,
+            max_bytes=max_mb * 1024 * 1024,
+        )
+    except _ms_material.ShotMaterialStorageError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    config = dict(task.get("config") or {})
+    intents = dict(config.get(MATERIAL_INTENT_KEY) or {})
+    entry = dict(intents.get(shot_id) or {})
+    # Uploading material is itself a dirty action; honor an explicit dirty intent,
+    # else keep an existing dirty intent, else default to supplement.
+    if isinstance(intent, str) and intent in MATERIAL_DIRTY_INTENTS:
+        shot_intent = intent
+    elif entry.get("intent") in MATERIAL_DIRTY_INTENTS:
+        shot_intent = str(entry["intent"])
+    else:
+        shot_intent = MATERIAL_INTENT_SUPPLEMENT
+
+    entry.update(
+        {
+            "intent": shot_intent,
+            "material_ref": stored.material_ref,
+            "material_name": stored.material_name,
+            "material_kind": stored.material_kind,
+            "material_source": stored.material_source,
+            "storage_scope": stored.storage_scope,
+            "local_path": stored.local_path,
+            "preview_url": stored.preview_url,
+            "thumbnail_url": stored.preview_url,
+            "bytes_resolvable": True,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    intents[shot_id] = entry
+    config[MATERIAL_INTENT_KEY] = intents
+    repo.update(task_id, {"config": config})
+
+    view = build_matrix_script_operator_workbench_view(repo.get(task_id) or task)
+    shot_view = next(
+        (s for s in view.get("shots", []) if s.get("shot_id") == shot_id), {}
+    )
+    return JSONResponse(
+        {
+            "ok": True,
+            "shot_id": shot_id,
+            "intent": shot_intent,
+            "material_attached": bool(shot_view.get("material_attached")),
+            "material_name": shot_view.get("material_name"),
+            "material_kind": shot_view.get("material_kind"),
+            "material_source": shot_view.get("material_source"),
+            "storage_scope": shot_view.get("storage_scope"),
+            "bytes_resolvable": bool(shot_view.get("bytes_resolvable")),
+            "preview_url": shot_view.get("preview_url"),
+            "material_changed": bool(view.get("material_changed")),
+            "dirty_shot_count": int(view.get("dirty_shot_count", 0)),
+            "official_publish_ready": False,
+        }
+    )
+
+
+@api_router.get("/matrix-script/{task_id}/shot-material/{shot_id}/file")
+async def matrix_script_shot_material_file(
+    task_id: str,
+    shot_id: str,
+    repo=Depends(get_task_repository),
+):
+    """Serve a stored shot material file for operator preview (local-only)."""
+    task = _require_matrix_script_task(repo, task_id)
+    if shot_id not in _MS_SHOT_IDS:
+        raise HTTPException(status_code=400, detail="unknown_shot_id")
+    config = task.get("config") or {}
+    entry = (config.get(MATERIAL_INTENT_KEY) or {}).get(shot_id) or {}
+    local_path = _ms_material.resolve_shot_material_local_path(
+        task_id, shot_id, entry.get("material_ref")
+    )
+    if not local_path:
+        # Fall back to a previously recorded absolute path within the MS material dir.
+        candidate = entry.get("local_path")
+        if isinstance(candidate, str) and os.path.exists(candidate) and os.path.getsize(candidate) > 0:
+            local_path = candidate
+    if not local_path:
+        raise HTTPException(status_code=404, detail="shot_material_not_available")
+    media_type = "video/mp4" if str(entry.get("material_kind")) == "video" else "image/*"
+    return FileResponse(path=local_path, media_type=media_type, filename=os.path.basename(local_path))
 
 
 def _require_matrix_script_task(repo: Any, task_id: str) -> dict:

@@ -94,6 +94,21 @@ Matrix Script PR must preserve the result-first layout (A main video, B
 material/music, C delivery, D/E folded, diagnostics collapsed) and the
 operator-only primary UI.
 
+**Matrix Script P1 / P1-2 established** (operator edit loop):
+
+- P1 PR-1 (#206) material replacement intent · P1 PR-2 (#207) regenerate V1/V2
+  versioning · P1 closure docs (#208).
+- P1-2 PR-A (#209) Shot Material Attachment Handle · P1-2 PR-B (#210) regenerate
+  records the attached material as `based_on_assets`. `material_bytes_consumed`
+  remains **false** because `asset://` bytes are not yet resolvable.
+- State note: `docs/execution/MATRIX_SCRIPT_P1_2_STATE_AND_P1_3_FOCUS_20260606.md`.
+
+**Next active focus — Matrix Script P1-3 PR-C — Shot Material Upload / Storage Handle.**
+Goal: make attached material bytes resolvable
+(`bytes_resolvable=true`, `storage_scope=local_workspace`,
+`material_source=operator_upload`) WITHOUT consuming them in regeneration yet
+(`material_bytes_consumed` stays false; consumption is PR-D).
+
 For Workbench, New Task, Delivery, result-line, or state/projection changes,
 also read the four-layer state authorities named in this index. Matrix Script
 UI may show L4 operator summary and necessary L3 acceptance facts; it must not

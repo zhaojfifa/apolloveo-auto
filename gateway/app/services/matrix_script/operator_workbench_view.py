@@ -106,6 +106,9 @@ _OPERATOR_NOTE_KEYS = ("intent_note", "operator_note")
 # overwrites the current main (V1), creates V2, changes the delivery candidate,
 # or flips official_publish_ready.
 MATERIAL_ATTACHMENT_SOURCE = "operator_attachment"
+# P1-3 PR-C — uploaded material carries resolvable BYTES (a storage fact); this
+# is distinct from material_bytes_consumed (a regeneration fact, still false).
+MATERIAL_UPLOAD_SOURCE = "operator_upload"
 MATERIAL_KIND_VIDEO = "video"
 MATERIAL_KIND_IMAGE = "image"
 MATERIAL_KINDS = (MATERIAL_KIND_VIDEO, MATERIAL_KIND_IMAGE)
@@ -117,8 +120,10 @@ _MATERIAL_KIND_LABEL = {
 }
 _MATERIAL_SOURCE_LABEL = {
     MATERIAL_ATTACHMENT_SOURCE: "运营补充素材",
+    MATERIAL_UPLOAD_SOURCE: "运营上传素材",
 }
 MATERIAL_ATTACHED_STATUS_ZH = "已绑定，等待再次生成预览"
+MATERIAL_UPLOADED_STATUS_ZH = "已上传，等待再次生成预览"
 MATERIAL_UNATTACHED_STATUS_ZH = "待补素材"
 
 # P1 PR-2 — regenerate preview versioning (V1 current main vs V2 candidate).
@@ -288,15 +293,23 @@ def _project_shot_attachment(
             "material_kind": None,
             "material_kind_label_zh": None,
             "thumbnail_url": None,
+            "preview_url": None,
             "material_source": None,
             "material_source_label_zh": None,
+            "storage_scope": None,
+            "bytes_resolvable": False,
             "material_status_zh": MATERIAL_UNATTACHED_STATUS_ZH if intent_dirty else None,
         }
     kind = str(entry.get("material_kind") or "")
     if kind not in MATERIAL_KINDS:
         kind = MATERIAL_KIND_VIDEO
     source = str(entry.get("material_source") or MATERIAL_ATTACHMENT_SOURCE)
-    thumb = entry.get("thumbnail_url")
+    uploaded = source == MATERIAL_UPLOAD_SOURCE
+    # An uploaded material has resolvable bytes (storage fact); a bare reference
+    # does not. NB: bytes_resolvable != material_bytes_consumed (regen fact).
+    bytes_resolvable = bool(entry.get("bytes_resolvable")) if uploaded else False
+    thumb = entry.get("thumbnail_url") or (entry.get("preview_url") if uploaded else None)
+    preview = entry.get("preview_url") if uploaded else None
     return {
         "material_attached": True,
         "material_ref": str(material_ref)[:MATERIAL_REF_MAX],
@@ -304,9 +317,14 @@ def _project_shot_attachment(
         "material_kind": kind,
         "material_kind_label_zh": _MATERIAL_KIND_LABEL[kind],
         "thumbnail_url": str(thumb)[:MATERIAL_REF_MAX] if thumb else None,
+        "preview_url": str(preview)[:MATERIAL_REF_MAX] if preview else None,
         "material_source": source,
         "material_source_label_zh": _MATERIAL_SOURCE_LABEL.get(source, "运营补充素材"),
-        "material_status_zh": MATERIAL_ATTACHED_STATUS_ZH,
+        "storage_scope": str(entry.get("storage_scope")) if uploaded and entry.get("storage_scope") else None,
+        "bytes_resolvable": bytes_resolvable,
+        "material_status_zh": (
+            MATERIAL_UPLOADED_STATUS_ZH if uploaded else MATERIAL_ATTACHED_STATUS_ZH
+        ),
     }
 
 
@@ -498,6 +516,9 @@ def build_matrix_script_operator_workbench_view(
         # P1-2 PR-A: bind a concrete material handle to a shot intent. Binding only —
         # regeneration does not consume it yet (PR-B).
         "material_attachment_endpoint": "/api/matrix-script/{task_id}/shot-material-attachment",
+        # P1-3 PR-C: upload a material file → resolvable bytes (storage fact).
+        # Regeneration still does not consume the bytes (PR-D).
+        "material_upload_endpoint": "/api/matrix-script/{task_id}/shot-material-upload",
         # P1 PR-2: regenerate preview versioning. The current main (V1) is the
         # staged candidate; a V2 candidate (if any) is shown alongside without
         # replacing V1 until confirmed.

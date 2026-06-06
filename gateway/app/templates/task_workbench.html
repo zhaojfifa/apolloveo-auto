@@ -803,6 +803,24 @@
                   <span class="muted" style="font-size:12px;">绑定后该镜头标记为已更新，返回主视频区点击“再次生成预览”。绑定不会自动生成或发布。</span>
                 </div>
               </details>
+              <details data-role="ms-primary-shot-material-upload" data-shot-id="{{ s.shot_id }}" style="margin-top:6px;">
+                <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-soft,#64748b);">上传素材文件（运营上传素材）</summary>
+                <div data-role="ms-primary-shot-material-upload-form"
+                     style="display:grid; gap:6px; margin-top:6px; max-width:420px;">
+                  <input type="file" data-role="ms-upload-material-file" accept="image/*,video/*"
+                         style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
+                  <select data-role="ms-upload-material-kind"
+                          style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
+                    <option value="">自动判断类型</option>
+                    <option value="video">视频</option>
+                    <option value="image">图片</option>
+                  </select>
+                  <button type="button" class="btn-secondary"
+                          data-role="ms-primary-shot-material-upload-submit"
+                          data-shot-id="{{ s.shot_id }}">上传素材</button>
+                  <span class="muted" style="font-size:12px;">上传后该镜头标记为“已上传，等待再次生成预览”。上传仅入库，不会自动生成或发布。</span>
+                </div>
+              </details>
             </div>
             {% endfor %}
           </div>
@@ -889,6 +907,32 @@
                   if (resp.ok) {
                     // Reload so B区 attachment info + dirty state render from the
                     // server projection. Binding never regenerates.
+                    window.location.reload();
+                    return;
+                  }
+                } catch (e) { /* fall through to re-enable */ }
+                btn.disabled = false;
+              });
+            });
+            // P1-3 PR-C: upload a material file → resolvable bytes (storage only).
+            // It never regenerates, never overwrites V1, never creates V2.
+            var uploadEndpoint = "/api/matrix-script/{{ task.task_id }}/shot-material-upload";
+            document.querySelectorAll('[data-role="ms-primary-shot-material-upload-submit"]').forEach(function (btn) {
+              btn.addEventListener('click', async function () {
+                var shotId = btn.getAttribute('data-shot-id');
+                var form = btn.closest('[data-role="ms-primary-shot-material-upload-form"]');
+                if (!form) { return; }
+                var fileInput = form.querySelector('[data-role="ms-upload-material-file"]');
+                var kind = (form.querySelector('[data-role="ms-upload-material-kind"]') || {}).value || '';
+                if (!fileInput || !fileInput.files || !fileInput.files.length) { return; }
+                var fd = new FormData();
+                fd.append('shot_id', shotId);
+                fd.append('file', fileInput.files[0]);
+                if (kind) { fd.append('material_kind', kind); }
+                btn.disabled = true;
+                try {
+                  var resp = await fetch(uploadEndpoint, { method: 'POST', body: fd });
+                  if (resp.ok) {
                     window.location.reload();
                     return;
                   }
