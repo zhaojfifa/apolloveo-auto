@@ -14,6 +14,7 @@ P1 PR-2:   #207 Regenerate Preview Versioning (V1 current main / V2 candidate)
 P1 closure:#208 operator edit loop closure (docs)
 P1-2 PR-A: #209 Shot Material Attachment Handle (asset:// reference on a shot intent)
 P1-2 PR-B: #210 Regenerate records the attached material as based_on_assets
+P1-3 PR-C: #211 Shot Material Upload / Storage Handle (msmaterial:// local_workspace bytes; resolvable, not yet consumed)
 ```
 
 Key state fact:
@@ -28,17 +29,22 @@ renders honest reference-label markers ("已绑定运营素材引用，当前预
 ## Next active focus
 
 ```
-Matrix Script P1-3 PR-C — Shot Material Upload / Storage Handle.
-Goal: make attached material BYTES resolvable, WITHOUT consuming them in
-regeneration yet.
-  - operator uploads/binds a material file for a shot
-  - stored under a Matrix-Script-scoped local workspace path (no artifact_storage.py)
-  - shot intent entry records bytes_resolvable=true, storage_scope=local_workspace,
-    material_source=operator_upload, a resolvable handle, and a preview/thumbnail
-  - material_bytes_consumed stays FALSE (regeneration byte consumption is PR-D)
+Matrix Script P1-3 PR-D — Regenerate Consumes Uploaded Material Bytes.
+Goal: a V2 regeneration RESOLVES a stored msmaterial:// handle and CONSUMES its
+bytes (the byte-store wiring PR-C deferred).
+  - regen resolver resolves msmaterial:// → local_workspace path (asset:// still None)
+  - renderer uses an uploaded image directly; an uploaded video's first frame is
+    extracted; anything unresolved/unsupported falls back to the default asset
+  - material_bytes_consumed=true ONLY when at least one uploaded file is actually
+    used; V2 entry records consumed_materials (shot_id / material_name /
+    material_kind / safe msmaterial:// handle / source)
+  - workbench copy is honest: used → "已使用运营上传素材生成新预览";
+    unresolved/unsupported → "已绑定运营素材引用，当前预览以素材引用标记生成。"
+  - V1 stays current until confirm; delivery follows confirmed main only;
+    discard / failure preserve V1
 ```
 
-Boundary held by PR-C: no V2 byte consumption, no Akool live, no provider
-switching, no multi-variant, no official publish, no Hot Follow / Digital Anchor
-/ `artifact_storage.py` / schema-contract change. `official_publish_ready`
-remains false.
+Boundary held by PR-D: no Akool live, no provider switching, no multi-variant,
+no official publish, no public publish URL, no Hot Follow / Digital Anchor /
+`artifact_storage.py` / schema-contract change. `official_publish_ready` remains
+false. (PR-C established the storage handle; byte consumption is this PR.)

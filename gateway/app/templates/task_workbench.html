@@ -499,6 +499,13 @@
                     <li data-role="ms-regen-material-asset" data-shot-id="{{ a.shot_id }}">{{ a.shot_label_zh }}：{{ a.material_name }}（{{ a.material_kind_label_zh }}）</li>
                     {% endfor %}
                   </ul>
+                  {% if ms_overlay.new_preview.consumed_materials %}
+                  <ul data-role="ms-regen-consumed-materials" style="margin:4px 0 0 16px; padding:0;">
+                    {% for m in ms_overlay.new_preview.consumed_materials %}
+                    <li data-role="ms-regen-consumed-material" data-shot-id="{{ m.shot_id }}">已生成：{{ m.shot_label_zh }}：{{ m.material_name }}（{{ m.material_kind_label_zh }}）</li>
+                    {% endfor %}
+                  </ul>
+                  {% endif %}
                 </div>
                 {% endif %}
                 <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">

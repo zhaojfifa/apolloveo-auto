@@ -141,6 +141,10 @@ _VERSION_LABEL = {VERSION_MAIN: "当前主视频", VERSION_CANDIDATE: "新预览
 # state plainly that the preview was generated from the material REFERENCE.
 MATERIAL_USAGE_CONSUMED_ZH = "已使用运营补充素材"
 MATERIAL_USAGE_REFERENCE_ZH = "已绑定运营素材引用，当前预览以素材引用标记生成。"
+# P1-3 PR-D — when the renderer actually consumed UPLOADED material bytes
+# (operator_upload source), the copy is explicit that a new preview was made FROM
+# the uploaded material. Distinct from the generic consumed copy above.
+MATERIAL_USAGE_UPLOAD_CONSUMED_ZH = "已使用运营上传素材生成新预览"
 
 
 def _truthy(v: Any) -> bool:
@@ -410,6 +414,32 @@ def _project_based_on_assets(raw: Any) -> List[Dict[str, Any]]:
     return out
 
 
+def _project_consumed_materials(raw: Any) -> List[Dict[str, Any]]:
+    """Operator-safe projection of the materials whose bytes V2 actually consumed.
+
+    Records shot_id / label / name / kind + the safe internal ``msmaterial://``
+    handle. NEVER a local_path / provider / publish URL.
+    """
+    out: List[Dict[str, Any]] = []
+    if not isinstance(raw, (list, tuple)):
+        return out
+    for item in raw:
+        if not isinstance(item, Mapping):
+            continue
+        shot_id = str(item.get("shot_id") or "")
+        kind = str(item.get("material_kind") or "")
+        ref = str(item.get("material_ref") or "")
+        out.append({
+            "shot_id": shot_id,
+            "shot_label_zh": _shot_label(shot_id),
+            "material_name": str(item.get("material_name") or ""),
+            "material_kind": kind,
+            "material_kind_label_zh": _MATERIAL_KIND_LABEL.get(kind, kind),
+            "material_ref": ref[:MATERIAL_REF_MAX] if ref else None,
+        })
+    return out
+
+
 def _build_preview_versions(
     task: Mapping[str, Any], main_result: Mapping[str, Any]
 ) -> Dict[str, Any]:
@@ -437,6 +467,21 @@ def _build_preview_versions(
     if isinstance(candidate, Mapping) and candidate.get("role") == ROLE_CANDIDATE:
         based_on = candidate.get("based_on_intents")
         bytes_consumed = bool(candidate.get("material_bytes_consumed"))
+        consumed_materials = _project_consumed_materials(candidate.get("consumed_materials"))
+        # P1-3 PR-D: an UPLOADED material's bytes were actually consumed → explicit
+        # upload copy; a generic (non-upload) consumed flag keeps the PR-B copy;
+        # nothing consumed → honest reference-label copy.
+        uploaded_consumed = bytes_consumed and any(
+            isinstance(m, Mapping)
+            and str(m.get("material_source")) == MATERIAL_UPLOAD_SOURCE
+            for m in (candidate.get("consumed_materials") or [])
+        )
+        if uploaded_consumed:
+            usage_note = MATERIAL_USAGE_UPLOAD_CONSUMED_ZH
+        elif bytes_consumed:
+            usage_note = MATERIAL_USAGE_CONSUMED_ZH
+        else:
+            usage_note = MATERIAL_USAGE_REFERENCE_ZH
         new_preview = {
             "version": VERSION_CANDIDATE,
             "role": ROLE_CANDIDATE,
@@ -449,10 +494,9 @@ def _build_preview_versions(
             # pixel-replacement claim unless the renderer actually consumed bytes.
             "based_on_assets": _project_based_on_assets(candidate.get("based_on_assets")),
             "material_bytes_consumed": bytes_consumed,
-            "material_usage_note_zh": (
-                MATERIAL_USAGE_CONSUMED_ZH if bytes_consumed
-                else MATERIAL_USAGE_REFERENCE_ZH
-            ),
+            # P1-3 PR-D: the materials whose bytes were actually consumed.
+            "consumed_materials": consumed_materials,
+            "material_usage_note_zh": usage_note,
         }
         versions.append(new_preview)
 

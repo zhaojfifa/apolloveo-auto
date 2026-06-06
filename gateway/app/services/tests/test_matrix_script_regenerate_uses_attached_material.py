@@ -323,6 +323,8 @@ def test_no_leakage_in_v2_material_projection() -> None:
     assert set(view["new_preview"].keys()) == {
         "version", "role", "label_zh", "preview_url", "based_on_intents", "source",
         "based_on_assets", "material_bytes_consumed", "material_usage_note_zh",
+        # P1-3 PR-D adds the consumed-bytes projection (operator-safe).
+        "consumed_materials",
     }
     asset_keys = set(view["new_preview"]["based_on_assets"][0].keys())
     assert asset_keys == {"shot_id", "shot_label_zh", "material_name", "material_kind", "material_kind_label_zh"}

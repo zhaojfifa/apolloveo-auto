@@ -239,9 +239,11 @@ def test_upload_keeps_dirty_preserves_v1_and_v2_and_delivery(monkeypatch, tmp_pa
     assert view["has_candidate_preview"] is True
 
 
-def test_material_bytes_consumed_stays_false_after_upload(monkeypatch, tmp_path) -> None:
-    # PR-C boundary: upload makes bytes RESOLVABLE but regeneration must NOT
-    # consume them yet — the regen resolver still returns None for the handle.
+def test_upload_alone_does_not_set_material_bytes_consumed(monkeypatch, tmp_path) -> None:
+    # Upload makes bytes RESOLVABLE; on its own it never runs a regeneration, so
+    # no material_bytes_consumed flag is written by the upload. (PR-D wires the
+    # regeneration resolver so a *subsequent* regeneration can consume the bytes;
+    # the resolver therefore now resolves the stored handle — see PR-D tests.)
     repo = _Repo()
     repo.create(_task())
     client = _client(monkeypatch, repo, tmp_path)
@@ -249,13 +251,12 @@ def test_material_bytes_consumed_stays_false_after_upload(monkeypatch, tmp_path)
         _upload(client, "shot04", "tasting.mp4", b"\x00\x00\x00\x18ftyp" + b"0" * 64, kind="video")
     finally:
         app.dependency_overrides.clear()
-    entry = repo.get(TID)["config"][INTENT_KEY]["shot04"]
-    # The regeneration-layer resolver does NOT resolve the stored handle to bytes
-    # in this PR (that wiring is PR-D), so material_bytes_consumed stays false.
-    assert auto.resolve_material_asset_bytes_path(entry["material_ref"]) is None
-    assets = auto._material_attachment_assets(repo.get(TID))
-    overrides = auto._material_overrides_from_assets(assets)
-    assert overrides == {}
+    cfg = repo.get(TID)["config"]
+    # No V2 candidate / regeneration state was produced by the upload itself.
+    assert auto.PREVIEW_VERSIONS_KEY not in cfg or not cfg.get(auto.PREVIEW_VERSIONS_KEY)
+    # PR-D: the stored msmaterial:// handle now resolves to its local bytes.
+    entry = cfg[INTENT_KEY]["shot04"]
+    assert auto.resolve_material_asset_bytes_path(entry["material_ref"]) is not None
 
 
 # --------------------------------------------------------------------------- #
