@@ -101,9 +101,10 @@ operator-only primary UI.
 - P1-2 PR-A (#209) Shot Material Attachment Handle · P1-2 PR-B (#210) regenerate
   records the attached material as `based_on_assets`. `material_bytes_consumed`
   remains **false** because `asset://` bytes are not yet resolvable.
-- P1-3 PR-C (#211) Shot Material Upload / Storage Handle — uploaded material is
-  resolvable (`msmaterial://`, `storage_scope=local_workspace`,
-  `bytes_resolvable=true`), still NOT consumed by regeneration.
+- Matrix Script P1-3 PR-C (#211) Shot Material Upload / Storage Handle —
+  uploaded material is resolvable (`msmaterial://`,
+  `storage_scope=local_workspace`, `bytes_resolvable=true`), still NOT consumed
+  by regeneration.
 - State note: `docs/execution/MATRIX_SCRIPT_P1_2_STATE_AND_P1_3_FOCUS_20260606.md`.
 
 **Next active focus — Matrix Script P1-3 PR-D — Regenerate Consumes Uploaded
