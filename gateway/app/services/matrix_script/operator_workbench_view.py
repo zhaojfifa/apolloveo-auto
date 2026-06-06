@@ -99,6 +99,28 @@ _MATERIAL_INTENT_LABEL = {
 # (the guard polices the projection's own identifiers, not operator prose).
 _OPERATOR_NOTE_KEYS = ("intent_note", "operator_note")
 
+# P1-2 PR-A — shot-level material ATTACHMENT handle. A replace/supplement intent
+# can carry a concrete material reference (an existing asset handle, operator
+# language only). This is a BINDING only: regeneration does NOT consume it yet
+# (PR-B). Binding keeps the shot dirty ("已绑定，等待再次生成预览") and never
+# overwrites the current main (V1), creates V2, changes the delivery candidate,
+# or flips official_publish_ready.
+MATERIAL_ATTACHMENT_SOURCE = "operator_attachment"
+MATERIAL_KIND_VIDEO = "video"
+MATERIAL_KIND_IMAGE = "image"
+MATERIAL_KINDS = (MATERIAL_KIND_VIDEO, MATERIAL_KIND_IMAGE)
+MATERIAL_NAME_MAX = 200
+MATERIAL_REF_MAX = 512
+_MATERIAL_KIND_LABEL = {
+    MATERIAL_KIND_VIDEO: "视频",
+    MATERIAL_KIND_IMAGE: "图片",
+}
+_MATERIAL_SOURCE_LABEL = {
+    MATERIAL_ATTACHMENT_SOURCE: "运营补充素材",
+}
+MATERIAL_ATTACHED_STATUS_ZH = "已绑定，等待再次生成预览"
+MATERIAL_UNATTACHED_STATUS_ZH = "待补素材"
+
 # P1 PR-2 — regenerate preview versioning (V1 current main vs V2 candidate).
 PREVIEW_VERSIONS_KEY = "matrix_script_preview_versions"
 CURRENT_MAIN_VERSION_KEY = "matrix_script_current_main_version"
@@ -238,6 +260,50 @@ def _material_intents(task: Mapping[str, Any]) -> Dict[str, Mapping[str, Any]]:
     return out
 
 
+def _project_shot_attachment(
+    entry: Mapping[str, Any], intent_dirty: bool
+) -> Dict[str, Any]:
+    """Operator-safe projection of a shot's material ATTACHMENT handle (PR-A).
+
+    A binding requires both a ``material_ref`` and a ``material_name``. The
+    regeneration loop does not consume this yet — it is shown so the operator
+    can confirm what is bound before the next ``再次生成预览``. When nothing is
+    bound but the shot is dirty (replace/supplement), the operator still needs
+    material → 待补素材.
+    """
+    material_ref = entry.get("material_ref")
+    material_name = entry.get("material_name")
+    attached = bool(material_ref) and bool(material_name)
+    if not attached:
+        return {
+            "material_attached": False,
+            "material_ref": None,
+            "material_name": None,
+            "material_kind": None,
+            "material_kind_label_zh": None,
+            "thumbnail_url": None,
+            "material_source": None,
+            "material_source_label_zh": None,
+            "material_status_zh": MATERIAL_UNATTACHED_STATUS_ZH if intent_dirty else None,
+        }
+    kind = str(entry.get("material_kind") or "")
+    if kind not in MATERIAL_KINDS:
+        kind = MATERIAL_KIND_VIDEO
+    source = str(entry.get("material_source") or MATERIAL_ATTACHMENT_SOURCE)
+    thumb = entry.get("thumbnail_url")
+    return {
+        "material_attached": True,
+        "material_ref": str(material_ref)[:MATERIAL_REF_MAX],
+        "material_name": str(material_name)[:MATERIAL_NAME_MAX],
+        "material_kind": kind,
+        "material_kind_label_zh": _MATERIAL_KIND_LABEL[kind],
+        "thumbnail_url": str(thumb)[:MATERIAL_REF_MAX] if thumb else None,
+        "material_source": source,
+        "material_source_label_zh": _MATERIAL_SOURCE_LABEL.get(source, "运营补充素材"),
+        "material_status_zh": MATERIAL_ATTACHED_STATUS_ZH,
+    }
+
+
 def _build_shots(has_result: bool, intents: Mapping[str, Mapping[str, Any]]) -> List[Dict[str, Any]]:
     cards: List[Dict[str, Any]] = []
     for shot in plan_mod.TOMATO_SHOTS:
@@ -246,7 +312,8 @@ def _build_shots(has_result: bool, intents: Mapping[str, Mapping[str, Any]]) -> 
         if intent not in MATERIAL_INTENTS:
             intent = MATERIAL_INTENT_KEEP
         note = entry.get("operator_note")
-        cards.append({
+        intent_dirty = intent in MATERIAL_DIRTY_INTENTS
+        card = {
             "shot_id": shot.shot_id,
             "order": shot.order,
             "title": shot.title_zh,
@@ -256,10 +323,12 @@ def _build_shots(has_result: bool, intents: Mapping[str, Mapping[str, Any]]) -> 
             "included_in_current_video": bool(has_result),
             "intent": intent,
             "intent_label_zh": _MATERIAL_INTENT_LABEL[intent],
-            "intent_dirty": intent in MATERIAL_DIRTY_INTENTS,
+            "intent_dirty": intent_dirty,
             "intent_note": str(note)[:MATERIAL_INTENT_NOTE_MAX] if note else None,
             "intent_updated_at": entry.get("updated_at"),
-        })
+        }
+        card.update(_project_shot_attachment(entry, intent_dirty))
+        cards.append(card)
     return cards
 
 
@@ -382,6 +451,9 @@ def build_matrix_script_operator_workbench_view(
         "dirty_shots": dirty_shots,
         "dirty_shot_count": len(dirty_shots),
         "material_intent_endpoint": "/api/matrix-script/{task_id}/material-replacement-intent",
+        # P1-2 PR-A: bind a concrete material handle to a shot intent. Binding only —
+        # regeneration does not consume it yet (PR-B).
+        "material_attachment_endpoint": "/api/matrix-script/{task_id}/shot-material-attachment",
         # P1 PR-2: regenerate preview versioning. The current main (V1) is the
         # staged candidate; a V2 candidate (if any) is shown alongside without
         # replacing V1 until confirmed.

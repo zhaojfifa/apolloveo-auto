@@ -269,10 +269,16 @@ from gateway.app.services.matrix_script.auto_preview_generation import (  # noqa
 )
 from gateway.app.services.matrix_script.operator_workbench_view import (  # noqa: E402
     build_matrix_script_operator_workbench_view,
+    MATERIAL_ATTACHMENT_SOURCE,
+    MATERIAL_DIRTY_INTENTS,
     MATERIAL_INTENT_KEY,
     MATERIAL_INTENT_KEEP,
+    MATERIAL_INTENT_SUPPLEMENT,
     MATERIAL_INTENTS,
     MATERIAL_INTENT_NOTE_MAX,
+    MATERIAL_KINDS,
+    MATERIAL_NAME_MAX,
+    MATERIAL_REF_MAX,
 )
 from gateway.app.services.matrix_script import tomato_real_result_plan as _ms_plan  # noqa: E402
 from gateway.app.services.matrix_script.source_script_body_store import (  # noqa: E402
@@ -833,6 +839,107 @@ async def matrix_script_material_replacement_intent(
             "ok": True,
             "shot_id": shot_id,
             "intent": intent,
+            "material_changed": bool(view.get("material_changed")),
+            "dirty_shot_count": int(view.get("dirty_shot_count", 0)),
+            "official_publish_ready": False,
+        }
+    )
+
+
+@api_router.post("/matrix-script/{task_id}/shot-material-attachment")
+async def matrix_script_shot_material_attachment(
+    task_id: str,
+    request: Request,
+    repo=Depends(get_task_repository),
+) -> JSONResponse:
+    """Bind a concrete material attachment handle to a shot intent (P1-2 PR-A).
+
+    Attachment is a BINDING only — it records the operator's replacement /
+    supplement material reference (an existing asset handle / operator language)
+    on the shot intent. It does NOT upload binary, regenerate, create V2,
+    overwrite the current main video (V1), change the delivery candidate, or flip
+    ``official_publish_ready``. Regeneration still does not consume the attached
+    material (that is PR-B). Binding keeps the shot dirty so the operator returns
+    to 主视频区 for 再次生成预览.
+    """
+    task = repo.get(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="task_not_found")
+    if not _is_matrix_script_task(task):
+        raise HTTPException(
+            status_code=400,
+            detail="material_attachment_only_available_for_matrix_script_tasks",
+        )
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=400, detail="invalid_request_body")
+
+    shot_id = body.get("shot_id")
+    if not isinstance(shot_id, str) or shot_id not in _MS_SHOT_IDS:
+        raise HTTPException(status_code=400, detail="unknown_shot_id")
+    material_ref = body.get("material_ref")
+    if not isinstance(material_ref, str) or not material_ref.strip():
+        raise HTTPException(status_code=400, detail="material_ref_required")
+    material_name = body.get("material_name")
+    if not isinstance(material_name, str) or not material_name.strip():
+        raise HTTPException(status_code=400, detail="material_name_required")
+    material_kind = body.get("material_kind")
+    if not isinstance(material_kind, str) or material_kind not in MATERIAL_KINDS:
+        raise HTTPException(status_code=400, detail="invalid_material_kind")
+
+    thumb_raw = body.get("thumbnail_url")
+    thumbnail_url = str(thumb_raw)[:MATERIAL_REF_MAX].strip() if thumb_raw else None
+    note_raw = body.get("operator_note")
+    operator_note = str(note_raw)[:MATERIAL_INTENT_NOTE_MAX].strip() if note_raw else None
+
+    config = dict(task.get("config") or {})
+    intents = dict(config.get(MATERIAL_INTENT_KEY) or {})
+    entry = dict(intents.get(shot_id) or {})
+
+    # The intent the attachment binds onto: an explicit dirty intent in the body
+    # wins; otherwise keep an existing dirty intent; otherwise binding a material
+    # is itself a supplement action (makes the shot dirty).
+    body_intent = body.get("intent")
+    if isinstance(body_intent, str) and body_intent in MATERIAL_DIRTY_INTENTS:
+        intent = body_intent
+    elif entry.get("intent") in MATERIAL_DIRTY_INTENTS:
+        intent = str(entry["intent"])
+    else:
+        intent = MATERIAL_INTENT_SUPPLEMENT
+
+    entry.update(
+        {
+            "intent": intent,
+            "material_ref": material_ref.strip()[:MATERIAL_REF_MAX],
+            "material_name": material_name.strip()[:MATERIAL_NAME_MAX],
+            "material_kind": material_kind,
+            "material_source": MATERIAL_ATTACHMENT_SOURCE,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+    )
+    if thumbnail_url:
+        entry["thumbnail_url"] = thumbnail_url
+    if operator_note:
+        entry["operator_note"] = operator_note
+    intents[shot_id] = entry
+    config[MATERIAL_INTENT_KEY] = intents
+    repo.update(task_id, {"config": config})
+
+    view = build_matrix_script_operator_workbench_view(repo.get(task_id) or task)
+    shot_view = next(
+        (s for s in view.get("shots", []) if s.get("shot_id") == shot_id), {}
+    )
+    return JSONResponse(
+        {
+            "ok": True,
+            "shot_id": shot_id,
+            "intent": intent,
+            "material_attached": bool(shot_view.get("material_attached")),
+            "material_name": shot_view.get("material_name"),
+            "material_kind": shot_view.get("material_kind"),
             "material_changed": bool(view.get("material_changed")),
             "dirty_shot_count": int(view.get("dirty_shot_count", 0)),
             "official_publish_ready": False,

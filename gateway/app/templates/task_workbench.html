@@ -736,6 +736,27 @@
                 {% if s.intent_note %}
                   <br><span data-role="ms-primary-shot-intent-note" style="color:var(--op-fg-soft,#64748b);">备注：{{ s.intent_note }}</span>
                 {% endif %}
+                <br><span data-role="ms-primary-shot-material-attachment"
+                          data-material-attached="{{ 'true' if s.material_attached else 'false' }}"
+                          data-material-kind="{{ s.material_kind or '' }}"
+                          style="{% if s.material_attached %}color:var(--op-fg-mid,#0f766e);{% else %}color:var(--op-fg-soft,#64748b);{% endif %}">
+                  {% if s.material_attached %}
+                    已绑定素材 · 素材名称：{{ s.material_name }} · 素材类型：{{ s.material_kind_label_zh }} · 来源：{{ s.material_source_label_zh }} · 状态：{{ s.material_status_zh }}
+                  {% elif s.intent_dirty %}
+                    {{ s.material_status_zh or "待补素材" }}
+                  {% else %}
+                    待补素材
+                  {% endif %}
+                </span>
+                {% if s.material_attached %}
+                  {% if s.thumbnail_url %}
+                    <br><img data-role="ms-primary-shot-material-thumb" src="{{ s.thumbnail_url }}" alt="素材缩略图"
+                             style="max-width:120px; border-radius:6px; margin-top:6px;">
+                  {% else %}
+                    <br><span data-role="ms-primary-shot-material-thumb-placeholder"
+                              style="display:inline-block; margin-top:6px; padding:14px 24px; background:var(--op-card-bd,#e5e7eb); border-radius:6px; color:var(--op-fg-soft,#64748b); font-size:12px;">缩略图待生成</span>
+                  {% endif %}
+                {% endif %}
               </span>
               <div class="task-actions" data-role="ms-primary-shot-intent-actions" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
                 <button type="button" class="btn-secondary"
@@ -751,6 +772,25 @@
                         data-shot-id="{{ s.shot_id }}" data-intent="keep"
                         {% if s.intent == 'keep' %}aria-pressed="true"{% endif %}>保持当前素材</button>
               </div>
+              <details data-role="ms-primary-shot-material-attach" data-shot-id="{{ s.shot_id }}" style="margin-top:8px;">
+                <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-soft,#64748b);">绑定补充素材（运营素材引用）</summary>
+                <div data-role="ms-primary-shot-material-attach-form"
+                     style="display:grid; gap:6px; margin-top:6px; max-width:420px;">
+                  <input type="text" data-role="ms-attach-material-name" placeholder="素材名称（例：番茄品尝特写）"
+                         style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
+                  <input type="text" data-role="ms-attach-material-ref" placeholder="素材引用（例：asset://matrix_script/.../{{ s.shot_id }}/<asset_id>）"
+                         style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
+                  <select data-role="ms-attach-material-kind"
+                          style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
+                    <option value="video">视频</option>
+                    <option value="image">图片</option>
+                  </select>
+                  <button type="button" class="btn-secondary"
+                          data-role="ms-primary-shot-material-attach-submit"
+                          data-shot-id="{{ s.shot_id }}">绑定素材</button>
+                  <span class="muted" style="font-size:12px;">绑定后该镜头标记为已更新，返回主视频区点击“再次生成预览”。绑定不会自动生成或发布。</span>
+                </div>
+              </details>
             </div>
             {% endfor %}
           </div>
@@ -808,6 +848,35 @@
                   if (resp.ok) {
                     // Reload so B区 dirty state + A区 "素材已更新" banner render from
                     // the server projection. Marking intent never regenerates.
+                    window.location.reload();
+                    return;
+                  }
+                } catch (e) { /* fall through to re-enable */ }
+                btn.disabled = false;
+              });
+            });
+            // P1-2 PR-A: bind a concrete material handle to a shot. Binding only —
+            // it never regenerates, never overwrites V1, never creates V2.
+            var attachEndpoint = "/api/matrix-script/{{ task.task_id }}/shot-material-attachment";
+            document.querySelectorAll('[data-role="ms-primary-shot-material-attach-submit"]').forEach(function (btn) {
+              btn.addEventListener('click', async function () {
+                var shotId = btn.getAttribute('data-shot-id');
+                var form = btn.closest('[data-role="ms-primary-shot-material-attach-form"]');
+                if (!form) { return; }
+                var name = (form.querySelector('[data-role="ms-attach-material-name"]') || {}).value || '';
+                var ref = (form.querySelector('[data-role="ms-attach-material-ref"]') || {}).value || '';
+                var kind = (form.querySelector('[data-role="ms-attach-material-kind"]') || {}).value || 'video';
+                if (!name.trim() || !ref.trim()) { return; }
+                btn.disabled = true;
+                try {
+                  var resp = await fetch(attachEndpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ shot_id: shotId, material_ref: ref, material_name: name, material_kind: kind })
+                  });
+                  if (resp.ok) {
+                    // Reload so B区 attachment info + dirty state render from the
+                    // server projection. Binding never regenerates.
                     window.location.reload();
                     return;
                   }
