@@ -101,13 +101,19 @@ operator-only primary UI.
 - P1-2 PR-A (#209) Shot Material Attachment Handle · P1-2 PR-B (#210) regenerate
   records the attached material as `based_on_assets`. `material_bytes_consumed`
   remains **false** because `asset://` bytes are not yet resolvable.
+- P1-3 PR-C (#211) Shot Material Upload / Storage Handle — uploaded material is
+  resolvable (`msmaterial://`, `storage_scope=local_workspace`,
+  `bytes_resolvable=true`), still NOT consumed by regeneration.
 - State note: `docs/execution/MATRIX_SCRIPT_P1_2_STATE_AND_P1_3_FOCUS_20260606.md`.
 
-**Next active focus — Matrix Script P1-3 PR-C — Shot Material Upload / Storage Handle.**
-Goal: make attached material bytes resolvable
-(`bytes_resolvable=true`, `storage_scope=local_workspace`,
-`material_source=operator_upload`) WITHOUT consuming them in regeneration yet
-(`material_bytes_consumed` stays false; consumption is PR-D).
+**Next active focus — Matrix Script P1-3 PR-D — Regenerate Consumes Uploaded
+Material Bytes.** Goal: a V2 regeneration resolves a stored `msmaterial://`
+handle and CONSUMES its bytes (uploaded image used directly; uploaded video
+first frame extracted). `material_bytes_consumed=true` only when at least one
+uploaded file was actually used; the V2 entry records `consumed_materials`;
+the workbench copy is honest ("已使用运营上传素材生成新预览" vs the reference
+label). V1 stays current until confirm; delivery follows confirmed main only;
+`official_publish_ready` stays false.
 
 For Workbench, New Task, Delivery, result-line, or state/projection changes,
 also read the four-layer state authorities named in this index. Matrix Script

@@ -87,6 +87,10 @@ class TomatoRealResult:
     delivery_block: Mapping[str, Any]
     acceptance: Mapping[str, Any]
     shot_checklist: Tuple[Mapping[str, Any], ...]
+    # P1-3 PR-D — shots whose UPLOADED material bytes the renderer actually
+    # consumed (image used directly / video first frame extracted). Empty unless
+    # a resolvable ``msmaterial://`` override was supplied AND used.
+    consumed_material_shot_ids: Tuple[str, ...] = ()
     official_publish_ready: bool = False
     line_id: str = LINE_ID
 
@@ -196,6 +200,60 @@ def _fmt_ts(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+def _extract_first_video_frame(video_path: str, work_dir: str, shot_id: str) -> Optional[str]:
+    """Extract the first frame of an uploaded video as a still PNG for rendering.
+
+    Returns the frame path when ffmpeg successfully decodes a frame, else None
+    (the caller then keeps the shot's default asset and does NOT mark the
+    material as consumed — honest: the uploaded bytes were not used).
+    """
+    out_png = os.path.join(work_dir, f"{shot_id}_material_frame.png")
+    cmd = [
+        ffmpeg_path(), "-y", "-i", video_path,
+        "-frames:v", "1", "-q:v", "2", out_png,
+    ]
+    import subprocess
+
+    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120, check=False)
+    if proc.returncode == 0 and os.path.exists(out_png) and os.path.getsize(out_png) > 0:
+        return out_png
+    return None
+
+
+def _resolve_shot_render_source(
+    shot_id: str,
+    default_image: str,
+    material_overrides: Optional[Mapping[str, Mapping[str, Any]]],
+    work_dir: str,
+) -> Tuple[str, bool]:
+    """Pick the visual source for a shot; return ``(path, consumed_uploaded_bytes)``.
+
+    When an uploaded material override resolves to readable local bytes the
+    renderer uses them: an image is used directly; a video has its first frame
+    extracted. Anything that does not resolve (missing bytes, unsupported kind,
+    failed frame extraction) falls back to the shot's default asset and is
+    reported as NOT consumed — the V2 candidate must never claim it used bytes it
+    did not.
+    """
+    if not material_overrides:
+        return default_image, False
+    override = material_overrides.get(shot_id)
+    if not isinstance(override, Mapping):
+        return default_image, False
+    src = override.get("local_path")
+    if not isinstance(src, str) or not src or not os.path.exists(src) or os.path.getsize(src) <= 0:
+        return default_image, False
+    kind = str(override.get("material_kind") or "")
+    if kind == "image":
+        return src, True
+    if kind == "video":
+        frame = _extract_first_video_frame(src, work_dir, shot_id)
+        if frame:
+            return frame, True
+        return default_image, False
+    return default_image, False
+
+
 def _write_srt(path: str, shots, durations: List[float]) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     lines: List[str] = []
@@ -219,8 +277,17 @@ def run_tomato_real_result(
     width: int = DEFAULT_WIDTH,
     height: int = DEFAULT_HEIGHT,
     fps: int = DEFAULT_FPS,
+    material_overrides: Optional[Mapping[str, Mapping[str, Any]]] = None,
 ) -> TomatoRealResult:
-    """Run the controlled tomato real-result path; return a staged, gated result."""
+    """Run the controlled tomato real-result path; return a staged, gated result.
+
+    ``material_overrides`` (P1-3 PR-D) maps a shot_id → ``{local_path,
+    material_kind}`` for an operator-UPLOADED material whose bytes are resolvable.
+    When supplied, the matching shot is rendered from those bytes instead of its
+    default asset (image used directly; video first frame extracted) and the shot
+    is reported in ``consumed_material_shot_ids``. An override that does not
+    resolve leaves the shot on its default asset and is NOT reported consumed.
+    """
     if not isinstance(task, Mapping):
         raise TomatoRealResultError("task must be a mapping")
     if sink is None or not hasattr(sink, "put"):
@@ -271,14 +338,21 @@ def run_tomato_real_result(
     scene_clip_paths: List[str] = []
     shot_facts: List[ShotRenderFact] = []
     checklist: List[Dict[str, Any]] = []
+    consumed_material_shot_ids: List[str] = []
     any_caption_burned = False
     for shot, dur in zip(shots, durations):
         image_path = os.path.join(asset_dir, shot.asset_filename)
         out_clip = os.path.join(shots_dir, f"{shot.shot_id}.mp4")
         rendered = False
+        # Default-asset existence gates whether this shot renders (keeps the
+        # rendered-shot set 1:1 with the downstream audio/subtitle alignment);
+        # the SOURCE pixels may be swapped for resolvable uploaded material bytes.
         if os.path.exists(image_path):
+            render_source, consumed = _resolve_shot_render_source(
+                shot.shot_id, image_path, material_overrides, work_dir
+            )
             res = render_shot_clip(
-                image_path, work_dir, out_clip,
+                render_source, work_dir, out_clip,
                 shot_id=shot.shot_id, duration_seconds=dur,
                 width=width, height=height, caption_text=shot.subtitle_zh,
                 focus=shot.focus, zoom=shot.zoom, fps=fps,
@@ -286,6 +360,8 @@ def run_tomato_real_result(
             rendered = res.rendered
             any_caption_burned = any_caption_burned or res.caption_burned
             scene_clip_paths.append(out_clip)
+            if rendered and consumed:
+                consumed_material_shot_ids.append(shot.shot_id)
         shot_facts.append(ShotRenderFact(
             shot_id=shot.shot_id, source=shot.source, rendered=rendered,
             real_visual=shot.real_visual and rendered,
@@ -388,6 +464,7 @@ def run_tomato_real_result(
         delivery_block=delivery_block,
         acceptance=acceptance.to_dict(),
         shot_checklist=tuple(checklist),
+        consumed_material_shot_ids=tuple(consumed_material_shot_ids),
     )
 
 
