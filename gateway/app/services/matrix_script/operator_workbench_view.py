@@ -131,6 +131,12 @@ ROLE_CANDIDATE = "candidate_preview"
 ROLE_CURRENT_MAIN = "current_main"
 _VERSION_LABEL = {VERSION_MAIN: "当前主视频", VERSION_CANDIDATE: "新预览"}
 
+# P1-2 PR-B — V2 attached-material usage copy. Honest by construction: only claim
+# the material was USED (bytes) when the renderer actually consumed it; otherwise
+# state plainly that the preview was generated from the material REFERENCE.
+MATERIAL_USAGE_CONSUMED_ZH = "已使用运营补充素材"
+MATERIAL_USAGE_REFERENCE_ZH = "已绑定运营素材引用，当前预览以素材引用标记生成。"
+
 
 def _truthy(v: Any) -> bool:
     return bool(v) and v not in ("", "false", "False", 0)
@@ -358,6 +364,34 @@ def _project_regeneration(task: Mapping[str, Any], now: datetime) -> Dict[str, A
     return {"status": status, "poll": in_progress, "blocked_reason": blocked}
 
 
+def _shot_label(shot_id: str) -> str:
+    """"shot04" -> "Shot 04" for operator display; fall back to the raw id."""
+    sid = str(shot_id)
+    if sid.startswith("shot") and sid[4:].isdigit():
+        return "Shot %02d" % int(sid[4:])
+    return sid
+
+
+def _project_based_on_assets(raw: Any) -> List[Dict[str, Any]]:
+    """Operator-safe projection of a V2 candidate's attached-material list."""
+    out: List[Dict[str, Any]] = []
+    if not isinstance(raw, (list, tuple)):
+        return out
+    for asset in raw:
+        if not isinstance(asset, Mapping):
+            continue
+        shot_id = str(asset.get("shot_id") or "")
+        kind = str(asset.get("material_kind") or "")
+        out.append({
+            "shot_id": shot_id,
+            "shot_label_zh": _shot_label(shot_id),
+            "material_name": str(asset.get("material_name") or ""),
+            "material_kind": kind,
+            "material_kind_label_zh": _MATERIAL_KIND_LABEL.get(kind, kind),
+        })
+    return out
+
+
 def _build_preview_versions(
     task: Mapping[str, Any], main_result: Mapping[str, Any]
 ) -> Dict[str, Any]:
@@ -384,6 +418,7 @@ def _build_preview_versions(
     candidate = raw_versions.get(VERSION_CANDIDATE)
     if isinstance(candidate, Mapping) and candidate.get("role") == ROLE_CANDIDATE:
         based_on = candidate.get("based_on_intents")
+        bytes_consumed = bool(candidate.get("material_bytes_consumed"))
         new_preview = {
             "version": VERSION_CANDIDATE,
             "role": ROLE_CANDIDATE,
@@ -391,6 +426,15 @@ def _build_preview_versions(
             "preview_url": candidate.get("preview_url"),
             "based_on_intents": list(based_on) if isinstance(based_on, (list, tuple)) else [],
             "source": candidate.get("source"),
+            # P1-2 PR-B: the attached material handles this V2 was regenerated
+            # from. Operator-safe labels only — never bytes, never a real
+            # pixel-replacement claim unless the renderer actually consumed bytes.
+            "based_on_assets": _project_based_on_assets(candidate.get("based_on_assets")),
+            "material_bytes_consumed": bytes_consumed,
+            "material_usage_note_zh": (
+                MATERIAL_USAGE_CONSUMED_ZH if bytes_consumed
+                else MATERIAL_USAGE_REFERENCE_ZH
+            ),
         }
         versions.append(new_preview)
 

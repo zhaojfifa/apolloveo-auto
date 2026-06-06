@@ -75,7 +75,10 @@ def _v2_candidate_payload() -> Dict[str, Any]:
 
 
 def _stub_regen(monkeypatch) -> None:
-    monkeypatch.setattr(auto, "build_matrix_script_regeneration_payload", lambda task: _v2_candidate_payload())
+    monkeypatch.setattr(
+        auto, "build_matrix_script_regeneration_payload",
+        lambda task, *, material_assets=None: _v2_candidate_payload(),
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -259,7 +262,11 @@ def test_no_leakage_in_version_projection() -> None:
     for token in owv._FORBIDDEN_TOKENS:
         assert token not in blob
     # The full candidate payload internals are not surfaced — only operator-safe fields.
-    assert set(view["new_preview"].keys()) == {"version", "role", "label_zh", "preview_url", "based_on_intents", "source"}
+    assert set(view["new_preview"].keys()) == {
+        "version", "role", "label_zh", "preview_url", "based_on_intents", "source",
+        # P1-2 PR-B adds the attached-material usage projection (operator-safe).
+        "based_on_assets", "material_bytes_consumed", "material_usage_note_zh",
+    }
 
 
 # --------------------------------------------------------------------------- #
@@ -268,7 +275,7 @@ def test_no_leakage_in_version_projection() -> None:
 
 
 def test_regeneration_failure_preserves_v1_and_shows_retry(monkeypatch) -> None:
-    def _boom(task):
+    def _boom(task, *, material_assets=None):
         raise auto.AutoPreviewValidationError("final_video_too_small")
     monkeypatch.setattr(auto, "build_matrix_script_regeneration_payload", _boom)
     repo = _Repo()

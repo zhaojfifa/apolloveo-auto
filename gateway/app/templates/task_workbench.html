@@ -489,6 +489,18 @@
                 {% if ms_overlay.new_preview.based_on_intents %}
                 <div class="muted" data-role="ms-regen-based-on">基于素材意图：{{ ms_overlay.new_preview.based_on_intents | join('、') }}</div>
                 {% endif %}
+                {% if ms_overlay.new_preview.based_on_assets %}
+                <div data-role="ms-regen-material-usage"
+                     data-material-bytes-consumed="{{ 'true' if ms_overlay.new_preview.material_bytes_consumed else 'false' }}"
+                     style="font-size:13px; color:var(--op-fg-mid,#334155);">
+                  <div data-role="ms-regen-material-usage-note">{{ ms_overlay.new_preview.material_usage_note_zh }}</div>
+                  <ul style="margin:4px 0 0 16px; padding:0;">
+                    {% for a in ms_overlay.new_preview.based_on_assets %}
+                    <li data-role="ms-regen-material-asset" data-shot-id="{{ a.shot_id }}">{{ a.shot_label_zh }}：{{ a.material_name }}（{{ a.material_kind_label_zh }}）</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                {% endif %}
                 <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
                   <button type="button" class="btn-primary" data-role="ms-regen-confirm">设为主版本</button>
                   <button type="button" class="btn-secondary" data-role="ms-regen-discard">丢弃新预览</button>

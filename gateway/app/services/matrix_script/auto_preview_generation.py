@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 import subprocess
 from datetime import datetime, timezone
-from typing import Any, Dict, Mapping
+from typing import Any, Dict, List, Mapping, Optional
 
 from gateway.app.config import get_settings
 from gateway.app.routers.matrix_script_real_trial import ArtifactStorageStagingSink
@@ -325,10 +325,90 @@ def _material_intent_shot_ids(task: Any) -> list:
     )
 
 
-def build_matrix_script_regeneration_payload(task: Mapping[str, Any]) -> Dict[str, Any]:
-    """Generate a V2 candidate preview into a version-scoped output dir."""
+def _material_attachment_assets(task: Any) -> List[Dict[str, str]]:
+    """Collect dirty shot intents that carry an attached material handle (PR-A).
+
+    Returns operator-safe asset descriptors (shot_id / material_ref /
+    material_name / material_kind) — NO bytes. Sorted by shot_id so a V2
+    regeneration records a deterministic ``based_on_assets`` list.
+    """
+    cfg = _config(task)
+    raw = cfg.get(MATERIAL_INTENT_CONFIG_KEY)
+    if not isinstance(raw, Mapping):
+        return []
+    assets: List[Dict[str, str]] = []
+    for shot_id, entry in raw.items():
+        if not isinstance(entry, Mapping):
+            continue
+        if entry.get("intent") not in _MATERIAL_DIRTY_INTENTS:
+            continue
+        material_ref = entry.get("material_ref")
+        if not material_ref:
+            continue
+        assets.append(
+            {
+                "shot_id": str(shot_id),
+                "material_ref": str(material_ref),
+                "material_name": str(entry.get("material_name") or ""),
+                "material_kind": str(entry.get("material_kind") or ""),
+            }
+        )
+    return sorted(assets, key=lambda a: a["shot_id"])
+
+
+def resolve_material_asset_bytes_path(material_ref: Any) -> Optional[str]:
+    """Resolve a material reference to a LOCAL byte path, or ``None``.
+
+    PR-A attachment handles are operator references (``asset://...``) with no
+    byte store yet, so they DO NOT resolve here. When nothing resolves, a V2
+    regeneration records the attached references and renders honest
+    reference-label markers — it never claims a real pixel replacement
+    ("真实替换画面") it did not perform. This resolver is the single seam a future
+    byte-store PR extends (alongside a renderer override) to consume real bytes;
+    extending it must not change the operator contract.
+    """
+    if not material_ref:
+        return None
+    ref = str(material_ref)
+    if ref.startswith("asset://"):
+        return None
+    # No other resolvable handle scheme is wired in this PR.
+    return None
+
+
+def _material_overrides_from_assets(
+    assets: List[Dict[str, str]]
+) -> Dict[str, str]:
+    """Per-shot {shot_id: local_path} overrides for assets that resolve to bytes.
+
+    Empty in this PR (asset:// handles never resolve) → the renderer runs
+    unchanged and the V2 candidate is annotated at the reference level only.
+    """
+    overrides: Dict[str, str] = {}
+    for asset in assets:
+        path = resolve_material_asset_bytes_path(asset.get("material_ref"))
+        if path:
+            overrides[asset["shot_id"]] = path
+    return overrides
+
+
+def build_matrix_script_regeneration_payload(
+    task: Mapping[str, Any],
+    *,
+    material_assets: Optional[List[Dict[str, str]]] = None,
+) -> Dict[str, Any]:
+    """Generate a V2 candidate preview into a version-scoped output dir.
+
+    ``material_assets`` (the attached-material handles for the dirty shots) is
+    threaded in as the narrowest plan-layer hook. When a handle resolves to local
+    bytes the resolver yields a per-shot override; in this PR no ``asset://``
+    handle resolves, so the renderer runs unchanged and V2 is annotated at the
+    reference level (see :func:`resolve_material_asset_bytes_path`).
+    """
     task_id = _task_id(task)
     task_payload = _task_mapping(task)
+    # Computed for the plan-layer hook; empty in this PR (no resolvable bytes).
+    _ = _material_overrides_from_assets(material_assets or [])
     result = run_tomato_real_result(
         task_payload,
         _resolve_version_output_dir(task_id, VERSION_CANDIDATE),
@@ -358,6 +438,13 @@ def trigger_matrix_script_preview_regeneration(task: Mapping[str, Any], repo: An
     )
     latest = repo.get(task_id) or task
     based_on = _material_intent_shot_ids(latest)
+    based_on_assets = _material_attachment_assets(latest)
+    material_overrides = _material_overrides_from_assets(based_on_assets)
+    # Honest: V2 consumes attached material BYTES only when a handle resolved to
+    # local bytes that the renderer actually used. asset:// handles never do (no
+    # byte store yet), so this stays False and the projection uses honest
+    # reference-label copy instead of claiming a real pixel replacement.
+    material_bytes_consumed = bool(material_overrides)
 
     def _fail(stage: str, error: str) -> Dict[str, Any]:
         failure = _failure_payload(
@@ -367,7 +454,7 @@ def trigger_matrix_script_preview_regeneration(task: Mapping[str, Any], repo: An
         return failure
 
     try:
-        payload = build_matrix_script_regeneration_payload(latest)
+        payload = build_matrix_script_regeneration_payload(latest, material_assets=based_on_assets)
     except FFmpegUnavailableError:
         return _fail("generation", "tomato_real_result_generation_unavailable")
     except AutoPreviewValidationError as exc:
@@ -387,6 +474,8 @@ def trigger_matrix_script_preview_regeneration(task: Mapping[str, Any], repo: An
         "created_at": _utc_now(),
         "source": SOURCE_REGENERATION,
         "based_on_intents": based_on,
+        "based_on_assets": based_on_assets,
+        "material_bytes_consumed": material_bytes_consumed,
         "payload": payload,
     }
     success = _status_payload(
