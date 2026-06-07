@@ -103,9 +103,30 @@ def _render_ms_primary_branch(overlay: Dict[str, Any]) -> str:
     )
 
 
-def test_dirty_material_renders_regenerate_action() -> None:
+def test_dirty_intent_only_guides_to_upload_not_regenerate() -> None:
+    # Observability model: a bare intent (no material yet) is intent_only and must
+    # NOT offer the regenerate trigger — it guides the operator to upload first.
     task = _task_with_v1({INTENT_KEY: {"shot04": {"intent": "supplement", "updated_at": "x"}}})
     overlay = owv.build_matrix_script_operator_workbench_view(task)
+    assert overlay["process_state"] == "intent_only"
+    html = _render_ms_primary_branch(overlay)
+    assert 'data-role="ms-regen-versioning"' in html
+    assert 'data-role="ms-regen-intent-only"' in html
+    assert 'data-role="ms-regen-trigger"' not in html
+    assert 'data-role="ms-main-video-result-video"' in html
+
+
+def test_material_ready_renders_regenerate_action() -> None:
+    # Once material is uploaded the shot is material_ready → regenerate is offered.
+    task = _task_with_v1({INTENT_KEY: {"shot04": {
+        "intent": "supplement", "updated_at": "x",
+        "material_ref": "msmaterial://matrix_script/ms-regen-1/shot04/u1",
+        "material_name": "fresh.png", "material_kind": "image",
+        "material_source": owv.MATERIAL_UPLOAD_SOURCE,
+        "storage_scope": "local_workspace", "bytes_resolvable": True,
+    }}})
+    overlay = owv.build_matrix_script_operator_workbench_view(task)
+    assert overlay["process_state"] == "material_ready"
     html = _render_ms_primary_branch(overlay)
     assert 'data-role="ms-regen-versioning"' in html
     assert 'data-role="ms-regen-trigger"' in html

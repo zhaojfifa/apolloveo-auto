@@ -114,6 +114,12 @@ material bytes):
 - P1-3 operator copy clarity (copy-only follow-up) — Workbench B区 per-shot
   decision area (`这个镜头怎么处理？` + 使用 / 补充 / 替换 buttons + upload helper);
   no behavior change. `docs/execution/MATRIX_SCRIPT_P1_3_OPERATOR_COPY_CLARITY_20260607.md`
+- Operator Process Observability (projection-only) — derived `process_state`
+  (intent_only / material_ready / generation_running / candidate_ready / failed),
+  per-shot visual-source + entered-V2 trace, A/B/C state-aware copy, and stable
+  `data-action` / `data-process-state` / `data-preview-version` DOM markers for
+  Network diagnosis. No new generation capability, no route/storage change.
+  `docs/execution/MATRIX_SCRIPT_OPERATOR_PROCESS_OBSERVABILITY_20260607.md`
 
 **Next recommended phase — production browser validation, then P2.** Prove the
 end-to-end operator flow in a real browser (upload Shot material → regenerate V2
