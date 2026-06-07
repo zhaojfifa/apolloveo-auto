@@ -220,6 +220,22 @@ NEXT_ACTION_UPLOAD_ZH = "上传/绑定素材"
 NEXT_ACTION_REGENERATE_ZH = "再次生成预览"
 NEXT_ACTION_CONFIRM_V2_ZH = "确认 V2 为主版本"
 
+# Guided Operator Workflow PR-2 (B区, Gate Spec §3.B). Operator-language copy,
+# all projection over existing signals — no new producer, no new truth.
+# R-SHOT-REASON (§3.B.2): why a shot is suggested for handling. Trigger is the
+# existing signal `source == fallback_semantic_reuse` (no real visual yet); the
+# per-shot phrase reproduces the established operator copy (was inline in the
+# template) so the operator is told WHY, not only WHAT.
+SHOT_REASON_PREFIX_ZH = "建议处理原因："
+_SHOT_REUSE_REASON_ZH = {
+    "shot04": "当前为复用素材，建议补充真实品尝素材。",
+    "shot05": "当前为复用素材，建议补充递向镜头素材。",
+}
+_SHOT_REUSE_REASON_DEFAULT_ZH = "当前为复用素材，建议补充真实素材。"
+# R-UPLOAD-HANDOFF (§3.B.2): after a shot's material is attached/uploaded but no
+# V2 candidate exists yet, the next step is visible right by the upload area.
+UPLOAD_HANDOFF_ZH = "下一步：素材已上传。请点击“再次生成预览”生成 V2。"
+
 # Per-shot observability status copy (§5 of the observability spec).
 SHOT_OBS_AWAIT_UPLOAD_ZH = "已选择处理方式，等待上传素材或选择素材来源。"
 SHOT_OBS_READY_ZH = "素材已就绪，等待再次生成预览。"
@@ -448,6 +464,14 @@ def _build_shots(has_result: bool, intents: Mapping[str, Mapping[str, Any]]) -> 
             "intent_note": str(note)[:MATERIAL_INTENT_NOTE_MAX] if note else None,
             "intent_updated_at": entry.get("updated_at"),
         }
+        # R-SHOT-REASON (PR-2 §3.B.2): reuse-source shots are suggested for
+        # handling; show WHY in operator language. Projection over `source`.
+        suggested = shot.source == PLAN_SOURCE_REUSE
+        card["suggested_for_handling"] = suggested
+        card["suggestion_reason_zh"] = (
+            SHOT_REASON_PREFIX_ZH
+            + _SHOT_REUSE_REASON_ZH.get(shot.shot_id, _SHOT_REUSE_REASON_DEFAULT_ZH)
+        ) if suggested else None
         card.update(_project_shot_attachment(entry, intent_dirty))
         cards.append(card)
     return cards
@@ -677,6 +701,11 @@ def _enrich_shot_observability(
             "next_action_zh": next_action,
             "shot_observability_status_zh": obs_status,
             "shot_adjust_outcome_zh": SHOT_ADJUST_OUTCOME_ZH if dirty else None,
+            # R-UPLOAD-HANDOFF (PR-2 §3.B.2): material attached but not yet in a V2
+            # candidate → the next step (regenerate) is shown right by the upload.
+            "upload_handoff_zh": (
+                UPLOAD_HANDOFF_ZH if (attached and not has_candidate) else None
+            ),
         })
 
 
