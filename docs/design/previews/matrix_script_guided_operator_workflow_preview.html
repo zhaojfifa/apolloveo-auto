@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matrix Script Guided Operator Workflow Preview</title>
+<!--
+  TEMPORARY STATIC PREVIEW — NOT RUNTIME, NOT AUTHORITY.
+  Purpose: human visual validation of the proposed guided operator workflow from
+  docs/design/MATRIX_SCRIPT_GUIDED_OPERATOR_WORKFLOW_PLAN_20260607.md (PR #216, OPEN).
+  This file wires NOTHING. No backend, no routes, no real data. All values are a
+  hand-authored illustrative scenario. The only script is a local collapse toggle.
+  Operator-safe copy only: no local_path / raw manifest / provider URL / publish URL /
+  Akool fields / raw process_state enum as primary copy.
+-->
+<style>
+  :root{
+    --bg:#0f1216; --panel:#171c22; --panel2:#1d242c; --line:#2a333d;
+    --ink:#e8edf2; --muted:#9aa7b4; --faint:#6c7884;
+    --emerald:#34d399; --emerald-dim:#0f3b30; --amber:#fbbf24; --amber-dim:#3a2e0c;
+    --violet:#a78bfa; --violet-dim:#2a2440; --blue:#60a5fa; --blue-dim:#15314f;
+    --red:#f87171; --pill:#222b34;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 20px 80px}
+  header.page{border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:8px}
+  header.page h1{font-size:21px;margin:0 0 4px}
+  .banner-temp{background:var(--amber-dim);border:1px solid var(--amber);color:var(--amber);
+    border-radius:8px;padding:8px 12px;font-size:13px;margin:12px 0 22px}
+  .scenario{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:12px 16px;margin-bottom:26px;font-size:13px;color:var(--muted)}
+  .scenario b{color:var(--ink)}
+  .scenario ul{margin:8px 0 0;padding-left:18px} .scenario li{margin:2px 0}
+
+  section.zone{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:0;margin:0 0 18px;overflow:hidden}
+  .zone-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .ix{font-weight:700;font-size:12px;letter-spacing:.5px;padding:3px 9px;border-radius:6px;
+    background:var(--pill);color:var(--muted)}
+  .ix.em{background:var(--emerald-dim);color:var(--emerald)}
+  .ix.am{background:var(--amber-dim);color:var(--amber)}
+  .ix.vi{background:var(--violet-dim);color:var(--violet)}
+  .ix.bl{background:var(--blue-dim);color:var(--blue)}
+  .zone-head h2{font-size:16px;margin:0;flex:1}
+  .step-tag{font-size:12px;color:var(--faint)}
+  .zone-body{padding:16px 18px}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 10px;
+    border-radius:999px;background:var(--pill);color:var(--muted)}
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .pill.live{color:var(--amber)} .pill.cand{color:var(--violet)} .pill.ok{color:var(--emerald)}
+
+  .state-card{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--amber);
+    border-radius:8px;padding:12px 14px;margin:12px 0}
+  .state-card .now{font-weight:600} .state-card .why{color:var(--muted);font-size:13px;margin-top:2px}
+  .state-card .next{color:var(--emerald);font-size:13px;margin-top:6px}
+
+  .videoframe{background:#0a0d10;border:1px solid var(--line);border-radius:8px;height:150px;
+    display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:13px;position:relative}
+  .videoframe .vbadge{position:absolute;top:8px;left:8px;font-size:11px;background:#0008;
+    border:1px solid var(--line);padding:2px 7px;border-radius:5px;color:var(--muted)}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+  .shot{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:12px 0}
+  .shot h3{margin:0 0 6px;font-size:14px}
+  .shot .qline{font-size:12px;color:var(--faint);margin-top:10px}
+  .shot .ans{font-size:13px;margin-top:2px}
+  .choices{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 2px}
+  .btn{font-size:13px;padding:6px 12px;border-radius:7px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);cursor:default}
+  .btn.sel{border-color:var(--emerald);background:var(--emerald-dim);color:var(--emerald)}
+  .btn.primary{border-color:var(--blue);color:var(--blue)}
+  .btn.warn{border-color:var(--amber);color:var(--amber)}
+  .btn.danger{border-color:var(--red);color:var(--red)}
+  .helper{font-size:12px;color:var(--muted);margin-top:6px}
+  .upload{border:1px dashed var(--line);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:13px}
+  .upload .file{color:var(--emerald)}
+  .statelabel{font-size:12px;padding:2px 8px;border-radius:6px;background:var(--pill);color:var(--muted)}
+  .statelabel.up{color:var(--emerald)} .statelabel.repl{color:var(--amber)}
+
+  details.adv{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+  details.adv>summary{cursor:pointer;padding:9px 12px;font-size:13px;color:var(--muted);list-style:none}
+  details.adv>summary::-webkit-details-marker{display:none}
+  details.adv>summary::before{content:"▸ ";color:var(--faint)}
+  details.adv[open]>summary::before{content:"▾ "}
+  details.adv .adv-body{padding:0 14px 12px;font-size:13px;color:var(--muted)}
+
+  .reason{background:var(--amber-dim);border:1px solid var(--amber);color:#f5d98a;
+    border-radius:8px;padding:8px 12px;font-size:13px;margin:8px 0 2px}
+  .reason b{color:var(--amber)}
+  .nudge{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--blue-dim);
+    border:1px solid var(--blue);color:#bcdcff;border-radius:8px;padding:9px 12px;font-size:13px;margin-top:10px}
+  .nudge a.jump{font-size:13px;padding:5px 11px;border-radius:7px;border:1px solid var(--blue);
+    color:var(--blue);text-decoration:none;background:var(--panel)}
+
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:10px 0}
+  @media(max-width:760px){.cmp{grid-template-columns:1fr}}
+  .cmp .col{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .cmp .col.v2{border-color:var(--violet)}
+  .cmp h4{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .changed{margin:10px 0 0;padding-left:0;list-style:none;font-size:13px}
+  .changed li{padding:4px 0;border-top:1px solid var(--line);color:var(--muted)}
+  .changed li b{color:var(--ink)}
+  .guard{background:var(--blue-dim);border:1px solid var(--blue);color:#bcdcff;border-radius:8px;
+    padding:10px 14px;font-size:13px;margin:12px 0}
+  .decide{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+
+  .kv{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding:7px 0;font-size:13px}
+  .kv:first-child{border-top:none}
+  .kv .k{color:var(--muted)} .kv .v{color:var(--ink)}
+  .falseflag{color:var(--faint)}
+
+  .log{font-size:13px;margin:0;padding-left:18px;color:var(--muted)}
+  .log li{margin:4px 0}
+  .note{font-size:12px;color:var(--faint);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Matrix Script · Guided Operator Workflow Preview</h1>
+  <div class="step-tag">运营引导式工作流 · 静态预览（人工判读用）</div>
+</header>
+
+<div class="banner-temp">
+  ⚠️ 临时静态预览，非运行时、非权威文档。仅用于人工判断引导流程是否清晰。不连接后端、不代表真实数据、不改动 Workbench。
+  规划来源：<code>docs/design/MATRIX_SCRIPT_GUIDED_OPERATOR_WORKFLOW_PLAN_20260607.md</code>（PR #216，未合并）。
+</div>
+
+<div class="scenario">
+  <b>本预览演示的场景</b>
+  <ul>
+    <li>V1 主视频已生成</li>
+    <li>Shot 04 需要<b>补充</b>素材，Shot 05 需要<b>替换</b>素材</li>
+    <li>Shot 04 / Shot 05 的新素材均已上传</li>
+    <li>已再次生成 V2 候选，V2 使用了运营上传的素材</li>
+    <li>V2 <b>尚未确认</b> → 交付候选仍跟随 V1</li>
+  </ul>
+</div>
+
+<!-- ============ A 区 ============ -->
+<section class="zone">
+  <div class="zone-head">
+    <span class="ix em">A</span>
+    <h2>主视频结果与流程状态</h2>
+    <span class="step-tag">步骤 1 · 看首版</span>
+  </div>
+  <div class="zone-body">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
+      <span class="pill ok"><span class="dot"></span>当前主视频：V1</span>
+      <span class="pill cand"><span class="dot"></span>新预览候选：V2（待确认）</span>
+    </div>
+
+    <div class="videoframe"><span class="vbadge">当前主视频 · V1</span>主视频预览（V1）</div>
+
+    <div class="state-card">
+      <div class="now">新预览 V2 已生成，等待你确认</div>
+      <div class="why">你上传的 Shot 04 / Shot 05 素材已被用于生成 V2 候选；当前主视频仍是 V1。</div>
+      <div class="next">下一步：到 C 区对比 V1 / V2，满意后确认主版本；不满意可丢弃或继续调整。</div>
+    </div>
+
+    <details class="adv">
+      <summary>为什么是这样生成的 · 脚本理解 / 故事理解</summary>
+      <div class="adv-body">
+        脚本被拆为 6 个镜头，按 Hook → Body → CTA 组织。此处为只读的生成背景说明，不是需要你操作的步骤。
+      </div>
+    </details>
+    <div class="note">提示：状态以运营语言呈现，按上方「下一步」操作即可。</div>
+  </div>
+</section>
+
+<!-- ============ B 区 ============ -->
+<section class="zone">
+  <div class="zone-head">
+    <span class="ix am">B</span>
+    <h2>逐镜调整与素材</h2>
+    <span class="step-tag">步骤 2–4 · 找不满意镜头 → 选择处理 → 上传素材</span>
+  </div>
+  <div class="zone-body">
+
+    <!-- Shot 04 supplement -->
+    <div class="shot">
+      <h3>Shot 04 · 吃番茄特写 <span class="statelabel up">已上传，等待再次生成预览</span></h3>
+      <div class="reason"><b>建议处理原因：</b>当前为复用素材，缺少真实品尝画面，建议补充一个吃番茄/品尝特写。</div>
+      <div class="qline">这个镜头现在用了什么？</div>
+      <div class="ans">运营上传素材（已进入 V2 新预览）</div>
+
+      <div class="qline">这个镜头怎么处理？</div>
+      <div class="choices">
+        <span class="btn">使用当前素材</span>
+        <span class="btn sel">补充这个镜头素材 ✓</span>
+        <span class="btn">替换这个镜头素材</span>
+      </div>
+      <div class="helper">已选择「补充」：在现有画面基础上补充你的素材。选择后请在下方上传素材。</div>
+
+      <div class="upload">
+        <div>上传这个镜头的新素材：<span class="file">已上传 · 04_eat_tomato.png</span></div>
+        <div class="helper">上传<b>不会</b>立刻覆盖主视频。</div>
+        <div class="nudge">
+          <span>下一步：素材已上传。请点击「再次生成预览」生成 V2。</span>
+          <a class="jump" href="#zone-c">去再次生成预览 →</a>
+        </div>
+        <div class="helper">（该跳转指向 C 区「再次生成预览」，与 C 区按钮是<b>同一个</b>再生成动作。）</div>
+      </div>
+
+      <div class="qline">调整后会发生什么？</div>
+      <div class="ans">再次生成时，这个镜头会使用你补充的素材生成新的 V2 候选；确认前不影响 V1 与交付。</div>
+
+      <details class="adv">
+        <summary>高级：绑定已有素材引用</summary>
+        <div class="adv-body">仅当你已经持有系统内的素材引用时使用。普通运营请直接「上传素材」，无需在此填写任何引用串。</div>
+      </details>
+    </div>
+
+    <!-- Shot 05 replace -->
+    <div class="shot">
+      <h3>Shot 05 · 沙滩远景 <span class="statelabel repl">已上传，等待再次生成预览</span></h3>
+      <div class="reason"><b>建议处理原因：</b>当前为复用素材，缺少递向镜头，建议替换为递向/展示动作素材。</div>
+      <div class="qline">这个镜头现在用了什么？</div>
+      <div class="ans">运营上传素材（已进入 V2 新预览）</div>
+
+      <div class="qline">这个镜头怎么处理？</div>
+      <div class="choices">
+        <span class="btn">使用当前素材</span>
+        <span class="btn">补充这个镜头素材</span>
+        <span class="btn sel">替换这个镜头素材 ✓</span>
+      </div>
+      <div class="helper">已选择「替换」：用你的素材整体替换这个镜头的画面。选择后请在下方上传素材。</div>
+
+      <div class="upload">
+        <div>上传这个镜头的新素材：<span class="file">已上传 · 05_beach_wide.mp4</span></div>
+        <div class="helper">上传<b>不会</b>立刻覆盖主视频。</div>
+        <div class="nudge">
+          <span>下一步：素材已上传。请点击「再次生成预览」生成 V2。</span>
+          <a class="jump" href="#zone-c">去再次生成预览 →</a>
+        </div>
+        <div class="helper">（该跳转指向 C 区「再次生成预览」，与 C 区按钮是<b>同一个</b>再生成动作。）</div>
+      </div>
+
+      <div class="qline">调整后会发生什么？</div>
+      <div class="ans">再次生成时，这个镜头的画面会被替换为你上传的素材；确认前不影响 V1 与交付。</div>
+
+      <details class="adv">
+        <summary>高级：绑定已有素材引用</summary>
+        <div class="adv-body">仅当你已经持有系统内的素材引用时使用。普通运营请直接「上传素材」。</div>
+      </details>
+    </div>
+
+    <div class="note">注：主路径只有三个选择（使用 / 补充 / 替换）+ 上传；「绑定已有素材引用」为次要折叠项，不作为主输入。</div>
+  </div>
+</section>
+
+<!-- ============ C 区 ============ -->
+<section class="zone" id="zone-c">
+  <div class="zone-head">
+    <span class="ix bl">C</span>
+    <h2>生成与对比：再次生成 → V1 / V2 对比 → 确认 / 丢弃</h2>
+    <span class="step-tag">步骤 5–6 · 最关键</span>
+  </div>
+  <div class="zone-body">
+
+    <div style="margin-bottom:10px">
+      <span class="btn warn">再次生成预览</span>
+      <span class="helper" style="margin-left:8px">已请求再次生成；V2 候选已生成完成。再次生成<b>不会</b>覆盖当前主视频 V1。</span>
+    </div>
+
+    <div class="cmp">
+      <div class="col">
+        <h4><span class="pill ok"><span class="dot"></span>V1</span> 当前主版本</h4>
+        <div class="videoframe"><span class="vbadge">V1</span>主视频（V1）</div>
+        <div class="helper" style="margin-top:8px">这是目前交付候选所跟随的版本。</div>
+      </div>
+      <div class="col v2">
+        <h4><span class="pill cand"><span class="dot"></span>V2</span> 新预览候选（未确认）</h4>
+        <div class="videoframe"><span class="vbadge">V2 · 候选</span>新预览（V2）</div>
+        <div class="helper" style="margin-top:8px">V2 使用了哪些上传素材：</div>
+        <ul class="changed">
+          <li><b>Shot 04</b> 补充素材 · 运营上传素材（04_eat_tomato.png）</li>
+          <li><b>Shot 05</b> 替换素材 · 运营上传素材（05_beach_wide.mp4）</li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="margin-top:6px">
+      <div class="helper" style="margin-bottom:4px">相比 V1，发生变化的镜头：</div>
+      <ul class="changed">
+        <li><b>Shot 04</b> 画面已用补充素材重新生成</li>
+        <li><b>Shot 05</b> 画面已用替换素材重新生成</li>
+        <li>其余镜头与 V1 一致</li>
+      </ul>
+    </div>
+
+    <div class="guard">🔒 V2 在你<b>确认</b>之前不会成为主版本，也不会影响交付候选。交付始终跟随已确认的主版本。</div>
+
+    <div class="decide">
+      <span class="btn primary">确认 V2 为主版本</span>
+      <span class="btn danger">丢弃 V2</span>
+      <span class="btn">继续调整</span>
+    </div>
+    <div class="helper">确认后：V2 成为当前主视频，交付候选切换到 V2，镜头调整意图清空。丢弃后：保留 V1，移除候选。</div>
+  </div>
+</section>
+
+<!-- ============ D 区 ============ -->
+<section class="zone">
+  <div class="zone-head">
+    <span class="ix">D</span>
+    <h2>交付候选</h2>
+    <span class="step-tag">步骤 7 · 终点</span>
+  </div>
+  <div class="zone-body">
+    <div class="kv"><span class="k">当前交付候选</span><span class="v">主视频 V1</span></div>
+    <div class="kv"><span class="k">V2 确认后</span><span class="v">交付候选才会切换到 V2</span></div>
+    <div class="kv"><span class="k">正式交付就绪</span><span class="v falseflag">否</span></div>
+    <div class="helper" style="margin-top:10px">
+      交付候选只跟随<b>已确认</b>的主版本。当前 V2 尚未确认，因此交付仍是 V1。完整成片与下载在交付页面，本面板不内嵌外部链接。
+    </div>
+  </div>
+</section>
+
+<!-- ============ E 区 ============ -->
+<section class="zone">
+  <div class="zone-head">
+    <span class="ix vi">E</span>
+    <h2>进阶 / 诊断（默认折叠）</h2>
+    <span class="step-tag">非主路径</span>
+  </div>
+  <div class="zone-body">
+
+    <details class="adv">
+      <summary>视频变体</summary>
+      <div class="adv-body">在主版本确认后，可在此基于已确认主视频生成不同时长 / 渠道的变体。属于进阶能力，不在主流程内。</div>
+    </details>
+
+    <details class="adv">
+      <summary>脚本理解 / 故事理解</summary>
+      <div class="adv-body">脚本结构、分镜与节奏的只读说明，作为生成背景上下文，按需展开。</div>
+    </details>
+
+    <details class="adv">
+      <summary>过程记录 / 技术诊断</summary>
+      <div class="adv-body">
+        运营可读的处理记录（不含技术细节）：
+        <ul class="log">
+          <li>已记录处理方式：Shot 04 补充素材</li>
+          <li>已记录处理方式：Shot 05 替换素材</li>
+          <li>上传成功：Shot 04 · 04_eat_tomato.png</li>
+          <li>上传成功：Shot 05 · 05_beach_wide.mp4</li>
+          <li>已请求再次生成预览</li>
+          <li>V2 新预览已生成（使用运营上传素材）</li>
+          <li>当前等待：对比 V1 / V2 并确认主版本</li>
+        </ul>
+        <div class="note">过程记录为运营安全文案，不含 local_path / 原始 manifest / provider URL / 发布 URL / Akool 字段。
+          原始技术字段属于 J · 技术诊断（架构视图），此处不展开。</div>
+      </div>
+    </details>
+
+  </div>
+</section>
+
+<div class="note" style="margin-top:24px">
+  本页为静态预览，所有按钮与状态均为示意，不触发任何请求。判读重点：主流程是否一目了然、A→B→C→D 是否构成一条线、
+  「绑定引用」是否明显次要、V1/V2 对比与「确认前不影响交付」是否清晰、过程记录是否运营安全。
+</div>
+
+</div>
+</body>
+</html>
