@@ -837,6 +837,18 @@ def build_matrix_script_operator_workbench_view(
     process_narration = _build_process_narration(
         process_state, version_view, main_result
     )
+    # Guided Operator Workflow PR-3 (C区 §3.C): which shots changed vs V1 (entered
+    # the V2 candidate). Pure projection over the per-shot entered_v2_candidate
+    # truth (#215 / PR-2) — no new producer, only populated when a candidate exists.
+    candidate_changed_shots = (
+        [
+            {"shot_id": s["shot_id"], "shot_label_zh": s.get("title") or s["shot_id"]}
+            for s in shots
+            if s.get("entered_v2_candidate")
+        ]
+        if version_view.get("has_candidate_preview")
+        else []
+    )
     generation_facts = _build_generation_facts(
         main_result, shots, version_view, missing_material_count
     )
@@ -869,6 +881,8 @@ def build_matrix_script_operator_workbench_view(
         # (当前主视频 / 当前状态 / 下一步). Projection only; raw process_state stays
         # a diagnosis-only data attribute, never primary operator copy.
         "process_narration": process_narration,
+        # PR-3 §3.C: changed-shot list for the V1/V2 compare pivot (projection only).
+        "candidate_changed_shots": candidate_changed_shots,
         "generation_facts": generation_facts,
         "missing_material_count": missing_material_count,
         "regenerate_endpoint": "/api/matrix-script/{task_id}/regenerate-preview",

@@ -522,6 +522,11 @@
                data-regen-poll="{{ 'true' if ms_overlay.regeneration.poll else 'false' }}"
                data-has-candidate="{{ 'true' if ms_overlay.has_candidate_preview else 'false' }}"
                style="margin-top:12px; padding:12px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:10px;">
+            {# Guided Operator Workflow PR-3 (Gate Spec §3.C): name the
+               regenerate → compare → confirm pivot. Presentation only — reuses the
+               existing regen lifecycle, candidate, and confirm/discard actions. #}
+            <div data-role="ms-compare-confirm-pivot-title"
+                 style="font-weight:600; margin-bottom:8px; color:var(--op-fg-mid,#334155);">生成与对比：V1 / V2</div>
             {% if ms_overlay.regeneration.poll %}
               <div data-role="ms-regen-running" data-preview-version="V2" style="font-size:14px; color:var(--op-fg-mid,#334155);">
                 <strong>正在生成 V2 新预览</strong>
@@ -529,7 +534,11 @@
               </div>
             {% elif ms_overlay.new_preview %}
               <div data-role="ms-regen-candidate" data-preview-version="{{ ms_overlay.new_preview.version }}" style="display:grid; gap:10px;">
-                <strong style="font-size:14px; color:var(--op-fg-mid,#334155);">{{ ms_overlay.new_preview.label_zh }}（{{ ms_overlay.new_preview.version }}） · 待运营确认</strong>
+                {# PR-3 §3.C: V1 reference paired with the V2 candidate so the two
+                   versions are visually distinct within the pivot. #}
+                <div data-role="ms-compare-current-main" data-preview-version="V1"
+                     style="font-size:13px; color:var(--op-fg-soft,#64748b);">当前主版本：V1（确认前保持为当前主视频）</div>
+                <strong data-role="ms-compare-candidate-label" data-preview-version="{{ ms_overlay.new_preview.version }}" style="font-size:14px; color:var(--op-fg-mid,#334155);">新预览候选：{{ ms_overlay.new_preview.label_zh }}（{{ ms_overlay.new_preview.version }}） · 候选 · 待运营确认</strong>
                 <video controls preload="metadata" src="{{ ms_overlay.new_preview.preview_url }}"
                        data-role="ms-regen-candidate-video"
                        style="width:100%; aspect-ratio:9/16; max-height:480px; border-radius:10px; background:#0f172a;"></video>
@@ -555,6 +564,22 @@
                   {% endif %}
                 </div>
                 {% endif %}
+                {# PR-3 §3.C: which shots changed vs V1 (entered the V2 candidate).
+                   Projected from candidate_changed_shots (reuses existing truth). #}
+                {% if ms_overlay.candidate_changed_shots %}
+                <div data-role="ms-compare-changed-shots" style="font-size:13px; color:var(--op-fg-mid,#334155);">
+                  哪些镜头发生了变化：
+                  <ul style="margin:4px 0 0 16px; padding:0;">
+                    {% for c in ms_overlay.candidate_changed_shots %}
+                    <li data-role="ms-compare-changed-shot" data-shot-id="{{ c.shot_id }}">{{ c.shot_label_zh }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+                {% endif %}
+                {# PR-3 §3.C: explicit delivery-truth guard. Confirm/discard/regen
+                   behavior and delivery truth are unchanged — this only states it. #}
+                <div data-role="ms-compare-delivery-guard"
+                     style="font-size:13px; color:var(--op-fg-mid,#b45309); font-weight:600;">V2 未确认前不会影响交付。</div>
                 <div class="task-actions" style="display:flex; flex-wrap:wrap; gap:8px;">
                   <button type="button" class="btn-primary" data-role="ms-regen-confirm">设为主版本</button>
                   <button type="button" class="btn-secondary" data-role="ms-regen-discard">丢弃新预览</button>
