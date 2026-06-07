@@ -129,6 +129,8 @@
   .upload .file{color:var(--emerald)}
   .ro{font-size:13px;color:var(--muted)}
   .ro b{color:var(--ink)}
+  .statusline{display:inline-block;margin-top:8px;font-size:12px;padding:3px 10px;border-radius:6px;
+    background:#241c12;color:#c79a52;border:1px solid #3a2e0c}
   details.adv{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
   details.adv>summary{cursor:pointer;padding:9px 12px;font-size:13px;color:var(--muted);list-style:none}
   details.adv>summary::-webkit-details-marker{display:none}
@@ -153,6 +155,9 @@
   .batchbar .bexpl{font-size:13px;color:#f5d98a}
   .selset{font-size:12px;color:var(--muted);margin:4px 0 12px}
   .selset b{color:var(--ink)}
+  .v2state{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--violet);
+    border-radius:8px;padding:10px 14px;margin:8px 0 4px;font-size:13px;color:var(--muted)}
+  .v2state>div{padding:3px 0} .v2state b{color:var(--ink)}
 
   /* ---- compare ---- */
   .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:10px 0}
@@ -310,10 +315,10 @@
         <div class="slot future">
           <div class="sname">配音槽<code>voiceover_slot</code></div>
           <div class="sbody">
-            <span class="sclass fut">后续工作流（尚不可用）</span>
-            <div class="ro" style="margin-top:6px">配音：<b>后续工作流</b> · 当前本线无可用配音动作</div>
-            <div class="choices"><span class="btn disabled">编辑配音（暂不可用）</span></div>
-            <div class="helper">不作为可编辑槽位呈现；待真实后台动作落地并通过 Gate Spec 后再开放。</div>
+            <span class="sclass fut">后续工作流 · 暂不可编辑</span>
+            <div class="ro" style="margin-top:6px">配音：<b>后续工作流</b> · 本线暂无配音工作流，当前不可编辑</div>
+            <div class="statusline">状态：后续工作流（暂不可编辑）—— 无可点操作</div>
+            <div class="helper">仅以状态呈现，不提供任何按钮；待真实后台动作落地并通过 Gate Spec 后再开放为可编辑槽位。</div>
           </div>
         </div>
 
@@ -321,10 +326,10 @@
         <div class="slot future">
           <div class="sname">背景音乐槽<code>bgm_slot</code></div>
           <div class="sbody">
-            <span class="sclass fut">后续工作流（尚不可用）</span>
-            <div class="ro" style="margin-top:6px">背景音乐：<b>后续工作流</b> · 当前本线无可用 BGM 动作</div>
-            <div class="choices"><span class="btn disabled">编辑背景音乐（暂不可用）</span></div>
-            <div class="helper">不作为可编辑槽位呈现；待真实后台动作落地并通过 Gate Spec 后再开放。</div>
+            <span class="sclass fut">后续工作流 · 暂不可编辑</span>
+            <div class="ro" style="margin-top:6px">背景音乐：<b>后续工作流</b> · 本线暂无 BGM 工作流，当前不可编辑</div>
+            <div class="statusline">状态：后续工作流（暂不可编辑）—— 无可点操作</div>
+            <div class="helper">仅以状态呈现，不提供任何按钮；待真实后台动作落地并通过 Gate Spec 后再开放为可编辑槽位。</div>
           </div>
         </div>
       </div>
@@ -356,10 +361,15 @@
     <!-- 5) Batch Regenerate Entry -->
     <div class="slabel">⑤ 批量再次生成入口（在选定镜头改动之后一次性生成，而非每张卡片各自再生成）</div>
     <div class="batchbar">
-      <span class="bbtn">已选择 3 个镜头调整，生成 V2 预览</span>
-      <span class="bexpl">再次生成在你处理完选定镜头<b>之后</b>统一触发；它不会覆盖当前主视频 V1。</span>
+      <span class="bbtn">已选择 3 个镜头调整，生成 / 更新 V2 预览</span>
+      <span class="bexpl">在你处理完选定镜头<b>之后</b>统一触发一次再次生成。</span>
     </div>
-    <div class="selset">本次将进入 V2 的镜头：<b>Shot 04（补充）</b> · <b>Shot 05（替换）</b> · <b>Shot 06（替换）</b>。其余镜头保持不变。</div>
+    <div class="v2state">
+      <div>① 已有一版 <b>V2 候选</b>（先前已把 Shot 03 的上传素材生成进 V2）。</div>
+      <div>② 本次「生成 / 更新 V2 预览」会在<b>同一个 V2 候选</b>上，把这 3 个镜头一起更新进去——不是另开一版，是更新当前候选。</div>
+      <div>③ 当前主视频<b>始终是 V1</b>；只有你在下方<b>明确「确认 V2 为主版本」</b>，V2 才会成为主视频。确认前 V1 不变、交付不变。</div>
+    </div>
+    <div class="selset">本次将更新进 V2 的镜头：<b>Shot 04（补充）</b> · <b>Shot 05（替换）</b> · <b>Shot 06（替换）</b>。其余镜头保持不变。</div>
 
     <div class="cmp">
       <div class="col">
@@ -368,13 +378,13 @@
         <div class="helper" style="margin-top:8px">这是目前交付候选所跟随的版本。</div>
       </div>
       <div class="col v2">
-        <h4><span class="pill cand"><span class="dot"></span>V2</span> 新预览候选（未确认）</h4>
+        <h4><span class="pill cand"><span class="dot"></span>V2</span> 新预览候选（未确认 · 始终是候选）</h4>
         <div class="videoframe"><span class="vbadge">V2 · 候选</span>新预览（V2）</div>
-        <div class="helper" style="margin-top:8px">V2 使用了哪些上传素材：</div>
+        <div class="helper" style="margin-top:8px">这一版 V2 候选包含 / 即将包含的上传素材：</div>
         <ul class="changed">
-          <li><b>Shot 03</b> · 已进入当前 V2（运营上传素材）</li>
-          <li><b>Shot 04</b> 补充 · 待下一次再次生成进入 V2</li>
-          <li><b>Shot 05 / 06</b> 替换 · 待下一次再次生成进入 V2</li>
+          <li><b>Shot 03</b> · 已生成进当前 V2 候选（运营上传素材）</li>
+          <li><b>Shot 04</b> 补充 · 本次再次生成时更新进同一 V2 候选</li>
+          <li><b>Shot 05 / 06</b> 替换 · 本次再次生成时更新进同一 V2 候选</li>
         </ul>
       </div>
     </div>

@@ -4,6 +4,11 @@ Status: **OPERATOR REVIEW REPORT — docs-only. Not authority, not implementatio
 Harness X S3→S4 gate artifact (role: Operator Reviewer; reads the static preview +
 screenshot only, **does not read code**). The verdict is the gate.
 
+> **Round 2 (post-revision) verdict: PASS.** Round 1 was PASS WITH ISSUES (C-1, C-2).
+> The Owner approved a Preview-only revision; both issues are resolved. The Round-2
+> fast re-review is recorded in §10. The Round-1 detail (§1–§9) is preserved below as
+> the audit trail.
+
 Inputs reviewed:
 - Preview: `docs/design/previews/matrix_script_slot_workflow_v2_preview.html`
 - Screenshot: `docs/design/screenshots/matrix_script_slot_workflow_v2_preview_20260607.png`
@@ -121,6 +126,53 @@ directly as binding copy rules in the Gate Spec amendment scope.
 - docs-only; reads preview + screenshot only; no code read; no runtime, template,
   service, test, schema, contract, or Gate Spec change.
 - Not authority; does not authorize implementation; does not advance any signoff.
+
+---
+
+## 10. Round 2 — Fast Re-Review (2026-06-07, post C-1/C-2 Preview revision)
+
+The Owner approved a **Preview-only** revision (no model change, no Gate Spec, no
+runtime). The two Round-1 issues were addressed in
+`docs/design/previews/matrix_script_slot_workflow_v2_preview.html`; the screenshot was
+regenerated. This is the fast re-review of the revised preview.
+
+### Changes verified
+
+- **C-1 (V1/V2 dual-state copy):** C区 now carries an explicit three-line
+  explanation above the compare: ① an existing V2 candidate already holds Shot 03; ②
+  "生成 / 更新 V2 预览" updates the **same** V2 candidate with the selected shots (not a
+  new version); ③ the current main is **始终是 V1** until an explicit "确认 V2 为主版本",
+  with V1 and delivery unchanged before confirm. The V2 compare column copy and the
+  batch button/selected-set lines were aligned to the "update the same candidate"
+  framing. The guard line ("V2 确认前不影响交付") is retained.
+- **C-2 (future slots):** the disabled buttons on `voiceover_slot` and `bgm_slot` were
+  removed. Both now render as pure status lines ("状态：后续工作流（暂不可编辑）—— 无可点
+  操作") with a "后续工作流 · 暂不可编辑" badge and no clickable control — read as future
+  workflow / not editable, not as a disabled action.
+
+### Re-review checklist (Round 2)
+
+| Item | Verdict |
+|------|---------|
+| C-1 V2 dual-state copy | **PASS** — existing-candidate / update-same-candidate / V1-stays-main-until-confirm now explicit |
+| C-2 future slots no longer misleading | **PASS** — pure status lines, no buttons, no advertised capability |
+| 10-shot scalability | **PASS** — queue unchanged; 10 shots scannable in one screen |
+| one-shot focus | **PASS** — single active Current Shot Work Panel (Shot 04) |
+| slot classification | **PASS** — visual active; text/subtitle display-only; voiceover/bgm future status-only |
+| assignment clarity | **PASS** — Assignment remains the only operator-mutated object |
+| batch regenerate clarity | **PASS** — single central "生成 / 更新 V2 预览"; after selected changes, not per-card |
+| V1/V2 semantics | **PASS** — V1 current main; V2 candidate; confirm-gated promotion |
+| delivery truth preservation | **PASS** — delivery follows confirmed main; 正式交付就绪：否; diagnostics collapsed |
+
+No model-level failure found; the revision is copy/presentation only.
+
+### Round 2 verdict
+
+**PASS.** Both Round-1 issues resolved; the v2 model is validated and the preview is
+operator-comprehensible at 10+ shots. Recommended next transition: **S4 → S5 — author
+the Gate Spec amendment / new Gate Spec** (Owner-gated).
+
+---
 
 *This is a Harness X Operator Review (S4 gate artifact). The verdict is the gate; the
 Owner decides the next transition.*
