@@ -326,9 +326,16 @@
              data-process-state="{{ ms_overlay.process_state }}"
              data-redesign-wave="2026-05-28-pr2a">
           {% if ms_overlay.process_state %}
-          <div class="muted" data-role="ms-process-state-banner"
-               data-process-state="{{ ms_overlay.process_state }}" style="margin-bottom:6px;">
-            生成流程状态：{{ ms_overlay.process_state_label_zh }}
+          {# Guided Operator Workflow PR-1 (Gate Spec §3.A): A区 state narration in
+             operator language — 当前主视频 / 当前状态 / 下一步. The raw process_state
+             enum stays a diagnosis-only data attribute, never primary copy. #}
+          <div class="op-process-narration" data-role="ms-process-state-banner"
+               data-process-state="{{ ms_overlay.process_state }}" style="margin-bottom:8px;">
+            {% if ms_overlay.process_narration.current_main_version %}
+            <div class="muted" data-role="ms-process-current-main">当前主视频：<span data-bind="current_main_version">{{ ms_overlay.process_narration.current_main_version }}</span></div>
+            {% endif %}
+            <div class="muted" data-role="ms-process-status">当前状态：<span data-bind="status_zh">{{ ms_overlay.process_narration.status_zh }}</span></div>
+            <div class="muted" data-role="ms-process-next-step">下一步：<span data-bind="next_step_zh">{{ ms_overlay.process_narration.next_step_zh }}</span></div>
           </div>
           {% endif %}
           <div class="op-section-head">

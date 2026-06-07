@@ -169,6 +169,34 @@ _PROCESS_STATE_LABEL = {
     PROCESS_FAILED: "生成失败，请重试",
 }
 
+# Guided Operator Workflow PR-1 (A区 state narration). Per Gate Spec §3.A the A区
+# state must read in operator language as 当前主视频 / 当前状态(现状) / 下一步.
+# These two maps are the normative 现状 + 下一步 columns of the §3.A table,
+# projected over the SAME derived process_state — no new truth, no new producer.
+# The short 当前状态 vocabulary matches the operator list in the PR-1 brief
+# (稳定 / 已记录调整意图 / 素材已就绪 / 正在生成 V2 / V2 待确认 / 生成失败).
+_PROCESS_STATE_STATUS_ZH = {
+    PROCESS_NOT_GENERATED: "未生成",
+    PROCESS_STABLE: "稳定",
+    PROCESS_INTENT_ONLY: "已记录调整意图",
+    PROCESS_MATERIAL_READY: "素材已就绪",
+    PROCESS_GENERATION_RUNNING: "正在生成 V2",
+    PROCESS_CANDIDATE_READY: "V2 待确认",
+    PROCESS_FAILED: "生成失败",
+}
+# 下一步 is phrased as a zone-agnostic operator action so it stays correct in the
+# CURRENT layout (regenerate lives in the main-video area, upload in the material
+# area); the future C区 re-order (PR-3/PR-4) does not change these action words.
+_PROCESS_STATE_NEXT_STEP_ZH = {
+    PROCESS_NOT_GENERATED: "确认素材与配乐后，生成主视频预览",
+    PROCESS_STABLE: "检查镜头，或进入交付",
+    PROCESS_INTENT_ONLY: "先上传这个镜头的素材",
+    PROCESS_MATERIAL_READY: "返回主视频区，点击“再次生成预览”",
+    PROCESS_GENERATION_RUNNING: "稍候，本页会自动更新；不影响当前主视频",
+    PROCESS_CANDIDATE_READY: "对比 V1 / V2，确认主版本或丢弃",
+    PROCESS_FAILED: "当前主视频未受影响，可点击“再次生成预览”重试",
+}
+
 # Per-shot visual source — where the pixels in the current main video came from.
 VISUAL_SOURCE_ORIGINAL = "original_generated"
 VISUAL_SOURCE_UPLOAD = "operator_upload"
@@ -677,6 +705,30 @@ def _derive_process_state(
     return PROCESS_NOT_GENERATED
 
 
+def _build_process_narration(
+    process_state: str,
+    version_view: Mapping[str, Any],
+    main_result: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """A区 operator-language state narration (Gate Spec §3.A, PR-1).
+
+    Projects the derived process_state into three operator-safe fields —
+    当前主视频 (version) / 当前状态 (现状) / 下一步 — with no raw enum, no backend
+    field, no new truth. ``current_main_version`` is None before any preview
+    exists so the template omits the 主视频 line rather than asserting a version.
+    """
+    has_preview = bool(main_result.get("preview_url"))
+    current_version = version_view.get("current_main_version") if has_preview else None
+    return {
+        "current_main_version": current_version,
+        "current_main_version_label_zh": (
+            _VERSION_LABEL.get(current_version, "") if current_version else ""
+        ),
+        "status_zh": _PROCESS_STATE_STATUS_ZH[process_state],
+        "next_step_zh": _PROCESS_STATE_NEXT_STEP_ZH[process_state],
+    }
+
+
 def _build_generation_facts(
     main_result: Mapping[str, Any],
     shots: List[Dict[str, Any]],
@@ -753,6 +805,9 @@ def build_matrix_script_operator_workbench_view(
     process_state = _derive_process_state(
         main_result, shots, regeneration, version_view
     )
+    process_narration = _build_process_narration(
+        process_state, version_view, main_result
+    )
     generation_facts = _build_generation_facts(
         main_result, shots, version_view, missing_material_count
     )
@@ -781,6 +836,10 @@ def build_matrix_script_operator_workbench_view(
         # current-main generation facts + missing-material count. Projection only.
         "process_state": process_state,
         "process_state_label_zh": _PROCESS_STATE_LABEL[process_state],
+        # Guided Operator Workflow PR-1: A区 operator-language state narration
+        # (当前主视频 / 当前状态 / 下一步). Projection only; raw process_state stays
+        # a diagnosis-only data attribute, never primary operator copy.
+        "process_narration": process_narration,
         "generation_facts": generation_facts,
         "missing_material_count": missing_material_count,
         "regenerate_endpoint": "/api/matrix-script/{task_id}/regenerate-preview",
