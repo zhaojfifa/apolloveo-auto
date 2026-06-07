@@ -121,6 +121,14 @@ material bytes):
   Network diagnosis. No new generation capability, no route/storage change.
   `docs/execution/MATRIX_SCRIPT_OPERATOR_PROCESS_OBSERVABILITY_20260607.md`
 
+**Guided Operator Workflow Planning Review (planning input only, not authority)** —
+operator-lens re-planning of the Workbench over the #211–#215 substrate: capability
+inventory, mainline (7-step procedure), advanced/diagnostics fold, A/B/C/D/E
+re-order proposal, operator-language state vocabulary, per-button expectations,
+diagnosable-but-non-leaking Network/action-log split, and a gate-spec-first 6-PR
+slicing proposal. **Proposal only — does not supersede Bucket A, authorizes no code,
+opens no wave.** `docs/design/MATRIX_SCRIPT_GUIDED_OPERATOR_WORKFLOW_PLAN_20260607.md`
+
 **Next recommended phase — production browser validation, then P2.** Prove the
 end-to-end operator flow in a real browser (upload Shot material → regenerate V2
 from uploaded bytes → confirm V2 → delivery follows V2, with honest usage copy
