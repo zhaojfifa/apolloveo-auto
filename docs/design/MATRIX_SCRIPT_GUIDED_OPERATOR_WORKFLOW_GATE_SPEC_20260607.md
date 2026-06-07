@@ -316,8 +316,8 @@ These are byte-stable across every slice and are re-audited at Closeout:
 
 | Role | Name | Date | Verdict |
 |------|------|------|---------|
-| Architect | `<fill>` | `<fill>` | `<fill>` |
-| Reviewer | `<fill>` | `<fill>` | `<fill>` |
+| Architect | Owner-authorized (Harness X) | 2026-06-07 | APPROVED — S5→S6 for PR-1 only |
+| Reviewer | Harness X Code Review (S6→S7) | 2026-06-07 | READY TO MERGE (PR-1) |
 | Operations Coordinator | `<fill>` | `<fill>` | binds Closeout (PR-6) |
 | Product Manager | `<fill>` | `<fill>` | binds Closeout (PR-6) |
 
@@ -325,6 +325,27 @@ Architect + Reviewer signoff merged to `main` **opens the implementation gate fo
 PR-1 only**. Coordinator + PM bind the Closeout acceptance audit (§6, PR-6), not
 gate opening. This spec authorizes no code; the first allowed action after signoff
 is PR-1 per §5.
+
+### §10 signoff reconciliation (2026-06-07, docs-only)
+
+This block was filled retroactively to reconcile paperwork after PR-1 had already
+completed the Harness X S6→S7→S8→S9 gates. The binding facts of record:
+
+- The **Owner authorized the S5→S6 transition for PR-1 only** (A区 state narration
+  + next-step guidance, §3.A). This was an explicit Owner decision; the Architect +
+  Reviewer rows above record that authorization and the in-run Code Review verdict.
+- **PR-1 has now reached S9 and is merged as
+  [#220](https://github.com/zhaojfifa/apolloveo-auto/pull/220)** (squash/merge to
+  `main`). Developer Report PASS, Code Review READY TO MERGE, Operator Trial PASS,
+  Owner merge approval granted.
+- **PR-2 through PR-6 remain CLOSED** until each is separately authorized by the
+  Owner, in order, per §5. Filling this block does **not** open PR-2; the §5
+  ordering still requires each slice's own Owner go.
+- This reconciliation is **docs-only**: it does **not** modify runtime, does **not**
+  change generation / storage / routes / schemas / contracts / `artifact_storage.py`
+  / providers / Akool / Hot Follow / Digital Anchor, and does **not** authorize any
+  new implementation slice. The Coordinator + Product Manager rows stay `<fill>`
+  because they bind the future Closeout (PR-6), which has not occurred.
 
 ---
 
