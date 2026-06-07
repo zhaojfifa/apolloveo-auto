@@ -18,6 +18,8 @@
   - verification、business regression、operator/developer runbooks
 - `docs/skills/`
   - skills 相关规范与目录说明
+- `docs/process/`
+  - 协同流程 / 角色协议设计（如 Harness X role engineering design）；流程协议文档，非 runtime authority
 - `docs/archive/`
   - 历史/legacy 文档
 
