@@ -206,8 +206,8 @@ slice's S5→S6 is its own Owner-gated (L3) decision. No bundling.
 
 | Role | Name | Date | Verdict |
 |------|------|------|---------|
-| Architect | `<fill>` | `<fill>` | opens S5→S6 for PR-1 only |
-| Reviewer | `<fill>` | `<fill>` | READY TO MERGE (gate spec) |
+| Architect | Owner-authorized (Harness X) | 2026-06-07 | APPROVED — gate-opening for PR-1 only (subject to a separate S5→S6 go) |
+| Reviewer | Harness X Code Review (S6→S7) | 2026-06-07 | READY TO MERGE (gate spec) |
 | Operations Coordinator | `<fill>` | `<fill>` | binds Closeout (PR-4) |
 | Product Manager | `<fill>` | `<fill>` | binds Closeout (PR-4) |
 
@@ -215,6 +215,26 @@ Architect + Reviewer signoff merged to `main` **opens the implementation gate fo
 only**. Coordinator + PM bind the Closeout audit (§10, PR-4). This spec authorizes no
 code; the first allowed action after signoff is PR-1 per §11. Opening each subsequent
 slice is its own Owner-gated S5→S6 (L3) decision.
+
+### §12 signoff reconciliation (2026-06-07, docs-only)
+
+The Owner authorized this gate-opening signoff PR (Architect + Reviewer rows filled
+above). Binding facts of record:
+
+- The **Owner authorized the gate-opening §12 signoff** for the ffmpeg backbone gate —
+  the Architect + Reviewer rows record that Harness X authorization, mirroring the Guided
+  Operator Workflow §10 precedent committed in #221.
+- **Per the Owner's explicit stricter posture, merging this signoff does NOT auto-start
+  PR-1.** Even with the gate "open," **ffmpeg backbone PR-1 may begin only after a
+  separate, explicit Owner S5→S6 (L3) approval.** This signoff prepares the gate-opening
+  paperwork; it does not itself start runtime.
+- **Coordinator + Product Manager rows remain `<fill>`** because they bind the future
+  Closeout (PR-4), not gate opening.
+- This reconciliation is **docs-only**: it changes no runtime, no `gateway/**`, no
+  services / templates / tests, no provider adapter, no generative provider integration,
+  no credentialed call, no schemas / contracts, no vendor UI, and authorizes no
+  implementation slice. The first allowed runtime action remains PR-1, gated on a
+  separate Owner S5→S6 go.
 
 ---
 
