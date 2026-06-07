@@ -155,7 +155,7 @@ def test_view_projects_dirty_shot_status() -> None:
     by_id = {s["shot_id"]: s for s in view["shots"]}
     assert by_id[_SHOT_04]["intent"] == "supplement"
     assert by_id[_SHOT_04]["intent_dirty"] is True
-    assert by_id[_SHOT_04]["intent_label_zh"] == "已标记补素材"
+    assert by_id[_SHOT_04]["intent_label_zh"] == "已标记补充素材"
     # Untouched shots remain non-dirty / keep.
     assert by_id[_SHOT_05]["intent"] == "keep"
     assert by_id[_SHOT_05]["intent_dirty"] is False
@@ -196,7 +196,7 @@ def test_workbench_renders_dirty_state_a_and_b() -> None:
     # A区 dirty banner + B区 dirty summary + per-shot intent state.
     assert "素材已更新，需要再次生成预览" in html
     assert 'data-role="ms-primary-material-dirty-summary"' in html
-    assert "已标记补素材" in html
+    assert "已标记补充素材" in html
     # Current main video (V1) still rendered via the staged preview, not overwritten.
     assert 'data-role="ms-main-video-result-video"' in html
     assert "/tomato-real-result/preview/final.mp4" in html

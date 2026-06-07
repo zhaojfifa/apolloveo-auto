@@ -5,7 +5,7 @@ reference (an existing asset handle / operator language). Binding is a HANDLE
 only: regeneration does NOT consume it yet (PR-B). Binding makes/keeps the shot
 dirty ("已绑定，等待再次生成预览") but must NOT overwrite the current main video
 (V1), create or overwrite a V2 candidate, change the delivery candidate, or flip
-official_publish_ready. Missing attachment on a dirty shot shows 待补素材.
+official_publish_ready. Missing attachment on a dirty shot shows 待上传素材.
 
 Boundary: Matrix-Script-scoped only — no upload/R2 binary, no Akool live, no
 Hot Follow / Digital Anchor / artifact_storage / schema-contract surface.
@@ -174,7 +174,7 @@ def test_attach_validates(monkeypatch) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# 3 + 4. Projection + render: B区 shows attachment / 待补素材.
+# 3 + 4. Projection + render: B区 shows attachment / 待上传素材.
 # --------------------------------------------------------------------------- #
 
 
@@ -203,7 +203,7 @@ def test_view_dirty_unattached_shows_pending() -> None:
     view = owv.build_matrix_script_operator_workbench_view(task)
     by_id = {s["shot_id"]: s for s in view["shots"]}
     assert by_id[_SHOT_05]["material_attached"] is False
-    assert by_id[_SHOT_05]["material_status_zh"] == "待补素材"
+    assert by_id[_SHOT_05]["material_status_zh"] == "待上传素材"
 
 
 def _render_ms_primary_branch(overlay: Dict[str, Any]) -> str:
@@ -255,7 +255,7 @@ def test_workbench_b_zone_shows_pending_for_unattached_dirty() -> None:
     task = _ms_task({**_v1_staged(), INTENT_KEY: {_SHOT_05: {"intent": "replace", "updated_at": "x"}}})
     overlay = owv.build_matrix_script_operator_workbench_view(task)
     html = _render_ms_primary_branch(overlay)
-    assert "待补素材" in html
+    assert "待上传素材" in html
 
 
 # --------------------------------------------------------------------------- #

@@ -762,9 +762,9 @@
                   {% if s.material_attached %}
                     已绑定素材 · 素材名称：{{ s.material_name }} · 素材类型：{{ s.material_kind_label_zh }} · 来源：{{ s.material_source_label_zh }} · 状态：{{ s.material_status_zh }}
                   {% elif s.intent_dirty %}
-                    {{ s.material_status_zh or "待补素材" }}
+                    {{ s.material_status_zh or "待上传素材" }}
                   {% else %}
-                    待补素材
+                    待上传素材
                   {% endif %}
                 </span>
                 {% if s.material_attached %}
@@ -777,19 +777,28 @@
                   {% endif %}
                 {% endif %}
               </span>
-              <div class="task-actions" data-role="ms-primary-shot-intent-actions" style="margin-top:8px; display:flex; flex-wrap:wrap; gap:6px;">
-                <button type="button" class="btn-secondary"
-                        data-role="ms-primary-shot-intent-replace"
-                        data-shot-id="{{ s.shot_id }}" data-intent="replace"
-                        {% if s.intent == 'replace' %}aria-pressed="true"{% endif %}>标记替换素材</button>
-                <button type="button" class="btn-secondary"
-                        data-role="ms-primary-shot-intent-supplement"
-                        data-shot-id="{{ s.shot_id }}" data-intent="supplement"
-                        {% if s.intent == 'supplement' %}aria-pressed="true"{% endif %}>标记补素材</button>
-                <button type="button" class="btn-secondary"
-                        data-role="ms-primary-shot-intent-keep"
-                        data-shot-id="{{ s.shot_id }}" data-intent="keep"
-                        {% if s.intent == 'keep' %}aria-pressed="true"{% endif %}>保持当前素材</button>
+              <div data-role="ms-primary-shot-decision" style="margin-top:10px;">
+                <div data-role="ms-primary-shot-decision-title" style="font-weight:600; margin-bottom:6px;">这个镜头怎么处理？</div>
+                <div class="task-actions" data-role="ms-primary-shot-intent-actions" style="display:flex; flex-wrap:wrap; gap:6px;">
+                  <button type="button" class="btn-secondary"
+                          data-role="ms-primary-shot-intent-keep"
+                          data-shot-id="{{ s.shot_id }}" data-intent="keep"
+                          {% if s.intent == 'keep' %}aria-pressed="true"{% endif %}>使用当前素材</button>
+                  <button type="button" class="btn-secondary"
+                          data-role="ms-primary-shot-intent-supplement"
+                          data-shot-id="{{ s.shot_id }}" data-intent="supplement"
+                          {% if s.intent == 'supplement' %}aria-pressed="true"{% endif %}>补充这个镜头素材</button>
+                  <button type="button" class="btn-secondary"
+                          data-role="ms-primary-shot-intent-replace"
+                          data-shot-id="{{ s.shot_id }}" data-intent="replace"
+                          {% if s.intent == 'replace' %}aria-pressed="true"{% endif %}>替换这个镜头素材</button>
+                </div>
+                <div data-role="ms-primary-shot-decision-helper"
+                     style="margin-top:6px; font-size:12px; color:var(--op-fg-soft,#64748b); display:grid; gap:4px;">
+                  <span>使用当前素材：当前画面可用，不需要替换。</span>
+                  <span>补充这个镜头素材：当前画面基本可用，但还需要补一个更合适的细节或补充镜头。</span>
+                  <span>替换这个镜头素材：当前画面不合适，用上传的新素材替换这个镜头。</span>
+                </div>
               </div>
               <details data-role="ms-primary-shot-material-attach" data-shot-id="{{ s.shot_id }}" style="margin-top:8px;">
                 <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-soft,#64748b);">绑定补充素材（运营素材引用）</summary>
@@ -811,7 +820,7 @@
                 </div>
               </details>
               <details data-role="ms-primary-shot-material-upload" data-shot-id="{{ s.shot_id }}" style="margin-top:6px;">
-                <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-soft,#64748b);">上传素材文件（运营上传素材）</summary>
+                <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-soft,#64748b);">上传这个镜头的新素材</summary>
                 <div data-role="ms-primary-shot-material-upload-form"
                      style="display:grid; gap:6px; margin-top:6px; max-width:420px;">
                   <input type="file" data-role="ms-upload-material-file" accept="image/*,video/*"
@@ -825,7 +834,7 @@
                   <button type="button" class="btn-secondary"
                           data-role="ms-primary-shot-material-upload-submit"
                           data-shot-id="{{ s.shot_id }}">上传素材</button>
-                  <span class="muted" style="font-size:12px;">上传后该镜头标记为“已上传，等待再次生成预览”。上传仅入库，不会自动生成或发布。</span>
+                  <span class="muted" data-role="ms-primary-shot-material-upload-helper" style="font-size:12px;">支持图片 / 视频。上传后不会立刻覆盖主视频，需要回到主视频区点击“再次生成预览”。</span>
                 </div>
               </details>
             </div>

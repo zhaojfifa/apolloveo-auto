@@ -350,9 +350,16 @@ def test_material_delivery_and_folded_sections_render(source: str) -> None:
     assert html.count('data-role="ms-primary-shot-intent-replace"') == 5
     assert html.count('data-role="ms-primary-shot-intent-supplement"') == 5
     assert html.count('data-role="ms-primary-shot-intent-keep"') == 5
-    assert "标记替换素材" in html
-    assert "标记补素材" in html
-    assert "保持当前素材" in html
+    # Operator copy clarity: a per-shot decision area with operator-language labels.
+    assert html.count('data-role="ms-primary-shot-decision-title"') == 5
+    assert "这个镜头怎么处理？" in html
+    assert "使用当前素材" in html
+    assert "补充这个镜头素材" in html
+    assert "替换这个镜头素材" in html
+    assert "上传这个镜头的新素材" in html
+    # Old confusing primary button labels are gone.
+    assert "标记补素材" not in html
+    assert "保持当前素材" not in html
     assert "素材来源：真实素材" in html
     assert "素材来源：复用素材" in html
     assert "语义状态：通过" in html

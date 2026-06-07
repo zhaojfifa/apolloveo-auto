@@ -92,7 +92,7 @@ MATERIAL_DIRTY_INTENTS = (MATERIAL_INTENT_REPLACE, MATERIAL_INTENT_SUPPLEMENT)
 MATERIAL_INTENT_NOTE_MAX = 280
 _MATERIAL_INTENT_LABEL = {
     MATERIAL_INTENT_REPLACE: "已标记替换素材",
-    MATERIAL_INTENT_SUPPLEMENT: "已标记补素材",
+    MATERIAL_INTENT_SUPPLEMENT: "已标记补充素材",
     MATERIAL_INTENT_KEEP: "使用当前素材",
 }
 # Operator-authored free text — excluded from the engineering leakage scan
@@ -124,7 +124,7 @@ _MATERIAL_SOURCE_LABEL = {
 }
 MATERIAL_ATTACHED_STATUS_ZH = "已绑定，等待再次生成预览"
 MATERIAL_UPLOADED_STATUS_ZH = "已上传，等待再次生成预览"
-MATERIAL_UNATTACHED_STATUS_ZH = "待补素材"
+MATERIAL_UNATTACHED_STATUS_ZH = "待上传素材"
 
 # P1 PR-2 — regenerate preview versioning (V1 current main vs V2 candidate).
 PREVIEW_VERSIONS_KEY = "matrix_script_preview_versions"
@@ -284,7 +284,7 @@ def _project_shot_attachment(
     regeneration loop does not consume this yet — it is shown so the operator
     can confirm what is bound before the next ``再次生成预览``. When nothing is
     bound but the shot is dirty (replace/supplement), the operator still needs
-    material → 待补素材.
+    material → 待上传素材.
     """
     material_ref = entry.get("material_ref")
     material_name = entry.get("material_name")
