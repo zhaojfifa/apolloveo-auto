@@ -89,6 +89,14 @@
   details.adv[open]>summary::before{content:"▾ "}
   details.adv .adv-body{padding:0 14px 12px;font-size:13px;color:var(--muted)}
 
+  .reason{background:var(--amber-dim);border:1px solid var(--amber);color:#f5d98a;
+    border-radius:8px;padding:8px 12px;font-size:13px;margin:8px 0 2px}
+  .reason b{color:var(--amber)}
+  .nudge{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--blue-dim);
+    border:1px solid var(--blue);color:#bcdcff;border-radius:8px;padding:9px 12px;font-size:13px;margin-top:10px}
+  .nudge a.jump{font-size:13px;padding:5px 11px;border-radius:7px;border:1px solid var(--blue);
+    color:var(--blue);text-decoration:none;background:var(--panel)}
+
   .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:10px 0}
   @media(max-width:760px){.cmp{grid-template-columns:1fr}}
   .cmp .col{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
@@ -162,7 +170,7 @@
         脚本被拆为 6 个镜头，按 Hook → Body → CTA 组织。此处为只读的生成背景说明，不是需要你操作的步骤。
       </div>
     </details>
-    <div class="note">注：流程状态以运营语言呈现，不显示原始 process_state 枚举值。</div>
+    <div class="note">提示：状态以运营语言呈现，按上方「下一步」操作即可。</div>
   </div>
 </section>
 
@@ -178,6 +186,7 @@
     <!-- Shot 04 supplement -->
     <div class="shot">
       <h3>Shot 04 · 吃番茄特写 <span class="statelabel up">已上传，等待再次生成预览</span></h3>
+      <div class="reason"><b>建议处理原因：</b>当前为复用素材，缺少真实品尝画面，建议补充一个吃番茄/品尝特写。</div>
       <div class="qline">这个镜头现在用了什么？</div>
       <div class="ans">运营上传素材（已进入 V2 新预览）</div>
 
@@ -191,7 +200,12 @@
 
       <div class="upload">
         <div>上传这个镜头的新素材：<span class="file">已上传 · 04_eat_tomato.png</span></div>
-        <div class="helper">上传<b>不会</b>立刻覆盖主视频；需回到 A/C 区点击「再次生成预览」后才会体现到新候选。</div>
+        <div class="helper">上传<b>不会</b>立刻覆盖主视频。</div>
+        <div class="nudge">
+          <span>下一步：素材已上传。请点击「再次生成预览」生成 V2。</span>
+          <a class="jump" href="#zone-c">去再次生成预览 →</a>
+        </div>
+        <div class="helper">（该跳转指向 C 区「再次生成预览」，与 C 区按钮是<b>同一个</b>再生成动作。）</div>
       </div>
 
       <div class="qline">调整后会发生什么？</div>
@@ -206,6 +220,7 @@
     <!-- Shot 05 replace -->
     <div class="shot">
       <h3>Shot 05 · 沙滩远景 <span class="statelabel repl">已上传，等待再次生成预览</span></h3>
+      <div class="reason"><b>建议处理原因：</b>当前为复用素材，缺少递向镜头，建议替换为递向/展示动作素材。</div>
       <div class="qline">这个镜头现在用了什么？</div>
       <div class="ans">运营上传素材（已进入 V2 新预览）</div>
 
@@ -219,7 +234,12 @@
 
       <div class="upload">
         <div>上传这个镜头的新素材：<span class="file">已上传 · 05_beach_wide.mp4</span></div>
-        <div class="helper">上传<b>不会</b>立刻覆盖主视频；需点击「再次生成预览」后才会体现到新候选。</div>
+        <div class="helper">上传<b>不会</b>立刻覆盖主视频。</div>
+        <div class="nudge">
+          <span>下一步：素材已上传。请点击「再次生成预览」生成 V2。</span>
+          <a class="jump" href="#zone-c">去再次生成预览 →</a>
+        </div>
+        <div class="helper">（该跳转指向 C 区「再次生成预览」，与 C 区按钮是<b>同一个</b>再生成动作。）</div>
       </div>
 
       <div class="qline">调整后会发生什么？</div>
@@ -236,7 +256,7 @@
 </section>
 
 <!-- ============ C 区 ============ -->
-<section class="zone">
+<section class="zone" id="zone-c">
   <div class="zone-head">
     <span class="ix bl">C</span>
     <h2>生成与对比：再次生成 → V1 / V2 对比 → 确认 / 丢弃</h2>
@@ -296,7 +316,7 @@
   <div class="zone-body">
     <div class="kv"><span class="k">当前交付候选</span><span class="v">主视频 V1</span></div>
     <div class="kv"><span class="k">V2 确认后</span><span class="v">交付候选才会切换到 V2</span></div>
-    <div class="kv"><span class="k">正式交付就绪</span><span class="v falseflag">否（official_publish_ready=false）</span></div>
+    <div class="kv"><span class="k">正式交付就绪</span><span class="v falseflag">否</span></div>
     <div class="helper" style="margin-top:10px">
       交付候选只跟随<b>已确认</b>的主版本。当前 V2 尚未确认，因此交付仍是 V1。完整成片与下载在交付页面，本面板不内嵌外部链接。
     </div>
