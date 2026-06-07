@@ -1096,7 +1096,10 @@
             <p class="op-section-helper" data-role="ms-primary-delivery-candidate"
                data-current-main-version="{{ ms_overlay.current_main_version | default('V1', true) }}">当前交付候选：主视频 {{ ms_overlay.current_main_version | default('V1', true) }}。</p>
             <p class="op-section-helper" data-role="ms-primary-delivery-follows-main">交付候选只跟随已确认的当前主版本；V2 新预览在确认为主版本前不会进入交付。</p>
-            <p class="op-section-helper" data-role="ms-primary-delivery-publish-ready">official_publish_ready=false；正式交付就绪：false。</p>
+            {# PR-4 §3.D R-DELIVERY-WORDING: primary D区 shows operator wording only.
+               The raw official_publish_ready field is not surfaced here (it stays
+               diagnostics-only); official_publish_ready remains false unchanged. #}
+            <p class="op-section-helper" data-role="ms-primary-delivery-publish-ready">正式交付就绪：否。</p>
             <div class="task-actions" style="margin-top:8px;">
               <a class="btn-primary" data-role="ms-primary-delivery-cta" href="/tasks/{{ task.task_id }}/publish">前往交付页</a>
             </div>

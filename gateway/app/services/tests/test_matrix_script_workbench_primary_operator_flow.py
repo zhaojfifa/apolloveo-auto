@@ -373,7 +373,8 @@ def test_material_delivery_and_folded_sections_render(source: str) -> None:
     assert "字幕" in html
     assert "旁白" in html
     assert "当前交付候选：主视频 V1" in html
-    assert "official_publish_ready=false" in html
+    # PR-4 §3.D R-DELIVERY-WORDING: primary D区 shows operator wording only.
+    assert "正式交付就绪：否" in html
     assert 'data-role="ms-primary-delivery-cta"' in html
     assert 'data-role="ms-primary-video-variants-fold"' in html
     assert 'data-role="ms-primary-script-story-fold"' in html

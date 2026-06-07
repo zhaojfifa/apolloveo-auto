@@ -193,7 +193,11 @@ def test_c_delivery_candidate_follows_confirmed_main_only() -> None:
     assert "当前交付候选：主视频 V1。" in c  # §8.10 not switched to V2
     assert "主视频 V2" not in c
     assert "V2 新预览在确认为主版本前不会进入交付" in c
-    assert "official_publish_ready=false" in c
+    # PR-4 §3.D R-DELIVERY-WORDING: primary D区 shows operator wording only, not the
+    # raw official_publish_ready field. Underlying truth still asserted below.
+    assert "正式交付就绪：否" in c
+    assert "official_publish_ready=false" not in c
+    assert view["delivery"]["official_publish_ready"] is False
 
 
 # --------------------------------------------------------------------------- #
