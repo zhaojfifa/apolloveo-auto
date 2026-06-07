@@ -78,3 +78,9 @@ standard discipline.
   proposal, operator-language state vocabulary, per-button expectations,
   diagnosable-but-non-leaking Network/action-log split, and a gate-spec-first 6-PR
   slicing proposal. Proposal only.
+- `docs/design/previews/matrix_script_guided_operator_workflow_preview.html` —
+  temporary static preview (2026-06-07) for human validation of the guided workflow
+  above; screenshot at
+  `docs/design/screenshots/matrix_script_guided_operator_workflow_preview_20260607.png`.
+  Static HTML/CSS only, no runtime wiring; values are an illustrative scenario.
+  Validation artifact only — not runtime, not authority, does not supersede Bucket A.
