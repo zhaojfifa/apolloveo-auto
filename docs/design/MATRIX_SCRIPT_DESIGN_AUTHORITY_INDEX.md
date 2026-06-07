@@ -84,3 +84,18 @@ standard discipline.
   `docs/design/screenshots/matrix_script_guided_operator_workflow_preview_20260607.png`.
   Static HTML/CSS only, no runtime wiring; values are an illustrative scenario.
   Validation artifact only — not runtime, not authority, does not supersede Bucket A.
+
+## Accepted Implementation Gate (governs UI only; NOT Bucket A)
+
+This is an accepted gate spec that governs future Matrix Script Guided Operator
+Workflow **UI implementation only**. It is derived from the Planning / Review
+Inputs above and freezes them into enforceable engineering rules. It **does not
+supersede Bucket A**, does not define a new IA, and does not authorize any backend
+generation / storage / provider / schema / contract change. Code begins only after
+its §10 architect + reviewer signoff merges, one slice at a time.
+
+- `docs/design/MATRIX_SCRIPT_GUIDED_OPERATOR_WORKFLOW_GATE_SPEC_20260607.md` — Guided
+  Operator Workflow Gate Spec (2026-06-07). Binding-and-exhaustive zone rules
+  (A/B/C/D/E + J), forbidden scope, six-PR slicing (PR-1..PR-6), and acceptance
+  rows A-1..A-15. Implementation gate for the five operator zones + Matrix Script
+  tests only.

@@ -129,6 +129,15 @@ diagnosable-but-non-leaking Network/action-log split, and a gate-spec-first 6-PR
 slicing proposal. **Proposal only — does not supersede Bucket A, authorizes no code,
 opens no wave.** `docs/design/MATRIX_SCRIPT_GUIDED_OPERATOR_WORKFLOW_PLAN_20260607.md`
 
+**Guided Operator Workflow Gate Spec (accepted implementation gate, UI only)** —
+freezes the #216 planning + #217 preview into enforceable engineering rules:
+binding zone rules A/B/C/D/E + J, forbidden scope, six-PR slicing (PR-1..PR-6), and
+acceptance rows A-1..A-15. **Governs future Matrix Script Guided Operator Workflow
+UI implementation only; implements nothing; does not supersede Bucket A; does not
+authorize backend/storage/provider/schema/contract change. Code begins only after
+its §10 architect + reviewer signoff merges, one slice at a time.**
+`docs/design/MATRIX_SCRIPT_GUIDED_OPERATOR_WORKFLOW_GATE_SPEC_20260607.md`
+
 **Next recommended phase — production browser validation, then P2.** Prove the
 end-to-end operator flow in a real browser (upload Shot material → regenerate V2
 from uploaded bytes → confirm V2 → delivery follows V2, with honest usage copy
