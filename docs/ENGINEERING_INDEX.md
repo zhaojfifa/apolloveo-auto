@@ -111,6 +111,9 @@ material bytes):
   consumed an uploaded file; honest copy otherwise.
 - P1-3 closure: `docs/execution/MATRIX_SCRIPT_P1_3_MATERIAL_BYTES_CLOSURE_20260606.md`
   (state note: `docs/execution/MATRIX_SCRIPT_P1_2_STATE_AND_P1_3_FOCUS_20260606.md`).
+- P1-3 operator copy clarity (copy-only follow-up) — Workbench B区 per-shot
+  decision area (`这个镜头怎么处理？` + 使用 / 补充 / 替换 buttons + upload helper);
+  no behavior change. `docs/execution/MATRIX_SCRIPT_P1_3_OPERATOR_COPY_CLARITY_20260607.md`
 
 **Next recommended phase — production browser validation, then P2.** Prove the
 end-to-end operator flow in a real browser (upload Shot material → regenerate V2
