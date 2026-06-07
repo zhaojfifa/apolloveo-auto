@@ -146,6 +146,71 @@ MATERIAL_USAGE_REFERENCE_ZH = "已绑定运营素材引用，当前预览以素�
 # the uploaded material. Distinct from the generic consumed copy above.
 MATERIAL_USAGE_UPLOAD_CONSUMED_ZH = "已使用运营上传素材生成新预览"
 
+# ---- Operator Process Observability (this PR) ------------------------------ #
+# A single derived, operator-safe process state for the whole Matrix Script
+# generation flow. It is a PROJECTION over already-existing facts (intents,
+# attachments, regeneration lifecycle, candidate version) — it adds no new
+# truth, no storage, no route behaviour. Drives A区 copy + the data-process-state
+# DOM marker so operations can read "where in the process am I" at a glance.
+PROCESS_NOT_GENERATED = "not_generated"
+PROCESS_STABLE = "stable"
+PROCESS_INTENT_ONLY = "intent_only"
+PROCESS_MATERIAL_READY = "material_ready"
+PROCESS_GENERATION_RUNNING = "generation_running"
+PROCESS_CANDIDATE_READY = "candidate_ready"
+PROCESS_FAILED = "failed"
+_PROCESS_STATE_LABEL = {
+    PROCESS_NOT_GENERATED: "未生成",
+    PROCESS_STABLE: "当前主视频可用，无待生成的素材变更",
+    PROCESS_INTENT_ONLY: "已记录素材调整意图，待上传/绑定素材",
+    PROCESS_MATERIAL_READY: "素材已就绪，待再次生成预览",
+    PROCESS_GENERATION_RUNNING: "正在生成新预览",
+    PROCESS_CANDIDATE_READY: "V2 新预览待运营确认",
+    PROCESS_FAILED: "生成失败，请重试",
+}
+
+# Per-shot visual source — where the pixels in the current main video came from.
+VISUAL_SOURCE_ORIGINAL = "original_generated"
+VISUAL_SOURCE_UPLOAD = "operator_upload"
+VISUAL_SOURCE_ATTACHMENT = "operator_attachment_ref"
+VISUAL_SOURCE_REUSE = "semantic_reuse"
+VISUAL_SOURCE_FALLBACK = "fallback_placeholder"
+_VISUAL_SOURCE_LABEL = {
+    VISUAL_SOURCE_ORIGINAL: "原始生成素材",
+    VISUAL_SOURCE_UPLOAD: "运营上传素材",
+    VISUAL_SOURCE_ATTACHMENT: "运营绑定素材引用",
+    VISUAL_SOURCE_REUSE: "复用素材",
+    VISUAL_SOURCE_FALLBACK: "降级占位素材",
+}
+# Plan-level source values from the fixed shot plan.
+PLAN_SOURCE_REAL = "local_real_asset"
+PLAN_SOURCE_REUSE = "fallback_semantic_reuse"
+
+# Per-shot next-available-action (operator language only).
+NEXT_ACTION_NONE_ZH = "无需操作"
+NEXT_ACTION_UPLOAD_ZH = "上传/绑定素材"
+NEXT_ACTION_REGENERATE_ZH = "再次生成预览"
+NEXT_ACTION_CONFIRM_V2_ZH = "确认 V2 为主版本"
+
+# Per-shot observability status copy (§5 of the observability spec).
+SHOT_OBS_AWAIT_UPLOAD_ZH = "已选择处理方式，等待上传素材或选择素材来源。"
+SHOT_OBS_READY_ZH = "素材已就绪，等待再次生成预览。"
+SHOT_OBS_ENTERED_V2_ZH = "已进入 V2 新预览。"
+SHOT_OBS_UPLOADED_NOT_CONSUMED_ZH = "已上传，但尚未进入新预览。"
+SHOT_ADJUST_OUTCOME_ZH = "上传素材后，再回到主视频区点击“再次生成预览”。"
+
+# A区 process-state copy (§4 of the observability spec).
+A_STABLE_TITLE_ZH = "当前没有需要再生成的素材变更"
+A_STABLE_BODY_ZH = "可继续检查素材或进入交付。"
+A_INTENT_ONLY_TITLE_ZH = "已记录素材调整意图"
+A_INTENT_ONLY_BODY_ZH = "请先上传/绑定素材，或选择 AI 生成素材后，再生成预览。"
+A_MATERIAL_READY_TITLE_ZH = "素材已就绪，需要再次生成预览"
+A_MATERIAL_READY_BODY_ZH = "返回主视频区点击“再次生成预览”，新预览为候选版本，确认后才会成为当前主视频。"
+
+# Current-main generation source labels (§3A).
+GEN_SOURCE_INITIAL_ZH = "首版预览"
+GEN_SOURCE_REGENERATED_ZH = "再生成预览"
+
 
 def _truthy(v: Any) -> bool:
     return bool(v) and v not in ("", "false", "False", 0)
@@ -511,6 +576,137 @@ def _build_preview_versions(
     }
 
 
+def _derive_visual_source(card: Mapping[str, Any]) -> str:
+    """Where the current pixels for this shot come from (operator-safe)."""
+    if card.get("material_attached"):
+        if card.get("material_source") == MATERIAL_UPLOAD_SOURCE:
+            return VISUAL_SOURCE_UPLOAD
+        return VISUAL_SOURCE_ATTACHMENT
+    src = str(card.get("source") or "")
+    if src == PLAN_SOURCE_REAL:
+        return VISUAL_SOURCE_ORIGINAL
+    if src == PLAN_SOURCE_REUSE:
+        return VISUAL_SOURCE_REUSE
+    return VISUAL_SOURCE_FALLBACK
+
+
+def _enrich_shot_observability(
+    shots: List[Dict[str, Any]],
+    version_view: Mapping[str, Any],
+) -> None:
+    """Second pass: annotate each shot card with process-observability fields.
+
+    Cross-references the V2 candidate so each shot can state whether its material
+    entered the candidate and whether bytes were actually consumed. Pure
+    projection — mutates the already-built cards in place, adds no new truth.
+    """
+    new_preview = version_view.get("new_preview") or {}
+    has_candidate = bool(version_view.get("has_candidate_preview"))
+    consumed_ids = {
+        str(m.get("shot_id"))
+        for m in (new_preview.get("consumed_materials") or [])
+        if isinstance(m, Mapping) and m.get("shot_id")
+    }
+    based_on_ids = {
+        str(a.get("shot_id"))
+        for a in (new_preview.get("based_on_assets") or [])
+        if isinstance(a, Mapping) and a.get("shot_id")
+    }
+    for card in shots:
+        shot_id = str(card.get("shot_id"))
+        attached = bool(card.get("material_attached"))
+        dirty = bool(card.get("intent_dirty"))
+        entered_v2 = shot_id in consumed_ids or shot_id in based_on_ids
+        bytes_for_shot = shot_id in consumed_ids
+        visual_source = _derive_visual_source(card)
+
+        if has_candidate:
+            next_action = NEXT_ACTION_CONFIRM_V2_ZH
+        elif not dirty:
+            next_action = NEXT_ACTION_NONE_ZH
+        elif not attached:
+            next_action = NEXT_ACTION_UPLOAD_ZH
+        else:
+            next_action = NEXT_ACTION_REGENERATE_ZH
+
+        if entered_v2:
+            obs_status = SHOT_OBS_ENTERED_V2_ZH
+        elif attached and has_candidate:
+            obs_status = SHOT_OBS_UPLOADED_NOT_CONSUMED_ZH
+        elif attached:
+            obs_status = SHOT_OBS_READY_ZH
+        elif dirty:
+            obs_status = SHOT_OBS_AWAIT_UPLOAD_ZH
+        else:
+            obs_status = None
+
+        card.update({
+            "visual_source": visual_source,
+            "visual_source_label_zh": _VISUAL_SOURCE_LABEL[visual_source],
+            "entered_current_main": bool(card.get("included_in_current_video")),
+            "entered_v2_candidate": entered_v2,
+            "bytes_consumed_for_shot": bytes_for_shot,
+            "next_action_zh": next_action,
+            "shot_observability_status_zh": obs_status,
+            "shot_adjust_outcome_zh": SHOT_ADJUST_OUTCOME_ZH if dirty else None,
+        })
+
+
+def _derive_process_state(
+    main_result: Mapping[str, Any],
+    shots: List[Dict[str, Any]],
+    regeneration: Mapping[str, Any],
+    version_view: Mapping[str, Any],
+) -> str:
+    """Single operator-safe process state for the whole generation flow."""
+    main_status = str(main_result.get("status") or "")
+    regen_status = str(regeneration.get("status") or "")
+    if main_result.get("poll") or regeneration.get("poll"):
+        return PROCESS_GENERATION_RUNNING
+    if main_status in _FAILURE_STATUSES or regen_status in _FAILURE_STATUSES:
+        return PROCESS_FAILED
+    if version_view.get("has_candidate_preview"):
+        return PROCESS_CANDIDATE_READY
+    dirty = [s for s in shots if s.get("intent_dirty")]
+    if dirty:
+        if any(s.get("material_attached") for s in dirty):
+            return PROCESS_MATERIAL_READY
+        return PROCESS_INTENT_ONLY
+    if main_result.get("operator_usable") or main_result.get("preview_url"):
+        return PROCESS_STABLE
+    return PROCESS_NOT_GENERATED
+
+
+def _build_generation_facts(
+    main_result: Mapping[str, Any],
+    shots: List[Dict[str, Any]],
+    version_view: Mapping[str, Any],
+    missing_material_count: int,
+) -> Dict[str, Any]:
+    """Operator-safe input/generation facts for the current main (V1/V2)."""
+    current_version = version_view.get("current_main_version")
+    has_preview = bool(main_result.get("preview_url"))
+    current_main: Optional[Dict[str, Any]] = None
+    if has_preview:
+        source_label = (
+            GEN_SOURCE_REGENERATED_ZH
+            if current_version == VERSION_CANDIDATE
+            else GEN_SOURCE_INITIAL_ZH
+        )
+        current_main = {
+            "version": current_version or VERSION_MAIN,
+            "version_label_zh": _VERSION_LABEL.get(
+                current_version or VERSION_MAIN, _VERSION_LABEL[VERSION_MAIN]
+            ),
+            "source_label_zh": source_label,
+            "shot_match_count": int(main_result.get("shot_match_count", 0) or 0),
+            "real_visual_count": int(main_result.get("real_visual_count", 0) or 0),
+            "missing_material_count": int(missing_material_count),
+            "official_publish_ready": False,
+        }
+    return {"current_main": current_main, "candidate": version_view.get("new_preview")}
+
+
 def _assert_clean(view: Mapping[str, Any]) -> None:
     # Scan the projection's own fields; operator free-text notes are excluded so
     # operator prose can never crash the Workbench render.
@@ -546,6 +742,20 @@ def build_matrix_script_operator_workbench_view(
     dirty_shots = [s["shot_id"] for s in shots if s["intent_dirty"]]
     material_changed = bool(dirty_shots)
     version_view = _build_preview_versions(task, main_result)
+    regeneration = _project_regeneration(task, clock)
+    # Process observability (this PR): enrich shots with per-shot trace fields,
+    # then derive the single flow-level process state + current-main facts.
+    _enrich_shot_observability(shots, version_view)
+    missing_material_count = sum(
+        1 for s in shots
+        if not s.get("material_attached") and s.get("source") == PLAN_SOURCE_REUSE
+    )
+    process_state = _derive_process_state(
+        main_result, shots, regeneration, version_view
+    )
+    generation_facts = _build_generation_facts(
+        main_result, shots, version_view, missing_material_count
+    )
     view: Dict[str, Any] = {
         "is_matrix_script": True,
         "has_pr_a_result": has_result,
@@ -566,7 +776,13 @@ def build_matrix_script_operator_workbench_view(
         # P1 PR-2: regenerate preview versioning. The current main (V1) is the
         # staged candidate; a V2 candidate (if any) is shown alongside without
         # replacing V1 until confirmed.
-        "regeneration": _project_regeneration(task, clock),
+        "regeneration": regeneration,
+        # Process observability (this PR): operator-safe derived process state +
+        # current-main generation facts + missing-material count. Projection only.
+        "process_state": process_state,
+        "process_state_label_zh": _PROCESS_STATE_LABEL[process_state],
+        "generation_facts": generation_facts,
+        "missing_material_count": missing_material_count,
         "regenerate_endpoint": "/api/matrix-script/{task_id}/regenerate-preview",
         "preview_version_confirm_endpoint": "/api/matrix-script/{task_id}/preview-version/confirm",
         "preview_version_discard_endpoint": "/api/matrix-script/{task_id}/preview-version/discard",

@@ -193,8 +193,11 @@ def test_workbench_renders_dirty_state_a_and_b() -> None:
     task = _ms_task({**_success_staged(), INTENT_KEY: {_SHOT_04: {"intent": "supplement", "updated_at": "x"}}})
     overlay = owv.build_matrix_script_operator_workbench_view(task)
     html = _render_ms_primary_branch(overlay)
-    # A区 dirty banner + B区 dirty summary + per-shot intent state.
-    assert "素材已更新，需要再次生成预览" in html
+    # Observability model: a bare intent (no material) is intent_only — the A区
+    # guidance is "已记录素材调整意图", NOT the regenerate prompt.
+    assert overlay["process_state"] == "intent_only"
+    assert "已记录素材调整意图" in html
+    assert "素材已更新，需要再次生成预览" not in html
     assert 'data-role="ms-primary-material-dirty-summary"' in html
     assert "已标记补充素材" in html
     # Current main video (V1) still rendered via the staged preview, not overwritten.
