@@ -789,16 +789,12 @@
                 素材来源：{% if s.source == 'local_real_asset' %}真实素材{% elif s.source == 'fallback_semantic_reuse' %}复用素材{% else %}待补充{% endif %} ·
                 语义状态：{% if s.semantic_status == 'pass' %}通过{% elif s.semantic_status == 'partial' %}部分通过{% else %}未通过{% endif %} ·
                 已进入当前主视频：{% if s.included_in_current_video %}是{% else %}否{% endif %}
+                {# R-SHOT-REASON (PR-2 §3.B.2): why this shot is suggested for
+                   handling. Real views project `suggestion_reason_zh` (with the
+                   "建议处理原因：" framing); the inline fallback keeps legacy
+                   hand-built overlays rendering the established copy. #}
                 {% if s.source == 'fallback_semantic_reuse' %}
-                  <br><span data-role="ms-primary-shot-material-suggestion">
-                    {% if s.order == 4 %}
-                      当前为复用素材，建议补充真实品尝素材。
-                    {% elif s.order == 5 %}
-                      当前为复用素材，建议补充递向镜头素材。
-                    {% else %}
-                      当前为复用素材，建议补充真实素材。
-                    {% endif %}
-                  </span>
+                  <br><span data-role="ms-primary-shot-material-suggestion">{% if s.suggestion_reason_zh %}{{ s.suggestion_reason_zh }}{% elif s.order == 4 %}当前为复用素材，建议补充真实品尝素材。{% elif s.order == 5 %}当前为复用素材，建议补充递向镜头素材。{% else %}当前为复用素材，建议补充真实素材。{% endif %}</span>
                 {% endif %}
                 <br><span data-role="ms-primary-shot-intent-state"
                           style="{% if s.intent_dirty %}color:var(--op-fg-mid,#b45309);font-weight:600;{% else %}color:var(--op-fg-soft,#64748b);{% endif %}">
@@ -878,27 +874,11 @@
                 </div>
                 {% endif %}
               </div>
-              <details data-role="ms-primary-shot-material-attach" data-shot-id="{{ s.shot_id }}" style="margin-top:8px;">
-                <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-soft,#64748b);">绑定补充素材（运营素材引用）</summary>
-                <div data-role="ms-primary-shot-material-attach-form"
-                     style="display:grid; gap:6px; margin-top:6px; max-width:420px;">
-                  <input type="text" data-role="ms-attach-material-name" placeholder="素材名称（例：番茄品尝特写）"
-                         style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
-                  <input type="text" data-role="ms-attach-material-ref" placeholder="素材引用（例：asset://matrix_script/.../{{ s.shot_id }}/<asset_id>）"
-                         style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
-                  <select data-role="ms-attach-material-kind"
-                          style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
-                    <option value="video">视频</option>
-                    <option value="image">图片</option>
-                  </select>
-                  <button type="button" class="btn-secondary"
-                          data-role="ms-primary-shot-material-attach-submit"
-                          data-shot-id="{{ s.shot_id }}">绑定素材</button>
-                  <span class="muted" style="font-size:12px;">绑定后该镜头标记为已更新，返回主视频区点击“再次生成预览”。绑定不会自动生成或发布。</span>
-                </div>
-              </details>
-              <details data-role="ms-primary-shot-material-upload" data-shot-id="{{ s.shot_id }}" style="margin-top:6px;">
-                <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-soft,#64748b);">上传这个镜头的新素材</summary>
+              {# PR-2 §3.B.1: upload is the PRIMARY material path — always visible,
+                 listed first. Advanced reference-binding is folded below. #}
+              <div data-role="ms-primary-shot-material-upload" data-shot-id="{{ s.shot_id }}"
+                   data-upload-primary="true" style="margin-top:8px;">
+                <div data-role="ms-primary-shot-material-upload-title" style="font-weight:600; margin-bottom:6px;">上传这个镜头的新素材</div>
                 <div data-role="ms-primary-shot-material-upload-form"
                      style="display:grid; gap:6px; margin-top:6px; max-width:420px;">
                   <input type="file" data-role="ms-upload-material-file" accept="image/*,video/*"
@@ -914,6 +894,31 @@
                           data-action="matrix-script-material-upload"
                           data-shot-id="{{ s.shot_id }}">上传素材</button>
                   <span class="muted" data-role="ms-primary-shot-material-upload-helper" style="font-size:12px;">支持图片 / 视频。上传后不会立刻覆盖主视频，需要回到主视频区点击“再次生成预览”。</span>
+                  {# R-UPLOAD-HANDOFF (§3.B.2): next step visible right by the upload. #}
+                  {% if s.upload_handoff_zh %}
+                  <span class="muted" data-role="ms-primary-shot-upload-handoff"
+                        style="font-size:12px; color:var(--op-fg-mid,#b45309); font-weight:600;">{{ s.upload_handoff_zh }}</span>
+                  {% endif %}
+                </div>
+              </div>
+              <details data-role="ms-primary-shot-material-attach" data-shot-id="{{ s.shot_id }}" style="margin-top:8px;">
+                <summary style="cursor:pointer; font-size:13px; color:var(--op-fg-soft,#64748b);">高级：绑定已有素材引用</summary>
+                <div data-role="ms-primary-shot-material-attach-form"
+                     style="display:grid; gap:6px; margin-top:6px; max-width:420px;">
+                  <span class="muted" data-role="ms-primary-shot-material-attach-helper" style="font-size:12px;">仅当你已有系统素材引用时使用。普通运营请上传素材。</span>
+                  <input type="text" data-role="ms-attach-material-name" placeholder="素材名称（例：番茄品尝特写）"
+                         style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
+                  <input type="text" data-role="ms-attach-material-ref" placeholder="素材引用（高级，可选）"
+                         style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
+                  <select data-role="ms-attach-material-kind"
+                          style="padding:6px 8px; border:1px solid var(--op-card-bd,#e5e7eb); border-radius:6px;">
+                    <option value="video">视频</option>
+                    <option value="image">图片</option>
+                  </select>
+                  <button type="button" class="btn-secondary"
+                          data-role="ms-primary-shot-material-attach-submit"
+                          data-shot-id="{{ s.shot_id }}">绑定素材</button>
+                  <span class="muted" style="font-size:12px;">绑定后该镜头标记为已更新，返回主视频区点击“再次生成预览”。绑定不会自动生成或发布。</span>
                 </div>
               </details>
             </div>
