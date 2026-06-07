@@ -204,7 +204,7 @@ with two side-panels (script-context, variants) that are not stops at all.
 | **A** | 主视频结果 + 流程状态 | **Step 1.** The current main video + the process-state narration banner ("你在这一步 / 刚才发生了什么 / 下一步"). Script-understanding context folds here as a collapsed "为什么这样生成". | C1, C9, C10 + folded C13 |
 | **B** | 逐镜调整与素材 | **Steps 2–4.** The shot-by-shot keep/supplement/replace + upload loop, with the per-shot headline trace inline and deep trace folded. | C5–C8 |
 | **C** | 生成与对比 (再次生成 → V1/V2 对比 → 确认/丢弃) | **Steps 5–6.** Promote the regenerate→compare→confirm decision into its **own** explicit zone. Today this is split between A's acceptance block and scattered version markers; it deserves to be the named pivot of the workflow. | C2, C3, C4, C10 |
-| **D** | 交付候选 | **Step 7, terminal.** Delivery follows the confirmed main; moved *after* the confirm decision, not before it. `official_publish_ready=false` stays visible. | C12 |
+| **D** | 交付候选 | **Step 7, terminal.** Delivery follows the confirmed main; moved *after* the confirm decision, not before it. Not-ready is shown in operator wording only — `正式交付就绪：否` — never the raw `official_publish_ready=false` field (that string belongs in collapsed diagnostics only). | C12 |
 | **进阶** | 视频变体 + 深度诊断入口 | Collapsed advanced lane. Variants live here, reachable after a main is confirmed. | C14 |
 | **J** | 技术诊断 | Unchanged — collapsed, architect-only. | C15 |
 
@@ -217,6 +217,31 @@ and script-understanding leave the mainline.
 > re-ordering / re-labelling existing sections and moving already-rendered fields,
 > **not** by creating new panels or a parallel flow (Anti-Sprawl rule 4). No new
 > `data-role` semantics, no new truth.
+
+### Binding guided-flow rules (from the 2026-06-07 operator review)
+
+The operator review of the preview surfaced three must-fix rules the future gate
+spec MUST encode. They constrain copy / placement only — no new capability, no new
+truth source:
+
+- **R-SHOT-REASON — every guided shot card must explain *why* the shot is being
+  suggested for supplement/replace, not only *what* action is available.** A flagged
+  shot shows a short operator-language reason (e.g. "建议处理原因：当前为复用素材，
+  缺少真实品尝画面") so the operator can locate weak shots themselves rather than
+  confirm a pre-made selection. The reason draws only on existing observable signals
+  (visual source / shot-match / missing-material) already projected by #215 — it
+  introduces no new field or producer.
+- **R-DELIVERY-WORDING — the primary 交付 zone shows not-ready in operator wording
+  only (`正式交付就绪：否`).** The raw `official_publish_ready=false` field (and any
+  raw enum/flag) is forbidden from the primary operator surface and may appear only
+  in collapsed diagnostics. No operator-facing note may name an internal enum (e.g.
+  "不显示原始 process_state 枚举值" is an engineer note, not operator copy).
+- **R-UPLOAD-HANDOFF — after a shot material upload, the regenerate CTA or a
+  jump-to-regenerate nudge must be visible without forcing the operator to search
+  another section.** The upload→regenerate hand-off must not cross a silent section
+  boundary; either surface a "下一步：去再次生成预览" nudge / jump beside the upload,
+  or mirror the same regenerate CTA (clearly the *same* action as the C-zone
+  trigger). This is placement only — it does not add a second regenerate path.
 
 ---
 
@@ -260,7 +285,7 @@ expected outcome is not always *stated* to the operator before/after the click.
 | 使用当前素材 (per shot) | 该镜头标记为「使用当前素材」，不触发生成 | 镜头状态更新；无新预览 | 不上传、不生成 |
 | 补充这个镜头素材 | 进入补素材意图；提示去上传 | 镜头→`待上传素材`；A 区→`intent_only` | 不立即改主视频 |
 | 替换这个镜头素材 | 标记替换意图；提示去上传 | 镜头→`已标记替换素材` | 不立即改主视频 |
-| 上传这个镜头的新素材 | 素材被校验并保存，可预览 | 镜头→`已上传，等待再次生成预览`；A 区→`material_ready` | **不会自动覆盖主视频** |
+| 上传这个镜头的新素材 | 素材被校验并保存，可预览；**就地出现「下一步：去再次生成预览」提示/跳转** | 镜头→`已上传，等待再次生成预览`；A 区→`material_ready`；上传区旁显示再生成提示 | **不会自动覆盖主视频** |
 | 再次生成预览 | 生成 V2 *候选*，当前主视频不动 | 状态→`generation_running`→`candidate_ready` | V1 不被覆盖 |
 | 设为主版本（确认 V2） | V2 成为当前主视频，交付跟随 V2 | 当前版本→V2；意图清空；交付候选更新 | 不发布到正式渠道 |
 | 丢弃新预览 | 候选移除，V1 仍为当前主视频 | 候选消失；当前版本仍 V1 | 不影响已上传素材记录 |
