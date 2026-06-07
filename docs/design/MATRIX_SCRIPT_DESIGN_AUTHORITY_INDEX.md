@@ -63,3 +63,18 @@ must not use execution logs as design authority:
 PR-191 is superseded by the one-step cleanup branch. Its authority
 consolidation intent is folded into this index after the baseline tag; the PR
 must not be merged separately.
+
+## Planning / Review Inputs (NOT authority)
+
+These are operator-lens planning and review proposals. They are **not Bucket A
+binding authority**, do not supersede Bucket A, do not define IA, and authorize no
+implementation. Future UI work still cites Bucket A first (Anti-Sprawl rule 3); a
+planning input may only be acted on after it is converted into a gate spec under the
+standard discipline.
+
+- `docs/design/MATRIX_SCRIPT_GUIDED_OPERATOR_WORKFLOW_PLAN_20260607.md` — Guided
+  Operator Workflow Planning Review (2026-06-07) over the #211–#215 substrate.
+  Operator-mainline procedure, advanced/diagnostics fold, A/B/C/D/E re-order
+  proposal, operator-language state vocabulary, per-button expectations,
+  diagnosable-but-non-leaking Network/action-log split, and a gate-spec-first 6-PR
+  slicing proposal. Proposal only.
