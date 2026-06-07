@@ -98,4 +98,16 @@ its §10 architect + reviewer signoff merges, one slice at a time.
   Operator Workflow Gate Spec (2026-06-07). Binding-and-exhaustive zone rules
   (A/B/C/D/E + J), forbidden scope, six-PR slicing (PR-1..PR-6), and acceptance
   rows A-1..A-15. Implementation gate for the five operator zones + Matrix Script
-  tests only.
+  tests only. **Engineering-CLOSED** (PR-1..PR-6 merged #220/#223/#224/#225/#226/#227).
+- `docs/design/MATRIX_SCRIPT_SLOT_WORKFLOW_V2_GATE_SPEC_20260607.md` — Slot Workflow v2
+  Gate Spec (2026-06-07). The **v2 successor to the B区 model only**: replaces the
+  Guided Workflow all-shot expanded-card B区 with a scalable compact Shot Queue +
+  single active Current Shot Work Panel + Slot Editor + Assignment model + single
+  C区 batch-regenerate entry; A/C/D/E inherit the Guided Gate Spec except §3.C.1.
+  Honest slot capability classification (visual_material active; text/subtitle
+  display-only; voiceover/bgm future, status-only no button), forbidden leakage rules,
+  acceptance rows A-V2-1..A-V2-18, four-PR slicing (PR-1..PR-4), forbidden paths, and a
+  `<fill>` §13 signoff block. Derived from the merged Product Plan #228 + the validated
+  static preview + operator review (Round 2 PASS). **Implementation gate CLOSED until
+  §13 signoff merges.** Does not supersede Bucket A; does not authorize backend /
+  storage / provider / schema / contract change.
