@@ -734,6 +734,34 @@ def _derive_process_state(
     return PROCESS_NOT_GENERATED
 
 
+def _build_process_action_log(
+    shots: List[Dict[str, Any]],
+    regeneration: Mapping[str, Any],
+    version_view: Mapping[str, Any],
+) -> List[str]:
+    """Operator-safe process / action record for E区 (Gate Spec §3.E, PR-5).
+
+    Projects existing facts (shot intents, uploads, regen lifecycle, candidate)
+    into operator-language step events. No new truth, no new producer. MUST stay
+    operator-safe — only shot titles + operator-uploaded material names; never a
+    local_path / handle / provider / publish URL / Akool field.
+    """
+    log: List[str] = []
+    for s in shots:
+        intent = s.get("intent")
+        if intent in MATERIAL_DIRTY_INTENTS:
+            verb = "补充素材" if intent == MATERIAL_INTENT_SUPPLEMENT else "替换素材"
+            log.append(f"已记录处理方式：{s.get('title')} {verb}")
+        if s.get("material_attached") and s.get("material_name"):
+            log.append(f"上传成功：{s.get('title')} {s.get('material_name')}")
+    status = str(regeneration.get("status") or "")
+    if regeneration.get("poll") or status in _IN_PROGRESS_STATUSES:
+        log.append("已请求再次生成预览")
+    if version_view.get("has_candidate_preview"):
+        log.append("V2 新预览已生成")
+    return log
+
+
 def _build_process_narration(
     process_state: str,
     version_view: Mapping[str, Any],
@@ -883,6 +911,11 @@ def build_matrix_script_operator_workbench_view(
         "process_narration": process_narration,
         # PR-3 §3.C: changed-shot list for the V1/V2 compare pivot (projection only).
         "candidate_changed_shots": candidate_changed_shots,
+        # PR-5 §3.E: operator-safe process/action record for the collapsed E区
+        # diagnostics fold. Projection over existing facts; no raw fields.
+        "process_action_log": _build_process_action_log(
+            shots, regeneration, version_view
+        ),
         "generation_facts": generation_facts,
         "missing_material_count": missing_material_count,
         "regenerate_endpoint": "/api/matrix-script/{task_id}/regenerate-preview",

@@ -1155,6 +1155,29 @@
         </div>
       {% endif %}
 
+      {# PR-5 §3.E · E区 进阶 / 过程记录 — operator-safe action log, collapsed by
+         default. Projection over existing facts (process_action_log); operator
+         language only, no raw backend/state/debug fields (those stay in J区). #}
+      {% if ms_main_video_result.is_matrix_script and ms_overlay.process_action_log %}
+        <div class="op-card"
+             data-role="matrix-script-primary-process-record"
+             data-primary-flow-section="E"
+             data-redesign-wave="2026-06-07-pr5-diagnostics-fold">
+          <details data-role="ms-primary-process-record-fold">
+            <summary style="cursor:pointer;">
+              <span class="op-section-index">进阶 · 过程记录</span>
+              <span class="op-section-subtitle" style="font-weight:600;">查看本任务的处理步骤记录</span>
+            </summary>
+            <ul data-role="ms-primary-process-record-log" style="margin:10px 0 0 16px; padding:0; font-size:13px; color:var(--op-fg-mid,#334155);">
+              {% for ev in ms_overlay.process_action_log %}
+              <li data-role="ms-primary-process-record-item">{{ ev }}</li>
+              {% endfor %}
+            </ul>
+            <div class="op-tech-note" style="margin-top:8px; font-size:12px; color:var(--op-fg-soft,#64748b);">仅记录运营可读的处理步骤；技术细节在 J · 技术诊断中查看。</div>
+          </details>
+        </div>
+      {% endif %}
+
       {# Phase 2C (2026-05-30) · operator-readability capability banner.
          ONE orientation line; relocated by Phase 2D to render BELOW §A so
          the result panel is the dominant first surface. Copy / layout only;
