@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matrix Script Slot Workflow v2 Preview</title>
+<!--
+  TEMPORARY STATIC PREVIEW — NOT RUNTIME, NOT AUTHORITY.
+  Purpose: human visual validation of the proposed Slot Workflow v2 model from
+  docs/design/MATRIX_SCRIPT_SLOT_WORKFLOW_V2_PRODUCT_PLAN_20260607.md (#228, MERGED).
+  Validates whether a queue + single-active-panel model scales B区 to 10+ shots and
+  makes the Shot / Slot / Assignment object model clear.
+  This file wires NOTHING. No backend, no routes, no real data. All values are a
+  hand-authored illustrative 10-shot scenario. The only script is a local collapse toggle.
+  Operator-safe copy only: no local_path / raw manifest / provider URL / publish URL /
+  Akool fields / raw process_state enum as primary copy.
+-->
+<style>
+  :root{
+    --bg:#0f1216; --panel:#171c22; --panel2:#1d242c; --line:#2a333d;
+    --ink:#e8edf2; --muted:#9aa7b4; --faint:#6c7884;
+    --emerald:#34d399; --emerald-dim:#0f3b30; --amber:#fbbf24; --amber-dim:#3a2e0c;
+    --violet:#a78bfa; --violet-dim:#2a2440; --blue:#60a5fa; --blue-dim:#15314f;
+    --red:#f87171; --pill:#222b34; --disabled:#11151a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 80px}
+  header.page{border-bottom:1px solid var(--line);padding-bottom:16px;margin-bottom:8px}
+  header.page h1{font-size:21px;margin:0 0 4px}
+  .step-tag{font-size:12px;color:var(--faint)}
+  .banner-temp{background:var(--amber-dim);border:1px solid var(--amber);color:var(--amber);
+    border-radius:8px;padding:8px 12px;font-size:13px;margin:12px 0 22px}
+  .banner-temp code{color:#f5d98a}
+  .scenario{background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:12px 16px;margin-bottom:26px;font-size:13px;color:var(--muted)}
+  .scenario b{color:var(--ink)}
+  .scenario ul{margin:8px 0 0;padding-left:18px} .scenario li{margin:2px 0}
+
+  section.zone{background:var(--panel);border:1px solid var(--line);border-radius:12px;
+    padding:0;margin:0 0 18px;overflow:hidden}
+  .zone-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--line)}
+  .ix{font-weight:700;font-size:12px;letter-spacing:.5px;padding:3px 9px;border-radius:6px;
+    background:var(--pill);color:var(--muted)}
+  .ix.em{background:var(--emerald-dim);color:var(--emerald)}
+  .ix.am{background:var(--amber-dim);color:var(--amber)}
+  .ix.vi{background:var(--violet-dim);color:var(--violet)}
+  .ix.bl{background:var(--blue-dim);color:var(--blue)}
+  .zone-head h2{font-size:16px;margin:0;flex:1}
+  .zone-body{padding:16px 18px}
+
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:3px 10px;
+    border-radius:999px;background:var(--pill);color:var(--muted)}
+  .pill .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+  .pill.live{color:var(--amber)} .pill.cand{color:var(--violet)} .pill.ok{color:var(--emerald)}
+
+  .state-card{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--violet);
+    border-radius:8px;padding:12px 14px;margin:12px 0}
+  .state-card .now{font-weight:600} .state-card .why{color:var(--muted);font-size:13px;margin-top:2px}
+  .state-card .next{color:var(--emerald);font-size:13px;margin-top:6px}
+
+  .videoframe{background:#0a0d10;border:1px solid var(--line);border-radius:8px;height:140px;
+    display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:13px;position:relative}
+  .videoframe .vbadge{position:absolute;top:8px;left:8px;font-size:11px;background:#0008;
+    border:1px solid var(--line);padding:2px 7px;border-radius:5px;color:var(--muted)}
+
+  /* ---- Shot Queue ---- */
+  .queue{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .qrow{display:flex;align-items:center;gap:12px;padding:9px 14px;border-top:1px solid var(--line);
+    font-size:13px;background:var(--panel2)}
+  .qrow:first-child{border-top:none}
+  .qrow.active{background:#202a33;border-left:3px solid var(--violet);padding-left:11px}
+  .qrow .qidx{font-weight:700;color:var(--muted);width:64px;flex:none}
+  .qrow .qthumb{width:40px;height:26px;border-radius:4px;background:#0a0d10;border:1px solid var(--line);
+    flex:none}
+  .qrow .qtitle{flex:1;color:var(--ink)}
+  .qrow .qreason{color:#f5d98a;font-size:12px;margin-left:8px}
+  .qrow .qopen{font-size:12px;color:var(--faint)}
+  .chip{font-size:12px;padding:2px 9px;border-radius:999px;background:var(--pill);color:var(--muted);flex:none}
+  .chip.todo{background:var(--amber-dim);color:var(--amber)}
+  .chip.uploaded{background:#143a3a;color:#5eead4}
+  .chip.skipped{background:#2a2230;color:#c4a3d8}
+  .chip.inv2{background:var(--violet-dim);color:var(--violet)}
+  .chip.none{background:var(--pill);color:var(--faint)}
+  .qfoot{font-size:12px;color:var(--faint);margin-top:8px}
+
+  /* ---- Current Shot Work Panel ---- */
+  .workpanel{background:var(--panel2);border:1px solid var(--violet);border-radius:10px;
+    padding:14px 16px;margin:14px 0 4px}
+  .workpanel h3{margin:0 0 4px;font-size:15px;display:flex;align-items:center;gap:10px}
+  .workpanel .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 18px;margin:10px 0}
+  .workpanel .meta .k{color:var(--faint);font-size:12px}
+  .workpanel .meta .v{color:var(--ink);font-size:13px}
+  .reason{background:var(--amber-dim);border:1px solid var(--amber);color:#f5d98a;
+    border-radius:8px;padding:8px 12px;font-size:13px;margin:8px 0}
+  .reason b{color:var(--amber)}
+  .next-inline{background:var(--blue-dim);border:1px solid var(--blue);color:#bcdcff;border-radius:8px;
+    padding:9px 12px;font-size:13px;margin-top:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .next-inline a.jump{font-size:13px;padding:5px 11px;border-radius:7px;border:1px solid var(--blue);
+    color:var(--blue);text-decoration:none;background:var(--panel)}
+
+  /* ---- Slot Editor ---- */
+  .slots{margin-top:12px}
+  .slots .slabel{font-size:12px;color:var(--faint);margin-bottom:6px}
+  .slot{display:flex;align-items:flex-start;gap:12px;border:1px solid var(--line);border-radius:9px;
+    padding:11px 13px;margin:8px 0;background:var(--panel)}
+  .slot.active-slot{border-color:var(--emerald)}
+  .slot.disp{opacity:.92}
+  .slot.future{background:var(--disabled);opacity:.72}
+  .slot .sname{font-weight:600;font-size:13px;width:190px;flex:none}
+  .slot .sname code{color:var(--faint);font-weight:400;font-size:11px;display:block;margin-top:2px}
+  .slot .sbody{flex:1}
+  .slot .sclass{font-size:11px;padding:2px 8px;border-radius:6px;flex:none}
+  .sclass.act{background:var(--emerald-dim);color:var(--emerald)}
+  .sclass.dispc{background:var(--pill);color:var(--muted)}
+  .sclass.fut{background:#241c12;color:#c79a52}
+  .choices{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 2px}
+  .btn{font-size:13px;padding:6px 12px;border-radius:7px;border:1px solid var(--line);
+    background:var(--panel);color:var(--ink);cursor:default}
+  .btn.sel{border-color:var(--emerald);background:var(--emerald-dim);color:var(--emerald)}
+  .btn.primary{border-color:var(--blue);color:var(--blue)}
+  .btn.warn{border-color:var(--amber);color:var(--amber)}
+  .btn.danger{border-color:var(--red);color:var(--red)}
+  .btn.ghost{color:var(--muted)}
+  .btn.disabled{border-color:var(--line);color:var(--faint);background:var(--disabled);cursor:not-allowed}
+  .helper{font-size:12px;color:var(--muted);margin-top:6px}
+  .upload{border:1px dashed var(--line);border-radius:8px;padding:10px 12px;margin-top:8px;font-size:13px}
+  .upload .file{color:var(--emerald)}
+  .ro{font-size:13px;color:var(--muted)}
+  .ro b{color:var(--ink)}
+  .statusline{display:inline-block;margin-top:8px;font-size:12px;padding:3px 10px;border-radius:6px;
+    background:#241c12;color:#c79a52;border:1px solid #3a2e0c}
+  details.adv{margin-top:10px;border:1px solid var(--line);border-radius:8px;background:var(--panel)}
+  details.adv>summary{cursor:pointer;padding:9px 12px;font-size:13px;color:var(--muted);list-style:none}
+  details.adv>summary::-webkit-details-marker{display:none}
+  details.adv>summary::before{content:"▸ ";color:var(--faint)}
+  details.adv[open]>summary::before{content:"▾ "}
+  details.adv .adv-body{padding:0 14px 12px;font-size:13px;color:var(--muted)}
+
+  /* ---- Assignment model ---- */
+  .assign{border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin-top:12px;background:var(--panel)}
+  .assign h4{margin:0 0 8px;font-size:13px;color:var(--emerald)}
+  .kv{display:flex;justify-content:space-between;border-top:1px solid var(--line);padding:7px 0;font-size:13px;gap:12px}
+  .kv:first-of-type{border-top:none}
+  .kv .k{color:var(--muted)} .kv .v{color:var(--ink);text-align:right}
+  .kv .v.lock{color:var(--violet)} .kv .v.pend{color:var(--amber)} .kv .v.done{color:var(--emerald)}
+  .falseflag{color:var(--faint)}
+
+  /* ---- Batch regenerate ---- */
+  .batchbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--amber-dim);
+    border:1px solid var(--amber);border-radius:10px;padding:12px 16px;margin:4px 0 10px}
+  .batchbar .bbtn{font-size:14px;font-weight:600;padding:9px 16px;border-radius:8px;border:1px solid var(--amber);
+    color:#1a1206;background:var(--amber)}
+  .batchbar .bexpl{font-size:13px;color:#f5d98a}
+  .selset{font-size:12px;color:var(--muted);margin:4px 0 12px}
+  .selset b{color:var(--ink)}
+  .v2state{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--violet);
+    border-radius:8px;padding:10px 14px;margin:8px 0 4px;font-size:13px;color:var(--muted)}
+  .v2state>div{padding:3px 0} .v2state b{color:var(--ink)}
+
+  /* ---- compare ---- */
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:10px 0}
+  @media(max-width:760px){.cmp{grid-template-columns:1fr}}
+  .cmp .col{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .cmp .col.v2{border-color:var(--violet)}
+  .cmp h4{margin:0 0 8px;font-size:14px;display:flex;align-items:center;gap:8px}
+  .changed{margin:10px 0 0;padding-left:0;list-style:none;font-size:13px}
+  .changed li{padding:4px 0;border-top:1px solid var(--line);color:var(--muted)}
+  .changed li b{color:var(--ink)}
+  .guard{background:var(--blue-dim);border:1px solid var(--blue);color:#bcdcff;border-radius:8px;
+    padding:10px 14px;font-size:13px;margin:12px 0}
+  .decide{display:flex;gap:10px;flex-wrap:wrap;margin-top:8px}
+
+  .log{font-size:13px;margin:0;padding-left:18px;color:var(--muted)}
+  .log li{margin:4px 0}
+  .note{font-size:12px;color:var(--faint);margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <h1>Matrix Script · Slot Workflow v2 Preview</h1>
+  <div class="step-tag">运营视角 · 可扩展镜头工作流（队列 + 单一活动面板）· 静态预览（人工判读用）</div>
+</header>
+
+<div class="banner-temp">
+  ⚠️ 临时静态预览，非运行时、非权威文档。仅用于人工判断 v2 模型是否解决「10+ 镜头不可扩展」问题。不连接后端、不代表真实数据、不改动 Workbench。
+  规划来源：<code>docs/design/MATRIX_SCRIPT_SLOT_WORKFLOW_V2_PRODUCT_PLAN_20260607.md</code>（#228，已合并）。
+</div>
+
+<div class="scenario">
+  <b>本预览演示的场景</b>
+  <ul>
+    <li>真实规模任务：<b>MS-TOMATO-BEACH-001 · 共 10 个镜头</b></li>
+    <li>V1 主视频已生成；已有一版 <b>V2 候选</b>（先前已消费 Shot 03 的上传素材）</li>
+    <li>运营继续逐镜检查，为 Shot 04 / 05 / 06 上传了新素材，<b>已锁定进入下一次 V2</b>（尚未被 V2 消费）</li>
+    <li>Shot 08 由运营标记为<b>跳过</b>；Shot 10 仍<b>待处理</b></li>
+    <li>当前活动镜头：<b>Shot 04 · 吃番茄特写</b>（仅此镜头展开为工作面板）</li>
+    <li>V2 <b>尚未确认</b> → 交付候选仍跟随 V1</li>
+  </ul>
+</div>
+
+<!-- ============ A 区 ============ -->
+<section class="zone">
+  <div class="zone-head">
+    <span class="ix em">A</span>
+    <h2>主视频结果与流程状态</h2>
+    <span class="step-tag">步骤 1 · 看首版（保持不变）</span>
+  </div>
+  <div class="zone-body">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:10px">
+      <span class="pill ok"><span class="dot"></span>当前主视频：V1</span>
+      <span class="pill cand"><span class="dot"></span>新预览候选：V2（待确认）</span>
+    </div>
+    <div class="videoframe"><span class="vbadge">当前主视频 · V1</span>主视频预览（V1）</div>
+    <div class="state-card">
+      <div class="now">已有可用主视频 V1；你正在逐镜准备下一次 V2 预览</div>
+      <div class="why">已为 3 个镜头上传新素材并锁定，将在下一次「批量再次生成」时一起进入 V2。</div>
+      <div class="next">下一步：到 B 区把每个待处理镜头处理完，再到 C 区一次性「批量再次生成 V2」。</div>
+    </div>
+    <div class="note">A 区在 v2 中保持现有引导式叙述（现状 → 原因 → 下一步），本次不改动。</div>
+  </div>
+</section>
+
+<!-- ============ B 区 ============ -->
+<section class="zone">
+  <div class="zone-head">
+    <span class="ix am">B</span>
+    <h2>逐镜调整与素材 · 镜头队列 + 单一活动面板</h2>
+    <span class="step-tag">步骤 2–4 · 扫描队列 → 处理活动镜头</span>
+  </div>
+  <div class="zone-body">
+
+    <!-- 1) Compact Shot Queue -->
+    <div class="slabel">① 镜头队列（10 个镜头一屏可扫，不必展开 10 张完整卡片）</div>
+    <div class="queue">
+      <div class="qrow"><span class="qidx">Shot 01</span><span class="qthumb"></span><span class="qtitle">开场标题卡</span><span class="chip none">无需处理</span><span class="qopen">展开</span></div>
+      <div class="qrow"><span class="qidx">Shot 02</span><span class="qthumb"></span><span class="qtitle">产品摆放</span><span class="chip none">无需处理</span><span class="qopen">展开</span></div>
+      <div class="qrow"><span class="qidx">Shot 03</span><span class="qthumb"></span><span class="qtitle">切开番茄</span><span class="chip inv2">已进入 V2</span><span class="qopen">展开</span></div>
+      <div class="qrow active"><span class="qidx">Shot 04</span><span class="qthumb"></span><span class="qtitle">吃番茄特写<span class="qreason">· 复用素材，缺真实品尝画面</span></span><span class="chip uploaded">已上传素材</span><span class="qopen">▾ 活动中</span></div>
+      <div class="qrow"><span class="qidx">Shot 05</span><span class="qthumb"></span><span class="qtitle">沙滩远景<span class="qreason">· 缺递向镜头</span></span><span class="chip uploaded">已上传素材</span><span class="qopen">展开</span></div>
+      <div class="qrow"><span class="qidx">Shot 06</span><span class="qthumb"></span><span class="qtitle">递向动作</span><span class="chip uploaded">已上传素材</span><span class="qopen">展开</span></div>
+      <div class="qrow"><span class="qidx">Shot 07</span><span class="qthumb"></span><span class="qtitle">标语字幕卡</span><span class="chip none">无需处理</span><span class="qopen">展开</span></div>
+      <div class="qrow"><span class="qidx">Shot 08</span><span class="qthumb"></span><span class="qtitle">二次品尝</span><span class="chip skipped">已跳过</span><span class="qopen">展开</span></div>
+      <div class="qrow"><span class="qidx">Shot 09</span><span class="qthumb"></span><span class="qtitle">收尾 logo</span><span class="chip none">无需处理</span><span class="qopen">展开</span></div>
+      <div class="qrow"><span class="qidx">Shot 10</span><span class="qthumb"></span><span class="qtitle">CTA 行动号召<span class="qreason">· 复用素材，建议补充</span></span><span class="chip todo">待处理</span><span class="qopen">展开</span></div>
+    </div>
+    <div class="qfoot">状态图例：<span class="chip todo">待处理</span> <span class="chip uploaded">已上传素材</span> <span class="chip skipped">已跳过</span> <span class="chip inv2">已进入 V2</span> <span class="chip none">无需处理</span> ｜ 同一时间只展开一个镜头；点其他行即切换活动镜头，不会再叠开第二张完整卡。</div>
+
+    <!-- 2) Current Shot Work Panel (only one expanded) -->
+    <div class="slabel" style="margin-top:18px">② 当前镜头工作面板（仅 Shot 04 展开）</div>
+    <div class="workpanel">
+      <h3>Shot 04 · 吃番茄特写 <span class="chip uploaded">已上传素材</span></h3>
+      <div class="reason"><b>为什么需要处理：</b>当前为复用素材，缺少真实品尝画面，建议补充一个吃番茄/品尝特写。</div>
+      <div class="meta">
+        <div><div class="k">当前素材状态</div><div class="v">已上传 · 04_eat_tomato.png</div></div>
+        <div><div class="k">当前处理决策（Assignment）</div><div class="v">补充素材</div></div>
+        <div><div class="k">是否进入下一次 V2</div><div class="v">已锁定 · 尚未被 V2 消费</div></div>
+        <div><div class="k">下一步</div><div class="v">到 C 区批量再次生成 V2</div></div>
+      </div>
+
+      <!-- 3) Slot Editor -->
+      <div class="slots">
+        <div class="slabel">③ 槽位编辑（Slot Editor）— 只有「现在可调整」的槽位提供真实操作，其余仅展示 / 后续工作流，不伪装成可编辑</div>
+
+        <!-- visual_material_slot: ACTIVE NOW -->
+        <div class="slot active-slot">
+          <div class="sname">画面素材槽<code>visual_material_slot</code></div>
+          <div class="sbody">
+            <span class="sclass act">现在可调整</span>
+            <div class="choices">
+              <span class="btn">使用当前素材</span>
+              <span class="btn sel">补充素材 ✓</span>
+              <span class="btn">替换素材</span>
+              <span class="btn ghost">跳过此镜头</span>
+            </div>
+            <div class="upload">
+              <div>上传 / 替换这个镜头的素材：<span class="file">已上传 · 04_eat_tomato.png</span></div>
+              <div class="helper">上传<b>不会</b>立刻覆盖主视频 V1，会在下一次批量再次生成时进入 V2。</div>
+            </div>
+            <details class="adv">
+              <summary>高级：绑定已有素材引用</summary>
+              <div class="adv-body">仅当你已持有系统内素材引用时使用。普通运营请直接「上传素材」，无需填写任何引用串。</div>
+            </details>
+            <div class="next-inline">
+              <span>下一步：素材已上传。处理完其他待处理镜头后，到 C 区「批量再次生成 V2」。</span>
+              <a class="jump" href="#zone-c">去批量再次生成 →</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- text_copy_slot: DISPLAY-ONLY -->
+        <div class="slot disp">
+          <div class="sname">文案槽<code>text_copy_slot</code></div>
+          <div class="sbody">
+            <span class="sclass dispc">仅展示（暂不可编辑）</span>
+            <div class="ro" style="margin-top:6px">当前文案：<b>「夏日番茄，鲜甜一口」</b>（由脚本生成，本线暂不提供运营改写动作）</div>
+            <div class="helper">本槽位为只读展示；没有可用的后台改写动作，因此不显示编辑控件。</div>
+          </div>
+        </div>
+
+        <!-- subtitle_slot: DISPLAY-ONLY -->
+        <div class="slot disp">
+          <div class="sname">字幕槽<code>subtitle_slot</code></div>
+          <div class="sbody">
+            <span class="sclass dispc">仅展示（暂不可编辑）</span>
+            <div class="ro" style="margin-top:6px">字幕状态：<b>已随脚本生成</b>（与文案一致）</div>
+            <div class="helper">本槽位为只读展示；如未来开放字幕编辑后台动作，将在独立 Gate Spec 下转为可编辑。</div>
+          </div>
+        </div>
+
+        <!-- voiceover_slot: FUTURE -->
+        <div class="slot future">
+          <div class="sname">配音槽<code>voiceover_slot</code></div>
+          <div class="sbody">
+            <span class="sclass fut">后续工作流 · 暂不可编辑</span>
+            <div class="ro" style="margin-top:6px">配音：<b>后续工作流</b> · 本线暂无配音工作流，当前不可编辑</div>
+            <div class="statusline">状态：后续工作流（暂不可编辑）—— 无可点操作</div>
+            <div class="helper">仅以状态呈现，不提供任何按钮；待真实后台动作落地并通过 Gate Spec 后再开放为可编辑槽位。</div>
+          </div>
+        </div>
+
+        <!-- bgm_slot: FUTURE -->
+        <div class="slot future">
+          <div class="sname">背景音乐槽<code>bgm_slot</code></div>
+          <div class="sbody">
+            <span class="sclass fut">后续工作流 · 暂不可编辑</span>
+            <div class="ro" style="margin-top:6px">背景音乐：<b>后续工作流</b> · 本线暂无 BGM 工作流，当前不可编辑</div>
+            <div class="statusline">状态：后续工作流（暂不可编辑）—— 无可点操作</div>
+            <div class="helper">仅以状态呈现，不提供任何按钮；待真实后台动作落地并通过 Gate Spec 后再开放为可编辑槽位。</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4) Assignment Model -->
+      <div class="assign">
+        <h4>④ 处理决策（Assignment）— 唯一由运营改动的对象</h4>
+        <div class="kv"><span class="k">决策选项</span><span class="v">使用当前素材 / 补充素材 / 替换素材 / 跳过此镜头</span></div>
+        <div class="kv"><span class="k">当前决策</span><span class="v">补充素材</span></div>
+        <div class="kv"><span class="k">绑定素材</span><span class="v">04_eat_tomato.png（运营上传）</span></div>
+        <div class="kv"><span class="k">锁定状态</span><span class="v lock">已锁定进入下一次 V2</span></div>
+        <div class="kv"><span class="k">V2 消费状态</span><span class="v pend">尚未被 V2 消费</span></div>
+        <div class="helper">镜头与槽位都是只读结构；只有 Assignment（决策 + 绑定素材）由运营改动。它记录意图与上传字节，不计算新的真值。</div>
+      </div>
+    </div>
+    <div class="note">对比旧模型：旧 B 区把 5+ 个镜头全部展开为等大卡片；v2 用「队列扫描 + 单一活动面板」承载 10+ 镜头，待处理镜头一眼可见。</div>
+  </div>
+</section>
+
+<!-- ============ C 区 ============ -->
+<section class="zone" id="zone-c">
+  <div class="zone-head">
+    <span class="ix bl">C</span>
+    <h2>批量再次生成 → V1 / V2 对比 → 确认 / 丢弃</h2>
+    <span class="step-tag">步骤 5–6 · 最关键</span>
+  </div>
+  <div class="zone-body">
+
+    <!-- 5) Batch Regenerate Entry -->
+    <div class="slabel">⑤ 批量再次生成入口（在选定镜头改动之后一次性生成，而非每张卡片各自再生成）</div>
+    <div class="batchbar">
+      <span class="bbtn">已选择 3 个镜头调整，生成 / 更新 V2 预览</span>
+      <span class="bexpl">在你处理完选定镜头<b>之后</b>统一触发一次再次生成。</span>
+    </div>
+    <div class="v2state">
+      <div>① 已有一版 <b>V2 候选</b>（先前已把 Shot 03 的上传素材生成进 V2）。</div>
+      <div>② 本次「生成 / 更新 V2 预览」会在<b>同一个 V2 候选</b>上，把这 3 个镜头一起更新进去——不是另开一版，是更新当前候选。</div>
+      <div>③ 当前主视频<b>始终是 V1</b>；只有你在下方<b>明确「确认 V2 为主版本」</b>，V2 才会成为主视频。确认前 V1 不变、交付不变。</div>
+    </div>
+    <div class="selset">本次将更新进 V2 的镜头：<b>Shot 04（补充）</b> · <b>Shot 05（替换）</b> · <b>Shot 06（替换）</b>。其余镜头保持不变。</div>
+
+    <div class="cmp">
+      <div class="col">
+        <h4><span class="pill ok"><span class="dot"></span>V1</span> 当前主版本</h4>
+        <div class="videoframe"><span class="vbadge">V1</span>主视频（V1）</div>
+        <div class="helper" style="margin-top:8px">这是目前交付候选所跟随的版本。</div>
+      </div>
+      <div class="col v2">
+        <h4><span class="pill cand"><span class="dot"></span>V2</span> 新预览候选（未确认 · 始终是候选）</h4>
+        <div class="videoframe"><span class="vbadge">V2 · 候选</span>新预览（V2）</div>
+        <div class="helper" style="margin-top:8px">这一版 V2 候选包含 / 即将包含的上传素材：</div>
+        <ul class="changed">
+          <li><b>Shot 03</b> · 已生成进当前 V2 候选（运营上传素材）</li>
+          <li><b>Shot 04</b> 补充 · 本次再次生成时更新进同一 V2 候选</li>
+          <li><b>Shot 05 / 06</b> 替换 · 本次再次生成时更新进同一 V2 候选</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="guard">🔒 V2 在你<b>确认</b>之前不会成为主版本，也不会影响交付候选。交付始终跟随已确认的主版本。</div>
+
+    <div class="decide">
+      <span class="btn primary">确认 V2 为主版本</span>
+      <span class="btn danger">丢弃 V2</span>
+      <span class="btn">继续调整</span>
+    </div>
+    <div class="helper">确认后：V2 成为当前主视频，交付候选切换到 V2，镜头调整意图清空。丢弃后：保留 V1，移除候选。失败 / 丢弃都不会覆盖 V1。</div>
+  </div>
+</section>
+
+<!-- ============ D 区 ============ -->
+<section class="zone">
+  <div class="zone-head">
+    <span class="ix">D</span>
+    <h2>交付候选</h2>
+    <span class="step-tag">步骤 7 · 终点</span>
+  </div>
+  <div class="zone-body">
+    <div class="kv"><span class="k">当前交付候选</span><span class="v">主视频 V1</span></div>
+    <div class="kv"><span class="k">V2 确认后</span><span class="v">交付候选才会切换到 V2</span></div>
+    <div class="kv"><span class="k">正式交付就绪</span><span class="v falseflag">否</span></div>
+    <div class="helper" style="margin-top:10px">
+      交付候选只跟随<b>已确认</b>的主版本。当前 V2 尚未确认，因此交付仍是 V1。完整成片与下载在交付页面，本面板不内嵌外部链接。
+    </div>
+  </div>
+</section>
+
+<!-- ============ E 区 ============ -->
+<section class="zone">
+  <div class="zone-head">
+    <span class="ix vi">E</span>
+    <h2>进阶 / 诊断（默认折叠）</h2>
+    <span class="step-tag">非主路径</span>
+  </div>
+  <div class="zone-body">
+    <details class="adv">
+      <summary>视频变体</summary>
+      <div class="adv-body">在主版本确认后，可在此基于已确认主视频生成不同时长 / 渠道的变体。属于进阶能力，不在主流程内。</div>
+    </details>
+    <details class="adv">
+      <summary>脚本理解 / 故事理解</summary>
+      <div class="adv-body">脚本结构、分镜与节奏的只读说明，作为生成背景上下文，按需展开。</div>
+    </details>
+    <details class="adv">
+      <summary>过程记录 / 技术诊断</summary>
+      <div class="adv-body">
+        运营可读的处理记录（不含技术细节）：
+        <ul class="log">
+          <li>已记录处理方式：Shot 04 补充素材</li>
+          <li>上传成功：Shot 04 · 04_eat_tomato.png</li>
+          <li>已记录处理方式：Shot 05 / 06 替换素材</li>
+          <li>已标记跳过：Shot 08</li>
+          <li>已选择 3 个镜头调整，等待批量再次生成 V2</li>
+          <li>当前等待：对比 V1 / V2 并确认主版本</li>
+        </ul>
+        <div class="note">过程记录为运营安全文案，不含 local_path / 原始 manifest / provider URL / 发布 URL / Akool 字段。原始技术字段属于 J · 技术诊断（架构视图），此处不展开。</div>
+      </div>
+    </details>
+  </div>
+</section>
+
+<div class="note" style="margin-top:24px">
+  本页为静态预览，所有按钮与状态均为示意，不触发任何请求。判读重点：10 个镜头是否一屏可扫、是否清楚「现在在处理哪个镜头」、
+  哪些槽位<b>现在可改</b>、哪些是<b>仅展示 / 后续工作流</b>（不被误当成可编辑）、Assignment 是否清晰、「批量再次生成」是否比「每卡各自再生成」更合理、
+  以及 V1/V2 与「确认前不影响交付」是否保持不变。
+</div>
+
+</div>
+</body>
+</html>
