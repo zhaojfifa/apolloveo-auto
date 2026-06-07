@@ -138,6 +138,15 @@ authorize backend/storage/provider/schema/contract change. Code begins only afte
 its §10 architect + reviewer signoff merges, one slice at a time.**
 `docs/design/MATRIX_SCRIPT_GUIDED_OPERATOR_WORKFLOW_GATE_SPEC_20260607.md`
 
+**Guided Operator Workflow — engineering-CLOSED (PR-1..PR-5).** All five
+presentation/projection-only slices merged: A区 state narration (#220), B区 shot-card
+convergence (#223), C区 V1/V2 compare-confirm (#224), D区 delivery wording /
+R-DELIVERY-WORDING (#225), E区 diagnostics fold + action log (#226). Closeout
+(acceptance audit §6 — all A-1..A-15 PASS; no-leak / forbidden-path / four-layer /
+behavior-preservation audits PASS): `docs/execution/MATRIX_SCRIPT_GUIDED_OPERATOR_WORKFLOW_CLOSEOUT_20260607.md`.
+Two pre-existing copy issues recorded as deferred follow-up candidates (raw
+`基于素材意图` enum; legacy A-J delivery wording) — not fixed in the wave.
+
 **Next recommended phase — production browser validation, then P2.** Prove the
 end-to-end operator flow in a real browser (upload Shot material → regenerate V2
 from uploaded bytes → confirm V2 → delivery follows V2, with honest usage copy
