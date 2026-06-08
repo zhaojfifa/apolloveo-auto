@@ -866,7 +866,7 @@ def build_matrix_script_operator_workbench_view(
     # Storyboard Control + Shot Workbench wave PR-1: projection-only Storyboard
     # Queue + single Current Shot Work Panel (§7 fields). No provider call, no
     # Prompt Builder, no route, no new truth — pure projection over the cards.
-    generation_plan = gen_plan.derive_matrix_script_generation_plan_view(shots=shots)
+    generation_plan = gen_plan.derive_matrix_script_generation_plan_view(shots=shots, task=task)
     missing_material_count = sum(
         1 for s in shots
         if not s.get("material_attached") and s.get("source") == PLAN_SOURCE_REUSE

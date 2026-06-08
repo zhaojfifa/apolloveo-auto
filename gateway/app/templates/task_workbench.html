@@ -860,7 +860,7 @@
                   <span class="op-meta-item__label">素材角色</span>
                   <span class="op-meta-item__value">{{ cs.material_role_zh }}</span>
                 </div>
-                <div class="op-meta-item" data-role="ms-current-shot-ai-requirement" data-status-code="{{ cs.ai_requirement_status_code }}">
+                <div class="op-meta-item" data-role="ms-current-shot-ai-requirement" data-status-code="{{ cs.ai_requirement_status_code }}" data-ai-requirement-source="{{ cs.ai_requirement_source }}">
                   <span class="op-meta-item__label">AI 生成要求</span>
                   <span class="op-meta-item__value">{{ cs.ai_requirement_zh }}</span>
                 </div>
@@ -873,6 +873,12 @@
                   <span class="op-meta-item__value">{{ cs.current_generation_status_zh }}</span>
                 </div>
               </div>
+              {% if cs.rewrite_requirement_note_zh %}
+              <div data-role="ms-current-shot-rewrite" data-ai-requirement-source="{{ cs.ai_requirement_source }}" class="muted" style="font-size:12px; margin-top:8px;">{{ cs.rewrite_requirement_note_zh }}</div>
+              {% endif %}
+              {% if cs.generation_diagnostic_zh %}
+              <div data-role="ms-current-shot-diagnostic" class="muted" style="font-size:12px; margin-top:2px;">诊断：{{ cs.generation_diagnostic_zh }}</div>
+              {% endif %}
               <div data-role="ms-current-shot-pending-actions" class="muted" style="font-size:12px; margin-top:8px;">
                 {% for a in cs.pending_actions_zh %}<span style="margin-right:10px;">{{ a }}</span>{% endfor %}
                 <div style="margin-top:4px;">{{ cs.replace_material_hint_zh }}</div>
