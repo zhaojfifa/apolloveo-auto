@@ -845,6 +845,13 @@ def build_matrix_script_operator_workbench_view(
         resolved is not None
         and str(resolved.get("status") or "") not in _NON_SUCCESS_STATUSES
     )
+    # Real-video heavy batch: operator-safe capability status (voiceover / image_to_video
+    # / subtitles / bgm) + voiceover status, surfaced read-only from the staged result.
+    _cap = resolved.get("capability_status") if isinstance(resolved, Mapping) else None
+    capability_status = _cap if isinstance(_cap, Mapping) else {}
+    voiceover_status = (
+        resolved.get("voiceover_status") if isinstance(resolved, Mapping) else None
+    )
     main_result = _build_main_result(resolved, clock)
     intents = _material_intents(task)
     shots = _build_shots(has_result, intents)
@@ -930,6 +937,9 @@ def build_matrix_script_operator_workbench_view(
             "preview_url": main_result["preview_url"],
             "official_publish_ready": False,
         },
+        # Real-video heavy batch: operator-safe capability status (read-only projection).
+        "capability_status": capability_status,
+        "voiceover_status": voiceover_status,
         "generate_endpoint": "/api/matrix-script/{task_id}/tomato-real-result",
     }
     _assert_clean(view)

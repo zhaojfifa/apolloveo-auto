@@ -247,6 +247,101 @@ def test_orchestrator_backbone_consumes_replacement_material(tmp_path) -> None:
     assert os.path.getsize(res.final_video_path) > 0
 
 
+@_skip_no_ffmpeg
+@_skip_no_assets
+def test_orchestrator_voiceover_status_and_capability_status_no_creds(tmp_path) -> None:
+    """With no TTS credentials, voiceover is honestly blocked + capability status is operator-safe."""
+    from gateway.app.services.matrix_script.tomato_real_result_orchestrator import (
+        run_tomato_real_result, tomato_result_to_payload,
+    )
+
+    res = run_tomato_real_result(
+        {"task_id": "tomato-voice", "kind": "matrix_script"}, str(tmp_path),
+        sink=InMemoryArtifactSink(), env={},
+    )
+    # honest: no fake voiceover — silent fallback + blocked status
+    assert res.voiceover_status == "blocked_credential_missing"
+    assert res.audio_mode == "silent_fallback"
+    cap = res.capability_status
+    assert cap["voiceover"]["status"] == "blocked_credential_missing"
+    assert cap["voiceover"]["generated"] is False
+    assert cap["image_to_video"]["status"] == "blocked_credential_missing"
+    assert cap["subtitles"]["status"] == "generated"   # burned captions
+    assert cap["bgm"]["status"] == "not_selected"
+    # final video still playable + publish-ready stays false
+    assert os.path.getsize(res.final_video_path) > 0
+    assert res.acceptance["official_publish_ready"] is False
+    # operator-safe: no provider/vendor/secret leak in payload capability status
+    payload = tomato_result_to_payload(res)
+    assert payload["voiceover_status"] == "blocked_credential_missing"
+    blob = str(payload["capability_status"]).lower()
+    for token in ("azure", "kling", "runway", "veo", "akool", "speech_key", "api_key"):
+        assert token not in blob
+
+
+@_skip_no_ffmpeg
+@_skip_no_assets
+def test_orchestrator_composes_real_voiceover_when_tts_available(tmp_path, monkeypatch) -> None:
+    """When a TTS path yields audio, it is composed into final.mp4 (real, not faked)."""
+    import subprocess
+    from gateway.app.services.matrix_script import tomato_real_result_orchestrator as orch
+    from gateway.app.services.matrix_script import voiceover_capability as vc
+
+    def fake_synth(text, out_path, *, env, voice):
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        subprocess.run(
+            ["ffmpeg", "-y", "-f", "lavfi", "-i", "sine=frequency=440:duration=18",
+             "-ar", "44100", "-ac", "1", out_path],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True,
+        )
+        return vc.VoiceoverOutcome(vc.STATUS_GENERATED, vc.PROVIDER_EDGE, out_path)
+
+    monkeypatch.setattr(orch, "_voiceover_synth", fake_synth)
+    res = orch.run_tomato_real_result(
+        {"task_id": "tomato-voice-ok", "kind": "matrix_script"}, str(tmp_path),
+        sink=InMemoryArtifactSink(), env={},
+    )
+    assert res.voiceover_status == "generated"
+    assert res.audio_mode == "edge_tts"
+    assert res.capability_status["voiceover"]["operator_label_zh"] == "旁白已生成"
+    # the composed final carries a non-silent audio stream
+    vol = subprocess.run(
+        ["ffmpeg", "-i", res.final_video_path, "-af", "volumedetect", "-f", "null", "-"],
+        capture_output=True, text=True,
+    )
+    means = [l for l in vol.stderr.splitlines() if "mean_volume" in l]
+    assert means, "no volumedetect output"
+    db = float(means[0].split("mean_volume:")[1].split("dB")[0].strip())
+    assert db > -80.0  # real narration, not pure silence
+
+
+def test_operator_workbench_view_surfaces_capability_status() -> None:
+    """The operator workbench view passes capability status through (read-only)."""
+    from gateway.app.services.matrix_script.operator_workbench_view import (
+        build_matrix_script_operator_workbench_view,
+    )
+
+    staged = {
+        "has_result": True, "operator_usable": True, "delivery_candidate": True,
+        "visual_semantic_match": "partial_pass", "shot_count": 5,
+        "real_visual_count": 3, "shot_match_count": 3,
+        "preview_url": "/api/matrix-script/t/preview-version/V1/final.mp4",
+        "voiceover_status": "blocked_credential_missing",
+        "capability_status": {
+            "voiceover": {"capability": "voiceover", "status": "blocked_credential_missing",
+                          "generated": False, "operator_label_zh": "旁白未生成 · 缺少语音凭证（已保留静音）"},
+            "subtitles": {"capability": "subtitles", "status": "generated",
+                          "operator_label_zh": "字幕已烧录"},
+        },
+    }
+    task = {"task_id": "t", "kind": "matrix_script",
+            "config": {"matrix_script_staged_candidate": staged}}
+    view = build_matrix_script_operator_workbench_view(task)
+    assert view["voiceover_status"] == "blocked_credential_missing"
+    assert view["capability_status"]["subtitles"]["status"] == "generated"
+    assert view["capability_status"]["voiceover"]["generated"] is False
+
+
 def test_orchestrator_raises_without_assets(tmp_path) -> None:
     if not _FFMPEG:
         pytest.skip("ffmpeg not installed")

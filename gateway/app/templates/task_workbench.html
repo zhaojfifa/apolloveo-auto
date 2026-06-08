@@ -381,6 +381,19 @@
                 <video controls preload="metadata" src="{{ ms_effective_preview_url }}"
                        data-role="ms-main-video-result-video"
                        style="width:100%; aspect-ratio:9/16; max-height:560px; border-radius:10px; background:#0f172a;"></video>
+                {# Real-video heavy batch: operator-safe capability status strip.
+                   Honest labels only — generated / blocked / not-selected; no provider
+                   brand, no local_path, no token. #}
+                {% if ms_overlay.capability_status %}
+                  {% set _cap = ms_overlay.capability_status %}
+                  <div data-role="ms-capability-status"
+                       style="margin-top:8px; font-size:12px; color:var(--op-fg-soft,#64748b); display:flex; flex-wrap:wrap; gap:10px;">
+                    {% if _cap.voiceover %}<span data-role="ms-cap-voiceover" data-status="{{ _cap.voiceover.status }}">🔊 {{ _cap.voiceover.operator_label_zh }}</span>{% endif %}
+                    {% if _cap.subtitles %}<span data-role="ms-cap-subtitles" data-status="{{ _cap.subtitles.status }}">💬 {{ _cap.subtitles.operator_label_zh }}</span>{% endif %}
+                    {% if _cap.image_to_video %}<span data-role="ms-cap-image-to-video" data-status="{{ _cap.image_to_video.status }}">🎬 {{ _cap.image_to_video.operator_label_zh }}</span>{% endif %}
+                    {% if _cap.bgm %}<span data-role="ms-cap-bgm" data-status="{{ _cap.bgm.status }}">🎵 {{ _cap.bgm.operator_label_zh }}</span>{% endif %}
+                  </div>
+                {% endif %}
               </div>
             {% elif ms_main_video_result.preview.available %}
               <div data-role="ms-main-video-result-preview-bound"
