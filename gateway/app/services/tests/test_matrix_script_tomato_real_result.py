@@ -265,7 +265,8 @@ def test_orchestrator_voiceover_status_and_capability_status_no_creds(tmp_path) 
     cap = res.capability_status
     assert cap["voiceover"]["status"] == "blocked_credential_missing"
     assert cap["voiceover"]["generated"] is False
-    assert cap["image_to_video"]["status"] == "blocked_credential_missing"
+    # image_to_video uses the Akool capability taxonomy; no flag/creds → credential_missing
+    assert cap["image_to_video"]["status"] == "credential_missing"
     assert cap["subtitles"]["status"] == "generated"   # burned captions
     assert cap["bgm"]["status"] == "not_selected"
     # final video still playable + publish-ready stays false

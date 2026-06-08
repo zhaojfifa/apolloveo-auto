@@ -41,6 +41,7 @@ from gateway.app.services.matrix_script.real_asset_scene_renderer import (
 )
 from gateway.app.services.matrix_script import ffmpeg_backbone as backbone
 from gateway.app.services.matrix_script import voiceover_capability
+from gateway.app.services.matrix_script import akool_image_to_video_capability as akool_i2v
 from gateway.app.services.matrix_script.simple_scene_renderer import (
     FFmpegUnavailableError,
     assemble_final_video,
@@ -72,17 +73,16 @@ AUDIO_MODE_SILENT = "silent_fallback"
 CAPTION_MODE_BURNED = "burned_in"
 CAPTION_MODE_SIDECAR = "sidecar_only"
 
-# image_to_video credential env vars probed for the operator-safe capability status
-# (presence only — values are never read into any artifact/log).
-_I2V_CREDENTIAL_ENVS = (
-    "KLING_API_KEY", "RUNWAY_API_KEY", "VEO_API_KEY",
-    "FAL_KEY", "AKOOL_CLIENT_ID", "GOOGLE_APPLICATION_CREDENTIALS",
-)
-
 # Scene engine + per-shot render-mode markers recorded on the manifest (operator-safe).
 SCENE_ENGINE_BACKBONE = "ffmpeg_backbone"
 RENDER_MODE_PROXY = "ffmpeg_backbone_proxy"
 RENDER_MODE_STATIC = "ffmpeg_backbone_static_still"
+# Vendor-agnostic render-mode token (the capability KIND, never the vendor name).
+RENDER_MODE_AKOOL = "provider_image_to_video"
+
+# The single shot that attempts real Akool image_to_video generation when enabled
+# (a real-visual product shot). One shot per run keeps provider cost bounded.
+AKOOL_SHOT_ID = "shot02"
 
 _DEFAULT_VOICE = voiceover_capability.DEFAULT_VOICE
 
@@ -300,7 +300,16 @@ def _render_shot_via_backbone(
     render_mode = (
         RENDER_MODE_STATIC if clip.tier == backbone.TIER_STATIC_STILL else RENDER_MODE_PROXY
     )
-    caption_burned = False
+    caption_burned = _overlay_caption_or_promote(motion_path, out_clip, shot=shot, work_dir=work_dir)
+    return _BackboneShotRender(render_mode=render_mode, caption_burned=caption_burned)
+
+
+def _overlay_caption_or_promote(motion_path: str, out_clip: str, *, shot, work_dir: str) -> bool:
+    """Burn the shot caption onto a motion clip (1080×1920) or promote it as-is.
+
+    Shared by the backbone and the Akool image_to_video paths so both carry the same
+    burned-in caption behavior. Returns whether a caption was burned.
+    """
     caption_text = (shot.subtitle_zh or "").strip()
     if caption_text:
         caption_png = render_caption_png(
@@ -311,10 +320,9 @@ def _render_shot_via_backbone(
         )
         if caption_png:
             overlay_caption(motion_path, caption_png, out_clip)
-            caption_burned = True
-    if not caption_burned:
-        os.replace(motion_path, out_clip)
-    return _BackboneShotRender(render_mode=render_mode, caption_burned=caption_burned)
+            return True
+    os.replace(motion_path, out_clip)
+    return False
 
 
 def _narration_text(shots) -> str:
@@ -332,30 +340,33 @@ def _voiceover_synth(text, out_path, *, env, voice):
 
 def _build_capability_status(
     *, voiceover, any_caption_burned: bool, env: Optional[Mapping[str, str]],
+    akool_result: Optional["akool_i2v.AkoolShotResult"] = None,
 ) -> Dict[str, Any]:
     """Operator-safe capability status for voiceover / image_to_video / subtitles / bgm.
 
     Honest by construction: no provider/vendor brand in the operator label; no secret
     (only credential presence is checked); a missing capability is reported as blocked /
-    not-selected, never faked.
+    not-selected, never faked. When a real Akool image_to_video one-shot was attempted,
+    its honest per-shot status is surfaced directly.
     """
     src = env if env is not None else os.environ
-    i2v_creds = any((src.get(name) or "").strip() for name in _I2V_CREDENTIAL_ENVS)
-    return {
-        "scene_engine": SCENE_ENGINE_BACKBONE,
-        # image_to_video: generative provider stays gated behind a credentialed trial;
-        # with no credential we honestly report blocked + keep the backbone proxy.
-        "image_to_video": {
+    if akool_result is not None:
+        image_to_video = akool_result.to_status_dict()
+    else:
+        akool_ready = akool_i2v.real_enabled(src) and akool_i2v.credentials_present(src)
+        image_to_video = {
             "capability": "image_to_video",
-            "status": (
-                "available_not_run" if i2v_creds
-                else voiceover_capability.STATUS_BLOCKED_CREDENTIAL_MISSING
-            ),
+            "status": ("available_not_run" if akool_ready else akool_i2v.STATUS_CREDENTIAL_MISSING),
+            "provider_attempted": False,
+            "succeeded": False,
             "operator_label_zh": (
-                "AI 视频生成可用（未启用）" if i2v_creds
+                "AI 视频生成可用（未启用）" if akool_ready
                 else "AI 视频生成未启用 · 缺少凭证（使用镜头代理）"
             ),
-        },
+        }
+    return {
+        "scene_engine": SCENE_ENGINE_BACKBONE,
+        "image_to_video": image_to_video,
         "voiceover": voiceover.to_status_dict(),
         "subtitles": {
             "capability": "subtitles",
@@ -431,9 +442,16 @@ def run_tomato_real_result(
     #    one real TTS narration track over the whole timeline in step 3).
     durations: List[float] = [DEFAULT_SHOT_SECONDS for _ in shots]
 
-    # 2. Render each shot clip THROUGH THE FFMPEG BACKBONE (image → 1080×1920
-    #    Ken-Burns proxy) + the existing caption overlay. The SOURCE pixels may be
-    #    swapped for resolvable uploaded/replacement material bytes (#212).
+    # Real Akool image_to_video is attempted for ONE designated shot when enabled
+    # (flag + credential). Any failure degrades to the backbone proxy with an honest
+    # per-shot status — never a fake provider clip.
+    akool_enabled = akool_i2v.real_enabled(env) and akool_i2v.credentials_present(env)
+    akool_shot_result: Optional[akool_i2v.AkoolShotResult] = None
+
+    # 2. Render each shot clip. The designated shot attempts real Akool image_to_video
+    #    (when enabled); every other shot renders THROUGH THE FFMPEG BACKBONE (image →
+    #    1080×1920 Ken-Burns proxy). The SOURCE pixels may be swapped for resolvable
+    #    uploaded/replacement material bytes (#212). Captions burned on all paths.
     scene_clip_paths: List[str] = []
     shot_facts: List[ShotRenderFact] = []
     checklist: List[Dict[str, Any]] = []
@@ -451,15 +469,29 @@ def run_tomato_real_result(
             render_source, consumed = _resolve_shot_render_source(
                 shot.shot_id, image_path, material_overrides, work_dir
             )
-            render_out = _render_shot_via_backbone(
-                render_source, work_dir, out_clip, shot=shot, duration_seconds=dur,
-            )
+            ak: Optional[akool_i2v.AkoolShotResult] = None
+            if akool_enabled and shot.shot_id == AKOOL_SHOT_ID:
+                ak = akool_i2v.generate_shot_clip_akool(
+                    still_path=render_source,
+                    out_clip=os.path.join(work_dir, f"{shot.shot_id}_akool.mp4"),
+                    task_id=task_id or LINE_ID, shot_id=shot.shot_id, env=env,
+                )
+                akool_shot_result = ak
+            if ak is not None and ak.succeeded:
+                # Real provider clip → burn the caption on top (same as backbone path).
+                cb = _overlay_caption_or_promote(ak.clip_path, out_clip, shot=shot, work_dir=work_dir)
+                render_mode = RENDER_MODE_AKOOL
+                any_caption_burned = any_caption_burned or cb
+            else:
+                # No Akool attempt, or it failed → honest backbone proxy fallback.
+                render_out = _render_shot_via_backbone(
+                    render_source, work_dir, out_clip, shot=shot, duration_seconds=dur,
+                )
+                render_mode = render_out.render_mode
+                any_caption_burned = any_caption_burned or render_out.caption_burned
             rendered = True
-            any_caption_burned = any_caption_burned or render_out.caption_burned
             scene_clip_paths.append(out_clip)
-            per_shot_render.append(
-                {"shot_id": shot.shot_id, "render_mode": render_out.render_mode}
-            )
+            per_shot_render.append({"shot_id": shot.shot_id, "render_mode": render_mode})
             if consumed:
                 consumed_material_shot_ids.append(shot.shot_id)
         shot_facts.append(ShotRenderFact(
@@ -567,6 +599,7 @@ def run_tomato_real_result(
     # 5c. Operator-safe capability status (voiceover / image_to_video / subtitles / bgm).
     capability_status = _build_capability_status(
         voiceover=voiceover, any_caption_burned=any_caption_burned, env=env,
+        akool_result=akool_shot_result,
     )
 
     # 6. Manifest (real local relative paths only).
