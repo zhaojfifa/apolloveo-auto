@@ -61,7 +61,7 @@ def _invocation() -> AdapterInvocation:
 def _success_transport() -> _TransportSpy:
     return _TransportSpy([
         AkoolHttpResponse(200, {"code": 1000, "data": {"_id": "job-1", "status": 1}}),
-        AkoolHttpResponse(200, {"code": 1000, "data": {"video_status": 3, "video_url": "https://tmp.akool/x.mp4"}}),
+        AkoolHttpResponse(200, {"code": 1000, "data": {"video_status": 3, "video": "https://tmp.akool/x.mp4"}}),
     ])
 
 

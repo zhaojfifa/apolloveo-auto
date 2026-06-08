@@ -75,7 +75,7 @@ def test_provider_success_downloads_and_normalizes(tmp_path) -> None:
     res = ak.generate_shot_clip_akool(
         still_path=_png(tmp_path), out_clip=str(tmp_path / "shot.mp4"),
         task_id="t", shot_id="shot02", env=_ENABLED,
-        transport=_create_then({"code": 1000, "data": {"video_status": 3, "video_url": "https://tmp/x.mp4"}}),
+        transport=_create_then({"code": 1000, "data": {"video_status": 3, "video": "https://tmp/x.mp4"}}),
         host_image=_host, download=_dl_makes_clip,
     )
     assert res.status == ak.STATUS_PROVIDER_SUCCESS and res.succeeded
