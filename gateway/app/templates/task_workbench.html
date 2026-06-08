@@ -903,6 +903,39 @@
             {% endif %}
           </div>
           {% endif %}
+          {# Multi-Shot wave (Part C) — operator-safe "AI 生成请求过程" panel: per-shot AI
+             generation lifecycle (prompt source / role / status / entered-final / time / fallback).
+             Reads capability_status.ai_generation_request_process. Operator language only — no
+             engineering identifiers, no brand, no key/URL/task-id (guarded by the panel scan +
+             _assert_clean; the R3 red-line words are intentionally absent from this markup). #}
+          {% set ms_cap = ms_overlay.capability_status or {} %}
+          {% set ms_aigen_panel = ms_cap.ai_generation_request_process %}
+          {% if ms_aigen_panel and ms_aigen_panel.rows %}
+          <details data-role="ms-ai-generation-process-fold" data-panel-key="{{ ms_aigen_panel.panel_key }}"
+                   style="margin-top:12px; padding:10px; border:1px solid var(--op-border,#e2e8f0); border-radius:10px;">
+            <summary style="cursor:pointer; font-weight:600;">
+              <span class="op-section-index" style="margin-right:8px;">AI 生成请求过程</span>
+              <span class="muted" style="font-weight:400; font-size:12px;">{{ ms_aigen_panel.summary_zh }}</span>
+            </summary>
+            <div data-role="ms-ai-generation-rows" style="display:flex; flex-direction:column; gap:6px; margin-top:10px;">
+              {% for row in ms_aigen_panel.rows %}
+              <div data-role="ms-ai-generation-row" data-shot-id="{{ row.shot_id }}"
+                   data-status-code="{{ row.status_code }}" data-prompt-source="{{ row.prompt_source_label_zh }}"
+                   style="display:flex; gap:8px; align-items:center; flex-wrap:wrap; padding:6px 8px; border-radius:6px; background:var(--op-bg-subtle,#f8fafc);">
+                <span data-role="ms-aigen-shot" style="min-width:120px; font-weight:600;">{{ row.shot_title_zh }}</span>
+                <span class="op-pill op-pill--neutral" data-role="ms-aigen-role">{{ row.material_role_label_zh }}</span>
+                <span class="op-pill op-pill--neutral" data-role="ms-aigen-source">提示词 · {{ row.prompt_source_label_zh }}</span>
+                <span class="op-pill" data-role="ms-aigen-status">{{ row.status_label_zh }}</span>
+                <span class="muted" data-role="ms-aigen-entered" style="font-size:12px;">进入成片：{{ row.entered_final_zh }}</span>
+                <span class="muted" data-role="ms-aigen-time" style="font-size:12px;">用时：{{ row.generation_time_zh }}</span>
+                <span class="muted" data-role="ms-aigen-poll" style="font-size:12px;">{{ row.poll_summary_zh }}</span>
+                {% if row.fallback_reason_zh %}<span class="muted" data-role="ms-aigen-fallback" style="font-size:12px;">{{ row.fallback_reason_zh }}</span>{% endif %}
+                <span class="muted" data-role="ms-aigen-prompt-summary" style="font-size:12px; flex-basis:100%;">{{ row.prompt_summary_zh }}</span>
+              </div>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
           {% if ms_overlay.shots %}
           <div data-role="ms-primary-shot-material-list"
                data-shot-count="{{ ms_overlay.shots | length }}"
