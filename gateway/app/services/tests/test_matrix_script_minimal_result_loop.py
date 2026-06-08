@@ -226,3 +226,74 @@ def test_full_loop_is_deterministic_in_structure(tmp_path) -> None:
     assert ra.manifest["manifest_id"] == rb.manifest["manifest_id"]
     assert ra.manifest["scene_clip_paths"] == rb.manifest["scene_clip_paths"]
     assert ra.manifest["shot_count"] == rb.manifest["shot_count"]
+
+
+# ---------------------------------------------------------------------------
+# ffmpeg backbone integration (Integration Batch)
+# ---------------------------------------------------------------------------
+
+
+def test_build_manifest_dict_backbone_keys_are_additive_and_clean() -> None:
+    plan = _plan()
+    m = build_manifest_dict(
+        plan=plan,
+        scene_clip_relpaths=["shots/a.mp4"],
+        audio_relpath="audio/n.wav",
+        subtitle_relpath="subtitles/s.srt",
+        final_video_relpath="final/final.mp4",
+        scene_strategy=loop_module.SCENE_STRATEGY_BACKBONE,
+        per_shot_render=[{"shot_id": "s1", "render_mode": loop_module.RENDER_MODE_PROXY}],
+        qc={"passed": True, "resolution": "1080x1920", "codec": "h264", "official_publish_ready": False},
+        backbone_summary={"engaged": True, "is_generative": False, "official_publish_ready": False},
+    )
+    assert m["scene_strategy"] == "ffmpeg_backbone_proxy"
+    assert m["per_shot_render"][0]["render_mode"] == loop_module.RENDER_MODE_PROXY
+    assert m["qc"]["passed"] is True
+    assert m["backbone"]["is_generative"] is False
+    # legacy default omits the additive keys (manifest shape preserved)
+    m2 = build_manifest_dict(
+        plan=plan, scene_clip_relpaths=[], audio_relpath="a", subtitle_relpath="s",
+        final_video_relpath="f",
+    )
+    assert "qc" not in m2 and "per_shot_render" not in m2 and "backbone" not in m2
+    assert m2["scene_strategy"] == "ffmpeg_color_card"
+
+
+@_skip_no_ffmpeg
+def test_backbone_engaged_when_shot_images_provided(tmp_path) -> None:
+    from gateway.app.services.matrix_script import ffmpeg_backbone as backbone
+    plan = _plan(task_id="bbt", dur=8.0)
+    shot_ids = [s.shot_id for s in plan.shots]
+    still = str(tmp_path / "still.png")
+    backbone._run([backbone.ffmpeg_path(), "-y", "-f", "lavfi", "-i",
+                   "color=c=red:s=900x1600:d=1", "-frames:v", "1", still])
+    out_dir = str(tmp_path / "out")
+    os.makedirs(out_dir, exist_ok=True)
+    result = run_minimal_result_loop(
+        _outline(), out_dir, task_id="bbt", target_duration_seconds=8.0,
+        shot_images={shot_ids[0]: still},
+    )
+    m = result.manifest
+    assert m["scene_strategy"] == loop_module.SCENE_STRATEGY_BACKBONE
+    modes = {r["shot_id"]: r["render_mode"] for r in m["per_shot_render"]}
+    assert modes[shot_ids[0]] in (loop_module.RENDER_MODE_PROXY, loop_module.RENDER_MODE_STATIC)
+    # shots without a still fall back to the color-card path (preserved)
+    assert any(v == loop_module.RENDER_MODE_COLOR_CARD for k, v in modes.items() if k != shot_ids[0])
+    # ffprobe QC evidence present + passes + backbone resolution
+    assert m["qc"]["passed"] is True
+    assert m["qc"]["resolution"] == "1080x1920"
+    assert m["qc"]["official_publish_ready"] is False
+    assert m["backbone"]["official_publish_ready"] is False
+    assert m["backbone"]["is_generative"] is False
+    assert os.path.exists(result.final_video_path)
+
+
+@_skip_no_ffmpeg
+def test_no_shot_images_keeps_legacy_color_card(tmp_path) -> None:
+    out_dir = str(tmp_path / "out")
+    os.makedirs(out_dir, exist_ok=True)
+    result = run_minimal_result_loop(_outline(), out_dir, task_id="legacy", target_duration_seconds=8.0)
+    assert result.manifest["scene_strategy"] == SCENE_STRATEGY == "ffmpeg_color_card"
+    assert "qc" not in result.manifest
+    assert "per_shot_render" not in result.manifest
+    assert "backbone" not in result.manifest
