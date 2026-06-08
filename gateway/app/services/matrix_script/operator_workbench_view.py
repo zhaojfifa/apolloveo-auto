@@ -817,6 +817,35 @@ def _build_generation_facts(
     return {"current_main": current_main, "candidate": version_view.get("new_preview")}
 
 
+def _build_candidate_change_explanation(
+    capability_status: Mapping[str, Any],
+    version_view: Mapping[str, Any],
+    shots: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """PR-4: operator-safe V1/V2 shot-change explanation for a script-directed
+    provider regeneration — which shot changed, the material role used, an
+    operator-safe generation summary, and the provider/fallback outcome. Pure
+    projection over the staged result's capability status; no raw prompt / URL /
+    vendor. Returns None unless a script-directed provider attempt was made.
+    """
+    cap = capability_status.get("image_to_video") if isinstance(capability_status, Mapping) else None
+    if not isinstance(cap, Mapping) or not cap.get("script_directed"):
+        return None
+    target_id = str(cap.get("provider_target_shot_id") or "")
+    label = next(
+        (s.get("title") for s in shots if str(s.get("shot_id")) == target_id), None
+    ) or _shot_label(target_id)
+    return {
+        "shot_id": target_id,
+        "shot_label_zh": label,
+        "material_role_label_zh": cap.get("material_role_label_zh"),
+        "ai_requirement_summary_zh": cap.get("generation_summary_zh"),
+        "provider_outcome_zh": cap.get("operator_label_zh"),
+        "succeeded": bool(cap.get("succeeded")),
+        "script_directed": True,
+    }
+
+
 def _assert_clean(view: Mapping[str, Any]) -> None:
     # Scan the projection's own fields; operator free-text notes are excluded so
     # operator prose can never crash the Workbench render.
@@ -867,6 +896,12 @@ def build_matrix_script_operator_workbench_view(
     # Queue + single Current Shot Work Panel (§7 fields). No provider call, no
     # Prompt Builder, no route, no new truth — pure projection over the cards.
     generation_plan = gen_plan.derive_matrix_script_generation_plan_view(shots=shots, task=task)
+    # PR-4: V1/V2 shot-change explanation for a script-directed provider regeneration
+    # (which shot, role, generation summary, provider/fallback outcome). Projection
+    # over the staged result's capability status; None unless a script-directed attempt.
+    candidate_change_explanation = _build_candidate_change_explanation(
+        capability_status, version_view, shots
+    )
     missing_material_count = sum(
         1 for s in shots
         if not s.get("material_attached") and s.get("source") == PLAN_SOURCE_REUSE
@@ -901,6 +936,9 @@ def build_matrix_script_operator_workbench_view(
         # Work Panel projection (§7 operator fields; honest placeholders for the
         # not-yet-wired motion / role / AI-requirement / negative fields).
         "generation_plan": generation_plan,
+        # PR-4: V1/V2 shot-change explanation for a script-directed provider regen
+        # (None unless a script-directed provider attempt was made).
+        "candidate_change_explanation": candidate_change_explanation,
         # P1 PR-1: material replacement intent is dirty-state only. It must NOT
         # touch the current main video, delivery candidate, or publish readiness.
         "material_changed": material_changed,
