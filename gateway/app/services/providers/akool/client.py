@@ -307,7 +307,9 @@ _OUTPUT_FIELDS: Mapping[AkoolCapability, str] = MappingProxyType(
     {
         AkoolCapability.TALKING_PHOTO: "video",
         AkoolCapability.TALKING_AVATAR: "video",
-        AkoolCapability.IMAGE_TO_VIDEO: "video_url",
+        # image2Video v4 returns the generated clip URL in the ``video`` field on
+        # ``video_status==3`` (verified against the live API), not ``video_url``.
+        AkoolCapability.IMAGE_TO_VIDEO: "video",
         AkoolCapability.FACE_SWAP: "url",
         AkoolCapability.LIP_SYNC: "video",
         AkoolCapability.TTS: "preview",
