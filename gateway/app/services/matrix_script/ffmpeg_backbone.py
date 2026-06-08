@@ -334,14 +334,25 @@ def generate_with_fallback(
 
 
 def compose_concat(
-    clip_paths: Sequence[str], out_path: str, *, work_dir: str, runner: Optional[Runner] = None,
+    clip_paths: Sequence[str], out_path: str, *, work_dir: str,
+    clip_durations: Optional[Sequence[float]] = None, runner: Optional[Runner] = None,
 ) -> ClipArtifact:
-    """Concat per-shot clips into one delivery-spec cut (stream copy)."""
+    """Concat per-shot clips into one delivery-spec cut (stream copy).
+
+    ``clip_durations`` (per-input-clip seconds, e.g. from each shot's
+    :class:`ClipArtifact`) populates the composed cut's ``duration_seconds`` as their
+    sum, so the descriptor/manifest evidence matches the authoritative ffprobe QC.
+    When omitted, the duration is left at ``0.0`` (caller should pass durations to keep
+    the operator-safe evidence accurate). The QC step (``qc_probe``) remains the
+    authoritative duration source and is unchanged.
+    """
     run = runner or _run
     if runner is None:
         _require_ffmpeg()
     if not clip_paths:
         raise BackboneRenderError("clip_paths must be non-empty")
+    if clip_durations is not None and len(clip_durations) != len(clip_paths):
+        raise BackboneRenderError("clip_durations length must match clip_paths")
     os.makedirs(os.path.abspath(work_dir), exist_ok=True)
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
     concat_list = os.path.join(work_dir, "concat.txt")
@@ -349,7 +360,9 @@ def compose_concat(
         for clip in clip_paths:
             fh.write(f"file '{os.path.abspath(clip)}'\n")
     run(build_compose_command(concat_list, out_path))
-    return ClipArtifact(kind="composed_cut", local_path=out_path, tier=TIER_PROXY)
+    composed_duration = float(sum(clip_durations)) if clip_durations else 0.0
+    return ClipArtifact(kind="composed_cut", local_path=out_path, tier=TIER_PROXY,
+                        duration_seconds=composed_duration)
 
 
 # ----- Manifest / evidence projection ------------------------------------------

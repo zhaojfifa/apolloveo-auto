@@ -194,6 +194,28 @@ class TestFallbackPath(unittest.TestCase):
             self.assertIn("a.mp4", body)
             self.assertIn("b.mp4", body)
 
+    def test_compose_populates_duration_from_input_durations(self):  # FB-4 evidence accuracy
+        with tempfile.TemporaryDirectory() as d:
+            out = os.path.join(d, "final.mp4")
+            cut = fb.compose_concat([os.path.join(d, "a.mp4"), os.path.join(d, "b.mp4")],
+                                    out, work_dir=d, clip_durations=[3.0, 2.0],
+                                    runner=lambda c: None)
+            self.assertEqual(cut.duration_seconds, 5.0)
+            self.assertEqual(cut.operator_summary()["duration_seconds"], 5.0)
+
+    def test_compose_duration_defaults_zero_without_durations(self):
+        with tempfile.TemporaryDirectory() as d:
+            out = os.path.join(d, "final.mp4")
+            cut = fb.compose_concat([os.path.join(d, "a.mp4")], out, work_dir=d, runner=lambda c: None)
+            self.assertEqual(cut.duration_seconds, 0.0)
+
+    def test_compose_duration_length_mismatch_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(fb.BackboneRenderError):
+                fb.compose_concat([os.path.join(d, "a.mp4"), os.path.join(d, "b.mp4")],
+                                  os.path.join(d, "o.mp4"), work_dir=d,
+                                  clip_durations=[3.0], runner=lambda c: None)
+
 
 @unittest.skipUnless(fb.ffmpeg_available(), "ffmpeg/ffprobe not on PATH (environment limitation)")
 class TestRealFfmpegIntegration(unittest.TestCase):
@@ -214,12 +236,16 @@ class TestRealFfmpegIntegration(unittest.TestCase):
                                             duration_seconds=2.0, zoom=fb.ZOOM_OUT)
             self.assertEqual(fb.qc_probe(c1.local_path, expected_duration_seconds=2.0)["passed"], True)
             cut = fb.compose_concat([c1.local_path, c2.local_path],
-                                    os.path.join(d, "final.mp4"), work_dir=d)
+                                    os.path.join(d, "final.mp4"), work_dir=d,
+                                    clip_durations=[c1.duration_seconds, c2.duration_seconds])
             rep = fb.qc_probe(cut.local_path, expected_duration_seconds=4.0)
             self.assertTrue(rep["passed"], rep)
             self.assertEqual(rep["resolution"], "1080x1920")
             self.assertEqual(rep["codec"], "h264")
             self.assertFalse(rep["official_publish_ready"])
+            # descriptor duration now matches the authoritative QC duration (the fix)
+            self.assertEqual(cut.duration_seconds, 4.0)
+            self.assertEqual(cut.operator_summary()["duration_seconds"], rep["duration_seconds"])
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -66,6 +66,22 @@ the backbone capability the offline trial proved.
   they error independently of this change).
 - Behavior preservation: additions only; no existing file modified.
 
+## Post-Code-Review fix (composed-cut duration accuracy)
+
+Operator Trial (S7→S8) found one minor non-blocking nit: the `composed_cut` descriptor's
+`operator_summary()` reported `duration_seconds: 0.0` while the authoritative ffprobe QC
+correctly reported the real duration. Owner chose **fix-then-merge (option A)**. Narrow
+correction (PR-1 module + tests only):
+
+- `compose_concat` now accepts an optional `clip_durations` (per-input seconds) and sets
+  the composed cut's `duration_seconds` to their **sum**, so the descriptor / manifest
+  evidence matches the QC. A length-mismatch raises `BackboneRenderError`.
+- The authoritative QC (`qc_probe`) is **unchanged**; operator summary + manifest are now
+  consistent with it. Verified live: descriptor `4.0` == QC `4.0`.
+- Added 3 dedicated tests (duration populated from sum; defaults `0.0` without durations;
+  length-mismatch rejected) + 2 asserts in the real-ffmpeg integration test. Focused suite
+  now **27 passed** (was 24); leak scan still NONE; `official_publish_ready` still `False`.
+
 ## Boundary
 
 runtime changed: **Yes (new module only, authorized PR-1)** · existing runtime modified:
