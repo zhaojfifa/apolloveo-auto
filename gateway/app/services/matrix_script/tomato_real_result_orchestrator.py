@@ -42,6 +42,7 @@ from gateway.app.services.matrix_script.real_asset_scene_renderer import (
 from gateway.app.services.matrix_script import ffmpeg_backbone as backbone
 from gateway.app.services.matrix_script import voiceover_capability
 from gateway.app.services.matrix_script import akool_image_to_video_capability as akool_i2v
+from gateway.app.services.matrix_script import generation_plan_view as gen_plan
 from gateway.app.services.matrix_script.simple_scene_renderer import (
     FFmpegUnavailableError,
     assemble_final_video,
@@ -341,6 +342,8 @@ def _voiceover_synth(text, out_path, *, env, voice):
 def _build_capability_status(
     *, voiceover, any_caption_burned: bool, env: Optional[Mapping[str, str]],
     akool_result: Optional["akool_i2v.AkoolShotResult"] = None,
+    provider_target_shot_id: Optional[str] = None,
+    provider_prompt_meta: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Operator-safe capability status for voiceover / image_to_video / subtitles / bgm.
 
@@ -364,6 +367,17 @@ def _build_capability_status(
                 else "AI 视频生成未启用 · 缺少凭证（使用镜头代理）"
             ),
         }
+    # PR-4: operator-safe provider-target evidence for the V1/V2 change explanation —
+    # which shot the provider targeted, the resolved material role, an operator-safe
+    # generation summary, and a script-directed flag. NEVER the raw provider prompt /
+    # URL / vendor (only surfaced when a script-directed provider attempt was made).
+    if provider_prompt_meta is not None:
+        image_to_video = dict(image_to_video)
+        image_to_video["provider_target_shot_id"] = provider_target_shot_id
+        image_to_video["material_role"] = provider_prompt_meta.get("material_role")
+        image_to_video["material_role_label_zh"] = provider_prompt_meta.get("material_role_label_zh")
+        image_to_video["generation_summary_zh"] = provider_prompt_meta.get("diagnostic_summary_zh")
+        image_to_video["script_directed"] = True
     return {
         "scene_engine": SCENE_ENGINE_BACKBONE,
         "image_to_video": image_to_video,
@@ -405,6 +419,7 @@ def run_tomato_real_result(
     height: int = DEFAULT_HEIGHT,
     fps: int = DEFAULT_FPS,
     material_overrides: Optional[Mapping[str, Mapping[str, Any]]] = None,
+    active_shot_id: Optional[str] = None,
 ) -> TomatoRealResult:
     """Run the controlled tomato real-result path; return a staged, gated result.
 
@@ -429,6 +444,11 @@ def run_tomato_real_result(
     output_dir = os.fspath(output_dir)
     asset_dir = asset_dir or plan_mod.default_asset_dir()
     shots = list(plan_mod.TOMATO_SHOTS)
+    # PR-4: the Current Shot Panel active shot is the provider-target; default to the
+    # designated product shot (shot02) when none / an unknown id is supplied (safe
+    # default behavior — bounded to ONE controlled shot per run).
+    _shot_ids = {s.shot_id for s in shots}
+    provider_target_id = active_shot_id if active_shot_id in _shot_ids else AKOOL_SHOT_ID
 
     shots_dir = os.path.join(output_dir, "shots")
     audio_dir = os.path.join(output_dir, "audio")
@@ -447,6 +467,7 @@ def run_tomato_real_result(
     # per-shot status — never a fake provider clip.
     akool_enabled = akool_i2v.real_enabled(env) and akool_i2v.credentials_present(env)
     akool_shot_result: Optional[akool_i2v.AkoolShotResult] = None
+    provider_prompt_meta: Optional[Dict[str, Any]] = None
 
     # 2. Render each shot clip. The designated shot attempts real Akool image_to_video
     #    (when enabled); every other shot renders THROUGH THE FFMPEG BACKBONE (image →
@@ -470,11 +491,17 @@ def run_tomato_real_result(
                 shot.shot_id, image_path, material_overrides, work_dir
             )
             ak: Optional[akool_i2v.AkoolShotResult] = None
-            if akool_enabled and shot.shot_id == AKOOL_SHOT_ID:
+            if akool_enabled and shot.shot_id == provider_target_id:
+                # PR-4: build a SCRIPT-DIRECTED, role-driven provider prompt for the
+                # active/provider-target shot (replaces the hardcoded DEFAULT_PROMPT).
+                # Same role + motion resolution the Current Shot Panel shows. The
+                # provider prompt is runtime-transient (passed here, never surfaced).
+                provider_prompt_meta = gen_plan.build_provider_prompt_for_shot(shot, task)
                 ak = akool_i2v.generate_shot_clip_akool(
                     still_path=render_source,
                     out_clip=os.path.join(work_dir, f"{shot.shot_id}_akool.mp4"),
-                    task_id=task_id or LINE_ID, shot_id=shot.shot_id, env=env,
+                    task_id=task_id or LINE_ID, shot_id=shot.shot_id,
+                    prompt=provider_prompt_meta["provider_prompt"], env=env,
                 )
                 akool_shot_result = ak
             if ak is not None and ak.succeeded:
@@ -600,6 +627,8 @@ def run_tomato_real_result(
     capability_status = _build_capability_status(
         voiceover=voiceover, any_caption_burned=any_caption_burned, env=env,
         akool_result=akool_shot_result,
+        provider_target_shot_id=provider_target_id,
+        provider_prompt_meta=provider_prompt_meta,
     )
 
     # 6. Manifest (real local relative paths only).

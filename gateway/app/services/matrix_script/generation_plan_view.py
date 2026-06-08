@@ -170,6 +170,33 @@ def _resolve_role(ps: Any, bindings: Mapping[str, Any]) -> "tuple":
     return _default_role_for_shot(ps), ROLE_SOURCE_SYSTEM
 
 
+def build_provider_prompt_for_shot(ps: Any, task: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+    """PUBLIC (PR-4): resolve the shot's material role (+ a clean operator rebinding)
+    and motion, then build the Prompt Builder payload for a script-directed provider
+    call. Returns the provider prompt + negative + operator-safe role label + diagnostic
+    — the SAME resolution the Current Shot Panel shows, so the operator surface and the
+    provider call stay consistent. The provider prompt itself is runtime-transient
+    (the caller passes it to the provider; it is never surfaced to the operator).
+    """
+    resolved_role, role_source = _resolve_role(ps, _role_bindings(task))
+    built = prompt_builder.build_shot_prompt(
+        visual_goal=ps.visual_intent_zh,
+        narration_line=ps.voiceover_zh,
+        script_segment=ps.subtitle_zh,
+        motion_instruction=_derive_motion_zh(ps),
+        material_role=resolved_role,
+        aspect_ratio="9:16",
+    )
+    return {
+        "provider_prompt": built["provider_prompt"],
+        "provider_negative_prompt": built["provider_negative_prompt"],
+        "material_role": resolved_role,
+        "material_role_source": role_source,
+        "material_role_label_zh": prompt_builder.ROLE_LABEL_ZH.get(resolved_role, _ROLE_CHIP_FALLBACK_ZH),
+        "diagnostic_summary_zh": built["diagnostic_summary_zh"],
+    }
+
+
 def _build_current_shot(
     ps: Any,
     card: Mapping[str, Any],

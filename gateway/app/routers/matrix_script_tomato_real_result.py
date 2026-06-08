@@ -15,7 +15,7 @@ absence → HTTP 503 (no fake final.mp4). The default sink wraps the existing
 from __future__ import annotations
 
 import os
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
@@ -64,15 +64,23 @@ def _ensure_matrix_script(task: Mapping[str, Any]) -> None:
 
 @api_router.post("/{task_id}/tomato-real-result")
 def post_tomato_real_result(
-    task_id: str, repo: ITaskRepository = Depends(get_task_repository)
+    task_id: str,
+    active_shot: Optional[str] = None,
+    repo: ITaskRepository = Depends(get_task_repository),
 ) -> JSONResponse:
-    """Run the controlled tomato real-result path; return a gated staged candidate."""
+    """Run the controlled tomato real-result path; return a gated staged candidate.
+
+    ``active_shot`` (thin request parse only) designates the Current Shot Panel active
+    shot as the provider-target for the one controlled script-directed generation; the
+    service safe-defaults to the designated product shot when absent. No business logic
+    here — the value is passed straight through to the service.
+    """
     task = _resolve_task(repo, task_id)
     _ensure_matrix_script(task)
     output_dir = resolve_tomato_output_dir(task_id)
     sink = build_tomato_sink(task_id)
     try:
-        result = run_tomato_real_result(task, output_dir, sink=sink)
+        result = run_tomato_real_result(task, output_dir, sink=sink, active_shot_id=active_shot)
     except TomatoRealResultError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     except FFmpegUnavailableError:

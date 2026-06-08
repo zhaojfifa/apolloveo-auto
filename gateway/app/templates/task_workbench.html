@@ -589,6 +589,20 @@
                   </ul>
                 </div>
                 {% endif %}
+                {# PR-4: script-directed provider regeneration explanation — which shot
+                   changed, the material role, the generation summary, and the
+                   provider/fallback outcome (operator-safe; no raw prompt/URL/vendor). #}
+                {% if ms_overlay.candidate_change_explanation %}
+                {% set _cce = ms_overlay.candidate_change_explanation %}
+                <div data-role="ms-change-explanation" data-shot-id="{{ _cce.shot_id }}"
+                     data-succeeded="{{ 'true' if _cce.succeeded else 'false' }}"
+                     style="font-size:13px; color:var(--op-fg-mid,#334155); margin-top:6px;">
+                  <div data-role="ms-change-explanation-shot">本次脚本驱动生成镜头：{{ _cce.shot_label_zh }}</div>
+                  {% if _cce.material_role_label_zh %}<div data-role="ms-change-explanation-role">素材角色：{{ _cce.material_role_label_zh }}</div>{% endif %}
+                  {% if _cce.ai_requirement_summary_zh %}<div data-role="ms-change-explanation-requirement">AI 生成要求：{{ _cce.ai_requirement_summary_zh }}</div>{% endif %}
+                  <div data-role="ms-change-explanation-outcome">{{ _cce.provider_outcome_zh }}</div>
+                </div>
+                {% endif %}
                 {# PR-3 §3.C: explicit delivery-truth guard. Confirm/discard/regen
                    behavior and delivery truth are unchanged — this only states it. #}
                 <div data-role="ms-compare-delivery-guard"
