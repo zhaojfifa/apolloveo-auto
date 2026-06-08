@@ -37,8 +37,10 @@ from gateway.app.services.matrix_script.minimal_result_delivery_view import (
     staged_record_to_delivery_block,
 )
 from gateway.app.services.matrix_script.real_asset_scene_renderer import (
-    render_shot_clip,
+    overlay_caption,
+    render_caption_png,
 )
+from gateway.app.services.matrix_script import ffmpeg_backbone as backbone
 from gateway.app.services.matrix_script.simple_scene_renderer import (
     FFmpegUnavailableError,
     assemble_final_video,
@@ -55,14 +57,24 @@ from gateway.app.services.matrix_script.tomato_acceptance_gate import (
 from gateway.app.services.matrix_script import tomato_real_result_plan as plan_mod
 
 LINE_ID = "matrix_script"
-DEFAULT_WIDTH = 720
-DEFAULT_HEIGHT = 1280
-DEFAULT_FPS = 25
+# Operator-visible scene clips are rendered through the proven ffmpeg backbone
+# (Owner-approved S5→S8 backbone integration): deterministic 1080×1920 / 30fps
+# Ken-Burns proxy from each shot's still, with the existing Pillow caption overlay
+# preserved on top, then ffprobe QC on the composed final.mp4. The backbone is a
+# fast-preview proxy — NOT generative, NOT publish-ready.
+DEFAULT_WIDTH = backbone.BACKBONE_WIDTH      # 1080
+DEFAULT_HEIGHT = backbone.BACKBONE_HEIGHT     # 1920
+DEFAULT_FPS = backbone.BACKBONE_FPS           # 30
 DEFAULT_SHOT_SECONDS = 4.0
 AUDIO_MODE_AZURE = "azure_tts"
 AUDIO_MODE_SILENT = "silent_fallback"
 CAPTION_MODE_BURNED = "burned_in"
 CAPTION_MODE_SIDECAR = "sidecar_only"
+
+# Scene engine + per-shot render-mode markers recorded on the manifest (operator-safe).
+SCENE_ENGINE_BACKBONE = "ffmpeg_backbone"
+RENDER_MODE_PROXY = "ffmpeg_backbone_proxy"
+RENDER_MODE_STATIC = "ffmpeg_backbone_static_still"
 
 _AZURE_KEY_ENV = "AZURE_SPEECH_KEY"
 _AZURE_REGION_ENV = "AZURE_SPEECH_REGION"
@@ -91,6 +103,11 @@ class TomatoRealResult:
     # consumed (image used directly / video first frame extracted). Empty unless
     # a resolvable ``msmaterial://`` override was supplied AND used.
     consumed_material_shot_ids: Tuple[str, ...] = ()
+    # Operator-visible ffmpeg-backbone integration (Owner-approved S5→S8):
+    # scene_engine + operator-safe ffprobe QC scalars from the composed final.mp4.
+    scene_engine: str = SCENE_ENGINE_BACKBONE
+    qc_passed: Optional[bool] = None
+    qc_resolution: Optional[str] = None
     official_publish_ready: bool = False
     line_id: str = LINE_ID
 
@@ -156,8 +173,12 @@ def _build_manifest(
     audio_mode: str, caption_mode: str, duration_seconds: float,
     width: int, height: int,
     final_rel: str, audio_rel: str, subtitle_rel: str, scene_rels: List[str],
+    scene_engine: str = SCENE_ENGINE_BACKBONE,
+    per_shot_render: Optional[List[Dict[str, Any]]] = None,
+    qc: Optional[Mapping[str, Any]] = None,
+    backbone_summary: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
-    return {
+    manifest: Dict[str, Any] = {
         "manifest_version": "matrix_script_tomato_real_result_v1",
         "line_id": LINE_ID,
         "case_id": plan_mod.CASE_ID,
@@ -174,6 +195,7 @@ def _build_manifest(
         },
         "audio_mode": audio_mode,
         "caption_mode": caption_mode,
+        "scene_engine": scene_engine,
         "shot_count": len(shot_facts),
         "duration_seconds": float(duration_seconds),
         "resolution": f"{width}x{height}",
@@ -187,6 +209,14 @@ def _build_manifest(
         "subtitle_path": subtitle_rel,
         "scene_clip_paths": list(scene_rels),
     }
+    # Additive backbone evidence (operator-safe; no local_path / provider field).
+    if per_shot_render is not None:
+        manifest["per_shot_render"] = [dict(r) for r in per_shot_render]
+    if qc is not None:
+        manifest["qc"] = dict(qc)
+    if backbone_summary is not None:
+        manifest["backbone"] = dict(backbone_summary)
+    return manifest
 
 
 def _fmt_ts(seconds: float) -> str:
@@ -252,6 +282,60 @@ def _resolve_shot_render_source(
             return frame, True
         return default_image, False
     return default_image, False
+
+
+@dataclass(frozen=True)
+class _BackboneShotRender:
+    """Per-shot backbone render outcome (internal)."""
+
+    render_mode: str          # RENDER_MODE_PROXY | RENDER_MODE_STATIC
+    caption_burned: bool
+
+
+def _render_shot_via_backbone(
+    still_path: str,
+    work_dir: str,
+    out_clip: str,
+    *,
+    shot,
+    duration_seconds: float,
+) -> _BackboneShotRender:
+    """Render one operator-visible shot clip through the ffmpeg backbone.
+
+    1. Ken-Burns **proxy** (deterministic 1080×1920 / 30fps) from the resolved
+       still via :func:`backbone.generate_with_fallback` — on render failure the
+       backbone itself falls back to a static-still clip (no fake clip is produced).
+    2. The existing Pillow caption PNG is overlaid on top (this build has no
+       drawtext/libass), preserving burned-in captions where a CJK font exists;
+       when no font is available the motion clip is promoted as-is and the run
+       still emits the .srt sidecar (honest, unchanged behavior).
+
+    The backbone is a fast-preview proxy: non-generative, ``official_publish_ready``
+    stays false. Returns the per-shot render mode + whether a caption was burned.
+    """
+    zoom = backbone.ZOOM_IN if shot.order % 2 else backbone.ZOOM_OUT
+    motion_path = os.path.join(work_dir, f"{shot.shot_id}_backbone.mp4")
+    clip = backbone.generate_with_fallback(
+        still_path, motion_path, duration_seconds=float(duration_seconds), zoom=zoom
+    )
+    render_mode = (
+        RENDER_MODE_STATIC if clip.tier == backbone.TIER_STATIC_STILL else RENDER_MODE_PROXY
+    )
+    caption_burned = False
+    caption_text = (shot.subtitle_zh or "").strip()
+    if caption_text:
+        caption_png = render_caption_png(
+            caption_text,
+            os.path.join(work_dir, f"{shot.shot_id}_caption.png"),
+            width=backbone.BACKBONE_WIDTH,
+            height=backbone.BACKBONE_HEIGHT,
+        )
+        if caption_png:
+            overlay_caption(motion_path, caption_png, out_clip)
+            caption_burned = True
+    if not caption_burned:
+        os.replace(motion_path, out_clip)
+    return _BackboneShotRender(render_mode=render_mode, caption_burned=caption_burned)
 
 
 def _write_srt(path: str, shots, durations: List[float]) -> None:
@@ -334,11 +418,14 @@ def run_tomato_real_result(
             shot_audio_paths.append(None)
             durations.append(DEFAULT_SHOT_SECONDS)
 
-    # 2. Render each shot clip from its real asset (image → motion + caption).
+    # 2. Render each shot clip THROUGH THE FFMPEG BACKBONE (image → 1080×1920
+    #    Ken-Burns proxy) + the existing caption overlay. The SOURCE pixels may be
+    #    swapped for resolvable uploaded/replacement material bytes (#212).
     scene_clip_paths: List[str] = []
     shot_facts: List[ShotRenderFact] = []
     checklist: List[Dict[str, Any]] = []
     consumed_material_shot_ids: List[str] = []
+    per_shot_render: List[Dict[str, Any]] = []
     any_caption_burned = False
     for shot, dur in zip(shots, durations):
         image_path = os.path.join(asset_dir, shot.asset_filename)
@@ -351,16 +438,16 @@ def run_tomato_real_result(
             render_source, consumed = _resolve_shot_render_source(
                 shot.shot_id, image_path, material_overrides, work_dir
             )
-            res = render_shot_clip(
-                render_source, work_dir, out_clip,
-                shot_id=shot.shot_id, duration_seconds=dur,
-                width=width, height=height, caption_text=shot.subtitle_zh,
-                focus=shot.focus, zoom=shot.zoom, fps=fps,
+            render_out = _render_shot_via_backbone(
+                render_source, work_dir, out_clip, shot=shot, duration_seconds=dur,
             )
-            rendered = res.rendered
-            any_caption_burned = any_caption_burned or res.caption_burned
+            rendered = True
+            any_caption_burned = any_caption_burned or render_out.caption_burned
             scene_clip_paths.append(out_clip)
-            if rendered and consumed:
+            per_shot_render.append(
+                {"shot_id": shot.shot_id, "render_mode": render_out.render_mode}
+            )
+            if consumed:
                 consumed_material_shot_ids.append(shot.shot_id)
         shot_facts.append(ShotRenderFact(
             shot_id=shot.shot_id, source=shot.source, rendered=rendered,
@@ -423,6 +510,26 @@ def run_tomato_real_result(
 
     caption_mode = CAPTION_MODE_BURNED if any_caption_burned else CAPTION_MODE_SIDECAR
 
+    # 5b. ffprobe QC on the composed operator-visible final.mp4 (backbone verdict).
+    #     QC is evidence, never a publish gate; a probe failure must not kill an
+    #     otherwise-playable result, so we degrade to qc=None honestly.
+    qc: Optional[Dict[str, Any]] = None
+    try:
+        qc = backbone.qc_probe(
+            final_video_path, expected_duration_seconds=float(sum(rendered_durations))
+        )
+    except Exception:  # noqa: BLE001 — QC is best-effort evidence, never a gate
+        qc = None
+    backbone_summary: Dict[str, Any] = {
+        "engaged": True,
+        "scene_engine": SCENE_ENGINE_BACKBONE,
+        "tier": backbone.TIER_PROXY,
+        "is_generative": False,
+        "official_publish_ready": False,
+        "qc_passed": (bool(qc.get("passed")) if isinstance(qc, Mapping) else None),
+        "note": "镜头代理（1080×1920）+ 字幕叠加 + 拼接 + ffprobe 质检；非生成式、非最终成片。",
+    }
+
     # 6. Manifest (real local relative paths only).
     manifest = _build_manifest(
         task_id=task_id, shot_facts=shot_facts, audio_mode=audio_mode,
@@ -432,6 +539,10 @@ def run_tomato_real_result(
         audio_rel=os.path.relpath(audio_path, output_dir),
         subtitle_rel=os.path.relpath(subtitle_path, output_dir),
         scene_rels=[os.path.relpath(p, output_dir) for p in scene_clip_paths],
+        scene_engine=SCENE_ENGINE_BACKBONE,
+        per_shot_render=per_shot_render,
+        qc=qc,
+        backbone_summary=backbone_summary,
     )
     manifest_path = os.path.join(output_dir, "manifest.json")
     with open(manifest_path, "w", encoding="utf-8") as fh:
@@ -465,6 +576,9 @@ def run_tomato_real_result(
         acceptance=acceptance.to_dict(),
         shot_checklist=tuple(checklist),
         consumed_material_shot_ids=tuple(consumed_material_shot_ids),
+        scene_engine=SCENE_ENGINE_BACKBONE,
+        qc_passed=(bool(qc.get("passed")) if isinstance(qc, Mapping) else None),
+        qc_resolution=(str(qc.get("resolution")) if isinstance(qc, Mapping) and qc.get("resolution") else None),
     )
 
 
@@ -481,5 +595,9 @@ def tomato_result_to_payload(result: TomatoRealResult) -> Dict[str, object]:
     payload["resolution"] = f"{result.width}x{result.height}"
     payload["official_publish_ready"] = False
     payload["shot_checklist"] = [dict(s) for s in result.shot_checklist]
+    # Operator-safe ffmpeg-backbone evidence (additive; no provider/publish token).
+    payload["scene_engine"] = result.scene_engine
+    payload["backbone_qc_passed"] = result.qc_passed
+    payload["backbone_qc_resolution"] = result.qc_resolution
     assert_no_delivery_view_forbidden_tokens(payload)
     return payload
