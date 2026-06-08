@@ -15,9 +15,10 @@ artifacts; the color-card fallback path is preserved; official_publish_ready sta
 no forbidden-token leakage. Real-render cases skip when ffmpeg/ffprobe are absent (no fake
 final.mp4 is ever produced).
 
-This is an acceptance smoke. It modifies no runtime; it does not thread shot_images through
-the operator service entry (that would touch minimal_result_service.py — reported as a
-scope-expansion decision, not done here).
+Scope Expansion Batch additions (later): the operator projection now surfaces
+``preview_mode`` (operator label for scene_strategy) + ``qc_passed`` / ``qc_summary``, and
+the live service entry (``run_matrix_script_minimal_result``) threads ``shot_images`` so
+the ffmpeg backbone auto-engages in the live flow — both covered below.
 """
 from __future__ import annotations
 
@@ -33,9 +34,12 @@ from gateway.app.services.matrix_script.minimal_result_loop import (
     run_minimal_result_loop,
 )
 from gateway.app.services.matrix_script.minimal_result_service import (
+    MatrixScriptMinimalResultRequest,
     MatrixScriptMinimalResultSummary,
+    run_matrix_script_minimal_result,
 )
 from gateway.app.services.matrix_script.minimal_result_record import (
+    MatrixScriptMinimalResultRecord,
     minimal_result_summary_to_record,
 )
 from gateway.app.services.matrix_script.minimal_result_projection import (
@@ -114,9 +118,8 @@ def test_backbone_fast_preview_is_operator_consumable(tmp_path):
     assert any(r["render_mode"] == RENDER_MODE_COLOR_CARD for r in m["per_shot_render"])
 
     # 4. existing operator + delivery projections CONSUME the produced artifacts (read-only).
-    #    NOTE (finding): the projection's closed key set surfaces the artifact PATHS +
-    #    publish-readiness, but does NOT expose scene_strategy/qc as first-class fields;
-    #    the backbone evidence is operator-referenceable via the manifest (manifest_path).
+    #    The Scope Expansion Batch additionally surfaces preview_mode / qc on the operator
+    #    projection (asserted in the dedicated scope-expansion tests below).
     summary = _summary_from_output(output, task_id="smoke-tomato")
     record = minimal_result_summary_to_record(summary)
 
@@ -159,3 +162,79 @@ def test_legacy_color_card_still_operator_consumable(tmp_path):
     )
     assert op["has_final_video"] is True and op["has_manifest"] is True
     assert op["official_publish_ready"] is False
+
+
+# ---------------------------------------------------------------------------
+# Scope Expansion Batch: operator projection surfaces scene_strategy / QC, and the
+# live service entry threads shot_images so the backbone auto-engages.
+# ---------------------------------------------------------------------------
+
+
+def _record(scene_strategy, qc_passed=None, qc_resolution=None):
+    return MatrixScriptMinimalResultRecord(
+        task_id="t", line_id="matrix_script", final_video_path="final/final.mp4",
+        manifest_path="manifest.json", subtitles_path="subs/s.srt", audio_path="audio/a.wav",
+        shot_count=3, duration_seconds=8.0, result_status="generated",
+        publish_ready_candidate=True, storage_scope="local_workspace",
+        generation_provider="none", scene_strategy=scene_strategy,
+        audio_strategy="silent_fallback", qc_passed=qc_passed, qc_resolution=qc_resolution,
+    )
+
+
+def test_operator_projection_surfaces_backbone_preview_mode_and_qc():
+    rec = _record("ffmpeg_backbone_proxy", qc_passed=True, qc_resolution="1080x1920")
+    op = operator_projection_to_dict(minimal_result_record_to_operator_projection(rec))
+    assert op["preview_mode"] == "快速预览·镜头代理"
+    assert op["qc_passed"] is True
+    assert "质检通过" in op["qc_summary"] and "1080x1920" in op["qc_summary"]
+    assert op["official_publish_ready"] is False
+    # no raw scene_strategy token leaked into the operator payload
+    assert "ffmpeg_backbone_proxy" not in json.dumps(op, ensure_ascii=False)
+
+
+def test_operator_projection_legacy_color_card_qc_none():
+    op = operator_projection_to_dict(minimal_result_record_to_operator_projection(
+        _record("ffmpeg_color_card")))
+    assert op["preview_mode"] == "快速预览·占位色卡"
+    assert op["qc_passed"] is None
+    assert op["qc_summary"] == "本次预览未进行质检"
+
+
+def test_operator_projection_qc_failed_summary():
+    op = operator_projection_to_dict(minimal_result_record_to_operator_projection(
+        _record("ffmpeg_backbone_proxy", qc_passed=False)))
+    assert op["qc_passed"] is False
+    assert "未通过" in op["qc_summary"]
+
+
+@_skip_no_ffmpeg
+def test_service_entry_threads_shot_images_and_backbone_engages(tmp_path):
+    plan = build_shot_plan(_tomato_outline(), task_id="svc", target_duration_seconds=8.0)
+    shot_ids = [s.shot_id for s in plan.shots]
+    stills = {sid: os.path.join(_TOMATO_DIR, n)
+              for sid, n in zip(shot_ids, ["02_tomato_bowl.png", "04_eat_tomato.png"])
+              if os.path.isfile(os.path.join(_TOMATO_DIR, n))}
+    assert stills
+    req = MatrixScriptMinimalResultRequest(
+        output_dir=str(tmp_path / "out"), task_id="svc", outline=_tomato_outline(),
+        target_duration_seconds=8.0, shot_images=stills,
+    )
+    summary = run_matrix_script_minimal_result(req)
+    assert summary.scene_strategy == SCENE_STRATEGY_BACKBONE
+    assert summary.qc_passed is True
+    op = operator_projection_to_dict(
+        minimal_result_record_to_operator_projection(minimal_result_summary_to_record(summary)))
+    assert op["preview_mode"] == "快速预览·镜头代理"
+    assert op["qc_passed"] is True
+    assert op["official_publish_ready"] is False
+
+
+@_skip_no_ffmpeg
+def test_service_entry_without_shot_images_stays_legacy(tmp_path):
+    req = MatrixScriptMinimalResultRequest(
+        output_dir=str(tmp_path / "out"), task_id="svc2", outline=_tomato_outline(),
+        target_duration_seconds=8.0,
+    )
+    summary = run_matrix_script_minimal_result(req)
+    assert summary.scene_strategy == "ffmpeg_color_card"
+    assert summary.qc_passed is None and summary.qc_resolution is None
