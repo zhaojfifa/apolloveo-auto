@@ -683,7 +683,7 @@
               var timer = setInterval(function () {
                 if (inFlight || document.hidden) { return; }
                 inFlight = true;
-                fetch(statusUrl, { headers: { 'Accept': 'application/json' } })
+                fetch(statusUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
                   .then(function (r) { return r.ok ? r.json() : null; })
                   .then(function (d) {
                     if (!d) { return; }
@@ -719,7 +719,7 @@
             var timer = setInterval(function () {
               if (inFlight || document.hidden) { return; }
               inFlight = true;
-              fetch(statusUrl, { headers: { 'Accept': 'application/json' } })
+              fetch(statusUrl, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
                 .then(function (resp) { return resp.ok ? resp.json() : null; })
                 .then(function (d) {
                   if (!d) { return; }
