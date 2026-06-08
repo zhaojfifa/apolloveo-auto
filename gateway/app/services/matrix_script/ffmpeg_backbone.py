@@ -29,7 +29,7 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Sequence
 
 # ----- Deterministic fast-preview encode params (Gate Spec §6) -----------------
 BACKBONE_WIDTH = 1080
@@ -363,6 +363,100 @@ def compose_concat(
     composed_duration = float(sum(clip_durations)) if clip_durations else 0.0
     return ClipArtifact(kind="composed_cut", local_path=out_path, tier=TIER_PROXY,
                         duration_seconds=composed_duration)
+
+
+# ----- Targeted regenerate orchestration (PR-2) --------------------------------
+
+ACTION_REGENERATED = "regenerated"
+ACTION_REUSED = "reused"
+
+
+@dataclass(frozen=True)
+class ShotSpec:
+    """An ordered shot in the preview: its still + proxy params."""
+    shot_id: str
+    image_path: str
+    duration_seconds: float = 3.0
+    zoom: str = ZOOM_IN
+
+
+@dataclass(frozen=True)
+class ShotClipResult:
+    """Per-shot outcome of a targeted regenerate: regenerated or reused."""
+    shot_id: str
+    action: str                    # ACTION_REGENERATED | ACTION_REUSED
+    clip: ClipArtifact
+
+    def operator_summary(self) -> Dict[str, Any]:
+        s = self.clip.operator_summary()
+        return {"shot_id": self.shot_id, "action": self.action,
+                "tier": s["tier"], "duration_seconds": s["duration_seconds"],
+                "is_generative": False}
+
+
+@dataclass(frozen=True)
+class TargetedRegenResult:
+    """Result of a targeted regenerate: per-shot actions + the recomposed cut."""
+    shot_results: Sequence[ShotClipResult] = field(default_factory=tuple)
+    composed_cut: Optional[ClipArtifact] = None
+
+    def regenerated_ids(self) -> List[str]:
+        return [r.shot_id for r in self.shot_results if r.action == ACTION_REGENERATED]
+
+    def reused_ids(self) -> List[str]:
+        return [r.shot_id for r in self.shot_results if r.action == ACTION_REUSED]
+
+    def operator_summary(self) -> Dict[str, Any]:
+        """Operator-safe projection — no local_path / raw field."""
+        return {
+            "shots": [r.operator_summary() for r in self.shot_results],
+            "regenerated": self.regenerated_ids(),
+            "reused": self.reused_ids(),
+            "composed_cut": self.composed_cut.operator_summary() if self.composed_cut else None,
+            "tier": TIER_PROXY,
+            "is_generative": False,
+            "official_publish_ready": False,
+            "note": "仅重生成有改动的镜头，其余复用既有预览，再重新拼接；非生成式、非最终成片。",
+        }
+
+
+def targeted_regenerate(
+    shots: Sequence[ShotSpec], out_path: str, *, work_dir: str,
+    changed_shot_ids: Iterable[str],
+    existing_clips: Optional[Mapping[str, str]] = None,
+    existing_durations: Optional[Mapping[str, float]] = None,
+    runner: Optional[Runner] = None,
+) -> TargetedRegenResult:
+    """Regenerate proxies only for changed shots, reuse unchanged clips, re-compose.
+
+    A shot is **regenerated** (via :func:`generate_with_fallback`, preserving fallback
+    semantics) when its id is in ``changed_shot_ids`` OR it has no existing clip;
+    otherwise its existing clip is **reused**. The cut is re-composed from the ordered
+    changed + reused clips with correct per-shot durations (Gate Spec §6/§8). QC is
+    preserved and unchanged — callers run :func:`qc_probe` on ``composed_cut``.
+    """
+    if not shots:
+        raise BackboneRenderError("shots must be non-empty")
+    changed = set(changed_shot_ids)
+    existing_clips = dict(existing_clips or {})
+    existing_durations = dict(existing_durations or {})
+    os.makedirs(os.path.abspath(work_dir), exist_ok=True)
+    results: List[ShotClipResult] = []
+    for shot in shots:
+        reusable = shot.shot_id in existing_clips and shot.shot_id not in changed
+        if reusable:
+            clip = ClipArtifact(kind="proxy_clip", local_path=existing_clips[shot.shot_id],
+                                duration_seconds=float(existing_durations.get(shot.shot_id, shot.duration_seconds)),
+                                tier=TIER_PROXY)
+            results.append(ShotClipResult(shot.shot_id, ACTION_REUSED, clip))
+        else:
+            clip_path = os.path.join(work_dir, f"{shot.shot_id}.mp4")
+            clip = generate_with_fallback(shot.image_path, clip_path,
+                                          duration_seconds=shot.duration_seconds, zoom=shot.zoom, runner=runner)
+            results.append(ShotClipResult(shot.shot_id, ACTION_REGENERATED, clip))
+    cut = compose_concat([r.clip.local_path for r in results], out_path, work_dir=work_dir,
+                         clip_durations=[r.clip.duration_seconds for r in results], runner=runner)
+    return TargetedRegenResult(shot_results=tuple(results), composed_cut=cut)
 
 
 # ----- Manifest / evidence projection ------------------------------------------

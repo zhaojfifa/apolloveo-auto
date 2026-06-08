@@ -217,6 +217,99 @@ class TestFallbackPath(unittest.TestCase):
                                   clip_durations=[3.0], runner=lambda c: None)
 
 
+class TestTargetedRegenerate(unittest.TestCase):
+    """PR-2 targeted-regenerate orchestration (injected runner; no ffmpeg)."""
+
+    def _shots(self):
+        return [
+            fb.ShotSpec("shot01", "a.png", duration_seconds=2.0, zoom=fb.ZOOM_IN),
+            fb.ShotSpec("shot02", "b.png", duration_seconds=3.0, zoom=fb.ZOOM_OUT),
+            fb.ShotSpec("shot03", "c.png", duration_seconds=2.0, zoom=fb.ZOOM_IN),
+        ]
+
+    def _runner(self, calls):
+        def run(cmd):
+            calls.append(cmd)
+            open(cmd[-1], "wb").close()  # create the declared output file
+        return run
+
+    def test_only_changed_shots_regenerated_others_reused(self):  # FB-5
+        calls = []
+        with tempfile.TemporaryDirectory() as d:
+            existing = {"shot01": os.path.join(d, "old01.mp4"),
+                        "shot02": os.path.join(d, "old02.mp4"),
+                        "shot03": os.path.join(d, "old03.mp4")}
+            durations = {"shot01": 2.0, "shot02": 3.0, "shot03": 2.0}
+            res = fb.targeted_regenerate(self._shots(), os.path.join(d, "final.mp4"),
+                                         work_dir=d, changed_shot_ids={"shot02"},
+                                         existing_clips=existing, existing_durations=durations,
+                                         runner=self._runner(calls))
+        self.assertEqual(res.regenerated_ids(), ["shot02"])
+        self.assertEqual(sorted(res.reused_ids()), ["shot01", "shot03"])
+
+    def test_reused_clip_paths_point_to_existing(self):  # FB-5 reuse
+        with tempfile.TemporaryDirectory() as d:
+            existing = {"shot01": os.path.join(d, "old01.mp4")}
+            res = fb.targeted_regenerate(self._shots(), os.path.join(d, "final.mp4"),
+                                         work_dir=d, changed_shot_ids=set(),
+                                         existing_clips=existing, runner=self._runner([]))
+        reused = next(r for r in res.shot_results if r.shot_id == "shot01")
+        self.assertEqual(reused.action, fb.ACTION_REUSED)
+        self.assertTrue(reused.clip.local_path.endswith("old01.mp4"))
+        # shots without an existing clip must be regenerated, not reused
+        self.assertEqual([r.shot_id for r in res.shot_results if r.action == fb.ACTION_REGENERATED],
+                         ["shot02", "shot03"])
+
+    def test_no_existing_clips_regenerates_all(self):
+        with tempfile.TemporaryDirectory() as d:
+            res = fb.targeted_regenerate(self._shots(), os.path.join(d, "final.mp4"),
+                                         work_dir=d, changed_shot_ids=set(), runner=self._runner([]))
+        self.assertEqual(sorted(res.regenerated_ids()), ["shot01", "shot02", "shot03"])
+        self.assertEqual(res.reused_ids(), [])
+
+    def test_composed_duration_is_sum_of_all_shots(self):  # FB-4 + FB-5
+        with tempfile.TemporaryDirectory() as d:
+            existing = {s.shot_id: os.path.join(d, f"old_{s.shot_id}.mp4") for s in self._shots()}
+            durations = {"shot01": 2.0, "shot02": 3.0, "shot03": 2.0}
+            res = fb.targeted_regenerate(self._shots(), os.path.join(d, "final.mp4"),
+                                         work_dir=d, changed_shot_ids={"shot02"},
+                                         existing_clips=existing, existing_durations=durations,
+                                         runner=self._runner([]))
+        self.assertEqual(res.composed_cut.duration_seconds, 7.0)  # 2+3+2
+
+    def test_operator_summary_is_leakage_safe(self):  # FB-8
+        with tempfile.TemporaryDirectory() as d:
+            existing = {"shot01": "/internal/secret/old01.mp4"}
+            res = fb.targeted_regenerate(self._shots(), os.path.join(d, "final.mp4"),
+                                         work_dir=d, changed_shot_ids=set(),
+                                         existing_clips=existing, runner=self._runner([]))
+            blob = repr(res.operator_summary()).lower()
+        for forbidden in ("local_path", "/internal/secret", "/tmp/", "provider", "vendor",
+                          "akool", "official_publish_ready=true"):
+            self.assertNotIn(forbidden, blob)
+        self.assertFalse(res.operator_summary()["official_publish_ready"])
+
+    def test_empty_shots_rejected(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(fb.BackboneRenderError):
+                fb.targeted_regenerate([], os.path.join(d, "o.mp4"), work_dir=d,
+                                       changed_shot_ids=set(), runner=self._runner([]))
+
+    def test_fallback_preserved_in_regeneration(self):  # FB-7 within PR-2
+        def flaky(cmd):
+            if "zoompan" in " ".join(cmd):
+                raise fb.BackboneRenderError("proxy fail")
+            open(cmd[-1], "wb").close()
+
+        with tempfile.TemporaryDirectory() as d:
+            res = fb.targeted_regenerate([fb.ShotSpec("shot01", "a.png", duration_seconds=2.0)],
+                                         os.path.join(d, "final.mp4"), work_dir=d,
+                                         changed_shot_ids={"shot01"}, runner=flaky)
+        regen = res.shot_results[0]
+        self.assertEqual(regen.action, fb.ACTION_REGENERATED)
+        self.assertEqual(regen.clip.tier, fb.TIER_STATIC_STILL)
+
+
 @unittest.skipUnless(fb.ffmpeg_available(), "ffmpeg/ffprobe not on PATH (environment limitation)")
 class TestRealFfmpegIntegration(unittest.TestCase):
     """Real end-to-end ffmpeg trial — skipped when ffmpeg is absent."""
@@ -246,6 +339,27 @@ class TestRealFfmpegIntegration(unittest.TestCase):
             # descriptor duration now matches the authoritative QC duration (the fix)
             self.assertEqual(cut.duration_seconds, 4.0)
             self.assertEqual(cut.operator_summary()["duration_seconds"], rep["duration_seconds"])
+
+    def test_targeted_regenerate_end_to_end(self):  # FB-5 real ffmpeg
+        with tempfile.TemporaryDirectory() as d:
+            still = self._make_still(d)
+            shots = [fb.ShotSpec("shot01", still, duration_seconds=2.0, zoom=fb.ZOOM_IN),
+                     fb.ShotSpec("shot02", still, duration_seconds=2.0, zoom=fb.ZOOM_OUT)]
+            # Round 1: no existing clips -> both regenerated.
+            r1 = fb.targeted_regenerate(shots, os.path.join(d, "final1.mp4"), work_dir=d,
+                                        changed_shot_ids=set())
+            self.assertEqual(sorted(r1.regenerated_ids()), ["shot01", "shot02"])
+            existing = {r.shot_id: r.clip.local_path for r in r1.shot_results}
+            durations = {r.shot_id: r.clip.duration_seconds for r in r1.shot_results}
+            # Round 2: only shot02 changed -> shot01 reused, shot02 regenerated.
+            r2 = fb.targeted_regenerate(shots, os.path.join(d, "final2.mp4"), work_dir=d,
+                                        changed_shot_ids={"shot02"},
+                                        existing_clips=existing, existing_durations=durations)
+            self.assertEqual(r2.regenerated_ids(), ["shot02"])
+            self.assertEqual(r2.reused_ids(), ["shot01"])
+            rep = fb.qc_probe(r2.composed_cut.local_path, expected_duration_seconds=4.0)
+            self.assertTrue(rep["passed"], rep)
+            self.assertEqual(r2.composed_cut.duration_seconds, rep["duration_seconds"])
 
 
 if __name__ == "__main__":  # pragma: no cover
