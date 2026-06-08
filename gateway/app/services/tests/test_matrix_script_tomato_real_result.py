@@ -142,10 +142,20 @@ def test_orchestrator_produces_operator_usable_tomato(tmp_path) -> None:
     assert os.path.getsize(res.final_video_path) > 0
     assert res.duration_seconds > 0
 
+    # Backbone integration: scene clips render through the ffmpeg backbone +
+    # the composed final.mp4 carries an ffprobe QC verdict (operator-safe).
+    assert res.scene_engine == "ffmpeg_backbone"
+    assert res.qc_passed is True
+    assert res.qc_resolution == "1080x1920"
+
     payload = tomato_result_to_payload(res)
     assert payload["storage_scope"] == "artifact_staged"
     assert payload["delivery_candidate"] is True
     assert payload["generation_provider"] == "none"
+    assert payload["scene_engine"] == "ffmpeg_backbone"
+    assert payload["backbone_qc_passed"] is True
+    assert payload["backbone_qc_resolution"] == "1080x1920"
+    assert payload["official_publish_ready"] is False
     blob = str(payload).lower()
     for token in ("akool", "provider_url", "temporary_url", "download_url",
                   "publish_url", "publish_status", "model_id", "credit",
@@ -163,9 +173,78 @@ def test_orchestrator_renders_real_frames_9x16(tmp_path) -> None:
         {"task_id": "tomato-frames", "kind": "matrix_script"}, str(tmp_path),
         sink=InMemoryArtifactSink(), env={},
     )
-    assert (res.width, res.height) == (720, 1280)
+    # Operator-visible scene clips now render through the ffmpeg backbone at its
+    # deterministic 1080×1920 spec (Owner-approved backbone integration).
+    assert (res.width, res.height) == (1080, 1920)
     # 5 shots × 4s silent fallback ≈ 20s
     assert probe_duration_seconds(res.final_video_path) >= 15.0
+
+
+@_skip_no_ffmpeg
+@_skip_no_assets
+def test_orchestrator_backbone_manifest_qc_and_per_shot_render(tmp_path) -> None:
+    """The operator-visible manifest carries backbone evidence + an ffprobe QC verdict."""
+    import json
+    from gateway.app.services.matrix_script.tomato_real_result_orchestrator import (
+        run_tomato_real_result,
+    )
+
+    res = run_tomato_real_result(
+        {"task_id": "tomato-backbone", "kind": "matrix_script"}, str(tmp_path),
+        sink=InMemoryArtifactSink(), env={},
+    )
+    manifest = json.load(open(os.path.join(str(tmp_path), "manifest.json")))
+    assert manifest["scene_engine"] == "ffmpeg_backbone"
+    assert manifest["resolution"] == "1080x1920"
+    # every shot rendered through the backbone (proxy or static-still fallback)
+    assert len(manifest["per_shot_render"]) == 5
+    assert all(
+        r["render_mode"] in ("ffmpeg_backbone_proxy", "ffmpeg_backbone_static_still")
+        for r in manifest["per_shot_render"]
+    )
+    # ffprobe QC verdict on the composed operator-visible final.mp4
+    qc = manifest["qc"]
+    assert qc["passed"] is True
+    assert qc["resolution"] == "1080x1920"
+    assert qc["codec"] == "h264"
+    assert abs(float(qc["fps"]) - 30.0) < 0.01
+    assert qc["official_publish_ready"] is False
+    assert manifest["backbone"]["is_generative"] is False
+    # no provider/publish leakage in the operator-safe manifest
+    blob = json.dumps(manifest, ensure_ascii=False).lower()
+    for token in ("akool", "provider_url", "temporary_url", "download_url",
+                  "publish_url", "publish_status", "model_id", "credit"):
+        assert token not in blob
+
+
+@_skip_no_ffmpeg
+@_skip_no_assets
+def test_orchestrator_backbone_consumes_replacement_material(tmp_path) -> None:
+    """An uploaded/replacement material is rendered through the backbone + reported consumed."""
+    from gateway.app.services.matrix_script.tomato_real_result_orchestrator import (
+        run_tomato_real_result,
+    )
+
+    # Reuse a real asset as a stand-in resolvable uploaded image override for shot04.
+    repl = os.path.join(plan_mod.default_asset_dir(), "04_eat_tomato.png")
+    if not os.path.exists(repl):
+        repl = os.path.join(plan_mod.default_asset_dir(), "02_tomato_bowl.png")
+    overrides = {
+        "shot04": {
+            "local_path": repl, "material_kind": "image",
+            "material_name": os.path.basename(repl),
+            "material_ref": "msmaterial://t/shot04/" + os.path.basename(repl),
+            "material_source": "operator_upload",
+        }
+    }
+    res = run_tomato_real_result(
+        {"task_id": "tomato-backbone-mat", "kind": "matrix_script"}, str(tmp_path),
+        sink=InMemoryArtifactSink(), env={}, material_overrides=overrides,
+    )
+    assert "shot04" in res.consumed_material_shot_ids
+    assert res.scene_engine == "ffmpeg_backbone"
+    assert res.qc_passed is True
+    assert os.path.getsize(res.final_video_path) > 0
 
 
 def test_orchestrator_raises_without_assets(tmp_path) -> None:
