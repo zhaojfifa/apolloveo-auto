@@ -15,7 +15,7 @@ Hard boundary:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from gateway.app.services.matrix_script.minimal_result_record import (
     MatrixScriptMinimalResultRecord,
@@ -24,6 +24,31 @@ from gateway.app.services.matrix_script.minimal_result_record import (
 )
 
 OFFICIAL_PUBLISH_READY_FALSE = False
+
+# Operator-language labels for the (internal) scene_strategy token — the raw token is
+# never surfaced to the operator; only this label is (truth-source / operator-safe rule).
+_PREVIEW_MODE_LABELS = {
+    "ffmpeg_backbone_proxy": "快速预览·镜头代理",
+    "ffmpeg_color_card": "快速预览·占位色卡",
+}
+
+
+def _preview_mode_label(scene_strategy: str) -> str:
+    return _PREVIEW_MODE_LABELS.get(str(scene_strategy or ""), "快速预览")
+
+
+def _qc_summary(qc_passed: Optional[bool], qc_resolution: Optional[str]) -> str:
+    """Operator-safe QC sentence from the (pass/fail, resolution) facts.
+
+    Surfaces only the verdict + the picture spec (resolution) in operator language —
+    never a raw path / codec internals / provider field. Neutral on the legacy path.
+    """
+    if qc_passed is None:
+        return "本次预览未进行质检"
+    if qc_passed:
+        resolution = str(qc_resolution or "").strip()
+        return f"质检通过 · 画面规格 {resolution}".strip() if resolution else "质检通过"
+    return "质检未通过 · 可重试"
 
 FORBIDDEN_PROJECTION_TOKENS = (
     "provider_url",
@@ -70,6 +95,10 @@ class MatrixScriptOperatorResultProjection:
     operator_summary: str
     storage_scope: str
     official_publish_ready: bool = OFFICIAL_PUBLISH_READY_FALSE
+    # Operator-safe fast-preview facts surfaced from the manifest (Scope Expansion Batch).
+    preview_mode: str = ""             # operator label for scene_strategy (no raw token)
+    qc_passed: Optional[bool] = None   # ffmpeg-backbone QC verdict (None on legacy path)
+    qc_summary: str = ""               # operator-language QC sentence
 
 
 @dataclass(frozen=True)
@@ -141,6 +170,9 @@ def minimal_result_record_to_operator_projection(
         operator_summary=_summary(record, audience="operator"),
         storage_scope=STORAGE_SCOPE_LOCAL,
         official_publish_ready=OFFICIAL_PUBLISH_READY_FALSE,
+        preview_mode=_preview_mode_label(record.scene_strategy),
+        qc_passed=record.qc_passed,
+        qc_summary=_qc_summary(record.qc_passed, record.qc_resolution),
     )
     assert_no_result_projection_forbidden_tokens(operator_projection_to_dict(projection))
     return projection
@@ -200,6 +232,9 @@ def operator_projection_to_dict(
         "operator_summary": projection.operator_summary,
         "storage_scope": projection.storage_scope,
         "official_publish_ready": projection.official_publish_ready,
+        "preview_mode": projection.preview_mode,
+        "qc_passed": projection.qc_passed,
+        "qc_summary": projection.qc_summary,
     }
     assert_no_result_projection_forbidden_tokens(payload)
     return payload

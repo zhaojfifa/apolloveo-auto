@@ -21,7 +21,7 @@ Hard boundary (PR-6R approval):
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from gateway.app.services.matrix_script.minimal_result_service import (
     MatrixScriptMinimalResultSummary,
@@ -73,6 +73,9 @@ class MatrixScriptMinimalResultRecord:
     generation_provider: str
     scene_strategy: str
     audio_strategy: str
+    # Operator-safe ffmpeg-backbone QC facts (hashable scalars; None on the legacy path).
+    qc_passed: Optional[bool] = None
+    qc_resolution: Optional[str] = None
 
 
 def _is_nonempty_str(value: Any) -> bool:
@@ -121,6 +124,8 @@ def minimal_result_summary_to_record(
         generation_provider=summary.generation_provider or GENERATION_PROVIDER_NONE,
         scene_strategy=summary.scene_strategy,
         audio_strategy=summary.audio_strategy,
+        qc_passed=summary.qc_passed,
+        qc_resolution=summary.qc_resolution,
     )
 
 

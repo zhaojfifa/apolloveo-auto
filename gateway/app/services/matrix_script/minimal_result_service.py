@@ -57,6 +57,10 @@ class MatrixScriptMinimalResultRequest:
     task: Optional[Mapping[str, Any]] = None
     aspect_ratio: str = "9:16"
     target_duration_seconds: float = 20.0
+    # Optional shot_id -> local still / caller-resolved material path. When present and
+    # valid, the ffmpeg backbone auto-engages in the loop (color-card fallback otherwise).
+    # Internal input plumbing only — not a public schema/contract.
+    shot_images: Optional[Mapping[str, str]] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.output_dir, str) or not self.output_dir:
@@ -83,6 +87,9 @@ class MatrixScriptMinimalResultSummary:
     generation_provider: str
     scene_strategy: str
     audio_strategy: str
+    # Operator-safe ffmpeg-backbone QC facts from the manifest (None on legacy path).
+    qc_passed: Optional[bool] = None
+    qc_resolution: Optional[str] = None
 
 
 def _first_present(mapping: Mapping[str, Any], *keys: str) -> Optional[Any]:
@@ -173,6 +180,7 @@ def run_matrix_script_minimal_result(
         task_id=task_id,
         aspect_ratio=request.aspect_ratio,
         target_duration_seconds=request.target_duration_seconds,
+        shot_images=request.shot_images,
     )
 
     # Success precondition: a real final.mp4 must exist before we summarise.
@@ -181,6 +189,7 @@ def run_matrix_script_minimal_result(
 
     duration_seconds = probe_duration_seconds(output.final_video_path)
     manifest = output.manifest
+    manifest_qc = manifest.get("qc") or {}
 
     return MatrixScriptMinimalResultSummary(
         task_id=task_id,
@@ -193,6 +202,8 @@ def run_matrix_script_minimal_result(
         generation_provider=str(manifest.get("generation_provider", GENERATION_PROVIDER)),
         scene_strategy=str(manifest["scene_strategy"]),
         audio_strategy=str(manifest["audio_strategy"]),
+        qc_passed=(bool(manifest_qc["passed"]) if "passed" in manifest_qc else None),
+        qc_resolution=manifest_qc.get("resolution"),
     )
 
 
