@@ -812,6 +812,75 @@
               <span class="op-meta-item__value">旁白：fallback；声音接入前以字幕承载脚本。</span>
             </div>
           </div>
+          {# Storyboard Control + Shot Workbench wave PR-1 — Storyboard Queue + single Current Shot Work Panel (projection-only, Slot-v2-conformant scaffold; §7 fields). No provider call, no route, no dead controls. #}
+          {% set ms_gen_plan = ms_overlay.generation_plan or {} %}
+          {% if ms_gen_plan.is_matrix_script and ms_gen_plan.scenes %}
+          <div data-role="ms-generation-plan"
+               data-plan-status="{{ ms_gen_plan.plan_status_code }}"
+               data-scene-count="{{ ms_gen_plan.scene_count }}"
+               style="margin-top:12px; padding:12px; border:1px solid var(--op-border,#e2e8f0); border-radius:10px;">
+            <div data-role="ms-generation-plan-title" style="font-weight:600; margin-bottom:4px;">视频生成计划 · 分镜故事板</div>
+            <p class="muted" data-role="ms-generation-plan-status" style="font-size:12px; margin-bottom:10px;">{{ ms_gen_plan.plan_status_label_zh }}</p>
+            <div data-role="ms-storyboard-queue" data-active-shot="{{ ms_gen_plan.active_shot_id }}"
+                 style="display:flex; flex-direction:column; gap:4px; margin-bottom:12px;">
+              {% for sc in ms_gen_plan.scenes %}
+              <div data-role="ms-storyboard-queue-row" data-shot-id="{{ sc.shot_id }}"
+                   data-active="{{ 'true' if sc.is_active else 'false' }}"
+                   data-flagged="{{ 'true' if sc.flagged else 'false' }}"
+                   style="display:flex; gap:8px; align-items:center; padding:6px 8px; border-radius:6px;{% if sc.is_active %} background:var(--op-bg-active,#eef2ff); font-weight:600;{% endif %}">
+                <span data-role="ms-storyboard-queue-index" style="min-width:54px;">{{ sc.shot_label_zh }}</span>
+                <span data-role="ms-storyboard-queue-title" style="flex:1;">{{ sc.title_zh }}</span>
+                <span class="op-pill op-pill--neutral" data-role="ms-storyboard-queue-status">{{ sc.status_chip_zh }}</span>
+              </div>
+              {% endfor %}
+            </div>
+            {% if ms_gen_plan.current_shot %}
+            {% set cs = ms_gen_plan.current_shot %}
+            <div data-role="ms-current-shot-panel" data-shot-id="{{ cs.shot_id }}"
+                 style="border-top:1px solid var(--op-border,#e2e8f0); padding-top:10px;">
+              <div data-role="ms-current-shot-title" style="font-weight:600; margin-bottom:8px;">当前镜头 · {{ cs.shot_label_zh }} · {{ cs.title_zh }}</div>
+              <div class="op-meta-grid">
+                <div class="op-meta-item" data-role="ms-current-shot-visual-goal">
+                  <span class="op-meta-item__label">镜头目标</span>
+                  <span class="op-meta-item__value">{{ cs.visual_goal_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-current-shot-motion" data-status-code="{{ cs.motion_status_code }}">
+                  <span class="op-meta-item__label">画面动作</span>
+                  <span class="op-meta-item__value">{{ cs.motion_instruction_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-current-shot-narration">
+                  <span class="op-meta-item__label">旁白</span>
+                  <span class="op-meta-item__value">{{ cs.narration_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-current-shot-subtitle">
+                  <span class="op-meta-item__label">字幕重点</span>
+                  <span class="op-meta-item__value">{{ cs.subtitle_focus_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-current-shot-material-role" data-status-code="{{ cs.material_role_status_code }}">
+                  <span class="op-meta-item__label">素材角色</span>
+                  <span class="op-meta-item__value">{{ cs.material_role_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-current-shot-ai-requirement" data-status-code="{{ cs.ai_requirement_status_code }}">
+                  <span class="op-meta-item__label">AI 生成要求</span>
+                  <span class="op-meta-item__value">{{ cs.ai_requirement_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-current-shot-negative" data-status-code="{{ cs.negative_status_code }}">
+                  <span class="op-meta-item__label">负面约束</span>
+                  <span class="op-meta-item__value">{{ cs.negative_constraint_zh }}</span>
+                </div>
+                <div class="op-meta-item" data-role="ms-current-shot-generation-status">
+                  <span class="op-meta-item__label">当前生成状态</span>
+                  <span class="op-meta-item__value">{{ cs.current_generation_status_zh }}</span>
+                </div>
+              </div>
+              <div data-role="ms-current-shot-pending-actions" class="muted" style="font-size:12px; margin-top:8px;">
+                {% for a in cs.pending_actions_zh %}<span style="margin-right:10px;">{{ a }}</span>{% endfor %}
+                <div style="margin-top:4px;">{{ cs.replace_material_hint_zh }}</div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
           {% if ms_overlay.shots %}
           <div data-role="ms-primary-shot-material-list"
                data-shot-count="{{ ms_overlay.shots | length }}"
