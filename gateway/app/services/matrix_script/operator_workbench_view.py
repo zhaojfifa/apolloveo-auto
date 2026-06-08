@@ -31,6 +31,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Mapping, Optional
 
 from gateway.app.services.matrix_script import tomato_real_result_plan as plan_mod
+from gateway.app.services.matrix_script import generation_plan_view as gen_plan
 
 LINE_ID = "matrix_script"
 
@@ -862,6 +863,10 @@ def build_matrix_script_operator_workbench_view(
     # Process observability (this PR): enrich shots with per-shot trace fields,
     # then derive the single flow-level process state + current-main facts.
     _enrich_shot_observability(shots, version_view)
+    # Storyboard Control + Shot Workbench wave PR-1: projection-only Storyboard
+    # Queue + single Current Shot Work Panel (§7 fields). No provider call, no
+    # Prompt Builder, no route, no new truth — pure projection over the cards.
+    generation_plan = gen_plan.derive_matrix_script_generation_plan_view(shots=shots)
     missing_material_count = sum(
         1 for s in shots
         if not s.get("material_attached") and s.get("source") == PLAN_SOURCE_REUSE
@@ -892,6 +897,10 @@ def build_matrix_script_operator_workbench_view(
         "has_pr_a_result": has_result,
         "main_result": main_result,
         "shots": shots,
+        # PR-1 (Storyboard Control wave): Storyboard Queue + single Current Shot
+        # Work Panel projection (§7 operator fields; honest placeholders for the
+        # not-yet-wired motion / role / AI-requirement / negative fields).
+        "generation_plan": generation_plan,
         # P1 PR-1: material replacement intent is dirty-state only. It must NOT
         # touch the current main video, delivery candidate, or publish readiness.
         "material_changed": material_changed,
