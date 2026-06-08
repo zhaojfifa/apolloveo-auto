@@ -827,9 +827,11 @@
               <div data-role="ms-storyboard-queue-row" data-shot-id="{{ sc.shot_id }}"
                    data-active="{{ 'true' if sc.is_active else 'false' }}"
                    data-flagged="{{ 'true' if sc.flagged else 'false' }}"
+                   data-material-role-code="{{ sc.material_role_code }}"
                    style="display:flex; gap:8px; align-items:center; padding:6px 8px; border-radius:6px;{% if sc.is_active %} background:var(--op-bg-active,#eef2ff); font-weight:600;{% endif %}">
                 <span data-role="ms-storyboard-queue-index" style="min-width:54px;">{{ sc.shot_label_zh }}</span>
                 <span data-role="ms-storyboard-queue-title" style="flex:1;">{{ sc.title_zh }}</span>
+                <span class="op-pill op-pill--neutral" data-role="ms-storyboard-queue-role">{{ sc.role_chip_zh }}</span>
                 <span class="op-pill op-pill--neutral" data-role="ms-storyboard-queue-status">{{ sc.status_chip_zh }}</span>
               </div>
               {% endfor %}
@@ -856,7 +858,7 @@
                   <span class="op-meta-item__label">字幕重点</span>
                   <span class="op-meta-item__value">{{ cs.subtitle_focus_zh }}</span>
                 </div>
-                <div class="op-meta-item" data-role="ms-current-shot-material-role" data-status-code="{{ cs.material_role_status_code }}">
+                <div class="op-meta-item" data-role="ms-current-shot-material-role" data-status-code="{{ cs.material_role_status_code }}" data-material-role-code="{{ cs.material_role_code }}" data-material-role-source="{{ cs.material_role_source }}">
                   <span class="op-meta-item__label">素材角色</span>
                   <span class="op-meta-item__value">{{ cs.material_role_zh }}</span>
                 </div>

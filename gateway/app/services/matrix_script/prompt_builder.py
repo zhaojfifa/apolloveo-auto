@@ -30,9 +30,9 @@ ROLE_SCENE = "scene_reference"
 ROLE_STYLE = "style_reference"
 ROLE_REPLACEMENT = "replacement_image"
 ROLE_BROLL = "broll_candidate"
-_ROLES = (ROLE_PRODUCT, ROLE_CHARACTER, ROLE_SCENE, ROLE_STYLE, ROLE_REPLACEMENT, ROLE_BROLL)
+ROLES = (ROLE_PRODUCT, ROLE_CHARACTER, ROLE_SCENE, ROLE_STYLE, ROLE_REPLACEMENT, ROLE_BROLL)
 
-_ROLE_LABEL_ZH = {
+ROLE_LABEL_ZH = {
     ROLE_PRODUCT: "产品素材",
     ROLE_CHARACTER: "人物素材",
     ROLE_SCENE: "场景素材",
@@ -94,8 +94,9 @@ _MOTION_EN = {
 _DEFAULT_ASPECT = "9:16"
 
 
-def _norm_role(material_role: Optional[str]) -> Optional[str]:
-    return material_role if material_role in _ROLES else None
+def normalize_role(material_role: Optional[str]) -> Optional[str]:
+    """Return ``material_role`` if it is in the closed ROLES set, else None (public)."""
+    return material_role if material_role in ROLES else None
 
 
 def _aspect(value: Optional[str]) -> str:
@@ -128,14 +129,14 @@ def build_shot_prompt(
     aspect_ratio: str = _DEFAULT_ASPECT,
 ) -> Dict[str, Any]:
     """Build the three audience-separated prompt outputs for one shot (pure)."""
-    role = _norm_role(material_role)
+    role = normalize_role(material_role)
     goal = (visual_goal or "").strip()
     motion_zh = (motion_instruction or "").strip() or _MOTION_DEFAULT_ZH
     motion_en = _MOTION_EN.get(motion_zh, "subtle camera motion")
     aspect = _aspect(aspect_ratio)
     preserve_zh = _ROLE_PRESERVE_ZH[role] if role else _DEFAULT_PRESERVE_ZH
     preserve_en = _ROLE_PRESERVE_EN[role] if role else _DEFAULT_PRESERVE_EN
-    role_label = _ROLE_LABEL_ZH[role] if role else _DEFAULT_LABEL_ZH
+    role_label = ROLE_LABEL_ZH[role] if role else _DEFAULT_LABEL_ZH
 
     # (a) operator-safe AI 生成要求 / 负面约束 (operator language only).
     req_parts = [p for p in (goal, motion_zh, preserve_zh, _aspect_zh(aspect)) if p]

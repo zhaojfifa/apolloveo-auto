@@ -79,6 +79,17 @@ _OVERRIDE_FORBIDDEN = (
     "credit", "provider_task_id", "publish_url", "publish_status", "://", "http",
 )
 
+# PR-3: material-role binding. Each shot gets a deterministic default role (Owner
+# tomato binding); an operator override may rebind it via an additive task.config
+# key (write route deferred). The resolved role feeds the Prompt Builder and drives
+# the role chip + the role-specific AI 生成要求 / 负面约束. Closed role set lives in
+# prompt_builder.ROLES; the friendly chip labels in prompt_builder.ROLE_LABEL_ZH.
+MATERIAL_ROLE_BINDING_KEY = "matrix_script_material_role_bindings"
+ROLE_BOUND = "material_role_bound"
+ROLE_SOURCE_SYSTEM = "system_derived"
+ROLE_SOURCE_OPERATOR = "operator"
+_ROLE_CHIP_FALLBACK_ZH = "通用素材"
+
 
 def _shot_label(shot_id: str) -> str:
     sid = str(shot_id)
@@ -126,26 +137,63 @@ def _clean_override_text(value: Any) -> Optional[str]:
     return text[:600]
 
 
+def _default_role_for_shot(ps: Any) -> str:
+    """Deterministic default material role per shot (Owner tomato binding).
+
+    02_tomato_bowl.png = product_reference; beach / hook = scene_reference; the
+    eating/lifestyle shot (shot04) = character_reference; other product shots =
+    product_reference. Derived from the fixed shot plan only — no provider, no I/O.
+    """
+    asset = str(getattr(ps, "asset_filename", "") or "").lower()
+    sid = str(getattr(ps, "shot_id", ""))
+    if "beach" in asset or "hook" in asset:
+        return prompt_builder.ROLE_SCENE
+    if sid == "shot04":
+        return prompt_builder.ROLE_CHARACTER
+    if "tomato" in asset or "pick" in asset:
+        return prompt_builder.ROLE_PRODUCT
+    return prompt_builder.ROLE_PRODUCT
+
+
+def _role_bindings(task: Optional[Mapping[str, Any]]) -> Mapping[str, Any]:
+    """Operator material-role rebindings from task.config (projection / read side)."""
+    cfg = task.get("config") if isinstance(task, Mapping) else None
+    raw = cfg.get(MATERIAL_ROLE_BINDING_KEY) if isinstance(cfg, Mapping) else None
+    return raw if isinstance(raw, Mapping) else {}
+
+
+def _resolve_role(ps: Any, bindings: Mapping[str, Any]) -> "tuple":
+    """Resolve (role, source): a valid operator override wins, else the default."""
+    override = bindings.get(ps.shot_id) if isinstance(bindings, Mapping) else None
+    if prompt_builder.normalize_role(override):
+        return override, ROLE_SOURCE_OPERATOR
+    return _default_role_for_shot(ps), ROLE_SOURCE_SYSTEM
+
+
 def _build_current_shot(
     ps: Any,
     card: Mapping[str, Any],
     status_zh: str,
+    *,
+    resolved_role: str,
+    role_source: str,
     override: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
     """The single active shot's §7 panel.
 
-    PR-2: AI 生成要求 / 负面约束 are built by the Prompt Builder (real, role-agnostic
-    until PR-3 binds a role), with a clean operator rewrite honored when present
-    (改写生成要求 read side). 画面动作 / 素材角色 remain honest placeholders. The
-    provider payload (b) is built by the Prompt Builder but is NOT placed on the view
-    (runtime-transient; never surfaced) — no provider call here.
+    PR-3: the resolved material role (system-derived default or a clean operator
+    rebinding) feeds the Prompt Builder, so AI 生成要求 / 负面约束 are role-specific; a
+    clean operator rewrite still overrides the text (改写生成要求 read side). 画面动作
+    remains an honest placeholder (later slice). The provider payload (b) is built
+    but is NOT placed on the view (runtime-transient; never surfaced) — no provider
+    call here.
     """
     built = prompt_builder.build_shot_prompt(
         visual_goal=ps.visual_intent_zh,
         narration_line=ps.voiceover_zh,
         script_segment=ps.subtitle_zh,
         motion_instruction=_derive_motion_zh(ps),
-        material_role=None,
+        material_role=resolved_role,
         aspect_ratio="9:16",
     )
     ov = override if isinstance(override, Mapping) else {}
@@ -165,11 +213,14 @@ def _build_current_shot(
         "visual_goal_zh": ps.visual_intent_zh,
         "narration_zh": ps.voiceover_zh,
         "subtitle_focus_zh": ps.subtitle_zh,
-        # 画面动作 / 素材角色 — still honest placeholders (later slices).
+        # 画面动作 — still an honest placeholder (later slice).
         "motion_instruction_zh": _PLACEHOLDER_ZH[MOTION_PENDING],
         "motion_status_code": MOTION_PENDING,
-        "material_role_zh": _PLACEHOLDER_ZH[ROLE_PENDING],
-        "material_role_status_code": ROLE_PENDING,
+        # 素材角色 — PR-3: bound (system-derived default or a clean operator rebinding).
+        "material_role_zh": prompt_builder.ROLE_LABEL_ZH.get(resolved_role, _ROLE_CHIP_FALLBACK_ZH),
+        "material_role_code": resolved_role,
+        "material_role_status_code": ROLE_BOUND,
+        "material_role_source": role_source,
         # AI 生成要求 / 负面约束 — PR-2: real Prompt Builder output (or a clean rewrite).
         "ai_requirement_zh": requirement_zh,
         "ai_requirement_status_code": AI_REQUIREMENT_READY,
@@ -211,6 +262,7 @@ def derive_matrix_script_generation_plan_view(
         str(c.get("shot_id")): c for c in (shots or []) if isinstance(c, Mapping)
     }
     overrides = _requirement_overrides(task)
+    role_bindings = _role_bindings(task)
     plan_shots = list(plan_mod.TOMATO_SHOTS)
     if not plan_shots:
         return {
@@ -230,6 +282,7 @@ def derive_matrix_script_generation_plan_view(
         card = card_by_id.get(ps.shot_id, {})
         status_zh = _current_generation_status_zh(card)
         is_active = ps.shot_id == active_id
+        resolved_role, role_source = _resolve_role(ps, role_bindings)
         scenes.append({
             "scene_index": ps.order,
             "shot_id": ps.shot_id,
@@ -238,10 +291,15 @@ def derive_matrix_script_generation_plan_view(
             "status_chip_zh": status_zh,
             "is_active": is_active,
             "flagged": bool(card.get("suggested_for_handling")),
+            # PR-3: friendly material-role chip on each queue row.
+            "role_chip_zh": prompt_builder.ROLE_LABEL_ZH.get(resolved_role, _ROLE_CHIP_FALLBACK_ZH),
+            "material_role_code": resolved_role,
         })
         if is_active:
             current_shot = _build_current_shot(
-                ps, card, status_zh, override=overrides.get(ps.shot_id)
+                ps, card, status_zh,
+                resolved_role=resolved_role, role_source=role_source,
+                override=overrides.get(ps.shot_id),
             )
 
     return {
