@@ -88,12 +88,12 @@ def test_projected_fields_are_real_script_text() -> None:
 
 
 def test_not_wired_fields_are_honest_placeholders() -> None:
-    # 画面动作 / 素材角色 remain honest placeholders (later slices). AI 生成要求 /
-    # 负面约束 are now real Prompt Builder output (PR-2), so their status is READY.
+    # 画面动作 remains an honest placeholder (later slice). AI 生成要求 / 负面约束 are
+    # real (PR-2); 素材角色 is now bound (PR-3, status ROLE_BOUND).
     plan = _plan_from_overlay()
     cs = plan["current_shot"]
     assert cs["motion_status_code"] == gen_plan.MOTION_PENDING
-    assert cs["material_role_status_code"] == gen_plan.ROLE_PENDING
+    assert cs["material_role_status_code"] == gen_plan.ROLE_BOUND
     assert cs["ai_requirement_status_code"] == gen_plan.AI_REQUIREMENT_READY
     assert cs["negative_status_code"] == gen_plan.NEGATIVE_READY
 
