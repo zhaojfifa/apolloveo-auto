@@ -22,10 +22,9 @@ raises (never a fake final.mp4).
 """
 from __future__ import annotations
 
-import asyncio
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from gateway.app.services.matrix_script.minimal_result_artifact_staging import (
@@ -41,6 +40,7 @@ from gateway.app.services.matrix_script.real_asset_scene_renderer import (
     render_caption_png,
 )
 from gateway.app.services.matrix_script import ffmpeg_backbone as backbone
+from gateway.app.services.matrix_script import voiceover_capability
 from gateway.app.services.matrix_script.simple_scene_renderer import (
     FFmpegUnavailableError,
     assemble_final_video,
@@ -67,18 +67,24 @@ DEFAULT_HEIGHT = backbone.BACKBONE_HEIGHT     # 1920
 DEFAULT_FPS = backbone.BACKBONE_FPS           # 30
 DEFAULT_SHOT_SECONDS = 4.0
 AUDIO_MODE_AZURE = "azure_tts"
+AUDIO_MODE_EDGE = "edge_tts"
 AUDIO_MODE_SILENT = "silent_fallback"
 CAPTION_MODE_BURNED = "burned_in"
 CAPTION_MODE_SIDECAR = "sidecar_only"
+
+# image_to_video credential env vars probed for the operator-safe capability status
+# (presence only — values are never read into any artifact/log).
+_I2V_CREDENTIAL_ENVS = (
+    "KLING_API_KEY", "RUNWAY_API_KEY", "VEO_API_KEY",
+    "FAL_KEY", "AKOOL_CLIENT_ID", "GOOGLE_APPLICATION_CREDENTIALS",
+)
 
 # Scene engine + per-shot render-mode markers recorded on the manifest (operator-safe).
 SCENE_ENGINE_BACKBONE = "ffmpeg_backbone"
 RENDER_MODE_PROXY = "ffmpeg_backbone_proxy"
 RENDER_MODE_STATIC = "ffmpeg_backbone_static_still"
 
-_AZURE_KEY_ENV = "AZURE_SPEECH_KEY"
-_AZURE_REGION_ENV = "AZURE_SPEECH_REGION"
-_DEFAULT_VOICE = "zh-CN-XiaoxiaoNeural"
+_DEFAULT_VOICE = voiceover_capability.DEFAULT_VOICE
 
 
 class TomatoRealResultError(ValueError):
@@ -108,6 +114,9 @@ class TomatoRealResult:
     scene_engine: str = SCENE_ENGINE_BACKBONE
     qc_passed: Optional[bool] = None
     qc_resolution: Optional[str] = None
+    # Real-video heavy batch: voiceover status + operator-safe capability status.
+    voiceover_status: str = voiceover_capability.STATUS_BLOCKED_CREDENTIAL_MISSING
+    capability_status: Mapping[str, Any] = field(default_factory=dict)
     official_publish_ready: bool = False
     line_id: str = LINE_ID
 
@@ -118,25 +127,6 @@ def _task_id(task: Mapping[str, Any]) -> Optional[str]:
         if isinstance(v, str) and v:
             return v
     return None
-
-
-def _azure_env(env: Optional[Mapping[str, str]]) -> Optional[Tuple[str, str]]:
-    src = env if env is not None else os.environ
-    key = (src.get(_AZURE_KEY_ENV) or "").strip()
-    region = (src.get(_AZURE_REGION_ENV) or "").strip()
-    if key and region:
-        return key, region
-    return None
-
-
-def _synthesize_shot_audio_azure(text: str, out_mp3: str, *, voice: str, key: str, region: str) -> None:
-    from gateway.app.providers.azure_speech import generate_audio_azure_speech
-
-    asyncio.run(
-        generate_audio_azure_speech(
-            text, voice, out_mp3, speech_key=key, speech_region=region,
-        )
-    )
 
 
 def _pad_audio_to(in_path: str, out_wav: str, duration_seconds: float) -> None:
@@ -152,22 +142,6 @@ def _pad_audio_to(in_path: str, out_wav: str, duration_seconds: float) -> None:
         raise TomatoRealResultError("audio pad/convert failed")
 
 
-def _concat_wavs(wav_paths: List[str], out_wav: str, work_dir: str) -> None:
-    list_path = os.path.join(work_dir, "audio_concat.txt")
-    with open(list_path, "w", encoding="utf-8") as fh:
-        for p in wav_paths:
-            fh.write(f"file '{os.path.abspath(p)}'\n")
-    cmd = [
-        ffmpeg_path(), "-y", "-f", "concat", "-safe", "0", "-i", list_path,
-        "-ar", "44100", "-ac", "1", out_wav,
-    ]
-    import subprocess
-
-    proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=120, check=False)
-    if proc.returncode != 0:
-        raise TomatoRealResultError("audio concat failed")
-
-
 def _build_manifest(
     *, task_id: Optional[str], shot_facts: List[ShotRenderFact],
     audio_mode: str, caption_mode: str, duration_seconds: float,
@@ -175,6 +149,8 @@ def _build_manifest(
     final_rel: str, audio_rel: str, subtitle_rel: str, scene_rels: List[str],
     scene_engine: str = SCENE_ENGINE_BACKBONE,
     per_shot_render: Optional[List[Dict[str, Any]]] = None,
+    capability_status: Optional[Mapping[str, Any]] = None,
+    voiceover_status: Optional[str] = None,
     qc: Optional[Mapping[str, Any]] = None,
     backbone_summary: Optional[Mapping[str, Any]] = None,
 ) -> Dict[str, Any]:
@@ -194,6 +170,7 @@ def _build_manifest(
             "artifact_staging": "done",
         },
         "audio_mode": audio_mode,
+        "voiceover_status": voiceover_status,
         "caption_mode": caption_mode,
         "scene_engine": scene_engine,
         "shot_count": len(shot_facts),
@@ -212,6 +189,8 @@ def _build_manifest(
     # Additive backbone evidence (operator-safe; no local_path / provider field).
     if per_shot_render is not None:
         manifest["per_shot_render"] = [dict(r) for r in per_shot_render]
+    if capability_status is not None:
+        manifest["capability_status"] = dict(capability_status)
     if qc is not None:
         manifest["qc"] = dict(qc)
     if backbone_summary is not None:
@@ -338,6 +317,59 @@ def _render_shot_via_backbone(
     return _BackboneShotRender(render_mode=render_mode, caption_burned=caption_burned)
 
 
+def _narration_text(shots) -> str:
+    """Operator-script narration text for the whole timeline (shot voiceover lines)."""
+    parts = [str(getattr(s, "voiceover_zh", "") or "").strip() for s in shots]
+    return "  ".join(p for p in parts if p)
+
+
+# Indirection so tests can monkeypatch the voiceover synth without network/secret.
+def _voiceover_synth(text, out_path, *, env, voice):
+    return voiceover_capability.synthesize_narration(
+        text, out_path, env=env, voice=voice
+    )
+
+
+def _build_capability_status(
+    *, voiceover, any_caption_burned: bool, env: Optional[Mapping[str, str]],
+) -> Dict[str, Any]:
+    """Operator-safe capability status for voiceover / image_to_video / subtitles / bgm.
+
+    Honest by construction: no provider/vendor brand in the operator label; no secret
+    (only credential presence is checked); a missing capability is reported as blocked /
+    not-selected, never faked.
+    """
+    src = env if env is not None else os.environ
+    i2v_creds = any((src.get(name) or "").strip() for name in _I2V_CREDENTIAL_ENVS)
+    return {
+        "scene_engine": SCENE_ENGINE_BACKBONE,
+        # image_to_video: generative provider stays gated behind a credentialed trial;
+        # with no credential we honestly report blocked + keep the backbone proxy.
+        "image_to_video": {
+            "capability": "image_to_video",
+            "status": (
+                "available_not_run" if i2v_creds
+                else voiceover_capability.STATUS_BLOCKED_CREDENTIAL_MISSING
+            ),
+            "operator_label_zh": (
+                "AI 视频生成可用（未启用）" if i2v_creds
+                else "AI 视频生成未启用 · 缺少凭证（使用镜头代理）"
+            ),
+        },
+        "voiceover": voiceover.to_status_dict(),
+        "subtitles": {
+            "capability": "subtitles",
+            "status": "generated" if any_caption_burned else "sidecar_only",
+            "operator_label_zh": "字幕已烧录" if any_caption_burned else "字幕（外挂文件）",
+        },
+        "bgm": {
+            "capability": "bgm",
+            "status": "not_selected",
+            "operator_label_zh": "配乐未选择",
+        },
+    }
+
+
 def _write_srt(path: str, shots, durations: List[float]) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     lines: List[str] = []
@@ -395,28 +427,9 @@ def run_tomato_real_result(
     for d in (shots_dir, audio_dir, subs_dir, final_dir, work_dir):
         os.makedirs(d, exist_ok=True)
 
-    azure = _azure_env(env)
-    audio_mode = AUDIO_MODE_AZURE if azure else AUDIO_MODE_SILENT
-
-    # 1. Per-shot audio (Azure if env) → decides per-shot duration; else fixed.
-    durations: List[float] = []
-    shot_audio_paths: List[Optional[str]] = []
-    for shot in shots:
-        if azure:
-            key, region = azure
-            mp3 = os.path.join(audio_dir, f"{shot.shot_id}.mp3")
-            try:
-                _synthesize_shot_audio_azure(shot.voiceover_zh, mp3, voice=voice, key=key, region=region)
-                dur = max(min(probe_duration_seconds(mp3) + 0.5, 9.0), 3.0)
-            except Exception:
-                # Azure failed mid-run → degrade this shot to silent timing.
-                mp3 = None
-                dur = DEFAULT_SHOT_SECONDS
-            shot_audio_paths.append(mp3)
-            durations.append(dur)
-        else:
-            shot_audio_paths.append(None)
-            durations.append(DEFAULT_SHOT_SECONDS)
+    # 1. Fixed per-shot durations (deterministic timeline; voiceover is composed as
+    #    one real TTS narration track over the whole timeline in step 3).
+    durations: List[float] = [DEFAULT_SHOT_SECONDS for _ in shots]
 
     # 2. Render each shot clip THROUGH THE FFMPEG BACKBONE (image → 1080×1920
     #    Ken-Burns proxy) + the existing caption overlay. The SOURCE pixels may be
@@ -477,22 +490,43 @@ def run_tomato_real_result(
     rendered_durations = [d for shot, d in zip(shots, durations)
                           if os.path.exists(os.path.join(asset_dir, shot.asset_filename))]
 
-    # 3. Audio track for the whole timeline.
+    # 3. Voiceover track for the whole timeline — REAL TTS narration where a path
+    #    is available (credentialed Azure → keyless edge_tts), else honest silent
+    #    fallback. Never fabricates audio; the status carries the honest block reason.
+    rendered_shots_for_audio = [
+        shot for shot in shots
+        if os.path.exists(os.path.join(asset_dir, shot.asset_filename))
+    ]
+    total_timeline_seconds = float(sum(rendered_durations))
     audio_path = os.path.join(audio_dir, "narration.wav")
-    if azure and any(p for p in shot_audio_paths):
-        padded: List[str] = []
-        for shot, mp3, dur in zip(shots, shot_audio_paths, durations):
-            if not os.path.exists(os.path.join(asset_dir, shot.asset_filename)):
-                continue
-            seg = os.path.join(work_dir, f"{shot.shot_id}_pad.wav")
-            if mp3 and os.path.exists(mp3):
-                _pad_audio_to(mp3, seg, dur)
-            else:
-                generate_silent_audio(seg, duration_seconds=dur)
-            padded.append(seg)
-        _concat_wavs(padded, audio_path, work_dir)
+    narration_text = _narration_text(rendered_shots_for_audio)
+    voiceover = _voiceover_synth(
+        narration_text,
+        os.path.join(audio_dir, "narration_tts.mp3"),
+        env=env,
+        voice=voice,
+    )
+    if voiceover.generated and voiceover.audio_path:
+        # Compose the real narration into the timeline (pad/trim to total duration).
+        try:
+            _pad_audio_to(voiceover.audio_path, audio_path, total_timeline_seconds)
+            audio_mode = (
+                AUDIO_MODE_AZURE
+                if voiceover.provider == voiceover_capability.PROVIDER_AZURE
+                else AUDIO_MODE_EDGE
+            )
+        except Exception:  # noqa: BLE001 — compose failure degrades to honest silence
+            generate_silent_audio(audio_path, duration_seconds=total_timeline_seconds)
+            audio_mode = AUDIO_MODE_SILENT
+            voiceover = voiceover_capability.VoiceoverOutcome(
+                voiceover_capability.STATUS_BLOCKED_PROVIDER_FAIL,
+                voiceover_capability.PROVIDER_NONE,
+                None,
+                "voiceover compose failed",
+            )
     else:
-        generate_silent_audio(audio_path, duration_seconds=float(sum(rendered_durations)))
+        generate_silent_audio(audio_path, duration_seconds=total_timeline_seconds)
+        audio_mode = AUDIO_MODE_SILENT
 
     # 4. Subtitles sidecar (.srt) for the rendered shots.
     rendered_shots = [shot for shot in shots
@@ -530,6 +564,11 @@ def run_tomato_real_result(
         "note": "镜头代理（1080×1920）+ 字幕叠加 + 拼接 + ffprobe 质检；非生成式、非最终成片。",
     }
 
+    # 5c. Operator-safe capability status (voiceover / image_to_video / subtitles / bgm).
+    capability_status = _build_capability_status(
+        voiceover=voiceover, any_caption_burned=any_caption_burned, env=env,
+    )
+
     # 6. Manifest (real local relative paths only).
     manifest = _build_manifest(
         task_id=task_id, shot_facts=shot_facts, audio_mode=audio_mode,
@@ -541,6 +580,8 @@ def run_tomato_real_result(
         scene_rels=[os.path.relpath(p, output_dir) for p in scene_clip_paths],
         scene_engine=SCENE_ENGINE_BACKBONE,
         per_shot_render=per_shot_render,
+        capability_status=capability_status,
+        voiceover_status=voiceover.status,
         qc=qc,
         backbone_summary=backbone_summary,
     )
@@ -579,6 +620,8 @@ def run_tomato_real_result(
         scene_engine=SCENE_ENGINE_BACKBONE,
         qc_passed=(bool(qc.get("passed")) if isinstance(qc, Mapping) else None),
         qc_resolution=(str(qc.get("resolution")) if isinstance(qc, Mapping) and qc.get("resolution") else None),
+        voiceover_status=voiceover.status,
+        capability_status=capability_status,
     )
 
 
@@ -599,5 +642,8 @@ def tomato_result_to_payload(result: TomatoRealResult) -> Dict[str, object]:
     payload["scene_engine"] = result.scene_engine
     payload["backbone_qc_passed"] = result.qc_passed
     payload["backbone_qc_resolution"] = result.qc_resolution
+    # Real-video heavy batch: voiceover + capability status (operator-safe labels only).
+    payload["voiceover_status"] = result.voiceover_status
+    payload["capability_status"] = dict(result.capability_status or {})
     assert_no_delivery_view_forbidden_tokens(payload)
     return payload
