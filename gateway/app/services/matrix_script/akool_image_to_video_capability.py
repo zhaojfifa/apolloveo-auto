@@ -189,6 +189,17 @@ def _normalize_to_backbone_spec(in_path: str, out_path: str) -> None:
         raise RuntimeError("normalize failed")
 
 
+def _emit(on_event: Optional[Callable[[str], None]], name: str) -> None:
+    """Fire an operator-safe lifecycle event (stage NAME only; never a secret / URL /
+    task id). Guarded so a faulty observability collector can never break generation."""
+    if on_event is None:
+        return
+    try:
+        on_event(name)
+    except Exception:  # noqa: BLE001 — observability must never break a real generation
+        pass
+
+
 def generate_shot_clip_akool(
     *,
     still_path: str,
@@ -200,6 +211,7 @@ def generate_shot_clip_akool(
     transport: Optional[Callable[[AkoolHttpRequest], AkoolHttpResponse]] = None,
     host_image: Optional[Callable[[str, str, str], str]] = None,
     download: Optional[Callable[[str, str], None]] = None,
+    on_event: Optional[Callable[[str], None]] = None,
     poll_max_seconds: float = 90.0,
     poll_interval_seconds: float = 8.0,
 ) -> AkoolShotResult:
@@ -229,13 +241,16 @@ def generate_shot_clip_akool(
 
     try:
         image_url = host_image(task_id, shot_id, still_path)
+        _emit(on_event, "hosted_input_created")
         created = client.create_task(
             AkoolCapability.IMAGE_TO_VIDEO, {"image_url": image_url, "prompt": prompt}
         )
+        _emit(on_event, "task_created")
         deadline = time.monotonic() + float(poll_max_seconds)
         output_url: Optional[str] = None
         while True:
             read = client.read_task_result(AkoolCapability.IMAGE_TO_VIDEO, created.provider_task_id)
+            _emit(on_event, f"poll_{read.status.name.lower()}")
             if read.status is AkoolTaskStatus.SUCCESS:
                 output_url = read.output.url if read.output else None
                 break
@@ -258,7 +273,9 @@ def generate_shot_clip_akool(
         download(output_url, raw)
         if not (os.path.exists(raw) and os.path.getsize(raw) > 0):
             return AkoolShotResult(STATUS_PROVIDER_FAILED, None, True, "download_empty")
+        _emit(on_event, "clip_downloaded")
         _normalize_to_backbone_spec(raw, out_clip)
+        _emit(on_event, "normalized")
     except Exception as exc:  # noqa: BLE001
         return AkoolShotResult(STATUS_PROVIDER_FAILED, None, True, f"postproc:{exc.__class__.__name__}")
 

@@ -43,6 +43,7 @@ from gateway.app.services.matrix_script import ffmpeg_backbone as backbone
 from gateway.app.services.matrix_script import voiceover_capability
 from gateway.app.services.matrix_script import akool_image_to_video_capability as akool_i2v
 from gateway.app.services.matrix_script import generation_plan_view as gen_plan
+from gateway.app.services.matrix_script import provider_orchestrator as prov_orch
 from gateway.app.services.matrix_script.simple_scene_renderer import (
     FFmpegUnavailableError,
     assemble_final_video,
@@ -407,6 +408,67 @@ def _write_srt(path: str, shots, durations: List[float]) -> None:
         fh.write("\n".join(lines).strip() + "\n")
 
 
+def _build_provider_targets(
+    shots, task: Mapping[str, Any], asset_dir: str, active_shot_id: Optional[str],
+) -> List[prov_orch.ShotTarget]:
+    """Select the storyboard shots to attempt real provider generation for.
+
+    Targets = the real-visual shots (distinct local assets: shot01 scene / shot02 product /
+    shot03 character+product), plus the operator's active shot if valid — ordered by shot
+    order. Each carries a script-derived, role-driven prompt (the SAME resolution the
+    Current Shot Panel shows, via ``generation_plan_view.build_provider_prompt_for_shot``).
+    The provider attempt budget (not this list) bounds cost.
+    """
+    selected_ids: List[str] = [s.shot_id for s in shots if s.real_visual]
+    if active_shot_id and active_shot_id not in selected_ids and active_shot_id in {s.shot_id for s in shots}:
+        selected_ids.append(active_shot_id)
+    by_id = {s.shot_id: s for s in shots}
+    ordered = sorted((by_id[sid] for sid in selected_ids), key=lambda s: s.order)
+    targets: List[prov_orch.ShotTarget] = []
+    for shot in ordered:
+        image_path = os.path.join(asset_dir, shot.asset_filename)
+        if not os.path.exists(image_path):
+            continue
+        meta = gen_plan.build_provider_prompt_for_shot(shot, task)
+        targets.append(prov_orch.ShotTarget(
+            shot_id=shot.shot_id, shot_title_zh=shot.title_zh, still_path=image_path,
+            base_prompt=meta["provider_prompt"], base_negative=meta["provider_negative_prompt"],
+            visual_goal=shot.visual_intent_zh, narration_line=shot.voiceover_zh,
+            script_segment=shot.subtitle_zh, material_role=meta["material_role"],
+            material_role_label_zh=meta["material_role_label_zh"],
+        ))
+    return targets
+
+
+def _augment_capability_with_provider_batch(
+    capability_status: Dict[str, Any], traces, *, attempts_used: int,
+) -> Dict[str, Any]:
+    """Fold the multi-shot provider outcome + the operator-safe "AI 生成请求过程" panel into
+    the capability status (honest counts; no vendor/secret; rides existing manifest plumbing)."""
+    out = dict(capability_status)
+    generated = [t for t in traces if t.consumed_into_final]
+    img = dict(out.get("image_to_video", {}))
+    img["multi_shot"] = True
+    img["provider_generated_count"] = len(generated)
+    img["provider_target_count"] = len(traces)
+    img["provider_attempt_count"] = int(attempts_used)
+    img["status"] = (
+        akool_i2v.STATUS_PROVIDER_SUCCESS if generated else akool_i2v.STATUS_PROVIDER_FAILED
+    )
+    img["succeeded"] = bool(generated)
+    img["provider_attempted"] = any(t.provider_attempted for t in traces)
+    img["script_directed"] = True
+    img["operator_label_zh"] = (
+        f"AI 视频生成：{len(generated)}/{len(traces)} 个镜头实时生成并进入成片"
+        if generated else "AI 视频生成未成功 · 全部回退本地兜底"
+    )
+    out["image_to_video"] = img
+    # Operator-surface key avoids the words provider/model/vendor/engine (R3 red line):
+    # the panel is "AI 生成请求过程".
+    out["ai_generation_request_process"] = prov_orch.build_provider_request_panel(traces)
+    return out
+
+
 def run_tomato_real_result(
     task: Mapping[str, Any],
     output_dir: "str | os.PathLike[str]",
@@ -420,6 +482,8 @@ def run_tomato_real_result(
     fps: int = DEFAULT_FPS,
     material_overrides: Optional[Mapping[str, Mapping[str, Any]]] = None,
     active_shot_id: Optional[str] = None,
+    use_gemini: bool = True,
+    max_video_attempts: int = prov_orch.DEFAULT_MAX_VIDEO_ATTEMPTS,
 ) -> TomatoRealResult:
     """Run the controlled tomato real-result path; return a staged, gated result.
 
@@ -444,11 +508,6 @@ def run_tomato_real_result(
     output_dir = os.fspath(output_dir)
     asset_dir = asset_dir or plan_mod.default_asset_dir()
     shots = list(plan_mod.TOMATO_SHOTS)
-    # PR-4: the Current Shot Panel active shot is the provider-target; default to the
-    # designated product shot (shot02) when none / an unknown id is supplied (safe
-    # default behavior — bounded to ONE controlled shot per run).
-    _shot_ids = {s.shot_id for s in shots}
-    provider_target_id = active_shot_id if active_shot_id in _shot_ids else AKOOL_SHOT_ID
 
     shots_dir = os.path.join(output_dir, "shots")
     audio_dir = os.path.join(output_dir, "audio")
@@ -462,12 +521,25 @@ def run_tomato_real_result(
     #    one real TTS narration track over the whole timeline in step 3).
     durations: List[float] = [DEFAULT_SHOT_SECONDS for _ in shots]
 
-    # Real Akool image_to_video is attempted for ONE designated shot when enabled
-    # (flag + credential). Any failure degrades to the backbone proxy with an honest
-    # per-shot status — never a fake provider clip.
+    # Multi-shot provider batch (Owner-authorized; supersedes the prior one-shot bound):
+    # the real-visual storyboard shots are each attempted via the provider orchestrator
+    # (Gemini-refined script prompt → image_to_video, bounded retry-on-failure, honest
+    # per-shot trace). Any shot that does not succeed degrades to the backbone proxy with
+    # an honest status — never a fake provider clip, never a silent fallback. Bounded by
+    # ``max_video_attempts`` (Owner cap ≤ 5). Disabled (flag/credential) ⇒ no provider call.
     akool_enabled = akool_i2v.real_enabled(env) and akool_i2v.credentials_present(env)
-    akool_shot_result: Optional[akool_i2v.AkoolShotResult] = None
-    provider_prompt_meta: Optional[Dict[str, Any]] = None
+    provider_clips_by_shot: Dict[str, str] = {}
+    provider_traces: List[prov_orch.ShotTrace] = []
+    provider_attempts_used = 0
+    if akool_enabled:
+        targets = _build_provider_targets(shots, task, asset_dir, active_shot_id)
+        batch = prov_orch.orchestrate_shots(
+            targets, task_id=task_id or LINE_ID, work_dir=work_dir, env=env,
+            use_gemini=use_gemini, max_video_attempts=max_video_attempts,
+        )
+        provider_clips_by_shot = dict(batch.clips_by_shot)
+        provider_traces = list(batch.traces)
+        provider_attempts_used = batch.attempts_used
 
     # 2. Render each shot clip. The designated shot attempts real Akool image_to_video
     #    (when enabled); every other shot renders THROUGH THE FFMPEG BACKBONE (image →
@@ -477,6 +549,7 @@ def run_tomato_real_result(
     shot_facts: List[ShotRenderFact] = []
     checklist: List[Dict[str, Any]] = []
     consumed_material_shot_ids: List[str] = []
+    consumed_provider_shot_ids: List[str] = []
     per_shot_render: List[Dict[str, Any]] = []
     any_caption_burned = False
     for shot, dur in zip(shots, durations):
@@ -490,27 +563,17 @@ def run_tomato_real_result(
             render_source, consumed = _resolve_shot_render_source(
                 shot.shot_id, image_path, material_overrides, work_dir
             )
-            ak: Optional[akool_i2v.AkoolShotResult] = None
-            if akool_enabled and shot.shot_id == provider_target_id:
-                # PR-4: build a SCRIPT-DIRECTED, role-driven provider prompt for the
-                # active/provider-target shot (replaces the hardcoded DEFAULT_PROMPT).
-                # Same role + motion resolution the Current Shot Panel shows. The
-                # provider prompt is runtime-transient (passed here, never surfaced).
-                provider_prompt_meta = gen_plan.build_provider_prompt_for_shot(shot, task)
-                ak = akool_i2v.generate_shot_clip_akool(
-                    still_path=render_source,
-                    out_clip=os.path.join(work_dir, f"{shot.shot_id}_akool.mp4"),
-                    task_id=task_id or LINE_ID, shot_id=shot.shot_id,
-                    prompt=provider_prompt_meta["provider_prompt"], env=env,
-                )
-                akool_shot_result = ak
-            if ak is not None and ak.succeeded:
+            # Multi-shot: consume this shot's real provider clip when the orchestrator
+            # produced one; otherwise honest backbone proxy fallback (never a fake clip).
+            provider_clip = provider_clips_by_shot.get(shot.shot_id)
+            if provider_clip and os.path.exists(provider_clip):
                 # Real provider clip → burn the caption on top (same as backbone path).
-                cb = _overlay_caption_or_promote(ak.clip_path, out_clip, shot=shot, work_dir=work_dir)
+                cb = _overlay_caption_or_promote(provider_clip, out_clip, shot=shot, work_dir=work_dir)
                 render_mode = RENDER_MODE_AKOOL
                 any_caption_burned = any_caption_burned or cb
+                consumed_provider_shot_ids.append(shot.shot_id)
             else:
-                # No Akool attempt, or it failed → honest backbone proxy fallback.
+                # No provider attempt, or it failed → honest backbone proxy fallback.
                 render_out = _render_shot_via_backbone(
                     render_source, work_dir, out_clip, shot=shot, duration_seconds=dur,
                 )
@@ -536,6 +599,14 @@ def run_tomato_real_result(
             "real_visual": shot.real_visual and rendered,
             "semantic_match": shot.semantic_match and rendered,
         })
+
+    # Mark which provider traces actually entered final.mp4 (honest consumed flag for the
+    # "AI 生成请求过程" panel: 已生成→进入成片 vs 失败回退).
+    if provider_traces:
+        _consumed_ids = set(consumed_provider_shot_ids)
+        provider_traces = [
+            t.consumed() if t.shot_id in _consumed_ids else t for t in provider_traces
+        ]
 
     if not scene_clip_paths:
         # No real assets rendered at all → honest fallback-only verdict; no
@@ -623,13 +694,16 @@ def run_tomato_real_result(
         "note": "镜头代理（1080×1920）+ 字幕叠加 + 拼接 + ffprobe 质检；非生成式、非最终成片。",
     }
 
-    # 5c. Operator-safe capability status (voiceover / image_to_video / subtitles / bgm).
+    # 5c. Operator-safe capability status (voiceover / image_to_video / subtitles / bgm)
+    #     + the multi-shot provider request trace ("AI 生成请求过程" panel, Part C).
     capability_status = _build_capability_status(
         voiceover=voiceover, any_caption_burned=any_caption_burned, env=env,
-        akool_result=akool_shot_result,
-        provider_target_shot_id=provider_target_id,
-        provider_prompt_meta=provider_prompt_meta,
+        akool_result=None, provider_target_shot_id=None, provider_prompt_meta=None,
     )
+    if akool_enabled:
+        capability_status = _augment_capability_with_provider_batch(
+            capability_status, provider_traces, attempts_used=provider_attempts_used,
+        )
 
     # 6. Manifest (real local relative paths only).
     manifest = _build_manifest(

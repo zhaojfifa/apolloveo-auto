@@ -65,65 +65,91 @@ def _fake_capture_success(captured: Dict[str, Any]):
     return _fake
 
 
-# --- Active-shot provider-target + script-derived prompt (not DEFAULT_PROMPT) --- #
+def _fake_capture_all(captured: Dict[str, Any], *, succeed: bool = True):
+    """Multi-shot capture: records every targeted shot's prompt by shot_id. On success it
+    writes a real clip per shot so the orchestrator consumes it into final.mp4."""
+    captured.setdefault("by_shot", {})
+
+    def _fake(*, still_path, out_clip, task_id, shot_id, prompt=akool_i2v.DEFAULT_PROMPT, env=None, **kw):
+        captured["by_shot"][shot_id] = {"prompt": prompt, "still_path": still_path}
+        if succeed:
+            backbone.generate_with_fallback(still_path, out_clip, duration_seconds=2.0, zoom=backbone.ZOOM_IN)
+            return akool_i2v.AkoolShotResult(akool_i2v.STATUS_PROVIDER_SUCCESS, out_clip, True, "")
+        return akool_i2v.AkoolShotResult(akool_i2v.STATUS_PROVIDER_FAILED, None, True, "test_fail")
+    return _fake
+
+
+# --- Multi-shot provider targeting + script-derived prompts (not DEFAULT_PROMPT) --- #
+# (Owner batch supersedes the prior one-shot bound: the real-visual storyboard shots are
+#  each targeted with a script-derived, role-driven prompt. use_gemini=False keeps the
+#  unit tests offline/hermetic — Gemini refinement is exercised in the dedicated module.)
 
 @_skip
-def test_active_shot_is_provider_target_and_prompt_is_script_directed(tmp_path, monkeypatch) -> None:
+def test_multi_shot_targets_are_script_directed_not_default_prompt(tmp_path, monkeypatch) -> None:
     _enable_akool(monkeypatch)
     captured: Dict[str, Any] = {}
-    monkeypatch.setattr(orch.akool_i2v, "generate_shot_clip_akool", _fake_capture_fail(captured))
-    orch.run_tomato_real_result(_TASK, str(tmp_path), sink=InMemoryArtifactSink(), env={}, active_shot_id="shot01")
-    # The active shot (shot01) — not the hardcoded shot02 — is the provider target.
-    assert captured["shot_id"] == "shot01"
-    # The prompt is the script-derived Prompt Builder payload, NOT DEFAULT_PROMPT.
-    assert captured["prompt"] != akool_i2v.DEFAULT_PROMPT
-    # shot01 = scene_reference → its scene-preservation clause is in the provider prompt.
-    assert "preserve scene and background environment continuity" in captured["prompt"]
-
-
-@_skip
-def test_default_provider_target_is_product_shot_with_product_prompt(tmp_path, monkeypatch) -> None:
-    _enable_akool(monkeypatch)
-    captured: Dict[str, Any] = {}
-    monkeypatch.setattr(orch.akool_i2v, "generate_shot_clip_akool", _fake_capture_fail(captured))
-    # No active_shot_id → safe default (shot02, the designated product shot).
-    orch.run_tomato_real_result(_TASK, str(tmp_path), sink=InMemoryArtifactSink(), env={})
-    assert captured["shot_id"] == "shot02"
-    assert captured["prompt"] != akool_i2v.DEFAULT_PROMPT
-    # shot02 = product_reference → product-preservation clause in the provider prompt.
-    assert "keep the product's shape, color and texture faithful" in captured["prompt"]
-
-
-# --- Provider clip consumed into final.mp4 + capability evidence ------------- #
-
-@_skip
-def test_provider_clip_consumed_into_final_and_capability_evidence(tmp_path, monkeypatch) -> None:
-    _enable_akool(monkeypatch)
-    captured: Dict[str, Any] = {}
-    monkeypatch.setattr(orch.akool_i2v, "generate_shot_clip_akool", _fake_capture_success(captured))
-    result = orch.run_tomato_real_result(
-        _TASK, str(tmp_path), sink=InMemoryArtifactSink(), env={}, active_shot_id="shot02"
+    monkeypatch.setattr(orch.akool_i2v, "generate_shot_clip_akool", _fake_capture_all(captured, succeed=False))
+    orch.run_tomato_real_result(
+        _TASK, str(tmp_path), sink=InMemoryArtifactSink(), env={}, use_gemini=False,
     )
-    # final.mp4 exists + QC ran + publish-ready stays false.
+    by = captured["by_shot"]
+    # Multi-shot: at least the three real-visual storyboard shots are targeted.
+    assert {"shot01", "shot02", "shot03"}.issubset(set(by)), by.keys()
+    # Every targeted shot uses a script-derived prompt, never the hardcoded DEFAULT_PROMPT.
+    for sid, info in by.items():
+        assert info["prompt"] != akool_i2v.DEFAULT_PROMPT
+    # Role-driven: shot01 scene-preservation clause; shot02 product-preservation clause.
+    assert "preserve scene and background environment continuity" in by["shot01"]["prompt"]
+    assert "keep the product's shape, color and texture faithful" in by["shot02"]["prompt"]
+
+
+@_skip
+def test_multi_shot_default_selection_is_real_visual_shots_only(tmp_path, monkeypatch) -> None:
+    _enable_akool(monkeypatch)
+    captured: Dict[str, Any] = {}
+    monkeypatch.setattr(orch.akool_i2v, "generate_shot_clip_akool", _fake_capture_all(captured, succeed=False))
+    # No active_shot_id → default selection = the real-visual shots (01/02/03); the
+    # semantic-reuse shots (04/05) are NOT targeted.
+    orch.run_tomato_real_result(
+        _TASK, str(tmp_path), sink=InMemoryArtifactSink(), env={}, use_gemini=False,
+    )
+    targeted = set(captured["by_shot"])
+    assert {"shot01", "shot02", "shot03"}.issubset(targeted)
+    assert "shot04" not in targeted and "shot05" not in targeted
+
+
+# --- Multiple provider clips consumed into final.mp4 + panel evidence -------- #
+
+@_skip
+def test_multi_shot_clips_consumed_and_request_panel_evidence(tmp_path, monkeypatch) -> None:
+    _enable_akool(monkeypatch)
+    captured: Dict[str, Any] = {}
+    monkeypatch.setattr(orch.akool_i2v, "generate_shot_clip_akool", _fake_capture_all(captured, succeed=True))
+    result = orch.run_tomato_real_result(
+        _TASK, str(tmp_path), sink=InMemoryArtifactSink(), env={}, use_gemini=False,
+    )
+    # final.mp4 exists + publish-ready stays false.
     assert os.path.exists(result.final_video_path) and os.path.getsize(result.final_video_path) > 0
     assert result.official_publish_ready is False
-    # The provider clip was consumed for the target shot (render_mode = provider_image_to_video).
+    # >= 2 provider clips consumed into final.mp4 (Owner PASS bar).
     manifest = json.load(open(os.path.join(str(tmp_path), "manifest.json"), encoding="utf-8"))
     per = {r["shot_id"]: r["render_mode"] for r in manifest["per_shot_render"]}
-    assert per["shot02"] == orch.RENDER_MODE_AKOOL
-    # Subtitles present (sidecar at minimum); other shots fell back honestly.
+    akool_shots = [sid for sid, m in per.items() if m == orch.RENDER_MODE_AKOOL]
+    assert len(akool_shots) >= 2, per
     assert os.path.exists(os.path.join(str(tmp_path), "subtitles", "subtitles.srt"))
-    # Capability status carries operator-safe provider-target evidence.
+    # Capability status carries the multi-shot outcome (operator-safe; no vendor brand).
     cap = result.capability_status["image_to_video"]
     assert cap["status"] == akool_i2v.STATUS_PROVIDER_SUCCESS and cap["succeeded"] is True
-    assert cap["provider_target_shot_id"] == "shot02"
-    assert cap["material_role"] == "product_reference"
+    assert cap["multi_shot"] is True
+    assert cap["provider_generated_count"] >= 2
     assert cap["script_directed"] is True
-    assert cap.get("generation_summary_zh")
-    # No raw provider URL / api key / raw provider-prompt token surfaced in the
-    # operator payload. (Internal `artifact://` staged handles + `/files/` preview
-    # paths are operator-safe and allowed — the contract's own forbidden-token scan
-    # ran inside tomato_result_to_payload and passed.)
+    # "AI 生成请求过程" panel present, operator-safe, lists generated vs fallback shots.
+    panel = result.capability_status["ai_generation_request_process"]
+    assert panel["panel_title_zh"] == "AI 生成请求过程"
+    assert len(panel["rows"]) >= 3
+    generated_rows = [r for r in panel["rows"] if r["status_code"] == "generated"]
+    assert len(generated_rows) >= 2
+    # No raw provider URL / api key / raw provider-prompt token in the operator payload.
     payload = orch.tomato_result_to_payload(result)
     blob = str(payload).lower()
     for tok in ("http://", "https://", "x-api-key", "keep the product", "cinematic",
@@ -136,12 +162,13 @@ def test_other_shots_fall_back_when_provider_fails(tmp_path, monkeypatch) -> Non
     _enable_akool(monkeypatch)
     monkeypatch.setattr(orch.akool_i2v, "generate_shot_clip_akool", _fake_capture_fail({}))
     result = orch.run_tomato_real_result(
-        _TASK, str(tmp_path), sink=InMemoryArtifactSink(), env={}, active_shot_id="shot02"
+        _TASK, str(tmp_path), sink=InMemoryArtifactSink(), env={}, active_shot_id="shot02",
+        use_gemini=False,
     )
     assert os.path.exists(result.final_video_path)  # final still produced via fallback
     manifest = json.load(open(os.path.join(str(tmp_path), "manifest.json"), encoding="utf-8"))
     modes = {r["render_mode"] for r in manifest["per_shot_render"]}
-    # No provider clip consumed (it failed); honest backbone fallback for every shot.
+    # No provider clip consumed (every attempt failed); honest backbone fallback everywhere.
     assert orch.RENDER_MODE_AKOOL not in modes
     assert result.capability_status["image_to_video"]["status"] == akool_i2v.STATUS_PROVIDER_FAILED
 
