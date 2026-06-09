@@ -35,7 +35,7 @@ def _assert_opaque_artifact_refs(artifact_refs: Optional[List[str]]) -> None:
     """Persistence invariant: artifact handles are opaque — never raw URLs/keys."""
     for ref in artifact_refs or []:
         low = str(ref).lower()
-        if low.startswith("http://") or low.startswith("https://"):
+        if "http://" in low or "https://" in low:
             raise ValueError("artifact_refs must be opaque handles, not raw URLs")
         if "x-amz" in low or "signature=" in low or "sig=" in low:
             raise ValueError("artifact_refs must not carry signing parameters")
@@ -110,7 +110,8 @@ class InMemoryJobStateStore:
         return dict(job) if job else None
 
     def get_jobs_for_task(self, task_id) -> List[Dict[str, Any]]:
-        return [dict(j) for j in self._jobs.values() if j["task_id"] == str(task_id)]
+        rows = [dict(j) for j in self._jobs.values() if j["task_id"] == str(task_id)]
+        return sorted(rows, key=lambda j: j["created_at"])  # match SqlAlchemy ordering
 
     def transition_state(self, job_id, target_state, *, failure_reason_code=None, increment_retry=False):
         job = self._jobs.get(job_id)
@@ -128,12 +129,13 @@ class InMemoryJobStateStore:
     def append_trace(self, job_id, *, phase, status, started_at, shot_id=None, ended_at=None,
                      elapsed_ms=None, provider_status_class=None, fallback_reason_code=None,
                      artifact_refs=None) -> str:
-        if job_id not in self._jobs:
-            raise JobNotFoundError(job_id)
+        # validate vocab/opacity first, then existence (matches SqlAlchemy impl)
         st.assert_valid_phase(phase)
         st.assert_valid_trace_status(status)
         _validate_optional_classes(provider_status_class, fallback_reason_code)
         _assert_opaque_artifact_refs(artifact_refs)
+        if job_id not in self._jobs:
+            raise JobNotFoundError(job_id)
         trace_id = _new_id("trc")
         self._seq[job_id] += 1
         self._traces[trace_id] = {

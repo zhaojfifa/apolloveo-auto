@@ -27,7 +27,7 @@ class GenerationJob(Base):
     job_id = Column(String(64), primary_key=True)
     task_id = Column(String(64), index=True, nullable=False)
     state = Column(String(40), nullable=False)
-    target_shots = Column(Integer, nullable=False, default=1)
+    target_shots = Column(Integer, nullable=False, default=0)  # 0 = uncapped (worker resolves)
     knobs_summary = Column(Text, nullable=True)  # JSON dict (operator-safe knob ints/bools)
     retry_count = Column(Integer, nullable=False, default=0)
     failure_reason_code = Column(String(64), nullable=True)

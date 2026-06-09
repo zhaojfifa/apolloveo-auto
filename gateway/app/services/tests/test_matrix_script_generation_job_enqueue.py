@@ -23,7 +23,7 @@ def _clear_knobs(monkeypatch):
         monkeypatch.delenv(name, raising=False)
 
 
-def test_enqueue_creates_queued_job_default_shots(monkeypatch) -> None:
+def test_enqueue_creates_queued_job_uncapped_when_knob_unset(monkeypatch) -> None:
     _clear_knobs(monkeypatch)
     store = InMemoryJobStateStore()
     job_id = enqueue_generation_job({"task_id": "task-1", "kind": "matrix_script"}, store=store)
@@ -31,8 +31,8 @@ def test_enqueue_creates_queued_job_default_shots(monkeypatch) -> None:
     assert job is not None
     assert job["state"] == st.JOB_STATE_QUEUED
     assert job["task_id"] == "task-1"
-    assert job["target_shots"] == 3  # current default behavior
-    assert job["knobs_summary"]["target_shots"] == 3
+    assert job["target_shots"] == 0  # 0 = uncapped (worker resolves from the storyboard plan)
+    assert job["knobs_summary"]["target_shots"] == 0
 
 
 def test_enqueue_respects_target_shots_knob(monkeypatch) -> None:

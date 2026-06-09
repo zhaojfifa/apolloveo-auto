@@ -20,7 +20,10 @@ _ATTEMPT_CAP_ENV = "MATRIX_SCRIPT_PROVIDER_ATTEMPT_CAP"
 _GEMINI_RETRY_ENV = "MATRIX_SCRIPT_PROVIDER_ENABLE_GEMINI_RETRY"
 _AKOOL_REAL_ENV = "MATRIX_SCRIPT_AKOOL_REAL"
 
-_DEFAULT_TARGET_SHOTS = 3  # current default behavior (knob overrides)
+# When the knob is unset the worker resolves the shot count from the storyboard
+# plan (uncapped). 0 records that "uncapped / resolve-at-runtime" hint — the job
+# record's target_shots is metadata; PR-3's worker reads the live knob/plan.
+_UNCAPPED_TARGET_SHOTS = 0
 
 
 def _field(task: Any, key: str, default: Any = None) -> Any:
@@ -61,7 +64,7 @@ def _operator_safe_knobs() -> Dict[str, Any]:
     summary is safe to persist on the operator-facing job record.
     """
     return {
-        "target_shots": _env_int(_TARGET_SHOTS_ENV, _DEFAULT_TARGET_SHOTS),
+        "target_shots": _env_int(_TARGET_SHOTS_ENV, _UNCAPPED_TARGET_SHOTS),
         "attempt_cap": _env_int(_ATTEMPT_CAP_ENV, 0) or None,
         "refine_retry": _env_bool(_GEMINI_RETRY_ENV, default=True),
         "real_provider": _env_bool(_AKOOL_REAL_ENV, default=False),
@@ -77,5 +80,5 @@ def enqueue_generation_job(task: Any, store: Optional[IJobStateStore] = None) ->
     store = store or get_job_state_store()
     task_id = _task_id(task)
     knobs = _operator_safe_knobs()
-    target_shots = int(knobs.get("target_shots") or _DEFAULT_TARGET_SHOTS)
+    target_shots = int(knobs.get("target_shots") or _UNCAPPED_TARGET_SHOTS)
     return store.create_job(task_id, target_shots=target_shots, knobs_summary=knobs)

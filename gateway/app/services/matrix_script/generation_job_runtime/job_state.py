@@ -159,7 +159,7 @@ FALLBACK_REASON_CODES: FrozenSet[str] = frozenset(
         "provider_timeout",
         "provider_auth",
         "provider_invalid_input",
-        "gemini_unavailable",
+        "refiner_unavailable",
         "none",
     }
 )

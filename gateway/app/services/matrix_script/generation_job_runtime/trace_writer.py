@@ -51,6 +51,7 @@ class JobTraceWriter:
     def begin_phase(self, phase: str, *, shot_id: Optional[str] = None) -> str:
         """Persist a ``running`` row BEFORE the heavy work; return its trace_id."""
         st.assert_valid_phase(phase)
+        assert_no_job_trace_leak({"shot_id": shot_id})  # guard the open field (contract §5)
         trace_id = self._store.append_trace(
             self._job_id, phase=phase, status=st.TRACE_STATUS_RUNNING,
             started_at=_utc_now(), shot_id=shot_id,
@@ -67,6 +68,7 @@ class JobTraceWriter:
         """Update the row at phase end with elapsed_ms + terminal phase status."""
         if status == st.TRACE_STATUS_RUNNING:
             raise ValueError("end_phase status must not be 'running'")
+        assert_no_job_trace_leak({"artifact_refs": artifact_refs})  # guard the open field (contract §5)
         started = self._starts.pop(trace_id, None)
         elapsed_ms = int((time.monotonic() - started) * 1000) if started is not None else None
         return self._store.update_trace(

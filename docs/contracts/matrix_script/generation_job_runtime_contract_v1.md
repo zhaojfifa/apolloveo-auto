@@ -53,8 +53,8 @@ progresses — it is **not** `failed_terminal`.
 | `job_id` | TEXT PK | `job-<uuid4hex>` |
 | `task_id` | TEXT (indexed) | the Matrix Script task |
 | `state` | TEXT | closed state (§2) |
-| `target_shots` | INTEGER | resolved from the provider knobs |
-| `knobs_summary` | TEXT (JSON) | operator-safe ints/bools only (`target_shots`/`attempt_cap`/`gemini_retry`/`akool_real`) — **no secret, no vendor/model name** |
+| `target_shots` | INTEGER | from the `MATRIX_SCRIPT_PROVIDER_TARGET_SHOTS` knob; `0` = uncapped (worker resolves from the storyboard plan) |
+| `knobs_summary` | TEXT (JSON) | operator-safe ints/bools only, **vendor-neutral keys** (`target_shots`/`attempt_cap`/`refine_retry`/`real_provider`) — **no secret, no vendor/model name** |
 | `retry_count` | INTEGER | job-level retry budget counter |
 | `failure_reason_code` | TEXT | set on failed states |
 | `claimed_by` | TEXT | worker id (PR-2 consumes) |
@@ -77,7 +77,7 @@ A worker kill leaves the last `running` row → the failing phase is identifiabl
 | `ended_at` | TEXT \| null | null while running |
 | `elapsed_ms` | INTEGER \| null | computed at end (monotonic) |
 | `provider_status_class` | TEXT (closed) \| null | `ok`/`quota`/`rate_limited`/`timeout`/`auth`/`invalid_input`/`server_error`/`unknown` |
-| `fallback_reason_code` | TEXT (closed) \| null | `provider_quota`/`provider_rate_limited`/`provider_timeout`/`provider_auth`/`provider_invalid_input`/`gemini_unavailable`/`none` |
+| `fallback_reason_code` | TEXT (closed) \| null | `provider_quota`/`provider_rate_limited`/`provider_timeout`/`provider_auth`/`provider_invalid_input`/`refiner_unavailable`/`none` (vendor-neutral) |
 | `artifact_refs` | TEXT (JSON list) | **opaque handles only** (R2 object key / `msmaterial://`) |
 | `seq` | INTEGER | monotonic per job (ordering) |
 
