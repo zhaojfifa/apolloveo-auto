@@ -22,6 +22,7 @@ from gateway.app.config import create_storage_service, get_settings
 from gateway.app.core.logging_config import configure_logging
 from gateway.app.db import Base, SessionLocal, engine, ensure_provider_config_table, ensure_task_extra_columns
 from gateway.app import models
+from gateway.app.services.matrix_script.generation_job_runtime import ensure_generation_job_tables
 from gateway.app.ports.storage_provider import get_storage_service, set_storage_service
 from gateway.app.routers import (
     admin_publish,
@@ -70,6 +71,7 @@ def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
     ensure_task_extra_columns(engine)
     ensure_provider_config_table(engine)
+    ensure_generation_job_tables(engine)
     set_storage_service(create_storage_service())
     for d in (Path("scenes"), Path("scene_packs"), Path("deliver/packs"), AUDIO_DIR):
         d.mkdir(parents=True, exist_ok=True)

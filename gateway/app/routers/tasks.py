@@ -267,6 +267,9 @@ from gateway.app.services.matrix_script.auto_preview_generation import (  # noqa
     discard_matrix_script_preview_candidate,
     resolve_version_final_path,
 )
+from gateway.app.services.matrix_script.generation_job_runtime import (  # noqa: E402
+    enqueue_generation_job,
+)
 from gateway.app.services.matrix_script.operator_workbench_view import (  # noqa: E402
     build_matrix_script_operator_workbench_view,
     MATERIAL_ATTACHMENT_SOURCE,
@@ -728,6 +731,16 @@ async def create_matrix_script_task(
     except Exception:  # noqa: BLE001 — never block task creation on the marker write
         logger.warning(
             "matrix_script initial-preview enqueue failed for task_id=%s", task_id,
+            exc_info=True,
+        )
+    # PR-1 (Production Job Runtime): also record a durable, off-dyno generation
+    # job (queued) in the durable job-state store. Thin + additive — does NOT run
+    # the worker (PR-2/PR-3); the existing in-process path below is unchanged.
+    try:
+        enqueue_generation_job(stored_task)
+    except Exception:  # noqa: BLE001 — never block task creation on the durable-job write
+        logger.warning(
+            "matrix_script durable generation-job enqueue failed for task_id=%s", task_id,
             exc_info=True,
         )
     background_tasks.add_task(
