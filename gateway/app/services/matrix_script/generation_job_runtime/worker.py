@@ -117,6 +117,15 @@ class WorkerRuntime:
 
     def _handle_failure(self, job_id: str, writer: JobTraceWriter, exc: Exception) -> Dict[str, Any]:
         job = self._store.get_job(job_id) or {}
+        if job.get("state") in st.TERMINAL_STATES:
+            # the job already reached a terminal state (e.g. result_ready) before a
+            # post-step store error — do NOT attempt an illegal transition out of it.
+            logger.warning(
+                "worker=%s job=%s post-terminal error=%s",
+                self._worker_id, job_id, exc.__class__.__name__,
+            )
+            return {"claimed": True, "job_id": job_id, "final_state": job.get("state"),
+                    "error": exc.__class__.__name__}
         will_terminal = (int(job.get("retry_count", 0)) + 1) >= self._max_retries
         self._store.transition_state(
             job_id, st.JOB_STATE_FAILED_RETRYABLE,

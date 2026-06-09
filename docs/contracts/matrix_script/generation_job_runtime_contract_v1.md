@@ -133,8 +133,10 @@ PR-3 makes the worker execute EXACTLY ONE real provider shot by REUSING the exis
   A crash leaves the in-flight state's OPEN row as durable evidence.
 - **Bounded load.** The worker forces `MATRIX_SCRIPT_PROVIDER_TARGET_SHOTS=1` +
   `MATRIX_SCRIPT_PROVIDER_ATTEMPT_CAP=1` (merged over the full env so the akool gate + creds + knobs
-  resolve together). Outcomes: (1) `result_ready` + provider final.mp4; (2) `result_ready` + fallback
-  final.mp4 (provider failed, ffmpeg fallback); (3) `failed_retryable` / `failed_terminal` + durable trace.
+  resolve together). It uses `use_gemini=True` to match the web in-process path (equivalent operator
+  deliverable — no silent quality drop; Gemini fail-closes to deterministic without creds). Outcomes:
+  (1) `result_ready` + provider final.mp4; (2) `result_ready` + fallback final.mp4 (provider failed,
+  ffmpeg fallback); (3) `failed_retryable` / `failed_terminal` + durable trace.
 - **H1 — atomic claim.** `claim_next_queued_job` (SQLAlchemy) uses a conditional single-row UPDATE
   (`WHERE state='queued'`) — race-safe + portable (SQLite/Postgres); the interface stays swappable.
 - **H2 — seq hardening.** `append_trace` (SQLAlchemy) locks the parent job row (FOR UPDATE on Postgres;
@@ -142,7 +144,8 @@ PR-3 makes the worker execute EXACTLY ONE real provider shot by REUSING the exis
   `count()+1` race.
 - **Web gate.** `MATRIX_SCRIPT_WORKER_OWNS_GENERATION` (default OFF): when ON, the web new-task handler
   skips the in-process heavy generation — the durable `queued` job is the worker's hand-off; OFF
-  preserves current behavior.
+  preserves current behavior. Scope: the **initial-preview** path only. Regenerate-preview (V2) stays
+  in-process and is intentionally deferred (the worker does not yet produce V2) — a later PR.
 - **Boundary.** No multi-shot; no UI; no route business logic (thin gate only); no delivery-truth
   change; `official_publish_ready` stays `false`; no new table/column (state names reuse the trace
   `phase` column).

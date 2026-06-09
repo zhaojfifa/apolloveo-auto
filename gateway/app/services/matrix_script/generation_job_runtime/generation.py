@@ -121,11 +121,16 @@ def execute_one_shot_generation(
     *,
     task: Optional[Any] = None,
     task_repo: Optional[Any] = None,
-    use_gemini: bool = False,
+    use_gemini: bool = True,
     sink: Optional[Any] = None,
     output_dir: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Real off-dyno 1-shot generation via the reused tomato stack.
+
+    Uses ``use_gemini=True`` by default to match the web in-process initial-preview
+    path (equivalent operator deliverable — no silent quality drop when the worker
+    owns generation); ``ATTEMPT_CAP=1`` still bounds the load, and Gemini
+    fail-closes to a deterministic prompt when unavailable.
 
     Loads the task (File/S3 task repo), runs ``run_tomato_real_result`` bounded to
     one shot with the durable ``on_phase`` walk, persists the staged result into

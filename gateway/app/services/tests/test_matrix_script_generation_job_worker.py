@@ -245,14 +245,14 @@ def test_execute_one_shot_drives_durable_state_via_on_phase(monkeypatch, provide
     summary = execute_one_shot_generation(
         store.get_job(job_id), store, writer, walker,
         task={"task_id": "t1", "config": {}}, task_repo=None,
-        use_gemini=False, sink=object(), output_dir="/tmp/ms_pr3_x",
+        sink=object(), output_dir="/tmp/ms_pr3_x",
     )
     walker.advance_to(st.JOB_STATE_RESULT_READY)
     walker.finalize()
 
     assert captured["env"]["MATRIX_SCRIPT_PROVIDER_TARGET_SHOTS"] == "1"  # bounded to 1 shot
     assert captured["env"]["MATRIX_SCRIPT_PROVIDER_ATTEMPT_CAP"] == "1"
-    assert captured["use_gemini"] is False
+    assert captured["use_gemini"] is True  # web parity (equivalent deliverable; ATTEMPT_CAP bounds load)
     assert summary["final_video"] is True
     assert summary["generation_provider"] == provider
     assert summary["official_publish_ready"] is False  # delivery truth unchanged
@@ -313,6 +313,44 @@ def test_trace_seq_strictly_increasing(store) -> None:
     seqs = [t["seq"] for t in store.get_traces(job_id)]
     assert seqs == [1, 2, 3, 4, 5, 6]
     assert len(set(seqs)) == len(seqs)
+
+
+def test_execute_persists_staged_result_into_task_config(monkeypatch) -> None:
+    """The worker mirrors the staged result into task.config (Workbench poller sync)."""
+    from gateway.app.services.matrix_script import auto_preview_generation as ap
+
+    monkeypatch.setattr(ap, "run_tomato_real_result", lambda *a, **k: object())
+    monkeypatch.setattr(ap, "validate_tomato_result_artifacts", lambda r: None)
+    monkeypatch.setattr(ap, "tomato_result_to_payload", lambda r: {
+        "generation_provider": "none", "official_publish_ready": False, "delivery_candidate": None,
+    })
+    monkeypatch.setattr(ap, "assert_no_delivery_view_forbidden_tokens", lambda p: None)
+    monkeypatch.setattr(ap, "_task_mapping", lambda t: t)
+
+    class _StubRepo:
+        def __init__(self, task):
+            self._t = dict(task)
+
+        def get(self, tid):
+            return dict(self._t)
+
+        def update(self, tid, patch):
+            self._t.update(patch)
+
+    repo = _StubRepo({"task_id": "t1", "config": {}})
+    store = InMemoryJobStateStore()
+    job_id = store.create_job("t1", target_shots=1)
+    store.transition_state(job_id, st.JOB_STATE_PLANNING)
+    writer = JobTraceWriter(store, job_id)
+    walker = StateWalker(store, writer, job_id)
+    walker.open_current()
+    execute_one_shot_generation(
+        store.get_job(job_id), store, writer, walker,
+        task_repo=repo, sink=object(), output_dir="/tmp/ms_pr3_persist",
+    )
+    cfg = repo.get("t1")["config"]
+    assert "matrix_script_staged_candidate" in cfg
+    assert cfg["matrix_script_initial_preview_generation"]["official_publish_ready"] is False
 
 
 def test_web_gate_worker_owns_generation(monkeypatch) -> None:

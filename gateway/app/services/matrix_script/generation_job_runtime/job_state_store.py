@@ -337,10 +337,11 @@ class SqlAlchemyJobStateStore:
         _assert_opaque_artifact_refs(artifact_refs)
         trace_id = _new_id("trc")
         with self._session_factory() as session:
-            # H2 (PR-3): deterministic per-job seq. Lock the parent job row
-            # (FOR UPDATE on Postgres; no-op on SQLite, where writes serialize),
-            # then MAX(seq)+1 — so concurrent appends can't collide on seq
-            # (replaces the naked count()+1 race; also delete-safe via MAX).
+            # H2 (PR-3): deterministic per-job seq. On Postgres, lock the parent
+            # job row (FOR UPDATE) then MAX(seq)+1 so concurrent appends to the
+            # same job can't collide on seq (replaces the naked count()+1 race;
+            # delete-safe via MAX). FOR UPDATE is skipped on SQLite (unsupported;
+            # local/test is single-writer).
             job_q = session.query(GenerationJob).filter(GenerationJob.job_id == job_id)
             if session.bind.dialect.name != "sqlite":
                 job_q = job_q.with_for_update()
