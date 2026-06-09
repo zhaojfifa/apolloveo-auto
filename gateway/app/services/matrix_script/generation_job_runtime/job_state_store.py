@@ -31,6 +31,16 @@ def _new_id(prefix: str) -> str:
     return f"{prefix}-{uuid.uuid4().hex}"
 
 
+def _add_seconds(iso: str, seconds: int) -> str:
+    return (datetime.fromisoformat(iso) + timedelta(seconds=int(seconds))).isoformat()
+
+
+def _is_expired(lease_iso: Optional[str], now_iso: str) -> bool:
+    if not lease_iso:
+        return False
+    return datetime.fromisoformat(lease_iso) < datetime.fromisoformat(now_iso)
+
+
 def _assert_opaque_artifact_refs(artifact_refs: Optional[List[str]]) -> None:
     """Persistence invariant: artifact handles are opaque — never raw URLs/keys."""
     for ref in artifact_refs or []:
@@ -73,7 +83,11 @@ class IJobStateStore(Protocol):
 
     def get_traces(self, job_id: str) -> List[Dict[str, Any]]: ...
 
-    def claim_next_queued_job(self, worker_id: str, *, lease_seconds: int) -> Optional[Dict[str, Any]]: ...
+    def claim_next_queued_job(self, worker_id: str, *, lease_seconds: int, now: Optional[str] = None) -> Optional[Dict[str, Any]]: ...
+
+    def heartbeat(self, job_id: str, worker_id: str, *, lease_seconds: int, now: Optional[str] = None) -> Optional[Dict[str, Any]]: ...
+
+    def reclaim_expired_leases(self, *, max_retries: int, now: Optional[str] = None) -> List[str]: ...
 
 
 class JobNotFoundError(LookupError):
@@ -119,6 +133,10 @@ class InMemoryJobStateStore:
             raise JobNotFoundError(job_id)
         st.assert_transition(job["state"], target_state)
         job["state"] = target_state
+        if target_state not in st.ACTIVE_CLAIM_STATES:
+            # leaving the active-claim lifecycle releases the claim + lease (B1 fix)
+            job["claimed_by"] = None
+            job["lease_expires_at"] = None
         if failure_reason_code is not None:
             job["failure_reason_code"] = failure_reason_code
         if increment_retry:
@@ -130,7 +148,7 @@ class InMemoryJobStateStore:
                      elapsed_ms=None, provider_status_class=None, fallback_reason_code=None,
                      artifact_refs=None) -> str:
         # validate vocab/opacity first, then existence (matches SqlAlchemy impl)
-        st.assert_valid_phase(phase)
+        st.assert_valid_trace_event(phase)
         st.assert_valid_trace_status(status)
         _validate_optional_classes(provider_status_class, fallback_reason_code)
         _assert_opaque_artifact_refs(artifact_refs)
@@ -172,22 +190,54 @@ class InMemoryJobStateStore:
         rows = [dict(r) for r in self._traces.values() if r["job_id"] == job_id]
         return sorted(rows, key=lambda r: r["seq"])
 
-    def claim_next_queued_job(self, worker_id, *, lease_seconds) -> Optional[Dict[str, Any]]:
+    def claim_next_queued_job(self, worker_id, *, lease_seconds, now=None) -> Optional[Dict[str, Any]]:
         candidates = sorted(
             (j for j in self._jobs.values() if j["state"] == st.JOB_STATE_QUEUED),
             key=lambda j: j["created_at"],
         )
         if not candidates:
             return None
+        now = now or _utc_now()
         job = candidates[0]
         st.assert_transition(job["state"], st.JOB_STATE_PLANNING)
         job["state"] = st.JOB_STATE_PLANNING
         job["claimed_by"] = worker_id
-        job["lease_expires_at"] = (
-            datetime.now(timezone.utc) + timedelta(seconds=int(lease_seconds))
-        ).isoformat()
-        job["updated_at"] = _utc_now()
+        job["lease_expires_at"] = _add_seconds(now, lease_seconds)
+        job["updated_at"] = now
         return dict(job)
+
+    def heartbeat(self, job_id, worker_id, *, lease_seconds, now=None) -> Optional[Dict[str, Any]]:
+        job = self._jobs.get(job_id)
+        if not job or st.is_terminal(job["state"]) or job.get("claimed_by") != worker_id:
+            return None
+        now = now or _utc_now()
+        job["lease_expires_at"] = _add_seconds(now, lease_seconds)
+        job["updated_at"] = now
+        return dict(job)
+
+    def reclaim_expired_leases(self, *, max_retries, now=None) -> List[str]:
+        now = now or _utc_now()
+        reclaimed: List[str] = []
+        for job in self._jobs.values():
+            if st.is_terminal(job["state"]) or not job.get("claimed_by"):
+                continue
+            if not _is_expired(job.get("lease_expires_at"), now):
+                continue
+            st.assert_transition(job["state"], st.JOB_STATE_FAILED_RETRYABLE)
+            new_retry = int(job["retry_count"]) + 1
+            target = (
+                st.JOB_STATE_FAILED_TERMINAL if new_retry >= int(max_retries)
+                else st.JOB_STATE_QUEUED
+            )
+            st.assert_transition(st.JOB_STATE_FAILED_RETRYABLE, target)
+            job["state"] = target
+            job["retry_count"] = new_retry
+            job["failure_reason_code"] = "lease_expired"
+            job["claimed_by"] = None
+            job["lease_expires_at"] = None
+            job["updated_at"] = now
+            reclaimed.append(job["job_id"])
+        return reclaimed
 
 
 # --------------------------------------------------------------------------
@@ -263,6 +313,10 @@ class SqlAlchemyJobStateStore:
                 raise JobNotFoundError(job_id)
             st.assert_transition(row.state, target_state)
             row.state = target_state
+            if target_state not in st.ACTIVE_CLAIM_STATES:
+                # leaving the active-claim lifecycle releases the claim + lease (B1 fix)
+                row.claimed_by = None
+                row.lease_expires_at = None
             if failure_reason_code is not None:
                 row.failure_reason_code = failure_reason_code
             if increment_retry:
@@ -274,7 +328,7 @@ class SqlAlchemyJobStateStore:
     def append_trace(self, job_id, *, phase, status, started_at, shot_id=None, ended_at=None,
                      elapsed_ms=None, provider_status_class=None, fallback_reason_code=None,
                      artifact_refs=None) -> str:
-        st.assert_valid_phase(phase)
+        st.assert_valid_trace_event(phase)
         st.assert_valid_trace_status(status)
         _validate_optional_classes(provider_status_class, fallback_reason_code)
         _assert_opaque_artifact_refs(artifact_refs)
@@ -333,9 +387,10 @@ class SqlAlchemyJobStateStore:
             )
             return [self._decode_trace(r) for r in rows]
 
-    def claim_next_queued_job(self, worker_id, *, lease_seconds) -> Optional[Dict[str, Any]]:
-        # PR-1: simple transactional claim. PR-2 hardens concurrency
-        # (Postgres SELECT ... FOR UPDATE SKIP LOCKED) when the worker lands.
+    def claim_next_queued_job(self, worker_id, *, lease_seconds, now=None) -> Optional[Dict[str, Any]]:
+        # Simple transactional claim. Concurrency hardening (Postgres
+        # SELECT ... FOR UPDATE SKIP LOCKED) is a follow-up before high fan-out.
+        now = now or _utc_now()
         with self._session_factory() as session:
             row = (
                 session.query(GenerationJob)
@@ -348,12 +403,50 @@ class SqlAlchemyJobStateStore:
             st.assert_transition(row.state, st.JOB_STATE_PLANNING)
             row.state = st.JOB_STATE_PLANNING
             row.claimed_by = worker_id
-            row.lease_expires_at = (
-                datetime.now(timezone.utc) + timedelta(seconds=int(lease_seconds))
-            ).isoformat()
-            row.updated_at = _utc_now()
+            row.lease_expires_at = _add_seconds(now, lease_seconds)
+            row.updated_at = now
             session.commit()
             return self._decode_job(row)
+
+    def heartbeat(self, job_id, worker_id, *, lease_seconds, now=None) -> Optional[Dict[str, Any]]:
+        now = now or _utc_now()
+        with self._session_factory() as session:
+            row = session.get(GenerationJob, job_id)
+            if not row or st.is_terminal(row.state) or row.claimed_by != worker_id:
+                return None
+            row.lease_expires_at = _add_seconds(now, lease_seconds)
+            row.updated_at = now
+            session.commit()
+            return self._decode_job(row)
+
+    def reclaim_expired_leases(self, *, max_retries, now=None) -> List[str]:
+        now = now or _utc_now()
+        reclaimed: List[str] = []
+        with self._session_factory() as session:
+            rows = (
+                session.query(GenerationJob)
+                .filter(GenerationJob.claimed_by.isnot(None))
+                .all()
+            )
+            for row in rows:
+                if st.is_terminal(row.state) or not _is_expired(row.lease_expires_at, now):
+                    continue
+                st.assert_transition(row.state, st.JOB_STATE_FAILED_RETRYABLE)
+                new_retry = int(row.retry_count or 0) + 1
+                target = (
+                    st.JOB_STATE_FAILED_TERMINAL if new_retry >= int(max_retries)
+                    else st.JOB_STATE_QUEUED
+                )
+                st.assert_transition(st.JOB_STATE_FAILED_RETRYABLE, target)
+                row.state = target
+                row.retry_count = new_retry
+                row.failure_reason_code = "lease_expired"
+                row.claimed_by = None
+                row.lease_expires_at = None
+                row.updated_at = now
+                reclaimed.append(row.job_id)
+            session.commit()
+        return reclaimed
 
 
 def _validate_optional_classes(

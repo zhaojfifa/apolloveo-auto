@@ -50,7 +50,7 @@ class JobTraceWriter:
 
     def begin_phase(self, phase: str, *, shot_id: Optional[str] = None) -> str:
         """Persist a ``running`` row BEFORE the heavy work; return its trace_id."""
-        st.assert_valid_phase(phase)
+        st.assert_valid_trace_event(phase)
         assert_no_job_trace_leak({"shot_id": shot_id})  # guard the open field (contract §5)
         trace_id = self._store.append_trace(
             self._job_id, phase=phase, status=st.TRACE_STATUS_RUNNING,
@@ -75,6 +75,23 @@ class JobTraceWriter:
             trace_id, status=status, ended_at=_utc_now(), elapsed_ms=elapsed_ms,
             provider_status_class=provider_status_class,
             fallback_reason_code=fallback_reason_code, artifact_refs=artifact_refs,
+        )
+
+    def record_event(
+        self, event: str, *, status: str = st.TRACE_STATUS_SUCCEEDED,
+        shot_id: Optional[str] = None, artifact_refs: Optional[List[str]] = None,
+    ) -> str:
+        """Write a point-in-time worker-lifecycle trace row (PR-2).
+
+        A single durable row (started_at == ended_at). Use ``begin_phase`` +
+        ``end_phase`` instead when an OPEN (running) row must span work.
+        """
+        st.assert_valid_trace_event(event)
+        assert_no_job_trace_leak({"event": event, "shot_id": shot_id, "artifact_refs": artifact_refs})
+        now = _utc_now()
+        return self._store.append_trace(
+            self._job_id, phase=event, status=status, started_at=now,
+            ended_at=now, elapsed_ms=0, shot_id=shot_id, artifact_refs=artifact_refs,
         )
 
 

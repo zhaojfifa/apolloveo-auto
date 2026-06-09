@@ -71,7 +71,7 @@ A worker kill leaves the last `running` row → the failing phase is identifiabl
 | `job_id` | TEXT (indexed) | |
 | `task_id` | TEXT (indexed) | |
 | `shot_id` | TEXT \| null | set for per-shot provider phases |
-| `phase` | TEXT (closed) | `generation_start`, `provider_knobs`, `provider_batch_start`, `prompt_build`, `provider_submit`, `provider_poll`, `provider_download`, `provider_normalize`, `shot_done`, `provider_trace_presummary`, `compose_start`, `compose_done`, `upload_start`, `upload_done` |
+| `phase` | TEXT (closed) | a trace **event**: a generation ms_phase — `generation_start`, `provider_knobs`, `provider_batch_start`, `prompt_build`, `provider_submit`, `provider_poll`, `provider_download`, `provider_normalize`, `shot_done`, `provider_trace_presummary`, `compose_start`, `compose_done`, `upload_start`, `upload_done` — **or** (PR-2) a worker-lifecycle event (see §8) |
 | `status` | TEXT (closed) | `running` / `succeeded` / `fallback` / `failed` / `skipped` / `cancelled` |
 | `started_at` | TEXT (ISO-8601 UTC) | before heavy work |
 | `ended_at` | TEXT \| null | null while running |
@@ -100,3 +100,24 @@ technology stays isolated behind this interface so the future Service Topology S
 - PR-1 delivers state + trace + a thin enqueue seam only — **no worker execution, no provider call,
   no ffmpeg, no UI, no auth change**. `official_publish_ready` remains `false`.
 - The operator AI 生成请求过程 panel projects from these durable rows (no second source of truth).
+
+## 8. Worker runtime + worker-lifecycle events (PR-2; additive)
+PR-2 adds an off-dyno worker (`worker.py` + `cli.py`) that consumes the store via `IJobStateStore`
+and is **dry-run only** (no provider/ffmpeg/upload). It extends the durable trace vocabulary with a
+closed **worker-lifecycle event** set, carried in the trace `phase` column (§4):
+
+```
+worker_started · job_claimed · heartbeat · dry_run_started · dry_run_completed
+· job_completed · job_failed_retryable · job_failed_terminal
+```
+
+- **Lease / heartbeat:** `claim_next_queued_job` sets `lease_expires_at = now + lease_seconds`
+  (queued → planning). `heartbeat(job_id, worker_id, lease_seconds)` extends the lease (only the
+  current claimant). `reclaim_expired_leases(max_retries)` resets non-terminal jobs whose lease
+  expired back to `queued` (graph-legal via `failed_retryable`), incrementing `retry_count` and
+  setting `failure_reason_code="lease_expired"`; once `retry_count >= max_retries` the job goes
+  `failed_terminal` instead. **Terminal jobs are never reclaimed.**
+- **Crash-safety:** the dry-run opens a `dry_run_started` (`running`) row BEFORE the stubbed work;
+  a crash/exception leaves that open row + a durable `failed_retryable`/`failed_terminal` state.
+- **Boundary:** worker is independent of the FastAPI request lifecycle; no operator HTML, no auth, no
+  delivery-truth change, `official_publish_ready` stays `false`.
