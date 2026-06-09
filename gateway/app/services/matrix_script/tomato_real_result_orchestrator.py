@@ -23,7 +23,9 @@ raises (never a fake final.mp4).
 from __future__ import annotations
 
 import json
+import logging
 import os
+import time
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
@@ -87,6 +89,32 @@ RENDER_MODE_AKOOL = "provider_image_to_video"
 AKOOL_SHOT_ID = "shot02"
 
 _DEFAULT_VOICE = voiceover_capability.DEFAULT_VOICE
+
+logger = logging.getLogger(__name__)
+
+# Diagnostic load knobs (env-driven; default = current behavior). Let the operator run
+# smaller deployed workloads to characterize worker resource limits. No schema/contract change.
+_TARGET_SHOTS_ENV = "MATRIX_SCRIPT_PROVIDER_TARGET_SHOTS"
+_ATTEMPT_CAP_ENV = "MATRIX_SCRIPT_PROVIDER_ATTEMPT_CAP"
+_GEMINI_RETRY_ENV = "MATRIX_SCRIPT_PROVIDER_ENABLE_GEMINI_RETRY"
+
+
+def _env_int(src: Mapping[str, str], name: str, default: Optional[int]) -> Optional[int]:
+    raw = str((src or {}).get(name, "")).strip()
+    if not raw:
+        return default
+    try:
+        v = int(raw)
+    except ValueError:
+        return default
+    return v if v > 0 else default
+
+
+def _env_bool(src: Mapping[str, str], name: str, default: bool) -> bool:
+    raw = str((src or {}).get(name, "")).strip().lower()
+    if not raw:
+        return default
+    return raw in ("1", "true", "yes", "on")
 
 
 class TomatoRealResultError(ValueError):
@@ -531,11 +559,23 @@ def run_tomato_real_result(
     provider_clips_by_shot: Dict[str, str] = {}
     provider_traces: List[prov_orch.ShotTrace] = []
     provider_attempts_used = 0
+    _env_src = env if env is not None else os.environ
+    _t_gen = time.monotonic()
+    logger.info("ms_phase phase=generation_start akool_enabled=%s shot_count=%d", akool_enabled, len(shots))
     if akool_enabled:
         targets = _build_provider_targets(shots, task, asset_dir, active_shot_id)
+        # Diagnostic load knobs: cap provider target-shot count + attempt budget + toggle
+        # Gemini retry (env-driven; default = current behavior). For low-load deployed runs.
+        _shots_cap = _env_int(_env_src, _TARGET_SHOTS_ENV, None)
+        if _shots_cap is not None:
+            targets = targets[:_shots_cap]
+        _attempt_cap = _env_int(_env_src, _ATTEMPT_CAP_ENV, max_video_attempts) or max_video_attempts
+        _retry = _env_bool(_env_src, _GEMINI_RETRY_ENV, True)
+        logger.info("ms_phase phase=provider_knobs target_shots=%d attempt_cap=%d gemini_retry=%s",
+                    len(targets), _attempt_cap, _retry)
         batch = prov_orch.orchestrate_shots(
             targets, task_id=task_id or LINE_ID, work_dir=work_dir, env=env,
-            use_gemini=use_gemini, max_video_attempts=max_video_attempts,
+            use_gemini=use_gemini, max_video_attempts=_attempt_cap, enable_retry=_retry,
         )
         provider_clips_by_shot = dict(batch.clips_by_shot)
         provider_traces = list(batch.traces)
@@ -666,10 +706,22 @@ def run_tomato_real_result(
 
     # 5. Assemble final.mp4 (reused substrate).
     final_video_path = os.path.join(final_dir, "final.mp4")
+    # Persist a partial provider-trace summary to logs BEFORE the heavy compose, so a
+    # compose-time worker crash still leaves evidence of how far provider generation got.
+    if provider_traces:
+        _gen = sum(1 for t in provider_traces if t.succeeded)
+        logger.info(
+            "ms_phase phase=provider_trace_presummary targets=%d generated=%d attempts=%d statuses=%s",
+            len(provider_traces), _gen, provider_attempts_used,
+            ",".join(f"{t.shot_id}:{t.provider_status}" for t in provider_traces),
+        )
+    _t_comp = time.monotonic()
+    logger.info("ms_phase phase=compose_start clips=%d resolution=%dx%d", len(scene_clip_paths), width, height)
     assemble_final_video(
         final_video_path, scene_clip_paths=scene_clip_paths,
         audio_path=audio_path, work_dir=work_dir,
     )
+    logger.info("ms_phase phase=compose_done elapsed_ms=%d", int((time.monotonic() - _t_comp) * 1000))
     duration_seconds = probe_duration_seconds(final_video_path)
 
     caption_mode = CAPTION_MODE_BURNED if any_caption_burned else CAPTION_MODE_SIDECAR
@@ -726,12 +778,16 @@ def run_tomato_real_result(
         json.dump(manifest, fh, ensure_ascii=False, indent=2)
 
     # 7. Stage the pack (reused) → artifact_staged refs + preview url.
+    _t_up = time.monotonic()
+    logger.info("ms_phase phase=upload_start")
     record = stage_minimal_result(
         sink=sink, task_id=task_id,
         final_video_path=final_video_path, manifest_path=manifest_path,
         subtitles_path=subtitle_path, audio_path=audio_path,
         scene_clip_paths=tuple(scene_clip_paths),
     )
+    logger.info("ms_phase phase=upload_done elapsed_ms=%d total_generation_ms=%d",
+                int((time.monotonic() - _t_up) * 1000), int((time.monotonic() - _t_gen) * 1000))
 
     # 8. Delivery staged-candidate block (reused; provider label stays "none").
     delivery_block = staged_record_to_delivery_block(record, generation_provider=GENERATION_PROVIDER_NONE)
