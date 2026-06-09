@@ -15,6 +15,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from . import job_state as st
+from .generation import StateWalker
 from .job_state_store import IJobStateStore, get_job_state_store
 from .trace_writer import JobTraceWriter
 
@@ -48,11 +49,16 @@ class WorkerRuntime:
         worker_id: str,
         lease_seconds: int = WORKER_DEFAULT_LEASE_SECONDS,
         max_retries: int = WORKER_DEFAULT_MAX_RETRIES,
+        generation_fn: Optional[Any] = None,
     ) -> None:
         self._store = store or get_job_state_store()
         self._worker_id = worker_id
         self._lease_seconds = int(lease_seconds)
         self._max_retries = int(max_retries)
+        # PR-3: real 1-shot generation_fn(job, store, writer, walker). When None,
+        # the PR-2 dry-run path runs (skeleton / hermetic test mode). Injected by
+        # the CLI (real default) or by tests (fakes).
+        self._generation_fn = generation_fn
 
     def run_once(
         self, *, simulate_failure: bool = False, now: Optional[str] = None
@@ -70,6 +76,7 @@ class WorkerRuntime:
         writer = JobTraceWriter(self._store, job_id)
         writer.record_event(st.WORKER_EVENT_WORKER_STARTED)
         writer.record_event(st.WORKER_EVENT_JOB_CLAIMED)
+        summary: Dict[str, Any] = {}
         try:
             if self._store.heartbeat(
                 job_id, self._worker_id, lease_seconds=self._lease_seconds, now=now
@@ -78,11 +85,23 @@ class WorkerRuntime:
                 # cleanly so durable evidence is left rather than an illegal move
                 raise WorkerDryRunError("lease lost before processing")
             writer.record_event(st.WORKER_EVENT_HEARTBEAT)
-            self._dry_run(job_id, writer, simulate_failure=simulate_failure)
-            self._store.transition_state(job_id, st.JOB_STATE_RESULT_READY)
+            if self._generation_fn is not None:
+                # PR-3 real path: open a per-state running row, run the bounded
+                # 1-shot generation (which advances state via walker.on_phase),
+                # then finalize to result_ready. A crash leaves the in-flight
+                # state's OPEN running row as durable evidence.
+                walker = StateWalker(self._store, writer, job_id)
+                walker.open_current()  # OPEN planning row (before heavy work)
+                summary = self._generation_fn(job, self._store, writer, walker) or {}
+                walker.advance_to(st.JOB_STATE_RESULT_READY)
+                walker.finalize()
+            else:
+                # PR-2 dry-run path (skeleton / test mode) — unchanged.
+                self._dry_run(job_id, writer, simulate_failure=simulate_failure)
+                self._store.transition_state(job_id, st.JOB_STATE_RESULT_READY)
             writer.record_event(st.WORKER_EVENT_JOB_COMPLETED)
             logger.info("worker=%s job=%s event=job_completed", self._worker_id, job_id)
-            return {"claimed": True, "job_id": job_id, "final_state": st.JOB_STATE_RESULT_READY}
+            return {"claimed": True, "job_id": job_id, "final_state": st.JOB_STATE_RESULT_READY, **summary}
         except Exception as exc:  # noqa: BLE001 — failure must leave durable evidence, not crash silently
             return self._handle_failure(job_id, writer, exc)
 
@@ -101,11 +120,11 @@ class WorkerRuntime:
         will_terminal = (int(job.get("retry_count", 0)) + 1) >= self._max_retries
         self._store.transition_state(
             job_id, st.JOB_STATE_FAILED_RETRYABLE,
-            failure_reason_code="dry_run_error", increment_retry=True,
+            failure_reason_code="worker_error", increment_retry=True,
         )
         if will_terminal:
             self._store.transition_state(
-                job_id, st.JOB_STATE_FAILED_TERMINAL, failure_reason_code="dry_run_error"
+                job_id, st.JOB_STATE_FAILED_TERMINAL, failure_reason_code="worker_error"
             )
             writer.record_event(st.WORKER_EVENT_JOB_FAILED_TERMINAL, status=st.TRACE_STATUS_FAILED)
             final = st.JOB_STATE_FAILED_TERMINAL

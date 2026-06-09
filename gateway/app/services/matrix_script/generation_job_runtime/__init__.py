@@ -10,7 +10,14 @@ unaffected (remains False).
 """
 from __future__ import annotations
 
-from .enqueue import enqueue_generation_job
+from .enqueue import enqueue_generation_job, worker_owns_generation
+from .generation import (
+    StateWalker,
+    WorkerGenerationError,
+    execute_one_shot_generation,
+    make_one_shot_generation_fn,
+    one_shot_env,
+)
 from .job_state import (
     ALLOWED_TRANSITIONS,
     FALLBACK_REASON_CODES,
@@ -81,6 +88,12 @@ __all__ = [
     "assert_no_job_trace_leak",
     "run_local_trace_harness",
     "enqueue_generation_job",
+    "worker_owns_generation",
+    "StateWalker",
+    "WorkerGenerationError",
+    "execute_one_shot_generation",
+    "make_one_shot_generation_fn",
+    "one_shot_env",
     "TRACE_EVENTS",
     "WORKER_EVENTS",
     "assert_valid_trace_event",

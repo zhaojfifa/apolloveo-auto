@@ -19,6 +19,7 @@ _TARGET_SHOTS_ENV = "MATRIX_SCRIPT_PROVIDER_TARGET_SHOTS"
 _ATTEMPT_CAP_ENV = "MATRIX_SCRIPT_PROVIDER_ATTEMPT_CAP"
 _GEMINI_RETRY_ENV = "MATRIX_SCRIPT_PROVIDER_ENABLE_GEMINI_RETRY"
 _AKOOL_REAL_ENV = "MATRIX_SCRIPT_AKOOL_REAL"
+_WORKER_OWNS_GENERATION_ENV = "MATRIX_SCRIPT_WORKER_OWNS_GENERATION"
 
 # When the knob is unset the worker resolves the shot count from the storyboard
 # plan (uncapped). 0 records that "uncapped / resolve-at-runtime" hint — the job
@@ -69,6 +70,16 @@ def _operator_safe_knobs() -> Dict[str, Any]:
         "refine_retry": _env_bool(_GEMINI_RETRY_ENV, default=True),
         "real_provider": _env_bool(_AKOOL_REAL_ENV, default=False),
     }
+
+
+def worker_owns_generation() -> bool:
+    """True when the off-dyno worker owns generation (PR-3).
+
+    When set, the web new-task handler skips the in-process heavy generation —
+    the durable ``queued`` job is the worker's hand-off. Default OFF preserves the
+    current in-process behavior (no regression).
+    """
+    return _env_bool(_WORKER_OWNS_GENERATION_ENV, default=False)
 
 
 def enqueue_generation_job(task: Any, store: Optional[IJobStateStore] = None) -> str:

@@ -121,3 +121,28 @@ worker_started · job_claimed · heartbeat · dry_run_started · dry_run_complet
   a crash/exception leaves that open row + a durable `failed_retryable`/`failed_terminal` state.
 - **Boundary:** worker is independent of the FastAPI request lifecycle; no operator HTML, no auth, no
   delivery-truth change, `official_publish_ready` stays `false`.
+
+## 9. Worker 1-shot generation (PR-3; additive)
+PR-3 makes the worker execute EXACTLY ONE real provider shot by REUSING the existing tomato stack
+(`run_tomato_real_result`) off the FastAPI request lifecycle — no rewrite of Akool/Gemini/Azure/ffmpeg.
+
+- **Trace = state walk.** A trace row's `phase` may also be a closed JOB STATE name: the worker writes
+  a per-state OPEN `running` row BEFORE each phase's heavy work and closes it on advance. Driven by an
+  additive `on_phase(name)` hook on `run_tomato_real_result` (guarded; default `None` = no behavior
+  change) firing at `generation_start` / `provider_batch_start` / `compose_start` / `upload_start`.
+  A crash leaves the in-flight state's OPEN row as durable evidence.
+- **Bounded load.** The worker forces `MATRIX_SCRIPT_PROVIDER_TARGET_SHOTS=1` +
+  `MATRIX_SCRIPT_PROVIDER_ATTEMPT_CAP=1` (merged over the full env so the akool gate + creds + knobs
+  resolve together). Outcomes: (1) `result_ready` + provider final.mp4; (2) `result_ready` + fallback
+  final.mp4 (provider failed, ffmpeg fallback); (3) `failed_retryable` / `failed_terminal` + durable trace.
+- **H1 — atomic claim.** `claim_next_queued_job` (SQLAlchemy) uses a conditional single-row UPDATE
+  (`WHERE state='queued'`) — race-safe + portable (SQLite/Postgres); the interface stays swappable.
+- **H2 — seq hardening.** `append_trace` (SQLAlchemy) locks the parent job row (FOR UPDATE on Postgres;
+  no-op on SQLite, where writes serialize) then `MAX(seq)+1` — deterministic per-job seq, no
+  `count()+1` race.
+- **Web gate.** `MATRIX_SCRIPT_WORKER_OWNS_GENERATION` (default OFF): when ON, the web new-task handler
+  skips the in-process heavy generation — the durable `queued` job is the worker's hand-off; OFF
+  preserves current behavior.
+- **Boundary.** No multi-shot; no UI; no route business logic (thin gate only); no delivery-truth
+  change; `official_publish_ready` stays `false`; no new table/column (state names reuse the trace
+  `phase` column).

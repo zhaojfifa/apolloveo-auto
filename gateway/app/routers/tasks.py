@@ -269,6 +269,7 @@ from gateway.app.services.matrix_script.auto_preview_generation import (  # noqa
 )
 from gateway.app.services.matrix_script.generation_job_runtime import (  # noqa: E402
     enqueue_generation_job,
+    worker_owns_generation,
 )
 from gateway.app.services.matrix_script.operator_workbench_view import (  # noqa: E402
     build_matrix_script_operator_workbench_view,
@@ -743,9 +744,13 @@ async def create_matrix_script_task(
             "matrix_script durable generation-job enqueue failed for task_id=%s", task_id,
             exc_info=True,
         )
-    background_tasks.add_task(
-        trigger_matrix_script_initial_preview_generation, stored_task, repo
-    )
+    # PR-3: when the off-dyno worker owns generation (env flag), the web does NOT
+    # run the heavy in-process generation — the durable job enqueued above is the
+    # worker's hand-off. Default OFF preserves the current in-process behavior.
+    if not worker_owns_generation():
+        background_tasks.add_task(
+            trigger_matrix_script_initial_preview_generation, stored_task, repo
+        )
     return RedirectResponse(url=f"/tasks/{task_id}?created={MATRIX_SCRIPT_LINE_ID}", status_code=303)
 
 

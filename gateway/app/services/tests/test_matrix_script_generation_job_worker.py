@@ -13,12 +13,16 @@ from sqlalchemy.orm import sessionmaker
 
 from gateway.app.services.matrix_script.generation_job_runtime import (
     InMemoryJobStateStore,
+    JobTraceWriter,
     SqlAlchemyJobStateStore,
+    StateWalker,
     WorkerRuntime,
     assert_no_job_trace_leak,
     ensure_generation_job_tables,
     enqueue_generation_job,
+    execute_one_shot_generation,
     job_state as st,
+    worker_owns_generation,
 )
 
 _BASE = datetime(2026, 6, 9, 12, 0, 0, tzinfo=timezone.utc)
@@ -199,6 +203,123 @@ def test_cli_once_processes_a_job() -> None:
 
     store = InMemoryJobStateStore()
     enqueue_generation_job({"task_id": "t1"}, store=store)
-    rc = cli.main(["--worker-id", "cli-1", "--once"], store=store)
+    # CLI default is real generation; --dry-run uses the PR-2 skeleton (hermetic).
+    rc = cli.main(["--worker-id", "cli-1", "--once", "--dry-run"], store=store)
     assert rc == 0
     assert store.get_jobs_for_task("t1")[0]["state"] == st.JOB_STATE_RESULT_READY
+
+
+# ===========================================================================
+# PR-3 — 1-shot worker generation
+# ===========================================================================
+@pytest.mark.parametrize("provider", ["provider_image_to_video", "none"])
+def test_execute_one_shot_drives_durable_state_via_on_phase(monkeypatch, provider) -> None:
+    """Worker-driven 1-shot path: reused stack invoked with 1-shot env + on_phase;
+    durable per-state rows persisted; official_publish_ready stays false.
+    provider="none" exercises the provider-failure→fallback outcome (#2)."""
+    from gateway.app.services.matrix_script import auto_preview_generation as ap
+
+    captured: dict = {}
+
+    def fake_run(task_mapping, output_dir, *, sink, env, use_gemini, on_phase):
+        captured["env"] = dict(env)
+        captured["use_gemini"] = use_gemini
+        for ph in ("generation_start", "provider_batch_start", "compose_start", "upload_start"):
+            on_phase(ph)  # the orchestrator fires these BEFORE each heavy phase
+        return object()  # sentinel result
+
+    monkeypatch.setattr(ap, "run_tomato_real_result", fake_run)
+    monkeypatch.setattr(ap, "validate_tomato_result_artifacts", lambda r: None)
+    monkeypatch.setattr(ap, "tomato_result_to_payload", lambda r: {
+        "generation_provider": provider, "official_publish_ready": False, "delivery_candidate": None,
+    })
+    monkeypatch.setattr(ap, "assert_no_delivery_view_forbidden_tokens", lambda p: None)
+    monkeypatch.setattr(ap, "_task_mapping", lambda t: t)
+
+    store = InMemoryJobStateStore()
+    job_id = store.create_job("t1", target_shots=1)
+    store.transition_state(job_id, st.JOB_STATE_PLANNING)  # claim leaves the job at planning
+    writer = JobTraceWriter(store, job_id)
+    walker = StateWalker(store, writer, job_id)
+    walker.open_current()
+    summary = execute_one_shot_generation(
+        store.get_job(job_id), store, writer, walker,
+        task={"task_id": "t1", "config": {}}, task_repo=None,
+        use_gemini=False, sink=object(), output_dir="/tmp/ms_pr3_x",
+    )
+    walker.advance_to(st.JOB_STATE_RESULT_READY)
+    walker.finalize()
+
+    assert captured["env"]["MATRIX_SCRIPT_PROVIDER_TARGET_SHOTS"] == "1"  # bounded to 1 shot
+    assert captured["env"]["MATRIX_SCRIPT_PROVIDER_ATTEMPT_CAP"] == "1"
+    assert captured["use_gemini"] is False
+    assert summary["final_video"] is True
+    assert summary["generation_provider"] == provider
+    assert summary["official_publish_ready"] is False  # delivery truth unchanged
+    phases = [t["phase"] for t in store.get_traces(job_id)]
+    for s in ("planning", "provider_generating", "provider_polling", "provider_clip_ready",
+              "composing", "uploading", "result_ready"):
+        assert s in phases  # durable per-state rows persisted (trace persistence)
+    assert store.get_job(job_id)["state"] == st.JOB_STATE_RESULT_READY
+    for row in store.get_traces(job_id):
+        assert_no_job_trace_leak(row)
+
+
+def test_worker_real_path_success_lifecycle(store) -> None:
+    """WorkerRuntime real path (fake generation_fn): full lifecycle + result_ready."""
+    enqueue_generation_job({"task_id": "t1"}, store=store)
+
+    def fake_gen(job, store_, writer, walker):
+        walker.advance_to(st.JOB_STATE_UPLOADING)  # simulate the on_phase-driven walk
+        return {"final_video": True, "official_publish_ready": False, "generation_provider": "none"}
+
+    r = WorkerRuntime(store, worker_id="w1", generation_fn=fake_gen).run_once(now=_iso(0))
+    assert r["final_state"] == st.JOB_STATE_RESULT_READY
+    assert r["final_video"] is True and r["official_publish_ready"] is False
+    phases = [t["phase"] for t in store.get_traces(r["job_id"])]
+    for ev in (
+        "worker_started", "job_claimed", "heartbeat", "planning", "provider_generating",
+        "provider_polling", "provider_clip_ready", "composing", "uploading", "result_ready",
+        "job_completed",
+    ):
+        assert ev in phases
+    assert store.get_job(r["job_id"])["state"] == st.JOB_STATE_RESULT_READY
+    for row in store.get_traces(r["job_id"]):
+        assert_no_job_trace_leak(row)
+
+
+def test_worker_real_path_failure_leaves_open_in_flight_row(store) -> None:
+    """Provider failure / crash: durable failed state + the in-flight OPEN row."""
+    enqueue_generation_job({"task_id": "t1"}, store=store)
+
+    def fake_gen(job, store_, writer, walker):
+        walker.advance_to(st.JOB_STATE_PROVIDER_GENERATING)  # reached provider phase
+        raise RuntimeError("provider boom")  # crash mid-flight
+
+    r = WorkerRuntime(store, worker_id="w1", generation_fn=fake_gen, max_retries=3).run_once(now=_iso(0))
+    assert r["final_state"] == st.JOB_STATE_FAILED_RETRYABLE
+    traces = store.get_traces(r["job_id"])
+    open_running = [t for t in traces if t["status"] == st.TRACE_STATUS_RUNNING and t["ended_at"] is None]
+    assert any(t["phase"] == "provider_generating" for t in open_running)  # in-flight evidence
+    assert "job_failed_retryable" in [t["phase"] for t in traces]
+    assert store.get_job(r["job_id"])["state"] == st.JOB_STATE_FAILED_RETRYABLE
+
+
+def test_trace_seq_strictly_increasing(store) -> None:
+    """H2: per-job seq is deterministic + strictly increasing (no count()+1 collisions)."""
+    job_id = store.create_job("t1", target_shots=1)
+    for i in range(6):
+        store.append_trace(job_id, phase="heartbeat", status="succeeded", started_at=_iso(i))
+    seqs = [t["seq"] for t in store.get_traces(job_id)]
+    assert seqs == [1, 2, 3, 4, 5, 6]
+    assert len(set(seqs)) == len(seqs)
+
+
+def test_web_gate_worker_owns_generation(monkeypatch) -> None:
+    """H/gate: when the worker owns generation, the web skips in-process heavy work."""
+    monkeypatch.delenv("MATRIX_SCRIPT_WORKER_OWNS_GENERATION", raising=False)
+    assert worker_owns_generation() is False  # default: web runs in-process (no regression)
+    monkeypatch.setenv("MATRIX_SCRIPT_WORKER_OWNS_GENERATION", "1")
+    assert worker_owns_generation() is True   # web skips in-process generation
+    monkeypatch.setenv("MATRIX_SCRIPT_WORKER_OWNS_GENERATION", "false")
+    assert worker_owns_generation() is False

@@ -203,7 +203,9 @@ WORKER_EVENTS: FrozenSet[str] = frozenset(
     }
 )
 
-TRACE_EVENTS: FrozenSet[str] = TRACE_PHASES | WORKER_EVENTS
+# A trace row's ``phase`` may also be a JOB STATE name (PR-3): the worker writes
+# a durable per-state row as it enters each state, before that phase's heavy work.
+TRACE_EVENTS: FrozenSet[str] = TRACE_PHASES | WORKER_EVENTS | JOB_STATES
 
 
 class InvalidJobStateError(ValueError):

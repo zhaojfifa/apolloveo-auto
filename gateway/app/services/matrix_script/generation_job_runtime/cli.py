@@ -17,6 +17,7 @@ import argparse
 import logging
 from typing import List, Optional
 
+from .generation import make_one_shot_generation_fn
 from .job_state_store import IJobStateStore, get_job_state_store
 from .worker import WORKER_DEFAULT_LEASE_SECONDS, WORKER_DEFAULT_MAX_RETRIES, WorkerRuntime
 
@@ -37,6 +38,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--max-iterations", type=int, default=None,
         help="loop mode: stop after N claimed jobs (default: until none queued)",
     )
+    p.add_argument(
+        "--dry-run", action="store_true",
+        help="skeleton dry-run (no provider/ffmpeg); default runs the real 1-shot generation",
+    )
     return p
 
 
@@ -52,9 +57,12 @@ def main(argv: Optional[List[str]] = None, *, store: Optional[IJobStateStore] = 
         ensure_generation_job_tables(engine)
         store = get_job_state_store()
 
+    # default: real off-dyno 1-shot generation; --dry-run uses the PR-2 skeleton.
+    generation_fn = None if args.dry_run else make_one_shot_generation_fn()
     worker = WorkerRuntime(
         store, worker_id=args.worker_id,
         lease_seconds=args.lease_seconds, max_retries=args.max_retries,
+        generation_fn=generation_fn,
     )
     if args.once:
         logger.info("worker=%s once result=%s", args.worker_id, worker.run_once())
