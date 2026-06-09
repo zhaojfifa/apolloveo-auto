@@ -17,10 +17,13 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
+from sqlalchemy import func
+
 from . import job_state as st
 from .models import GenerationJob, GenerationJobTrace
 
 _JSON_FIELDS_JOB = ("knobs_summary",)
+_CLAIM_MAX_CANDIDATES = 50  # H1: bound the conditional-claim retry loop under contention
 
 
 def _utc_now() -> str:
@@ -334,14 +337,23 @@ class SqlAlchemyJobStateStore:
         _assert_opaque_artifact_refs(artifact_refs)
         trace_id = _new_id("trc")
         with self._session_factory() as session:
-            job = session.get(GenerationJob, job_id)
+            # H2 (PR-3): deterministic per-job seq. On Postgres, lock the parent
+            # job row (FOR UPDATE) then MAX(seq)+1 so concurrent appends to the
+            # same job can't collide on seq (replaces the naked count()+1 race;
+            # delete-safe via MAX). FOR UPDATE is skipped on SQLite (unsupported;
+            # local/test is single-writer).
+            job_q = session.query(GenerationJob).filter(GenerationJob.job_id == job_id)
+            if session.bind.dialect.name != "sqlite":
+                job_q = job_q.with_for_update()
+            job = job_q.first()
             if not job:
                 raise JobNotFoundError(job_id)
-            next_seq = (
-                session.query(GenerationJobTrace)
+            max_seq = (
+                session.query(func.max(GenerationJobTrace.seq))
                 .filter(GenerationJobTrace.job_id == job_id)
-                .count()
-            ) + 1
+                .scalar()
+            )
+            next_seq = (max_seq or 0) + 1
             session.add(
                 GenerationJobTrace(
                     trace_id=trace_id, job_id=job_id, task_id=job.task_id, shot_id=shot_id,
@@ -388,25 +400,46 @@ class SqlAlchemyJobStateStore:
             return [self._decode_trace(r) for r in rows]
 
     def claim_next_queued_job(self, worker_id, *, lease_seconds, now=None) -> Optional[Dict[str, Any]]:
-        # Simple transactional claim. Concurrency hardening (Postgres
-        # SELECT ... FOR UPDATE SKIP LOCKED) is a follow-up before high fan-out.
+        # H1 (PR-3): production-safe atomic claim — a conditional single-row UPDATE
+        # that only succeeds if the job is STILL queued. Portable across SQLite +
+        # Postgres and race-safe (two workers racing the same candidate: only the
+        # UPDATE with rowcount==1 wins; the loser retries the next candidate). No
+        # DB-specific logic leaks to the worker (the interface stays swappable).
         now = now or _utc_now()
+        lease = _add_seconds(now, lease_seconds)
+        st.assert_transition(st.JOB_STATE_QUEUED, st.JOB_STATE_PLANNING)  # static legality guard
         with self._session_factory() as session:
-            row = (
-                session.query(GenerationJob)
-                .filter(GenerationJob.state == st.JOB_STATE_QUEUED)
-                .order_by(GenerationJob.created_at)
-                .first()
-            )
-            if not row:
-                return None
-            st.assert_transition(row.state, st.JOB_STATE_PLANNING)
-            row.state = st.JOB_STATE_PLANNING
-            row.claimed_by = worker_id
-            row.lease_expires_at = _add_seconds(now, lease_seconds)
-            row.updated_at = now
-            session.commit()
-            return self._decode_job(row)
+            for _ in range(_CLAIM_MAX_CANDIDATES):
+                candidate = (
+                    session.query(GenerationJob.job_id)
+                    .filter(GenerationJob.state == st.JOB_STATE_QUEUED)
+                    .order_by(GenerationJob.created_at)
+                    .first()
+                )
+                if candidate is None:
+                    return None
+                job_id = candidate[0]
+                claimed = (
+                    session.query(GenerationJob)
+                    .filter(
+                        GenerationJob.job_id == job_id,
+                        GenerationJob.state == st.JOB_STATE_QUEUED,  # atomic guard
+                    )
+                    .update(
+                        {
+                            GenerationJob.state: st.JOB_STATE_PLANNING,
+                            GenerationJob.claimed_by: worker_id,
+                            GenerationJob.lease_expires_at: lease,
+                            GenerationJob.updated_at: now,
+                        },
+                        synchronize_session=False,
+                    )
+                )
+                if claimed == 1:
+                    session.commit()
+                    return self._decode_job(session.get(GenerationJob, job_id))
+                session.rollback()  # lost the race for this candidate; try the next
+            return None
 
     def heartbeat(self, job_id, worker_id, *, lease_seconds, now=None) -> Optional[Dict[str, Any]]:
         now = now or _utc_now()

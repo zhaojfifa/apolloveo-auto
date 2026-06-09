@@ -512,6 +512,7 @@ def run_tomato_real_result(
     active_shot_id: Optional[str] = None,
     use_gemini: bool = True,
     max_video_attempts: int = prov_orch.DEFAULT_MAX_VIDEO_ATTEMPTS,
+    on_phase: Any = None,
 ) -> TomatoRealResult:
     """Run the controlled tomato real-result path; return a staged, gated result.
 
@@ -531,6 +532,18 @@ def run_tomato_real_result(
             "ffmpeg/ffprobe not found on PATH; the tomato real-result path cannot "
             "produce a real final.mp4 in this environment."
         )
+
+    def _safe_on_phase(_name: str) -> None:
+        # PR-3: optional durable-trace hook so an off-dyno worker can persist a
+        # trace row BEFORE each heavy phase. Observability only — a callback error
+        # must never break generation (default None => no-op; existing callers
+        # unaffected).
+        if on_phase is None:
+            return
+        try:
+            on_phase(_name)
+        except Exception:  # noqa: BLE001
+            pass
 
     task_id = _task_id(task)
     output_dir = os.fspath(output_dir)
@@ -562,6 +575,8 @@ def run_tomato_real_result(
     _env_src = env if env is not None else os.environ
     _t_gen = time.monotonic()
     logger.info("ms_phase phase=generation_start akool_enabled=%s shot_count=%d", akool_enabled, len(shots))
+    _safe_on_phase("generation_start")
+    _safe_on_phase("provider_batch_start")
     if akool_enabled:
         targets = _build_provider_targets(shots, task, asset_dir, active_shot_id)
         # Diagnostic load knobs: cap provider target-shot count + attempt budget + toggle
@@ -716,6 +731,7 @@ def run_tomato_real_result(
             ",".join(f"{t.shot_id}:{t.provider_status}" for t in provider_traces),
         )
     _t_comp = time.monotonic()
+    _safe_on_phase("compose_start")
     logger.info("ms_phase phase=compose_start clips=%d resolution=%dx%d", len(scene_clip_paths), width, height)
     assemble_final_video(
         final_video_path, scene_clip_paths=scene_clip_paths,
@@ -779,6 +795,7 @@ def run_tomato_real_result(
 
     # 7. Stage the pack (reused) → artifact_staged refs + preview url.
     _t_up = time.monotonic()
+    _safe_on_phase("upload_start")
     logger.info("ms_phase phase=upload_start")
     record = stage_minimal_result(
         sink=sink, task_id=task_id,
