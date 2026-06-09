@@ -57,9 +57,9 @@ def main(argv: Optional[List[str]] = None, *, store: Optional[IJobStateStore] = 
         lease_seconds=args.lease_seconds, max_retries=args.max_retries,
     )
     if args.once:
-        logger.info("worker=%s once result=%s", args.worker_id, worker.run_once(dry_run=True))
+        logger.info("worker=%s once result=%s", args.worker_id, worker.run_once())
     else:
-        results = worker.run_loop(max_iterations=args.max_iterations, dry_run=True)
+        results = worker.run_loop(max_iterations=args.max_iterations)
         logger.info("worker=%s loop processed=%d", args.worker_id, len(results))
     return 0
 

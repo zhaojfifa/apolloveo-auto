@@ -46,6 +46,20 @@ TERMINAL_STATES: FrozenSet[str] = frozenset(
     {JOB_STATE_RESULT_READY, JOB_STATE_FAILED_TERMINAL, JOB_STATE_CANCELLED}
 )
 
+# States where a worker actively holds the job: claim + lease are meaningful ONLY
+# here. Transitioning to any other state releases the claim/lease (PR-2 B1 fix:
+# prevents a stale claim on failed_retryable from poisoning the reclaim sweep).
+ACTIVE_CLAIM_STATES: FrozenSet[str] = frozenset(
+    {
+        JOB_STATE_PLANNING,
+        JOB_STATE_PROVIDER_GENERATING,
+        JOB_STATE_PROVIDER_POLLING,
+        JOB_STATE_PROVIDER_CLIP_READY,
+        JOB_STATE_COMPOSING,
+        JOB_STATE_UPLOADING,
+    }
+)
+
 # Explicit, closed transition graph (Gate Spec §5 table).
 ALLOWED_TRANSITIONS: Dict[str, FrozenSet[str]] = {
     JOB_STATE_QUEUED: frozenset({JOB_STATE_PLANNING, JOB_STATE_CANCELLED}),

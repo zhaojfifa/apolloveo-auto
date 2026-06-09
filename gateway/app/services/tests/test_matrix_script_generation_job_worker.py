@@ -162,6 +162,29 @@ def test_happy_path_writes_all_lifecycle_events_no_leak(store) -> None:
     assert "official_publish_ready" not in store.get_job(r["job_id"])
 
 
+def test_claim_released_on_leaving_active_lifecycle(store) -> None:
+    # B1 root-cause guard: claim/lease are cleared on entering a non-active state.
+    enqueue_generation_job({"task_id": "t1"}, store=store)
+    claimed = store.claim_next_queued_job("w1", lease_seconds=600, now=_iso(0))
+    assert claimed["claimed_by"] == "w1" and claimed["lease_expires_at"]
+    failed = store.transition_state(claimed["job_id"], st.JOB_STATE_FAILED_RETRYABLE)
+    assert failed["claimed_by"] is None and failed["lease_expires_at"] is None
+
+
+def test_reclaim_after_worker_failure_does_not_poison_queue(store) -> None:
+    # B1 regression: a worker-induced failed_retryable must NOT crash a later
+    # reclaim sweep (it did before: failed_retryable -> failed_retryable illegal).
+    enqueue_generation_job({"task_id": "bad"}, store=store)
+    w = WorkerRuntime(store, worker_id="w1", lease_seconds=10, max_retries=3)
+    bad = w.run_once(simulate_failure=True, now=_iso(0))
+    assert bad["final_state"] == st.JOB_STATE_FAILED_RETRYABLE
+    assert store.get_job(bad["job_id"])["claimed_by"] is None  # claim released
+    # a later run with the lease long past must not raise; a healthy job still runs
+    enqueue_generation_job({"task_id": "good"}, store=store)
+    r = w.run_once(now=_iso(100000))
+    assert r["claimed"] is True and r["final_state"] == st.JOB_STATE_RESULT_READY
+
+
 def test_run_loop_processes_until_empty(store) -> None:
     for i in range(3):
         enqueue_generation_job({"task_id": f"t{i}"}, store=store)

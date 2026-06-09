@@ -55,7 +55,7 @@ class WorkerRuntime:
         self._max_retries = int(max_retries)
 
     def run_once(
-        self, *, dry_run: bool = True, simulate_failure: bool = False, now: Optional[str] = None
+        self, *, simulate_failure: bool = False, now: Optional[str] = None
     ) -> Dict[str, Any]:
         """Reclaim stale leases, claim one job, dry-run it, leave durable trace."""
         self._store.reclaim_expired_leases(max_retries=self._max_retries, now=now)
@@ -71,9 +71,12 @@ class WorkerRuntime:
         writer.record_event(st.WORKER_EVENT_WORKER_STARTED)
         writer.record_event(st.WORKER_EVENT_JOB_CLAIMED)
         try:
-            self._store.heartbeat(
+            if self._store.heartbeat(
                 job_id, self._worker_id, lease_seconds=self._lease_seconds, now=now
-            )
+            ) is None:
+                # claim/lease lost before processing (reclaimed / taken) — fail
+                # cleanly so durable evidence is left rather than an illegal move
+                raise WorkerDryRunError("lease lost before processing")
             writer.record_event(st.WORKER_EVENT_HEARTBEAT)
             self._dry_run(job_id, writer, simulate_failure=simulate_failure)
             self._store.transition_state(job_id, st.JOB_STATE_RESULT_READY)
@@ -116,14 +119,12 @@ class WorkerRuntime:
         )
         return {"claimed": True, "job_id": job_id, "final_state": final, "error": exc.__class__.__name__}
 
-    def run_loop(
-        self, *, max_iterations: Optional[int] = None, dry_run: bool = True
-    ) -> List[Dict[str, Any]]:
+    def run_loop(self, *, max_iterations: Optional[int] = None) -> List[Dict[str, Any]]:
         """Claim + dry-run jobs until none remain (or ``max_iterations`` reached)."""
         results: List[Dict[str, Any]] = []
         i = 0
         while max_iterations is None or i < max_iterations:
-            result = self.run_once(dry_run=dry_run)
+            result = self.run_once()
             results.append(result)
             if not result.get("claimed"):
                 break

@@ -133,6 +133,10 @@ class InMemoryJobStateStore:
             raise JobNotFoundError(job_id)
         st.assert_transition(job["state"], target_state)
         job["state"] = target_state
+        if target_state not in st.ACTIVE_CLAIM_STATES:
+            # leaving the active-claim lifecycle releases the claim + lease (B1 fix)
+            job["claimed_by"] = None
+            job["lease_expires_at"] = None
         if failure_reason_code is not None:
             job["failure_reason_code"] = failure_reason_code
         if increment_retry:
@@ -309,6 +313,10 @@ class SqlAlchemyJobStateStore:
                 raise JobNotFoundError(job_id)
             st.assert_transition(row.state, target_state)
             row.state = target_state
+            if target_state not in st.ACTIVE_CLAIM_STATES:
+                # leaving the active-claim lifecycle releases the claim + lease (B1 fix)
+                row.claimed_by = None
+                row.lease_expires_at = None
             if failure_reason_code is not None:
                 row.failure_reason_code = failure_reason_code
             if increment_retry:
