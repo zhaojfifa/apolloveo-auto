@@ -264,6 +264,40 @@ def test_assert_no_provider_trace_leak_raises_on_url():
         po.assert_no_provider_trace_leak({"x": "see https://leak.example"})
 
 
+def test_enable_retry_false_disables_gemini_rewrite_retry(tmp_path):
+    """Diagnostic load knob: enable_retry=False → at most one attempt per shot (no Gemini
+    rewrite retry), even when Gemini is available and the first attempt failed."""
+    calls = {"n": 0}
+
+    def fail_then_ok(*, still_path, out_clip, task_id, shot_id, prompt=akool_i2v.DEFAULT_PROMPT,
+                     env=None, on_event=None, **kw):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return _akool_fail(still_path=still_path, out_clip=out_clip, task_id=task_id,
+                               shot_id=shot_id, on_event=on_event)
+        return _akool_ok(still_path=still_path, out_clip=out_clip, task_id=task_id,
+                         shot_id=shot_id, on_event=on_event)
+
+    refine = lambda **kw: refiner.RefinedPrompt(refiner.SOURCE_GEMINI, "p", "n", "s", available=True)
+    batch = po.orchestrate_shots([_target("shot01")], task_id="t", work_dir=str(tmp_path),
+                                 env={"GEMINI_API_KEY": "x"}, use_gemini=True, enable_retry=False,
+                                 akool_fn=fail_then_ok, refine_fn=refine)
+    assert batch.traces[0].attempts == 1        # no retry
+    assert batch.traces[0].succeeded is False
+
+
+def test_tomato_env_knob_helpers():
+    from gateway.app.services.matrix_script import tomato_real_result_orchestrator as tomato
+    assert tomato._env_int({"X": "2"}, "X", 5) == 2
+    assert tomato._env_int({}, "X", 5) == 5
+    assert tomato._env_int({"X": "0"}, "X", 5) == 5      # non-positive → default
+    assert tomato._env_int({"X": "abc"}, "X", 5) == 5    # unparseable → default
+    assert tomato._env_int({"X": "1"}, "X", None) == 1
+    assert tomato._env_bool({"Y": "false"}, "Y", True) is False
+    assert tomato._env_bool({"Y": "1"}, "Y", False) is True
+    assert tomato._env_bool({}, "Y", True) is True
+
+
 def test_diagnostic_dict_keeps_redacted_detail_out_of_panel():
     tr = po.ShotTrace(
         shot_id="s", shot_title_zh="t", material_role="r", material_role_label_zh="L",

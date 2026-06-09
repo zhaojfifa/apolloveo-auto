@@ -21,6 +21,7 @@ bounded video-attempt budget (Owner cap ≤ 5); a fallback-only batch is honest,
 """
 from __future__ import annotations
 
+import logging
 import os
 import time
 from dataclasses import dataclass
@@ -28,6 +29,8 @@ from typing import Callable, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from gateway.app.services.matrix_script import akool_image_to_video_capability as akool_i2v
 from gateway.app.services.matrix_script import gemini_prompt_refiner as refiner_mod
+
+logger = logging.getLogger(__name__)
 
 # Bounded provider video-attempt budget for one batch run (Owner cap: ≤ 5).
 DEFAULT_MAX_VIDEO_ATTEMPTS = 5
@@ -178,10 +181,17 @@ def _attempt_shot(
     full_prompt = prompt + (f". Avoid: {negative}" if negative else "")
     out_clip = os.path.join(work_dir, f"{target.shot_id}_provider_{attempt_index}.mp4")
     t0 = clock()
+
+    def _collect(name: str) -> None:
+        # Redacted phase timing: stage name + shot_id + elapsed only (no url / key / task id).
+        events.append(name)
+        logger.info("ms_phase phase=akool_%s shot=%s attempt=%d elapsed_ms=%d",
+                    name, target.shot_id, attempt_index, int((clock() - t0) * 1000))
+
     result = akool_fn(
         still_path=target.still_path, out_clip=out_clip,
         task_id=task_id, shot_id=target.shot_id, prompt=full_prompt,
-        env=env, on_event=events.append,
+        env=env, on_event=_collect,
     )
     return result, events, max(0.0, clock() - t0)
 
@@ -216,11 +226,14 @@ def _run_one_shot(
     target: ShotTarget, *, task_id: str, work_dir: str, env: Optional[Mapping[str, str]],
     use_gemini: bool, akool_fn: Callable[..., akool_i2v.AkoolShotResult],
     refine_fn: Callable[..., refiner_mod.RefinedPrompt], clock: Callable[[], float],
-    budget_remaining: int,
+    budget_remaining: int, enable_retry: bool = True,
 ) -> "tuple[ShotTrace, int]":
     """Attempt one shot within the remaining budget; return (trace, attempts_used)."""
     max_attempts = min(_MAX_ATTEMPTS_PER_SHOT, max(0, budget_remaining))
+    _t_ref = clock()
     refined = _resolve_prompt(target, use_gemini=use_gemini, env=env, refine_fn=refine_fn)
+    logger.info("ms_phase phase=gemini_refine_done shot=%s source=%s elapsed_ms=%d",
+                target.shot_id, refined.source, int((clock() - _t_ref) * 1000))
     if max_attempts == 0:
         return _build_trace(target, refined, None, [], attempts=0, latency=0.0,
                             fallback_reason_zh=_FALLBACK_REASON_BUDGET_ZH), 0
@@ -243,7 +256,7 @@ def _run_one_shot(
             break  # no point retrying without credentials / flag
         # Retry ONLY when Gemini actually rewrites the prompt (Owner: retry == Gemini
         # rewrite, not a blind re-send). No rewrite available → honest fallback now.
-        if i + 1 < max_attempts and use_gemini:
+        if i + 1 < max_attempts and use_gemini and enable_retry:
             retry_refined = _resolve_prompt(
                 target, use_gemini=True, env=env, refine_fn=refine_fn,
                 previous_failure_reason=(result.redacted_detail or result.status),
@@ -258,6 +271,9 @@ def _run_one_shot(
     trace = _build_trace(target, refined, result, all_events,
                          attempts=attempts, latency=latency_total,
                          fallback_reason_zh=fallback_reason)
+    logger.info("ms_phase phase=shot_done shot=%s status=%s attempts=%d succeeded=%s elapsed_ms=%d",
+                target.shot_id, trace.provider_status, attempts, trace.succeeded,
+                int(latency_total * 1000))
     return trace, attempts
 
 
@@ -265,6 +281,7 @@ def orchestrate_shots(
     targets: Sequence[ShotTarget], *,
     task_id: str, work_dir: str, env: Optional[Mapping[str, str]] = None,
     use_gemini: bool = True, max_video_attempts: int = DEFAULT_MAX_VIDEO_ATTEMPTS,
+    enable_retry: bool = True,
     akool_fn: Optional[Callable[..., akool_i2v.AkoolShotResult]] = None,
     refine_fn: Optional[Callable[..., refiner_mod.RefinedPrompt]] = None,
     clock: Callable[[], float] = time.monotonic,
@@ -272,11 +289,14 @@ def orchestrate_shots(
     """Run the bounded multi-shot provider batch. Continues past non-fatal failures; never
     stops at the first success; respects the global ``max_video_attempts`` budget.
 
+    ``enable_retry`` toggles the Gemini-rewrite retry (diagnostic load knob).
     ``akool_fn`` / ``refine_fn`` resolve at CALL time (so a monkeypatch on the capability /
     refiner module is honored) and stay injectable for offline unit tests."""
     akool_fn = akool_fn or akool_i2v.generate_shot_clip_akool
     refine_fn = refine_fn or refiner_mod.refine_prompt
     os.makedirs(work_dir, exist_ok=True)
+    logger.info("ms_phase phase=provider_batch_start targets=%d max_attempts=%d use_gemini=%s retry=%s",
+                len(targets), int(max_video_attempts), use_gemini, enable_retry)
     traces: List[ShotTrace] = []
     attempts_used = 0
     for target in targets:
@@ -284,6 +304,7 @@ def orchestrate_shots(
         trace, used = _run_one_shot(
             target, task_id=task_id, work_dir=work_dir, env=env, use_gemini=use_gemini,
             akool_fn=akool_fn, refine_fn=refine_fn, clock=clock, budget_remaining=remaining,
+            enable_retry=enable_retry,
         )
         attempts_used += used
         traces.append(trace)
