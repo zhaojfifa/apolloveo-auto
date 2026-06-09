@@ -17,13 +17,16 @@ from .job_state import (
     JOB_STATES,
     PROVIDER_STATUS_CLASSES,
     TERMINAL_STATES,
+    TRACE_EVENTS,
     TRACE_PHASES,
     TRACE_STATUSES,
+    WORKER_EVENTS,
     InvalidJobStateError,
     InvalidJobStateTransitionError,
     assert_transition,
     assert_valid_phase,
     assert_valid_state,
+    assert_valid_trace_event,
     assert_valid_trace_status,
     is_terminal,
 )
@@ -43,6 +46,12 @@ from .trace_writer import (
     JobTraceWriter,
     assert_no_job_trace_leak,
     run_local_trace_harness,
+)
+from .worker import (
+    WORKER_DEFAULT_LEASE_SECONDS,
+    WORKER_DEFAULT_MAX_RETRIES,
+    WorkerDryRunError,
+    WorkerRuntime,
 )
 
 __all__ = [
@@ -72,4 +81,11 @@ __all__ = [
     "assert_no_job_trace_leak",
     "run_local_trace_harness",
     "enqueue_generation_job",
+    "TRACE_EVENTS",
+    "WORKER_EVENTS",
+    "assert_valid_trace_event",
+    "WorkerRuntime",
+    "WorkerDryRunError",
+    "WORKER_DEFAULT_LEASE_SECONDS",
+    "WORKER_DEFAULT_MAX_RETRIES",
 ]

@@ -164,6 +164,33 @@ FALLBACK_REASON_CODES: FrozenSet[str] = frozenset(
     }
 )
 
+# --- Worker-lifecycle trace events (PR-2; additive to the trace vocabulary) --
+# A trace row's ``phase`` field carries a trace EVENT: either a generation
+# ms_phase (PR-1) or one of these worker-lifecycle events (PR-2).
+WORKER_EVENT_WORKER_STARTED = "worker_started"
+WORKER_EVENT_JOB_CLAIMED = "job_claimed"
+WORKER_EVENT_HEARTBEAT = "heartbeat"
+WORKER_EVENT_DRY_RUN_STARTED = "dry_run_started"
+WORKER_EVENT_DRY_RUN_COMPLETED = "dry_run_completed"
+WORKER_EVENT_JOB_COMPLETED = "job_completed"
+WORKER_EVENT_JOB_FAILED_RETRYABLE = "job_failed_retryable"
+WORKER_EVENT_JOB_FAILED_TERMINAL = "job_failed_terminal"
+
+WORKER_EVENTS: FrozenSet[str] = frozenset(
+    {
+        WORKER_EVENT_WORKER_STARTED,
+        WORKER_EVENT_JOB_CLAIMED,
+        WORKER_EVENT_HEARTBEAT,
+        WORKER_EVENT_DRY_RUN_STARTED,
+        WORKER_EVENT_DRY_RUN_COMPLETED,
+        WORKER_EVENT_JOB_COMPLETED,
+        WORKER_EVENT_JOB_FAILED_RETRYABLE,
+        WORKER_EVENT_JOB_FAILED_TERMINAL,
+    }
+)
+
+TRACE_EVENTS: FrozenSet[str] = TRACE_PHASES | WORKER_EVENTS
+
 
 class InvalidJobStateError(ValueError):
     """Raised when a state value is outside the closed set."""
@@ -199,6 +226,13 @@ def assert_valid_phase(phase: str) -> str:
     if phase not in TRACE_PHASES:
         raise InvalidJobStateError(f"unknown trace phase: {phase!r}")
     return phase
+
+
+def assert_valid_trace_event(event: str) -> str:
+    """Validate a trace event: a generation ms_phase OR a worker-lifecycle event."""
+    if event not in TRACE_EVENTS:
+        raise InvalidJobStateError(f"unknown trace event: {event!r}")
+    return event
 
 
 def assert_valid_trace_status(status: str) -> str:
